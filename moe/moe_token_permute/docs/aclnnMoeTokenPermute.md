@@ -106,7 +106,7 @@ aclnnStatus aclnnMoeTokenPermute(
       <td>tokens</td>
       <td>输入</td>
       <td>输入token特征。</td>
-      <td><ul><li>支持空tensor。</li><li>要求为一个维度大于等于2的Tensor，第一维的大小为num_tokens。</li><li>INT8仅支持Ascend 950，按非量化方式处理。</li></ul></td>
+      <td><ul><li>支持空tensor。</li><li>要求为一个维度大于等于2的Tensor，第一维的大小为num_tokens。</li><li>INT8仅支持Ascend 950，按非量化方式处理，且此时维度必须为2，不支持3维及以上。</li></ul></td>
       <td>FLOAT16、BFLOAT16、FLOAT32、INT8</td>
       <td>ND</td>
       <td>≥2</td>
@@ -274,7 +274,7 @@ aclnnStatus aclnnMoeTokenPermute(
 
 ## 约束说明
 
-- INT8类型的tokens和permuteTokensOut仅支持Ascend 950，且二者数据类型必须一致。
+- INT8类型的tokens和permuteTokensOut仅支持Ascend 950，且二者数据类型必须一致；INT8时`tokens`维度必须为2，不支持3维及以上，非INT8时维度大于等于2。
 - 在Ascend 950上调用本接口且`tokens`数据类型为INT8时，`indices`表示expert ID，取值范围为`[0, 10240)`，最大值为`10239`，不支持`10240`。
 - 调用本接口时，`indices`必须为1D或2D；不满足时接口直接返回参数错误。
 - 确定性计算：
