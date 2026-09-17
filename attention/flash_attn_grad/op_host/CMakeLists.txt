@@ -7,6 +7,49 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
+set(_fag_excluded_versions "9.2.0-beta.1;9.2.0-beta.2")
+set(_fag_cann_version "")
+set(_fag_ver_src "")
+if(DEFINED CANN_VERSION AND NOT "${CANN_VERSION}" STREQUAL "")
+    set(_fag_cann_version "${CANN_VERSION}")
+    set(_fag_ver_src "cmake variable CANN_VERSION")
+else()
+    foreach(_fag_ver_file
+            "${ASCEND_CANN_PACKAGE_PATH}/toolkit/version.info"
+            "${ASCEND_CANN_PACKAGE_PATH}/version.info"
+            "${ASCEND_CANN_PACKAGE_PATH}/opp/version.info"
+            "${ASCEND_CANN_PACKAGE_PATH}/compiler/version.info")
+        if(EXISTS "${_fag_ver_file}")
+            file(READ "${_fag_ver_file}" _fag_ver_content)
+            string(REPLACE "\r" "" _fag_ver_content "${_fag_ver_content}")
+            string(REPLACE "\n" ";" _fag_ver_lines "${_fag_ver_content}")
+            foreach(_fag_line IN LISTS _fag_ver_lines)
+                if(_fag_line MATCHES "^Version=")
+                    string(SUBSTRING "${_fag_line}" 8 -1 _fag_cann_version)
+                    set(_fag_ver_src "${_fag_ver_file}")
+                    break()
+                endif()
+            endforeach()
+            if(NOT "${_fag_cann_version}" STREQUAL "")
+                break()
+            endif()
+        endif()
+    endforeach()
+endif()
+
+string(TOLOWER "${_fag_cann_version}" _fag_cann_version)
+if("${_fag_cann_version}" STREQUAL "")
+    message(WARNING "[flash_attn_grad] Cannot determine CANN version, exclusion check skipped, operator will be compiled")
+else()
+    message(STATUS "[flash_attn_grad] CANN version ${_fag_cann_version} (from ${_fag_ver_src}), excluded: ${_fag_excluded_versions}")
+endif()
+if(_fag_cann_version IN_LIST _fag_excluded_versions)
+    message(STATUS "[flash_attn_grad] Skipped: operator not supported on CANN version ${_fag_cann_version}")
+    set_property(GLOBAL PROPERTY flash_attn_grad_CANN_VERSION_SKIPPED TRUE)
+    set_property(GLOBAL APPEND PROPERTY CANN_VERSION_SKIPPED_OPS "flash_attn_grad (cann=${_fag_cann_version} not supported)")
+    return()
+endif()
+
 require_pypto_pro(flash_attn_grad)
 add_op_to_compiled_list()
 
