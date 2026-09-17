@@ -173,6 +173,7 @@ __simd_vf__ void ProcessVec1UpdateImpl64Mxfp8FullquantVFSubloop0(
         Muls(vreg_input_max, vreg_input_max, INV_LN2, preg_all_float);
         Truncate<T, RoundMode::CAST_CEIL>(vreg_input_max, vreg_input_max, preg_all_float);
         Muls(vreg_input_max, vreg_input_max, LN2, preg_all_float);
+        Sub(vreg_input_max, vreg_input_max, vreg_ln_p_scale, preg_all_float);
         Compare<float, CMPMODE::LE>(preg_compare_max, vreg_input_max, vreg_min, preg_all_float);
         Select(vreg_input_max, vreg_min, vreg_input_max, preg_compare_max);
         StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpMaxUb), vreg_input_max, ureg_max, 1);
@@ -195,7 +196,6 @@ __simd_vf__ void ProcessVec1UpdateImpl64Mxfp8FullquantVFSubloop0(
 
     for (uint16_t i = 0; i < m; ++i) {
         LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_max, maxUbStart + i);
-        Sub(vreg_max, vreg_max, vreg_ln_p_scale, preg_all_float);
         LoadAlign(vreg_src_x, srcUb + i * s2BaseSize);
         ExpSub(vreg_exp, vreg_src_x, vreg_max, preg_ori_src_n);
 
@@ -457,6 +457,7 @@ __simd_vf__ void ProcessVec1UpdateImpl64Mxfp8FullquantVFSubloop1(
         Muls(vreg_input_max, vreg_input_max, INV_LN2, preg_all);
         Truncate<T, RoundMode::CAST_CEIL>(vreg_input_max, vreg_input_max, preg_all);
         Muls(vreg_input_max, vreg_input_max, LN2, preg_all);
+        Sub(vreg_input_max, vreg_input_max, vreg_ln_p_scale, preg_all);
         Compare<float, CMPMODE::LE>(preg_compare_max, vreg_input_max, vreg_min, preg_all);
         Select(vreg_input_max, vreg_min, vreg_input_max, preg_compare_max);
         StoreUnAlign<float, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpMaxUb), vreg_input_max, ureg_max, 1);
@@ -480,7 +481,6 @@ __simd_vf__ void ProcessVec1UpdateImpl64Mxfp8FullquantVFSubloop1(
 
     for (uint16_t i = 0; i < m; ++i) {
         LoadAlign<T, Reg::LoadDist::DIST_BRC_B32>(vreg_max, maxUbStart + i);
-        Sub(vreg_max, vreg_max, vreg_ln_p_scale, preg_all);
         LoadAlign(vreg_src_x, srcUb + i * s2BaseSize);
         ExpSub(vreg_exp, vreg_src_x, vreg_max, preg_ori_src_n);
 
