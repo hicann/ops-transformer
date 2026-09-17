@@ -1405,7 +1405,7 @@ ge::graphStatus SFATilingCheck::CheckActualSeqLensDType()
     if (opParamInfo_.actualSeqLengths.desc->GetDataType() != ge::DT_INT32) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
             opName_, "actual_seq_lengths_kv",
-            SFADataTypeToSerialString(opParamInfo_.actualSeqLengthsQ.desc->GetDataType()).c_str(),
+            SFADataTypeToSerialString(opParamInfo_.actualSeqLengths.desc->GetDataType()).c_str(),
             "The dtype of actual_seq_lengths_kv must be DT_INT32");
         return ge::GRAPH_FAILED;
     }

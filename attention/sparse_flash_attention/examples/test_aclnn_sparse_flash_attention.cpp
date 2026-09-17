@@ -241,6 +241,8 @@ int main()
     aclrtFree(softmaxMaxDeviceAddr);
     aclrtFree(softmaxSumDeviceAddr);
     aclrtFree(outDeviceAddr);
+    aclrtFree(actSeqQLenDeviceAddr);
+    aclrtFree(actSeqKvLenDeviceAddr);
     aclrtFree(qRopeDeviceAddr);
     aclrtFree(kRopeDeviceAddr);
     if (workspaceSize > 0) {
