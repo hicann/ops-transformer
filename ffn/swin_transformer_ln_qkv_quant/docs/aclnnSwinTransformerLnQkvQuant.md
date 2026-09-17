@@ -571,10 +571,28 @@ int main() {
 
   // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
   aclDestroyTensor(x);
+  aclDestroyTensor(gamma);
+  aclDestroyTensor(beta);
+  aclDestroyTensor(weight);
+  aclDestroyTensor(bias);
+  aclDestroyTensor(quantScale);
+  aclDestroyTensor(quantOffset);
+  aclDestroyTensor(dequantScale);
   aclDestroyTensor(queryOutput);
+  aclDestroyTensor(keyOutput);
+  aclDestroyTensor(valueOutput);
   // 7. 释放device资源，需要根据具体API的接口定义修改
   aclrtFree(xDeviceAddr);
+  aclrtFree(gammaDeviceAddr);
+  aclrtFree(betaDeviceAddr);
+  aclrtFree(weightDeviceAddr);
+  aclrtFree(biasDeviceAddr);
+  aclrtFree(scaleDeviceAddr);
+  aclrtFree(offsetDeviceAddr);
+  aclrtFree(dequantDeviceAddr);
   aclrtFree(outqDeviceAddr);
+  aclrtFree(outkDeviceAddr);
+  aclrtFree(outvDeviceAddr);
   if (workspaceSize > 0) {
     aclrtFree(workspaceAddr);
   }
