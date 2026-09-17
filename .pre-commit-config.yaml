@@ -1,22 +1,79 @@
+# -----------------------------------------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
+minimum_pre_commit_version: 4.0.0
+exclude: ^LICENSES/|\.(html|csv|svg)$
+
+default_stages: [pre-commit]
+ci:
+  autofix_prs: false
+  autoupdate_schedule: monthly
+
 repos:
-  # C++/C code formatting with clang-format
-  - repo: local
+  # pre-commit 基础检查
+  - repo: https://gitcode.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-json
+        exclude: .*_runtime_kb\.json$
+
+  # C++ 代码格式化检查
+  - repo: https://gitcode.com/pre-commit-clang/mirrors-clang-format
+    rev: v18.1.8
     hooks:
       - id: clang-format
-        name: clang-format
-        entry: clang-format -i
-        language: system
-        types_or: [c++, c]
-        stages: [commit]
+        files: \.(c|h|cpp|hpp|cc|hh|cxx|hxx|asc)$
+        args:
+          - "--style=file"
+          - "--verbose"
+          - "-i"
+        exclude: ^build/|tests/third_party/|_def\.cpp$
 
-  # OAT compliance check (Open Source Audit Tool)
+  # Python 代码检查
+  - repo: https://gitcode.com/gh_mirrors/ru/ruff-pre-commit
+    rev: v0.14.14
+    hooks:
+      - id: ruff-check
+        args: ["--output-format", "github", "--fix", "--ignore", "F841,F821,E741,E712,F403,F405,F601,E721,E731,F811,E711,E722,E402,F401"]
+        types: [python]
+      - id: ruff-format
+        types: [python]
+
+  # 拼写检查
+  - repo: https://gitcode.com/gh_mirrors/co/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args: [
+            "-L",
+            "CANN,cann,NNAL,nnal,ASCEND,ascend,EnQue,CopyIn,ArchType,AND,ND,tbe,copyin,alog,wIh,dout,indexs,inH,padD,outWeight",
+            "--skip",
+            "*.cc,*.cjs,*.clang-format,*.cmake,*.cpp,*.csv,*.cts,*.gitignore,*.gitkeep,*.gitmodules,*.h,*.hpp,*.in,*.info,*.ini,*.js,*.json,*.log,*.md,*.py,*.sh,*.TAG,*.ts,*.txt,*.xml,*.yaml,*.yml",
+          ]
+
+  # 新增/重命名头文件 basename 重名拦截
+  # OAT 合规性检查 (Open Source Audit Tool)
   - repo: local
     hooks:
       - id: oat-check
         name: OAT Compliance Check
         entry: bash scripts/oat_check.sh
         language: system
+        require_serial: true
         pass_filenames: true
         types: [file]
-        stages: [commit]
+        stages: [pre-commit]
         verbose: true
