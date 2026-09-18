@@ -54,6 +54,15 @@ bool IsNullArg(const string &value)
     return trimmed.empty() || trimmed == "<null>" || trimmed == "NONE";
 }
 
+bool HasEmptyDim(const string &shape)
+{
+    if (IsNullArg(shape)) {
+        return false;
+    }
+    const vector<int64_t> dims = ParseDims(shape);
+    return std::any_of(dims.begin(), dims.end(), [](int64_t dim) { return dim == 0; });
+}
+
 TensorDesc MakeTensorDesc(const vector<int64_t> &shape, aclDataType dtype, bool useRange = true)
 {
     auto desc = TensorDesc(shape, dtype, ACL_FORMAT_ND);
@@ -234,6 +243,15 @@ void RunCase(const QkvRmsNormRopeCacheWithKScaleCase &testCase)
         expectedRet = ACLNN_ERR_PARAM_INVALID;
     } else if (expectedRet == ACLNN_SUCCESS && qOutputQuantized && IsNullArg(testCase.qScaleShape)) {
         expectedRet = ACLNN_ERR_PARAM_NULLPTR;
+    }
+    const bool requiredTensorEmpty = HasEmptyDim(testCase.qkvShape) || HasEmptyDim(testCase.qGammaShape) ||
+                                     HasEmptyDim(testCase.kGammaShape) || HasEmptyDim(testCase.cosSinShape) ||
+                                     HasEmptyDim(testCase.slotMappingShape) || HasEmptyDim(testCase.kCacheShape) ||
+                                     HasEmptyDim(testCase.vCacheShape) || HasEmptyDim(testCase.kScaleCacheShape) ||
+                                     HasEmptyDim(testCase.qOutShape) || HasEmptyDim(testCase.queryStartLocShape) ||
+                                     HasEmptyDim(testCase.seqLensShape) || HasEmptyDim(testCase.mropePositionShape);
+    if (expectedRet == ACLNN_SUCCESS && requiredTensorEmpty) {
+        expectedRet = ACLNN_ERR_PARAM_INVALID;
     }
     EXPECT_EQ(ret, expectedRet) << "caseName=" << testCase.caseName
                                 << ", operatorExpectRet=" << testCase.operatorExpectRet;
