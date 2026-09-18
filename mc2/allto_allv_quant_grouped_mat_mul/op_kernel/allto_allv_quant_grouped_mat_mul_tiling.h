@@ -12,8 +12,8 @@
  * \file allto_allv_quant_grouped_mat_mul_tiling.h
  * \brief
  */
-#ifndef __ALL_TO_ALLV_GROUPED_MAT_MUL_TILING_H__
-#define __ALL_TO_ALLV_GROUPED_MAT_MUL_TILING_H__
+#ifndef ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_TILING_H
+#define ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_TILING_H
 
 #include <cstdint>
 #include "kernel_tiling/kernel_tiling.h"
@@ -30,4 +30,4 @@ struct QuantAlltoAllvGroupedMatmulTilingData {
 };
 #pragma pack(pop)
 
-#endif // __ALL_TO_ALLV_GROUPED_MAT_MUL_TILING_H__
+#endif // ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_TILING_H

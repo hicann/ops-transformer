@@ -16,6 +16,7 @@
 #include "allto_allv_mx_quant_grouped_mat_mul_tiling.h"
 #include "mc2_tiling_utils.h"
 #include "mc2_comm_utils.h"
+#include "../../../op_kernel/allto_allv_quant_grouped_mat_mul_tiling_key.h"
 
 using namespace ge;
 using namespace AscendC;
@@ -536,8 +537,9 @@ void AlltoAllvMXQuantGmmTiling::GetPermuteOutSize()
     permuteOutSize_ = Ops::Base::CeilAlign(permuteOutSize_, static_cast<uint64_t>(BASIC_BLOCK_SIZE_512));
     // permutscaleout size
     uint64_t hSize = Ops::Base::CeilDiv(h1_, MX_BASIC_FACTOR);
-    permuteScaleOutSize_ = Ops::Base::CeilAlign((a_ * hSize * 2 * GetSizeByDataType(gmmWeightDataType_)),
-                                                static_cast<uint64_t>(BASIC_BLOCK_SIZE_512));
+    permuteScaleOutSize_ = Ops::Base::CeilAlign(
+        (a_ * hSize * 2 * GetSizeByDataType(context_->GetRequiredInputDesc(GMM_X_SCALE_INDEX)->GetDataType())),
+        static_cast<uint64_t>(BASIC_BLOCK_SIZE_512));
     // 如果单卡专家数大于等于32时，需要额外申请scale重排空间
     if (e_ >= SCALE_BATCH_THRESHOLD) {
         permuteScaleOutSize_ = permuteScaleOutSize_ * 2;

@@ -73,12 +73,15 @@ ge::Status AlltoAllvQuantGroupedMatMulGenTaskFunc(const gert::ExeResGenerationCo
     }
     bool isArch35 = IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5);
     if ((isArch35 && commMode == "ai_cpu")) {
-        OPS_LOG_D(context->GetNodeName(), "AlltoAllvQuantGroupedMatMulCalcParamFunc use AICPU GenTask");
+        OPS_LOG_D(context->GetNodeName(), "AlltoAllvQuantGroupedMatMulGenTaskFunc use AICPU GenTask");
         return Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallback(context, tasks);
     } else if ((isArch35 && commMode == "ccu")) {
-        OPS_LOG_D(context->GetNodeName(), "AlltoAllvQuantGroupedMatMulCalcParamFunc use CCU GenTask");
+        OPS_LOG_D(context->GetNodeName(), "AlltoAllvQuantGroupedMatMulGenTaskFunc use CCU GenTask");
         return Mc2Arch35GenTaskOpsUtils::Mc2Arch35GenTaskCallBack(context, tasks);
     }
+    OPS_LOG_E(context->GetNodeName(), "Unsupported arch or commMode %s for AlltoAllvQuantGroupedMatMulGenTaskFunc.",
+              commMode.c_str());
+    return ge::GRAPH_FAILED;
 }
 
 // new ver

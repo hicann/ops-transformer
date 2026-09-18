@@ -16,6 +16,7 @@
 #include "allto_allv_tt_quant_grouped_mat_mul_tiling.h"
 #include "mc2_tiling_utils.h"
 #include "mc2_comm_utils.h"
+#include "../../../op_kernel/allto_allv_quant_grouped_mat_mul_tiling_key.h"
 
 using namespace ge;
 using namespace AscendC;
@@ -194,6 +195,8 @@ ge::graphStatus AlltoAllvTTQuantGmmTiling::CheckQuantMode() const
                     return ge::GRAPH_FAILED);
     if (hasSharedExpertFlag_) {
         // mmXQuantMode(same as gmmXQuantMode)
+        OP_TILING_CHECK(mmXQuantModePtr_ == nullptr,
+                        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "mmXQuantMode"), return ge::GRAPH_FAILED);
         int64_t mmXQuantMode = *mmXQuantModePtr_;
         OP_TILING_CHECK(mmXQuantMode != gmmXQuantMode,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -201,6 +204,9 @@ ge::graphStatus AlltoAllvTTQuantGmmTiling::CheckQuantMode() const
                             "The value of mmXQuantMode must be the same as that of gmmXQuantMode(1)."),
                         return ge::GRAPH_FAILED);
         // mmWeightQuantMode
+        OP_TILING_CHECK(mmWeightQuantModePtr_ == nullptr,
+                        OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "mmWeightQuantMode"),
+                        return ge::GRAPH_FAILED);
         int64_t mmWeightQuantMode = *mmWeightQuantModePtr_;
         OP_TILING_CHECK(mmWeightQuantMode != gmmWeightQuantMode,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(

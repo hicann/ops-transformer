@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#ifndef ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_API_UT_PARAM_H
-#define ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_API_UT_PARAM_H
+#ifndef ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_API_UT_PARAM_V2_H
+#define ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_API_UT_PARAM_V2_H
 
 #include <sstream>
 #include "op_api_csv_case_loader.h"
@@ -89,4 +89,4 @@ inline std::ostream &operator<<(std::ostream &os, const AlltoAllvQuantGroupedMat
 
 } // namespace AlltoAllvQuantGroupedMatMulV2UT
 
-#endif // ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_API_UT_PARAM_H
+#endif // ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_API_UT_PARAM_V2_H

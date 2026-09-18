@@ -12,8 +12,8 @@
  * \file allto_allv_quant_grouped_mat_mul_tiling_key.h
  * \brief
  */
-#ifndef __ALL_TO_ALLV_GROUPED_MAT_MUL_TILING_KEY_H__
-#define __ALL_TO_ALLV_GROUPED_MAT_MUL_TILING_KEY_H__
+#ifndef ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_TILING_KEY_H
+#define ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_TILING_KEY_H
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
@@ -52,4 +52,4 @@ ASCENDC_TPL_SEL(
     ),
 ); // AlltoAllvGroupedMatMu
 
-#endif // __ALL_TO_ALLV_GROUPED_MAT_MUL_TILING_KEY_H__
+#endif // ALLTO_ALLV_QUANT_GROUPED_MAT_MUL_TILING_KEY_H
