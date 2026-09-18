@@ -77,11 +77,12 @@ private:
     __aicore__ inline void ComputeGlobalOffset();
     __aicore__ inline void LoadAndReduceAllCoreExpertCount(LocalTensor<int32_t> &allCoreExpertCountLocal,
                                                            LocalTensor<int32_t> &prefixSumLocal,
-                                                           int32_t *totalForExpertArr);
+                                                           int32_t *totalForExpertArr, int64_t totalForExpertArrLen);
     __aicore__ inline int64_t ComputeSeedsAndExpertTokens(LocalTensor<int32_t> &allCoreExpertCountLocal,
                                                           LocalTensor<int32_t> &prefixSumLocal,
                                                           LocalTensor<int32_t> &expertCountLocal,
-                                                          const int32_t *totalForExpertArr);
+                                                          const int32_t *totalForExpertArr,
+                                                          int64_t totalForExpertArrLen);
     __aicore__ inline void WriteExpertTokens();
     __aicore__ inline void WaitXLoadCommon();
     __aicore__ inline void BucketByExpert();
@@ -582,7 +583,8 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::WriteExpertCount
 // DCCI 基址读回各 filter 核写出的 expert count，向量化核间求和得到每专家全核总数（复用 prefixSumLocal 作累加器）
 template <typename T>
 __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::LoadAndReduceAllCoreExpertCount(
-    LocalTensor<int32_t> &allCoreExpertCountLocal, LocalTensor<int32_t> &prefixSumLocal, int32_t *totalForExpertArr)
+    LocalTensor<int32_t> &allCoreExpertCountLocal, LocalTensor<int32_t> &prefixSumLocal, int32_t *totalForExpertArr,
+    int64_t totalForExpertArrLen)
 {
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(workspaceGm_);
 
@@ -602,7 +604,7 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::LoadAndReduceAll
     }
 
     SetWaitFlag<HardEvent::V_S>(HardEvent::V_S);
-    for (int64_t e = 0; e < actualExpertNum_; e++) {
+    for (int64_t e = 0; e < totalForExpertArrLen; e++) {
         totalForExpertArr[e] = totalCountLocal.GetValue(e);
     }
 }
@@ -612,7 +614,7 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::LoadAndReduceAll
 template <typename T>
 __aicore__ inline int64_t MoeV3CountingSortFullLoadUnquantized<T>::ComputeSeedsAndExpertTokens(
     LocalTensor<int32_t> &allCoreExpertCountLocal, LocalTensor<int32_t> &prefixSumLocal,
-    LocalTensor<int32_t> &expertCountLocal, const int32_t *totalForExpertArr)
+    LocalTensor<int32_t> &expertCountLocal, const int32_t *totalForExpertArr, int64_t totalForExpertArrLen)
 {
     Duplicate(prefixSumLocal, static_cast<int32_t>(0), static_cast<int32_t>(expertCountStride_));
     for (int64_t c = 0; c < blockIdx_; c++) {
@@ -631,7 +633,7 @@ __aicore__ inline int64_t MoeV3CountingSortFullLoadUnquantized<T>::ComputeSeedsA
     }
     int64_t cumulativeSum = 0;
     int64_t keyValueOffset = 0; // KEY_VALUE 模式下的紧凑写出下标（跳过 count==0 的专家）
-    for (int64_t e = 0; e < actualExpertNum_; e++) {
+    for (int64_t e = 0; e < totalForExpertArrLen; e++) {
         int32_t totalForExpert = totalForExpertArr[e];
         int32_t prefixForExpert = prefixSumLocal.GetValue(e);
 
@@ -670,10 +672,10 @@ __aicore__ inline void MoeV3CountingSortFullLoadUnquantized<T>::ComputeGlobalOff
 
     int32_t totalForExpertArr[COUNTING_SORT_MAX_ACTUAL_EXPERT_NUM]; // actualExpertNum_ <=
                                                                     // COUNTING_SORT_MAX_ACTUAL_EXPERT_NUM
-    LoadAndReduceAllCoreExpertCount(allCoreExpertCountLocal, prefixSumLocal, totalForExpertArr);
+    LoadAndReduceAllCoreExpertCount(allCoreExpertCountLocal, prefixSumLocal, totalForExpertArr, actualExpertNum_);
 
-    int64_t cumulativeSum =
-        ComputeSeedsAndExpertTokens(allCoreExpertCountLocal, prefixSumLocal, expertCountLocal, totalForExpertArr);
+    int64_t cumulativeSum = ComputeSeedsAndExpertTokens(allCoreExpertCountLocal, prefixSumLocal, expertCountLocal,
+                                                        totalForExpertArr, actualExpertNum_);
 
     // dropless：cumulativeSum = 跨专家保留行总数，各 filter 核由全核计数求得同一值（无需额外广播）。
     // Phase D 以 expertTotalCount_ 为上界，只展开已写满的 dst 前缀；expert 越界（expertTotalCount_<outputRows_）时
