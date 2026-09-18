@@ -8,7 +8,7 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""Materialize the metadata placeholder after H2D and before timing."""
+"""Resize and fill metadata after H2D, before timing and graph capture."""
 
 from .metadata import build_metadata
 
@@ -36,10 +36,9 @@ def run(
         seqused_q=seqused_q,
         **kwargs,
     )
-    if metadata.dtype != generated.dtype or metadata.numel() < generated.numel():
+    if metadata.dtype != generated.dtype:
         raise ValueError(
-            f"MLA metadata placeholder must be {generated.dtype} with at least "
-            f"{generated.numel()} elements; got {metadata.dtype}, {metadata.numel()}"
+            f"MLA metadata placeholder must be {generated.dtype}; got {metadata.dtype}"
         )
-    metadata.zero_()
-    metadata.reshape(-1)[: generated.numel()].copy_(generated.reshape(-1))
+    metadata.resize_(generated.shape)
+    metadata.copy_(generated)

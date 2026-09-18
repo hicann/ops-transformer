@@ -28,6 +28,9 @@ def build_metadata(
     layout_kv="PA_BBND",
     **unused,
 ):
+    # Keep device initialization out of TTK's parent process and CPU prepare.
+    import cann_ops_transformer  # noqa: F401
+
     if cache_seqlens is None:
         raise ValueError("cache_seqlens is required for MLA metadata")
     return torch.ops.cann_ops_transformer.flash_mla_with_kvcache_metadata(

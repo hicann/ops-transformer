@@ -12,7 +12,6 @@
 
 from typing import Optional
 import torch
-import cann_ops_transformer  # Register the extension operators.
 
 import importlib.util
 from pathlib import Path
@@ -47,6 +46,9 @@ def flash_mla_with_kvcache_ttk(
     return_softmax_lse: bool = False,
 ):
     arguments = dict(locals())
+    # Register in the execution process; importing the extension may initialize NPU.
+    import cann_ops_transformer  # noqa: F401
+
     if metadata is None:
         arguments["metadata"] = _build_metadata(**arguments)
     return torch.ops.cann_ops_transformer.flash_mla_with_kvcache(**arguments)

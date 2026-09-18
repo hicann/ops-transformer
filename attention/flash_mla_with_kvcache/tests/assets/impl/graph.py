@@ -8,10 +8,9 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""Generate MLA metadata inside the torch graph, as in FlashAttn assets."""
+"""Reuse MLA metadata prepared before graph capture."""
 
 import torch
-from .metadata import build_metadata
 
 
 class FlashMlaWithKvcacheAclGraph(torch.nn.Module):
@@ -60,7 +59,8 @@ class FlashMlaWithKvcacheAclGraph(torch.nn.Module):
             seqused_q=seqused_q,
             attn_mask=attn_mask,
         )
-        metadata = build_metadata(q, k_cache, **tensors, **self.attrs)
+        if metadata is None or metadata.numel() == 0:
+            raise ValueError("MLA graph requires metadata prepared by npu_preprocess")
         return torch.ops.cann_ops_transformer.flash_mla_with_kvcache(
             q, k_cache, **tensors, metadata=metadata, **self.attrs
         )

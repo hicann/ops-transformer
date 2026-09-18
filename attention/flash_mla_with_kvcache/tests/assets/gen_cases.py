@@ -54,7 +54,6 @@ def coverage_row(
     kv_lengths,
     q_lengths,
     *,
-    core_count=256,
     layout="PA_BBND",
     mask=0,
     lse=True,
@@ -74,7 +73,6 @@ def coverage_row(
     counts = [(length + 127) // 128 for length in kv_lengths]
     pages = sum(counts)
     kshape = (pages, 128, 1, 576) if layout == "PA_BBND" else (pages, 1, 36, 128, 16)
-    metadata_size = (((core_count * batch + 1) * 16 + 4095) // 4096) * 4096
     assert num_heads_q in (64, 96)
     shapes = (
         (sum(q_lengths), num_heads_q, 576),
@@ -84,7 +82,7 @@ def coverage_row(
         (batch + 1,),
         None if no_seqused else (batch,),
         (2048, 2048) if mask else None,
-        (metadata_size,),
+        (0,),
     )
     dtypes = (
         dtype,
@@ -157,9 +155,9 @@ def coverage_row(
     return row
 
 
-def coverage_cases(core_count=256):
+def coverage_cases():
     # 16: all currently reachable dtype/layout/mask/LSE template combinations.
-    rows = list(cases(core_count))
+    rows = list(cases())
     for row in rows:
         row["remark"] = "template_matrix"
     # 20: S2 tile=112, page=128, two-tile=224; test both sides and exact boundaries.
@@ -172,7 +170,6 @@ def coverage_cases(core_count=256):
                     [length],
                     [1],
                     num_heads_q=64,
-                    core_count=core_count,
                     layout="PA_NZ" if index % 2 else "PA_BBND",
                     mask=3 if index % 2 else 0,
                     page_order="reverse",
@@ -261,7 +258,7 @@ def coverage_cases(core_count=256):
         ),
     ]
     for name, dtype, kv, q, options in specials:
-        rows.append(coverage_row(name, dtype, kv, q, core_count=core_count, **options))
+        rows.append(coverage_row(name, dtype, kv, q, **options))
     assert len(rows) == 50 and len({r["testcase_name"] for r in rows}) == 50
     # Bound input storage independently of host golden intermediates/workspace.
     for row in rows:
@@ -279,9 +276,7 @@ def coverage_cases(core_count=256):
     return rows
 
 
-def cases(core_count=256):
-    # Reserve the extension's worst-case metadata capacity for B=2.
-    metadata_size = ((((core_count * 2 + 1) * 16) + 4095) // 4096) * 4096
+def cases():
     for dtype, layout_kv, mask, return_lse in itertools.product(
         ("float16", "bfloat16"),
         ("PA_BBND", "PA_NZ"),
@@ -301,7 +296,7 @@ def cases(core_count=256):
             (3,) if layout_q == "TND" else None,
             (2,),
             (2048, 2048) if mask == 3 else None,
-            (metadata_size,),
+            (0,),
         )
         dtypes = (
             dtype,
@@ -356,15 +351,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-o", "--output", type=Path, default=None)
     parser.add_argument("--suite", choices=("smoke", "coverage"), default="coverage")
-    parser.add_argument(
-        "--core-count",
-        type=int,
-        default=256,
-        help="Upper bound on AIC + AIV cores for metadata allocation",
-    )
     args = parser.parse_args()
-    if args.core_count <= 0:
-        parser.error("--core-count must be positive")
     requested = args.output or Path(
         f"testcase/flash_mla_with_kvcache_e2e_{args.suite}.csv"
     )
@@ -377,11 +364,7 @@ def main():
             lineterminator="\n",
         )
         writer.writeheader()
-        writer.writerows(
-            coverage_cases(args.core_count)
-            if args.suite == "coverage"
-            else cases(args.core_count)
-        )
+        writer.writerows(coverage_cases() if args.suite == "coverage" else cases())
 
 
 if __name__ == "__main__":
