@@ -24,6 +24,7 @@ import math
 import ctypes
 import copy
 import ast
+import re
 from liv2_parameter_normalization import normalize_liv2_params
 
 try:
@@ -35,6 +36,125 @@ from cann_ops_transformer.ops import lightning_indexer, lightning_indexer_metada
 DISCONTINUOUS_KEYS = True  # key非连续
 DEFAULT_SPLIT_S1 = False  # golden切分S1Flag
 DEFAULT_S1SIZE = 4  # s1切分基本块大小
+
+
+# INF/NAN 用例支持：非有限datarange的解析与生成，以及golden与NPU
+# 排序语义（FloatToSortableKey / LiTopKVF）的对齐
+_INF_NAN_TOKEN_RE = re.compile(r"(?<![\w.'\"])(-?)(inf|nan)(?![\w.'\"])")
+
+# canonical正NAN的float32位模式
+_CANONICAL_NAN_BITS = np.uint32(0x7FC00000)
+_ALL_ONE_KEY = np.uint32(0xFFFFFFFF)
+_SIGN_BIT = np.uint32(0x80000000)
+_CANONICAL_NAN_F32 = np.array(0x7FC00000, dtype=np.uint32).view(np.float32)
+_CANONICAL_NAN_TORCH = torch.from_numpy(_CANONICAL_NAN_F32.copy())
+
+
+def extended_literal_val(s):
+    """ast.literal_eval 的扩展：支持 inf / -inf / nan 字面量"""
+    if s is None or not isinstance(s, str):
+        return s
+    try:
+        return ast.literal_eval(s)
+    except (ValueError, SyntaxError):
+        pass
+    token_map = {}
+
+    def _replace_token(match):
+        sign, token = match.group(1), match.group(2)
+        placeholder = "__EXTENDED_LITERAL_{0}__".format(len(token_map))
+        if token == "inf":
+            token_map[placeholder] = -math.inf if sign == "-" else math.inf
+        else:
+            token_map[placeholder] = math.nan
+        return "'{0}'".format(placeholder)
+
+    substituted = _INF_NAN_TOKEN_RE.sub(_replace_token, s)
+    value = ast.literal_eval(substituted)
+
+    def _restore(node):
+        if isinstance(node, str) and node in token_map:
+            return token_map[node]
+        if isinstance(node, list):
+            return [_restore(item) for item in node]
+        if isinstance(node, tuple):
+            return tuple(_restore(item) for item in node)
+        return node
+
+    return _restore(value)
+
+
+def sample_datarange(low, high, shape):
+    """按 datarange 生成数据，支持 inf / -inf / nan 非有限边界
+
+    - 双有限：与原逻辑一致，np.random.uniform(low, high, shape)
+    - inf,inf / -inf,-inf：常量填充对应极值
+    - nan,nan：全部填充nan
+    - -inf,inf（或一端有限一端无限）：按位置交替填充 -inf / +inf
+    """
+    low = float(low)
+    high = float(high)
+    if math.isfinite(low) and math.isfinite(high):
+        return np.random.uniform(low, high, shape)
+    if math.isnan(low) or math.isnan(high):
+        return np.full(shape, math.nan, dtype=np.float64)
+    if low == math.inf and high == math.inf:
+        return np.full(shape, math.inf, dtype=np.float64)
+    if low == -math.inf and high == -math.inf:
+        return np.full(shape, -math.inf, dtype=np.float64)
+    count = int(np.prod(shape)) if np.asarray(shape).size else 1
+    flat = np.full(count, -math.inf, dtype=np.float64)
+    flat[1::2] = math.inf
+    return flat.reshape(shape)
+
+
+def float_to_sortable_key(scores):
+    """float32 分数 -> NPU topk 的 uint32 可排序 key
+    canonical NaN > 带 payload 的正 Nan > +inf > 正有限 > +0 > -0 > 负有限 > -inf > 负NaN
+    """
+    bits = np.ascontiguousarray(scores, dtype=np.float32).view(np.uint32)
+    keys = np.where(
+        bits == _CANONICAL_NAN_BITS,
+        _ALL_ONE_KEY,
+        np.where((bits & _SIGN_BIT) != 0, ~bits, bits | _SIGN_BIT),
+    )
+    return keys.astype(np.uint32)
+
+
+def stable_desc_order_by_key(scores):
+    """按 sortbale key 稳定降序排序，返回原位置索引数组"""
+    keys = float_to_sortable_key(scores)
+    return np.argsort(-keys.astype(np.int64), kind="stable")
+
+
+def topk_order_by_key(scores, k):
+    """按 NPU LiTopkVF 两段式选点顺序返回前 k 个原始索引"""
+    keys = float_to_sortable_key(scores)
+    n = keys.shape[-1]
+    k = min(int(k), n)
+    if k <= 0:
+        return np.empty(0, dtype=np.int64)
+    kth = np.partition(keys, n - k)[n - k]
+    gt = np.flatnonzero(keys > kth)
+    eq = np.flatnonzero(keys == kth)[: k - gt.size]
+    return np.concatenate([gt, eq]).astype(np.int64)
+
+
+def sort_f32_desc_by_key(values):
+    """按 sortable key 降序重排最后一维，返回重排后的数值"""
+    values = np.array(values, dtype=np.float32, copy=True)
+    values[np.isnan(values)] = _CANONICAL_NAN_F32
+    keys = float_to_sortable_key(values)
+    order = np.argsort(-keys.astype(np.int64), axis=-1, kind="stable")
+    return np.take_along_axis(values, order, axis=-1)
+
+
+def canonicalize_nan_f32(scores):
+    """将 float32 tensor 中的全部 NaN 样例转化为 canonical 正 NaN"""
+    nan_mask = torch.isnan(scores)
+    if nan_mask.any():
+        scores[nan_mask] = _CANONICAL_NAN_TORCH
+    return scores
 
 
 class GeneralizedLIV2:
@@ -261,7 +381,7 @@ class GeneralizedLIV2:
                             :,
                             s1_start:s1_end,
                             :actual_selected_count,
-                        ] = -np.sort(-y_value.numpy())[
+                        ] = sort_f32_desc_by_key(y_value.numpy())[
                             b_idx : (b_idx + 1),
                             :,
                             s1_start:s1_end,
@@ -351,7 +471,7 @@ class GeneralizedLIV2:
                         :,
                         :curr_actualSeq_q,
                         :actual_selected_count,
-                    ] = -np.sort(-y_value.numpy())[
+                    ] = sort_f32_desc_by_key(y_value.numpy())[
                         b_idx : (b_idx + 1),
                         :,
                         :curr_actualSeq_q,
@@ -489,6 +609,8 @@ class GeneralizedLIV2:
             reduce_sum[cur_m_broadcasted.to(dtype=torch.bool)] = -torch.inf
         to_be_sort_ele = reduce_sum.clone()
         to_be_sort_ele = to_be_sort_ele.to(torch.float32)
+        # INF/NAN 用例：NaN 样例转化为 canonical 正 NaN，对齐 NPU 排序语义
+        to_be_sort_ele = canonicalize_nan_f32(to_be_sort_ele)
         # 稳定排序
         b_sorted_indices = torch.full(to_be_sort_ele.shape, -1, dtype=torch.int32)
         if sparse_mode == 3:
@@ -496,22 +618,19 @@ class GeneralizedLIV2:
                 row_mask = cur_m_broadcasted[0, 0, i, :].to(dtype=torch.bool)
                 true_indices = torch.where(~row_mask)[0]
                 row_ele = to_be_sort_ele[0, 0, i, true_indices]
-                indices = torch.arange(len(row_ele), device=row_ele.device)
-
-                sorted_vals, sorted_idx = torch.sort(
-                    torch.stack([-row_ele, indices], dim=1), dim=0, stable=True
+                # 按 NPU sortable key 稳定降序排序
+                order = torch.from_numpy(stable_desc_order_by_key(row_ele.numpy()))
+                b_sorted_indices[0, 0, i, true_indices] = true_indices[order].to(
+                    torch.int32
                 )
-                b_sorted_indices[0, 0, i, true_indices] = true_indices[
-                    sorted_idx[:, 0]
-                ].to(torch.int32)
         else:
             for i in range(temp_s1):
                 row_ele = to_be_sort_ele[0, 0, i, :]
-                indices = torch.arange(len(row_ele), device=row_ele.device)
-                sorted_vals, sorted_idx = torch.sort(
-                    torch.stack([-row_ele, indices], dim=1), dim=0, stable=True
-                )
-                b_sorted_indices[0, 0, i, :] = sorted_idx[:, 0]
+                # 按 NPU LiTopkVF 两段式选点
+                order = topk_order_by_key(row_ele.numpy(), actual_selected_count)
+                b_sorted_indices[0, 0, i, :actual_selected_count] = torch.from_numpy(
+                    order
+                ).to(torch.int32)
         topk_indices = b_sorted_indices[..., :actual_selected_count]
         return topk_indices, to_be_sort_ele
 
@@ -549,6 +668,8 @@ class GeneralizedLIV2:
 
         to_be_sort_ele = reduce_sum.clone()
         to_be_sort_ele = to_be_sort_ele.to(torch.float32)
+        # INF/NAN 用例：NaN 转化为 canonical 正 NaN，对齐 NPU 排序语义
+        to_be_sort_ele = canonicalize_nan_f32(to_be_sort_ele)
         # 稳定排序
         b_sorted_indices = torch.full(to_be_sort_ele.shape, -1, dtype=torch.int32)
         if sparse_mode == 3:
@@ -556,22 +677,18 @@ class GeneralizedLIV2:
                 row_mask = cur_m_broadcasted[0, 0, i, :].to(dtype=torch.bool)
                 true_indices = torch.where(~row_mask)[0]
                 row_ele = to_be_sort_ele[0, 0, i, true_indices]
-                indices = torch.arange(len(row_ele), device=row_ele.device)
-
-                sorted_vals, sorted_idx = torch.sort(
-                    torch.stack([-row_ele, indices], dim=1), dim=0, stable=True
+                # 按 NPU sortable key稳定降序排序
+                order = torch.from_numpy(stable_desc_order_by_key(row_ele.numpy()))
+                b_sorted_indices[0, 0, i, true_indices] = true_indices[order].to(
+                    torch.int32
                 )
-                b_sorted_indices[0, 0, i, true_indices] = true_indices[
-                    sorted_idx[:, 0]
-                ].to(torch.int32)
         else:
             for i in range(temp_s1):
                 row_ele = to_be_sort_ele[0, 0, i, :]
-                indices = torch.arange(len(row_ele), device=row_ele.device)
-                sorted_vals, sorted_idx = torch.sort(
-                    torch.stack([-row_ele, indices], dim=1), dim=0, stable=True
-                )
-                b_sorted_indices[0, 0, i, :] = sorted_idx[:, 0]
+                order = topk_order_by_key(row_ele.numpy(), actual_selected_count)
+                b_sorted_indices[0, 0, i, :actual_selected_count] = torch.from_numpy(
+                    order
+                ).to(torch.int32)
         topk_indices = b_sorted_indices[..., :actual_selected_count]
         return topk_indices, to_be_sort_ele
 
@@ -914,11 +1031,11 @@ def liv2_output_single(
         if cmp_residual_k is not None and isinstance(cmp_residual_k, str):
             cmp_residual_k = ast.literal_eval(cmp_residual_k)
         if query_datarange is not None and isinstance(query_datarange, str):
-            query_datarange = ast.literal_eval(query_datarange)
+            query_datarange = extended_literal_val(query_datarange)
         if key_datarange is not None and isinstance(key_datarange, str):
-            key_datarange = ast.literal_eval(key_datarange)
+            key_datarange = extended_literal_val(key_datarange)
         if weights_datarange is not None and isinstance(weights_datarange, str):
-            weights_datarange = ast.literal_eval(weights_datarange)
+            weights_datarange = extended_literal_val(weights_datarange)
         if output_idx_offset is not None and isinstance(output_idx_offset, str):
             output_idx_offset = ast.literal_eval(output_idx_offset)
             output_idx_offset = [int(x) for x in output_idx_offset]
@@ -1068,14 +1185,14 @@ def liv2_output_single(
 
     if layout_query == "BSND":
         query = torch.tensor(
-            np.random.uniform(
+            sample_datarange(
                 query_datarange[0],
                 query_datarange[1],
                 (batch_size, q_seq, q_head_num, head_dim),
             )
         ).to(qk_dtype)
         weights = torch.tensor(
-            np.random.uniform(
+            sample_datarange(
                 weights_datarange[0],
                 weights_datarange[1],
                 (batch_size, q_seq, q_head_num),
@@ -1089,12 +1206,12 @@ def liv2_output_single(
             )
     elif layout_query == "TND":
         query = torch.tensor(
-            np.random.uniform(
+            sample_datarange(
                 query_datarange[0], query_datarange[1], (q_t_size, q_head_num, head_dim)
             )
         ).to(qk_dtype)
         weights = torch.tensor(
-            np.random.uniform(
+            sample_datarange(
                 weights_datarange[0], weights_datarange[1], (q_t_size, q_head_num)
             )
         ).to(torch.float32)
@@ -1107,7 +1224,7 @@ def liv2_output_single(
     cpu_block_table = None
     if layout_key == "BSND":
         key = torch.tensor(
-            np.random.uniform(
+            sample_datarange(
                 key_datarange[0],
                 key_datarange[1],
                 (batch_size, k_seq, k_head_num, head_dim),
@@ -1133,7 +1250,7 @@ def liv2_output_single(
 
     elif layout_key == "TND":
         key = torch.tensor(
-            np.random.uniform(
+            sample_datarange(
                 key_datarange[0], key_datarange[1], (k_t_size, k_head_num, head_dim)
             )
         ).to(qk_dtype)
@@ -1163,7 +1280,7 @@ def liv2_output_single(
         )  # 遍历batch得到的最大的block num
 
         key_bnsd = torch.tensor(
-            np.random.uniform(
+            sample_datarange(
                 key_datarange[0],
                 key_datarange[1],
                 (batch_size, k_head_num, k_max_s2, head_dim),
