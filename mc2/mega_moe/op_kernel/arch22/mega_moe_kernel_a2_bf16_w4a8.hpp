@@ -291,17 +291,18 @@ private:
             // [preSumDispatch][preSumCombine]），低地址区为既有临时缓冲区（SendTokensV3 / epilogue /
             // CombineV2 rdma），互不踩踏；每 chunk 在 allgather + cumsum 完成后由 CacheRouteTablesToUb 刷新。
             routeCacheNum = params.EP * params.expertPerRank;
+            expertPerRankAligned = AlignUp(params.expertPerRank, 8);
             uint32_t routeCacheBytes = AlignUp(routeCacheNum * sizeof(int32_t), BYTE_PER_BLK);
-            uint32_t routeCacheUbOffset = ArchTag::UB_SIZE - kRouteCacheBufCnt * routeCacheBytes;
+            uint32_t tpeCacheBytes = AlignUp(params.EP * expertPerRankAligned * sizeof(int32_t), BYTE_PER_BLK);
+            uint32_t routeCacheUbOffset = ArchTag::UB_SIZE - 3 * routeCacheBytes - tpeCacheBytes;
             ubTpeSendCache = resource.ubBuf.template GetBufferByByte<int32_t>(routeCacheUbOffset);
             ubTpeSendCache.SetSize(routeCacheNum);
             ubTpeRecvCache = resource.ubBuf.template GetBufferByByte<int32_t>(routeCacheUbOffset + routeCacheBytes);
-            ubTpeRecvCache.SetSize(routeCacheNum);
             ubPreSumDispatchCache =
-                resource.ubBuf.template GetBufferByByte<int32_t>(routeCacheUbOffset + 2 * routeCacheBytes);
+                resource.ubBuf.template GetBufferByByte<int32_t>(routeCacheUbOffset + routeCacheBytes + tpeCacheBytes);
             ubPreSumDispatchCache.SetSize(routeCacheNum);
-            ubPreSumCombineCache =
-                resource.ubBuf.template GetBufferByByte<int32_t>(routeCacheUbOffset + 3 * routeCacheBytes);
+            ubPreSumCombineCache = resource.ubBuf.template GetBufferByByte<int32_t>(
+                routeCacheUbOffset + 2 * routeCacheBytes + tpeCacheBytes);
             ubPreSumCombineCache.SetSize(routeCacheNum);
         }
     }
@@ -1203,7 +1204,8 @@ private:
                 AscendC::LocalTensor<int32_t> zeroBuf = resource.ubBuf.template GetBufferByByte<int32_t>(0);
                 AscendC::Duplicate(zeroBuf, 0, params.expertPerRank);
                 AscendC::PipeBarrier<PIPE_V>();
-                AscendC::DataCopy(gmExpertTokenNums[0], zeroBuf, params.expertPerRank);
+                AscendC::DataCopyPad(gmExpertTokenNums[0], zeroBuf,
+                                     {1, static_cast<uint16_t>(params.expertPerRank * sizeof(int32_t)), 0, 0});
                 AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
             }
@@ -1273,15 +1275,17 @@ private:
                     AscendC::LocalTensor<int32_t> ubSum = resource.ubBuf.template GetBufferByByte<int32_t>(0);
                     AscendC::LocalTensor<int32_t> ubOut = resource.ubBuf.template GetBufferByByte<int32_t>(
                         AlignUp(params.expertPerRank * sizeof(int32_t), UB_ALIGN));
-                    AscendC::DataCopy(ubSum, cumsumMM[tokenPerExpertLayout(params.EP - 1, rank, 0)],
-                                      params.expertPerRank);
-                    AscendC::DataCopy(ubOut, gmExpertTokenNums[0], params.expertPerRank);
+                    AscendC::DataCopyPad(ubSum, cumsumMM[tokenPerExpertLayout(params.EP - 1, rank, 0)],
+                                         {1, static_cast<uint16_t>(params.expertPerRank * sizeof(int32_t)), 0, 0}, {});
+                    AscendC::DataCopyPad(ubOut, gmExpertTokenNums[0],
+                                         {1, static_cast<uint16_t>(params.expertPerRank * sizeof(int32_t)), 0, 0}, {});
                     AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
                     AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
                     AscendC::Add(ubOut, ubOut, ubSum, params.expertPerRank);
                     AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
                     AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-                    AscendC::DataCopy(gmExpertTokenNums[0], ubOut, params.expertPerRank);
+                    AscendC::DataCopyPad(gmExpertTokenNums[0], ubOut,
+                                         {1, static_cast<uint16_t>(params.expertPerRank * sizeof(int32_t)), 0, 0});
                     AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID0);
                     AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID0);
                 }
@@ -1352,7 +1356,7 @@ private:
                                                                srcEpIdx - 1, RuntimeRank(params), groupIdx))));
                     if (rowStart2 < params.maxOutputSize) {
                         uint32_t rows2 =
-                            static_cast<uint32_t>(ubTpeRecvCache.GetValue(srcEpIdx * params.expertPerRank + groupIdx));
+                            static_cast<uint32_t>(ubTpeRecvCache.GetValue(srcEpIdx * expertPerRankAligned + groupIdx));
                         if (rows2 + rowStart2 > params.maxOutputSize) {
                             rows2 = params.maxOutputSize - rowStart2;
                         }
@@ -1394,6 +1398,7 @@ private:
             // epilogue 内 tokenPerExpert / preSumBeforeRank 标量读取走本核 UB 缓存
             // （每 chunk 已由 CacheRouteTablesToUb 刷新，规避跨 chunk GM 标量读 D-Cache 陈旧）
             epilogueParams.useUbRouteCache = true;
+            epilogueParams.ubRouteStride = expertPerRankAligned;
             epilogueParams.ubTokenPerExpert = ubTpeRecvCache;
             epilogueParams.ubPreSumBeforeRank = ubPreSumCombineCache;
 
@@ -1539,7 +1544,7 @@ private:
             int32_t preSumRankInExpert = 0;
             for (int32_t dstEpIdx = 0; dstEpIdx < params.EP; ++dstEpIdx) {
                 // chunk 模式：路由表读走本核 UB 缓存（CacheRouteTablesToUb 每 chunk 刷新）
-                int32_t lenRankInExpert = ubTpeRecvCache.GetValue(dstEpIdx * params.expertPerRank + groupIdx);
+                int32_t lenRankInExpert = ubTpeRecvCache.GetValue(dstEpIdx * expertPerRankAligned + groupIdx);
                 int32_t stRankInExpert = preSumRankInExpert;
                 int32_t edRankInExpert = stRankInExpert + lenRankInExpert;
                 preSumRankInExpert += lenRankInExpert;
@@ -1766,6 +1771,7 @@ private:
     // 紧凑索引均为 [dstEpIdx * expertPerRank + groupIdx]，每 chunk 由 CacheRouteTablesToUb 刷新
     static constexpr int32_t kRouteCacheBufCnt = 4; // 路由表 4 份独立 UB 缓存：send/recv 的 tokenPerExpert 与 preSum
     int32_t routeCacheNum = 0;
+    int32_t expertPerRankAligned = 0;
     AscendC::LocalTensor<int32_t> ubTpeSendCache;
     AscendC::LocalTensor<int32_t> ubTpeRecvCache;
     AscendC::LocalTensor<int32_t> ubPreSumDispatchCache;
