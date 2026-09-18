@@ -12,7 +12,9 @@
 
 """Small batch-consistency protocol shared by LI_V2 and QLI_V2 assets."""
 
+import ast
 import hashlib
+import math
 import random
 from numbers import Integral
 
@@ -21,6 +23,8 @@ import torch
 
 
 HIFLOAT8_QUANT_MODE = 4
+MXFP8_QUANT_MODE = 3
+MXFP4_QUANT_MODE = 5
 SUPPORTED_QUANT_MODES = (1, 2, 3, 4, 5)
 MXFP4_DECODE_VALUES = torch.tensor(
     (
@@ -95,16 +99,22 @@ class BatchRelationProtocol:
             return False
         first_batch = first_slices[0]
         second_batch = second_slices[0]
-        if first_batch[1] <= second_batch[0] or second_batch[1] <= first_batch[0]:
+        if not BatchRelationProtocol.ranges_overlap(first_batch, second_batch):
             return False
         if first_axes == (0,):
             return True
         first_sequence = first_slices[1]
         second_sequence = second_slices[1]
-        return not (
-            first_sequence[1] <= second_sequence[0]
-            or second_sequence[1] <= first_sequence[0]
-        )
+        return BatchRelationProtocol.ranges_overlap(first_sequence, second_sequence)
+
+    @staticmethod
+    def ranges_overlap(first, second):
+        """Return whether two positive-step slices share an integer position."""
+        first_values = range(*first)
+        second_values = range(*second)
+        if len(first_values) > len(second_values):
+            first_values, second_values = second_values, first_values
+        return any(value in second_values for value in first_values)
 
     def validate_disjoint_relations(self, relations):
         """Reject duplicate or overlapping samples that would self-compare."""
@@ -162,9 +172,9 @@ class BatchRelationProtocol:
                         f"{self.operator_name} slices must contain integers"
                     )
                 start, stop, step = (int(item) for item in value)
-                if step != 1 or start < 0 or start >= stop:
+                if step <= 0 or start < 0 or start >= stop:
                     raise ValueError(
-                        f"{self.operator_name} slices must be non-empty and contiguous"
+                        f"{self.operator_name} slices must be non-empty with positive step"
                     )
                 seed = axis_seeds[axis_group][sample_index]
                 if not isinstance(seed, Integral):
@@ -178,7 +188,7 @@ class BatchRelationProtocol:
                     )
                 relation_seed = seed
                 slices.append((start, stop, step))
-            if axes == (0, 1) and slices[0][1] - slices[0][0] != 1:
+            if axes == (0, 1) and len(range(*slices[0])) != 1:
                 raise ValueError(
                     f"{self.operator_name} logical (B,S) requires one B per sample"
                 )
@@ -190,12 +200,20 @@ class BatchRelationProtocol:
 class IndexerBatchInputNormalizer:
     """Materialize equal logical inputs for declared LI/QLI relations."""
 
-    def __init__(self, data, attributes, operator_name, quantized):
+    def __init__(
+        self,
+        data,
+        attributes,
+        operator_name,
+        quantized,
+        hifloat8_encoder=None,
+    ):
         self.data = data
         self.attributes = attributes
         self.operator_name = operator_name
         self.quantized = quantized
         self.quant_mode = int(attributes.get("quant_mode", 1)) if quantized else None
+        self.hifloat8_encoder = hifloat8_encoder
         self.layout_q = attributes.get(
             "layout_q", attributes.get("layout_query", "BSND")
         )
@@ -218,6 +236,7 @@ class IndexerBatchInputNormalizer:
         self.k_lengths = self.resolve_lengths("k")
         self.residual = self.resolve_vector("cmp_residual_k", 0)
         self.assigned_blocks = {}
+        self.input_ranges = self.resolve_input_ranges()
 
     @staticmethod
     def tensor_values(value):
@@ -249,6 +268,33 @@ class IndexerBatchInputNormalizer:
             )
         return value
 
+    def resolve_input_ranges(self):
+        """Read the exact ranges normalized by the reused pytest generator."""
+        params = self.data.get("params")
+        if not isinstance(params, (tuple, list)) or len(params) not in (32, 33):
+            raise ValueError(f"{self.operator_name} pytest params are unavailable")
+        range_start = 25 if len(params) == 33 else 24
+        ranges = {
+            0: params[range_start],
+            10: params[range_start + 1],
+            1: params[range_start + 2],
+            2: params[range_start + 3],
+            11: params[range_start + 4],
+            3: params[-1],
+        }
+        for slot, value in tuple(ranges.items()):
+            if value is None:
+                ranges.pop(slot)
+                continue
+            if isinstance(value, str):
+                value = ast.literal_eval(value)
+            if not isinstance(value, (tuple, list)) or len(value) < 2:
+                raise ValueError(
+                    f"{self.operator_name} input range for relation slot {slot} is invalid"
+                )
+            ranges[slot] = (float(value[0]), float(value[1]))
+        return ranges
+
     def resolve_lengths(self, target):
         prefix = self.q_prefix if target == "q" else self.k_prefix
         tensor = self.query if target == "q" else self.key
@@ -258,10 +304,10 @@ class IndexerBatchInputNormalizer:
                 len(prefix) != self.batch_size + 1
                 or prefix[0] != 0
                 or prefix[-1] != int(tensor.shape[0])
-                or any(right <= left for left, right in zip(prefix, prefix[1:]))
+                or any(right < left for left, right in zip(prefix, prefix[1:]))
             ):
                 raise ValueError(
-                    f"{self.operator_name} {target} prefix must strictly span its tensor"
+                    f"{self.operator_name} {target} prefix must non-decreasingly span its tensor"
                 )
             lengths = [right - left for left, right in zip(prefix, prefix[1:])]
         else:
@@ -276,9 +322,9 @@ class IndexerBatchInputNormalizer:
                 raise ValueError(
                     f"{self.operator_name} seqused_{target} length must equal B"
                 )
-            if any(length <= 0 for length in actual):
+            if any(length < 0 for length in actual):
                 raise ValueError(
-                    f"{self.operator_name} seqused_{target} must be positive"
+                    f"{self.operator_name} seqused_{target} must be non-negative"
                 )
             if layout in ("BSND", "TND") and any(
                 actual_length > physical_length
@@ -297,68 +343,141 @@ class IndexerBatchInputNormalizer:
             (1 << 63) - 1
         )
 
-    @classmethod
-    def random_tensor(cls, shape, template, seed, relative_batch, slot, positive=False):
+    @staticmethod
+    def e8m0_code_range(data_range):
+        lower, upper = data_range
+        if not math.isfinite(lower) or not math.isfinite(upper):
+            raise ValueError("E8M0 scale range must be finite")
+        if lower <= 0 or lower > upper:
+            raise ValueError("E8M0 scale range must satisfy 0 < min <= max")
+        low_code = max(0, math.ceil(math.log2(lower)) + 127)
+        high_code = min(254, math.floor(math.log2(upper)) + 127)
+        while low_code <= 254 and math.ldexp(1.0, low_code - 127) < lower:
+            low_code += 1
+        while high_code >= 0 and math.ldexp(1.0, high_code - 127) > upper:
+            high_code -= 1
+        if low_code > high_code:
+            raise ValueError("E8M0 scale range contains no representable value")
+        return low_code, high_code
+
+    def random_tensor(self, shape, template, seed, relative_batch, slot):
         generator = torch.Generator(device="cpu")
-        generator.manual_seed(cls.derived_seed(seed, relative_batch, slot))
+        generator.manual_seed(self.derived_seed(seed, relative_batch, slot))
         dtype = template.dtype
+        if slot not in self.input_ranges:
+            raise ValueError(
+                f"{self.operator_name} input range for relation slot {slot} is required"
+            )
+        lower, upper = self.input_ranges[slot]
+        if lower > upper:
+            raise ValueError(
+                f"{self.operator_name} input range must satisfy min <= max"
+            )
         if dtype == torch.bool:
             value = torch.randint(0, 2, shape, generator=generator, dtype=torch.int64)
-        elif "float4" in str(dtype):
-            # CPU cannot cast into Float4, but its packed byte view is writable.
-            packed = torch.randint(0, 16, shape, generator=generator, dtype=torch.uint8)
+        elif self.quant_mode == MXFP4_QUANT_MODE and slot in (0, 10):
+            valid_codes = torch.nonzero(
+                (MXFP4_DECODE_VALUES >= lower) & (MXFP4_DECODE_VALUES <= upper),
+                as_tuple=False,
+            ).flatten()
+            if valid_codes.numel() == 0:
+                raise ValueError("MXFP4 input range contains no representable value")
+            logical_shape = (*shape[:-1], shape[-1] * 2)
+            code_indexes = torch.randint(
+                valid_codes.numel(),
+                logical_shape,
+                generator=generator,
+                dtype=torch.int64,
+            )
+            codes = valid_codes[code_indexes].to(torch.uint8)
+            packed = codes[..., 0::2] | (codes[..., 1::2] << 4)
             return packed.view(dtype)
+        elif self.quant_mode in (MXFP8_QUANT_MODE, MXFP4_QUANT_MODE) and slot in (
+            2,
+            11,
+        ):
+            low_code, high_code = self.e8m0_code_range((lower, upper))
+            raw = torch.randint(
+                low_code,
+                high_code + 1,
+                shape,
+                generator=generator,
+                dtype=torch.uint8,
+            )
+            return raw.view(dtype)
+        elif self.quant_mode == HIFLOAT8_QUANT_MODE and slot in (0, 10):
+            if self.hifloat8_encoder is None:
+                raise ValueError(
+                    f"{self.operator_name} HIFLOAT8 encoder is unavailable"
+                )
+            value = torch.rand(shape, generator=generator, dtype=torch.float32)
+            value = value * (upper - lower) + lower
+            return self.hifloat8_encoder(value, round_mode="hybrid", over_mode=True)
         elif dtype.is_floating_point:
             value = torch.rand(shape, generator=generator, dtype=torch.float32)
-            value = value * 0.75 + 0.25 if positive else value - 0.5
-        elif dtype == torch.uint8:
-            value = torch.randint(0, 16, shape, generator=generator, dtype=torch.int64)
+            value = value * (upper - lower) + lower
         else:
-            value = torch.randint(-8, 9, shape, generator=generator, dtype=torch.int64)
+            low = int(np.ceil(lower))
+            high = int(np.floor(upper))
+            if low > high:
+                raise ValueError(
+                    f"{self.operator_name} integer input range has no representable value"
+                )
+            value = torch.randint(
+                low, high + 1, shape, generator=generator, dtype=torch.int64
+            )
         return value.to(dtype=dtype)
+
+    @staticmethod
+    def decode_mxfp4(value):
+        packed = value.view(torch.uint8)
+        decode_values = MXFP4_DECODE_VALUES.to(device=value.device)
+        low = decode_values[(packed & 0x0F).to(torch.long)]
+        high = decode_values[(packed >> 4).to(torch.long)]
+        return torch.stack((low, high), dim=-1).reshape(
+            *value.shape[:-1], value.shape[-1] * 2
+        )
 
     @staticmethod
     def copy_selection(tensor, selector, value):
         if tensor is None:
             return
         source = value
-        if (
-            torch.is_tensor(source)
-            and "float4" in str(source.dtype)
-            and "float4" not in str(tensor.dtype)
-        ):
-            # PyTorch has no Float4 CPU cast kernel.  The pytest CPU golden
-            # stores unpacked values, while the device input uses packed bytes.
-            packed = source.view(torch.uint8)
-            decode_values = MXFP4_DECODE_VALUES.to(device=source.device)
-            low = decode_values[(packed & 0x0F).to(torch.long)]
-            high = decode_values[(packed >> 4).to(torch.long)]
-            source = torch.stack((low, high), dim=-1).reshape(
-                *source.shape[:-1], source.shape[-1] * 2
-            )
+        if torch.is_tensor(source) and "float4" in str(source.dtype):
+            if "float4" in str(tensor.dtype):
+                target = tensor[selector].view(torch.uint8)
+                target.copy_(source.view(torch.uint8).to(device=tensor.device))
+                return
+            source = IndexerBatchInputNormalizer.decode_mxfp4(source)
         tensor[selector].copy_(source.to(dtype=tensor.dtype, device=tensor.device))
 
     def query_selector(self, batch_index, sequence_slice):
         if self.layout_q == "BSND":
-            start, stop = (0, self.q_lengths[batch_index])
+            start, stop, step = (0, self.q_lengths[batch_index], 1)
             if sequence_slice is not None:
-                start, stop = sequence_slice[:2]
-            return (batch_index, slice(start, stop, 1)), stop - start
+                start, stop, step = sequence_slice
+            return (batch_index, slice(start, stop, step)), len(
+                range(start, stop, step)
+            )
         token_start = self.q_prefix[batch_index]
         token_stop = self.q_prefix[batch_index + 1]
+        step = 1
         if sequence_slice is not None:
             token_start += sequence_slice[0]
             token_stop = self.q_prefix[batch_index] + sequence_slice[1]
-        return (slice(token_start, token_stop, 1),), token_stop - token_start
+            step = sequence_slice[2]
+        return (slice(token_start, token_stop, step),), len(
+            range(token_start, token_stop, step)
+        )
 
     def query_capacity(self, batch_index):
-        """Return the physical q span used by the raw-byte output comparator."""
+        """Return the physical Q span represented by one logical batch."""
         if self.layout_q == "BSND":
             return int(self.query.shape[1])
         return self.q_prefix[batch_index + 1] - self.q_prefix[batch_index]
 
     def query_comparison_length(self, batch_index):
-        """Match the q span that the output comparator will actually select."""
+        """Match the output span selected by the phase-two comparator."""
         if self.layout_q == "TND":
             return self.query_capacity(batch_index)
         return self.q_lengths[batch_index]
@@ -370,11 +489,12 @@ class IndexerBatchInputNormalizer:
         grouped_signatures = {}
         occupied = []
         for axes, slices, seed in relations:
-            batch_start, batch_stop, _ = slices[0]
+            batch_start, batch_stop, batch_step = slices[0]
             if batch_stop > self.batch_size:
                 raise ValueError(
                     f"{self.operator_name} logical B slice exceeds B={self.batch_size}"
                 )
+            batch_indices = range(batch_start, batch_stop, batch_step)
             sequence_slice = slices[1] if axes == (0, 1) else None
             if sequence_slice is not None and mask_mode != 0:
                 raise ValueError(
@@ -383,10 +503,7 @@ class IndexerBatchInputNormalizer:
             if (
                 sequence_slice is None
                 and len(
-                    {
-                        self.query_capacity(batch_index)
-                        for batch_index in range(batch_start, batch_stop)
-                    }
+                    {self.query_capacity(batch_index) for batch_index in batch_indices}
                 )
                 != 1
             ):
@@ -394,7 +511,7 @@ class IndexerBatchInputNormalizer:
                     f"{self.operator_name} one B-only relation requires equal q output spans"
                 )
             signature = []
-            for batch_index in range(batch_start, batch_stop):
+            for batch_index in batch_indices:
                 selector, q_count = self.query_selector(batch_index, sequence_slice)
                 if (
                     sequence_slice is not None
@@ -403,24 +520,34 @@ class IndexerBatchInputNormalizer:
                     raise ValueError(
                         f"{self.operator_name} logical S slice exceeds effective q length"
                     )
+                effective_q_count = (
+                    q_count
+                    if sequence_slice is not None
+                    else self.q_lengths[batch_index]
+                )
+                if effective_q_count == 0:
+                    raise ValueError(
+                        f"{self.operator_name} relation selects no q output elements"
+                    )
                 occupied.append((selector, seed))
                 signature.append(
                     (
                         q_count
                         if sequence_slice is not None
                         else self.query_comparison_length(batch_index),
+                        effective_q_count,
                         self.k_lengths[batch_index],
                         self.residual[batch_index],
                     )
                 )
-            relation_size = tuple(stop - start for start, stop, _step in slices)
+            relation_size = tuple(len(range(*value)) for value in slices)
             key = (axes, seed, relation_size)
             value = tuple(signature)
             previous = grouped_signatures.setdefault(key, value)
             if previous != value:
                 raise ValueError(
                     f"{self.operator_name} relation requires equal q output spans, "
-                    "K lengths and residuals"
+                    "effective q lengths, K lengths and residuals"
                 )
 
         for index, (left, left_seed) in enumerate(occupied):
@@ -439,7 +566,12 @@ class IndexerBatchInputNormalizer:
                 if left_item != right_item:
                     return False
                 continue
-            if left_item.stop <= right_item.start or right_item.stop <= left_item.start:
+            left_range = range(left_item.start, left_item.stop, left_item.step or 1)
+            right_range = range(right_item.start, right_item.stop, right_item.step or 1)
+            if not BatchRelationProtocol.ranges_overlap(
+                (left_range.start, left_range.stop, left_range.step),
+                (right_range.start, right_range.stop, right_range.step),
+            ):
                 return False
         return True
 
@@ -452,13 +584,13 @@ class IndexerBatchInputNormalizer:
     def fill_query_inputs(self, batch_index, sequence_slice, seed, relative_batch):
         selector, _count = self.query_selector(batch_index, sequence_slice)
         targets = (
-            (self.query_references("query"), 0, False),
-            (self.query_references("weights"), 1, False),
-            (self.query_references("output_idx_offset"), 3, True),
+            (self.query_references("query"), 0),
+            (self.query_references("weights"), 1),
+            (self.query_references("output_idx_offset"), 3),
         )
         if self.quant_mode != HIFLOAT8_QUANT_MODE:
-            targets += ((self.query_references("query_dequant_scale"), 2, True),)
-        for references, slot, positive in targets:
+            targets += ((self.query_references("query_dequant_scale"), 2),)
+        for references, slot in targets:
             if not references:
                 continue
             value = self.random_tensor(
@@ -467,7 +599,6 @@ class IndexerBatchInputNormalizer:
                 seed,
                 relative_batch,
                 slot,
-                positive,
             )
             for tensor in references:
                 self.copy_selection(tensor, selector, value)
@@ -488,14 +619,18 @@ class IndexerBatchInputNormalizer:
             if value is not None
         ]
 
-    def fill_hifloat8_scales(self):
-        """Use one stable global scale because mode 4 scales have shape ``(1,)``."""
-        for name in ("query_dequant_scale", "key_dequant_scale"):
-            for tensor in self.input_references(name):
+    def fill_hifloat8_scales(self, seed):
+        """Use stable global scales because mode 4 scale inputs have shape ``(1,)``."""
+        for name, slot in (("query_dequant_scale", 2), ("key_dequant_scale", 11)):
+            references = self.input_references(name)
+            if not references:
+                continue
+            value = self.random_tensor((1,), references[0], seed, 0, slot).item()
+            for tensor in references:
                 if torch.is_tensor(tensor):
-                    tensor.fill_(1)
+                    tensor.fill_(value)
                 else:
-                    np.asarray(tensor).fill(1)
+                    np.asarray(tensor).fill(value)
 
     def scatter_paged(self, tensor, batch_index, value, seed, relative_batch):
         table = self.tensor_values(self.block_table[batch_index])
@@ -512,8 +647,10 @@ class IndexerBatchInputNormalizer:
                     f"{self.operator_name} paged relations share block {block_id} "
                     "between different logical batches"
                 )
-            tensor[block_id, :count].copy_(
-                value[copied : copied + count].to(tensor.device, tensor.dtype)
+            self.copy_selection(
+                tensor,
+                (block_id, slice(0, count, 1)),
+                value[copied : copied + count],
             )
             copied += count
         if copied != value.shape[0]:
@@ -521,7 +658,7 @@ class IndexerBatchInputNormalizer:
                 f"{self.operator_name} block table has insufficient capacity"
             )
 
-    def fill_key_tensor(self, name, batch_index, seed, relative_batch, slot, positive):
+    def fill_key_tensor(self, name, batch_index, seed, relative_batch, slot):
         tensor = self.data.get(name)
         if tensor is None:
             return
@@ -542,7 +679,7 @@ class IndexerBatchInputNormalizer:
             raise ValueError(
                 f"{self.operator_name} unsupported key layout {self.layout_k!r}"
             )
-        value = self.random_tensor(shape, tensor, seed, relative_batch, slot, positive)
+        value = self.random_tensor(shape, tensor, seed, relative_batch, slot)
         if selector is None:
             self.scatter_paged(tensor, batch_index, value, seed, relative_batch)
         else:
@@ -553,8 +690,11 @@ class IndexerBatchInputNormalizer:
                 continue
             if self.layout_k == "PA_BBND":
                 permutation = (1, 0, *range(2, value.ndim))
+                source = value
+                if "float4" in str(source.dtype):
+                    source = self.decode_mxfp4(source)
                 reference[batch_index, :, :key_length].copy_(
-                    value.permute(permutation).to(reference.device, reference.dtype)
+                    source.permute(permutation)
                 )
             else:
                 self.copy_selection(reference, selector, value)
@@ -566,17 +706,15 @@ class IndexerBatchInputNormalizer:
                 f"{self.operator_name} batch consistency supports quant_mode 1 through 5"
             )
         for axes, slices, seed in relations:
-            batch_start, batch_stop, _ = slices[0]
+            batch_start, batch_stop, batch_step = slices[0]
             sequence_slice = slices[1] if axes == (0, 1) else None
             for relative_batch, batch_index in enumerate(
-                range(batch_start, batch_stop)
+                range(batch_start, batch_stop, batch_step)
             ):
                 self.fill_query_inputs(
                     batch_index, sequence_slice, seed, relative_batch
                 )
-                self.fill_key_tensor(
-                    "key", batch_index, seed, relative_batch, 10, False
-                )
+                self.fill_key_tensor("key", batch_index, seed, relative_batch, 10)
                 if self.quant_mode != HIFLOAT8_QUANT_MODE:
                     self.fill_key_tensor(
                         "key_dequant_scale",
@@ -584,13 +722,18 @@ class IndexerBatchInputNormalizer:
                         seed,
                         relative_batch,
                         11,
-                        True,
                     )
         if self.quant_mode == HIFLOAT8_QUANT_MODE:
-            self.fill_hifloat8_scales()
+            self.fill_hifloat8_scales(relations[0][2])
 
 
-def normalize_indexer_inputs(data, attributes, operator_name, quantized=False):
+def normalize_indexer_inputs(
+    data,
+    attributes,
+    operator_name,
+    quantized=False,
+    hifloat8_encoder=None,
+):
     protocol = BatchRelationProtocol(operator_name)
     relations = protocol.parse(
         attributes.get("batch_axis"),
@@ -598,6 +741,10 @@ def normalize_indexer_inputs(data, attributes, operator_name, quantized=False):
         attributes.get("batch_seed"),
     )
     if relations is not None:
-        IndexerBatchInputNormalizer(data, attributes, operator_name, quantized).apply(
-            relations
-        )
+        IndexerBatchInputNormalizer(
+            data,
+            attributes,
+            operator_name,
+            quantized,
+            hifloat8_encoder,
+        ).apply(relations)

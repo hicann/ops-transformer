@@ -835,7 +835,13 @@ class QuantLightningIndexerV2InputAdapter:
         batch_module = self.load_batch_consistency()
         with batch_module.CaseRandomContext(kwargs):
             data = pytest_golden.generate_qliv2_test_data(params, generate_golden=False)
-        batch_module.normalize_indexer_inputs(data, kwargs, "QLI_V2", quantized=True)
+        batch_module.normalize_indexer_inputs(
+            data,
+            kwargs,
+            "QLI_V2",
+            quantized=True,
+            hifloat8_encoder=pytest_golden.trans_float_tensor_to_hifuint8,
+        )
         for name, dst, src_name in (
             ("query", query, "query"),
             ("key", key, "key"),
@@ -870,8 +876,8 @@ class QuantLightningIndexerV2InputAdapter:
 INPUT_ADAPTER = QuantLightningIndexerV2InputAdapter()
 
 
-def is_negative_case(kwargs):
-    value = kwargs.get("is_negative_case", False)
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
     if isinstance(value, str):
         return value.strip().lower() in ("1", "true", "yes", "on")
     return bool(value)
@@ -914,7 +920,7 @@ def generate_qli_v2_inputs(
     **kwargs,
 ):
     """Populate pytest-derived inputs; metadata is filled by npu_preprocess."""
-    if is_negative_case(kwargs):
+    if expect_error(kwargs):
         return None
 
     if metadata is None:

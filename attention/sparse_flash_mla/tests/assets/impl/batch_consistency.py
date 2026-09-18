@@ -45,6 +45,13 @@ class TorchBatchRandomContext:
             self.list_value(kwargs, "seqused_q") or self.q_lengths
         )
         self.relations = self.parse_relations(kwargs)
+        if self.layout_kv == "TND" and any(
+            batch_slice[2] != 1 and len(range(*batch_slice)) > 1
+            for batch_slice, _sequence_slice, _seed in self.relations
+        ):
+            raise ValueError(
+                "SMLA TND KV relations cannot map a strided logical B slice"
+            )
         self.batch_relations = [
             (batch_slice, seed) for batch_slice, _sequence_slice, seed in self.relations
         ]
@@ -118,6 +125,14 @@ class TorchBatchRandomContext:
     def prefix_lengths(prefix):
         return [right - left for left, right in zip(prefix, prefix[1:])]
 
+    @staticmethod
+    def ranges_overlap(left, right):
+        left_values = range(*left)
+        right_values = range(*right)
+        if len(left_values) > len(right_values):
+            left_values, right_values = right_values, left_values
+        return any(value in right_values for value in left_values)
+
     @classmethod
     def build_prefix(cls, kwargs, name, expected_total, required):
         value = cls.list_value(kwargs, name)
@@ -144,9 +159,9 @@ class TorchBatchRandomContext:
         if not all(isinstance(item, int) for item in value):
             raise ValueError(f"SMLA {label} slice must contain integers: {value!r}")
         start, stop, step = (int(item) for item in value)
-        if step != 1 or start < 0 or start >= stop or stop > extent:
+        if step <= 0 or start < 0 or start >= stop or stop > extent:
             raise ValueError(
-                f"SMLA {label} slice must be in-range, non-empty and contiguous: {value!r}"
+                f"SMLA {label} slice must be in-range, non-empty and have a positive step: {value!r}"
             )
         return start, stop, step
 
@@ -194,7 +209,7 @@ class TorchBatchRandomContext:
                     raise ValueError(
                         "SMLA logical B and S slices must use the same seed"
                     )
-                if batch_slice[1] - batch_slice[0] != 1:
+                if len(range(*batch_slice)) != 1:
                     raise ValueError(
                         "SMLA logical (B,S) relation requires one B per sample"
                     )
@@ -214,20 +229,30 @@ class TorchBatchRandomContext:
     def map_query_relations(self):
         selectors = []
         for batch_slice, sequence_slice, _seed in self.relations:
-            batch_start, batch_stop, _ = batch_slice
+            batch_start, batch_stop, batch_step = batch_slice
             if self.layout_q == "BSND":
                 selector = [batch_slice]
                 if sequence_slice is not None:
                     selector.append(sequence_slice)
             elif sequence_slice is None:
-                selector = [(self.q_prefix[batch_start], self.q_prefix[batch_stop], 1)]
+                batch_indices = range(*batch_slice)
+                if batch_step != 1 and len(batch_indices) > 1:
+                    raise ValueError(
+                        "SMLA TND logical B relation requires a contiguous B slice"
+                    )
+                physical_stop = (
+                    self.q_prefix[batch_start + 1]
+                    if len(batch_indices) == 1
+                    else self.q_prefix[batch_stop]
+                )
+                selector = [(self.q_prefix[batch_start], physical_stop, 1)]
             else:
-                sequence_start, sequence_stop, _ = sequence_slice
+                sequence_start, sequence_stop, sequence_step = sequence_slice
                 selector = [
                     (
                         self.q_prefix[batch_start] + sequence_start,
                         self.q_prefix[batch_start] + sequence_stop,
-                        1,
+                        sequence_step,
                     )
                 ]
             selectors.append(tuple(selector))
@@ -239,18 +264,14 @@ class TorchBatchRandomContext:
             for candidate_batch, candidate_sequence, _candidate_seed in self.relations[
                 index + 1 :
             ]:
-                if (
-                    batch_slice[1] <= candidate_batch[0]
-                    or candidate_batch[1] <= batch_slice[0]
-                ):
+                if not self.ranges_overlap(batch_slice, candidate_batch):
                     continue
                 if sequence_slice is None:
                     raise ValueError(
                         "SMLA relation samples must not overlap logical B positions"
                     )
-                if candidate_sequence is None or not (
-                    sequence_slice[1] <= candidate_sequence[0]
-                    or candidate_sequence[1] <= sequence_slice[0]
+                if candidate_sequence is None or self.ranges_overlap(
+                    sequence_slice, candidate_sequence
                 ):
                     raise ValueError(
                         "SMLA relation samples must not overlap logical q positions"
@@ -259,12 +280,10 @@ class TorchBatchRandomContext:
     def validate_relation_contract(self, kwargs):
         self.validate_disjoint_relations()
         reference_slice = self.batch_relations[0][0]
-        reference_count = reference_slice[1] - reference_slice[0]
+        reference_count = len(range(*reference_slice))
         reference_sequence = self.relations[0][1]
         reference_sequence_count = (
-            reference_sequence[1] - reference_sequence[0]
-            if reference_sequence is not None
-            else None
+            len(range(*reference_sequence)) if reference_sequence is not None else None
         )
         vector_names = (
             "seqused_q",
@@ -296,31 +315,32 @@ class TorchBatchRandomContext:
                 raise ValueError("SMLA prefix-length vector length must equal B + 1")
 
         def relation_signature(batch_slice):
-            start, stop, _ = batch_slice
+            start, stop, step = batch_slice
             signature = []
             for value in prefixes:
                 signature.append(
                     tuple(
-                        value[index + 1] - value[index] for index in range(start, stop)
+                        value[index + 1] - value[index]
+                        for index in range(start, stop, step)
                     )
                 )
             for value in vectors.values():
-                signature.append(tuple(value[start:stop]))
+                signature.append(
+                    tuple(value[index] for index in range(start, stop, step))
+                )
             return tuple(signature)
 
         reference_signature = relation_signature(reference_slice)
         for relation, (batch_slice, _seed) in zip(
             self.relations[1:], self.batch_relations[1:]
         ):
-            if batch_slice[1] - batch_slice[0] != reference_count:
+            if len(range(*batch_slice)) != reference_count:
                 raise ValueError(
                     "SMLA relation slices must contain the same logical batch count"
                 )
             sequence_slice = relation[1]
             sequence_count = (
-                sequence_slice[1] - sequence_slice[0]
-                if sequence_slice is not None
-                else None
+                len(range(*sequence_slice)) if sequence_slice is not None else None
             )
             if sequence_count != reference_sequence_count:
                 raise ValueError(
@@ -343,8 +363,17 @@ class TorchBatchRandomContext:
 
     def register_prefix(self, prefix, source):
         selectors = []
-        for (start, stop, _), _seed in self.batch_relations:
-            selectors.append((prefix[start], prefix[stop], 1))
+        for batch_slice, _seed in self.batch_relations:
+            start, stop, step = batch_slice
+            batch_indices = range(*batch_slice)
+            if step != 1 and len(batch_indices) > 1:
+                raise ValueError(
+                    "SMLA TND KV relations require contiguous logical B slices"
+                )
+            physical_stop = (
+                prefix[start + 1] if len(batch_indices) == 1 else prefix[stop]
+            )
+            selectors.append((prefix[start], physical_stop, 1))
         self.register_extent(
             prefix[-1], tuple((value, 0) for value in selectors), source
         )
@@ -414,24 +443,23 @@ class TorchBatchRandomContext:
         self.randperm_batch_offsets = offsets
         n2 = int(params["N2"])
         for batch_slice, sequence_slice, seed in self.relations:
-            batch_start, batch_stop, _ = batch_slice
+            batch_start, batch_stop, batch_step = batch_slice
             for relative_batch, batch_index in enumerate(
-                range(batch_start, batch_stop)
+                range(batch_start, batch_stop, batch_step)
             ):
-                token_start = 0 if sequence_slice is None else sequence_slice[0]
-                token_stop = (
-                    int(sequence_lengths[batch_index])
+                token_range = (
+                    range(int(sequence_lengths[batch_index]))
                     if sequence_slice is None
-                    else sequence_slice[1]
+                    else range(*sequence_slice)
                 )
-                for token_index in range(token_start, token_stop):
+                for relative_token, token_index in enumerate(token_range):
                     for head_index in range(n2):
                         local_index = token_index * n2 + head_index
                         key = (batch_index, local_index)
                         relation_key = (
                             seed,
                             relative_batch,
-                            token_index - token_start,
+                            relative_token,
                             head_index,
                         )
                         existing = self.randperm_relation_keys.get(key)
@@ -525,15 +553,13 @@ class TorchBatchRandomContext:
         if self.layout_kv != "PA_BBND":
             return
         op_input = data.get("input", {})
-        reference = self.relations[0][0]
+        reference_indices = tuple(range(*self.relations[0][0]))
         for name in ("ori_block_table", "cmp_block_table"):
             table = op_input.get(name)
             if table is None:
                 continue
             for batch_slice, _sequence_slice, _seed in self.relations[1:]:
-                for offset in range(reference[1] - reference[0]):
-                    source = reference[0] + offset
-                    target = batch_slice[0] + offset
+                for source, target in zip(reference_indices, range(*batch_slice)):
                     table[target].copy_(table[source])
 
     def __enter__(self):

@@ -173,10 +173,6 @@ class MixedQuantSparseFlashMlaInputAdapter:
         layout_kv,
         kwargs,
     ):
-        is_batch_case = all(
-            kwargs.get(name) is not None
-            for name in ("batch_axis", "batch_slice_info", "batch_seed")
-        )
         cu_q = self.list_value(kwargs, "cu_seqlens_q")
         cu_ori = self.list_value(kwargs, "cu_seqlens_ori_kv")
         cu_cmp = self.list_value(kwargs, "cu_seqlens_cmp_kv")
@@ -198,7 +194,7 @@ class MixedQuantSparseFlashMlaInputAdapter:
             _, kv_seq, kv_heads, _ = [int(x) for x in ori_kv.shape]
             block_num1 = kwargs.get("block_num1")
             block_size1 = kwargs.get("block_size1")
-            if is_batch_case and block_size1 is None:
+            if block_size1 is None:
                 block_size1 = self.PYTEST_BLOCK_SIZE
         elif layout_kv == "TND":
             _, kv_heads, _ = [int(x) for x in ori_kv.shape]
@@ -207,7 +203,7 @@ class MixedQuantSparseFlashMlaInputAdapter:
             )
             block_num1 = kwargs.get("block_num1")
             block_size1 = kwargs.get("block_size1")
-            if is_batch_case and block_size1 is None:
+            if block_size1 is None:
                 block_size1 = self.PYTEST_BLOCK_SIZE
         else:
             shape_block_num, shape_block_size, kv_heads, _ = [
@@ -225,7 +221,7 @@ class MixedQuantSparseFlashMlaInputAdapter:
         if cmp_kv is None:
             block_num2 = kwargs.get("block_num2")
             block_size2 = kwargs.get("block_size2")
-            if is_batch_case and block_size2 is None:
+            if block_size2 is None:
                 block_size2 = block_size1
         elif layout_kv == "PA_BBND":
             block_num2 = kwargs.get("block_num2")
@@ -237,7 +233,7 @@ class MixedQuantSparseFlashMlaInputAdapter:
         else:
             block_num2 = kwargs.get("block_num2")
             block_size2 = kwargs.get("block_size2")
-            if is_batch_case and block_size2 is None:
+            if block_size2 is None:
                 block_size2 = block_size1
 
         mode = self.select_template_mode(kwargs)
@@ -288,8 +284,8 @@ class MixedQuantSparseFlashMlaInputAdapter:
                 "cmp_residual_kv": residual,
             }
         )
-        if is_batch_case and params.get("tile_size") is None:
-            # The batch CSV has no target API field for this pytest packing geometry.
+        if params.get("tile_size") is None:
+            # Pytest packing needs this even when no batch relation is requested.
             params["tile_size"] = self.PYTEST_TILE_SIZE
         if mode is not None:
             params["template_run_mode"] = mode
@@ -349,8 +345,8 @@ class MixedQuantSparseFlashMlaInputAdapter:
 INPUT_ADAPTER = MixedQuantSparseFlashMlaInputAdapter()
 
 
-def is_negative_case(kwargs):
-    value = kwargs.get("is_negative_case", False)
+def expect_error(kwargs):
+    value = kwargs.get("expect_error", False)
     if isinstance(value, str):
         return value.strip().lower() in ("1", "true", "yes", "on")
     return bool(value)
@@ -402,7 +398,7 @@ def generate_mixed_quant_sparse_flash_mla_inputs(
     **kwargs,
 ):
     """Populate pytest-derived inputs and leave metadata for npu_preprocess."""
-    if is_negative_case(kwargs):
+    if expect_error(kwargs):
         return None
 
     params = dict(kwargs)
