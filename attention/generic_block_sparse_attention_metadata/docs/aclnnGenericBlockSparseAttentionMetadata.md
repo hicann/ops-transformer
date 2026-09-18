@@ -45,14 +45,16 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
   int64_t            numKvHeads,
   int64_t            headDim,
   const aclIntArray *blockShape,
-  int64_t            isPackedGQA,
   const char         *layoutQ,
   const char         *layoutKv,
+  int64_t            layoutSparsePattern,
   int64_t            maskType,
   int64_t            quantType,
   int64_t            softmaxPrecision,
   int64_t            winLeft,
   int64_t            winRight,
+  int64_t            residualBlockMode,
+  bool               isConsistentTopK,
   const aclTensor   *metadataOptional,
   uint64_t          *workspaceSize,
   aclOpExecutor    **executor)
@@ -100,7 +102,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>sparseBlockIdx</td>
       <td>输入</td>
       <td>稀疏块索引数组，指定每个Q块选择的KV块索引。</td>
-      <td>当前仅支持TND + isPackedGQA=1。取值须为合法KV块索引（按cu存储长度分块）；无效位置可用-1填充，有效值须落在前sparseBlockCount个位置。isPackedGQA及其余shape见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#layout对应关系说明">layout对应关系说明</a>。</td>
+      <td>取值须为合法KV块索引（按cu存储长度分块）；无效位置可用-1填充，有效值须落在前sparseBlockCount个位置。详细参考<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#layout对应关系说明">layout对应关系说明</a>。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>[numKeyValueHeads, totalQBlocks, maxSparseBlockCount]</td>
@@ -110,7 +112,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>sparseBlockCount</td>
       <td>输入</td>
       <td>每个Q块实际选择的KV块数量。</td>
-      <td>当前仅支持TND + isPackedGQA=1。isPackedGQA含义与sparseBlockIdx相同。其他组合的shape见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#layout对应关系说明">layout对应关系说明</a>。</td>
+      <td>详细参考<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#layout对应关系说明">layout对应关系说明</a>。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>[numKeyValueHeads, totalQBlocks]</td>
@@ -242,16 +244,6 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>-</td>
     </tr>
     <tr>
-      <td>isPackedGQA</td>
-      <td>输入</td>
-      <td>代表进行块状稀疏时，同一个group内的qHead是否共享同样的稀疏pattern<br>（注：不同batch之间不会共享同样的稀疏pattern，该入参仅区分head维度的共享情况）。</td>
-      <td>若取值为0，则代表同一个group内的qHead不共享同样的稀疏pattern；<br>若取值为1，则代表同一个group内的qHead共享同样的稀疏pattern。<br>当前仅支持1。</td>
-      <td>INT64</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-    </tr>
-    <tr>
       <td>layoutQ</td>
       <td>输入</td>
       <td>代表输入query的数据排布格式。</td>
@@ -267,6 +259,16 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>代表输入key、value的数据排布格式。</td>
       <td>目标支持"TND""BNSD""BSND""PA_BBND""PA_BNBD"，详见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#layout对应关系说明">layout对应关系说明</a>。当前仅支持"PA_BBND"。</td>
       <td>String</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>layoutSparsePattern</td>
+      <td>输入</td>
+      <td>代表输入的sparseBlockIdx、sparseBlockCount的数据排布格式。</td>
+      <td>当前仅支持取"4"，详细参考<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#layout对应关系说明">layout对应关系说明</a>。</td>
+      <td>INT64</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -330,6 +332,26 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>滑窗attention场景下，滑窗需要向后包含多少个token。</td>
       <td>用于滑窗attention；不使能时必须为-1，需与maskType配合，见<a href="../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#掩码说明">掩码说明</a>。当前只支持传入-1。</td>
       <td>INT64</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>residualBlockMode</td>
+      <td>输入</td>
+      <td>表示KV序列以blockShapeY为单位进行稀疏后，尾部不完整块的状态。</td>
+      <td>当前仅支持取0或1。0代表尾部不完整块是否参与运算由sparseBlockIdx传入的值决定，1表示尾部不完整块必定参与运算，但必定不包含在sparseBlockIdx中。</td>
+      <td>INT64</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>isConsistentTopK</td>
+      <td>输入</td>
+      <td>前置算子进行稀疏块选择时，同一batch同一head内每个Q块选择的KV块最大数量是否一致。</td>
+      <td>仅支持0或1。0代表不一致，1代表一致。</td>
+      <td>BOOL</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -498,7 +520,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 ### 其他约束
 
 - 本接口必须与`aclnnGenericBlockSparseAttention`配套使用。共同Tensor和属性须与随后调用的主算子完全一致，每次调用主算子前均须重新生成`metadataOptional`。主算子的完整约束见[aclnnGenericBlockSparseAttention](../../generic_block_sparse_attention/docs/aclnnGenericBlockSparseAttention.md#约束说明)。
-- 当前仅支持`layoutQ="TND"`、`layoutKv="PA_BBND"`、`isPackedGQA=1`、`headDim=128`、`blockShape=[1, 128]`、`maskType=1`以及`winLeft=winRight=-1`。
+- 当前仅支持`layoutQ="TND"`、`layoutKv="PA_BBND"`、`headDim=128`、`blockShape=[1, 128]`、`maskType=1`以及`winLeft=winRight=-1`。
 - `sparseBlockIdx`的shape为`[numKvHeads, totalQBlocks, maxSparseBlockCount]`，`sparseBlockCount`的shape为`[numKvHeads, totalQBlocks]`。`maxSparseBlockCount`须大于0、不超过256，且须不小于`sparseBlockCount`中所有元素的最大值。
 - `cuSeqLengthsQOptional`当前必须传入；`sequsedQOptional`可传入nullptr。传入sequsedQ时，每个元素须位于`[0, 对应Batch存储长度]`范围内。分核按实际长度累加，稀疏块分块仍按cu前缀和描述的存储长度计算。
 - layoutKv为PA_BBND时须传`sequsedKvOptional`，不传`cuSeqLengthsKvOptional`。layoutKv为TND时，`sequsedKvOptional`可与`cuSeqLengthsKvOptional`并存，双长度语义同Q侧。
@@ -526,7 +548,7 @@ aclnnStatus RunMetadata(const aclTensor *sparseBlockIdx, const aclTensor *sparse
     aclOpExecutor *executor = nullptr;
     aclnnStatus ret = aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
         sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, nullptr, nullptr, sequsedKvOptional, 16, 2048,
-        32, 8, 128, blockShape, 1, "TND", "PA_BBND", 1, 0, 0, -1, -1, metadataOptional, &workspaceSize,
+        32, 8, 128, blockShape, "TND", "PA_BBND", 4, 1, 0, 0, -1, -1, 0, 0, metadataOptional, &workspaceSize,
         &executor);
     aclDestroyIntArray(blockShape);
     if (ret != ACL_SUCCESS) {
