@@ -1125,8 +1125,8 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
         int64_t quantMode = 0;
         int64_t groupListType = 0;
 
-        std::vector<int64_t> tuningConfigData = {};
-        aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigData.data(), 1);
+        std::vector<int64_t> tuningConfigData;
+        aclIntArray* tuningConfig = aclCreateIntArray(tuningConfigData.data(), 0);
 
         uint64_t workspaceSize = 0;
         aclOpExecutor* executor;
@@ -1186,8 +1186,6 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
             aclrtFree(weightDeviceAddr[i]);
             aclrtFree(weightScaleDeviceAddr[i]);
         }
-        aclrtFree(weightDeviceAddr);
-        aclrtFree(weightScaleDeviceAddr);
         aclrtFree(xScaleDeviceAddr);
         aclrtFree(groupListDeviceAddr);
         aclrtFree(outputDeviceAddr);
