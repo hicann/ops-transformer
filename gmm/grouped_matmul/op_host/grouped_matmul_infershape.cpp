@@ -437,6 +437,12 @@ static bool IsS8S4PseudoQuant(const gert::InferShapeContext *context)
 
 static bool IsS8S4SpecialWeightFormat(const gert::InferShapeContext *context)
 {
+    fe::PlatformInfo platformInfo;
+    fe::OptionalInfo optionalInfo;
+    const auto ret = fe::PlatformInfoManager::Instance().GetPlatformInfoWithOutSocVersion(platformInfo, optionalInfo);
+    if (ret != GRAPH_SUCCESS || GmmDavidSupportSoc.count(platformInfo.str_info.short_soc_version) == 0) {
+        return false;
+    }
     if (!IsS8S4PseudoQuant(context)) {
         return false;
     }
