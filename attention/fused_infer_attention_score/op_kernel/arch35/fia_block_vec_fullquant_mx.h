@@ -329,7 +329,7 @@ public:
         if constexpr (HAS_MASK) {
             maskLine = ComputeMaskLineDN(runInfo, subLoop);
         }
-        if (isFullMask) {
+        if (unlikely(isFullMask)) {
             maskLine = -256;
         }
         uint32_t softmaxBufIdx = runInfo.mloop % PRELOAD_N;

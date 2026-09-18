@@ -336,7 +336,7 @@ public:
         if constexpr (HAS_MASK) {
             maskLine = ComputeMaskLineDN(runInfo, subLoop);
         }
-        if (isFullMask_) {
+        if (unlikely(isFullMask_)) {
             maskLine = -256;
         }
 
