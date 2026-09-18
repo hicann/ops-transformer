@@ -115,6 +115,27 @@ inline uint32_t GetMaxUsedAicCores(uint32_t aicNum, uint32_t batchSize, uint32_t
     return cores;
 }
 
+constexpr uint32_t FA_TEMPLATE_ND = 0;
+constexpr uint32_t FA_TEMPLATE_DN = 1;
+constexpr uint32_t FA_TEMPLATE_DN_UNMERGED = 2; // 不合轴 DN(templateId=2), 预埋路由入口默认关闭
+
+// 预埋开关: false 时模板路由维持原逻辑(ND/合轴DN), 不影响现网行为;
+// 打开后所有 case 路由到不合轴 DN 新模板(kernel/block *_dn_unmerged.h 文件, templateId=2),
+// host tiling 与 flash_attn_metadata(AICPU) 共享该开关, 保证两侧分核选择严格一致。
+constexpr bool DN_UNMERGED_ROUTE_ENABLED = false;
+
+// DN 模板路由的共享判定: host tiling 与 flash_attn_metadata(AICPU) 必须使用同一份逻辑,
+// 保证 metadata 的分核 outputLayout 选择与 kernel 模板选择严格一致。
+// 全量路由: 所有 case 均走 DN 模板; 接口层已限定 D/DV 注册组合, 此处注册表仅作
+// 未注册维度的防御性回退, mask/layout/S1 大小不设任何路由限制。
+inline uint32_t GetFlashAttnTemplateId(uint32_t qkHeadDim, uint32_t vHeadDim)
+{
+    bool supportedEqualDim =
+        (qkHeadDim == vHeadDim) && (qkHeadDim == 64 || qkHeadDim == 72 || qkHeadDim == 128 || qkHeadDim == 256);
+    bool supportedMlaDim = (qkHeadDim == 192) && (vHeadDim == 128);
+    return (supportedEqualDim || supportedMlaDim) ? FA_TEMPLATE_DN_UNMERGED : FA_TEMPLATE_ND;
+}
+
 } // namespace fa_tiling_util
 } // namespace flash_attn
 } // namespace optiling

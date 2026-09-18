@@ -18,6 +18,7 @@
 #include "utils/flash_attn_common_def.h"
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 #include "arch35/flash_attn_kernel_dn.h"
+#include "arch35/flash_attn_kernel_dn_unmerged.h"
 #include "arch35/flash_attn_kernel_nd.h"
 
 using namespace AscendC;
@@ -127,7 +128,25 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key
     using FA_T = FlashAttnKernel::FAType<INPUT_T, OUT_T, pageAttention, qLayout, kvLayout, outLayout, s1TemplateType,
                                          s2TemplateType, dTemplateType, dVTemplateType, hasAttenMask>;
 
-    if constexpr (templateId == FA_Template_DN) {
+    if constexpr (templateId == FA_Template_DN_Unmerged) {
+        // 不合轴 DN(预埋): BN1_S1 分核, 独立文件(*_dn_unmerged.h), 全部注册维度/有无 mask 实例化;
+        // 路由入口 DN_UNMERGED_ROUTE_ENABLED 默认关闭, 打开后由 host tiling 产生 templateId=2
+        using CubeBlock = FlashAttnKernel::FANoQuantGqaBlockCubeDnUnmerged<FA_T>;
+        using VecFaBlock = FlashAttnKernel::FANoQuantGqaBlockVecDnUnmerged<FA_T>;
+        using VecFdBlock = FlashAttnKernel::FiaBlockVecFlashDecode<FA_T, true>;
+        using VecDummy = FlashAttnKernel::FANoQuantGqaBlockVecDummyDnUnmerged<FA_T>;
+        using CubeDummy = FlashAttnKernel::FANoQuantGqaBlockCubeDummyDnUnmerged<FA_T>;
+#ifdef __DAV_CUBE__
+        using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernelDnUnmerged<FA_T, CubeBlock, VecDummy, VecDummy>;
+#else
+        using Kernel =
+            FlashAttnKernel::FlashAttentionNoQuantGqaKernelDnUnmerged<FA_T, CubeDummy, VecFaBlock, VecFdBlock>;
+#endif
+        Kernel op;
+        op.Init(query, key, value, blockTable, cuSeqLensQ, cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata,
+                attnOut, softmaxLse, user, &tilingData->baseTiling);
+        op.Process();
+    } else if constexpr (templateId == FA_Template_DN) {
         using CubeBlock = FlashAttnKernel::FANoQuantGqaBlockCubeDn<FA_T>;
         using VecFaBlock = FlashAttnKernel::FANoQuantGqaBlockVecDn<FA_T>;
         using VecFdBlock = FlashAttnKernel::FiaBlockVecFlashDecode<FA_T>;

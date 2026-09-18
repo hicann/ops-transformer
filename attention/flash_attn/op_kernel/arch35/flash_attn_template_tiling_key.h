@@ -59,8 +59,9 @@ ASCENDC_TPL_ARGS_DECL(FlashAttn,
 
                       // templateId (8-bit)
                       //    0: ND模板
-                      //    1: DN模板
-                      ASCENDC_TPL_UINT_DECL(TemplateId, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 1),
+                      //    1: DN模板(合轴)
+                      //    2: DN模板(不合轴, 预埋, 路由入口默认关闭)
+                      ASCENDC_TPL_UINT_DECL(TemplateId, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 2),
 
                       // config (4-bit), support D=64/128/256 and (D=192, DV=128)
                       //    config=0: sOuter=64, sInner=128 → D=64,  DV=64
@@ -89,6 +90,16 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_BOOL_SEL(HasAttenMask, false),
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 1),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 2, 6),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
+    // DN不合轴模板（templateId=2, 预埋）：kernel 侧为独立文件(*_dn_unmerged.h),
+    // 全部已注册 D/DV config(0-7) 与有无 attenMask 全量实例化; 路由入口默认关闭,
+    // 打开 DN_UNMERGED_ROUTE_ENABLED 后由 GetFlashAttnTemplateId 产生 templateId=2
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
+                                              InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+                         ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 2),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)), );
 
 #endif // TEMPLATE_TILING_KEY_FLASH_ATTN_H_

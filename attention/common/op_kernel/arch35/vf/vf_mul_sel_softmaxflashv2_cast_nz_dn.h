@@ -126,8 +126,11 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateVF(__ubuf__ T2 *x_exp, __ubuf__ flo
     if constexpr (hasSink) {
         Duplicate(vreg_sink_input, sinkValue);
     }
+    uint32_t paddingRows = m;
+    MaskReg paddingMask = UpdateMask<T>(paddingRows);
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
+        // 仅写实际 pitch 对应的 M lanes, 避免全宽写入越过相邻通信缓冲
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, paddingMask);
     }
     mem_bar(VST_VLD);
 
@@ -510,8 +513,11 @@ __simd_vf__ inline void ProcessVec1DnUpdateVF(__ubuf__ T2 *x_exp, __ubuf__ float
     if constexpr (hasSink) {
         Duplicate(vreg_sink_input, sinkValue);
     }
+    uint32_t paddingRows = m;
+    MaskReg paddingMask = UpdateMask<T>(paddingRows);
     for (uint16_t i = originN; i < ubN; ++i) {
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, preg_135);
+        // 仅写实际 pitch 对应的 M lanes, 避免全宽写入越过相邻通信缓冲
+        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)input_x_local_UB + i * m, vreg_min, paddingMask);
     }
     mem_bar(VST_VLD);
 

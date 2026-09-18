@@ -137,4 +137,25 @@ __aicore__ inline void DataCopySoftmaxLseTNDtoNTArch35(GlobalTensor<float> softm
     }
 }
 
+// DN 不合轴: 每个任务只属于一个 query 头, LSE 输出按 (b, n1, s1) 定位, 不存在跨 G 行
+template <FA_LAYOUT LAYOUT_T, typename CONST_INFO_T, typename SEQ_TOOL>
+__aicore__ inline void DataCopySoftmaxLseS1Only(GlobalTensor<float> softmaxLseGm, LocalTensor<float> lseSrc, uint32_t b,
+                                                uint32_t n2, uint32_t g, uint32_t s1, uint32_t rows,
+                                                const CONST_INFO_T &info, SEQ_TOOL &seq)
+{
+    uint64_t head = static_cast<uint64_t>(n2) * info.gSize + g;
+    uint64_t offset;
+    if constexpr (LAYOUT_T == FA_LAYOUT::TND) {
+        offset = head * info.t1Size + seq.cuSeqLensParser.GetTBase(b) + s1;
+    } else {
+        offset = (static_cast<uint64_t>(b) * info.n2Size * info.gSize + head) * info.s1Size + s1;
+    }
+    DataCopyExtParams dataCopyParams;
+    dataCopyParams.blockCount = rows;
+    dataCopyParams.blockLen = sizeof(float);
+    dataCopyParams.srcStride = 0;
+    dataCopyParams.dstStride = 0;
+    DataCopyPad(softmaxLseGm[offset], lseSrc, dataCopyParams);
+}
+
 #endif
