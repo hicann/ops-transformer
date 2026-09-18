@@ -248,6 +248,8 @@ def cgdr_benchmark(
         actual_seq_lengths,
         g,
         chunk_size=chunk_size,
+        # Keep the BF16 state baseline, but match the Vinner/Vprime accumulator path.
+        v_inner_dtype=initial_state.dtype,
     )
     o_bench = o_bench.to(torch.float32)
     state_bench = state_bench.to(torch.float32)
