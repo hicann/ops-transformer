@@ -19,6 +19,7 @@ def stage1_opt(
     beta,  # (S, Nv)
     scale,
     C,  # chunk size
+    v_inner_dtype=torch.bfloat16,
 ):
     S, Nk, Dk = query.shape
     _, Nv, Dv = value.shape
@@ -78,7 +79,9 @@ def stage1_opt(
         torch.bfloat16
     )  # (Nv*nc, C, Dk)
 
-    v_inner = attn_1 @ v_beta  # (Nv*nc, C, Dv)
+    # Match the Vinner accumulator precision of the selected state path.
+    # Convert operands before matmul so FP32 results are not rounded through BF16.
+    v_inner = attn_1.to(v_inner_dtype) @ v_beta.to(v_inner_dtype)  # (Nv*nc, C, Dv)
     k_cumdecay = attn_1 @ k_cumdecay.to(torch.bfloat16)  # (Nv*nc, C, Dk)
     kg = kg.to(torch.bfloat16)  # (Nv*nc, C, Dk)
 
@@ -127,8 +130,9 @@ def stage2_opt(
         state_fT = state_f.transpose(-1, -2)  # (Nv, Dk, Dv)
 
         attn_inter_chunk = (qg.float() @ state_fT).to(torch.bfloat16)  # (Nv, C, Dv)
-        v_prime = (kcd.float() @ state_fT).to(torch.bfloat16)  # (Nv, C, Dv)
-        v_new_chunk = vi + v_prime  # (Nv, C, Dv)
+        v_prime = (kcd.float() @ state_fT).to(v_inner.dtype)  # (Nv, C, Dv)
+        # FP32 Vinner/Vprime are summed before the single BF16 cast used by stage3.
+        v_new_chunk = (vi + v_prime).to(torch.bfloat16)  # (Nv, C, Dv)
 
         state_out = v_new_chunk.transpose(-1, -2) @ kgc  # (Nv, Dv, Dk)
         decay = gc.exp()[:, -1][:, None, None]  # (Nv, 1, 1)
@@ -185,6 +189,7 @@ def chunk_gdn_benchmark_opt(
     actual_seq_lengths,  # (B,)
     g=None,  # (T, Nv)
     chunk_size=64,
+    v_inner_dtype=torch.bfloat16,
 ):
     T, Nk, Dk = query.shape
     B, Nv, Dv, _ = initial_state.shape
@@ -210,6 +215,7 @@ def chunk_gdn_benchmark_opt(
             beta[start:end],
             scale,
             C,
+            v_inner_dtype=v_inner_dtype,
         )
 
         cur_state, attn_inter, v_new = stage2_opt(
