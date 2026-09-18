@@ -28,12 +28,14 @@
 - **功能更新**：（相对于aclnnMlaPrologV3weightNz的差异）
     - 新增可选参数doRope：控制是否对queryRopeOut与krCache执行旋转位置编码；默认true；doRope=true时ropeSin/ropeCos必须传入非空有效Tensor，doRope=false时跳过RoPE并写直通结果，此时ropeSin/ropeCos必须同时为空（nullptr或空Tensor）。
     - N:Head-Num（多头数）范围调整为1-128
-- **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为五路:
+- **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路:
     - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后，再乘以Query尺度矫正因子$\alpha_q$得到$q^N$；第二路乘以$W^{QR}$后，在doRope=true时经过旋转位置编码得到$q^R$，doRope=false时对$c^Q \cdot W^{QR}$直通写出。
     - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后，乘以Key尺度矫正因子$\alpha_{kv}$传入Cache中得到$k^C$；
     - 第四路是输入$x$乘以$W^{KR}$后，在doRope=true时经过旋转位置编码再写入Cache得到$k^R$，doRope=false时对$x \cdot W^{KR}$直通写入Cache；
     - 第五路是输出$q^N$经过DynamicQuant后得到的量化参数。
-    - 权重参数WeightDq、WeightUqQr和WeightDkvKr需要以NZ格式传入
+    - 第六路是queryNormFlag=true时，输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后得到压缩结果$c^Q$，作为queryNormOutOptional输出。
+    - 第七路是queryNormFlag=true且量化场景（weightQuantMode≠0）下，对$c^Q$做DynamicQuant，最终得到量化后的queryNormOutOptional和对应量化参数dequantScaleQNormOutOptional。
+    - 权重参数WeightDq、WeightUqQr和WeightDkvKr需要以NZ格式传入。
 
 - **计算公式**：
 
@@ -60,6 +62,7 @@
     $$
     q^N = q^C \cdot W^{UK}
     $$
+    其中 $\alpha_q$ 是Query的尺度矫正参数。
 
     对Query进行ROPE旋转位置编码（doRope=true）
 
@@ -82,6 +85,7 @@
     $$
     k^C = \mathrm{Cache}(c^{KV})
     $$
+    其中 $\alpha_{kv}$ 是Key的尺度矫正参数。
 
     对Key进行ROPE旋转位置编码，并将结果存入cache（doRope=true）
 
@@ -98,12 +102,48 @@
     Dequant Scale Query Nope计算公式
 
     $$
-    \mathrm{dequantScaleQNope} = {\mathrm{RowMax}(\mathrm{abs}(q^{N})) / 127}
+    \mathrm{dequantScaleQNope} = {\mathrm{RowMax}(\mathrm{abs}(q^{N})) / Q_{max}}
     $$
 
     $$
     q^{N} = {\mathrm{round}(q^{N} / \mathrm{dequantScaleQNope})}
     $$
+
+    Query Norm及Dequant Scale Query Norm计算公式（queryNormFlag=true时输出）
+
+    非量化场景（weightQuantMode=0）：
+
+    $$
+    queryNorm = c^Q = \alpha_q\cdot\mathrm{RmsNorm}(x \cdot W^{DQ})
+    $$
+
+    此时queryNorm为BFLOAT16类型，dequantScaleQNorm不输出（为nullptr）。
+
+    量化场景（weightQuantMode=1/2/4/5，per-token动态量化），smoothScaleCq可选传入，未传入时视为1：
+
+    $$
+    \tilde{c}^Q = c^Q \cdot smoothScale
+    $$
+
+    $$
+    \mathrm{dequantScaleQNorm} = {\mathrm{RowMax}(\mathrm{abs}(\tilde{c}^Q)) / Q_{max}}
+    $$
+
+    $$
+    queryNorm = {\mathrm{round}(\tilde{c}^Q / \mathrm{dequantScaleQNorm})}
+    $$
+
+    mxfp8量化场景（weightQuantMode=3，每32个元素一组pergroup动态量化，量化参数为FLOAT8_E8M0类型）：
+
+    $$
+    \mathrm{dequantScaleQNorm} = 2^{\lfloor \mathrm{log}_2(\mathrm{GroupMax}(\mathrm{abs}(c^Q))) \rfloor - 8}
+    $$
+
+    $$
+    queryNorm = {\mathrm{cast\_to\_fp8}(c^Q / \mathrm{dequantScaleQNorm})}
+    $$
+
+    其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数位的最大值emax。
 
 ## 函数原型
 
@@ -855,7 +895,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
 ## 约束说明
 
 - 确定性计算：
-  - aclnnMlaPrologV4WeightNz默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
+  - aclnnMlaPrologV4WeightNz默认确定性实现。
 
 <details>
   <summary><a id="shapeDesc"></a>shape格式字段含义说明</summary>
