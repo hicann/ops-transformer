@@ -240,7 +240,11 @@ ge::graphStatus CompressorTiling::SetInnerSplitInfo()
         baseParams_->kBaseNum = 1;
         baseParams_->kBaseSize = baseParams_->hiddenSize;
         if ((dBaseNum * mBaseNum) < baseParams_->usedCoreNum) {
-            baseParams_->kBaseNum = baseParams_->usedCoreNum / dBaseNum;
+            // Each Split-K part must own at least one 128-wide K block. Empty
+            // parts do not produce a Cube partial sum but were read by Vector
+            // as stale workspace data.
+            uint32_t candidateKBaseNum = baseParams_->usedCoreNum / dBaseNum;
+            baseParams_->kBaseNum = candidateKBaseNum < kAlignNum ? candidateKBaseNum : kAlignNum;
             baseParams_->kBaseSize = kAlignNum / baseParams_->kBaseNum * 128;
         }
         for (uint32_t i = 0; i < baseParams_->usedCoreNum; i++) {
