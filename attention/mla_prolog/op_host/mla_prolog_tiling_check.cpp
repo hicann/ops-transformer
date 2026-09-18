@@ -31,7 +31,10 @@ std::string ElemToString(const E &elem)
     return std::to_string(elem);
 }
 
-std::string FormatToString(const ge::Format format) { return std::string(ge::GetFormatName(format)); }
+std::string FormatToString(const ge::Format format)
+{
+    return std::string(ge::GetFormatName(format));
+}
 
 template <typename C, typename Func = std::string (*)(const typename C::value_type &)>
 std::string ConvertContainerToString(const C &container, Func func = ElemToString<typename C::value_type>)
@@ -263,13 +266,8 @@ ge::graphStatus MlaPrologTilingCheck::CheckDims() const
                             std::to_string(MAX_BLOCK_SIZE) + "] and a multiple of " + std::to_string(ALIGN_BLOCK_SIZE)),
                     return ge::GRAPH_FAILED);
     }
-    if (CheckHcqSize() != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-    if (CheckDSize() != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
-    if (CheckDtileSize() != ge::GRAPH_SUCCESS) {
+    if (CheckHcqSize() != ge::GRAPH_SUCCESS || CheckDSize() != ge::GRAPH_SUCCESS ||
+        CheckDtileSize() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -806,13 +804,25 @@ void MlaPrologTilingCheck::FillMxfp8FullKVPertileParamInfo()
     expectedParamInfo_[KV_CACHE_OUT_NAME].dtype = ge::DT_FLOAT8_E4M3FN;
 }
 
-void MlaPrologTilingCheck::FillFP8FullQuantParamInfo() { FillFullQuantParamInfo(); }
+void MlaPrologTilingCheck::FillFP8FullQuantParamInfo()
+{
+    FillFullQuantParamInfo();
+}
 
-void MlaPrologTilingCheck::FillFP8FullKVQuantParamInfo() { FillFullKVQuantParamInfo(); }
+void MlaPrologTilingCheck::FillFP8FullKVQuantParamInfo()
+{
+    FillFullKVQuantParamInfo();
+}
 
-void MlaPrologTilingCheck::FillHIF8FullQuantParamInfo() { FillFullQuantParamInfo(); }
+void MlaPrologTilingCheck::FillHIF8FullQuantParamInfo()
+{
+    FillFullQuantParamInfo();
+}
 
-void MlaPrologTilingCheck::FillHIF8FullKVQuantParamInfo() { FillFullKVQuantParamInfo(); }
+void MlaPrologTilingCheck::FillHIF8FullKVQuantParamInfo()
+{
+    FillFullKVQuantParamInfo();
+}
 
 void MlaPrologTilingCheck::FillFP8FullKVPertileQuantParamInfo()
 {
@@ -1146,7 +1156,10 @@ bool MlaPrologTilingCheck::CheckRopeCos() const
     return IsSingleParamValid(context_.ropeCos, ROPE_COS_NAME, {ge::DT_BF16}, {ge::FORMAT_ND, ge::FORMAT_NCHW}, {2, 3});
 }
 
-bool MlaPrologTilingCheck::IsRopeDisabled() const { return context_.doRope != nullptr && !(*(context_.doRope)); }
+bool MlaPrologTilingCheck::IsRopeDisabled() const
+{
+    return context_.doRope != nullptr && !(*(context_.doRope));
+}
 
 bool MlaPrologTilingCheck::IsEmptyTensor(const BaseParaInfo &param) const
 {

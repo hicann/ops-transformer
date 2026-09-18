@@ -28,7 +28,7 @@
         - queryNormOptional：公式中tokenX做rmsNorm后的输出tensor（对应$c^Q$）。
         - dequantScaleQNormOptional：query_norm的输出tensor的量化参数。
     - 调整cacheIndex参数的名称与位置，对应当前的cacheIndexOptional。
-- **算子功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为四路，首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后得到$q^N$；第二路乘以$W^{QR}$后经过旋转位置编码（ROPE）得到$q^R$；第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后传入Cache中得到$k^C$；第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码后传入另一个Cache中得到$k^R$。
+- **算子功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路，首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后得到$q^N$；第二路乘以$W^{QR}$后经过旋转位置编码（ROPE）得到$q^R$；第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后传入Cache中得到$k^C$；第四路是输入$x$乘以$W^{KR}$后经过旋转位置编码后传入另一个Cache中得到$k^R$；第五路是输出$q^N$经过DynamicQuant后得到的量化参数；第六路是queryNormFlag=true时，输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后得到压缩结果$c^Q$，作为queryNorm输出；第七路是queryNormFlag=true且量化场景（weightQuantMode≠0）下，对$c^Q$做DynamicQuant，最终得到量化后的queryNorm和对应量化参数dequantScaleQNorm。
 - **计算公式**：
 
     RmsNorm公式
@@ -78,6 +78,52 @@
     $$
     k^R = \mathrm{Cache}(\mathrm{ROPE}(x \cdot W^{KR}))
     $$
+
+    Dequant Scale Query Nope计算公式
+
+    $$
+    \mathrm{dequantScaleQNope} = {\mathrm{RowMax}(\mathrm{abs}(q^{N})) / Q_{max}}
+    $$
+
+    $$
+    q^{N} = {\mathrm{round}(q^{N} / \mathrm{dequantScaleQNope})}
+    $$
+
+    Query Norm及Dequant Scale Query Norm计算公式（queryNormFlag=true时输出）
+
+    非量化场景（weightQuantMode=0）：
+
+    $$
+    queryNorm = c^Q = \alpha_q\cdot\mathrm{RmsNorm}(x \cdot W^{DQ})
+    $$
+
+    此时queryNorm为BFLOAT16类型，dequantScaleQNorm不输出（为nullptr）。
+
+    量化场景（weightQuantMode=1/2/4/5，per-token动态量化），smoothScaleCq可选传入，未传入时视为1：
+
+    $$
+    \tilde{c}^Q = c^Q \cdot smoothScale
+    $$
+
+    $$
+    \mathrm{dequantScaleQNorm} = {\mathrm{RowMax}(\mathrm{abs}(\tilde{c}^Q)) / Q_{max}}
+    $$
+
+    $$
+    queryNorm = {\mathrm{round}(\tilde{c}^Q / \mathrm{dequantScaleQNorm})}
+    $$
+
+    mxfp8量化场景（weightQuantMode=3，每32个元素一组pergroup动态量化，量化参数为FLOAT8_E8M0类型）：
+
+    $$
+    \mathrm{dequantScaleQNorm} = 2^{\lfloor \mathrm{log}_2(\mathrm{GroupMax}(\mathrm{abs}(c^Q))) \rfloor - 8}
+    $$
+
+    $$
+    queryNorm = {\mathrm{cast\_to\_fp8}(c^Q / \mathrm{dequantScaleQNorm})}
+    $$
+
+    其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数位的最大值emax。
 
 ## 参数说明
 
@@ -268,12 +314,12 @@
   </tr></thead>
 <tbody>
   <tr>
-    <td class="tg-9wq8" rowspan="6">aclnn接口</td>
+    <td class="tg-9wq8" rowspan="2">aclnn API</td>
     <td class="tg-0pky">
-    <a href="./examples/test_aclnn_mla_prolog_v3.cpp">MlaPrologV3接口测试用例代码
+    <a href="./examples/test_aclnn_mla_prolog_v3_weight_nz.cpp">aclnnMlaPrologV3WeightNz接口测试用例代码
     </a>
     </td>
-    <td class="tg-lboi" rowspan="6">
+    <td class="tg-lboi">
     通过
     <a href="./docs/aclnnMlaPrologV3WeightNz.md">aclnnMlaPrologV3WeightNz
     </a>
@@ -282,10 +328,10 @@
   </tr>
   <tr>
     <td class="tg-0pky">
-    <a href="./examples/test_aclnn_mla_prolog_v4.cpp">MlaPrologV4WeightNz接口测试用例代码
+    <a href="./examples/test_aclnn_mla_prolog_v4_weight_nz.cpp">aclnnMlaPrologV4WeightNz接口测试用例代码
     </a>
     </td>
-    <td class="tg-lboi" rowspan="6">
+    <td class="tg-lboi">
     通过
     <a href="./docs/aclnnMlaPrologV4WeightNz.md">aclnnMlaPrologV4WeightNz
     </a>

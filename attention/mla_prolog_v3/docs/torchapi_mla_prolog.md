@@ -58,6 +58,7 @@
     $$
     q^N = q^C \cdot W^{UK}
     $$
+    其中 $\alpha_q$ 是Query的尺度矫正参数。
 
     对Query进行ROPE旋转位置编码
 
@@ -80,6 +81,7 @@
     $$
     k^C = \mathrm{Cache}(c^{KV})
     $$
+    其中 $\alpha_{kv}$ 是Key的尺度矫正参数。
 
     对Key进行ROPE旋转位置编码，并将结果存入cache
 
@@ -96,12 +98,48 @@
     Dequant Scale Query Nope计算公式
 
     $$
-    \mathrm{dequantScaleQNope} = {\mathrm{RowMax}(\mathrm{abs}(q^{N})) / 127}
+    \mathrm{dequantScaleQNope} = {\mathrm{RowMax}(\mathrm{abs}(q^{N})) / Q_{max}}
     $$
 
     $$
     q^{N} = {\mathrm{round}(q^{N} / \mathrm{dequantScaleQNope})}
     $$
+
+    Query Norm及Dequant Scale Query Norm计算公式（queryNormFlag=true时输出）
+
+    非量化场景（weightQuantMode=0）：
+
+    $$
+    queryNorm = c^Q = \alpha_q\cdot\mathrm{RmsNorm}(x \cdot W^{DQ})
+    $$
+
+    此时queryNorm为BFLOAT16类型，dequantScaleQNorm不输出（为nullptr）。
+
+    量化场景（weightQuantMode=1/2/4/5，per-token动态量化），smoothScaleCq可选传入，未传入时视为1：
+
+    $$
+    \tilde{c}^Q = c^Q \cdot smoothScale
+    $$
+
+    $$
+    \mathrm{dequantScaleQNorm} = {\mathrm{RowMax}(\mathrm{abs}(\tilde{c}^Q)) / Q_{max}}
+    $$
+
+    $$
+    queryNorm = {\mathrm{round}(\tilde{c}^Q / \mathrm{dequantScaleQNorm})}
+    $$
+
+    mxfp8量化场景（weightQuantMode=3，每32个元素一组pergroup动态量化，量化参数为FLOAT8_E8M0类型）：
+
+    $$
+    \mathrm{dequantScaleQNorm} = 2^{\lfloor \mathrm{log}_2(\mathrm{GroupMax}(\mathrm{abs}(c^Q))) \rfloor - 8}
+    $$
+
+    $$
+    queryNorm = {\mathrm{cast\_to\_fp8}(c^Q / \mathrm{dequantScaleQNorm})}
+    $$
+
+    其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数位的最大值emax。
 
 
 ## 函数原型

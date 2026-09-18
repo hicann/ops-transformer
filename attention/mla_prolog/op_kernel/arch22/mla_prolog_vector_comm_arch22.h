@@ -224,16 +224,16 @@ __aicore__ inline void RowMax(LocalTensor<float> &dstUb, LocalTensor<float> &src
           stride 一行的真实长度
  */
 template <typename T>
-__aicore__ inline void Dequant(const LocalTensor<float> &outputLocal, const LocalTensor<T> &inputLocal,
+__aicore__ inline void Dequant(const LocalTensor<float> &a22OutputLocal, const LocalTensor<T> &inputLocal,
                                const LocalTensor<float> &scaleLocal, const LocalTensor<float> &scale2Local,
                                const Rectangle &rectangleParams)
 {
     uint64_t cnt = rectangleParams.col * rectangleParams.row;
-    Cast(outputLocal, inputLocal, RoundMode::CAST_RINT, cnt);
+    Cast(a22OutputLocal, inputLocal, RoundMode::CAST_RINT, cnt);
     AscendC::PipeBarrier<PIPE_V>();
-    RowMuls(outputLocal, outputLocal, scale2Local, rectangleParams);
+    RowMuls(a22OutputLocal, a22OutputLocal, scale2Local, rectangleParams);
     AscendC::PipeBarrier<PIPE_V>();
-    VecMulMat(outputLocal, scaleLocal, outputLocal, rectangleParams);
+    VecMulMat(a22OutputLocal, scaleLocal, a22OutputLocal, rectangleParams);
 }
 
 /**

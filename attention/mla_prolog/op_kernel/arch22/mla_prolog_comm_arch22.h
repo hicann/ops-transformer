@@ -277,8 +277,8 @@ struct DequantQcQrSplitNParams {
 };
 
 struct RopeQrSplitNParams {
-    int64_t ropeQrOffset;
     int64_t ropeQrResOffset;
+    int64_t ropeQrOffset;
     uint32_t inputOffsetRope;
     uint32_t deqScaleOffset;
     uint32_t outputOffsetRope;
@@ -341,8 +341,8 @@ struct AicOffset {
 };
 
 struct MMBufParams {
-    uint32_t aL1BufIter = 0;
     uint32_t bL1BufIter = 0;
+    uint32_t aL1BufIter = 0;
     TBuffAddr aL1BufAddr;
     TBuffAddr bL1BufAddr;
     uint32_t aL0BufIter = 0;
@@ -354,8 +354,8 @@ struct MMBufParams {
 };
 
 struct MMParams {
-    uint32_t m;
     uint32_t n;
+    uint32_t m;
     uint32_t k;
     uint32_t orgM;
     uint32_t orgN;

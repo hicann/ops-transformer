@@ -45,31 +45,31 @@ __aicore__ inline void DequantSplitNQc(const GlobalTensor<O> &outputGm, const Gl
                                        const LocalTensor<uint8_t> &shareTmpUb, Rectangle dequantRowColStrideParams,
                                        uint32_t oriCol, uint32_t dstStride, uint32_t subBlockIdx_)
 {
-    int64_t count = dequantRowColStrideParams.col * 1;
-    LocalTensor<T> inputLocal = shareTmpUb.ReinterpretCast<T>();                         // count * sizeof(T)
-    LocalTensor<C> scaleLocal = inputLocal[count + 16].template ReinterpretCast<C>();    // count * sizeof(C)
-    LocalTensor<C> computeLocal = scaleLocal[count + 16].template ReinterpretCast<C>();  // count * sizeof(C)
-    LocalTensor<O> outputLocal = computeLocal[count + 16].template ReinterpretCast<O>(); // count * sizeof(O)
+    int64_t a22Count = dequantRowColStrideParams.col * 1;
+    LocalTensor<T> inputLocal = shareTmpUb.ReinterpretCast<T>();                            // a22Count * sizeof(T)
+    LocalTensor<C> scaleLocal = inputLocal[a22Count + 16].template ReinterpretCast<C>();    // a22Count * sizeof(C)
+    LocalTensor<C> computeLocal = scaleLocal[a22Count + 16].template ReinterpretCast<C>();  // a22Count * sizeof(C)
+    LocalTensor<O> outputLocal = computeLocal[a22Count + 16].template ReinterpretCast<O>(); // a22Count * sizeof(O)
 
     DataCopyParams inputCopyParams{
-        static_cast<uint16_t>(1), static_cast<uint16_t>(count * sizeof(T) / 32U),
+        static_cast<uint16_t>(1), static_cast<uint16_t>(a22Count * sizeof(T) / 32U),
         static_cast<uint16_t>((dequantRowColStrideParams.stride - dequantRowColStrideParams.col) * sizeof(T) / 32U), 0};
 
-    DataCopyParams outputCopyParams{static_cast<uint16_t>(1), static_cast<uint16_t>(count * sizeof(O) / 32U), 0,
+    DataCopyParams outputCopyParams{static_cast<uint16_t>(1), static_cast<uint16_t>(a22Count * sizeof(O) / 32U), 0,
                                     static_cast<uint16_t>(dstStride * sizeof(O) / 32U)};
 
     Rectangle rectangleParams{
-        (uint32_t)1,     // row
-        (uint32_t)count, // col
-        (uint32_t)count  // columnStride
+        (uint32_t)1,        // row
+        (uint32_t)a22Count, // col
+        (uint32_t)a22Count  // columnStride
     };
 
     AscendC::SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
-    int64_t scaleOffset = count * subBlockIdx_;
+    int64_t scaleOffset = a22Count * subBlockIdx_;
     DataCopy(scaleLocal, deqScaleQcQrWGm[scaleOffset], dequantRowColStrideParams.col);
     for (int64_t rowOffset = 0; rowOffset < dequantRowColStrideParams.row; rowOffset++) {
-        int64_t outputOffset = rowOffset * oriCol + subBlockIdx_ * count;
-        int64_t inputOffset = rowOffset * oriCol + subBlockIdx_ * count;
+        int64_t outputOffset = rowOffset * oriCol + subBlockIdx_ * a22Count;
+        int64_t inputOffset = rowOffset * oriCol + subBlockIdx_ * a22Count;
         AscendC::WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
         DataCopy(inputLocal, inputGm[inputOffset], inputCopyParams);
         AscendC::SetFlag<HardEvent::MTE2_V>(EVENT_ID1);
@@ -78,11 +78,11 @@ __aicore__ inline void DequantSplitNQc(const GlobalTensor<O> &outputGm, const Gl
         Dequant(computeLocal, inputLocal, scaleLocal, deQuantScaleQcQrLocal, rectangleParams);
         AscendC::PipeBarrier<PIPE_V>();
         // cast
-        Cast(outputLocal, computeLocal, RoundMode::CAST_RINT, count);
+        Cast(outputLocal, computeLocal, RoundMode::CAST_RINT, a22Count);
         AscendC::SetFlag<HardEvent::V_MTE3>(EVENT_ID2);
         // copy out
         AscendC::WaitFlag<HardEvent::V_MTE3>(EVENT_ID2);
-        DataCopy(outputGm[outputOffset], outputLocal, count);
+        DataCopy(outputGm[outputOffset], outputLocal, a22Count);
         AscendC::SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
     }
     AscendC::WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
