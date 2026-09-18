@@ -616,8 +616,8 @@ protected:
             //   worldSize * m_per_rank * (x1_data + x1_scale) + 2MB 预留
             // x1_data = kPerRank * sizeof(dtype)，fp4 打包存储(4bit)所以用 bit 精确计算
             // x1_scale = ceil(kPerRank / MX_SCALE_ALIGN) * SCALE_LAST_DIM * sizeof(uint8)
-            uint64_t x1Bits = (x1Dtype == ge::DT_FLOAT4_E2M1) ? 4UL : 8UL;
-            uint64_t scaleKGroups = (kPerRank + MX_SCALE_ALIGN - 1UL) / MX_SCALE_ALIGN;
+            uint64_t x1Bits = (x1Dtype == ge::DT_FLOAT4_E2M1) ? MXFP4_BITS : MXFP8_BITS;
+            uint64_t scaleKGroups = CeilDiv(kPerRank, MX_SCALE_ALIGN);
             uint64_t perRankBits = kPerRank * x1Bits + scaleKGroups * SCALE_LAST_DIM * 8UL;
             uint64_t commDataBits = worldSize_ * m_ * perRankBits;
             uint64_t commDataBytes = (commDataBits + 7UL) / 8UL;
@@ -669,7 +669,7 @@ protected:
             tilingEngine.SetPlatformInfoPtr(context_->GetPlatformInfo());
             tilingEngine.SetBiasInfo(hasBias);
             tilingEngine.EnableBaseMHalving(true);
-            tilingEngine.SetBiasInfo(hasBias);
+            tilingEngine.SetOptimizeEnable(false);
             tilingEngine.GetTilingData(m_, n_, k_, false, true, td->tileQbmmTilingData);
         } else {
             QuantMatmulTilingSwat<mm::DataType::DT_FLOAT8_E4M3FN, mm::DataType::DT_FLOAT8_E4M3FN,
@@ -678,7 +678,7 @@ protected:
             tilingEngine.SetPlatformInfoPtr(context_->GetPlatformInfo());
             tilingEngine.SetBiasInfo(hasBias);
             tilingEngine.EnableBaseMHalving(true);
-            tilingEngine.SetBiasInfo(hasBias);
+            tilingEngine.SetOptimizeEnable(false);
             tilingEngine.GetTilingData(m_, n_, k_, false, true, td->tileQbmmTilingData);
         }
 
@@ -711,6 +711,40 @@ protected:
             td->commTilingData.nonSplitAxisSize = ka / 2;
         }
 
+        // win 区 buffer 复用深度决策：budget 取自 context 的 hccl_buffer_size，
+        // < 400MB 拦截，>= 400MB 用 400MB。data 复用、scale 恒全量，故预算需扣除 scale 固定占用。
+        if (hccBufPtr != nullptr && *hccBufPtr > 0 && static_cast<uint64_t>(*hccBufPtr) < WIN_REUSE_BUDGET_CAP) {
+            OP_LOGE_WITH_INVALID_ATTR(opName, "hccl_buffer_size", std::to_string(*hccBufPtr).c_str(),
+                                      (std::string(">= ") + std::to_string(WIN_REUSE_BUDGET_CAP / (1024UL * 1024UL)) +
+                                       " MB (400MB) for win buffer reuse")
+                                          .c_str());
+            return ge::GRAPH_FAILED;
+        }
+        uint64_t winBudget = WIN_REUSE_BUDGET_CAP;
+
+        uint64_t totalTiles = td->commTilingData.splitAxisTileCnt + td->commTilingData.splitAxisTailCnt;
+        uint64_t maxTileSize = std::max(td->commTilingData.splitAxisTileSize, td->commTilingData.splitAxisTailSize);
+        uint64_t x1Bits = (x1Dtype == ge::DT_FLOAT4_E2M1) ? MXFP4_BITS : MXFP8_BITS;
+        uint64_t dataSlotSize = worldSize_ * maxTileSize * (ka * x1Bits / 8UL);
+        uint64_t scaleKGroups = CeilDiv(ka, MX_SCALE_ALIGN);
+        uint64_t scaleSlotSize = worldSize_ * maxTileSize * scaleKGroups * SCALE_LAST_DIM;
+        uint64_t fullWinBytes = totalTiles * (dataSlotSize + scaleSlotSize);
+
+        uint64_t slotNum;
+        if (fullWinBytes <= winBudget) {
+            slotNum = totalTiles;
+        } else {
+            uint64_t scaleWinFixed = totalTiles * scaleSlotSize;
+            uint64_t dataBudget = (scaleWinFixed >= winBudget) ? 0UL : winBudget - scaleWinFixed;
+            uint64_t budgetDepth = (dataSlotSize == 0UL) ? totalTiles : dataBudget / dataSlotSize;
+            slotNum = std::min({WIN_REUSE_DEPTH_CAP, budgetDepth, totalTiles});
+        }
+        if (slotNum < WIN_REUSE_DEPTH_MIN) {
+            slotNum = WIN_REUSE_DEPTH_MIN;
+        }
+        td->commTilingData.slotNum = slotNum;
+        td->scaleCommTilingData.slotNum = 0;
+
         OP_LOGI(opName, "comm tiling: tileSize=%lu, tileCnt=%lu, tailSize=%lu, tailCnt=%lu, nonSplitSize=%lu",
                 td->commTilingData.splitAxisTileSize, td->commTilingData.splitAxisTileCnt,
                 td->commTilingData.splitAxisTailSize, td->commTilingData.splitAxisTailCnt,
@@ -719,6 +753,9 @@ protected:
                 td->scaleCommTilingData.splitAxisTileSize, td->scaleCommTilingData.splitAxisTileCnt,
                 td->scaleCommTilingData.splitAxisTailSize, td->scaleCommTilingData.splitAxisTailCnt,
                 td->scaleCommTilingData.nonSplitAxisSize);
+        OP_LOGI(opName,
+                "win reuse: totalTiles=%lu, dataSlotBytes=%lu, scaleSlotBytes=%lu, fullWinBytes=%lu, slotNum=%lu",
+                totalTiles, dataSlotSize, scaleSlotSize, fullWinBytes, slotNum);
 
         td->localMatmul = precisionMode_;
 
