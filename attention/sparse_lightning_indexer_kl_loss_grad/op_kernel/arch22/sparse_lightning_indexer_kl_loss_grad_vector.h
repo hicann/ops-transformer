@@ -93,7 +93,8 @@ public:
     __aicore__ inline void ProcessDeterVector2(SLIKLLossGradRunInfo &runInfo);
     __aicore__ inline void ProcessPrivateScatterVector2(SLIKLLossGradRunInfo &runInfo);
     __aicore__ inline void SetCachedValidTotalSize(int64_t validTotalSize);
-    __aicore__ inline void ZeroFp32Gm(GlobalTensor<T> &dst, int64_t offset, int64_t count);
+    template <typename CLEAR_T>
+    __aicore__ inline void ZeroOutputGm(GlobalTensor<CLEAR_T> &dst, int64_t offset, int64_t count);
 
 private:
     // =============== vector 0 functions ==============
@@ -2349,24 +2350,28 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::CopySoftmaxOutTailZeros(int
 }
 
 template <typename SLIT>
-__aicore__ inline void SLIKLLossVectorService<SLIT>::ZeroFp32Gm(GlobalTensor<T> &dst, int64_t offset, int64_t count)
+template <typename CLEAR_T>
+__aicore__ inline void SLIKLLossVectorService<SLIT>::ZeroOutputGm(GlobalTensor<CLEAR_T> &dst, int64_t offset,
+                                                                  int64_t count)
 {
     if (count <= 0) {
         return;
     }
-    constexpr int32_t chunk = isTopkLess2k ? static_cast<int32_t>(SLIKLLossGradConstInfo::BUFFER_SIZE_BYTE_2K) :
-                                             static_cast<int32_t>(SLIKLLossGradConstInfo::BUFFER_SIZE_BYTE_8K);
-    Duplicate(reduceSumYResUb, static_cast<T>(0), chunk);
+    constexpr int32_t elemAlign = 32 / static_cast<int32_t>(sizeof(CLEAR_T));
+    constexpr int32_t maxElems = static_cast<int32_t>(ubAllocPolicy.sharedUbSize / sizeof(CLEAR_T));
+    constexpr int32_t chunk = (maxElems / elemAlign) * elemAlign;
+    LocalTensor<CLEAR_T> zeroUb = sharedTBuf.Get<CLEAR_T>();
+    Duplicate(zeroUb, static_cast<CLEAR_T>(0), chunk);
     PipeBarrier<PIPE_V>();
     event_t eventVToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
     int64_t remain = count;
     int64_t cur = offset;
     while (remain > 0) {
         int64_t n = Min(remain, static_cast<int64_t>(chunk));
-        DataCopyExtParams params(1, static_cast<uint32_t>(n * sizeof(T)), 0, 0, 0);
+        DataCopyExtParams params(1, static_cast<uint32_t>(n * sizeof(CLEAR_T)), 0, 0, 0);
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(eventVToMte3);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(eventVToMte3);
-        AscendC::DataCopyPad(dst[cur], reduceSumYResUb, params);
+        AscendC::DataCopyPad(dst[cur], zeroUb, params);
         cur += n;
         remain -= n;
     }

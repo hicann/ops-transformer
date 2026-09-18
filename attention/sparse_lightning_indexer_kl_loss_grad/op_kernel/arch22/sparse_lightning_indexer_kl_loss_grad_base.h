@@ -241,7 +241,7 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::Init(
                                     reluGradRes, actualSeqLengthsQueryGm, actualSeqLengthsKeyGm);
         vectorService.InitVector2GM(bmm3Res, topKIndexGm, scatterAddRes, scatterAddResBanks);
         if (softmaxInitCount_ > 0) {
-            vectorService.ZeroFp32Gm(softmaxOutGm, softmaxInitOffset_, softmaxInitCount_);
+            vectorService.ZeroOutputGm(softmaxOutGm, softmaxInitOffset_, softmaxInitCount_);
             softmaxInitCount_ = 0;
         }
     } else if ASCEND_IS_AIC {
@@ -617,8 +617,8 @@ __aicore__ inline void SparseLightningIndexerKLLossGradBase<SLIT>::ClearInvalidS
         constexpr int64_t align = 32 / static_cast<int64_t>(sizeof(CLEAR_T));
         if ((gmOffset % align == 0) && (n % align == 0)) {
             AscendC::InitOutput(outputGm[gmOffset], n, static_cast<CLEAR_T>(0));
-        } else if constexpr (IsSameType<CLEAR_T, T>::value) {
-            vectorService.ZeroFp32Gm(outputGm, gmOffset, n);
+        } else {
+            vectorService.ZeroOutputGm(outputGm, gmOffset, n);
         }
     }
 }
