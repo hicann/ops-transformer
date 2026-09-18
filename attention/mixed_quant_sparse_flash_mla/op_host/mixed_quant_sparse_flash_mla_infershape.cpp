@@ -13,7 +13,6 @@
  * \brief
  */
 
-#include <graph/utils/type_utils.h>
 #include <register/op_impl_registry.h>
 #include "err/ops_err.h"
 #include "mixed_quant_sparse_flash_mla_check.h"

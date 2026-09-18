@@ -18,6 +18,7 @@
 #include "checkers/sparse_flash_mla_checker.h"
 #include "../op_kernel/sparse_flash_mla_template_tiling_key.h"
 #include "register/op_def_registry.h"
+#include "err/ops_err.h"
 
 using namespace ge;
 using namespace AscendC;
@@ -777,7 +778,7 @@ ge::graphStatus SMLAInfoParser::GetGSize()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor, SMLALayout &layout,
+ge::graphStatus SMLAInfoParser::GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor, SMLALayout &layout,
                                                     const std::string &name) const
 {
     if ((tensor == nullptr)) {
@@ -792,11 +793,11 @@ ge::graphStatus SMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert::
                                                   "The shape size of " + name + " should be greater than 0");
         return ge::GRAPH_FAILED;
     }
-    size = static_cast<uint32_t>(shapeSize) - 1;
+    size = shapeSize - 1;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SMLAInfoParser::GetActualSeqLenQSize(uint32_t &size)
+ge::graphStatus SMLAInfoParser::GetActualSeqLenQSize(int64_t &size)
 {
     return GetActualSeqLenSize(size, opParamInfo_.cuSeqLensQ.tensor, qLayout_, "cu_seqlens_q");
 }
@@ -2243,7 +2244,7 @@ ge::graphStatus SMLATilingCheck::CheckActualSeqLens() const
     }
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus SMLATilingCheck::CheckMultiParaConsistency()
+ge::graphStatus SMLATilingCheck::CheckMultiParaConsistency() const
 {
     if (ge::GRAPH_SUCCESS != CheckOriAndCmpKv() || ge::GRAPH_SUCCESS != CheckAttenOut() ||
         ge::GRAPH_SUCCESS != CheckActualSeqLensQ() || ge::GRAPH_SUCCESS != CheckActualSeqLens()) {

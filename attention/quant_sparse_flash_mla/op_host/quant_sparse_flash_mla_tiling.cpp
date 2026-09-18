@@ -299,7 +299,7 @@ ge::graphStatus QSMLAInfoParser::GetGSize()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor, QSMLALayout &layout,
+ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor, QSMLALayout &layout,
                                                      const std::string &name) const
 {
     if ((tensor == nullptr)) {
@@ -307,16 +307,15 @@ ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert:
                 name.c_str());
         return ge::GRAPH_FAILED;
     }
-    int64_t shapeSize = tensor->GetShapeSize();
-    if (shapeSize <= 0) {
-        OP_LOGE(opName_, "the shape size of %s is %ld, it should be greater than 0.", name.c_str(), shapeSize);
+    size = tensor->GetShapeSize();
+    if (size <= 0) {
+        OP_LOGE(opName_, "the shape size of %s is %ld, it should be greater than 0.", name.c_str(), size);
         return ge::GRAPH_FAILED;
     }
-    size = static_cast<uint32_t>(shapeSize);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSMLAInfoParser::GetActualSeqLenQSize(uint32_t &size)
+ge::graphStatus QSMLAInfoParser::GetActualSeqLenQSize(int64_t &size)
 {
     if (opParamInfo_.cuSeqLensQ.tensor != nullptr) {
         int64_t shapeSize = opParamInfo_.cuSeqLensQ.tensor->GetShapeSize();
@@ -324,7 +323,7 @@ ge::graphStatus QSMLAInfoParser::GetActualSeqLenQSize(uint32_t &size)
             OP_LOGE(opName_, "the shape size of cuSeqLensQ is %ld, it should be greater than 1.", shapeSize);
             return ge::GRAPH_FAILED;
         }
-        size = static_cast<uint32_t>(shapeSize - 1);
+        size = shapeSize - 1;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -468,7 +467,7 @@ ge::graphStatus QSMLAInfoParser::GetSparseBlockCount()
 
 ge::graphStatus QSMLAInfoParser::GetActualseqInfo()
 {
-    maxActualseq_ = static_cast<uint32_t>(s2Size_);
+    maxActualseq_ = s2Size_;
     return ge::GRAPH_SUCCESS;
 }
 

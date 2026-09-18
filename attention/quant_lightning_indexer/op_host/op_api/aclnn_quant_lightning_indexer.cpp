@@ -72,7 +72,7 @@ aclnnStatus aclnnQuantLightningIndexerGetWorkspaceSize(
                     OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                             "Key only supports non-contiguous tensor on the 0-axis in PA scenarios. "
                             "axis[%ld] stride=%ld, expected=%ld",
-                            i, (long)keyStride[i], (long)expected);
+                            i, static_cast<long>(keyStride[i]), static_cast<long>(expected));
                     return ACLNN_ERR_PARAM_INVALID;
                 }
                 expected *= keyShape.GetDim(i);

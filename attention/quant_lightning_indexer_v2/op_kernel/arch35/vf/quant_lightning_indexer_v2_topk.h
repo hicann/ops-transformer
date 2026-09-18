@@ -174,7 +174,7 @@ public:
             Cast(hisIndexLocal[(loopIdx + 1) % 2], tmpIndexLocal, RoundMode::CAST_NONE, topK);
             PipeBarrier<PIPE_V>();
             AscendC::DataCopy(indicesOutLocal, hisIndexLocal[(loopIdx + 1) % 2],
-                              QLIV2Common::Align(topK, (uint32_t)256));
+                              QLIV2Common::Align(topK, (uint32_t)256)); // 256：拷贝长度对齐大小
         } else if (loopIdx != 0 && isNeedLD) {
             topkb16gather::LiTopKVF<true>(tmpIndexLocal, hisValueLocal, mrgValueLocal, histogramsLocal, idxHighLocal,
                                           idxLowLocal, nkValueLocal, topK, s2SeqLen);

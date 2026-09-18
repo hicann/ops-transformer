@@ -330,7 +330,7 @@ ge::graphStatus MQSMLAInfoParser::GetGSize()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MQSMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor, MQSMLALayout &layout,
+ge::graphStatus MQSMLAInfoParser::GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor, MQSMLALayout &layout,
                                                       const std::string &name) const
 {
     if ((tensor == nullptr)) {
@@ -339,17 +339,16 @@ ge::graphStatus MQSMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert
             "When layout_q is " + MQSMLALayoutToSerialString(layout) + ", " + name + " must be provided");
         return ge::GRAPH_FAILED;
     }
-    int64_t shapeSize = tensor->GetShapeSize();
-    if (shapeSize <= 0) {
-        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName_, name.c_str(), std::to_string(shapeSize).c_str(),
+    size = tensor->GetShapeSize();
+    if (size <= 0) {
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName_, name.c_str(), std::to_string(size).c_str(),
                                                   "The shape size of " + name + " should be greater than 0");
         return ge::GRAPH_FAILED;
     }
-    size = static_cast<uint32_t>(shapeSize);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MQSMLAInfoParser::GetActualSeqLenQSize(uint32_t &size)
+ge::graphStatus MQSMLAInfoParser::GetActualSeqLenQSize(int64_t &size)
 {
     if (opParamInfo_.cuSeqLensQ.tensor != nullptr) {
         int64_t shapeSize = opParamInfo_.cuSeqLensQ.tensor->GetShapeSize();
@@ -359,7 +358,7 @@ ge::graphStatus MQSMLAInfoParser::GetActualSeqLenQSize(uint32_t &size)
                 "The shape size of cu_seqlens_q should be greater than 1");
             return ge::GRAPH_FAILED;
         }
-        size = static_cast<uint32_t>(shapeSize - 1);
+        size = shapeSize - 1;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -503,7 +502,7 @@ ge::graphStatus MQSMLAInfoParser::GetSparseBlockCount()
 
 ge::graphStatus MQSMLAInfoParser::GetActualseqInfo()
 {
-    maxActualseq_ = static_cast<uint32_t>(s2Size_);
+    maxActualseq_ = s2Size_;
     return ge::GRAPH_SUCCESS;
 }
 

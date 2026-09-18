@@ -494,7 +494,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyOutKvUb2L1(
     dataCopyParams.blockCount = constInfo.dSize / blockElementNum;
     dataCopyParams.blockLen = dealRow;
     dataCopyParams.srcGap = (dealRow | 0x1) - dealRow;
-    dataCopyParams.dstGap = ((runInfo.s2RealSize + 31) >> 5 << 5) - dealRow; // 31：计算目标地址间隙，确保对齐到32的倍数
+    dataCopyParams.dstGap =
+        ((runInfo.s2RealSize + 31) >> 5 << 5) - dealRow; // {31, 5}：计算目标地址间隙，确保对齐到32的倍数
     DataCopy(dst[s2StartIdx * blockElementNum], kvOutUb, dataCopyParams);
 }
 
@@ -509,7 +510,8 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::CopyOutKvUb2Gm(
     dataCopyParams.blockCount = constInfo.dSize / blockElementNum;
     dataCopyParams.blockLen = dealRow;
     dataCopyParams.srcGap = (dealRow | 0x1) - dealRow;
-    dataCopyParams.dstGap = ((runInfo.s2RealSize + 31) >> 5 << 5) - dealRow; // 31：计算目标地址间隙，确保对齐到32的倍数
+    dataCopyParams.dstGap =
+        ((runInfo.s2RealSize + 31) >> 5 << 5) - dealRow; // {31, 5}：计算目标地址间隙，确保对齐到32的倍数
     DataCopy(v0ResGmTensor[s2StartIdx * blockElementNum], kvOutUb, dataCopyParams);
 }
 
@@ -1296,13 +1298,13 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::GetKVPhyAddrForKvType(
                 break;
             }
         }
-        SetFlag<AscendC::HardEvent::V_MTE2>(3);
+        SetFlag<AscendC::HardEvent::V_MTE2>(3); // 3: 同步标志位值
         qsmlaTmpGS1Start = 0;
     }
 
-    WaitFlag<AscendC::HardEvent::V_MTE2>(3);
-    WaitFlag<AscendC::HardEvent::V_MTE2>(4);
-    WaitFlag<AscendC::HardEvent::MTE3_V>(7);
+    WaitFlag<AscendC::HardEvent::V_MTE2>(3); // 3: 同步标志位值
+    WaitFlag<AscendC::HardEvent::V_MTE2>(4); // 4: 同步标志位值
+    WaitFlag<AscendC::HardEvent::MTE3_V>(7); // 7: 同步标志位值
 }
 
 TEMPLATES_DEF_NO_DEFAULT

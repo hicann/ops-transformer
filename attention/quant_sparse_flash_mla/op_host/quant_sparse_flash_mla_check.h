@@ -15,9 +15,9 @@
 #ifndef QUANT_SPARSE_FLASH_MLA_CHECK_H
 #define QUANT_SPARSE_FLASH_MLA_CHECK_H
 
-#include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
 #include "../../sparse_flash_mla/op_host/common/smla_host_common_defs.h"
+#include "platform/soc_spec.h"
 
 namespace optiling {
 
@@ -206,9 +206,9 @@ public:
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckRequiredParaExistence() const;
 
-    ge::graphStatus GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor, QSMLALayout &layout,
+    ge::graphStatus GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor, QSMLALayout &layout,
                                         const std::string &name) const;
-    ge::graphStatus GetActualSeqLenQSize(uint32_t &size);
+    ge::graphStatus GetActualSeqLenQSize(int64_t &size);
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaInfo();
@@ -253,25 +253,25 @@ public:
     static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
 
     // BaseParams
-    uint32_t bSize_ = 0;
-    uint32_t n1Size_ = 0;
-    uint32_t n2Size_ = 0;
-    uint32_t gSize_ = 0;
-    uint32_t s1Size_ = 0;
+    int64_t bSize_ = 0;
+    int64_t n1Size_ = 0;
+    int64_t n2Size_ = 0;
+    int64_t gSize_ = 0;
+    int64_t s1Size_ = 0;
     int64_t s2Size_ = 0;
     int64_t cmpS2Size_ = 0;
-    uint32_t headDim_ = 0;
-    uint32_t qTSize_ = 0;
-    uint32_t qkHeadDim_ = 0;
+    int64_t headDim_ = 0;
+    int64_t qTSize_ = 0;
+    int64_t qkHeadDim_ = 0;
     int64_t sparseBlockSize_ = 0;
     int64_t oriSparseBlockCount_ = 0;
     int64_t cmpSparseBlockCount_ = 0;
-    uint32_t maxActualseq_ = 0;
+    int64_t maxActualseq_ = 0;
     bool isSameSeqAllKVTensor_ = true;
-    uint32_t dSizeQ_ = 0;
-    uint32_t dSizeKV_ = 0;
-    uint32_t oriKvStride_ = 0;
-    uint32_t cmpKvStride_ = 0;
+    int64_t dSizeQ_ = 0;
+    int64_t dSizeKV_ = 0;
+    int64_t oriKvStride_ = 0;
+    int64_t cmpKvStride_ = 0;
     std::vector<int64_t> oriKvStridesVec_;
     std::vector<int64_t> cmpKvStridesVec_;
     // Layout
@@ -281,8 +281,8 @@ public:
     // PageAttention
     uint32_t oriMaxBlockNumPerBatch_ = 0;
     uint32_t cmpMaxBlockNumPerBatch_ = 0;
-    int32_t oriBlockSize_ = 0;
-    int32_t cmpBlockSize_ = 0;
+    int64_t oriBlockSize_ = 0;
+    int64_t cmpBlockSize_ = 0;
     platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
     NpuArch npuArch_ = NpuArch::DAV_2201;
     ge::DataType qType_ = ge::DT_FLOAT16;
