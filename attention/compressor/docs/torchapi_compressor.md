@@ -169,7 +169,7 @@ cann_ops_transformer.compressor(
     </table>
     </div>
 - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下state_cache不做更新，输出cmp_kv为空tensor。
-- state_block_table元素取值范围为[0, block_num)，block_num为state_cache第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cache_mode=1（连续buffer）下写state_cache操作跳过该位置；cache_mode=2（循环buffer）下读写操作均不跳过。
+- state_block_table元素取值范围为[0, block_num)，block_num为state_cache第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cache_mode=1（连续buffer）下写state_cache操作跳过该位置；cache_mode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cache_mode=1下元素值0为"未分配"哨兵值可重复出现，非0值须全局唯一；cache_mode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
 - 支持D为128/512。
 - 支持H为1K~10K，512对齐。
 - 支持block_size为1~1024。
@@ -288,7 +288,7 @@ cann_ops_transformer.compressor(
             super().__init__()
 
         def forward(self, x, wkv, wgate, state_cache, ape, block_table, start_pos):
-            return torch.ops.cann_ops_transformer._compressor_forward(
+            return torch.ops.cann_ops_transformer.compressor(
                 x, wkv, wgate, state_cache, ape,
                 cmp_ratio=cmp_ratio,
                 state_block_table=block_table,
@@ -305,6 +305,6 @@ cann_ops_transformer.compressor(
     npu_backend = torchair.get_npu_backend(compiler_config=config)
     torch._dynamo.reset()
     npu_mode = torch.compile(CompressorNetwork(), fullgraph=True, backend=npu_backend, dynamic=False)
-    cmp_kv, _, _ = npu_mode(x, wkv, wgate, state_cache, ape, block_table, start_pos)
+    cmp_kv = npu_mode(x, wkv, wgate, state_cache, ape, block_table, start_pos)
     print(f"cmp_kv shape: {cmp_kv.shape}")
     ```

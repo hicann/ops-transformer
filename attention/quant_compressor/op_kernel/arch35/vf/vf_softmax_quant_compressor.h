@@ -1772,8 +1772,8 @@ __aicore__ inline void SoftmaxDnVF(const LocalTensor<T> &dstTensor, const LocalT
                                    const uint32_t RowSize, const uint32_t ReduceSize, const uint32_t vScRealSize,
                                    const T minValue, const uint32_t dDealSize)
 {
-    __ubuf__ T *inputAddr = (__ubuf__ T *)dstTensor.GetPhyAddr();
-    __ubuf__ T *outputAddr = (__ubuf__ T *)srcTensor.GetPhyAddr();
+    __ubuf__ T *inputAddr = (__ubuf__ T *)srcTensor.GetPhyAddr();
+    __ubuf__ T *outputAddr = (__ubuf__ T *)dstTensor.GetPhyAddr();
     if (dDealSize == VF_D_SIZE_8) {
         SoftmaxDndBase8<T>(inputAddr, outputAddr, RowSize, ReduceSize, vScRealSize, minValue);
     } else if (dDealSize == VF_D_SIZE_16) {

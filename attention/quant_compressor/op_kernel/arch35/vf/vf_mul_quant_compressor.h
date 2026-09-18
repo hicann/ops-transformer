@@ -56,39 +56,16 @@ __simd_vf__ void MulReduceSumbase8VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAd
                                          const uint32_t baseD)
 {
     ReduceMulRegList<T> regList;
-    Reg::RegTensor<T> vregSum0;
     Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
-    Reg::MaskReg maskL32 = Reg::CreateMask<T, Reg::MaskPattern::VL32>();
-    Reg::MaskReg maskL16 = Reg::CreateMask<T, Reg::MaskPattern::VL16>();
     Reg::MaskReg maskL8 = Reg::CreateMask<T, Reg::MaskPattern::VL8>();
-    Reg::MaskReg maskH32;
-    Reg::MaskReg maskH48;
-    Reg::MaskReg maskH56;
-    Reg::Not(maskH48, maskL16, mask);
-    Reg::Not(maskH32, maskL32, mask);
-    Reg::Not(maskH56, maskL8, mask);
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
         Reg::Duplicate(regList.vregSum, 0, mask);
-        // 当前仅支持coff * cmpRatio为2的幂的情况
-        for (uint32_t rLoop = 0; rLoop < SimdCeilDivT(rCnt, 8U); rLoop++) {
-            uint32_t dealLen = min((rCnt - rLoop * 8) * baseD, VF_D_SIZE_64);
-            LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, dealLen);
-            offset += dealLen;
+        for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
+            LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, baseD);
+            offset += baseD;
         }
-        // 64 -> 32
-        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH32);
-        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL32);
-
-        // 32 -> 16
-        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH48);
-        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL16);
-
-        // 16 -> 8
-        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH56);
-        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL8);
-
         Reg::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, maskL8);
     }
 }
@@ -99,32 +76,16 @@ __simd_vf__ void MulReduceSumbase16VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
                                           const uint32_t baseD)
 {
     ReduceMulRegList<T> regList;
-    Reg::RegTensor<T> vregSum0;
     Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
-    Reg::MaskReg maskL32 = Reg::CreateMask<T, Reg::MaskPattern::VL32>();
     Reg::MaskReg maskL16 = Reg::CreateMask<T, Reg::MaskPattern::VL16>();
-    Reg::MaskReg maskH32;
-    Reg::MaskReg maskH48;
-    Reg::Not(maskH48, maskL16, mask);
-    Reg::Not(maskH32, maskL32, mask);
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
         Reg::Duplicate(regList.vregSum, 0, mask);
-        // 当前仅支持coff * cmpRatio为2的幂的情况
-        for (uint32_t rLoop = 0; rLoop < SimdCeilDivT(rCnt, 4U); rLoop++) {
-            uint32_t dealLen = min((rCnt - rLoop * 4) * baseD, VF_D_SIZE_64);
-            LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, dealLen);
-            offset += dealLen;
+        for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
+            LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, baseD);
+            offset += baseD;
         }
-        // 64 -> 32
-        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH32);
-        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL32);
-
-        // 32 -> 16
-        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH48);
-        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL16);
-
         Reg::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, maskL16);
     }
 }
@@ -135,26 +96,16 @@ __simd_vf__ void MulReduceSumbase32VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
                                           const uint32_t baseD)
 {
     ReduceMulRegList<T> regList;
-    Reg::RegTensor<T> vregSum0;
-    Reg::RegTensor<T> vregSum1;
     Reg::MaskReg mask = Reg::CreateMask<T, Reg::MaskPattern::ALL>();
     Reg::MaskReg maskL32 = Reg::CreateMask<T, Reg::MaskPattern::VL32>();
-    Reg::MaskReg maskH32;
-    Reg::Not(maskH32, maskL32, mask);
     uint32_t offset = 0;
     uint32_t rCnt = coff * cmpRatio;
     for (uint32_t scLoop = 0; scLoop < scLoopCnt; scLoop++) {
         Reg::Duplicate(regList.vregSum, 0, mask);
-        // 当前仅支持coff * cmpRatio为2的幂的情况
-        for (uint32_t rLoop = 0; rLoop < SimdCeilDivT(rCnt, 2U); rLoop++) {
-            uint32_t dealLen = min((rCnt - rLoop * 2) * baseD, VF_D_SIZE_64);
-            LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, dealLen);
-            offset += dealLen;
+        for (uint32_t rLoop = 0; rLoop < rCnt; rLoop++) {
+            LoadMulAddVFImpl(kvAddr, scoreAddr, regList, offset, baseD);
+            offset += baseD;
         }
-        // 64 -> 32
-        Reg::Squeeze<T, AscendC::Reg::GatherMaskMode::NO_STORE_REG>(vregSum0, regList.vregSum, maskH32);
-        Reg::Add(regList.vregSum, regList.vregSum, vregSum0, maskL32);
-
         Reg::StoreAlign(outputAddr + scLoop * baseD, regList.vregSum, maskL32);
     }
 }

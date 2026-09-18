@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 
 import torch
 from torch.library import impl
-from cann_ops_transformer.op_builder import OpBuilder
+from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 
 class CompressorOpBuilder(OpBuilder):
@@ -24,14 +24,51 @@ class CompressorOpBuilder(OpBuilder):
 
     def schema(self):
         """PyTorch operator signature."""
-        pass
+        return (
+            "compressor(Tensor x, Tensor wkv, Tensor wgate, Tensor(a!) state_cache, Tensor ape, "
+            "int cmp_ratio, *, "
+            "Tensor? state_block_table=None, Tensor? cu_seqlens=None, Tensor? seqused=None, "
+            "Tensor? start_pos=None, int coff=1, int cache_mode=1) -> Tensor"
+        )
 
     def register_meta(self):
         """
         Registers the Meta implementation (Shape/Dtype inference).
         Essential for Autograd and FakeTensor support.
         """
-        pass
+
+        @impl(get_as_library(), self.name, "Meta")
+        def compressor_meta(
+            x: torch.Tensor,
+            wkv: torch.Tensor,
+            wgate: torch.Tensor,
+            state_cache: torch.Tensor,
+            ape: torch.Tensor,
+            cmp_ratio: int,
+            *,
+            state_block_table: Optional[torch.Tensor] = None,
+            cu_seqlens: Optional[torch.Tensor] = None,
+            seqused: Optional[torch.Tensor] = None,
+            start_pos: Optional[torch.Tensor] = None,
+            coff: Optional[int] = 1,
+            cache_mode: Optional[int] = 1,
+        ):
+            cmp_kv, _, _ = _compressor_forward_fake(
+                x,
+                wkv,
+                wgate,
+                state_cache,
+                ape,
+                cmp_ratio,
+                state_block_table,
+                cu_seqlens,
+                seqused,
+                start_pos,
+                coff,
+                cache_mode,
+                False,
+            )
+            return cmp_kv
 
 
 compressor_op_builder = CompressorOpBuilder()
@@ -221,6 +258,8 @@ def backward(ctx, dout, *grads):
 _compressor_forward.register_autograd(backward, setup_context=setup_context)
 
 
+@impl(get_as_library(), compressor_op_builder.name, "PrivateUse1")
+@impl(get_as_library(), compressor_op_builder.name, "Autograd")
 def compressor(
     x: torch.Tensor,
     wkv: torch.Tensor,
