@@ -40,7 +40,7 @@
     当rangeOptional[0] <= sortedIndicesOut[i] < rangeOptional[1]时:
 
     $$
-    permuteTokensOut[sortedIndicesOut[i] - rangeOptional[1]]=tokens[i//topK]
+    permuteTokensOut[sortedIndicesOut[i] - rangeOptional[0]]=tokens[i//topK]
     $$
 
   - paddedMode为`true`时（暂不支持）：
