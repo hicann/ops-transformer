@@ -16,8 +16,6 @@
 #ifndef GROUPED_MATMUL_SWIGLU_QUANT_V2_TENSOR_API_TILING_DATA_H
 #define GROUPED_MATMUL_SWIGLU_QUANT_V2_TENSOR_API_TILING_DATA_H
 
-#include "kernel_tiling/kernel_tiling.h"
-
 #ifndef __CCE_AICORE__
 #include <cstdint>
 #endif

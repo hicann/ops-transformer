@@ -562,7 +562,7 @@ protected:
             shape.SetScalar();
             shape.AppendDim(viewShape.GetDim(1));
             shape.AppendDim(viewShape.GetDim(0));
-            shape.AppendDim(viewShape.GetDim(2));
+            shape.AppendDim(viewShape.GetDim(2)); // 2：第三维，不交换
             aclTensor *tensor = executor->CreateView(inputTensor, shape, inputTensor->GetViewOffset());
             tensor->SetStorageFormat(inputTensor->GetStorageFormat());
             tensor->SetStorageShape(storageShape);
@@ -1004,8 +1004,6 @@ protected:
 
         // 1：检查K是否为偶数
         int64_t kModValue = kValue % MXFP4_K_CONSTRAINT;
-        // 2：检查N是否为偶数
-        int64_t nModValue = nValue % MXFP4_N_CONSTRAINT;
         if (kModValue != 0) {
             std::string gotStr = BuildLogValue("K", kValue);
             OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
@@ -1078,7 +1076,6 @@ protected:
 
     bool CheckMxA8W4InputShape()
     {
-        int64_t m = gmmDsqParams_.x->GetViewShape().GetDim(0);
         int64_t k = gmmDsqParams_.x->GetViewShape().GetDim(1);
         // 多tensor下shape:(n,k), 单tensor下shape:(e, n, k)
         int64_t n = IsMultiTensorWeight() ? ((*gmmDsqParams_.weight)[0])->GetViewShape().GetDim(0) :
@@ -1330,19 +1327,8 @@ protected:
         return true;
     }
 
-    bool CheckDtypeValid() override
+    bool CheckNdE1M2Restriction(DataType xDtype, DataType weightDtype, const aclTensor *weight, const aclTensor *output)
     {
-        DataType xDtype = gmmDsqParams_.x->GetDataType();
-        DataType weightDtype = ((*gmmDsqParams_.weight)[0])->GetDataType();
-        const aclTensor *x = gmmDsqParams_.x;
-        const aclTensor *weight = (*gmmDsqParams_.weight)[0];
-        const aclTensor *xScale = gmmDsqParams_.xScale;
-        const aclTensor *groupList = gmmDsqParams_.groupList;
-        const aclTensor *output = gmmDsqParams_.output;
-        const aclTensor *outputScale = gmmDsqParams_.outputScale;
-        if (!CheckWeightFormatConsistency()) {
-            return false;
-        }
         if (weight->GetStorageFormat() == ge::FORMAT_ND &&
             (weightDtype == DataType::DT_FLOAT4_E1M2 || xDtype == DataType::DT_FLOAT4_E1M2 ||
              output->GetDataType() == DataType::DT_FLOAT4_E1M2)) {
@@ -1353,6 +1339,11 @@ protected:
                 "when the format of weight is ND, the dtypes of weight, x and output can not be DT_FLOAT4_E1M2");
             return false;
         }
+        return true;
+    }
+
+    bool CheckXAndWeightDtypeSupport(DataType xDtype, DataType weightDtype, const aclTensor *weight)
+    {
         const auto &xDtypeSupportListMxfp4 = GetXSupportListMxfp4(weight);
         const auto &weightDtypeSupportListMxfp4 = GetWeightSupportListMxfp4(weight);
         const char *dtypeSupportList = IsMxfp4WeightNzFormat(weight) ?
@@ -1382,6 +1373,12 @@ protected:
                                       dtypeSupportList);
             return false;
         }
+        return true;
+    }
+
+    bool CheckQuantModeDtype(DataType xDtype, DataType weightDtype, const aclTensor *x, const aclTensor *xScale,
+                             const aclTensor *groupList, const aclTensor *output, const aclTensor *outputScale)
+    {
         if (gmmDsqParams_.quantMode == QUNAT_MODE_MX &&
             (xDtype == DataType::DT_FLOAT8_E4M3FN || xDtype == DataType::DT_FLOAT8_E5M2) &&
             (weightDtype == DataType::DT_FLOAT8_E4M3FN || weightDtype == DataType::DT_FLOAT8_E5M2)) {
@@ -1409,6 +1406,28 @@ protected:
             return false;
         }
         return true;
+    }
+
+    bool CheckDtypeValid() override
+    {
+        DataType xDtype = gmmDsqParams_.x->GetDataType();
+        DataType weightDtype = ((*gmmDsqParams_.weight)[0])->GetDataType();
+        const aclTensor *x = gmmDsqParams_.x;
+        const aclTensor *weight = (*gmmDsqParams_.weight)[0];
+        const aclTensor *xScale = gmmDsqParams_.xScale;
+        const aclTensor *groupList = gmmDsqParams_.groupList;
+        const aclTensor *output = gmmDsqParams_.output;
+        const aclTensor *outputScale = gmmDsqParams_.outputScale;
+        if (!CheckWeightFormatConsistency()) {
+            return false;
+        }
+        if (!CheckNdE1M2Restriction(xDtype, weightDtype, weight, output)) {
+            return false;
+        }
+        if (!CheckXAndWeightDtypeSupport(xDtype, weightDtype, weight)) {
+            return false;
+        }
+        return CheckQuantModeDtype(xDtype, weightDtype, x, xScale, groupList, output, outputScale);
     }
 
     bool CheckFormat() override

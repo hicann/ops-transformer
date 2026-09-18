@@ -52,16 +52,21 @@ private:
                                                  const int64_t weightNDimValue, const size_t index) const;
     ge::graphStatus CheckCaseMultiScenario(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs,
                                            const GMMInputParamsInfo &paramsInputInfo) const;
+    ge::graphStatus CheckPerTensorShapeMultiScenario(const gert::InferShapeContext *context, size_t wKDimIdx,
+                                                     size_t wNDimIdx, size_t xSize) const;
+    ge::graphStatus CheckA16W4PergroupMultiScenario(const gert::InferShapeContext *context, size_t wKDimIdx,
+                                                    size_t xSize) const;
     ge::graphStatus CheckShapeForTensorList(const gert::InferShapeContext *context, size_t gmm_index,
                                             const std::string &tensorType, const GMMAttrs &gmmAttrs) const;
     ge::graphStatus CheckShapeForTensorListAtIndex(const gert::InferShapeContext *context, size_t gmm_index,
-                                                   const std::string &tensorType, const GMMAttrs &gmmAttrs,
-                                                   size_t tensorIdx) const;
+                                                   const std::string &tensorType, size_t tensorIdx) const;
     ge::graphStatus CheckScenarioValid(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs) const;
     ge::graphStatus GetNumOfInputs(const gert::InferShapeContext *context, GMMInputParamsInfo &paramsInputInfo) const;
     ge::graphStatus CheckTensorListSizeMultiScenario(const gert::InferShapeContext *context,
                                                      const GMMInputParamsInfo &paramsInputInfo) const;
     ge::graphStatus CheckShapeValid(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs);
+    ge::graphStatus CheckShapeValidNoSplit(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs);
+    ge::graphStatus CheckShapeValidSplitM(const gert::InferShapeContext *context, const GMMAttrs &gmmAttrs);
 
     ge::graphStatus CheckShapeForWeightQuantParam(const gert::InferShapeContext *context,
                                                   const GMMAttrs &gmmAttrs) const;

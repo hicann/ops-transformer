@@ -65,6 +65,10 @@ private:
     bool AnalyzeAttrs() override;
     bool AnalyzeDtype() override;
     bool AnalyzeInputs() override;
+    bool GetInputShapes(const gert::Shape *&xShape, const gert::Shape *&wShape, const gert::Shape *&wScaleShape);
+    bool GetAndCheckXScaleShape(const gert::Shape *&xScaleShape);
+    bool CheckMxPerGroupShape(const gert::Shape &xScaleShape, const gert::Shape &wScaleShape, size_t weightCount,
+                              bool isMultiWeightNz);
     int64_t LogQuantParams();
     bool SetQuantModeForGMMSwigluQuant(const gert::Shape &wScaleShape, const gert::Shape &xScaleShape);
     bool CheckShapeForMxQuant(const gert::Shape &x1ScaleShape, const gert::Shape &x2ScaleShape);
@@ -85,6 +89,8 @@ private:
     void ModifyWeightNzDepthForUnalign(uint64_t leftL1Size, uint64_t baseASize, uint64_t baseBSize,
                                        uint64_t baseScaleABSize);
     ge::graphStatus CalWeightNzScaleFactors();
+    ge::graphStatus CalBaseSizesAndScaleInit(uint64_t &baseScaleASize, uint64_t &baseScaleBSize, uint32_t &scaleInit);
+    ge::graphStatus CalScaleFactors(uint64_t baseScaleASize, uint64_t baseScaleBSize, uint32_t scaleInit);
     // add for pertoken quant mode
     bool AnalyzeAttrsPertoken();
     bool IsB8(ge::DataType dtype);

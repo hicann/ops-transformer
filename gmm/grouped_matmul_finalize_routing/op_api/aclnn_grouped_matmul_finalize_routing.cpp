@@ -1362,6 +1362,52 @@ aclnnStatus aclnnGroupedMatmulFinalizeRouting(void *workspace, uint64_t workspac
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
 
+static aclnnStatus ValidateV2Inputs(const aclTensor *x1, const aclTensor *x2, const aclTensor *scaleOptional,
+                                    const aclTensor *biasOptional, const aclTensor *pertokenScaleOptional,
+                                    const aclTensor *groupListOptional, const aclTensor *logitOptional,
+                                    const aclTensor *rowIndexOptional, const aclTensor *antiquantScaleOptional,
+                                    const aclTensor *antiquantOffsetOptional, int64_t dtype, bool transposeX1,
+                                    bool transposeX2)
+{
+    auto scene = x1 != nullptr && x2 != nullptr && scaleOptional != nullptr && pertokenScaleOptional != nullptr &&
+                 groupListOptional != nullptr && logitOptional != nullptr && rowIndexOptional != nullptr &&
+                 biasOptional != nullptr && antiquantScaleOptional == nullptr && antiquantOffsetOptional == nullptr;
+    if (!scene) {
+        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "GroupedMatmulFinalizeRoutingV2 weightNd do not support input nullptr.");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    int64_t viewDimNum = x2->GetViewShape().GetDimNum();
+    if (dtype != 0) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "GroupedMatmulFinalizeRoutingV2 weightNd dtype must be 0 (FLOAT32), but is %lld.", dtype);
+        return ACLNN_ERR_PARAM_INVALID;
+    } else if (viewDimNum < MIN_DIM_NUM_ND) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "GroupedMatmulFinalizeRoutingV2 weightNd x2's view dimNum should be greater than 1, but is %lld.",
+                viewDimNum);
+        return ACLNN_ERR_PARAM_INVALID;
+    } else if (!(transposeX1 == false && transposeX2 == false)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "GroupedMatmulFinalizeRoutingV2 weightNd transpose should be false");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+static aclnnStatus UnpackWeightInt32ToInt4(aclTensor *&weight, const char *opName)
+{
+    if (weight->GetDataType() != DataType::DT_INT32) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s weightNd weight type should be DT_INT32, but now is %s", opName,
+                op::ToString(weight->GetDataType()).GetString());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    op::Shape weightShape = weight->GetViewShape();
+    auto viewShapeDim = weightShape.GetDimNum();
+    weightShape[viewShapeDim - 1] = weightShape[viewShapeDim - 1] * PER_INT4_IN_U32;
+    weight->SetViewShape(weightShape);
+    weight->SetDataType(DataType::DT_INT4);
+    return ACLNN_SUCCESS;
+}
+
 aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2GetWorkspaceSize(
     const aclTensor *x1, aclTensor *x2, const aclTensor *scaleOptional, const aclTensor *biasOptional,
     const aclTensor *offsetOptional, const aclTensor *antiquantScaleOptional, const aclTensor *antiquantOffsetOptional,
@@ -1377,44 +1423,12 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2GetWorkspaceSize(
                           sharedInputOptional, logitOptional, rowIndexOptional, dtype, sharedInputWeight,
                           sharedInputOffset, transposeX1, transposeX2, groupListType),
                    DFX_OUT(out));
-    auto scene = x1 != nullptr && x2 != nullptr && scaleOptional != nullptr && pertokenScaleOptional != nullptr &&
-                 groupListOptional != nullptr && logitOptional != nullptr && rowIndexOptional != nullptr &&
-                 biasOptional != nullptr && antiquantScaleOptional == nullptr && antiquantOffsetOptional == nullptr;
-    if (!scene) {
-        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "GroupedMatmulFinalizeRoutingV2 weightNd do not support input nullptr.");
-        return ACLNN_ERR_PARAM_NULLPTR;
-    }
-
-    int64_t viewDimNum = x2->GetViewShape().GetDimNum();
-    if (dtype != 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "GroupedMatmulFinalizeRoutingV2 weightNd dtype must be 0 (FLOAT32), but is %lld.", dtype);
-        return ACLNN_ERR_PARAM_INVALID;
-    } else if (viewDimNum < MIN_DIM_NUM_ND) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "GroupedMatmulFinalizeRoutingV2 weightNd x2's view dimNum should be greater than 1, but is %lld.",
-                viewDimNum);
-        return ACLNN_ERR_PARAM_INVALID;
-    } else if (!(transposeX1 == false && transposeX2 == false)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "GroupedMatmulFinalizeRoutingV2 weightNd transpose should be false");
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-
-    // unpack int32 to int4
-    auto tmpWeightV2 = x2;
-    if (tmpWeightV2->GetDataType() == DataType::DT_INT32) {
-        op::Shape weightShapeV2 = tmpWeightV2->GetViewShape();
-        auto viewShapeDimV2 = weightShapeV2.GetDimNum();
-        weightShapeV2[viewShapeDimV2 - 1] = weightShapeV2[viewShapeDimV2 - 1] * PER_INT4_IN_U32;
-        tmpWeightV2->SetViewShape(weightShapeV2);
-        tmpWeightV2->SetDataType(DataType::DT_INT4);
-    } else {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "GroupedMatmulFinalizeRoutingV2 weightNd weight type should be DT_INT32, but now is %s",
-                op::ToString(tmpWeightV2->GetDataType()).GetString());
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-
+    auto ret0 = ValidateV2Inputs(x1, x2, scaleOptional, biasOptional, pertokenScaleOptional, groupListOptional,
+                                 logitOptional, rowIndexOptional, antiquantScaleOptional, antiquantOffsetOptional,
+                                 dtype, transposeX1, transposeX2);
+    CHECK_RET(ret0 == ACLNN_SUCCESS, ret0);
+    auto ret1 = UnpackWeightInt32ToInt4(x2, "GroupedMatmulFinalizeRoutingV2");
+    CHECK_RET(ret1 == ACLNN_SUCCESS, ret1);
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     const aclIntArray *unusedTuningConfig = nullptr;
@@ -1431,8 +1445,8 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2GetWorkspaceSize(
                                      .SetNumbers(sharedInputWeight, sharedInputOffset, groupListType)
                                      .SetTranspose(transposeX1, transposeX2)
                                      .Build();
-    auto ret1 = aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSizeCommonProcess(params, uniqueExecutor.get());
-    CHECK_RET(ret1 == ACLNN_SUCCESS, ret1);
+    auto ret = aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSizeCommonProcess(params, uniqueExecutor.get());
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);
     return ACLNN_SUCCESS;

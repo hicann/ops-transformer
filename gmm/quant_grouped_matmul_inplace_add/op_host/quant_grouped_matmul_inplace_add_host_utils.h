@@ -16,7 +16,7 @@
 #ifndef QUANT_GROUPED_MATMUL_INPLACE_ADD_UTILS_H
 #define QUANT_GROUPED_MATMUL_INPLACE_ADD_UTILS_H
 
-#include <map>
+#include <cstdint>
 
 namespace QuantGroupedMatmulInplaceAdd {
 constexpr uint32_t X_INDEX = 0;
