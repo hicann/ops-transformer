@@ -95,7 +95,7 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext *context, co
                             maxBs, h, actualSize / MB_SIZE + 1UL, hcclBufferSizeEp / MB_SIZE),
                         return ge::GRAPH_FAILED);
     } else {
-        if (socVersion == "Ascend950") {
+        if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
             actualSize += epWorldSize * EP_RANK_OFFSET_STEP;
             OP_TILING_CHECK(
                 (actualSize > maxWindowSizeEp),

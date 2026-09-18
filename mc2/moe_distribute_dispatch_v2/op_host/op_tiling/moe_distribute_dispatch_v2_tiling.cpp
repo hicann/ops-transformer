@@ -633,9 +633,9 @@ static ge::graphStatus CheckGroupAttrParams(const gert::TilingContext *context, 
     auto commAlgPtr = attrs->GetAttrPointer<char>(static_cast<int64_t>(config.attrCommAlgIndex));
     int64_t epWorldSize = *epWorldSizePtr;
     isLayered = strcmp(commAlgPtr, "hierarchy") == 0; // isLayered赋值
-    std::string socVersion = mc2tiling::GetSocVersion(context);
+    NpuArch npuArch = mc2tiling::GetNpuArch(context);
     int64_t maxEpworldsize = 0;
-    if (socVersion == "Ascend950") {
+    if (npuArch == Ops::Base::DAV_3510) {
         maxEpworldsize = isLayered ? MAX_EP_WORLD_SIZE_LAYERED : MAX_EP_WORLD_SIZE_A5;
     } else {
         maxEpworldsize = isLayered ? MAX_EP_WORLD_SIZE_LAYERED : MAX_EP_WORLD_SIZE_A3;
@@ -899,7 +899,7 @@ static bool CheckCommAlgAttrs(const gert::TilingContext *context, const char *no
     const int64_t expertIdsDim1 = expertIdStorageShape->GetStorageShape().GetDim(1);
     uint32_t k = static_cast<uint32_t>(expertIdsDim1);
     int64_t fullMeshBsUpperBound =
-        mc2tiling::GetSocVersion(context) == "Ascend950" ? FULLMESH_BS_UPPER_BOUND_A5 : FULLMESH_BS_UPPER_BOUND_A3;
+        mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510 ? FULLMESH_BS_UPPER_BOUND_A5 : FULLMESH_BS_UPPER_BOUND_A3;
 
     // 检查comm_alg和bs是否冲突
     OP_TILING_CHECK(isSetFullMeshV2 && (bs > fullMeshBsUpperBound),
@@ -1784,7 +1784,7 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const char *no
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     workSpaces[0] = SYSTEM_NEED_WORKSPACE + static_cast<size_t>(WORKSPACE_ELEMENT_OFFSET * aivNum * aivNum);
-    if (mc2tiling::GetSocVersion(context) == "Ascend950") {
+    if (mc2tiling::GetNpuArch(context) == Ops::Base::DAV_3510) {
         // A5为前缀和同步标记预留空间
         workSpaces[0] +=
             A5_CUMSUM_WS_FLAG_OFFSET + static_cast<uint64_t>(aivNum) * A5_CUMSUM_WORKSPACE_MAX_CORE_NUM * UB_ALIGN_VAL;

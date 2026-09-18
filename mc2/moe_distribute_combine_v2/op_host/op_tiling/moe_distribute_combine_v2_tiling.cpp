@@ -280,9 +280,9 @@ static ge::graphStatus GetTpAndEpAttrAndSetTilingData(const gert::TilingContext 
     OP_TILING_CHECK(tpWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tpWorldSize"),
                     return ge::GRAPH_FAILED);
     int64_t epWorldSize = *epWorldSizePtr;
-    std::string socVersion = mc2tiling::GetSocVersion(context);
+    NpuArch npuArch = mc2tiling::GetNpuArch(context);
     int64_t maxEpworldsize = 0;
-    if (socVersion == "Ascend950") {
+    if (npuArch == Ops::Base::DAV_3510) {
         maxEpworldsize = isLayered ? MAX_EP_WORLD_SIZE_LAYERED : MAX_EP_WORLD_SIZE_A5;
     } else {
         maxEpworldsize = isLayered ? MAX_EP_WORLD_SIZE_LAYERED : MAX_EP_WORLD_SIZE_A3;
