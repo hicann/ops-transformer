@@ -952,7 +952,9 @@ def _t_increattention_bnsd(fa_param):
     sparse_mode = fa_param["sparse_mode"]
     g = numheads // numKeyValueHeads
     sinks_tensor = fa_param.get("sinks_tensor")
-    if sinks_tensor is not None:
+    if sinks_tensor is None:
+        sinks_tensor = torch.zeros(numheads, dtype=torch.float32)
+    else:
         sinks_tensor = sinks_tensor.cpu().float()
 
     q_bnsd_tensor = fa_param["q_bnsd_tensor"]
@@ -1023,7 +1025,24 @@ def _t_increattention_bnsd(fa_param):
                     cur_sinks = sinks_tensor[n2Idx * g : (n2Idx + 1) * g]
                 if emptyFlag:
                     continue
-                bmm1Res = torch.matmul(q_curr.float(), k_sparse.float().T)
+                k_dim = q_curr.shape[-1]
+                rope_dim = 64
+                nope_dim = k_dim - rope_dim
+                nope_sum = torch.matmul(
+                    q_curr[..., :nope_dim].to(torch.float64),
+                    k_sparse[..., :nope_dim].to(torch.float64).T,
+                )
+                nope_quant = torch.ceil(nope_sum * 16.0) / 16.0
+                acc = nope_quant.float()
+                q_rope_f64 = q_curr[..., nope_dim:].to(torch.float64)
+                k_rope_f64 = k_sparse[..., nope_dim:].to(torch.float64)
+                for chunk_start in range(0, rope_dim, 16):
+                    chunk_sum = torch.matmul(
+                        q_rope_f64[..., chunk_start : chunk_start + 16],
+                        k_rope_f64[..., chunk_start : chunk_start + 16].T,
+                    )
+                    acc = (acc.double() + chunk_sum).float()
+                bmm1Res = acc
                 scaleRes = bmm1Res * scaleValue
                 softmax_res, x_max, x_sum = softmax(scaleRes, cur_sinks)
                 exp_unnorm = torch.exp(scaleRes - x_max)
@@ -1033,7 +1052,12 @@ def _t_increattention_bnsd(fa_param):
                     exp_quantized = exp_unnorm.to(torch.bfloat16).float()
                 else:
                     exp_quantized = exp_unnorm
-                bmm2Res = torch.matmul(exp_quantized, v_sparse.float()) / x_sum
+                bmm2Res = (
+                    torch.matmul(
+                        exp_quantized.to(torch.float64), v_sparse.to(torch.float64)
+                    ).float()
+                    / x_sum
+                )
                 y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = bmm2Res
 
                 if layout_query == "BSND":
