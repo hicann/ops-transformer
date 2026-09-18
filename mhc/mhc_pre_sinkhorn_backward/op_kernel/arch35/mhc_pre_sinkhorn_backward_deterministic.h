@@ -138,6 +138,8 @@ private:
                                                       __local_mem__ U *tmpDiv4LocalPtr, uint16_t bsLenLoop);
     __aicore__ inline void SinkhornGradUpdateSkGrad(__local_mem__ U *tmpDiv3LocalPtr, __local_mem__ U *tmpDiv4LocalPtr,
                                                     __local_mem__ U *skGradPtr, uint16_t bsLenLoop);
+    __aicore__ inline void SinkhornGradRestoreRaw(__local_mem__ U *rowNormPtr, __local_mem__ U *rowSumPtr,
+                                                  uint16_t bsLenLoop);
     // ExpGradSimdVf sub-functions
     __aicore__ inline void ExpGradComputeMaxAndIsMax(__local_mem__ U *zResPtr, __local_mem__ U *zResMaxPtr,
                                                      __local_mem__ U *zResMaxIdxPtr, __local_mem__ U *isMaxIdxPtr,
@@ -692,11 +694,11 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::C
     if (num == SIGMOID_GRAD_PRE) {
         gradHLocal = gradHPreBuf_.Get<U>();
         gradHAddr = (__ubuf__ U *)gradHLocal.GetPhyAddr();
-        SigmoidGrad<U, true>(gradHAddr, zPreAddr, gradZAddr, bsLen, colLen, V_REG_SIZE, eps_);
+        SigmoidGrad<U, true>(gradHAddr, zPreAddr, gradZAddr, bsLen, colLen, V_REG_SIZE);
     } else {
         gradHLocal = hPreAndGradHPostQue_.DeQue<U>();
         gradHAddr = (__ubuf__ U *)gradHLocal.GetPhyAddr();
-        SigmoidGrad<U, false>(gradHAddr, zPreAddr, gradZAddr, bsLen, colLen, V_REG_SIZE, eps_);
+        SigmoidGrad<U, false>(gradHAddr, zPreAddr, gradZAddr, bsLen, colLen, V_REG_SIZE);
         hPreAndGradHPostQue_.FreeTensor(gradHLocal);
     }
 }
@@ -883,6 +885,9 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::S
         SinkhornGradComputeTmpMul(rowNormPtr, skGradPtr, tmpPtr, bsLenLoop);
         SinkhornGradComputeTmpDiv(colSumPtr, skGradPtr, tmpPtr, tmpDivLocalPtr, tmpDiv2LocalPtr, bsLenLoop);
         SinkhornGradReduceSumCol(tmpDiv2LocalPtr, tmpPtr, bsLenLoop);
+        if (i == 0) {
+            SinkhornGradRestoreRaw(rowNormPtr, rowSumPtr, bsLenLoop);
+        }
         SinkhornGradComputeRowNorm(tmpDivLocalPtr, rowNormPtr, tmpPtr, rowSumPtr, tmpDiv3LocalPtr, tmpDiv4LocalPtr,
                                    bsLenLoop);
         SinkhornGradUpdateSkGrad(tmpDiv3LocalPtr, tmpDiv4LocalPtr, skGradPtr, bsLenLoop);
@@ -1145,6 +1150,41 @@ __aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::S
                 Reg::StoreUnAlign(skGradPtr1, skGradReg, uregStore3, n_);
             }
             Reg::StoreUnAlignPost(skGradPtr1, uregStore3, 0);
+        }
+    }
+}
+
+template <typename X_T, typename GRADHIN_T, typename U>
+__aicore__ inline void MhcPreSinkhornBackwardDeterministic<X_T, GRADHIN_T, U>::SinkhornGradRestoreRaw(
+    __local_mem__ U *rowNormPtr, __local_mem__ U *rowSumPtr, uint16_t bsLenLoop)
+{
+    __VEC_SCOPE__
+    {
+        Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
+
+        Reg::RegTensor<float> rowSumReg;
+        Reg::RegTensor<float> rowNormReg;
+        Reg::UnalignRegForLoad ureg0, ureg1;
+        Reg::MaskReg maskN;
+        Reg::MaskReg maskNN;
+
+        for (uint16_t j = 0; j < bsLenLoop; j++) {
+            uint32_t maskLenN = static_cast<uint32_t>(n_);
+            uint32_t maskLenNN = static_cast<uint32_t>(nn_);
+            maskNN = Reg::UpdateMask<float>(maskLenNN);
+            maskN = Reg::UpdateMask<float>(maskLenN);
+
+            int64_t bsOffset = j * nn_;
+
+            Reg::LoadUnAlignPre(ureg0, rowSumPtr + j * n_);
+            Reg::LoadUnAlign(rowSumReg, ureg0, rowSumPtr + j * n_);
+            Reg::Adds(rowSumReg, rowSumReg, -eps_, maskN);
+            Reg::Store(rowSumPtr + j * n_, rowSumReg, n_);
+
+            Reg::LoadUnAlignPre(ureg1, rowNormPtr + bsOffset);
+            Reg::LoadUnAlign(rowNormReg, ureg1, rowNormPtr + bsOffset);
+            Reg::Adds(rowNormReg, rowNormReg, -eps_, maskNN);
+            Reg::Store(rowNormPtr + bsOffset, rowNormReg, nn_);
         }
     }
 }
