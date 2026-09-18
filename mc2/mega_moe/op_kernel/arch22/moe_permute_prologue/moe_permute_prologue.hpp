@@ -230,10 +230,6 @@ public:
 
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID0);
-        // 全数据缓存 clean+invalidate 已统一放到调用侧（mega_moe_kernel_a3.hpp，prologue
-        // 调用后）：确保本核此前 UB→GM 的写（tokenPerExpert 等）对下游
-        // （allgather/cumsum）及对端 dispatch 立即可见，规避跨 chunk 复用 workspace 时的
-        // cache 陈旧读竞态。
         countCopyParams = AscendC::DataCopyExtParams{1, params_.alignedNumExpertsBytes, 0, 0, 0};
         AscendC::DataCopyPad(gmTokenPerExpert, totalExpertCount, countCopyParams);
         // SyncAll 自带全流水同步，此处无需额外的 PipeBarrier
