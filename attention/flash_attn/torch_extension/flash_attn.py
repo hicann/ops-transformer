@@ -16,6 +16,35 @@ FA_METADATA_OP_NAME = "flash_attn_metadata"
 METADATA_STRIDE = 16
 
 
+_LAYOUT_DIMS = {
+    "TND": 3,
+    "BSND": 4,
+    "BNSD": 4,
+    "PA_BBND": 4,
+    "PA_BNBD": 4,
+    "PA_NZ": 5,
+}
+
+
+def _check_layout_dims(tensor, name, layout):
+    # Layout validity is checked by tiling; only check rank here to prevent out-of-range shape access.
+    expected = _LAYOUT_DIMS.get(layout)
+    if expected is None:
+        return
+    torch._check(
+        tensor.dim() == expected,
+        lambda: f"{name} with layout {layout} expects {expected} dims, "
+        f"but got {tensor.dim()} dims {tuple(tensor.shape)}",
+    )
+
+
+def _validate_layout_dims(q, k, v, layout_q, layout_kv):
+    # Validate before indexing shapes or inferring output dimensions.
+    _check_layout_dims(q, "q", layout_q)
+    _check_layout_dims(k, "k", layout_kv)
+    _check_layout_dims(v, "v", layout_kv)
+
+
 def _get_npu_core_nums():
     try:
         properties = torch.npu.get_device_properties()
@@ -133,6 +162,7 @@ class FlashAttenOpBuilder(OpBuilder):
             layout_out: Optional[str] = "BSND",
             return_softmax_lse: Optional[bool] = False,
         ):
+            _validate_layout_dims(q, k, v, layout_q, layout_kv)
             if layout_q == "TND":
                 t_size = q.size(0)
                 n_size = q.size(1)
@@ -313,6 +343,7 @@ def flash_attn(
     dispatcher implementation for NPU.
     'PrivateUse1' is the combine key for custom NPU backends.
     """
+    _validate_layout_dims(q, k, v, layout_q, layout_kv)
     op_module = flash_attn_op_builder.load()
     return op_module.flash_attn(
         q,
