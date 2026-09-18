@@ -12,6 +12,7 @@
 #define OP_API_INC_QKV_RMS_NORM_ROPE_CACHE_WITH_K_SCALE_CHECKER_H
 
 #include "op_common/log/log.h"
+#include "opdev/common_types.h"
 #include "opdev/op_errno.h"
 #include "opdev/shape_utils.h"
 
@@ -126,6 +127,29 @@ public:
                                                   "qScaleOptional is required when Q output is quantized");
             return ACLNN_ERR_PARAM_NULLPTR;
         }
+
+        const TensorEmptyRule nonEmptyTensors[] = {
+            {"qkv", params.qkv, "qkv can not be an empty tensor"},
+            {"qGamma", params.qGamma, "qGamma can not be an empty tensor"},
+            {"kGamma", params.kGamma, "kGamma can not be an empty tensor"},
+            {"cosSin", params.cosSin, "cosSin can not be an empty tensor"},
+            {"slotMapping", params.slotMapping, "slotMapping can not be an empty tensor"},
+            {"kCacheRef", params.kCache, "kCacheRef can not be an empty tensor"},
+            {"vCacheRef", params.vCache, "vCacheRef can not be an empty tensor"},
+            {"kScaleCacheRef", params.kScaleCache, "kScaleCacheRef can not be an empty tensor"},
+            {"qOut", params.qOut, "qOut can not be an empty tensor"},
+            {"queryStartLocOptional", params.queryStartLoc,
+             "queryStartLocOptional can not be an empty tensor when passed"},
+            {"seqLensOptional", params.seqLens, "seqLensOptional can not be an empty tensor when passed"},
+            {"mropePositionOptional", params.mropePositionOptional,
+             "mropePositionOptional can not be an empty tensor when passed"},
+        };
+        for (const auto &rule : nonEmptyTensors) {
+            if (rule.tensor != nullptr && rule.tensor->IsEmpty()) {
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_NAME, rule.paramName, "empty tensor", rule.reason);
+                return ACLNN_ERR_PARAM_INVALID;
+            }
+        }
         return ACLNN_SUCCESS;
     }
 
@@ -133,6 +157,12 @@ private:
     struct PointerNullRule {
         const char *paramName;
         const void *ptr;
+        const char *reason;
+    };
+
+    struct TensorEmptyRule {
+        const char *paramName;
+        const aclTensor *tensor;
         const char *reason;
     };
 };
