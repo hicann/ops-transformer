@@ -147,6 +147,7 @@ public:
     uint32_t maxActualseq = 0;
     bool actualSeqLenFlag = false;
     bool isSameSeqAllKVTensor = true;
+    bool batchConsistency = false;
 
     int64_t quantMode = 0;
     uint32_t dSize = 0;
@@ -268,6 +269,7 @@ public:
     int64_t cmpSparseBlockCount_ = 0;
     int64_t maxActualseq_ = 0;
     bool isSameSeqAllKVTensor_ = true;
+    bool batchConsistency_ = false;
     int64_t dSizeQ_ = 0;
     int64_t dSizeKV_ = 0;
     int64_t oriKvStride_ = 0;
