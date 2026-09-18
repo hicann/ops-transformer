@@ -177,7 +177,7 @@ public:
     ge::graphStatus CheckTensorDescriptions() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckRequiredParaExistence() const;
-    ge::graphStatus GetActualSeqLenSize(uint32_t &liSize, const gert::Tensor *liTensor,
+    ge::graphStatus GetActualSeqLenSize(int64_t &liSize, const gert::Tensor *liTensor,
                                         const std::string &liSeqLenName) const;
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
@@ -217,19 +217,19 @@ public:
     LiParaInfo opParamInfo_;
 
     // BaseParams
-    uint32_t bSize_ = 0;
-    uint32_t n1Size_ = 0;
-    uint32_t n2Size_ = 0;
-    uint32_t gSize_ = 0;
-    uint32_t s1Size_ = 0;
+    int64_t bSize_ = 0;
+    int64_t n1Size_ = 0;
+    int64_t n2Size_ = 0;
+    int64_t gSize_ = 0;
+    int64_t s1Size_ = 0;
     int64_t s2Size_ = 0;
-    uint32_t headDim_ = 0;
+    int64_t headDim_ = 0;
     // Layout
     DataLayout qLayout_ = DataLayout::BSND;
     DataLayout kLayout_ = DataLayout::BnBsND;
     // PageAttention
     uint32_t maxBlockNumPerBatch_ = 0;
-    int32_t blockSize_ = 0;
+    int64_t blockSize_ = 0;
     NpuArch npuArch_ = NpuArch::DAV_2201;
     platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
     ge::DataType inputQType_ = ge::DT_FLOAT16;

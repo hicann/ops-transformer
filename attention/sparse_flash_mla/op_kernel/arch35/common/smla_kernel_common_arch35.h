@@ -222,12 +222,12 @@ __aicore__ inline void SetRunInfo(RunInfo &runInfo, RunParamStr &runParam, int64
         runInfo.goIdx = runParam.goIdx;
         runInfo.multiCoreInnerIdx = multiCoreInnerIdx;
         runInfo.multiCoreIdxMod2 = multiCoreInnerIdx & 1;
-        runInfo.multiCoreIdxMod3 = multiCoreInnerIdx % 3;
+        runInfo.multiCoreIdxMod3 = multiCoreInnerIdx % 3; // 3：获取大小为3的组内的索引
     }
 
     runInfo.taskId = taskId;
     runInfo.taskIdMod2 = taskId & 1;
-    runInfo.taskIdMod3 = taskId % 3;
+    runInfo.taskIdMod3 = taskId % 3; // 3：同上
     runInfo.s2LoopLimit = s2LoopLimit;
 
     runInfo.actualS1Size = runParam.actualS1Size;
@@ -257,7 +257,7 @@ __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Inde
     if constexpr (IS_SPLIT_G) {
         int64_t halfG = (constInfo.gSize + 1) / 2; // ceil(gSize/2), 第一个AIC多处理一行
         runParam.goIdx = (aicIdx % 2 == 0) ? 0 : halfG;
-        runParam.gSplitSize = (aicIdx % 2 == 0) ? halfG : (constInfo.gSize - halfG);
+        runParam.gSplitSize = (aicIdx % 2 == 0) ? halfG : (constInfo.gSize - halfG); // 2：AIC切分数量
     } else {
         runParam.goIdx = 0;
         runParam.gSplitSize = constInfo.gSize;

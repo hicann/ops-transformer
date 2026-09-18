@@ -288,13 +288,15 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAMatmulService<TEMPLATE_ARGS>:
         uint32_t s1Coord = runInfo.s1oIdx * runInfo.qSNumInOneBlock;
         uint64_t queryGmOffset =
             this->queryGm.offsetCalculator.GetOffset(runInfo.boIdx, runInfo.n2oIdx, runInfo.goIdx, s1Coord, 0);
-        CopyToL1Nd2Nz<Q_T>(inputLeftTensor, this->queryGm.gmTensor[queryGmOffset], runInfo.mRealSize, 512, 512);
+        CopyToL1Nd2Nz<Q_T>(inputLeftTensor, this->queryGm.gmTensor[queryGmOffset], runInfo.mRealSize, 512,
+                           512); // 512: Query主维度
         if constexpr (HAS_ROPE) {
             uint64_t queryRopeGmOffset =
                 this->queryRopeGm.offsetCalculator.GetOffset(runInfo.boIdx, runInfo.n2oIdx, runInfo.goIdx, s1Coord, 0);
             CopyToL1Nd2Nz<Q_T>(inputLeftTensor[Align16Func(runInfo.mRealSize) * 512], // 512: 同上
-                               this->queryRopeGm.gmTensor[queryRopeGmOffset], runInfo.mRealSize, 64,
-                               64); // 64 constInfo.dSize constInfo.mm1Ka
+                               this->queryRopeGm.gmTensor[queryRopeGmOffset], runInfo.mRealSize,
+                               64,  //  64：constInfo.dSize constInfo.mm1Ka
+                               64); // 64：同上
         }
         inputLeftBuf.Set<HardEvent::MTE2_MTE1>(); // 通知
     } else {                                      // 非S2的第一次循环直接复用Q

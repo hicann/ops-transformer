@@ -475,19 +475,19 @@ private:
     SFAParaInfo opParamInfo_;
     const SFATilingInfo &sfaInfo_;
 
-    uint32_t bSize_ = 0;
-    uint32_t n1Size_ = 0;
-    uint32_t n2Size_ = 0;
-    uint32_t gSize_ = 0;
-    uint32_t qkHeadDim_ = 0;
-    uint32_t vHeadDim_ = 0;
-    uint32_t ropeHeadDim_ = 0;
-    uint32_t s1Size_ = 0;
+    int64_t bSize_ = 0;
+    int64_t n1Size_ = 0;
+    int64_t n2Size_ = 0;
+    int64_t gSize_ = 0;
+    int64_t qkHeadDim_ = 0;
+    int64_t vHeadDim_ = 0;
+    int64_t ropeHeadDim_ = 0;
+    int64_t s1Size_ = 0;
     int64_t s2Size_ = 0;
-    uint32_t qTSize_ = 0;  // 仅TND时生效
-    uint32_t kvTSize_ = 0; // 仅TND时生效
+    int64_t qTSize_ = 0;  // 仅TND时生效
+    int64_t kvTSize_ = 0; // 仅TND时生效
     KvStorageMode kvStorageMode_ = KvStorageMode::BATCH_CONTINUOUS;
-    uint32_t sparseBlockCount_ = 0;
+    int64_t sparseBlockCount_ = 0;
     int64_t sparseBlockSize_ = 0;
 
     SFALayout qLayout_ = SFALayout::BSND;
@@ -536,7 +536,7 @@ public:
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckRequiredParaExistence() const;
 
-    ge::graphStatus GetActualSeqLenQSize(uint32_t &size);
+    ge::graphStatus GetActualSeqLenQSize(int64_t &size);
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
     void GetOptionalInputParaInfo();
@@ -581,19 +581,19 @@ public:
     fe::PlatFormInfos *platformInfo_;
     SFAParaInfo opParamInfo_;
 
-    uint32_t bSize_ = 0;
-    uint32_t n1Size_ = 0;
-    uint32_t n2Size_ = 0;
-    uint32_t gSize_ = 0;
-    uint32_t s1Size_ = 0;
+    int64_t bSize_ = 0;
+    int64_t n1Size_ = 0;
+    int64_t n2Size_ = 0;
+    int64_t gSize_ = 0;
+    int64_t s1Size_ = 0;
     int64_t s2Size_ = 0;
-    uint32_t qkHeadDim_ = 0;
-    uint32_t vHeadDim_ = 0;
-    uint32_t ropeHeadDim_ = 0;
-    uint32_t qTSize_ = 0;  // 仅TND时生效
-    uint32_t kvTSize_ = 0; // 仅TND时生效
+    int64_t qkHeadDim_ = 0;
+    int64_t vHeadDim_ = 0;
+    int64_t ropeHeadDim_ = 0;
+    int64_t qTSize_ = 0;  // 仅TND时生效
+    int64_t kvTSize_ = 0; // 仅TND时生效
     KvStorageMode kvStorageMode_ = KvStorageMode::BATCH_CONTINUOUS;
-    uint32_t sparseBlockCount_ = 0;
+    int64_t sparseBlockCount_ = 0;
 
     SFALayout qLayout_ = SFALayout::BSND;
     SFALayout topkLayout_ = SFALayout::BSND;
@@ -602,7 +602,7 @@ public:
     SFALayout softmaxMaxLayout_ = SFALayout::BNSG;
     SFALayout softmaxSumLayout_ = SFALayout::BNSG;
     uint32_t maxBlockNumPerBatch_ = 0;
-    uint32_t blockSize_ = 0;
+    int64_t blockSize_ = 0;
 
     NpuArch npuArch_ = NpuArch::DAV_2201;
     bool isA5_ = false;
@@ -617,7 +617,7 @@ public:
 
     bool isSameSeqAllKVTensor_ = true;
     bool isSameActualseq_ = true;
-    uint32_t maxActualseq_ = 0;
+    int64_t maxActualseq_ = 0;
 
     uint32_t actualLenDimsQ_ = 0;
     uint32_t actualLenDimsKV_ = 0;
