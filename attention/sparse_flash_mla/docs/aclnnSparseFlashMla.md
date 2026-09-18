@@ -528,7 +528,7 @@ aclnnStatus aclnnSparseFlashMla(
   </table>
 
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：N1/N2支持1、2、4、8、16、32、64、128；cmp_ratio在SWA场景保持默认值1，CSA支持传入4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏ori_kv场景支持ori_sparse_indices及ori_topk_length，oriWinLeft和oriWinRight支持非负数，cmp_sparse_indices的最后一维K2当前支持[1, 8192]内的任意整数。
+  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：N1/N2支持1、2、4、8、16、32、64、128；SWA不传入cmpKv，cmpRatio不参与计算，CSA支持传入1、2或4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏ori_kv场景支持ori_sparse_indices及ori_topk_length，oriWinLeft和oriWinRight支持非负数，cmp_sparse_indices的最后一维K2当前支持[1, 8192]内的任意整数。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR/Ascend 950DT</term>：N1支持1-128，N2只支持1。
@@ -577,7 +577,7 @@ aclnnStatus aclnnSparseFlashMla(
         <td>非SWA稀疏ori_kv场景oriMaskMode不为4，SWA稀疏ori_kv场景oriMaskMode不为0，或cmpMaskMode不为3。</td>
       </tr>
       <tr>
-        <td>SWA场景cmpRatio不为1，或cmpRatio与CSA、HCA场景不匹配。</td>
+        <td>cmpRatio与CSA、HCA场景不匹配。</td>
       </tr>
       <tr>
         <td>非SWA稀疏ori_kv场景oriWinLeft不为127，或oriWinRight不为0；SWA稀疏ori_kv场景oriWinLeft或oriWinRight为负数。</td>

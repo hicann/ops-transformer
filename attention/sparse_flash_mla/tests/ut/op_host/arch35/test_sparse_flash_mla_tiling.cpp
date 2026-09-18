@@ -889,12 +889,12 @@ TEST_F(SparseFlashMlaTilingArch35, test_tiling_910b_block_table_dim0_failed)
     RunSmlaTilingCase(c, ge::GRAPH_FAILED);
 }
 
-// 910B SWA without cmp_kv: cmp_ratio must be 1
-TEST_F(SparseFlashMlaTilingArch35, test_tiling_910b_swa_cmp_ratio_not_1_failed)
+// 910B SWA without cmp_kv: cmp_ratio does not affect routing
+TEST_F(SparseFlashMlaTilingArch35, test_tiling_910b_swa_cmp_ratio_4_success)
 {
     SmlaCase c = Make910bCase();
     c.cmpRatio = 4;
-    RunSmlaTilingCase(c, ge::GRAPH_FAILED);
+    RunSmlaTilingCase(c, ge::GRAPH_SUCCESS);
 }
 
 // 910B DSpark: dtype of ori_topk_length only supports int32

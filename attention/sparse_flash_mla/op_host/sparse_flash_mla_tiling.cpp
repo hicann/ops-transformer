@@ -1651,33 +1651,24 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaMetadata() const
 
 ge::graphStatus SMLATilingCheck::CheckSingleParaCmpRatio() const
 {
-    if (IsA5Arch(npuArch_)) {
-        if (opParamInfo_.cmpKv.tensor != nullptr) {
-            OP_CHECK_IF(
-                cmpRatio_ < 1 || cmpRatio_ > 128,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "cmp_ratio", std::to_string(cmpRatio_).c_str(),
-                                                      "Cmp_ratio should be in range [1, 128] on " + A5_PLATFORM_LOG),
-                return ge::GRAPH_FAILED);
-        }
-    } else {
-        uint32_t expectedCmpRatio = 1;
-        const char *modeName = "SWA";
-        const char *modeReason = "when cmp_kv is not provided";
-        if (smlaInfo_.perfMode == SMLATemplateMode::CSA_TEMPLATE_MODE) {
-            expectedCmpRatio = 4; // 4：CSA模式下的固定压缩比
-            modeName = "CSA";
-            modeReason = "when cmp_sparse_indices is provided";
-        } else if (smlaInfo_.perfMode == SMLATemplateMode::HCA_TEMPLATE_MODE) {
-            expectedCmpRatio = 128; // 128：HCA模式下的最大压缩比
-            modeName = "HCA";
-            modeReason = "when cmp_sparse_indices is not provided";
-        }
-        OP_CHECK_IF(cmpRatio_ != expectedCmpRatio,
-                    OP_LOGE(opName_, "cmpRatio should be %u in %s on %s %s, but got %ld.", expectedCmpRatio, modeName,
+    const auto checkRatio = [this](bool isSupported, const char *expectedRatios, const char *modeName,
+                                   const char *modeReason) {
+        OP_CHECK_IF(!isSupported,
+                    OP_LOGE(opName_, "cmpRatio should be %s in %s on %s %s, but got %ld.", expectedRatios, modeName,
                             A2_A3_PLATFORM_LOG.c_str(), modeReason, cmpRatio_),
                     return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    };
+
+    switch (smlaInfo_.perfMode) {
+        case SMLATemplateMode::CSA_TEMPLATE_MODE:
+            return checkRatio(cmpRatio_ == 1 || cmpRatio_ == 2 || cmpRatio_ == 4, "1, 2 or 4", "CSA",
+                              "when cmp_sparse_indices is provided");
+        case SMLATemplateMode::HCA_TEMPLATE_MODE:
+            return checkRatio(cmpRatio_ == 128, "128", "HCA", "when cmp_sparse_indices is not provided");
+        default:
+            return ge::GRAPH_SUCCESS;
     }
-    return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus SMLATilingCheck::CheckSingleParaOriMaskMode() const
