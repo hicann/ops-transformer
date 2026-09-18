@@ -20,6 +20,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <memory>
 #include "assert.h"
 
 #include "graph.h"
@@ -50,8 +51,8 @@ using std::vector;
     placeholder##inputIndex##_desc.SetPlacement(ge::kPlacementHost); \
     placeholder##inputIndex##_desc.SetFormat(FORMAT_ND); \
     Tensor tensor_placeholder##inputIndex; \
-    ret = GenOnesData(placeholder##inputIndex##_shape, tensor_placeholder##inputIndex, \
-                      placeholder##inputIndex##_desc, inputDtype, 2); \
+    ret = GenOnesData(placeholder##inputIndex##_shape, tensor_placeholder##inputIndex, placeholder##inputIndex##_desc, \
+                      inputDtype, 2); \
     if (ret != SUCCESS) { \
         printf("%s - ERROR - [XIR]: Generate input data failed\n", GetTime().c_str()); \
         return FAILED; \
@@ -124,13 +125,16 @@ int32_t GenOnesDataFloat32(vector<int64_t> shapes, Tensor &input_tensor, TensorD
         size *= shapes[i];
     }
     uint32_t byteSizeFloat32 = 4;
-    uint32_t data_len = size * byteSizeFloat32;
-    float *pData = new (std::nothrow) float[size];
+    size_t data_len = size * byteSizeFloat32;
+    std::unique_ptr<float[]> pData(new (std::nothrow) float[size]);
+    if (pData == nullptr) {
+        return FAILED;
+    }
 
     for (size_t i = 0; i < size; ++i) {
-        *(pData + i) = value;
+        pData[i] = value;
     }
-    input_tensor = Tensor(input_tensor_desc, (uint8_t *)pData, data_len);
+    input_tensor = Tensor(input_tensor_desc, reinterpret_cast<uint8_t *>(pData.get()), data_len);
     return SUCCESS;
 }
 
@@ -142,12 +146,17 @@ int32_t GenOnesData(vector<int64_t> shapes, Tensor &input_tensor, TensorDesc &in
     for (uint32_t i = 0; i < shapes.size(); i++) {
         size *= shapes[i];
     }
-    uint32_t data_len = size * GetDataTypeSize(data_type);
-    int32_t *pData = new (std::nothrow) int32_t[data_len];
-    for (uint32_t i = 0; i < size; ++i) {
-        *(pData + i) = value;
+    size_t data_len = size * GetDataTypeSize(data_type);
+    // Preserve the int32_t fill pattern while allocating only the required storage.
+    size_t data_count = data_len / sizeof(int32_t) + (data_len % sizeof(int32_t) != 0);
+    std::unique_ptr<int32_t[]> pData(new (std::nothrow) int32_t[data_count]);
+    if (pData == nullptr) {
+        return FAILED;
     }
-    input_tensor = Tensor(input_tensor_desc, reinterpret_cast<uint8_t *>(pData), data_len);
+    for (size_t i = 0; i < data_count; ++i) {
+        pData[i] = value;
+    }
+    input_tensor = Tensor(input_tensor_desc, reinterpret_cast<uint8_t *>(pData.get()), data_len);
     return SUCCESS;
 }
 
@@ -297,6 +306,7 @@ int main(int argc, char *argv[])
     std::string warning_str(warning_msg.GetString());
     std::cout << "Warning message: " << warning_str << std::endl;
     printf("%s - INFO - [XIR]: Start to finalize ir graph session\n", GetTime().c_str());
+    delete session;
     ret = ge::GEFinalize();
     if (ret != SUCCESS) {
         printf("%s - INFO - [XIR]: Finalize ir graph session failed\n", GetTime().c_str());
