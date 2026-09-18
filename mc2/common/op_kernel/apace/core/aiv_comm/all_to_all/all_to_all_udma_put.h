@@ -40,7 +40,7 @@ private:
     }
 
     template <uint8_t BarrierMode>
-    __aicore__ inline void DoCommit(uint32_t targetRankId, uint64_t tileByteSize)
+    __aicore__ inline void DoCommit(uint32_t targetRankId, uint64_t tileByteSize, uint64_t bufferOffset)
     {
         if (targetRankId == this->udmaCtx_->rankId) {
             return;
@@ -49,7 +49,7 @@ private:
             this->localAddr_ + targetRankId * this->chunkBytes_ + this->currentTileIdx_ * this->tileMaxByteSize_;
 
         GM_ADDR dstAddr = reinterpret_cast<GM_ADDR>(this->udmaCtx_->commBufferAddrs[targetRankId] + this->winOffset_) +
-                          this->udmaCtx_->rankId * this->chunkBytes_ + this->tileByteOffset_;
+                          bufferOffset + this->udmaCtx_->rankId * this->tileMaxByteSize_;
 
         int32_t ret = this->comm_.WriteNbi(static_cast<ChannelHandle>(this->udmaCtx_->channelHandles[targetRankId]),
                                            dstAddr, srcAddr, tileByteSize);

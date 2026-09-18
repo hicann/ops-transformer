@@ -14,19 +14,19 @@
  *
  * 通信状态由 HcommCommState 容器存储，AllToAllMxQuantMatmulHcommImpl 直接持有；
  * 等待策略由 HcommCommWaitPolicy 承担，通过 state_ 指针引用 HcommCommState，
- * kernel 内逐 tile 通过 commPolicy_.WaitTile() 等待通信完成。
+ * kernel 内逐 tile 通过 bufferSyncMgr_.Acquire() 等待通信完成。
  *
  * Init():
  *   AIC: 在 commState_ 上直接执行 hccl_.InitV2()/SetCcTilingV2()，
  *        并批量下发 AlltoAll<true> 通信任务（scale + dataHead + dataTail），
- *        最后通过 GetCommPolicy().state_ = &commState_ 将 WaitPolicy 绑定到通信状态。
+ *        最后通过 GetBufferSyncMgr().state_ = &commState_ 将 WaitPolicy 绑定到通信状态。
  *
  * Run():
  *   AIC: local块前置 — 若 localMatmul != 0，先执行 MatmulProcess(LOCAL) 计算本 rank 数据，
  *        再执行 MatmulProcess(REMOTE) 计算通信收到的远端数据，以 local 计算掩盖通信延迟；
- *        最后所有核 WaitTile 完成后再统一 Finalize。
- *        kernel 内逐 tile 通过 commPolicy_.WaitTile() → state_->hccl_.Wait(handle) 等待通信完成，
- *        首次 wait 紧挨 data wait 之前执行 hccl->Wait(scaleHandle_)。
+ *        最后 commState_.hccl_.Finalize()。
+ *        kernel 内逐 tile 通过 bufferSyncMgr_.Acquire() → state_->hccl_.Wait(handle) 等待通信完成，
+ *        首次 wait 紧挨 data wait 之前执行 hccl->Wait(scaleHandle_)（每核仅一次，掩盖 matmul 头开销）。
  *
  * AIC side: 通信下发 + 计算 + per-tile wait 均在 AIC 核内完成，无 AIV↔AIC 跨核 flag 同步.
  *
@@ -41,7 +41,6 @@
 #include "blaze/gemm/utils/common_utils.h"
 #include "blaze/gemm/policy/dispatch_policy.h"
 #include "blaze/gemm/block/block_mmad_qbmm_mx.h"
-#include "blaze/gemm/block/block_scheduler_qbmm.h"
 #include "../../matmul/quant_batch_matmul/all_to_all_qbmm_mx_kernel.h"
 #include "include/tensor_api/tensor.h"
 #include "../../../utils/op_state_dump.h"
@@ -71,10 +70,11 @@ struct HcommCommState {
 template <AscendC::HcclServerType ServerType>
 struct HcommCommWaitPolicy {
     HcommCommState<ServerType> *state_{nullptr};
+    uint32_t slotNum{0};
 
-    // 返回本次实际执行的 hccl.Wait 次数: tile0=2(scale+data)，其余=1(data)，
-    // 供 kernel 侧经 DoDump 的 waitDelta 计入 commWaitCount，与 commit 侧 tiles 计数对称。
-    __aicore__ inline void WaitTile(uint32_t tileIdx)
+    __aicore__ inline void Release(uint32_t tileIdx) {}
+
+    __aicore__ inline void Acquire(uint32_t tileIdx)
     {
         if (tileIdx == 0) {
             state_->hccl_.Wait(state_->scaleHandle_);
@@ -114,7 +114,7 @@ public:
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, X1Type, LayoutA, X2Type, LayoutB, YType, LayoutC,
                                                     BiasType, LayoutBias>;
     using QuantMatmulKernelImpl = Blaze::Gemm::Kernel::AllToAllQbmmMxKernel<ProblemShape, BlockMmad, BlockScheduler,
-                                                                            HcommCommWaitPolicy<ServerType>>;
+                                                                            HcommCommWaitPolicy<ServerType>, false>;
 
     // 参数类型
     using Params = typename QuantMatmulKernelImpl::Params;
@@ -193,7 +193,9 @@ AllToAllMxQuantMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMa
     opStateDump_.Init(workspaceGM_, &tilingData_->dumpInfo.workspaceLayout,
                       tilingData_->tileQbmmTilingData.usedCoreNum);
 #endif
-    quantMatmulKernelImpl_.GetCommPolicy().state_ = &commState_;
+    quantMatmulKernelImpl_.GetBufferSyncMgr().state_ = &commState_;
+    quantMatmulKernelImpl_.GetBufferSyncMgr().slotNum =
+        static_cast<uint32_t>(commTiling.splitAxisTileCnt + commTiling.splitAxisTailCnt);
     commState_.hccl_.InitV2(AscendC::GetHcclContext<0>(), &(tilingData_->mc2InitTiling));
     commState_.hccl_.SetCcTilingV2(static_cast<uint64_t>(offsetof(AlltoAllMatmulTilingDataType, mc2CcTiling)));
     rankId_ = commState_.hccl_.GetRankId();
