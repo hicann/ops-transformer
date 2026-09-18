@@ -43,6 +43,7 @@ constexpr uint32_t SENDER_CHANNEL_IDX = 0U;
 constexpr uint32_t RECEIVER_CHANNEL_IDX = 1U;
 constexpr uint32_t HANDLE_ARRAY_SIZE = 72U;
 constexpr uint32_t MAX_CHANNELS_PER_RANK = 3U;
+constexpr uint32_t HCOMM_SQ_MAX_PENDING = 32767U;
 
 struct EngramCommContext {
     uint32_t rankId;
