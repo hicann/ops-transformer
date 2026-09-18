@@ -269,8 +269,8 @@ void FlashAttnMetadataCpuKernel::InitBaseInfo()
     }
     baseInfo.attenMaskFlag = (maskMode != load_balance::SparseMode::BUTT);
     baseInfo.sparseMode = static_cast<uint32_t>(maskMode);
-    baseInfo.preToken = (winLeft_ == -1) ? std::numeric_limits<uint32_t>::max() : static_cast<uint32_t>(winLeft_);
-    baseInfo.nextToken = (winRight_ == -1) ? std::numeric_limits<uint32_t>::max() : static_cast<uint32_t>(winRight_);
+    baseInfo.preToken = (winLeft_ == -1) ? static_cast<int64_t>(std::numeric_limits<uint32_t>::max()) : winLeft_;
+    baseInfo.nextToken = (winRight_ == -1) ? static_cast<int64_t>(std::numeric_limits<uint32_t>::max()) : winRight_;
     baseInfo.layoutQuery = load_balance::ConvertToLayout(layoutQ_);
     baseInfo.layoutKv = load_balance::ConvertToLayout(layoutKv_);
     baseInfo.queryType = load_balance::DataType::FP16;

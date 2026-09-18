@@ -79,8 +79,8 @@ private:
     int32_t headDim_ = 0;
     int32_t headDimV_ = -1; // -1: 未指定, 归一化后等于 headDim_
     int32_t maskMode_ = 1;
-    int32_t winLeft_ = -1;
-    int32_t winRight_ = -1;
+    int64_t winLeft_ = -1;
+    int64_t winRight_ = -1;
     std::string layoutQ_ = "BSND";
     std::string layoutKv_ = "BSND";
     std::string layoutOut_ = "BSND";

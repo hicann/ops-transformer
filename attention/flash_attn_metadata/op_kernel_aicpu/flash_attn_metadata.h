@@ -121,7 +121,7 @@ struct FaMetadata {
           aivNum(aivNum),
           headMetadata(static_cast<FA_METADATA_T *>(metadataPtr)),
           faMetadata(headMetadata + METADATA_STRIDE),
-          fdMetadata(faMetadata + sectionNum * aicNum * METADATA_STRIDE)
+          fdMetadata(faMetadata + static_cast<size_t>(sectionNum) * static_cast<size_t>(aicNum * METADATA_STRIDE))
     {
         headMetadata[0] = sectionNum;
     }
@@ -156,7 +156,9 @@ struct FaMetadata {
         assert(sectionIdx < sectionNum);
         assert(aicIdx < aicNum);
         assert(metaIdx < METADATA_STRIDE);
-        faMetadata[sectionIdx * aicNum * METADATA_STRIDE + aicIdx * METADATA_STRIDE + metaIdx] = val;
+        size_t offset = static_cast<size_t>(sectionIdx) * static_cast<size_t>(aicNum * METADATA_STRIDE) +
+                        static_cast<size_t>(aicIdx * METADATA_STRIDE);
+        faMetadata[offset + static_cast<size_t>(metaIdx)] = val;
     }
 
     uint32_t GetFaMetadata(uint32_t sectionIdx, uint32_t aicIdx, uint32_t metaIdx)
@@ -164,7 +166,9 @@ struct FaMetadata {
         assert(sectionIdx < sectionNum);
         assert(aicIdx < aicNum);
         assert(metaIdx < METADATA_STRIDE);
-        return faMetadata[aicNum * METADATA_STRIDE * sectionIdx + METADATA_STRIDE * aicIdx + metaIdx];
+        size_t offset = static_cast<size_t>(sectionIdx) * static_cast<size_t>(aicNum * METADATA_STRIDE) +
+                        static_cast<size_t>(aicIdx * METADATA_STRIDE);
+        return faMetadata[offset + static_cast<size_t>(metaIdx)];
     }
 
     void SetFdMetadata(uint32_t sectionIdx, uint32_t aivIdx, uint32_t metaIdx, uint32_t val)
@@ -172,7 +176,9 @@ struct FaMetadata {
         assert(sectionIdx < sectionNum);
         assert(aivIdx < aicNum);
         assert(metaIdx < METADATA_STRIDE);
-        fdMetadata[aivNum * METADATA_STRIDE * sectionIdx + METADATA_STRIDE * aivIdx + metaIdx] = val;
+        size_t offset = static_cast<size_t>(sectionIdx) * static_cast<size_t>(aivNum * METADATA_STRIDE) +
+                        static_cast<size_t>(aivIdx * METADATA_STRIDE);
+        fdMetadata[offset + static_cast<size_t>(metaIdx)] = val;
     }
 
     uint32_t GetFdMetadata(uint32_t sectionIdx, uint32_t aivIdx, uint32_t metaIdx)
@@ -180,7 +186,9 @@ struct FaMetadata {
         assert(sectionIdx < sectionNum);
         assert(aivIdx < aivNum);
         assert(metaIdx < METADATA_STRIDE);
-        return fdMetadata[aivNum * METADATA_STRIDE * sectionIdx + METADATA_STRIDE * aivIdx + metaIdx];
+        size_t offset = static_cast<size_t>(sectionIdx) * static_cast<size_t>(aivNum * METADATA_STRIDE) +
+                        static_cast<size_t>(aivIdx * METADATA_STRIDE);
+        return fdMetadata[offset + static_cast<size_t>(metaIdx)];
     }
 };
 } // namespace detail
