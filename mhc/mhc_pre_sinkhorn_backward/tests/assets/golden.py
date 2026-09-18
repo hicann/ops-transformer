@@ -90,9 +90,8 @@ __golden__ = {
 }
 
 
-def _sigmoid_grad(z, dy, is_pre=False, hc_eps=1e-6):
-    y = torch.sigmoid(z)
-    sigma = y - hc_eps if is_pre else y
+def _sigmoid_grad(z, dy):
+    sigma = torch.sigmoid(z)
     return dy * sigma * (1 - sigma)
 
 
@@ -111,7 +110,7 @@ def _exp_grad(x, y_grad):
     return y * y_grad - is_max * sum_all
 
 
-def _sinkhorn_grad(grad_h_res, sum_out, norm_out):
+def _sinkhorn_grad(grad_h_res, sum_out, norm_out, hc_eps=1e-6):
     bs, seq_len, n, _ = grad_h_res.shape
     x_grad = grad_h_res
     iters_times_2, B, S, n = sum_out.shape
@@ -125,6 +124,9 @@ def _sinkhorn_grad(grad_h_res, sum_out, norm_out):
         grad_x_row_normed = x_grad / col_sum - (
             x_grad * x_row_normed / (col_sum**2)
         ).sum(dim=-2, keepdim=True)
+        if i == 0:
+            row_sum = row_sum - hc_eps
+            x_row_normed = x_row_normed - hc_eps
         x_grad = grad_x_row_normed / row_sum - (
             grad_x_row_normed * x_row_normed / row_sum
         ).sum(dim=-1, keepdim=True)
@@ -197,13 +199,13 @@ def mhc_pre_sinkhorn_backward_golden(
         B, S, n, n
     )
 
-    grad_z_pre = _sigmoid_grad(z_pre, grad_h_pre, is_pre=True, hc_eps=hc_eps)
-    grad_z_post = 2 * _sigmoid_grad(z_post, grad_h_post_t, is_pre=False, hc_eps=hc_eps)
+    grad_z_pre = _sigmoid_grad(z_pre, grad_h_pre)
+    grad_z_post = 2 * _sigmoid_grad(z_post, grad_h_post_t)
     # grad_h_res可能为(B,S,N*N)或(B,S,N,N), 统一reshape为(B,S,N,N)供_sinkhorn_grad处理
     grad_h_res_4d = (
         grad_h_res_t.reshape(B, S, n, n) if grad_h_res_t.dim() == 3 else grad_h_res_t
     )
-    sk_grad = _sinkhorn_grad(grad_h_res_4d, sum_out_t, norm_out_t)
+    sk_grad = _sinkhorn_grad(grad_h_res_4d, sum_out_t, norm_out_t, hc_eps)
     grad_z_res = _exp_grad(z_res, sk_grad).flatten(2)
 
     grad_bias = torch.cat(

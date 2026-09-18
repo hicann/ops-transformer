@@ -69,11 +69,10 @@ __aicore__ inline void CopyOut(const GlobalTensor<PARAM_T> &dstTensor, const Loc
 
 template <typename U, bool ISPRE>
 __aicore__ inline void SigmoidGrad(__local_mem__ U *gradHAddr, __local_mem__ U *zAddr, __local_mem__ U *gradZAddr,
-                                   uint64_t bsLen, uint64_t n, uint64_t vRegSize, float hcEps)
+                                   uint64_t bsLen, uint64_t n, uint64_t vRegSize)
 {
     uint32_t vfLen = vRegSize / sizeof(U);
     uint16_t loopCnt = (bsLen * n + vfLen - 1) / vfLen;
-    float hcEpsNeg = hcEps * (-1);
     __VEC_SCOPE__
     {
         AscendC::Reg::RegTensor<U> onesReg;
@@ -97,9 +96,6 @@ __aicore__ inline void SigmoidGrad(__local_mem__ U *gradHAddr, __local_mem__ U *
             AscendC::Reg::Exp(zReg, zReg, maskReg);
             AscendC::Reg::Add(zReg, zReg, onesReg, maskReg);
             AscendC::Reg::Div(sigmaReg, onesReg, zReg, maskReg);
-            if constexpr (ISPRE) {
-                AscendC::Reg::Adds(sigmaReg, sigmaReg, hcEpsNeg, maskReg);
-            }
             AscendC::Reg::Sub(dysigma2Reg, onesReg, sigmaReg, maskReg);
             AscendC::Reg::Mul(dysigmaReg, sigmaReg, gradHReg, maskReg);
             AscendC::Reg::Mul(gradZReg, dysigmaReg, dysigma2Reg, maskReg);
