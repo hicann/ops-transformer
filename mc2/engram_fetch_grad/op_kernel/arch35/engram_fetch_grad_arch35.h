@@ -36,8 +36,8 @@
 #include "adv_api/hcomm/hcomm.h"
 #endif
 
-#include "engram_fetch_grad_sort.h"
 #include "engram_fetch_grad_unique.h"
+#include "sortlib/sort_lib.h"
 
 namespace Mc2Kernel {
 
@@ -63,6 +63,7 @@ enum TimeoutSite {
     TIMEOUT_STATUS_FLAG_WAIT = 2,  // WaitAllStatusFlags 等待跨 rank barrier
     TIMEOUT_SEND_CREDIT_WAIT = 3,  // SendGradRemote 发送端等待对端 credit
     TIMEOUT_RECV_COUNTER_WAIT = 4, // RecvGradFromPeers 接收端等待对端写计数
+    TIMEOUT_A2A_PROGRESS_STALL = 5,
 };
 
 class EngramFetchGradArch35 {
@@ -84,15 +85,8 @@ private:
     __aicore__ inline uint32_t LoadGradChunk(int64_t pos, int64_t end, LocalTensor<uint8_t> &buf, int32_t bufIdx,
                                              LocalTensor<int32_t> &idxUb, uint32_t tokensPerBuf);
     __aicore__ inline void StoreGradChunk(int64_t base, uint32_t count, LocalTensor<uint8_t> &buf, int32_t bufIdx);
-    __aicore__ inline void ExchangeGrad();
-    __aicore__ inline void SendGradToPeers();
-    __aicore__ inline void SendGradRemote(uint32_t dstRank, uint32_t senderIdx, int32_t sendCount, int64_t sdispl,
-                                          GM_ADDR localWinBase);
     __aicore__ inline void DrainAndSendFlags();
-    __aicore__ inline void RecvGradFromPeers();
     __aicore__ inline void FinishExchangeGrad();
-    __aicore__ inline void InitCompanion(uint32_t numRecv);
-    __aicore__ inline void RunSort(uint32_t numRecv);
     __aicore__ inline void InitFlagsAndDispls();
     __aicore__ inline void ClearWinCounters();
     __aicore__ inline void CrossRankBarrierIssue();
@@ -107,9 +101,21 @@ private:
     __aicore__ inline void WriteLocalCounter(GM_ADDR winBase, uint64_t counterOffset, uint32_t peerRank,
                                              uint32_t senderIdx, int32_t value);
     __aicore__ inline void PrefetchCreditCounter(uint32_t dstRank, uint32_t senderIdx);
-    __aicore__ inline int32_t CompleteCreditCounter(uint64_t startTime);
-    __aicore__ inline void RetireCreditCounter();
+    __aicore__ inline int32_t PollCreditCounterOnce();
     __aicore__ inline void LocalCopySlice(GM_ADDR dst, GM_ADDR src, uint64_t len);
+    __aicore__ inline void A2aChunkInit();
+    __aicore__ inline bool A2aChunkSendStep();
+    __aicore__ inline bool A2aChunkRecvStep();
+    __aicore__ inline void A2aRecvEmitSegment(uint32_t u);
+    __aicore__ inline void A2aRecvFinishBatch(uint32_t u, GM_ADDR localWinBase);
+    __aicore__ inline bool A2aChunkAllDone() const;
+    __aicore__ inline void A2aDriveLoop();
+    __aicore__ inline void A2aCopyDispatch(GM_ADDR dst, GM_ADDR src, uint64_t len);
+    __aicore__ inline void A2aCopyPp(GM_ADDR dst, GM_ADDR src, uint64_t len);
+    __aicore__ inline void A2aHookStep();
+    __aicore__ inline void A2aTailDrive();
+    __aicore__ inline void RebuildA2aHookBuffers();
+    __aicore__ inline void RunSortHooked(uint32_t numRecv);
 
     TPipe *tpipe_{nullptr};
     GM_ADDR gradFetchedGM_{nullptr};
@@ -159,6 +165,56 @@ private:
     bool isReceiver_{false};
     bool isFlagCore_{false};
 
+    static constexpr uint32_t MAX_A2A_SEND_UNITS = 8U;
+    static constexpr uint32_t MAX_A2A_RECV_UNITS = 8U;
+    static constexpr uint32_t A2A_STEP_COPY_BYTES = 64U * 1024U;
+    struct A2aSendUnit {
+        uint32_t dstRank;
+        uint32_t senderIdx;
+        uint64_t handle;
+        int32_t sendCount;
+        int64_t sdispl;
+        uint32_t totalSent;
+        uint32_t localWriteCnt;
+        int32_t remoteReadCnt;
+        bool isLocal;
+        bool done;
+        GM_ADDR localSrc;
+        GM_ADDR localDst;
+        uint64_t localOff;
+        uint64_t localTotal;
+    };
+    struct A2aRecvUnit {
+        uint32_t srcRank;
+        uint32_t si;
+        uint32_t senderRecvCount;
+        int64_t senderBase;
+        uint32_t senderReceived;
+        uint32_t localReadCnt;
+        bool done;
+        bool batchActive;
+        GM_ADDR pendSegDst;
+        GM_ADDR pendSegSrc;
+        uint64_t pendSegRemain;
+        uint32_t pendSegsLeft;
+        uint32_t pendSegsDone;
+        uint32_t pendTokensAccum;
+        uint32_t pendReadBase;
+        uint64_t pendSlotArea;
+        uint32_t pendSlots;
+        bool pendContig;
+    };
+    A2aSendUnit a2aSendUnits_[MAX_A2A_SEND_UNITS];
+    A2aRecvUnit a2aRecvUnits_[MAX_A2A_RECV_UNITS];
+    uint32_t a2aSendUnitCnt_{0};
+    uint32_t a2aRecvUnitCnt_{0};
+    uint32_t a2aSlotsPerSender_{1};
+    int32_t a2aCreditOwner_{-1};
+    bool a2aInSortPhase_{false};
+    uint64_t a2aLastProgressUs_{0};
+    TBuf<> a2aCopyBuf_;
+    int32_t a2aCopyEvtMte2Mte3_[2] = {0, 0};
+    int32_t a2aCopyEvtMte3Mte2_[2] = {0, 0};
     GM_ADDR gradSortedGM_{0};
     GM_ADDR recvGradGM_{0};
     GM_ADDR sendCountsGM_{0};
@@ -173,6 +229,10 @@ private:
     GM_ADDR sortCompanionGM_{0};
     GM_ADDR sortWorkspaceGm_{0};
 
+    uint32_t sortNumTileData_{0U}; // SortLib tile 元素数
+    uint32_t sortTmpUbSize_{0U};   // SortLib AscendC::Sort 临时 UB
+    uint32_t chunkElems_{0U};
+
     TBuf<> entryBuf_;
     TBuf<> gradBuf_;
     int32_t ppEvtMte2ToMte3_[2] = {0, 0};
@@ -184,11 +244,22 @@ private:
     uint32_t indicesBufElements_{0};
     TBuf<> castFp32Buf_;
     TBuf<> accumBuf_;
-    TBufPool<TPosition::VECCALC, SORT_POOL_NUMBER> sortPool_;
+    uint32_t statusBufBytes_{0U};
+    uint32_t tempBufBytes_{0U};
+    uint32_t indicesBufBytes_{0U};
+    uint32_t castBufBytes_{0U};
+    uint32_t accumBufBytes_{0U};
 
     AscendC::Hcomm<COMM_PROTOCOL_UBC_CTP> hcomm_;
-    EngramFetchGradSort::EngramFetchGradSort sorter_;
     EngramFetchGradUnique::EngramFetchGradUnique uniqueScatter_;
+    friend struct EngramA2aSortHook;
+};
+struct EngramA2aSortHook {
+    EngramFetchGradArch35 *self;
+    __aicore__ inline void operator()() const
+    {
+        self->A2aHookStep();
+    }
 };
 
 __aicore__ inline void EngramFetchGradArch35::WriteNbiChecked(uint64_t handle, GM_ADDR dst, GM_ADDR src, uint64_t len)
@@ -276,32 +347,17 @@ __aicore__ inline void EngramFetchGradArch35::PrefetchCreditCounter(uint32_t dst
     creditReadInFlight_ = true;
 }
 
-__aicore__ inline int32_t EngramFetchGradArch35::CompleteCreditCounter(uint64_t startTime)
+__aicore__ inline int32_t EngramFetchGradArch35::PollCreditCounterOnce()
 {
     GM_ADDR scratchAddr = counterScratchGM_ + static_cast<uint64_t>(aivId_) * UB_ALIGN;
     GlobalTensor<int32_t> scratchGM;
     scratchGM.SetGlobalBuffer((__gm__ int32_t *)scratchAddr);
     LocalTensor<int32_t> creditLocal = statusBuf_.Get<int32_t>();
-    int32_t value = GRAD_CREDIT_READ_SENTINEL;
-    while (value == GRAD_CREDIT_READ_SENTINEL) {
-        DataCopyExtParams cpParams{1U, static_cast<uint32_t>(UB_ALIGN), 0U, 0U, 0U};
-        DataCopyPadExtParams<int32_t> cpPad{false, 0, 0, 0};
-        DataCopyPad(creditLocal, scratchGM, cpParams, cpPad);
-        EngramFetchGradSyncFunc<HardEvent::MTE2_S>();
-        value = creditLocal.GetValue(0);
-        TimeoutCheck(startTime, TIMEOUT_CREDIT_READ_WAIT);
-    }
-    creditReadInFlight_ = false;
-    return value;
-}
-
-__aicore__ inline void EngramFetchGradArch35::RetireCreditCounter()
-{
-    if (!creditReadInFlight_) {
-        return;
-    }
-    uint64_t startTime = static_cast<uint64_t>(AscendC::GetSystemCycle()) / ENGRAM_GRAD_CYCLES_PER_US;
-    (void)CompleteCreditCounter(startTime);
+    DataCopyExtParams cpParams{1U, static_cast<uint32_t>(UB_ALIGN), 0U, 0U, 0U};
+    DataCopyPadExtParams<int32_t> cpPad{false, 0, 0, 0};
+    DataCopyPad(creditLocal, scratchGM, cpParams, cpPad);
+    EngramFetchGradSyncFunc<HardEvent::MTE2_S>();
+    return creditLocal.GetValue(0);
 }
 
 __aicore__ inline void EngramFetchGradArch35::WaitAllStatusFlags(GM_ADDR statusWinBase, uint32_t expectCount)
@@ -485,7 +541,23 @@ __aicore__ inline void EngramFetchGradArch35::Init(GM_ADDR commContext, GM_ADDR 
     outputDtype_ = tilingData->outputDtype;
     ubSize_ = tilingData->ubSize;
     gradSubBatch_ = tilingData->gradSubBatch;
-    if (gradSubBatch_ == 0U) {
+    sortNumTileData_ = tilingData->sortNumTileData;
+    sortTmpUbSize_ = tilingData->sortTmpUbSize;
+    chunkElems_ = tilingData->chunkElems;
+    if (chunkElems_ > 0U) {
+        uint32_t chunkFp32Stride =
+            (chunkElems_ * sizeof(float) + Mc2Kernel::UB_ALIGN - 1U) / Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN;
+        uint32_t chunkOutStride = chunkFp32Stride;
+        castBufBytes_ = (inputDtype_ != Mc2Kernel::ENGRAM_DT_FLOAT) ? chunkFp32Stride : 0U;
+        accumBufBytes_ = 2U * chunkFp32Stride;
+        uniqueEntryBytes_ = Mc2Kernel::FLUSH_CAST_HEAD_BYTES;
+        if (outputDtype_ != Mc2Kernel::ENGRAM_DT_FLOAT) {
+            uniqueEntryBytes_ += 2U * chunkOutStride;
+        }
+        if (gradSubBatch_ == 0U) {
+            gradSubBatch_ = 1U;
+        }
+    } else if (gradSubBatch_ == 0U) {
         // 旧 tiling 兼容回落：回落值必须同时受半缓冲容量约束（按 32B 对齐行 stride），
         // 否则 subLen*rowStride 越过 32KB 半缓冲
         uint32_t rowsPerPing = 1U;
@@ -583,9 +655,20 @@ __aicore__ inline void EngramFetchGradArch35::Init(GM_ADDR commContext, GM_ADDR 
     uint64_t sortCompanionSize = Ceil(static_cast<uint64_t>(maxSortCount) * sizeof(int32_t), UB_ALIGN) * UB_ALIGN;
     sortCompanionGM_ = workspaceGM_ + wsOffset;
     wsOffset += sortCompanionSize;
-    uint64_t sortWorkspaceSize = EngramFetchGradSort::EngramFetchGradSort::GetWorkspaceSize(maxSortCount, totalBlocks_);
+    constexpr uint64_t kRadixRounds = 4U;
+    uint64_t slTileCount = static_cast<uint64_t>(tilingData->sortTileCount);
+    uint64_t seg0 = Ceil(256U * kRadixRounds * 4U, UB_ALIGN) * UB_ALIGN;
+    uint64_t seg1 = Ceil(slTileCount * 256U * kRadixRounds * 4U, UB_ALIGN) * UB_ALIGN;
+    uint64_t seg2 = Ceil(static_cast<uint64_t>(totalRecv_) * 4U, UB_ALIGN) * UB_ALIGN;
+    uint64_t seg3 = 2U * Ceil(slTileCount * 256U * 2U, UB_ALIGN) * UB_ALIGN;
+    uint64_t seg4 = Ceil(slTileCount * static_cast<uint64_t>(sortNumTileData_), UB_ALIGN) * UB_ALIGN;
+    uint64_t seg5 = Ceil(static_cast<uint64_t>(totalRecv_) * 4U, UB_ALIGN) * UB_ALIGN;
+    uint64_t sortWorkspaceSize = seg0 + seg1 + seg2 + seg3 + seg4 + seg5;
+    sortWorkspaceGm_ = workspaceGM_ + wsOffset;
+    wsOffset += sortWorkspaceSize;
 
     uint32_t statusBufSize = Ceil(numRanks_ * STATE_OFFSET, UB_ALIGN) * UB_ALIGN;
+    statusBufBytes_ = statusBufSize;
     tpipe_->InitBuffer(statusBuf_, statusBufSize);
     uint32_t tempBufSize = statusBufSize;
     uint32_t entryBatchBytes = ENTRY_BATCH_CAP * sizeof(int32_t);
@@ -602,6 +685,7 @@ __aicore__ inline void EngramFetchGradArch35::Init(GM_ADDR commContext, GM_ADDR 
         tempBufSize = displsBatchBytes;
     }
     tpipe_->InitBuffer(tempBuf_, tempBufSize);
+    tempBufBytes_ = tempBufSize;
     uint32_t indicesBufSize = Mc2Kernel::IDX_BUF_BYTES;
     if (indicesBufSize < statusBufSize) {
         indicesBufSize = statusBufSize;
@@ -613,34 +697,37 @@ __aicore__ inline void EngramFetchGradArch35::Init(GM_ADDR commContext, GM_ADDR 
         indicesBufSize = stagingBytes;
     }
     tpipe_->InitBuffer(indicesBuf_, indicesBufSize);
+    indicesBufBytes_ = indicesBufSize;
     indicesBufElements_ = indicesBufSize / sizeof(int32_t);
 
-    uint32_t sortUbSize = EngramFetchGradSort::EngramFetchGradSort::GetUbSize(maxSortCount, totalBlocks_);
     uint32_t maxByPong = MaxGradRowsPerPing(static_cast<uint32_t>(hiddenBytes_), gradSubBatch_);
-    uint32_t castBufSize = (inputDtype_ != Mc2Kernel::ENGRAM_DT_FLOAT) ? CastBufBytes(hiddenDim_, maxByPong) : 0U;
-    uint32_t accumBufSize = AccumBufBytes(hiddenDim_);
-    uniqueEntryBytes_ = UniqueEntryBytes(hiddenDim_, outputDtype_);
-    // unique 阶段池峰值：grad 整缓冲 + entryBuf 收缩区 + cast + accum（与 Process 二次 InitBuffer 布局一致）
-    uint32_t uniqueBufSize = Mc2Kernel::GRAD_BUF_BYTES + uniqueEntryBytes_ + castBufSize + accumBufSize;
-    uint32_t poolSize = sortUbSize;
-    if (uniqueBufSize > poolSize) {
-        poolSize = uniqueBufSize;
+    if (chunkElems_ == 0U) {
+        if (inputDtype_ != Mc2Kernel::ENGRAM_DT_FLOAT) {
+            if (inputDtype_ == outputDtype_) {
+                castBufBytes_ = (static_cast<uint32_t>(hiddenDim_) * sizeof(float) + Mc2Kernel::UB_ALIGN - 1U) /
+                                Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN;
+            } else {
+                castBufBytes_ = CastBufBytes(hiddenDim_, maxByPong);
+            }
+        } else {
+            castBufBytes_ = 0U;
+        }
+        accumBufBytes_ = AccumBufBytes(hiddenDim_);
+        uniqueEntryBytes_ = UniqueEntryBytes(hiddenDim_, outputDtype_);
     }
-    // UB 池预算自检：池 + 常驻四缓冲必须落在 SetLocalMemorySize 授权范围内，超限确定性失败
-    uint64_t permanentUsed = Mc2Kernel::HCOMM_INIT_SIZE + statusBufSize + tempBufSize + indicesBufSize;
-    uint64_t budgetLeft = (ubSize_ > permanentUsed) ? (ubSize_ - permanentUsed) : 0U;
-    ascendc_assert(static_cast<uint64_t>(poolSize) <= budgetLeft,
-                   "UB pool overflow: pool=%u, permanent=%llu, ubSize=%llu", poolSize, permanentUsed, ubSize_);
-    tpipe_->InitBufPool(sortPool_, poolSize);
-    sortPool_.InitBuffer(entryBuf_, Mc2Kernel::ENTRY_BUF_BYTES);
-    sortPool_.InitBuffer(gradBuf_, Mc2Kernel::GRAD_BUF_BYTES);
-
-    sortWorkspaceGm_ = workspaceGM_ + wsOffset;
-    wsOffset += sortWorkspaceSize;
+    uint32_t scatterPeak = Mc2Kernel::GRAD_BUF_BYTES + uniqueEntryBytes_ + castBufBytes_ + accumBufBytes_;
+    uint32_t uniqueBufSize = (scatterPeak > Mc2Kernel::COMM_BUF_BYTES) ? scatterPeak : Mc2Kernel::COMM_BUF_BYTES;
+    uint64_t permanentUsed = Mc2Kernel::HCOMM_INIT_SIZE + statusBufBytes_ + tempBufBytes_ + indicesBufBytes_;
+    ascendc_assert(static_cast<uint64_t>(uniqueBufSize) <= ubSize_ - permanentUsed,
+                   "scatter stage buffers overflow: need=%u, permanent=%llu, ubSize=%llu", uniqueBufSize, permanentUsed,
+                   ubSize_);
+    tpipe_->InitBuffer(entryBuf_, Mc2Kernel::ENTRY_BUF_BYTES);
+    tpipe_->InitBuffer(gradBuf_, Mc2Kernel::GRAD_BUF_BYTES);
 
     uniqueScatter_.Init(aivId_, totalBlocks_, rankId_, numRanks_, numEntriesPerRank_, hiddenDim_, hiddenBytes_,
                         inputDtype_, outputDtype_, tpipe_, entryBuf_, gradBuf_, indicesBuf_, tempBuf_, statusBuf_,
                         castFp32Buf_, accumBuf_);
+    uniqueScatter_.SetChunkElems(chunkElems_);
 }
 
 __aicore__ inline uint32_t EngramFetchGradArch35::LoadGradChunk(int64_t pos, int64_t end, LocalTensor<uint8_t> &buf,
@@ -844,192 +931,232 @@ __aicore__ inline void EngramFetchGradArch35::FinishExchangeGrad()
 
     SyncAll<true>();
 }
-__aicore__ inline void EngramFetchGradArch35::SendGradToPeers()
+__aicore__ inline void EngramFetchGradArch35::A2aChunkInit()
 {
-    pendingHandleCount_ = 0;
-    if (!isSender_) {
-        return;
+    a2aSendUnitCnt_ = 0U;
+    a2aRecvUnitCnt_ = 0U;
+    a2aCreditOwner_ = -1;
+    pendingHandleCount_ = 0U;
+    a2aSlotsPerSender_ = NUM_SLOTS / sendersPerRank_;
+    if (a2aSlotsPerSender_ == 0U) {
+        a2aSlotsPerSender_ = 1U;
     }
 
-    GM_ADDR localWinBase = (GM_ADDR)ctxPtr_->commBuffer[rankId_];
-    uint32_t totalSendWorkUnits = numRanks_ * sendersPerRank_;
-    if (totalSendWorkUnits == 0U) {
-        return;
+    if (isSender_) {
+        uint32_t totalSendWorkUnits = numRanks_ * sendersPerRank_;
+        for (uint32_t wIdx = aivId_ % totalSendWorkUnits; wIdx < totalSendWorkUnits; wIdx += numSendCores_) {
+            uint32_t dstRank = wIdx % numRanks_;
+            uint32_t senderIdx = wIdx / numRanks_;
+            GM_ADDR sSlot = sendCountsGM_ + dstRank * UB_ALIGN;
+            GlobalTensor<int32_t> sSlotGM;
+            sSlotGM.SetGlobalBuffer((__gm__ int32_t *)sSlot);
+            DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(sSlotGM);
+            int32_t totalSendCount = sSlotGM.GetValue(0);
+            GM_ADDR sDisplSlot = sdisplsGM_ + dstRank * UB_ALIGN;
+            GlobalTensor<int64_t> sDisplSlotGM;
+            sDisplSlotGM.SetGlobalBuffer((__gm__ int64_t *)sDisplSlot);
+            DataCacheCleanAndInvalid<int64_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(sDisplSlotGM);
+            int64_t sdispl = sDisplSlotGM.GetValue(0);
+            int32_t baseShare = totalSendCount / static_cast<int32_t>(sendersPerRank_);
+            int32_t mySendCount = baseShare;
+            int64_t mySdispl = sdispl + static_cast<int64_t>(senderIdx) * baseShare;
+            if (senderIdx == sendersPerRank_ - 1U) {
+                mySendCount = totalSendCount - static_cast<int32_t>(senderIdx) * baseShare;
+            }
+            if (mySendCount <= 0) {
+                continue;
+            }
+            ascendc_assert(a2aSendUnitCnt_ < MAX_A2A_SEND_UNITS, "a2a send units overflow: rankId=%u, aivId=%u",
+                           rankId_, aivId_);
+            A2aSendUnit &unit = a2aSendUnits_[a2aSendUnitCnt_];
+            if (dstRank == rankId_) {
+                GM_ADDR rDisplSlot = rdisplsGM_ + rankId_ * UB_ALIGN;
+                GlobalTensor<int64_t> rDisplSlotGM;
+                rDisplSlotGM.SetGlobalBuffer((__gm__ int64_t *)rDisplSlot);
+                DataCacheCleanAndInvalid<int64_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(rDisplSlotGM);
+                int64_t rdispl = rDisplSlotGM.GetValue(0);
+                int64_t myRdispl = rdispl + static_cast<int64_t>(senderIdx) * baseShare;
+                unit.dstRank = dstRank;
+                unit.senderIdx = senderIdx;
+                unit.isLocal = true;
+                unit.done = false;
+                unit.localSrc = gradSortedGM_ + static_cast<uint64_t>(mySdispl) * hiddenBytes_;
+                unit.localDst = recvGradGM_ + static_cast<uint64_t>(myRdispl) * hiddenBytes_;
+                unit.localOff = 0U;
+                unit.localTotal = static_cast<uint64_t>(mySendCount) * hiddenBytes_;
+            } else {
+                unit.dstRank = dstRank;
+                unit.senderIdx = senderIdx;
+                unit.handle = GetCommHandle(dstRank, senderIdx);
+                unit.isLocal = false;
+                unit.done = false;
+                unit.sendCount = mySendCount;
+                unit.sdispl = mySdispl;
+                unit.totalSent = 0U;
+                unit.localWriteCnt = 0U;
+                unit.remoteReadCnt = 0;
+            }
+            a2aSendUnitCnt_++;
+        }
     }
-    for (uint32_t wIdx = aivId_ % totalSendWorkUnits; wIdx < totalSendWorkUnits; wIdx += numSendCores_) {
-        uint32_t dstRank = wIdx % numRanks_;
-        uint32_t senderIdx = wIdx / numRanks_;
 
-        GM_ADDR sSlot = sendCountsGM_ + dstRank * UB_ALIGN;
-        GlobalTensor<int32_t> sSlotGM;
-        sSlotGM.SetGlobalBuffer((__gm__ int32_t *)sSlot);
-        DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(sSlotGM);
-        int32_t totalSendCount = sSlotGM.GetValue(0);
+    if (isReceiver_) {
+        uint32_t recvIdx = aivId_ - numSendCores_;
+        uint32_t totalWorkUnits = (numRanks_ - 1U) * sendersPerRank_;
+        for (uint32_t wIdx = recvIdx; wIdx < totalWorkUnits; wIdx += numRecvCores_) {
+            uint32_t adjustedSrcRank = wIdx / sendersPerRank_;
+            uint32_t srcRank = (adjustedSrcRank >= rankId_) ? (adjustedSrcRank + 1U) : adjustedSrcRank;
+            uint32_t si = wIdx % sendersPerRank_;
 
-        GM_ADDR sDisplSlot = sdisplsGM_ + dstRank * UB_ALIGN;
-        GlobalTensor<int64_t> sDisplSlotGM;
-        sDisplSlotGM.SetGlobalBuffer((__gm__ int64_t *)sDisplSlot);
-        DataCacheCleanAndInvalid<int64_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(sDisplSlotGM);
-        int64_t sdispl = sDisplSlotGM.GetValue(0);
+            GM_ADDR rSlot = recvCountsGM_ + srcRank * sizeof(int32_t);
+            GlobalTensor<int32_t> rSlotGM;
+            rSlotGM.SetGlobalBuffer((__gm__ int32_t *)rSlot);
+            DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(rSlotGM);
+            int32_t recvCount = rSlotGM.GetValue(0);
 
-        int32_t baseShare = totalSendCount / static_cast<int32_t>(sendersPerRank_);
-        int32_t mySendCount = baseShare;
-        int64_t mySdispl = sdispl + static_cast<int64_t>(senderIdx) * baseShare;
-        if (senderIdx == sendersPerRank_ - 1U) {
-            mySendCount = totalSendCount - static_cast<int32_t>(senderIdx) * baseShare;
-        }
-
-        if (mySendCount <= 0) {
-            continue;
-        }
-
-        if (dstRank == rankId_) {
-            GM_ADDR rDisplSlot = rdisplsGM_ + rankId_ * UB_ALIGN;
+            GM_ADDR rDisplSlot = rdisplsGM_ + srcRank * UB_ALIGN;
             GlobalTensor<int64_t> rDisplSlotGM;
             rDisplSlotGM.SetGlobalBuffer((__gm__ int64_t *)rDisplSlot);
             DataCacheCleanAndInvalid<int64_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(rDisplSlotGM);
             int64_t rdispl = rDisplSlotGM.GetValue(0);
-            int64_t myRdispl = rdispl + static_cast<int64_t>(senderIdx) * baseShare;
-            LocalCopySlice(recvGradGM_ + myRdispl * hiddenBytes_, gradSortedGM_ + mySdispl * hiddenBytes_,
-                           static_cast<uint64_t>(mySendCount) * hiddenBytes_);
+            int32_t baseShare = recvCount / static_cast<int32_t>(sendersPerRank_);
+            uint32_t senderRecvCount = (si == sendersPerRank_ - 1U) ?
+                                           static_cast<uint32_t>(recvCount - static_cast<int32_t>(si) * baseShare) :
+                                           static_cast<uint32_t>(baseShare);
+            if (senderRecvCount == 0U) {
+                continue;
+            }
+            ascendc_assert(a2aRecvUnitCnt_ < MAX_A2A_RECV_UNITS, "a2a recv units overflow: rankId=%u, aivId=%u",
+                           rankId_, aivId_);
+            A2aRecvUnit &unit = a2aRecvUnits_[a2aRecvUnitCnt_];
+            unit.srcRank = srcRank;
+            unit.si = si;
+            unit.senderRecvCount = senderRecvCount;
+            unit.senderBase = rdispl + static_cast<int64_t>(si) * baseShare;
+            unit.senderReceived = 0U;
+            unit.localReadCnt = 0U;
+            unit.done = false;
+            unit.batchActive = false;
+            unit.pendSegRemain = 0U;
+            unit.pendSegsLeft = 0U;
+            unit.pendSegsDone = 0U;
+            unit.pendTokensAccum = 0U;
+            a2aRecvUnitCnt_++;
+        }
+    }
+}
+__aicore__ inline bool EngramFetchGradArch35::A2aChunkSendStep()
+{
+    if (a2aSendUnitCnt_ == 0U) {
+        return false;
+    }
+    bool progress = false;
+    uint32_t slotsPerSender = a2aSlotsPerSender_;
+    for (uint32_t u = 0U; u < a2aSendUnitCnt_; u++) {
+        A2aSendUnit &s = a2aSendUnits_[u];
+        if (s.done) {
+            continue;
+        }
+        if (s.isLocal) {
+            uint64_t rem = s.localTotal - s.localOff;
+            uint64_t len = (rem > A2A_STEP_COPY_BYTES) ? A2A_STEP_COPY_BYTES : rem;
+            A2aCopyDispatch(s.localDst + s.localOff, s.localSrc + s.localOff, len);
+            s.localOff += len;
+            if (s.localOff >= s.localTotal) {
+                s.done = true;
+            }
+            progress = true;
             continue;
         }
 
-        SendGradRemote(dstRank, senderIdx, mySendCount, mySdispl, localWinBase);
-    }
-}
-
-__aicore__ inline void EngramFetchGradArch35::SendGradRemote(uint32_t dstRank, uint32_t senderIdx, int32_t sendCount,
-                                                             int64_t sdispl, GM_ADDR localWinBase)
-{
-    uint64_t handle = GetCommHandle(dstRank, senderIdx);
-    uint32_t totalSent = 0;
-    uint32_t localWriteCnt = 0;
-    int32_t remoteReadCnt = 0;
-    uint32_t slotsPerSender = NUM_SLOTS / sendersPerRank_;
-    if (slotsPerSender == 0U) {
-        slotsPerSender = 1U;
-    }
-
-    while (totalSent < static_cast<uint32_t>(sendCount)) {
         if (totalBlocks_ > 1U) {
-            uint64_t startTime = static_cast<uint64_t>(AscendC::GetSystemCycle()) / ENGRAM_GRAD_CYCLES_PER_US;
-            if (!creditReadInFlight_ && localWriteCnt + 1U >= static_cast<uint32_t>(remoteReadCnt) + slotsPerSender) {
-                PrefetchCreditCounter(dstRank, senderIdx);
+            if (!creditReadInFlight_ &&
+                s.localWriteCnt + 1U >= static_cast<uint32_t>(s.remoteReadCnt) + slotsPerSender) {
+                PrefetchCreditCounter(s.dstRank, s.senderIdx);
+                a2aCreditOwner_ = static_cast<int32_t>(u);
             }
-            while (localWriteCnt >= static_cast<uint32_t>(remoteReadCnt) &&
-                   localWriteCnt - static_cast<uint32_t>(remoteReadCnt) >= slotsPerSender) {
-                PrefetchCreditCounter(dstRank, senderIdx);
-                remoteReadCnt = CompleteCreditCounter(startTime);
-                TimeoutCheck(startTime, TIMEOUT_SEND_CREDIT_WAIT);
+            if (s.localWriteCnt >= static_cast<uint32_t>(s.remoteReadCnt) &&
+                s.localWriteCnt - static_cast<uint32_t>(s.remoteReadCnt) >= slotsPerSender) {
+                if (!creditReadInFlight_) {
+                    PrefetchCreditCounter(s.dstRank, s.senderIdx);
+                    a2aCreditOwner_ = static_cast<int32_t>(u);
+                }
+                if (a2aCreditOwner_ == static_cast<int32_t>(u) && creditReadInFlight_) {
+                    int32_t v = PollCreditCounterOnce();
+                    if (v == GRAD_CREDIT_READ_SENTINEL) {
+                        continue;
+                    }
+                    s.remoteReadCnt = v;
+                    creditReadInFlight_ = false;
+                    a2aCreditOwner_ = -1;
+                    progress = true;
+                } else {
+                    continue;
+                }
+                if (s.localWriteCnt - static_cast<uint32_t>(s.remoteReadCnt) >= slotsPerSender) {
+                    continue;
+                }
             }
         }
 
-        uint32_t remaining = static_cast<uint32_t>(sendCount) - totalSent;
+        uint32_t remaining = static_cast<uint32_t>(s.sendCount) - s.totalSent;
         uint32_t chunkLen = (remaining > maxTokensPerSlot_) ? maxTokensPerSlot_ : remaining;
         ascendc_assert(chunkLen != 0U, "ExchangeGrad chunkLen is 0");
 
         uint64_t slotBase = static_cast<uint64_t>(rankId_) * NUM_SLOTS * tokenSlotSize_;
-        uint64_t slotIdx =
-            static_cast<uint64_t>(senderIdx) * slotsPerSender + (static_cast<uint64_t>(localWriteCnt) % slotsPerSender);
+        uint64_t slotIdx = static_cast<uint64_t>(s.senderIdx) * slotsPerSender +
+                           (static_cast<uint64_t>(s.localWriteCnt) % slotsPerSender);
         uint64_t slotOffset = tokenDataOffset_ + slotBase + slotIdx * tokenSlotSize_;
-        GM_ADDR remoteSlotAddr = GetRemoteWinAddr(dstRank, slotOffset);
-        GM_ADDR srcAddr = gradSortedGM_ + (sdispl + totalSent) * hiddenBytes_;
+        GM_ADDR remoteSlotAddr = GetRemoteWinAddr(s.dstRank, slotOffset);
+        GM_ADDR srcAddr = gradSortedGM_ + static_cast<uint64_t>(s.sdispl + s.totalSent) * hiddenBytes_;
         uint64_t dataBytes = static_cast<uint64_t>(chunkLen) * hiddenBytes_;
 
-        GM_ADDR remoteCounterAddr = GetRemoteWinAddr(dstRank, tokenWriteOffset_) +
-                                    (static_cast<uint64_t>(rankId_) * sendersPerRank_ + senderIdx) * STATE_OFFSET;
-        int32_t ret = hcomm_.WriteWithNotifyNbi(handle, remoteSlotAddr, srcAddr, dataBytes, remoteCounterAddr,
-                                                static_cast<uint64_t>(localWriteCnt + 1));
+        GM_ADDR remoteCounterAddr = GetRemoteWinAddr(s.dstRank, tokenWriteOffset_) +
+                                    (static_cast<uint64_t>(rankId_) * sendersPerRank_ + s.senderIdx) * STATE_OFFSET;
+        int32_t ret = hcomm_.WriteWithNotifyNbi(s.handle, remoteSlotAddr, srcAddr, dataBytes, remoteCounterAddr,
+                                                static_cast<uint64_t>(s.localWriteCnt + 1U));
         ascendc_assert(ret == 0, "WriteWithNotifyNbi failed, ret=%d, tag=ExTok_data, rankId=%u, dstRank=%u", ret,
-                       rankId_, dstRank);
+                       rankId_, s.dstRank);
 
-        localWriteCnt++;
-        totalSent += chunkLen;
+        s.localWriteCnt++;
+        s.totalSent += chunkLen;
+        progress = true;
+        if (s.totalSent >= static_cast<uint32_t>(s.sendCount)) {
+            ascendc_assert(pendingHandleCount_ < Mc2Kernel::MAX_PENDING_HANDLES,
+                           "pendingHandles overflow: count=%u, max=%u, rankId=%u, dstRank=%u", pendingHandleCount_,
+                           Mc2Kernel::MAX_PENDING_HANDLES, rankId_, s.dstRank);
+            pendingHandles_[pendingHandleCount_] = s.handle;
+            pendingHandleCount_++;
+            s.done = true;
+        }
     }
-    RetireCreditCounter();
-
-    // 单核 remote handle 数随 numRanks_/numSendCores_ 配置增长，必须守卫固定数组边界
-    ascendc_assert(pendingHandleCount_ < Mc2Kernel::MAX_PENDING_HANDLES,
-                   "pendingHandles overflow: count=%u, max=%u, rankId=%u, dstRank=%u", pendingHandleCount_,
-                   Mc2Kernel::MAX_PENDING_HANDLES, rankId_, dstRank);
-    pendingHandles_[pendingHandleCount_] = handle;
-    pendingHandleCount_++;
+    return progress;
 }
 
-__aicore__ inline void EngramFetchGradArch35::DrainAndSendFlags()
+__aicore__ inline bool EngramFetchGradArch35::A2aChunkRecvStep()
 {
-    for (uint32_t i = 0; i < pendingHandleCount_; i++) {
-        DrainChecked(pendingHandles_[i]);
+    if (a2aRecvUnitCnt_ == 0U) {
+        return false;
     }
-    pendingHandleCount_ = 0;
-}
-
-__aicore__ inline void EngramFetchGradArch35::RecvGradFromPeers()
-{
-    if (!isReceiver_) {
-        return;
-    }
-
     GM_ADDR localWinBase = (GM_ADDR)ctxPtr_->commBuffer[rankId_];
-    uint32_t recvIdx = (aivId_ > numSendCores_) ? (aivId_ - numSendCores_) : 0U;
-    uint32_t totalWorkUnits = (numRanks_ - 1U) * sendersPerRank_;
-    if (totalWorkUnits == 0U) {
-        return;
-    }
-
-    // Each work unit must be owned by EXACTLY one receiver core: with numRecvCores_ >
-    // totalWorkUnits, `recvIdx % totalWorkUnits` would map several cores onto the same
-    // (srcRank, senderIdx) unit and race on the tokenRead counters (flow-control slots
-    // get reused while the slower duplicate is still copying -> recvGrad corruption).
-    for (uint32_t wIdx = recvIdx; wIdx < totalWorkUnits; wIdx += numRecvCores_) {
-        uint32_t adjustedSrcRank = wIdx / sendersPerRank_;
-        uint32_t srcRank = (adjustedSrcRank >= rankId_) ? (adjustedSrcRank + 1U) : adjustedSrcRank;
-        uint32_t si = wIdx % sendersPerRank_;
-
-        GM_ADDR rSlot = recvCountsGM_ + srcRank * sizeof(int32_t);
-        GlobalTensor<int32_t> rSlotGM;
-        rSlotGM.SetGlobalBuffer((__gm__ int32_t *)rSlot);
-        DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(rSlotGM);
-        int32_t recvCount = rSlotGM.GetValue(0);
-
-        GM_ADDR rDisplSlot = rdisplsGM_ + srcRank * UB_ALIGN;
-        GlobalTensor<int64_t> rDisplSlotGM;
-        rDisplSlotGM.SetGlobalBuffer((__gm__ int64_t *)rDisplSlot);
-        DataCacheCleanAndInvalid<int64_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(rDisplSlotGM);
-        int64_t rdispl = rDisplSlotGM.GetValue(0);
-
-        int32_t baseShare = recvCount / static_cast<int32_t>(sendersPerRank_);
-        uint32_t senderRecvCount = (si == sendersPerRank_ - 1U) ?
-                                       static_cast<uint32_t>(recvCount - static_cast<int32_t>(si) * baseShare) :
-                                       static_cast<uint32_t>(baseShare);
-        if (senderRecvCount == 0) {
+    bool progress = false;
+    for (uint32_t u = 0U; u < a2aRecvUnitCnt_; u++) {
+        A2aRecvUnit &r = a2aRecvUnits_[u];
+        if (r.done) {
             continue;
         }
 
-        int64_t senderBase = rdispl + static_cast<int64_t>(si) * baseShare;
-        uint32_t slotsPerSender = NUM_SLOTS / sendersPerRank_;
-        if (slotsPerSender == 0U) {
-            slotsPerSender = 1U;
-        }
-        uint64_t slotAreaBase = tokenDataOffset_ + static_cast<uint64_t>(srcRank) * NUM_SLOTS * tokenSlotSize_;
-
-        uint32_t senderReceived = 0;
-        uint32_t localReadCnt = 0;
-
-        while (senderReceived < senderRecvCount) {
-            uint64_t startTime = static_cast<uint64_t>(AscendC::GetSystemCycle()) / ENGRAM_GRAD_CYCLES_PER_US;
-            int32_t remoteWriteCnt = ReadLocalCounter(localWinBase, tokenWriteOffset_, srcRank, si);
-            while (remoteWriteCnt <= 0 || static_cast<uint32_t>(remoteWriteCnt) <= localReadCnt) {
-                remoteWriteCnt = ReadLocalCounter(localWinBase, tokenWriteOffset_, srcRank, si);
-                TimeoutCheck(startTime, TIMEOUT_RECV_COUNTER_WAIT);
+        if (!r.batchActive) {
+            int32_t remoteWriteCnt = ReadLocalCounter(localWinBase, tokenWriteOffset_, r.srcRank, r.si);
+            if (remoteWriteCnt <= 0 || static_cast<uint32_t>(remoteWriteCnt) <= r.localReadCnt) {
+                continue;
             }
 
-            uint32_t availSlots = static_cast<uint32_t>(remoteWriteCnt) - localReadCnt;
-            uint32_t remaining = senderRecvCount - senderReceived;
+            uint32_t availSlots = static_cast<uint32_t>(remoteWriteCnt) - r.localReadCnt;
+            uint32_t remaining = r.senderRecvCount - r.senderReceived;
             uint32_t remainingChunks = (remaining + maxTokensPerSlot_ - 1U) / maxTokensPerSlot_;
-            uint32_t localSlotIdx = localReadCnt % slotsPerSender;
-            uint32_t maxBatchFromHere = slotsPerSender - localSlotIdx;
+            uint32_t localSlotIdx = r.localReadCnt % a2aSlotsPerSender_;
+            uint32_t maxBatchFromHere = a2aSlotsPerSender_ - localSlotIdx;
 
             uint32_t batchSlots = availSlots;
             if (batchSlots > remainingChunks) {
@@ -1039,90 +1166,243 @@ __aicore__ inline void EngramFetchGradArch35::RecvGradFromPeers()
                 batchSlots = maxBatchFromHere;
             }
 
-            uint32_t slotsRead = 0;
-            uint32_t tokensRead = 0;
-            // The contiguous multi-slot read assumes consecutive slots are exactly
-            // maxTokensPerSlot_*hiddenBytes_ apart. tokenSlotSize_ = tokenArea/numRanks_/
-            // NUM_SLOTS leaves a per-slot slack of tokenSlotSize_ % hiddenBytes_ bytes
-            // whenever tokenArea isn't a multiple of numRanks_*NUM_SLOTS*hiddenBytes_;
-            // reading contiguously then mixes never-written window memory into recvGrad
-            // and misaligns every following slot (grad rows zero/shifted while indices
-            // stay correct). Only batch when there is no slack; otherwise read per slot.
             bool noSlotSlack =
                 (tokenSlotSize_ == static_cast<uint64_t>(maxTokensPerSlot_) * static_cast<uint64_t>(hiddenBytes_));
-            if (noSlotSlack && batchSlots < remainingChunks) {
-                uint32_t totalTokens = batchSlots * maxTokensPerSlot_;
-                uint32_t firstSegIdx = localReadCnt % slotsPerSender;
-                uint32_t firstSlotIdx = si * slotsPerSender + firstSegIdx;
-                uint64_t firstSlotOffset = slotAreaBase + static_cast<uint64_t>(firstSlotIdx) * tokenSlotSize_;
+            r.pendContig = noSlotSlack && batchSlots < remainingChunks;
+            r.batchActive = true;
+            r.pendSegsDone = 0U;
+            r.pendTokensAccum = 0U;
+            r.pendReadBase = r.localReadCnt;
+            r.pendSlotArea = tokenDataOffset_ + static_cast<uint64_t>(r.srcRank) * NUM_SLOTS * tokenSlotSize_;
+            r.pendSlots = batchSlots;
+            r.pendSegsLeft = r.pendContig ? 1U : batchSlots;
+            r.pendSegRemain = 0U;
+        }
 
-                LocalCopySlice(recvGradGM_ + (senderBase + senderReceived) * hiddenBytes_,
-                               localWinBase + firstSlotOffset, static_cast<uint64_t>(totalTokens) * hiddenBytes_);
-                slotsRead = batchSlots;
-                tokensRead = totalTokens;
-            } else {
-                while (slotsRead < batchSlots) {
-                    uint32_t segIdx = (localReadCnt + slotsRead) % slotsPerSender;
-                    uint32_t slotGlobalIdx = si * slotsPerSender + segIdx;
-                    uint64_t slotOffset = slotAreaBase + static_cast<uint64_t>(slotGlobalIdx) * tokenSlotSize_;
+        if (r.pendSegRemain > 0U) {
+            uint64_t n = (r.pendSegRemain > A2A_STEP_COPY_BYTES) ? A2A_STEP_COPY_BYTES : r.pendSegRemain;
+            A2aCopyDispatch(r.pendSegDst, r.pendSegSrc, n);
+            r.pendSegDst += n;
+            r.pendSegSrc += n;
+            r.pendSegRemain -= n;
+            progress = true;
+        } else if (r.pendSegsLeft > 0U) {
+            A2aRecvEmitSegment(u);
+        } else {
+            A2aRecvFinishBatch(u, localWinBase);
+            progress = true;
+        }
+    }
+    return progress;
+}
 
-                    uint32_t thisTokens = maxTokensPerSlot_;
-                    if (tokensRead + thisTokens > remaining) {
-                        thisTokens = remaining - tokensRead;
-                    }
+__aicore__ inline void EngramFetchGradArch35::A2aRecvEmitSegment(uint32_t u)
+{
+    A2aRecvUnit &r = a2aRecvUnits_[u];
+    if (r.pendSegsLeft == 0U) {
+        return;
+    }
+    uint64_t hb = static_cast<uint64_t>(hiddenBytes_);
+    if (r.pendContig) {
+        uint32_t firstSegIdx = r.pendReadBase % a2aSlotsPerSender_;
+        uint32_t firstSlotIdx = r.si * a2aSlotsPerSender_ + firstSegIdx;
+        r.pendSegDst = recvGradGM_ + static_cast<uint64_t>(r.senderBase + r.senderReceived) * hb;
+        r.pendSegSrc = (GM_ADDR)ctxPtr_->commBuffer[rankId_] + r.pendSlotArea +
+                       static_cast<uint64_t>(firstSlotIdx) * tokenSlotSize_;
+        r.pendSegRemain = static_cast<uint64_t>(r.pendSlots) * maxTokensPerSlot_ * hb;
+        r.pendTokensAccum += r.pendSlots * maxTokensPerSlot_;
+        r.pendSegsLeft = 0U;
+        return;
+    }
+    uint32_t segIdx = (r.pendReadBase + r.pendSegsDone) % a2aSlotsPerSender_;
+    uint32_t slotGlobalIdx = r.si * a2aSlotsPerSender_ + segIdx;
+    uint32_t thisTokens = maxTokensPerSlot_;
+    uint32_t remaining = r.senderRecvCount - r.senderReceived - r.pendTokensAccum;
+    if (thisTokens > remaining) {
+        thisTokens = remaining;
+    }
+    r.pendSegDst = recvGradGM_ + static_cast<uint64_t>(r.senderBase + r.senderReceived + r.pendTokensAccum) * hb;
+    r.pendSegSrc =
+        (GM_ADDR)ctxPtr_->commBuffer[rankId_] + r.pendSlotArea + static_cast<uint64_t>(slotGlobalIdx) * tokenSlotSize_;
+    r.pendSegRemain = static_cast<uint64_t>(thisTokens) * hb;
+    r.pendTokensAccum += thisTokens;
+    r.pendSegsDone++;
+    r.pendSegsLeft--;
+}
 
-                    LocalCopySlice(recvGradGM_ + (senderBase + senderReceived + tokensRead) * hiddenBytes_,
-                                   localWinBase + slotOffset, static_cast<uint64_t>(thisTokens) * hiddenBytes_);
+__aicore__ inline void EngramFetchGradArch35::A2aRecvFinishBatch(uint32_t u, GM_ADDR localWinBase)
+{
+    A2aRecvUnit &r = a2aRecvUnits_[u];
+    r.localReadCnt += r.pendSlots;
+    r.senderReceived += r.pendTokensAccum;
+    WriteLocalCounter(localWinBase, tokenReadOffset_, r.srcRank, r.si, static_cast<int32_t>(r.localReadCnt));
+    r.batchActive = false;
+    r.pendSegRemain = 0U;
+    r.pendSegsLeft = 0U;
+    if (r.senderReceived >= r.senderRecvCount) {
+        r.done = true;
+    }
+}
 
-                    tokensRead += thisTokens;
-                    slotsRead++;
-                }
+__aicore__ inline bool EngramFetchGradArch35::A2aChunkAllDone() const
+{
+    for (uint32_t u = 0U; u < a2aSendUnitCnt_; u++) {
+        if (!a2aSendUnits_[u].done) {
+            return false;
+        }
+    }
+    for (uint32_t u = 0U; u < a2aRecvUnitCnt_; u++) {
+        if (!a2aRecvUnits_[u].done) {
+            return false;
+        }
+    }
+    return true;
+}
+__aicore__ inline void EngramFetchGradArch35::A2aDriveLoop()
+{
+    a2aLastProgressUs_ = static_cast<uint64_t>(AscendC::GetSystemCycle()) / ENGRAM_GRAD_CYCLES_PER_US;
+    while (!A2aChunkAllDone()) {
+        bool progress = A2aChunkSendStep();
+        progress = A2aChunkRecvStep() || progress;
+        if (creditReadInFlight_ && a2aCreditOwner_ >= 0 && a2aSendUnits_[a2aCreditOwner_].done) {
+            if (PollCreditCounterOnce() != GRAD_CREDIT_READ_SENTINEL) {
+                creditReadInFlight_ = false;
+                a2aCreditOwner_ = -1;
             }
+        }
+        if (progress) {
+            a2aLastProgressUs_ = static_cast<uint64_t>(AscendC::GetSystemCycle()) / ENGRAM_GRAD_CYCLES_PER_US;
+        } else {
+            TimeoutCheck(a2aLastProgressUs_, TIMEOUT_A2A_PROGRESS_STALL);
+        }
+    }
+    if (creditReadInFlight_) {
+        (void)PollCreditCounterOnce();
+    }
+}
 
-            localReadCnt += slotsRead;
-            senderReceived += tokensRead;
-            WriteLocalCounter(localWinBase, tokenReadOffset_, srcRank, si, static_cast<int32_t>(localReadCnt));
+__aicore__ inline void EngramFetchGradArch35::A2aCopyDispatch(GM_ADDR dst, GM_ADDR src, uint64_t len)
+{
+    if (a2aInSortPhase_) {
+        A2aCopyPp(dst, src, len);
+    } else {
+        LocalCopySlice(dst, src, len);
+    }
+}
+__aicore__ inline void EngramFetchGradArch35::A2aCopyPp(GM_ADDR dst, GM_ADDR src, uint64_t len)
+{
+    if (len == 0U) {
+        return;
+    }
+    GlobalTensor<uint8_t> srcGm;
+    GlobalTensor<uint8_t> dstGm;
+    srcGm.SetGlobalBuffer((__gm__ uint8_t *)src);
+    dstGm.SetGlobalBuffer((__gm__ uint8_t *)dst);
+    LocalTensor<uint8_t> base = a2aCopyBuf_.Get<uint8_t>();
+    LocalTensor<uint8_t> buf0 = base;
+    LocalTensor<uint8_t> buf1 = base[A2A_COPY_HALF_BYTES];
+    DataCopyPadExtParams<uint8_t> pad{false, 0, 0, 0};
+    uint64_t off = 0;
+    uint32_t tileIdx = 0;
+    uint64_t pendingOff = 0;
+    uint32_t pendingLen = 0;
+    uint32_t pendingBufIdx = 0;
+    bool hasPendingMte3 = false;
+    while (off < len) {
+        uint64_t rem = len - off;
+        uint32_t thisLen = (rem > A2A_COPY_HALF_BYTES) ? A2A_COPY_HALF_BYTES : static_cast<uint32_t>(rem);
+        uint32_t bufIdx = tileIdx % 2U;
+        LocalTensor<uint8_t> &buf = (bufIdx == 0U) ? buf0 : buf1;
+        if (tileIdx >= 2U) {
+            AscendC::WaitFlag<HardEvent::MTE3_MTE2>(a2aCopyEvtMte3Mte2_[bufIdx]);
+        }
+        DataCopyExtParams mte2Params{1U, thisLen, 0U, 0U, 0U};
+        DataCopyPad(buf, srcGm[off], mte2Params, pad);
+        AscendC::SetFlag<HardEvent::MTE2_MTE3>(a2aCopyEvtMte2Mte3_[bufIdx]);
+        if (hasPendingMte3) {
+            AscendC::WaitFlag<HardEvent::MTE2_MTE3>(a2aCopyEvtMte2Mte3_[pendingBufIdx]);
+            LocalTensor<uint8_t> &pendBuf = (pendingBufIdx == 0U) ? buf0 : buf1;
+            DataCopyExtParams mte3Params{1U, pendingLen, 0U, 0U, 0U};
+            DataCopyPad(dstGm[pendingOff], pendBuf, mte3Params);
+            AscendC::SetFlag<HardEvent::MTE3_MTE2>(a2aCopyEvtMte3Mte2_[pendingBufIdx]);
+        }
+        pendingOff = off;
+        pendingLen = thisLen;
+        pendingBufIdx = bufIdx;
+        hasPendingMte3 = true;
+        off += thisLen;
+        tileIdx++;
+    }
+    if (hasPendingMte3) {
+        AscendC::WaitFlag<HardEvent::MTE2_MTE3>(a2aCopyEvtMte2Mte3_[pendingBufIdx]);
+        LocalTensor<uint8_t> &pendBuf = (pendingBufIdx == 0U) ? buf0 : buf1;
+        DataCopyExtParams mte3Params{1U, pendingLen, 0U, 0U, 0U};
+        DataCopyPad(dstGm[pendingOff], pendBuf, mte3Params);
+        AscendC::SetFlag<HardEvent::MTE3_MTE2>(a2aCopyEvtMte3Mte2_[pendingBufIdx]);
+    }
+    uint32_t last = (tileIdx - 1U) % 2U;
+    AscendC::WaitFlag<HardEvent::MTE3_MTE2>(a2aCopyEvtMte3Mte2_[last]);
+    if (tileIdx >= 2U) {
+        AscendC::WaitFlag<HardEvent::MTE3_MTE2>(a2aCopyEvtMte3Mte2_[last ^ 1U]);
+    }
+}
+__aicore__ inline void EngramFetchGradArch35::A2aHookStep()
+{
+    (void)A2aChunkSendStep();
+    (void)A2aChunkRecvStep();
+    if (creditReadInFlight_ && a2aCreditOwner_ >= 0 && a2aSendUnits_[a2aCreditOwner_].done) {
+        if (PollCreditCounterOnce() != GRAD_CREDIT_READ_SENTINEL) {
+            creditReadInFlight_ = false;
+            a2aCreditOwner_ = -1;
         }
     }
 }
 
-__aicore__ inline void EngramFetchGradArch35::InitCompanion(uint32_t numRecv)
+__aicore__ inline void EngramFetchGradArch35::A2aTailDrive()
 {
-    uint32_t chunk = (numRecv + totalBlocks_ - 1U) / totalBlocks_;
-    uint32_t start = aivId_ * chunk;
-    uint32_t end = start + chunk;
-    if (end > numRecv) {
-        end = numRecv;
-    }
-
-    LocalTensor<int32_t> idxLocal = indicesBuf_.Get<int32_t>();
-    GlobalTensor<int32_t> compGM;
-    compGM.SetGlobalBuffer((__gm__ int32_t *)sortCompanionGM_);
-
-    uint32_t cur = start;
-    while (cur < end) {
-        uint32_t batchLen = end - cur;
-        if (batchLen > ENTRY_BATCH_CAP) {
-            batchLen = ENTRY_BATCH_CAP;
-        }
-        for (uint32_t i = 0; i < batchLen; i++) {
-            idxLocal.SetValue(i, static_cast<int32_t>(cur + i));
-        }
-        EngramFetchGradSyncFunc<HardEvent::V_MTE3>();
-        DataCopyParams cp = {1U, static_cast<uint16_t>(batchLen * sizeof(int32_t)), 0U, 0U};
-        DataCopyPad(compGM[cur], idxLocal, cp);
-        EngramFetchGradSyncFunc<HardEvent::MTE3_S>();
-        cur += batchLen;
+    A2aDriveLoop();
+    a2aInSortPhase_ = false;
+    for (uint32_t i = 0U; i < 2U; i++) {
+        tpipe_->ReleaseEventID<HardEvent::MTE2_MTE3>(a2aCopyEvtMte2Mte3_[i]);
+        tpipe_->ReleaseEventID<HardEvent::MTE3_MTE2>(a2aCopyEvtMte3Mte2_[i]);
     }
 }
 
-__aicore__ inline void EngramFetchGradArch35::RunSort(uint32_t numRecv)
+__aicore__ inline void EngramFetchGradArch35::RebuildA2aHookBuffers()
 {
-    // 乘积上限由 Host 侧 rankSize*numEntriesPerRank <= INT32_MAX 校验保证，int64 中间量双保险
-    int64_t offset = static_cast<int64_t>(rankId_) * static_cast<int64_t>(numEntriesPerRank_);
-    sorter_.SetValueOffset(static_cast<int32_t>(offset));
-    sorter_.SetMaxValue(static_cast<uint32_t>(numEntriesPerRank_));
-    sorter_.Process(numRecv, *tpipe_);
+    tpipe_->InitBuffer(hcommBuf_, Mc2Kernel::HCOMM_INIT_SIZE);
+    LocalTensor<uint8_t> hcommTensor = hcommBuf_.Get<uint8_t>();
+    hcomm_.Init(hcommTensor, Mc2Kernel::HCOMM_INIT_SIZE);
+    tpipe_->InitBuffer(statusBuf_, statusBufBytes_);
+    tpipe_->InitBuffer(a2aCopyBuf_, 2U * Mc2Kernel::A2A_COPY_HALF_BYTES);
+    for (uint32_t i = 0U; i < 2U; i++) {
+        a2aCopyEvtMte2Mte3_[i] = static_cast<int32_t>(tpipe_->AllocEventID<HardEvent::MTE2_MTE3>());
+        a2aCopyEvtMte3Mte2_[i] = static_cast<int32_t>(tpipe_->AllocEventID<HardEvent::MTE3_MTE2>());
+    }
+    a2aInSortPhase_ = true;
+}
+__aicore__ inline void EngramFetchGradArch35::RunSortHooked(uint32_t numRecv)
+{
+    SortLib::SortParams p;
+    p.numTileData = sortNumTileData_;
+    p.tileCount = (numRecv + p.numTileData - 1U) / p.numTileData;
+    p.activeCores = (p.tileCount < totalBlocks_) ? p.tileCount : totalBlocks_;
+    p.tmpUbSize = sortTmpUbSize_;
+    p.totalElements = static_cast<int64_t>(numRecv);
+    p.isSingleCore = 0;
+    EngramA2aSortHook hook{this};
+    SortLib::SortInvoke<int32_t, int32_t, uint32_t, false, EngramA2aSortHook>(
+        tpipe_, (__gm__ int32_t *)recvLocalEntryOutGM_, (__gm__ int32_t *)recvLocalEntryOutGM_,
+        (__gm__ int32_t *)sortCompanionGM_, (__gm__ char *)sortWorkspaceGm_, p, hook);
+    A2aTailDrive();
+    FinishExchangeGrad();
+}
+__aicore__ inline void EngramFetchGradArch35::DrainAndSendFlags()
+{
+    for (uint32_t i = 0; i < pendingHandleCount_; i++) {
+        DrainChecked(pendingHandles_[i]);
+    }
+    pendingHandleCount_ = 0;
 }
 
 __aicore__ inline void EngramFetchGradArch35::InitFlagsAndDispls()
@@ -1226,7 +1506,6 @@ __aicore__ inline void EngramFetchGradArch35::CrossRankBarrierIssue()
 // Second half of the cross-rank barrier: drain the flag writes issued by
 // CrossRankBarrierIssue (the drain latency was overlapped with UnsortGrad), then wait for
 // every rank's flag. The trailing SyncAll also orders every core's UnsortGrad output
-// before SendGradToPeers reads gradSortedGM_.
 __aicore__ inline void EngramFetchGradArch35::CrossRankBarrierWait()
 {
     if (isSender_) {
@@ -1257,55 +1536,44 @@ __aicore__ inline void EngramFetchGradArch35::Process()
 
         // Barrier split: issue the cross-rank flag writes, then run the local 10MB
         // UnsortGrad while the flags fly; the wait phase drains + spins, and its trailing
-        // SyncAll doubles as the gradSorted-completion barrier before SendGradToPeers.
+        // SyncAll doubles as the gradSorted-completion barrier before a2a.
         CrossRankBarrierIssue();
         UnsortGrad();
         CrossRankBarrierWait();
 
-        SendGradToPeers();
-
-        // RecvGradFromPeers 必须先于 entry 阶段的 SyncAll 执行：其内部的 tokenRead 计数器推进是
-        // 发送核流控自旋（SendGradRemote）唯一的解锁来源；若延后到 sort 之后的 FinishExchangeGrad，
-        // 发送核会因无法到达 SyncAll 而与接收核形成跨 rank 进度依赖环（超窗口场景死锁）。
-        RecvGradFromPeers();
-
-        // PR10464 flow: receivers pull grad right after senders finish issuing, so the
-        // flow-control tokenRead advance never depends on a full-core barrier; the
-        // entry-only phases (initCompanion/sort/count/zero) then run on the received
-        // entries, and scatterCast is the only consumer of recvGradGM_.
         GlobalTensor<int32_t> numRecvGM;
         numRecvGM.SetGlobalBuffer((__gm__ int32_t *)numRecvOutGM_);
         DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(numRecvGM);
         uint32_t numRecv = static_cast<uint32_t>(numRecvGM.GetValue(0));
+        A2aChunkInit();
         if (numRecv == 0) {
+            A2aDriveLoop();
             FinishExchangeGrad();
             uniqueScatter_.WriteNumUniqueZero(numUniqueOutGM_);
         } else {
-            InitCompanion(numRecv);
-            SyncAll<true>();
+            tpipe_->Reset();
+            RebuildA2aHookBuffers();
+            RunSortHooked(numRecv);
 
-            sortPool_.Reset();
-            uint32_t maxSortCount = static_cast<uint32_t>(totalRecv_);
-            sorter_.Init(maxSortCount, totalBlocks_, recvLocalEntryOutGM_, sortCompanionGM_, sortWorkspaceGm_, *tpipe_,
-                         sortPool_);
-            RunSort(numRecv);
-
-            sortPool_.Reset();
-            sortPool_.InitBuffer(entryBuf_, uniqueEntryBytes_);
-            sortPool_.InitBuffer(gradBuf_, Mc2Kernel::GRAD_BUF_BYTES);
-            uint32_t maxByPong = MaxGradRowsPerPing(static_cast<uint32_t>(hiddenBytes_), gradSubBatch_);
-            if (inputDtype_ != Mc2Kernel::ENGRAM_DT_FLOAT) {
-                sortPool_.InitBuffer(castFp32Buf_, CastBufBytes(hiddenDim_, maxByPong));
+            tpipe_->Reset();
+            tpipe_->InitBuffer(statusBuf_, statusBufBytes_);
+            tpipe_->InitBuffer(tempBuf_, tempBufBytes_);
+            tpipe_->InitBuffer(indicesBuf_, indicesBufBytes_);
+            tpipe_->InitBuffer(entryBuf_, uniqueEntryBytes_);
+            tpipe_->InitBuffer(gradBuf_, Mc2Kernel::GRAD_BUF_BYTES);
+            if (castBufBytes_ > 0U) {
+                tpipe_->InitBuffer(castFp32Buf_, castBufBytes_);
+            } else {
+                tpipe_->InitBuffer(castFp32Buf_, Mc2Kernel::UB_ALIGN);
             }
-            sortPool_.InitBuffer(accumBuf_, AccumBufBytes(hiddenDim_));
+            tpipe_->InitBuffer(accumBuf_, accumBufBytes_);
             uniqueScatter_.SetCastBuf(castFp32Buf_);
             uniqueScatter_.SetAccumBuf(accumBuf_);
             uniqueScatter_.SetGradSubBatch(gradSubBatch_);
             uniqueScatter_.SetEntryBufBytes(uniqueEntryBytes_);
 
             uniqueScatter_.CountUniquesParallel(numRecv, recvLocalEntryOutGM_, coreStartGM_, segCountGM_);
-            uniqueScatter_.ZeroGradUnique(numRecv, gradUniqueOutGM_);
-            FinishExchangeGrad();
+            SyncAll<true>();
             uniqueScatter_.RunScatterCast(numRecv, recvLocalEntryOutGM_, uniqueLocalEntryOutGM_, numUniqueOutGM_,
                                           gradUniqueOutGM_, recvGradGM_, coreStartGM_, segCountGM_, sortCompanionGM_);
         }
