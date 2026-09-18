@@ -112,7 +112,6 @@ extern "C" __global__ __aicore__ void moe_distribute_dispatch_teardown(
         op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
                 workspaceGM, &pipe, &tilingData);
         op.Process();
-        op.Process();
     }
 #endif
 }

@@ -685,7 +685,7 @@ const bool MoeDistributeDispatchTeardownTilingBase::CheckRelationTensorDataType(
     OP_TILING_CHECK((context_->GetOutputDesc(OUTPUT_EXPERT_TOKEN_NUMS_INDEX) == nullptr),
                     OP_LOGE_WITH_INVALID_INPUT(nodeName_, "expertTokenNumsOut"), return false);
 
-    if (quantMode == PERTOKEN_DYNAMIC_QUANT) {
+    if ((quantMode == PERTOKEN_DYNAMIC_QUANT) || (quantMode == PERGROUP_DYNAMIC_QUANT)) {
         OP_TILING_CHECK(
             (context_->GetOutputDesc(OUTPUT_DYNAMIC_SCALES_INDEX)->GetDataType() != ge::DT_FLOAT),
             OP_LOGE_FOR_INVALID_DTYPE(

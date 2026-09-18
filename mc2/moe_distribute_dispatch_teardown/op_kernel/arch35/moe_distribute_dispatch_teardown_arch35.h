@@ -162,7 +162,7 @@ private:
 
     DataCopyExtParams floatDataCopyParams_;
     DataCopyExtParams expandXCopyParams_;
-    DataCopyExtParams hCommuCopyOutParams_;
+    DataCopyParams hCommuCopyOutParams_;
 };
 
 template <TemplateMC2TypeClass>
@@ -265,7 +265,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Init(
 
     uint32_t axisHCommu = hOutSizeAlign_ / sizeof(ExpandXOutType); // 有效搬运长度
     floatDataCopyParams_ = {1U, sizeof(float), 0U, 0U, 0U};
-    hCommuCopyOutParams_ = {1U, static_cast<uint32_t>(axisHCommu * sizeof(ExpandXOutType)), 0U, 0U, 0U};
+    hCommuCopyOutParams_ = {1U, static_cast<uint16_t>(axisHCommu * sizeof(ExpandXOutType)), 0U, 0U};
     expandXCopyParams_ = {1U, static_cast<uint32_t>(axisH_ * sizeof(ExpandXOutType)), 0U, 0U, 0U};
 }
 
@@ -470,8 +470,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Local
     GetCumSum(outCountLocal, aivId_);
     uint32_t beginIdx = outCountLocal.GetValue(0); // outcount表示当前专家之前的所有专家接收的token数目总和
     statusTensor_ = waitStatusBuf_.Get<int32_t>();
-    DataCopyPadExtParams<ExpandXOutType> copyPadExtParams{false, 0U, 0U,
-                                                          *reinterpret_cast<ExpandXOutType *>(uint8_t(0))};
+    DataCopyPadParams copyPadParams{false, 0U, 0U, 0U};
     DataCopyExtParams dataCopyOutParams{1U, static_cast<uint32_t>(sendExpertNum_ * sizeof(int32_t)), 0U, 0U, 0U};
     for (uint32_t index = startExpertId_; index < endExpertId_; index++) {
         uint32_t i = index - startExpertId_;
@@ -494,7 +493,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Local
             tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType *)(wAddr + j * hAlignWinSize_));
             // 将数据从Window拷贝到UB
             xTmpTensor_ = xQueue_.AllocTensor<ExpandXOutType>();
-            DataCopyPad(xTmpTensor_, tokGlobal, hCommuCopyOutParams_, copyPadExtParams);
+            DataCopyPad(xTmpTensor_, tokGlobal, hCommuCopyOutParams_, copyPadParams);
             SyncFunc<AscendC::HardEvent::MTE2_S>();
             xQueue_.EnQue(xTmpTensor_);
             xTmpTensor_ = xQueue_.DeQue<ExpandXOutType>();
