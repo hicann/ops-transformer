@@ -1849,7 +1849,8 @@ int64_t GetTndQueryS(gert::TilingContext &context)
         return (queryT4Tnd + batchSize - 1) / batchSize;
     }
     int64_t qActualSeqMax = 0;
-    for (int64_t i = 0; i < batchSize; i++) {
+    int64_t actualSeqQNum = static_cast<int64_t>(actualSeqlenthsQ->GetShapeSize());
+    for (int64_t i = 0; i < actualSeqQNum; i++) {
         int64_t tmpS1 = (i == 0) ? actualSeqQ[0] : (actualSeqQ[i] - actualSeqQ[i - 1U]);
         if (tmpS1 > qActualSeqMax) {
             qActualSeqMax = tmpS1;
