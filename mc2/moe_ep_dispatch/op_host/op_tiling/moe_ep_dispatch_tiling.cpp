@@ -199,20 +199,37 @@ static bool CheckOptionalTensorShape(const gert::TilingContext *context, const c
                         OP_LOGE(nodeName, "cached_slot_idx dims must be 2, but got %lu.",
                                 cachedShape->GetStorageShape().GetDimNum()),
                         return false);
-        OP_TILING_CHECK(
-            cachedShape->GetStorageShape().GetDim(0) != topkDim0,
-            OP_LOGE(
-                nodeName,
-                "cached_slot_idx dim0 must equal topk_idx dim0, but got cached_slot_idx dim0=%ld, topk_idx dim0=%ld.",
-                cachedShape->GetStorageShape().GetDim(0), topkDim0),
-            return false);
-        OP_TILING_CHECK(
-            cachedShape->GetStorageShape().GetDim(1) != topkDim1,
-            OP_LOGE(
-                nodeName,
-                "cached_slot_idx dim1 must equal topk_idx dim1, but got cached_slot_idx dim1=%ld, topk_idx dim1=%ld.",
-                cachedShape->GetStorageShape().GetDim(1), topkDim1),
-            return false);
+        if (info.networkMode == NETWORK_HYBRID) {
+            // hybrid: [num_tokens, top_k]
+            OP_TILING_CHECK(cachedShape->GetStorageShape().GetDim(0) != topkDim0,
+                            OP_LOGE(nodeName,
+                                    "cached_slot_idx dim0 must equal topk_idx dim0, but got cached_slot_idx dim0=%ld, "
+                                    "topk_idx dim0=%ld.",
+                                    cachedShape->GetStorageShape().GetDim(0), topkDim0),
+                            return false);
+            OP_TILING_CHECK(cachedShape->GetStorageShape().GetDim(1) != topkDim1,
+                            OP_LOGE(nodeName,
+                                    "cached_slot_idx dim1 must equal topk_idx dim1, but got cached_slot_idx dim1=%ld, "
+                                    "topk_idx dim1=%ld.",
+                                    cachedShape->GetStorageShape().GetDim(1), topkDim1),
+                            return false);
+        } else {
+            // direct: [ep_world_size, num_tokens + 1]
+            OP_TILING_CHECK(
+                cachedShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(info.cfg.epWorldSize),
+                OP_LOGE(nodeName,
+                        "cached_slot_idx dim0 must equal ep_world_size=%u in direct mode, but got cached_slot_idx "
+                        "dim0=%ld.",
+                        info.cfg.epWorldSize, cachedShape->GetStorageShape().GetDim(0)),
+                return false);
+            OP_TILING_CHECK(
+                cachedShape->GetStorageShape().GetDim(1) != topkDim0 + 1,
+                OP_LOGE(nodeName,
+                        "cached_slot_idx dim1 must equal topk_idx dim0(num_tokens) + 1 in direct mode, but got "
+                        "cached_slot_idx dim1=%ld, topk_idx dim0=%ld.",
+                        cachedShape->GetStorageShape().GetDim(1), topkDim0),
+                return false);
+        }
     }
 
     const gert::StorageShape *cachedRouteCountShape = context->GetOptionalInputShape(CACHED_ROUTE_COUNT_INDEX);
@@ -336,18 +353,35 @@ static bool CheckOutputTensorShape(const gert::TilingContext *context, const cha
                     OP_LOGE(nodeName, "dst_buffer_slot_idx dims must be 2, but got %lu.",
                             dstSlotIdxShape->GetStorageShape().GetDimNum()),
                     return false);
-    OP_TILING_CHECK(dstSlotIdxShape->GetStorageShape().GetDim(0) != topkDim0,
-                    OP_LOGE(nodeName,
-                            "dst_buffer_slot_idx dim0 must equal topk_idx dim0, but got dst_buffer_slot_idx dim0=%ld, "
-                            "topk_idx dim0=%ld.",
-                            dstSlotIdxShape->GetStorageShape().GetDim(0), topkDim0),
-                    return false);
-    OP_TILING_CHECK(dstSlotIdxShape->GetStorageShape().GetDim(1) != topkDim1,
-                    OP_LOGE(nodeName,
-                            "dst_buffer_slot_idx dim1 must equal topk_idx dim1, but got dst_buffer_slot_idx dim1=%ld, "
-                            "topk_idx dim1=%ld.",
-                            dstSlotIdxShape->GetStorageShape().GetDim(1), topkDim1),
-                    return false);
+    if (info.networkMode == NETWORK_HYBRID) {
+        // hybrid: [num_tokens, top_k]
+        OP_TILING_CHECK(dstSlotIdxShape->GetStorageShape().GetDim(0) != topkDim0,
+                        OP_LOGE(nodeName,
+                                "dst_buffer_slot_idx dim0 must equal topk_idx dim0, but got dst_buffer_slot_idx "
+                                "dim0=%ld, topk_idx dim0=%ld.",
+                                dstSlotIdxShape->GetStorageShape().GetDim(0), topkDim0),
+                        return false);
+        OP_TILING_CHECK(dstSlotIdxShape->GetStorageShape().GetDim(1) != topkDim1,
+                        OP_LOGE(nodeName,
+                                "dst_buffer_slot_idx dim1 must equal topk_idx dim1, but got dst_buffer_slot_idx "
+                                "dim1=%ld, topk_idx dim1=%ld.",
+                                dstSlotIdxShape->GetStorageShape().GetDim(1), topkDim1),
+                        return false);
+    } else {
+        // direct: [ep_world_size, num_tokens + 1]
+        OP_TILING_CHECK(dstSlotIdxShape->GetStorageShape().GetDim(0) != static_cast<int64_t>(info.cfg.epWorldSize),
+                        OP_LOGE(nodeName,
+                                "dst_buffer_slot_idx dim0 must equal ep_world_size=%u in direct mode, but got "
+                                "dst_buffer_slot_idx dim0=%ld.",
+                                info.cfg.epWorldSize, dstSlotIdxShape->GetStorageShape().GetDim(0)),
+                        return false);
+        OP_TILING_CHECK(dstSlotIdxShape->GetStorageShape().GetDim(1) != topkDim0 + 1,
+                        OP_LOGE(nodeName,
+                                "dst_buffer_slot_idx dim1 must equal topk_idx dim0(num_tokens) + 1 in direct mode, but "
+                                "got dst_buffer_slot_idx dim1=%ld, topk_idx dim0=%ld.",
+                                dstSlotIdxShape->GetStorageShape().GetDim(1), topkDim0),
+                        return false);
+    }
     int64_t routeCapacity = topkDim1;
     OP_TILING_CHECK(routeCountShape->GetStorageShape().GetDimNum() != ONE_DIM,
                     OP_LOGE(nodeName, "route_count dims must be 1."), return false);
@@ -759,14 +793,8 @@ static uint64_t BuildDispatchWorkspaceLayout(MoeEpDispatchInfo &info)
     // dstRank 区 [BS][K]
     uint64_t dstRankInfoBytes = AlignUpWin(numTokens * info.cfg.topK * sizeof(int16_t));
 
-    // tokenHit 发送列表区 [ep][bsAlign]：统一存 tokenId(int32)，
-    uint64_t srcTokenListBytes = AlignUpWin(numTokens * sizeof(int32_t));
-    uint64_t srcTokenTableBytes = epWorldSize * srcTokenListBytes;
-
     uint64_t sendCntBytes = counterBytes + sendCntPerRankBytes + sendCntPerExpertBytes;
     info.workspace.dstRankInfoOffset = sendCntBytes;
-    info.workspace.srcTokenTableOffset = sendCntBytes + dstRankInfoBytes;
-    info.workspace.srcTokenListBytes = srcTokenListBytes;
 
     // scaleout counter 与 scaleup counter 一样按每 AIV 一份，SendPhase 用它做 slot prefix。
     uint64_t scaleoutCounterBytes =
@@ -788,7 +816,7 @@ static uint64_t BuildDispatchWorkspaceLayout(MoeEpDispatchInfo &info)
     info.workspace.routeWorkspaceOffset = 0UL;
     info.workspace.scaleoutSendEntryOffset = 0UL;
     info.workspace.scaleupSendEntryOffset = 0UL;
-    return SYSTEM_NEED_WORKSPACE + sendCntBytes + dstRankInfoBytes + srcTokenTableBytes + globalABytes;
+    return SYSTEM_NEED_WORKSPACE + sendCntBytes + dstRankInfoBytes + globalABytes;
 }
 
 static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *context, MoeEpDispatchInfo &info,
