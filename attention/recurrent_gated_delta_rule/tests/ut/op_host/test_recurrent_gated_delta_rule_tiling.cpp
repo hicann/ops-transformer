@@ -506,3 +506,49 @@ TEST_F(RecurrentGatedDeltaRuleTilingTest, InvalidDim)
 
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
+
+TEST_F(RecurrentGatedDeltaRuleTilingTest, InvalidNegativeDim)
+{
+    optiling::RecurrentGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+
+    int t = -1;
+    int nk = 4;
+    int dk = 8;
+    int nv = 128;
+    int dv = 128;
+    int sBlockNum = 128;
+    int b = 64;
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{sBlockNum, nv, dv, dk}, {sBlockNum, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{b}, {b}};
+    gert::StorageShape ssmStateIndicesShape = {{t}, {t}};
+    gert::StorageShape gShape = {{t, nv}, {t, nv}};
+    gert::StorageShape outShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape finalStateShape = {{sBlockNum, nv, dv, dk}, {sBlockNum, nv, dv, dk}};
+
+    gert::TilingContextPara tilingContextPara("RecurrentGatedDeltaRule",
+                                              {
+                                                  {queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {ssmStateIndicesShape, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {gShape, ge::DT_FLOAT, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {outShape, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {finalStateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {"sacle_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0)},
+                                              },
+                                              &compileinfo);
+
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}

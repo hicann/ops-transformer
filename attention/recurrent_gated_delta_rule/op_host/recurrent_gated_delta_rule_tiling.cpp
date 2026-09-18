@@ -275,55 +275,61 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeShapesParser()
     const auto &stateShape = context_->GetInputShape(STATE_INDEX)->GetStorageShape();
     const auto &actSeqlensShape = context_->GetInputShape(ACTUAL_SEQ_LENGTHS_INDEX)->GetStorageShape();
 
-    tilingData_.t = queryShape.GetDim(DIM_0);
-    tilingData_.nk = queryShape.GetDim(DIM_1);
-    tilingData_.dk = queryShape.GetDim(DIM_2);
-    tilingData_.nv = valueShape.GetDim(DIM_1);
-    tilingData_.dv = valueShape.GetDim(DIM_2);
-    tilingData_.sBlockNum = stateShape.GetDim(DIM_0);
-    tilingData_.b = actSeqlensShape.GetDim(DIM_0);
+    int64_t t = queryShape.GetDim(DIM_0);
+    int64_t nk = queryShape.GetDim(DIM_1);
+    int64_t dk = queryShape.GetDim(DIM_2);
+    int64_t nv = valueShape.GetDim(DIM_1);
+    int64_t dv = valueShape.GetDim(DIM_2);
+    int64_t sBlockNum = stateShape.GetDim(DIM_0);
+    int64_t b = actSeqlensShape.GetDim(DIM_0);
 
     // T>0
-    OP_CHECK_IF(tilingData_.t <= 0,
-                OP_LOGE(inputParams_.opName, "T should be greater than 0, but T is %u.", tilingData_.t),
+    OP_CHECK_IF(t <= 0, OP_LOGE(inputParams_.opName, "T should be greater than 0, but T is %ld.", t),
                 return ge::GRAPH_FAILED);
     // // B>=0
-    OP_CHECK_IF((tilingData_.b <= 0),
-                OP_LOGE(inputParams_.opName, "B should be greater than 0, but B is %u.", tilingData_.b),
+    OP_CHECK_IF(b <= 0, OP_LOGE(inputParams_.opName, "B should be greater than 0, but B is %ld.", b),
                 return ge::GRAPH_FAILED);
     // nk>0 nk<=256
-    OP_CHECK_IF(tilingData_.nk <= 0 || tilingData_.nk > 256,
-                OP_LOGE(inputParams_.opName, "Nk should be greater than 0 and less than or equal to 256, but Nk is %u.",
-                        tilingData_.nk),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        nk <= 0 || nk > 256,
+        OP_LOGE(inputParams_.opName, "Nk should be greater than 0 and less than or equal to 256, but Nk is %ld.", nk),
+        return ge::GRAPH_FAILED);
     // nv>0 nv<=256
-    OP_CHECK_IF(tilingData_.nv <= 0 || tilingData_.nv > 256,
-                OP_LOGE(inputParams_.opName, "Nv should be greater than 0 and less than or equal to 256, but Nv is %u.",
-                        tilingData_.nv),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        nv <= 0 || nv > 256,
+        OP_LOGE(inputParams_.opName, "Nv should be greater than 0 and less than or equal to 256, but Nv is %ld.", nv),
+        return ge::GRAPH_FAILED);
     // dk>0 dk<=512
-    OP_CHECK_IF(tilingData_.dk <= 0 || tilingData_.dk > 512,
-                OP_LOGE(inputParams_.opName, "Dk should be greater than 0 and less than or equal to 512, but Dk is %u.",
-                        tilingData_.dk),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        dk <= 0 || dk > 512,
+        OP_LOGE(inputParams_.opName, "Dk should be greater than 0 and less than or equal to 512, but Dk is %ld.", dk),
+        return ge::GRAPH_FAILED);
     // dv>0 dv<=512
-    OP_CHECK_IF(tilingData_.dv <= 0 || tilingData_.dv > 512,
-                OP_LOGE(inputParams_.opName, "Dv should be greater than 0 and less than or equal to 512, but Dv is %u.",
-                        tilingData_.dv),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        dv <= 0 || dv > 512,
+        OP_LOGE(inputParams_.opName, "Dv should be greater than 0 and less than or equal to 512, but Dv is %ld.", dv),
+        return ge::GRAPH_FAILED);
     // nv>=nk
-    OP_CHECK_IF(tilingData_.nv % tilingData_.nk != 0,
-                OP_LOGE(inputParams_.opName, "Nv should be an integer multiple of Nk, but Nv is %u, Nk is %u.",
-                        tilingData_.nv, tilingData_.nk),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        nv % nk != 0,
+        OP_LOGE(inputParams_.opName, "Nv should be an integer multiple of Nk, but Nv is %ld, Nk is %ld.", nv, nk),
+        return ge::GRAPH_FAILED);
     // blockNum >= T
-    OP_CHECK_IF(tilingData_.sBlockNum < tilingData_.t,
-                OP_LOGE(inputParams_.opName,
-                        "BlockNum should be greater than or equal to T, Current values: BlockNum=%u, T=%u.",
-                        tilingData_.sBlockNum, tilingData_.t),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        sBlockNum < t,
+        OP_LOGE(inputParams_.opName,
+                "BlockNum should be greater than or equal to T, Current values: BlockNum=%ld, T=%ld.", sBlockNum, t),
+        return ge::GRAPH_FAILED);
 
-    uint64_t batchHeadTaskNum = static_cast<uint64_t>(tilingData_.b) * static_cast<uint64_t>(tilingData_.nv);
+    tilingData_.t = static_cast<uint32_t>(t);
+    tilingData_.nk = static_cast<uint32_t>(nk);
+    tilingData_.dk = static_cast<uint32_t>(dk);
+    tilingData_.nv = static_cast<uint32_t>(nv);
+    tilingData_.dv = static_cast<uint32_t>(dv);
+    tilingData_.sBlockNum = static_cast<uint32_t>(sBlockNum);
+    tilingData_.b = static_cast<uint32_t>(b);
+
+    uint64_t batchHeadTaskNum = static_cast<uint64_t>(b) * static_cast<uint64_t>(nv);
     if (batchHeadTaskNum > 0 && batchHeadTaskNum < tilingData_.vectorCoreNum) {
         tilingData_.vectorCoreNum = static_cast<uint32_t>(batchHeadTaskNum);
     }
