@@ -116,6 +116,7 @@
 - [aclnnKvCompressEpilog](../../attention/kv_compress_epilog/docs/aclnnKvCompressEpilog.md)
 - [aclnnKvRmsNormRopeCache](../../posembedding/kv_rms_norm_rope_cache/docs/aclnnKvRmsNormRopeCache.md)
 - [aclnnKvRmsNormRopeCacheV2](../../posembedding/kv_rms_norm_rope_cache/docs/aclnnKvRmsNormRopeCacheV2.md)
+- [aclnnKdaInputProj](../../attention/kda_input_proj/docs/aclnnKdaInputProj.md)
 - [aclnnLightningIndexer](../../attention/lightning_indexer/docs/aclnnLightningIndexer.md)
 - [aclnnLightningIndexerGrad](../../attention/lightning_indexer_grad/docs/aclnnLightningIndexerGrad.md)
 - [aclnnLightningIndexerKLLoss](../../attention/lightning_indexer_kl_loss/docs/aclnnLightningIndexerKLLoss.md)

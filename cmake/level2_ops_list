@@ -421,6 +421,7 @@ aclnn_kl_div_backward.h
 aclnn_kl_div.h
 aclnn_kl_div_target_backward.h
 aclnn_kthvalue.h
+aclnn_kda_input_proj.h
 aclnn_kv_rms_norm_rope_cache.h
 aclnn_l1_loss_backward.h
 aclnn_l1_loss.h
