@@ -18,7 +18,6 @@
 
 namespace optiling {
 
-constexpr size_t RESERVERD_WORKSPACE_SIZE = static_cast<size_t>(16 * 1024 * 1024);
 constexpr int64_t MAX_COPY_BLOCK_COUNT = 4095;
 constexpr int64_t CONST_TWO = 2;
 constexpr int64_t CONST_FOUR = 4;
@@ -28,9 +27,9 @@ constexpr uint64_t ROPE_AB_TILING_PRIORITY = 10000;
 
 class ApplyRotaryPosEmbTilingAB : public ApplyRotaryPosEmbRegbaseTilingBaseClass {
 public:
-    explicit ApplyRotaryPosEmbTilingAB(gert::TilingContext *context) : ApplyRotaryPosEmbRegbaseTilingBaseClass(context)
-    {
-    }
+    explicit ApplyRotaryPosEmbTilingAB(gert::TilingContext *context)
+        : ApplyRotaryPosEmbRegbaseTilingBaseClass(context)
+    {}
 
 protected:
     bool IsCapable() override;
@@ -65,8 +64,8 @@ ge::graphStatus ApplyRotaryPosEmbTilingAB::DoOpTiling()
         return ge::GRAPH_FAILED;
     }
     if (typeSize == 0) {
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "query",
-            Ops::Base::ToString(dtype_).c_str(), "The dtype size of input query cannot be 0");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "query", Ops::Base::ToString(dtype_).c_str(),
+                                              "The dtype size of input query cannot be 0");
         return ge::GRAPH_FAILED;
     }
 
@@ -116,7 +115,10 @@ ge::graphStatus ApplyRotaryPosEmbTilingAB::PostTiling()
     context_->SetTilingKey(GetTilingKey());
     context_->SetBlockDim(blockNum_);
     size_t *workspaces = context_->GetWorkspaceSizes(1);
-    workspaces[0] = RESERVERD_WORKSPACE_SIZE;
+    auto platformInfo = context_->GetPlatformInfo();
+    OP_CHECK_NULL_WITH_CONTEXT(context_, platformInfo);
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
+    workspaces[0] = ascendcPlatform.GetLibApiWorkSpaceSize();
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
 
@@ -148,7 +150,7 @@ bool ApplyRotaryPosEmbTilingAB::IsCapable()
     // 1. qk:bsnd, cos:bs1d 2. qk:sbnd, cos:sb1d 3. qk:sbnd, cos:s11d 4. qk:tnd, cos:t1d
     if ((layout_ == ApplyRotaryPosEmbLayout::BSND && cosb_ == b_) ||
         (layout_ == ApplyRotaryPosEmbLayout::SBND && cosb_ == b_) ||
-        (layout_ == ApplyRotaryPosEmbLayout::SBND && cosb_ == 1)  ||
+        (layout_ == ApplyRotaryPosEmbLayout::SBND && cosb_ == 1) ||
         (layout_ == ApplyRotaryPosEmbLayout::TND && cosb_ == b_ && cosb_ == 1)) {
         return true;
     }
