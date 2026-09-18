@@ -185,7 +185,7 @@ uint64_t HCCLPerformanceModel::InverseCommTime(double targetTime) const
     if (targetTime > commEstimatePar_.timeToSizeBoundary2) {
         tmpSize = (targetTime - commEstimatePar_.sizeToTimeLinearOffset) / commEstimatePar_.sizeToTimeLinearGradient;
     } else if (targetTime > commEstimatePar_.timeToSizeBoundary1) {
-        if (socVersion_ == SocVersion::SOC950) {
+        if (npuArch_ == Ops::Base::DAV_3510) { // A5
             tmpSize =
                 (targetTime - commEstimatePar_.timeToSizeParabolicPar3) / commEstimatePar_.timeToSizeParabolicPar2;
         } else {

@@ -306,7 +306,7 @@ void FormPartition::MaxTileCntUniform()
 double OneCalcOneCommBase::EstimateTotalMatmulTime()
 {
     uint64_t tileM = clusterInfo_.mValue;
-    if (clusterInfo_.socType == SocVersion::SOC910_93 && rankDim_ > MIN_COMM_RANKDIM) { // double ring
+    if (clusterInfo_.socVersion_2201 == SocVersion_2201::SOC910_93 && rankDim_ > MIN_COMM_RANKDIM) { // double ring
         tileM *= rankTileNum_;
     }
     OP_LOGD("Common", "Estimate mm time: mValue %lu, rankDim_ %lu, tileM %lu", clusterInfo_.mValue, rankDim_, tileM);
@@ -316,7 +316,7 @@ double OneCalcOneCommBase::EstimateTotalMatmulTime()
 double OneCalcOneCommBase::EstimateTotalCommTime()
 {
     uint64_t totalStepSize = 1U;
-    if (clusterInfo_.socType == SocVersion::SOC910_93 && rankDim_ > MIN_COMM_RANKDIM) { // double ring
+    if (clusterInfo_.socVersion_2201 == SocVersion_2201::SOC910_93 && rankDim_ > MIN_COMM_RANKDIM) { // double ring
         totalStepSize = rankDim_;
     }
     return commPerf_.CommTime(clusterInfo_.mValue * totalStepSize);

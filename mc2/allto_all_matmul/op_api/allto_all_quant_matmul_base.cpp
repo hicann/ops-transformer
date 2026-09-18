@@ -234,7 +234,7 @@ static bool CheckAllDtypesValid(const aclTensor *x1, const aclTensor *x2, int64_
     return true;
 }
 
-// 950数据类型校验
+// A5数据类型校验
 // 量化模式下X支持的FP16数据类型（PerToken动态量化）(A5)
 static const std::initializer_list<op::DataType> X_DTYPE_FP16_SUPPORT_LIST_A5 = {op::DataType::DT_FLOAT16,
                                                                                  op::DataType::DT_BF16};

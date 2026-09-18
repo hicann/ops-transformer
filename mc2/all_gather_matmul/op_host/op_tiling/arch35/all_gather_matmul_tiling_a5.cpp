@@ -62,7 +62,7 @@ std::string AllGatherMatmulTilingA5::GetAlgConfig(Mc2Tiling::AllGatherMatmulTili
 CutResult AllGatherMatmulTilingA5::GetCutResult(Mc2Tiling::AllGatherMatmulTilingData &tilingData,
                                                 mc2tiling::TilingArgs &args)
 {
-    AllGatherPlusMMA5 tileFormulate(args, args.rankDim, KernelType::ALL_GATHER, SocVersion::SOC950);
+    AllGatherPlusMMA5 tileFormulate(args, args.rankDim, KernelType::ALL_GATHER);
     tileFormulate.GetTiling();
     CutResult mCutGather = tileFormulate.tilingM_.cutRes;
     return mCutGather;

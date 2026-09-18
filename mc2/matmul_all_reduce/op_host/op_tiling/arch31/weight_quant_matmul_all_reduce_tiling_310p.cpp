@@ -227,17 +227,17 @@ ge::graphStatus WeightQuantMatmulAllReduceTiling310P::DoWeightQuantTiling()
 CutResult WeightQuantMatmulAllReduceTiling310P::GetTilingResult()
 {
     CutResult mCutAllreduceOut;
-    SocVersion socVersionInput = SocVersion::SOC910_B;
+    SocVersion_2201 socVersionInput = SocVersion_2201::SOC910_B;
     SetMCutSocVersion(socVersionInput);
     const gert::StorageShape *commQuantScaleFirst = mmrCtxInfo_.comm_quant_scale_1_shape;
     const gert::StorageShape *commQuantScaleSecond = mmrCtxInfo_.comm_quant_scale_2_shape;
     if ((commQuantScaleFirst != nullptr) && (commQuantScaleSecond != nullptr)) { // low-bit comm
         OP_LOGD(opName_, "TileCnt enter comm quant.");
-        MMPlusQuantAllReduce quantAllReduceTilingObj(args_, args_.rankDim, KernelType::ALL_REDUCE, socVersionInput);
+        MMPlusQuantAllReduce quantAllReduceTilingObj(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_);
         quantAllReduceTilingObj.GetTiling();
         mCutAllreduceOut = quantAllReduceTilingObj.tilingM_.cutRes;
     } else {
-        MMPlusAllReduce allReduceTilingObj(args_, args_.rankDim, KernelType::ALL_REDUCE, socVersionInput, isPerBlock_);
+        MMPlusAllReduce allReduceTilingObj(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_, isPerBlock_);
         allReduceTilingObj.GetTiling();
         mCutAllreduceOut = allReduceTilingObj.tilingM_.cutRes;
     }

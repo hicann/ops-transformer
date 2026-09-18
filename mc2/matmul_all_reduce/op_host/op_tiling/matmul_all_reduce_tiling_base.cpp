@@ -279,16 +279,18 @@ void MatmulAllReduceTilingBase::DoRCSTiling()
     SetCommQuantScale();
 }
 
-void MatmulAllReduceTilingBase::SetMCutSocVersion(SocVersion &inputSocVersion)
+void MatmulAllReduceTilingBase::SetMCutSocVersion(SocVersion_2201 &socVersion_2201)
 {
     if (npuArch_ == Ops::Base::DAV_2002) {
-        inputSocVersion = SocVersion::SOC310_P;
+        // 310P:档位key已迁出枚举(与DAV_2002一一对应),保持调用方初始化的占位值;
+        // 模型内由arch(调用点传入的npuArch_)直接走2002分支
         OP_LOGD(opName_, "TileCnt enter 310P branch.");
         return;
     }
     // __NPU_ARCH__ == 3510
     if (npuArch_ == Ops::Base::DAV_3510) {
-        inputSocVersion = SocVersion::SOC950;
+        // A5:档位保持调用方初始化的占位值(平台判定已由arch承担);
+        // 模型内由arch(调用点传入的npuArch_)直接走3510分支
         OP_LOGD(opName_, "TileCnt enter 3510 branch.");
         return;
     }
@@ -297,25 +299,25 @@ void MatmulAllReduceTilingBase::SetMCutSocVersion(SocVersion &inputSocVersion)
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     uint64_t socMemSize = L2_CACHE_SIZE_910_B4;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, socMemSize);
-    inputSocVersion = (socMemSize == L2_CACHE_SIZE_910_B4) ? SocVersion::SOC910_B4 : inputSocVersion;
+    socVersion_2201 = (socMemSize == L2_CACHE_SIZE_910_B4) ? SocVersion_2201::SOC910_B4 : socVersion_2201;
     if (socMemSize == L2_CACHE_SIZE_910_B4) {
-        inputSocVersion = SocVersion::SOC910_B4;
+        socVersion_2201 = SocVersion_2201::SOC910_B4;
         OP_LOGD(opName_, "TileCnt enter 910B4 branch.");
     }
 }
 
 CutResult MatmulAllReduceTilingBase::GetTilingResult()
 {
-    SocVersion inputSocVersion = SocVersion::SOC910_B;
-    SetMCutSocVersion(inputSocVersion); // 判断是否是310P或者910B4
-    MMPlusAllReduce allReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, inputSocVersion, isPerBlock_);
+    SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B;
+    SetMCutSocVersion(socVersion_2201); // 判断是否是310P或者910B4
+    MMPlusAllReduce allReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_, isPerBlock_);
     allReduceTilingHccl.GetTiling();
     CutResult mCutAllreduce = allReduceTilingHccl.tilingM_.cutRes;
     const gert::StorageShape *commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
     const gert::StorageShape *commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
     if ((commQuantScaleShape1 != nullptr) && (commQuantScaleShape2 != nullptr)) { // 低bit通信
         OP_LOGD(opName_, "TileCnt enter comm quant.");
-        MMPlusQuantAllReduce quantAllReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, inputSocVersion);
+        MMPlusQuantAllReduce quantAllReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_);
         quantAllReduceTilingHccl.GetTiling();
         mCutAllreduce = quantAllReduceTilingHccl.tilingM_.cutRes;
     }
@@ -492,7 +494,7 @@ ge::graphStatus MatmulAllReduceTilingBase::GetWorkspaceSize()
     uint64_t gmcFloat = 0;
 
     // __NPU_ARCH__ == 3510
-    // 950需要自己申请一块workSpace存放mm的输出
+    // A5需要自己申请一块workSpace存放mm的输出
     if (npuArch_ == Ops::Base::DAV_3510) {
         gmcFloat = static_cast<uint64_t>(MutableRCSTilingData().rankM) *
                    static_cast<uint64_t>(MutableRCSTilingData().rankN) * static_cast<uint64_t>(args_.outputDtypeSize);

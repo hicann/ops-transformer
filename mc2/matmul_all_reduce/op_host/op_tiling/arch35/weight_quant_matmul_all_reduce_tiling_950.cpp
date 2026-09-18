@@ -663,7 +663,7 @@ WeightQuantMatmulAllReduceTilingA5::WeightQuantMatmulAllReduceTilingA5(gert::Til
 CutResult WeightQuantMatmulAllReduceTilingA5::GetTilingResult()
 {
     CutResult mCutAllreduceOutput;
-    SocVersion inputSocVer = SocVersion::SOC910_B;
+    SocVersion_2201 inputSocVer = SocVersion_2201::SOC910_B;
     SetMCutSocVersion(inputSocVer);
     const gert::StorageShape *commQuantScaleFirst = mmrCtxInfo_.comm_quant_scale_1_shape;
     const gert::StorageShape *commQuantScaleSecond = mmrCtxInfo_.comm_quant_scale_2_shape;
@@ -683,7 +683,7 @@ CutResult WeightQuantMatmulAllReduceTilingA5::GetTilingResult()
         MMAllReduceFitBalanceTiling allReduceTilingHcclInst(args_, kernelType, TopoType::EIGHT_P);
         mCutAllreduceOutput = allReduceTilingHcclInst.GetTiling();
     } else {
-        MMPlusAllReduce allReduceTilingHcclInst(args_, args_.rankDim, KernelType::ALL_REDUCE, inputSocVer, isPerBlock_);
+        MMPlusAllReduce allReduceTilingHcclInst(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_, isPerBlock_);
         allReduceTilingHcclInst.GetTiling();
         mCutAllreduceOutput = allReduceTilingHcclInst.tilingM_.cutRes;
     }

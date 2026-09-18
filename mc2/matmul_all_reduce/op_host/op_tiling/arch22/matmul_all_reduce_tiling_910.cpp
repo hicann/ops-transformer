@@ -327,17 +327,19 @@ TilingTransferHelper::TilingTransferHelper(MatmulAllReduceTiling910 &matmulAllRe
 CutResult MatmulAllReduceTiling910::GetTilingResult()
 {
     CutResult mCutAllreduce;
-    SocVersion inputSocVersion = SocVersion::SOC910_B;
-    SetMCutSocVersion(inputSocVersion);
+    SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B;
+    SetMCutSocVersion(socVersion_2201);
     const gert::StorageShape *commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
     const gert::StorageShape *commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
     if ((commQuantScaleShape1 != nullptr) && (commQuantScaleShape2 != nullptr)) { // low-bit comm
         OP_LOGD(opName_, "TileCnt enter comm quant.");
-        MMPlusQuantAllReduce quantAllReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, inputSocVersion);
+        MMPlusQuantAllReduce quantAllReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_,
+                                                      socVersion_2201);
         quantAllReduceTilingHccl.GetTiling();
         mCutAllreduce = quantAllReduceTilingHccl.tilingM_.cutRes;
     } else {
-        MMPlusAllReduce allReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, inputSocVersion, isPerBlock_);
+        MMPlusAllReduce allReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, Ops::Base::DAV_2201,
+                                            isPerBlock_, socVersion_2201);
         allReduceTilingHccl.GetTiling();
         mCutAllreduce = allReduceTilingHccl.tilingM_.cutRes;
     }

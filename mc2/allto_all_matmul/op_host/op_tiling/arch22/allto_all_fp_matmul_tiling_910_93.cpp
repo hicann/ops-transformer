@@ -40,12 +40,12 @@ bool AllToAllFpMatmulTilingBaseA3::IsCapable()
     OP_TILING_CHECK(platformInfoPtr == nullptr, OP_LOGE(opName_, "fail to get platform info"), return false);
     fe::PlatFormInfos &platformInfo = *platformInfoPtr;
     (void)platformInfo.GetPlatformResWithLock("version", "Short_SoC_version", socVersionStr_);
-    OP_LOGD(opName_, "Current SocVersion is : %s", socVersionStr_.c_str());
+    OP_LOGD(opName_, "Current SocVersion_2201 is : %s", socVersionStr_.c_str());
     if (socVersionStr_ == "Ascend910_93") {
         OP_LOGI(opName_, "Start with A3 FpMatmulAllToAll tiling.");
         return true;
     }
-    OP_LOGI(opName_, "Skip FpMatmulAllToAll tiling when it is not NON_QUANT or the SocVersion is unsupported.");
+    OP_LOGI(opName_, "Skip FpMatmulAllToAll tiling when it is not NON_QUANT or the SocVersion_2201 is unsupported.");
     return false;
 }
 

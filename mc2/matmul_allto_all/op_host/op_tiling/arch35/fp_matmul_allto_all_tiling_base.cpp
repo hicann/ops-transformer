@@ -391,8 +391,7 @@ CutResult FpMatmulAllToAllTilingBase::GetTilingResult()
     }
 
     uint8_t commMode = (engineType == mc2tiling::A5_CCU_ENGINE) ? Mc2Comm::COMM_MODE_CCU : Mc2Comm::COMM_MODE_AICPU;
-    return GetArch35TilingResult(contextInfo.args_, KernelType::ALL_TO_ALL, SocVersion::SOC950, npuArch_,
-                                 contextInfo.quantMode, commMode);
+    return GetArch35TilingResult(contextInfo.args_, KernelType::ALL_TO_ALL, npuArch_, contextInfo.quantMode, commMode);
 }
 
 /**

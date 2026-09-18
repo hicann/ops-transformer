@@ -23,9 +23,8 @@ class MMAllReduceFitBalanceTiling : public Mc2FitBasedBalanceTiling {
 public:
     explicit MMAllReduceFitBalanceTiling(const mc2tiling::TilingArgs &args, KernelType kernelType,
                                          TopoType topoType = TopoType::STANDARD_CARD,
-                                         SocVersion socVersion = SocVersion::SOC950,
                                          uint8_t commMode = Mc2Comm::COMM_MODE_AICPU, bool isPertileFp8 = false)
-        : Mc2FitBasedBalanceTiling(args, kernelType, topoType, socVersion)
+        : Mc2FitBasedBalanceTiling(args, kernelType, topoType)
     {
         commPerf_.SetCommShapeLen(args.nValue);
         commPerf_.SetCommDTypeSize(mmInfo_.outMatrixCDtypeSize);

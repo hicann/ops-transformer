@@ -32,8 +32,7 @@ void MMPlusAllReduce::SetCommTimeFactorForOther()
 
 void MMPlusAllReduce::SetCommTimeFactor()
 {
-    if (clusterInfo_.socType == SocVersion::SOC950) {
-        // __NPU_ARCH__ == 3510
+    if (npuArch_ == Ops::Base::DAV_3510) { // A5, __NPU_ARCH__ == 3510
         SetCommTimeFactorForA5();
         // end __NPU_ARCH__ == 3510
     } else {
@@ -95,11 +94,11 @@ void MMPlusAllReduce::SelectTilingMethod()
 
     // 根据首尾块大小、轮次等约束调整切分
     bool largeCalcCommRatio = ratioCalcComm_ > LARGE_BACKTILE_CALC_COMM_RATIO_BAR;
-    bool soc310Flag = clusterInfo_.socType == SocVersion::SOC310_P;
+    bool soc310Flag = npuArch_ == Ops::Base::DAV_2002;
     bool kGreaterThanN = clusterInfo_.kValue > clusterInfo_.nValue;
     tilingM_.FitTileLengthContinuous(kGreaterThanN, largeCalcCommRatio, soc310Flag);
     // 310P首地址非对齐时通信很慢，所以把非对齐的短块放到最后
-    bool commBoundNotAligned = ((clusterInfo_.socType == SocVersion::SOC310_P) && !tilingM_.cutRes.shortTileAtBack &&
+    bool commBoundNotAligned = ((npuArch_ == Ops::Base::DAV_2002) && !tilingM_.cutRes.shortTileAtBack &&
                                 (tilingM_.cutRes.shortTileLen % tilingM_.tileArgs.mAlignLen != 0)) ||
                                isPerBlock_;
     if (commBoundNotAligned) {

@@ -66,7 +66,7 @@ uint64_t MatmulPerformanceModel::GetLinearThresholdLen(uint64_t rankTileNum)
 
     uint64_t thresholdSize = 0;
     MinMatmulShapeParameters minShapePar;
-    bool adaptCoreNumFlag = (mmShapeInfo_.socType != SocVersion::SOC310_P);
+    bool adaptCoreNumFlag = (npuArch_ != Ops::Base::DAV_2002);
     if (adaptCoreNumFlag) {
         minShapePar.mmMinDataSize1 =
             minShapePar.mmMinDataSize1 / MatmulPerformance::MARK_CORE_NUM_SOC910B * mmShapeInfo_.coreNum;
@@ -120,10 +120,10 @@ double MatmulPerformanceModel::FindCubeUtilByL2Usage(uint64_t mSize, uint64_t ra
     tmpUtil *= static_cast<double>(std::min(mBlockNum * nBlockNum, mmShapeInfo_.coreNum) /
                                    static_cast<double>(mmShapeInfo_.coreNum));
 
-    /*950
+    /*A5(DAV_3510)
     cube利用率计算公式：两个输入为M、N的调和平均数和K。MN调和平均数的阈值为820，K阈值为1280，小于这个阈值
     认为提供负增益，大于这个阈值认为提供正增益，但是正增益最高不超过1.4倍。乘方函数用来缓和增长率，减慢变化速度*/
-    if (mmShapeInfo_.socType == SocVersion::SOC950) {
+    if (npuArch_ == Ops::Base::DAV_3510) {
         double mnharmonicMean = static_cast<double>(mSize * rankTileNum * mmShapeInfo_.nValue) /
                                 static_cast<double>(mSize * rankTileNum + mmShapeInfo_.nValue);
         double kExponentiated = std::min(
@@ -167,7 +167,7 @@ double MatmulPerformanceModel::FindCubeUtilVersion310P() const
 void MatmulPerformanceModel::ChangeCubeUtilByKAlign()
 {
     uint64_t kLength = mmShapeInfo_.kValue * mmShapeInfo_.inMatrixADtypeSize;
-    if (mmShapeInfo_.socType == SocVersion::SOC910_B4) {
+    if (mmShapeInfo_.socVersion_2201 == SocVersion_2201::SOC910_B4) {
         if (kLength % MatmulPerformance::HALF_CACHE_LINE_LEN != 0) {
             cubeUtil_ *= MatmulPerformance::K_UNALIGN_UTIL_RATIO_910_B4;
         }
@@ -184,7 +184,7 @@ void MatmulPerformanceModel::ChangeCubeUtilByKAlign()
 void MatmulPerformanceModel::FindCubeUtil(uint64_t mSize, uint64_t rankTileNum, bool flagAllReduce,
                                           uint64_t *maxTileLen)
 {
-    if (mmShapeInfo_.socType == SocVersion::SOC310_P) {
+    if (npuArch_ == Ops::Base::DAV_2002) {
         if (calcType_ == MatmulCalcType::QUANT) {
             cubeUtil_ = FindCubeUtilQuantVersion310P();
         } else {
@@ -196,7 +196,7 @@ void MatmulPerformanceModel::FindCubeUtil(uint64_t mSize, uint64_t rankTileNum, 
 
     cubeUtil_ = FindCubeUtilByL2Usage(mSize, rankTileNum, maxTileLen);
 
-    if (mmShapeInfo_.socType == SocVersion::SOC950) {
+    if (npuArch_ == Ops::Base::DAV_3510) {
         double mnharmonicMean = static_cast<double>(mmShapeInfo_.mValue * rankTileNum * mmShapeInfo_.nValue) /
                                 static_cast<double>(mmShapeInfo_.mValue * rankTileNum + mmShapeInfo_.nValue);
         double kExponentiated = std::min(

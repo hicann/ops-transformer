@@ -23,18 +23,18 @@ using namespace std;
 
 class HCCLPerformanceArch35 : public HCCLPerformanceModel {
 public:
+    // A5专用通信拟合模型:仅服务于DAV_3510平台,A5内蕴于类本身,不再接收档位key
     explicit HCCLPerformanceArch35(uint32_t inputRankDim, KernelType inputKernelType,
-                                   SocVersion socVersion = SocVersion::SOC950,
                                    TopoType topoType = TopoType::STANDARD_CARD)
-        : HCCLPerformanceModel(inputRankDim, inputKernelType, socVersion)
+        : HCCLPerformanceModel(inputRankDim, inputKernelType, Ops::Base::DAV_3510)
     {
         InitArch35Parameters();
         commTypeInfo_.topoType = topoType;
-        GetCommArch35Parameters(socVersion);
+        GetCommArch35Parameters();
     }
 
-    string GetCommInfoString(SocVersion socVersion);
-    void GetCommArch35Parameters(SocVersion socVersion);
+    string GetCommInfoString() const;
+    void GetCommArch35Parameters();
     void InitArch35Parameters();
     uint64_t InverseCommTime(double targetTime) const override;
 };

@@ -20,9 +20,9 @@
 class AllGatherPlusMMA5 : public AllGatherPlusMM {
 public:
     // Constructor
-    explicit AllGatherPlusMMA5(const mc2tiling::TilingArgs &args, uint32_t inputRankDim, KernelType inputKernelType,
-                               SocVersion inputSocVersion = SocVersion::SOC950)
-        : AllGatherPlusMM(args, inputRankDim, inputKernelType, inputSocVersion)
+    // A5专用:A5内蕴于类本身,不再接收档位key
+    explicit AllGatherPlusMMA5(const mc2tiling::TilingArgs &args, uint32_t inputRankDim, KernelType inputKernelType)
+        : AllGatherPlusMM(args, inputRankDim, inputKernelType, Ops::Base::DAV_3510)
     {
         commPerf_.SetCommShapeLen(clusterInfo_.kValue);
         commPerf_.SetCommDTypeSize(clusterInfo_.inMatrixADtypeSize);

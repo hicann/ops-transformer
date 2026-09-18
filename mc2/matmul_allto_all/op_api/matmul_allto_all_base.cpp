@@ -57,7 +57,7 @@ static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTens
 }
 
 // 检查是否有空tensor
-// 950 非量化场景支持x1的m轴为0，即token提示词为空
+// A5非量化场景支持x1的m轴为0，即token提示词为空
 static bool CheckNotEmptyTensor(const aclTensor *x1, const aclTensor *x2, bool transposeX2)
 {
     if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
@@ -214,7 +214,7 @@ static aclnnStatus CheckAndHandleParams(const aclTensor *x1, const aclTensor *x2
     // 3. 检查shape
     CHECK_RET(CheckShapeMMAA("matmul_allto_all", x1, x2, biasOptional, transposeX2, output), ACLNN_ERR_PARAM_INVALID);
     // 4. 检查输入的数据类型是否在API支持的数据类型范围之内，需要根据api定义校验
-    // bias的数据类型限制在950和910B上有所区别，这里根据芯片版本做区分
+    // bias的数据类型限制在A5和910B上有所区别，这里根据芯片版本做区分
     if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
         CHECK_RET(CheckAllDtypesValid(x1, x2, biasOptional, output), ACLNN_ERR_PARAM_INVALID);
     } else {

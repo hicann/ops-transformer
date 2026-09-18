@@ -25,7 +25,7 @@ void AlltoAllMM::EstimateKernelTime()
     double totalMatmulTime = 0;
     double totalTpTime = 0;
     // 预测计算、通信任务耗时
-    if (socVersion_ == SocVersion::SOC910_93) {
+    if (socVersion_2201 == SocVersion_2201::SOC910_93) {
         totalMatmulTime = EstimateTotalMatmulTime();
         totalTpTime = EstimateTotalCommTime(); // 通信时间
     } else {
@@ -60,7 +60,7 @@ void AlltoAllMM::EstimateKernelTime()
  */
 void AlltoAllMM::SetCommTimeFactor()
 {
-    if (socVersion_ == SocVersion::SOC910_93) {
+    if (socVersion_2201 == SocVersion_2201::SOC910_93) {
         OP_LOGD("AlltoAllMatmul, Current socVersion is SOC910_93.");
         tilingM_.SetMaxTileCnt(MAX_TILE_CNT_A3);                                        // 最多切8轮
         uint64_t rankDim = std::max(static_cast<uint64_t>(rankDim_), MIN_COMM_RANKDIM); // 并行维度最小为2
@@ -71,7 +71,7 @@ void AlltoAllMM::SetCommTimeFactor()
         OP_LOGD("AlltoAllMatmul", "Current commTimeFactor is %f", CommTimeFactor);
         commPerf_.ChangeCommTimeFactorByDivision(CommTimeFactor);
     } else {
-        OP_LOGD("AlltoAllMatmul, Current socVersion is SOC950.");
+        OP_LOGD("AlltoAllMatmul, Current platform is A5 (DAV_3510).");
         // A5上的时间因子AlltoAll暂时定义为2
         commPerf_.ChangeCommTimeFactorByDivision(TWO); // 2x time of factor
     }

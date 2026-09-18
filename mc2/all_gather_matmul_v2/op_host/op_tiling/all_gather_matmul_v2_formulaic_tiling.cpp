@@ -47,7 +47,7 @@ void AllGatherPlusMMV2::EstimateKernelTime()
     bool smallMFlag =
         (clusterInfo_.mValue < tilingM_.GetMinLen() * 2U) && (rankTileNum_ > MatmulPerformance::SMALL_RANKTILE);
     bool allowMoreCuts = (!tilingM_.cutRes.shortTileAtBack && smallMFlag) ||
-                         (strongTpBound_ && clusterInfo_.socType == SocVersion::SOC910_B);
+                         (strongTpBound_ && clusterInfo_.socVersion_2201 == SocVersion_2201::SOC910_B);
     bool reduceAlignLen = clusterInfo_.nValue > SMALL_N_BOUNDARY && clusterInfo_.mValue <= TINY_M;
     if (allowMoreCuts) {
         if (reduceAlignLen) {
@@ -88,14 +88,14 @@ void AllGatherPlusMMV2::SetCommTimeFactorForOther()
         commPerf_.ChangeCommTimeFactorByDivision(gatherLargerNKCommGrowRatio2); // 1.5x time of factor
     }
     commPerf_.ChangeCommTimeFactorByDivision(commGrowRatio); // 1.15x time of factor
-    if (clusterInfo_.socType == SocVersion::SOC910_93) {
+    if (clusterInfo_.socVersion_2201 == SocVersion_2201::SOC910_93) {
         commPerf_.ChangeCommTimeFactorByDivision(0.6); // 0.6x time of factor
     }
 }
 
 void AllGatherPlusMMV2::SetCommTimeFactor()
 {
-    if (clusterInfo_.socType == SocVersion::SOC950) {
+    if (npuArch_ == Ops::Base::DAV_3510) { // A5
         SetCommTimeFactorForA5();
     } else {
         SetCommTimeFactorForOther();

@@ -987,8 +987,8 @@ void QuantTilingTransferHelperA5::PrintTilingInputParam(Mc2QuantBatchMatmulInfo 
 CutResult QuantMatmulAllReduceTilingA5::GetTilingResult()
 {
     CutResult mCutAllreduce;
-    SocVersion inputSocVersion = SocVersion::SOC910_B;
-    SetMCutSocVersion(inputSocVersion);
+    SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B;
+    SetMCutSocVersion(socVersion_2201);
     const gert::StorageShape *commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
     const gert::StorageShape *commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
     auto &&param = MutableRCSTilingData();
@@ -998,8 +998,7 @@ CutResult QuantMatmulAllReduceTilingA5::GetTilingResult()
                     isPertileFp8);
     if (mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
         MMAllReduceFitBalanceTiling allReduceTilingHccl(args_, KernelType::ALL_REDUCE_VIA_TWO_SHOT,
-                                                        TopoType::STANDARD_CARD, SocVersion::SOC950, commMode,
-                                                        isPertileFp8);
+                                                        TopoType::STANDARD_CARD, commMode, isPertileFp8);
         allReduceTilingHccl.SetIsAlign(isAlign);
         mCutAllreduce = allReduceTilingHccl.GetTiling();
     } else if (mc2tiling::Is8P(args_.rankDim, npuArch_)) {
@@ -1010,12 +1009,11 @@ CutResult QuantMatmulAllReduceTilingA5::GetTilingResult()
         } else {
             kernelType = KernelType::ALL_REDUCE_VIA_TWO_SHOT;
         }
-        MMAllReduceFitBalanceTiling allReduceTilingHccl(args_, kernelType, TopoType::EIGHT_P, SocVersion::SOC950,
-                                                        commMode, isPertileFp8);
+        MMAllReduceFitBalanceTiling allReduceTilingHccl(args_, kernelType, TopoType::EIGHT_P, commMode, isPertileFp8);
         allReduceTilingHccl.SetIsAlign(isAlign);
         mCutAllreduce = allReduceTilingHccl.GetTiling();
     } else {
-        MMPlusAllReduce allReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, inputSocVersion, isPerBlock_);
+        MMPlusAllReduce allReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_, isPerBlock_);
         allReduceTilingHccl.GetTiling();
         mCutAllreduce = allReduceTilingHccl.tilingM_.cutRes;
     }

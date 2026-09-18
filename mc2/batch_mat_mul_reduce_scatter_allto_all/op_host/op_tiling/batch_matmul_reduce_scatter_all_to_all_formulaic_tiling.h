@@ -22,8 +22,8 @@
 class ReduceScatterAll2AllBMM : public OneCalcTwoCommBase {
 public:
     explicit ReduceScatterAll2AllBMM(const mc2tiling::TilingArgs &args, uint64_t inputEpDim, uint64_t inputTpDim,
-                                     uint64_t batchSize, SocVersion inputSocVersion = SocVersion::SOC910_93)
-        : OneCalcTwoCommBase(args, inputEpDim, inputTpDim, batchSize, inputSocVersion)
+                                     uint64_t batchSize, SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_93)
+        : OneCalcTwoCommBase(args, inputEpDim, inputTpDim, batchSize, socVersion_2201)
     {
         epCommPerf.SetCommShapeLen(clusterInfo.nValue / tpDim);
         epCommPerf.SetCommDTypeSize(clusterInfo.outMatrixCDtypeSize);
@@ -35,8 +35,9 @@ public:
 class ReduceScatterAll2AllBMMShardH : public OneCalcTwoCommShardHBase {
 public:
     explicit ReduceScatterAll2AllBMMShardH(const mc2tiling::TilingArgs &args, uint64_t inputEpDim, uint64_t inputTpDim,
-                                           uint64_t batchSize, SocVersion inputSocVersion = SocVersion::SOC910_93)
-        : OneCalcTwoCommShardHBase(args, inputEpDim, inputTpDim, batchSize, inputSocVersion)
+                                           uint64_t batchSize,
+                                           SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_93)
+        : OneCalcTwoCommShardHBase(args, inputEpDim, inputTpDim, batchSize, socVersion_2201)
     {
         epCommPerf.SetCommShapeLen(clusterInfo.nValue);
         epCommPerf.SetCommDTypeSize(clusterInfo.outMatrixCDtypeSize);

@@ -35,7 +35,7 @@ void AllGatherPlusMMA2A3::SetCommTimeFactor()
         commPerf_.ChangeCommTimeFactorByDivision(gatherLargerNKCommGrowRatio2); // 1.5x time of factor
     }
     commPerf_.ChangeCommTimeFactorByDivision(commGrowRatio); // 1.15x time of factor
-    if (clusterInfo_.socType == SocVersion::SOC910_93) {
+    if (clusterInfo_.socVersion_2201 == SocVersion_2201::SOC910_93) {
         commPerf_.ChangeCommTimeFactorByDivision(0.6); // 0.6x time of factor
     }
 }
@@ -43,7 +43,7 @@ void AllGatherPlusMMA2A3::SetCommTimeFactor()
 bool AllGatherPlusMMA2A3::GetAllowMoreCuts(bool smallMFlag)
 {
     bool allowMoreCuts = (!tilingM_.cutRes.shortTileAtBack && smallMFlag) ||
-                         (strongTpBound_ && clusterInfo_.socType == SocVersion::SOC910_B);
+                         (strongTpBound_ && clusterInfo_.socVersion_2201 == SocVersion_2201::SOC910_B);
 
     return allowMoreCuts;
 }

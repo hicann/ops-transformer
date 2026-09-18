@@ -247,17 +247,14 @@ CutResult MatmulReduceScatterV2Tiling::GetTilingResult()
 {
     if (mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
         MMReduceScatterFitBalanceTiling scatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
-                                                      TopoType::STANDARD_CARD, SocVersion::SOC950,
-                                                      (commMode_ == TPL_AICPU_COMM_MODE));
+                                                      TopoType::STANDARD_CARD, (commMode_ == TPL_AICPU_COMM_MODE));
         return scatterTiling.GetTiling();
     } else if (mc2tiling::Is8P(args_.rankDim, npuArch_)) {
         MMReduceScatterFitBalanceTiling scatterTiling(args_, KernelType::REDUCE_SCATTER_VIA_ALL_TO_ALL,
-                                                      TopoType::EIGHT_P, SocVersion::SOC950,
-                                                      (commMode_ == TPL_AICPU_COMM_MODE));
+                                                      TopoType::EIGHT_P, (commMode_ == TPL_AICPU_COMM_MODE));
         return scatterTiling.GetTiling();
     } else {
-        SocVersion inputSocVersion = (npuArch_ == Ops::Base::DAV_3510) ? SocVersion::SOC950 : SocVersion::SOC910_B;
-        MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, inputSocVersion, false,
+        MMPlusReduceScatter scatterTiling(args_, args_.rankDim, KernelType::REDUCE_SCATTER, npuArch_, false,
                                           (commMode_ == TPL_AICPU_COMM_MODE));
         scatterTiling.GetTiling();
         return scatterTiling.tilingM_.cutRes;

@@ -526,9 +526,8 @@ uint32_t AllGatherMatmulTilingBase::AllGatherSplitM(mc2tiling::TilingArgs &args,
 
 CutResult AllGatherMatmulTilingBase::GetTilingResult()
 {
-    SocVersion inputSocVersion = (npuArch_ == Ops::Base::DAV_3510) ? SocVersion::SOC950 : SocVersion::SOC910_B;
     OP_LOGD(opName_, "Start to find proper tileCnt by formulaic tiling.");
-    AllGatherPlusMMV2 tileFormulate(args_, args_.rankDim, KernelType::ALL_GATHER, inputSocVersion);
+    AllGatherPlusMMV2 tileFormulate(args_, args_.rankDim, KernelType::ALL_GATHER, npuArch_);
     tileFormulate.GetTiling();
     return tileFormulate.tilingM_.cutRes;
 }

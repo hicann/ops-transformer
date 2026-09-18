@@ -23,9 +23,8 @@ public:
     double frontMMTime_ = 0;
 
     explicit AllGatherMMFitBalanceTiling(const mc2tiling::TilingArgs &args, KernelType kernelType,
-                                         TopoType topoType = TopoType::STANDARD_CARD,
-                                         SocVersion socVersion = SocVersion::SOC950)
-        : Mc2FitBasedBalanceTiling(args, kernelType, topoType, socVersion)
+                                         TopoType topoType = TopoType::STANDARD_CARD)
+        : Mc2FitBasedBalanceTiling(args, kernelType, topoType)
     {
         commPerf_.SetCommShapeLen(mmInfo_.kValue);
         commPerf_.SetCommDTypeSize(mmInfo_.inMatrixADtypeSize);

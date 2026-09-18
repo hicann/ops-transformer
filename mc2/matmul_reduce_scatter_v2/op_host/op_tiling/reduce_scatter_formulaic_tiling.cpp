@@ -39,7 +39,7 @@ void MMPlusReduceScatter::SetCommTimeFactorForOther()
         commPerf_.ChangeCommTimeFactorByDivision(scatterLargerNKCommGrowRatio2);
     }
     commPerf_.ChangeCommTimeFactorByDivision(commGrowRatio); // 1.15x time of factor
-    if (clusterInfo_.socType == SocVersion::SOC910_93) {
+    if (clusterInfo_.socVersion_2201 == SocVersion_2201::SOC910_93) {
         commPerf_.ChangeCommTimeFactorByDivision(0.6); // 0.6x time of factor
     }
     return;
@@ -47,7 +47,7 @@ void MMPlusReduceScatter::SetCommTimeFactorForOther()
 
 void MMPlusReduceScatter::SetCommTimeFactor()
 {
-    if (clusterInfo_.socType == SocVersion::SOC950) {
+    if (npuArch_ == Ops::Base::DAV_3510) { // A5
         SetCommTimeFactorForA5();
     } else {
         SetCommTimeFactorForOther();

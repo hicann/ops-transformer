@@ -605,7 +605,8 @@ class AllGatherMatmulV2AclnnAIVTest : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
-        // 不依赖 tests/ 框架里 SetPlatformNpuArch(DAV_2201) 映射；直接设 SocVersion 使 GetCurNpuArch()==DAV_2201
+        // 不依赖 tests/ 框架里 SetPlatformNpuArch(DAV_2201) 映射；直接设平台 SocVersion(ASCEND910B)，
+        // 经框架 soc->arch 映射使 GetCurNpuArch()==DAV_2201
         op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
         cout << "AllGatherMatmulV2AclnnAIVTest SetUp" << endl;
     }

@@ -39,12 +39,15 @@ constexpr uint64_t MIN_DATA_PAR2 = 6 * ONE_MBYTE;
 constexpr uint64_t MIN_M_SIZE_SOC310P = 512;
 constexpr uint64_t MIN_COMM_RANKDIM = 2;
 
-enum class SocVersion {
-    SOC910_B,
-    SOC310_P,
-    SOC910_93,
-    SOC910_B4,
-    SOC950,
+// 拟合表键内嵌序列号(如"4_0"/"1_3"/"2_1"):arch映射值与枚举序值均显式钉住,不可漂移
+constexpr uint64_t NPUARCH_3510_FITTING_CODE = 4; // A5(DAV_3510)查表序列号
+constexpr uint64_t NPUARCH_2002_FITTING_CODE = 1; // 310系(DAV_2002)查表序列号
+
+// DAV_2201系(A2/A3)拟合档位:A5/310P与arch一一对应已迁出,故名
+enum class SocVersion_2201 {
+    SOC910_B = 0,
+    SOC910_93 = 2, // 历史序值,表键"2_1"依赖
+    SOC910_B4 = 3, // 历史序值,表键"3_..."依赖
 };
 
 enum class KernelType {
@@ -63,7 +66,7 @@ enum class MatmulCalcType {
 };
 
 struct MatmulParameters {
-    SocVersion socType;
+    SocVersion_2201 socVersion_2201;
     uint64_t coreNum;
     uint64_t inMatrixADtypeSize;
     uint64_t inMatrixBDtypeSize;
@@ -153,11 +156,5 @@ struct TileArguments {
     uint64_t maxTileLen;
     uint64_t minTileLen; // threshold size, max(commMinLen, matmulMinLen)
     uint64_t maxTileCnt;
-};
-
-struct TilingBestBaseBlock {
-    uint32_t baseM = 256; // 256: init value for baseM
-    uint32_t baseN = 256; // 256: init value for baseN
-    uint32_t baseK = 128; // 128: init value for baseK
 };
 #endif // __FORMULAIC_TILING_DATATYPE_H__
