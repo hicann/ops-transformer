@@ -45,6 +45,7 @@
 
 #include "mega_moe_tiling.h"
 #include "mega_moe_tiling_key.h"
+#include <type_traits>
 
 using namespace AscendC;
 
@@ -60,37 +61,38 @@ namespace MegaMoeImpl {
 template <typename XType, typename OutputType, typename TopkWeightsType, typename MoeWeightType,
           int32_t MoeWeight1Format, int32_t MoeWeight2Format, typename SharedWeightType, int32_t SharedWeight1Format,
           int32_t SharedWeight2Format, int32_t MoeQuantMode, int32_t SharedQuantMode, int32_t CombineQuantMode,
-          bool TopkWeightsPrefetch>
+          bool TopkWeightsPrefetch, typename TopkIndexType>
 class MegaMoeMteWave
     : public MegaMoeA8W8Wave<XType, OutputType, TopkWeightsType, MoeWeightType, MoeQuantMode, SharedWeightType,
                              SharedQuantMode, MoeWeight1Format, MoeWeight2Format, SharedWeight1Format,
-                             SharedWeight2Format, CombineQuantMode, TopkWeightsPrefetch> {};
+                             SharedWeight2Format, CombineQuantMode, TopkWeightsPrefetch, TopkIndexType> {};
 
 template <typename XType, typename OutputType, typename TopkWeightsType, int32_t MoeWeight1Format,
           int32_t MoeWeight2Format, typename SharedWeightType, int32_t SharedWeight1Format, int32_t SharedWeight2Format,
-          int32_t SharedQuantMode, int32_t CombineQuantMode, bool TopkWeightsPrefetch>
+          int32_t SharedQuantMode, int32_t CombineQuantMode, bool TopkWeightsPrefetch, typename TopkIndexType>
 class MegaMoeMteWave<XType, OutputType, TopkWeightsType, fp4x2_e2m1_t, MoeWeight1Format, MoeWeight2Format,
                      SharedWeightType, SharedWeight1Format, SharedWeight2Format, EXPERT_QUANT_OUT_DTYPE_E4M3FN,
-                     SharedQuantMode, CombineQuantMode, TopkWeightsPrefetch>
+                     SharedQuantMode, CombineQuantMode, TopkWeightsPrefetch, TopkIndexType>
     : public MegaMoeA8W4Wave<XType, OutputType, TopkWeightsType, fp4x2_e2m1_t, EXPERT_QUANT_OUT_DTYPE_E4M3FN,
                              SharedWeightType, SharedQuantMode, MoeWeight1Format, MoeWeight2Format, SharedWeight1Format,
-                             SharedWeight2Format, CombineQuantMode, TopkWeightsPrefetch> {};
+                             SharedWeight2Format, CombineQuantMode, TopkWeightsPrefetch, TopkIndexType> {};
 
 template <typename XType, typename OutputType, typename TopkWeightsType, int32_t MoeWeight1Format,
           int32_t MoeWeight2Format, typename SharedWeightType, int32_t SharedWeight1Format, int32_t SharedWeight2Format,
-          int32_t SharedQuantMode, int32_t CombineQuantMode, bool TopkWeightsPrefetch>
+          int32_t SharedQuantMode, int32_t CombineQuantMode, bool TopkWeightsPrefetch, typename TopkIndexType>
 class MegaMoeMteWave<XType, OutputType, TopkWeightsType, fp4x2_e2m1_t, MoeWeight1Format, MoeWeight2Format,
                      SharedWeightType, SharedWeight1Format, SharedWeight2Format, EXPERT_QUANT_OUT_DTYPE_E2M1,
-                     SharedQuantMode, CombineQuantMode, TopkWeightsPrefetch>
+                     SharedQuantMode, CombineQuantMode, TopkWeightsPrefetch, TopkIndexType>
     : public MegaMoeA4W4Wave<XType, OutputType, TopkWeightsType, fp4x2_e2m1_t, EXPERT_QUANT_OUT_DTYPE_E2M1,
                              SharedWeightType, SharedQuantMode, MoeWeight1Format, MoeWeight2Format, SharedWeight1Format,
-                             SharedWeight2Format, CombineQuantMode, TopkWeightsPrefetch> {};
+                             SharedWeight2Format, CombineQuantMode, TopkWeightsPrefetch, TopkIndexType> {};
 
 } // namespace MegaMoeImpl
 #endif
 
 template <typename MoeWeightType, typename SharedWeightType, uint8_t DispatchQuantMode, uint8_t DispatchQuantOutType,
-          uint8_t SharedQuantOutType, uint8_t CombineQuantOutType, uint8_t CommModeType, bool TopkWeightsPrefetch>
+          uint8_t SharedQuantOutType, uint8_t CombineQuantOutType, uint8_t CommModeType, bool TopkWeightsPrefetch,
+          uint8_t TopkIndexTypeValue>
 __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds, GM_ADDR topkWeights, GM_ADDR weight1,
                                     GM_ADDR weight2, GM_ADDR weightScales1, GM_ADDR weightScales2, GM_ADDR bias1,
                                     GM_ADDR bias2, GM_ADDR xActiveMask, GM_ADDR scales, GM_ADDR sharedWeight1,
@@ -108,9 +110,12 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
      (ORIG_DTYPE_WEIGHT1 == DT_FLOAT4_E2M1)) && \
     defined(ORIG_DTYPE_WEIGHT2) && (ORIG_DTYPE_WEIGHT2 == ORIG_DTYPE_WEIGHT1)
     if constexpr (CommModeType == TILINGKEY_TPL_MTE) {
+        using TopkIndexType =
+            typename std::conditional<TopkIndexTypeValue == TILINGKEY_TOPK_INDEX_INT16, int16_t, int32_t>::type;
         MegaMoeImpl::MegaMoeMteWave<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, MoeWeightType, FORMAT_WEIGHT1, FORMAT_WEIGHT2,
                                     SharedWeightType, FORMAT_SHARED_WEIGHT1, FORMAT_SHARED_WEIGHT2,
-                                    DispatchQuantOutType, SharedQuantOutType, CombineQuantOutType, TopkWeightsPrefetch>
+                                    DispatchQuantOutType, SharedQuantOutType, CombineQuantOutType, TopkWeightsPrefetch,
+                                    TopkIndexType>
             op;
         op.Init(context, x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2, scales,
                 sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut, expertTokenNumsOut,
