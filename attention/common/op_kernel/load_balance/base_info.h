@@ -214,8 +214,8 @@ public:
     uint32_t headDimV{64U};
     bool attenMaskFlag{false};
     uint32_t sparseMode{0U};
-    uint32_t preToken{0U};
-    uint32_t nextToken{0U};
+    int64_t preToken{0U};
+    int64_t nextToken{0U};
     bool isCumulativeQuerySeq{false};
     bool isCumulativeKvSeq{false};
     std::vector<int64_t> actualQuerySeqSize{};
