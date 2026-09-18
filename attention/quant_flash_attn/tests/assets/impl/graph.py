@@ -368,7 +368,9 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
             seqused_q=seqused_q_t,
             seqused_kv=seqused_kv_t,
-            batch_size=batch_size if not is_tnd_q else None,
+            batch_size=(batch_size if batch_size is not None else q_shape[0])
+            if not is_tnd_q
+            else None,
             max_seqlen_q=int(inputs["max_seqlen_q"]),
             max_seqlen_kv=int(inputs["max_seqlen_kv"]),
             head_dim_v=head_dim_v,
