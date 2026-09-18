@@ -73,6 +73,17 @@ __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadCompute
     asc_atomic_add(actualIdxNumAddr, localCount);
 }
 
+__simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadFillInvalidRowIdxSimt(
+    int32_t invalidNum, int32_t validNum, __ubuf__ int32_t *sortedRowIdxLocalAddr,
+    __ubuf__ int32_t *expandedRowIdxLocalAddr)
+{
+    for (auto offset = static_cast<int32_t>(threadIdx.x); offset < invalidNum;
+         offset += static_cast<int32_t>(blockDim.x)) {
+        int32_t invalidRouteIdx = sortedRowIdxLocalAddr[validNum + offset];
+        expandedRowIdxLocalAddr[invalidRouteIdx] = -1;
+    }
+}
+
 __simt_vf__ __aicore__ LAUNCH_BOUND(SIMT_THREAD_NUM) inline void FullLoadTopkWeightGatherSimt(
     int64_t elements, int64_t indexBase, int64_t totalLength, int64_t expertStart, int64_t expertEnd,
     __ubuf__ int32_t *sortedRowIdx, __ubuf__ int32_t *sortedExpertIdx, __gm__ float *topkWeight,
@@ -348,6 +359,9 @@ __aicore__ inline void MoeV3FullLoadBase<T>::SortCompute()
     }
 
     if (actualExpertIdxNum_ < 1) {
+        LocalTensor<int32_t> expandedRowIdx = expandedRowIdxQueue_.AllocTensor<int32_t>();
+        Duplicate(expandedRowIdx, static_cast<int32_t>(-1), static_cast<int32_t>(totalLength_));
+        expandedRowIdxQueue_.EnQue<int32_t>(expandedRowIdx);
         sortDataCopyInQueue_.FreeTensor(inLocal);
         return;
     }
@@ -501,10 +515,14 @@ __aicore__ inline void MoeV3FullLoadBase<T>::CopyOutRowIdx()
             expandedRowIdxQueue_.FreeTensor(expandedRowIdx);
         } else {
             LocalTensor<int32_t> expandedRowIdx = expandedRowIdxQueue_.DeQue<int32_t>();
-            for (int64_t i = actualExpertIdxNum_; i < totalLength_; i++) {
-                int32_t invalidRouteIdx = sortedRowIdx.GetValue(i);
-                expandedRowIdx.SetValue(invalidRouteIdx, -1);
+            int64_t invalidNum = totalLength_ - actualExpertIdxNum_;
+            if (invalidNum > 0 && actualExpertIdxNum_ > 0) {
+                uint32_t threadNum = static_cast<uint32_t>(Min(invalidNum, SIMT_THREAD_NUM));
+                asc_vf_call<FullLoadFillInvalidRowIdxSimt>(
+                    dim3{threadNum, 1, 1}, static_cast<int32_t>(invalidNum), static_cast<int32_t>(actualExpertIdxNum_),
+                    (__ubuf__ int32_t *)sortedRowIdx.GetPhyAddr(), (__ubuf__ int32_t *)expandedRowIdx.GetPhyAddr());
             }
+            SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
             DataCopyExtParams copyParams{static_cast<uint16_t>(1),
                                          static_cast<uint32_t>(totalLength_ * sizeof(int32_t)), 0, 0, 0};
             DataCopyPad(expandedRowIdxGm_, expandedRowIdx, copyParams);
