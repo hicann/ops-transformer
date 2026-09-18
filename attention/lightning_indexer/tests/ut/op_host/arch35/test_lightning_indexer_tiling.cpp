@@ -126,6 +126,36 @@ TEST_F(LightningIndexerTilingArch35, LightningIndexer_950_tiling_2)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
+// S1 exceeds 8M is NOT rejected on Ascend950 (A2/A3 seqLen limit is arch22 only)
+TEST_F(LightningIndexerTilingArch35, LightningIndexer_950_tiling_3)
+{
+    struct LightningIndexerCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexer",
+        {
+            {{{1, 8388609, 64, 128}, {1, 8388609, 64, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // query
+            {{{1, 1024, 1, 128}, {1, 1024, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},         // key
+            {{{1, 8388609, 64}, {1, 8388609, 64}}, ge::DT_BF16, ge::FORMAT_ND},           // weights
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                      // actual_seq_lengths_query
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                      // actual_seq_lengths_key
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}                                       // block_table
+        },
+        {
+            {{{1, 8388609, 1, 2048}, {1, 8388609, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_BF16, ge::FORMAT_ND}                                       // sparse_values
+        },
+        {{"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
 // Tiling data classes are registered for the op
 TEST_F(LightningIndexerTilingArch35, LightningIndexer_tiling_data_class_registered)
 {
