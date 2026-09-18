@@ -209,7 +209,10 @@ __aicore__ inline void KeyPoolKernel<COMP>::SplitK()
     uint64_t mTaskNum = static_cast<uint64_t>(constInfo.dBasicBlockNum) * mBaseNum;
     if (mTaskNum * SPLIT_K_THRESHOLD_FACTOR < constInfo.usedCoreNum &&
         constInfo.batchConsistency != BATCH_CONSISTENCY) {
-        constInfo.kBaseNum = constInfo.usedCoreNum / constInfo.dBasicBlockNum;
+        uint32_t candidateKBaseNum = constInfo.usedCoreNum / constInfo.dBasicBlockNum;
+        uint32_t kBlockNum =
+            CeilDivT(constInfo.hSize, static_cast<uint32_t>(BUFFER_SIZE_BYTE_32B / sizeof(HIDDEN_STATES_T)));
+        constInfo.kBaseNum = candidateKBaseNum < kBlockNum ? candidateKBaseNum : kBlockNum;
         uint32_t kAlignSize =
             CeilDivT(Align(constInfo.hSize, static_cast<uint32_t>(BUFFER_SIZE_BYTE_32B / sizeof(HIDDEN_STATES_T))),
                      constInfo.kBaseNum);

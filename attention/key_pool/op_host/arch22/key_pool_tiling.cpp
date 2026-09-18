@@ -198,7 +198,11 @@ ge::graphStatus KeyPoolTiling::SetInnerSplitInfo()
         constexpr uint32_t SPLIT_K_THRESHOLD_FACTOR = 4U;
         uint64_t mTaskNum = static_cast<uint64_t>(dBaseNum) * mBaseNum;
         if (mTaskNum * SPLIT_K_THRESHOLD_FACTOR < baseParams_->usedCoreNum) {
-            baseParams_->kBaseNum = baseParams_->usedCoreNum / dBaseNum;
+            // Each Split-K part must own at least one 128-wide K block. Empty
+            // parts do not produce a Cube partial sum but were read by Vector
+            // as stale workspace data.
+            uint32_t candidateKBaseNum = baseParams_->usedCoreNum / dBaseNum;
+            baseParams_->kBaseNum = candidateKBaseNum < kAlignNum ? candidateKBaseNum : kAlignNum;
             baseParams_->kBaseSize = kAlignNum / baseParams_->kBaseNum * 128;
         }
         for (uint32_t i = 0; i < baseParams_->usedCoreNum; i++) {
