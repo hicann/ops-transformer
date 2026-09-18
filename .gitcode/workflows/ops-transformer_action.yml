@@ -271,6 +271,7 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+              allow-unsafe-pr-checkout: true
           -
             name: download
             uses: obs-download
@@ -321,6 +322,7 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+              allow-unsafe-pr-checkout: true
           - name: 执行 Kirin PreSmoke_harmony-infer-chs-transformer 测试
             run: bash .gitcode/scripts/kirin_smoke_chs.sh
       PreSmoke_harmony-infer-cpro-transformer:
@@ -333,6 +335,7 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+              allow-unsafe-pr-checkout: true
           - name: 执行 Kirin PreSmoke_harmony-infer-cpro-transformer 测试
             run: bash .gitcode/scripts/kirin_smoke_cpro.sh
     pre:
@@ -350,6 +353,7 @@ stages:
             uses: checkout
             with:
               ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+              allow-unsafe-pr-checkout: true
           -
             name: download
             uses: obs-download
