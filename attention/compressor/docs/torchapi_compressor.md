@@ -9,7 +9,7 @@
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 推理产品</term>：不支持
@@ -106,18 +106,18 @@ cann_ops_transformer.compressor(
 | x | Tensor | 必选 | 原始不经压缩的数据，对应公式中的 $X$。不支持非连续，数据格式支持ND。 | bfloat16、float16 | [B,S,H]、[T,H] |
 | wkv | Tensor | 必选 | kv压缩权重，对应公式中的 $W^{KV}$。不支持非连续，数据格式支持ND。 | bfloat16、float16 | [coff\*D,H] |
 | wgate | Tensor | 必选 | gate压缩权重，对应公式中的 $W^{Gate}$。不支持非连续，数据格式支持ND。 | bfloat16、float16 | [coff\*D,H] |
-| state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。不支持非连续，数据格式支持ND。 | float32 | [block_num, block_size, 2\*coff\*D]，要求block_num>0 |
+| state_cache | Tensor | 必选 | kv_state和score_state的历史数据，对应公式中的 $\left[kv\_state, score\_state\right]$。支持0轴非连续，数据格式支持ND。计算后 kv_state 和 score_state 会原位更新到此 Tensor | float32 | [block_num, block_size, 2\*coff\*D]，要求block_num>0 |
 | ape | Tensor | 必选 | positional biases，对应公式中的 $Ape$。不支持非连续，数据格式支持ND。 | float32 | [cmp_ratio,coff\*D] |
 | cmp_ratio | int | 必选 | 数据压缩率。取值范围为[2, 128]内的整数。 | - | - |
-| state_block_table | Tensor | 可选 | state_cache存储使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B]。当其中元素的值为0时，表示当前位置无需进行更新state_cache操作 |
-| cu_seqlens | Tensor | 可选 | 不同Batch上的有效token数。不支持非连续，数据格式支持ND。<br>当x的shape为[B,S,H]时，参数必须为空。<br>当x的shape为[T,H]时，输入shape必须为[B+1,]，该参数为前缀和数组，后一个元素≥前一个元素，第一位必须为0。 | int32 | [B+1,] |
+| state_block_table | Tensor | 可选 | state_cache存储使用的block映射表。不支持非连续，数据格式支持ND。 | int32 | cache_mode=1时，shape为[B,ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length，当x的shape为[B,S,H]时，Smax=max(start_pos)+S。当x的shape为[T,H]时，Smax=max(start_pos)+max(cu_seqlens[n+1] - cu_seqlens[n])。cache_mode=2时，shape为[B] |
+| cu_seqlens | Tensor | 可选 | 不同Batch上的有效token数。不支持非连续，数据格式支持ND。<br>当x的shape为[B,S,H]时，参数必须为空。<br>当x的shape为[T,H]时，输入shape必须为[B+1,]，该参数为前缀和数组，后一个元素≥前一个元素，第一位必须为0，最后一位必须为T。 | int32 | [B+1,] |
 | seqused | Tensor | 可选 | 不同Batch中实际参与压缩的token数。不支持非连续，数据格式支持ND。<br>指定为None时，数值等于每个Batch上的Sequence Length。<br>[B,S,H]场景：0 ≤ seqused[n] ≤ S<br>[T,H]场景：0 ≤ seqused[n] ≤ cu_seqlens[n+1] - cu_seqlens[n]。 | int32 | [B,] |
 | start_pos | Tensor | 可选 | 计算起始位置。不支持非连续，数据格式支持ND，输入为None时从0开始计算 | int32 | [B,] |
 | coff | int | 可选 | 表示是否进行overlap数据重排，默认值为1。<br>仅支持1/2：<br>coff=1：无需进行overlap数据重排。<br>coff=2：需要进行overlap数据重排。 | int | - |
 | cache_mode | int | 可选 | state_cache的存储模式，默认值为1。<br>1：连续buffer。<br>2：循环buffer。 | int | - |
 
-<!-- npu="A3" id7 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：cache_mode不支持输入2，且不支持0轴非连续；cmp_ratio仅支持2/4/8/16/32/64/128。
+<!-- npu="A3,910b" id7 -->
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：cmp_ratio仅支持2/4/8/16/32/64/128；gradEnabled不支持为true。
 <!-- end id7 -->
 
 ## 返回值说明
@@ -132,7 +132,6 @@ cann_ops_transformer.compressor(
 - 该接口支持单算子模式和TorchAir图模式(aclgraph)调用。
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 该接口支持B、S泛化，且存在如下场景限制：
-  - 只支持B、S为0。
   - 部分长序列场景下，如果计算量过大可能会导致出现超过NPU内存的报错，注：这里计算量会受x输入shape的影响，值越大计算量越大。典型的长序列（即B、S的乘积或T较大）场景包括但不限于：
     <div style="overflow-x: auto;">
     <table style="undefined;table-layout: fixed; width: 400px"><colgroup>
@@ -169,6 +168,8 @@ cann_ops_transformer.compressor(
     </tbody>
     </table>
     </div>
+- 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下state_cache不做更新，输出cmp_kv为空tensor。
+- state_block_table元素取值范围为[0, block_num)，block_num为state_cache第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cache_mode=1（连续buffer）下写state_cache操作跳过该位置；cache_mode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cache_mode=1下元素值0为"未分配"哨兵值可重复出现，非0值须全局唯一；cache_mode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
 - 支持D为128/512。
 - 支持H为1K~10K，512对齐。
 - 支持block_size为1~1024。
