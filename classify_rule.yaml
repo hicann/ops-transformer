@@ -697,6 +697,12 @@ mc2_moe_advanced@ops-transformer:
     src:
         release:
             huawei_style:
+                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/op_host/
+                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/op_api/
+                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/op_graph/
+                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/op_kernel/
+                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/CMakeLists.txt
+                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/README.md
                 - ops/ops-transformer/mc2/distribute_barrier/op_host/
                 - ops/ops-transformer/mc2/distribute_barrier/op_api/
                 - ops/ops-transformer/mc2/distribute_barrier/op_graph/
@@ -1084,12 +1090,6 @@ mc2_inference@ops-transformer:
                 - ops/ops-transformer/mc2/ffn_to_attention/op_kernel/
                 - ops/ops-transformer/mc2/ffn_to_attention/CMakeLists.txt
                 - ops/ops-transformer/mc2/ffn_to_attention/README.md
-                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/op_host/
-                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/op_api/
-                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/op_graph/
-                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/op_kernel/
-                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/CMakeLists.txt
-                - ops/ops-transformer/mc2/grouped_mat_mul_all_reduce/README.md
                 - ops/ops-transformer/mc2/all_gather_matmul/op_host/all_gather_matmul_def.cpp
                 - ops/ops-transformer/mc2/all_gather_matmul/op_host/all_gather_matmul_infershape.cpp
                 - ops/ops-transformer/mc2/all_gather_matmul/op_host/CMakeLists.txt
