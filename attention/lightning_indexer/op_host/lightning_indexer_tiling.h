@@ -81,6 +81,7 @@ constexpr uint32_t QUERY_HEAD_NUM_LIMIT_950_32 = 32;
 constexpr uint32_t QUERY_HEAD_NUM_LIMIT_950_24 = 24;
 constexpr uint32_t QUERY_HEAD_NUM_LIMIT_950_16 = 16;
 constexpr uint32_t QUERY_HEAD_NUM_LIMIT_950_8 = 8;
+constexpr int64_t MAX_SEQ_LEN_LIMIT = 8 * 1024 * 1024;
 
 // -----------算子TilingData定义---------------
 BEGIN_TILING_DATA_DEF(LITilingData)
@@ -199,6 +200,7 @@ public:
     ge::graphStatus CheckBlockCount();
     ge::graphStatus GetS2SizeForPageAttention();
     ge::graphStatus GetS2Size();
+    ge::graphStatus CheckSeqLenLimit() const;
     ge::graphStatus GetQueryKeyAndOutLayout();
     ge::graphStatus GetN1Size();
     ge::graphStatus GetAndCheckN2Size();

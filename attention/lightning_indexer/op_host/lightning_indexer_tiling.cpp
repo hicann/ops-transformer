@@ -748,6 +748,32 @@ ge::graphStatus LIInfoParser::GetS2Size()
     return ge::GRAPH_SUCCESS;
 }
 
+// A2/A3(arch22)场景BSND布局下S1/S2超过8M直接报错不支持
+// TND/PA布局序列长度host侧不可见, 不做该校验
+ge::graphStatus LIInfoParser::CheckSeqLenLimit() const
+{
+    if (npuArch_ != NpuArch::DAV_2201) {
+        return ge::GRAPH_SUCCESS;
+    }
+    if (qLayout_ == DataLayout::BSND) {
+        OP_CHECK_IF(s1Size_ > MAX_SEQ_LEN_LIMIT,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "query", ToStringRaw(opParamInfo_.query.shape->GetStorageShape()).c_str(),
+                        "S1 of query is " + std::to_string(s1Size_) + ", exceeds max supported seqLen " +
+                            std::to_string(MAX_SEQ_LEN_LIMIT) + " on A2/A3, operator not supported"),
+                    return ge::GRAPH_FAILED);
+    }
+    if (kLayout_ == DataLayout::BSND) {
+        OP_CHECK_IF(s2Size_ > MAX_SEQ_LEN_LIMIT,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName_, "key", ToStringRaw(opParamInfo_.key.shape->GetStorageShape()).c_str(),
+                        "S2 of key is " + std::to_string(s2Size_) + ", exceeds max supported seqLen " +
+                            std::to_string(MAX_SEQ_LEN_LIMIT) + " on A2/A3, operator not supported"),
+                    return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus LIInfoParser::ValidateInputShapesMatchQtnd()
 {
     // -----------------------check BatchSize-------------------
@@ -1088,6 +1114,10 @@ ge::graphStatus LIInfoParser::ParseAndCheck(LITilingInfo &liInfo)
 
     if (ge::GRAPH_SUCCESS != GetBatchSize() || ge::GRAPH_SUCCESS != GetS1Size() || ge::GRAPH_SUCCESS != GetHeadDim() ||
         ge::GRAPH_SUCCESS != GetS2Size()) {
+        return ge::GRAPH_FAILED;
+    }
+
+    if (ge::GRAPH_SUCCESS != CheckSeqLenLimit()) {
         return ge::GRAPH_FAILED;
     }
 

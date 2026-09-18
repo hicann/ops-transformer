@@ -9,6 +9,7 @@
  */
 #include <iostream>
 #include <gtest/gtest.h>
+#include "register/tilingdata_base.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 using namespace std;
@@ -382,4 +383,132 @@ TEST_F(LightningIndexerTiling, LightningIndexer_910b_tiling_10)
          {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
         &compileInfo, "Ascend910B", 64, 262144, 16384);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// BSND case: S1 of query exceeds 8M must be rejected (A2/A3 seqLen limit)
+TEST_F(LightningIndexerTiling, LightningIndexer_910b_tiling_11)
+{
+    struct LightningIndexerCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexer",
+        {
+            {{{1, 8388609, 64, 128}, {1, 8388609, 64, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // query
+            {{{1, 1024, 1, 128}, {1, 1024, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},         // key
+            {{{1, 8388609, 64}, {1, 8388609, 64}}, ge::DT_BF16, ge::FORMAT_ND},           // weights
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                      // actual_seq_lengths_query
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                      // actual_seq_lengths_key
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}                                       // block_table
+        },
+        {
+            {{{1, 8388609, 1, 2048}, {1, 8388609, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_BF16, ge::FORMAT_ND}                                       // sparse_values
+        },
+        {{"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// BSND case: S2 of key exceeds 8M must be rejected (A2/A3 seqLen limit)
+TEST_F(LightningIndexerTiling, LightningIndexer_910b_tiling_12)
+{
+    struct LightningIndexerCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexer",
+        {
+            {{{1, 1024, 64, 128}, {1, 1024, 64, 128}}, ge::DT_BF16, ge::FORMAT_ND},     // query
+            {{{1, 8388609, 1, 128}, {1, 8388609, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // key
+            {{{1, 1024, 64}, {1, 1024, 64}}, ge::DT_BF16, ge::FORMAT_ND},               // weights
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                    // actual_seq_lengths_query
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                    // actual_seq_lengths_key
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}                                     // block_table
+        },
+        {
+            {{{1, 1024, 1, 2048}, {1, 1024, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_BF16, ge::FORMAT_ND}                                 // sparse_values
+        },
+        {{"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// PA_BSND case: S2 (maxBlockNumPerBatch * blockSize) exceeds 8M, seq len is not host-visible on PA layout,
+// no validation, tiling succeeds
+TEST_F(LightningIndexerTiling, LightningIndexer_910b_tiling_13)
+{
+    struct LightningIndexerCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexer",
+        {
+            {{{1, 1024, 64, 128}, {1, 1024, 64, 128}}, ge::DT_BF16, ge::FORMAT_ND},     // query
+            {{{8193, 1024, 1, 128}, {8193, 1024, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // key
+            {{{1, 1024, 64}, {1, 1024, 64}}, ge::DT_BF16, ge::FORMAT_ND},               // weights
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                    // actual_seq_lengths_query
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},                                  // actual_seq_lengths_key
+            {{{1, 8193}, {1, 8193}}, ge::DT_INT32, ge::FORMAT_ND}                       // block_table
+        },
+        {
+            {{{1, 1024, 1, 2048}, {1, 1024, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_BF16, ge::FORMAT_ND}                                 // sparse_values
+        },
+        {{"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BSND")},
+         {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+// TND case: T1/T2 exceed 8M, seq len is not host-visible on TND layout, no validation, tiling succeeds
+TEST_F(LightningIndexerTiling, LightningIndexer_910b_tiling_14)
+{
+    struct LightningIndexerCompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexer",
+        {
+            {{{9000000, 64, 128}, {9000000, 64, 128}}, ge::DT_BF16, ge::FORMAT_ND}, // query
+            {{{9000000, 1, 128}, {9000000, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},   // key
+            {{{9000000, 64}, {9000000, 64}}, ge::DT_BF16, ge::FORMAT_ND},           // weights
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},                              // actual_seq_lengths_query
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},                              // actual_seq_lengths_key
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}                                 // block_table
+        },
+        {
+            {{{9000000, 1, 2048}, {9000000, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_BF16, ge::FORMAT_ND}                                 // sparse_values
+        },
+        {{"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"sparse_count", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
+         {"return_values", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
+        &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+// Tiling data classes are registered for the op
+TEST_F(LightningIndexerTiling, LightningIndexer_tiling_data_class_registered)
+{
+    auto &factory = optiling::CTilingDataClassFactory::GetInstance();
+    EXPECT_NE(factory.CreateTilingDataInstance("LightningIndexer"), nullptr);
 }

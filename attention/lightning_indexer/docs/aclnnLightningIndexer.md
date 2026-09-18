@@ -424,6 +424,7 @@ aclnnStatus aclnnLightningIndexer(
 - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
   - query的N支持小于等于64。
   - key不支持非连续。
+  - BSND布局下S1/S2序列长度不超过8M（8388608），超过时算子报错不支持。TND/PA布局下序列长度在host侧不可见，不做该校验。
 
 ## 调用示例
 
