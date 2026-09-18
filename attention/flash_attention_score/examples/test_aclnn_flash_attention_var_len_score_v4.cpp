@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file test_aclnn_flash_attention_varlen_score.cpp
+ * \file test_aclnn_flash_attention_var_len_score_v4.cpp
  * \brief
  */
 
