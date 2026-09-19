@@ -370,21 +370,32 @@ __aicore__ inline void EngramFetchGradUnique::CountUniquesParallel(uint32_t numR
     int32_t boundaryEntry = 0;
     if (rawStart > 0 && rawStart < rawEnd) {
         AscendC::LocalTensor<int32_t> probeUb = tempBuf_->Get<int32_t>();
-        uint32_t probeLen = rawEnd - rawStart + 1U;
-        if (probeLen > Mc2Kernel::ENTRY_BATCH_CAP) {
-            probeLen = Mc2Kernel::ENTRY_BATCH_CAP;
-        }
         AscendC::DataCopyPadExtParams<int32_t> cpPad{false, 0, 0, 0};
-        AscendC::DataCopyExtParams cpParams{1U, static_cast<uint32_t>(probeLen * sizeof(int32_t)), 0U, 0U, 0U};
-        AscendC::DataCopyPad(probeUb, sortedEntryGM[rawStart - 1U], cpParams, cpPad);
-        SyncFunc<AscendC::HardEvent::MTE2_S>(*pipe_);
+        uint32_t probeBase = rawStart - 1U;
+        start = rawEnd;
+        while (probeBase < rawEnd) {
+            uint32_t probeLen = rawEnd - probeBase;
+            if (probeLen > Mc2Kernel::ENTRY_BATCH_CAP) {
+                probeLen = Mc2Kernel::ENTRY_BATCH_CAP;
+            }
+            AscendC::DataCopyExtParams cpParams{1U, static_cast<uint32_t>(probeLen * sizeof(int32_t)), 0U, 0U, 0U};
+            AscendC::DataCopyPad(probeUb, sortedEntryGM[probeBase], cpParams, cpPad);
+            SyncFunc<AscendC::HardEvent::MTE2_S>(*pipe_);
 
-        boundaryEntry = probeUb.GetValue(0);
-        uint32_t p = 1U;
-        while (p < probeLen && probeUb.GetValue(p) == boundaryEntry) {
-            p++;
+            boundaryEntry = probeUb.GetValue(0);
+            uint32_t p = 1U;
+            while (p < probeLen && probeUb.GetValue(p) == boundaryEntry) {
+                p++;
+            }
+            if (p < probeLen) {
+                start = probeBase + p;
+                break;
+            }
+            if (probeBase + probeLen >= rawEnd) {
+                break;
+            }
+            probeBase += probeLen - 1U;
         }
-        start = rawStart + p - 1U;
     }
 
     uint32_t localUniqueCount = 0;
@@ -502,6 +513,17 @@ __aicore__ inline void EngramFetchGradUnique::ChunkColumnPass(uint32_t chunkIdx,
     int32_t runningUniqueOffset = preCoreOffset;
     int32_t prevEntry = 0;
     bool isFirstElement = true;
+    if (start > 0U) {
+        AscendC::GlobalTensor<int32_t> sortedEntryGM;
+        sortedEntryGM.SetGlobalBuffer((__gm__ int32_t *)recvLocalEntryOutGM);
+        AscendC::LocalTensor<int32_t> prevUb = tempBuf_->Get<int32_t>();
+        AscendC::DataCopyPadExtParams<int32_t> prevPad{false, 0, 0, 0};
+        AscendC::DataCopyExtParams prevParams{1U, static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U};
+        AscendC::DataCopyPad(prevUb, sortedEntryGM[start - 1U], prevParams, prevPad);
+        SyncFunc<AscendC::HardEvent::MTE2_S>(*pipe_);
+        prevEntry = prevUb.GetValue(0);
+        isFirstElement = false;
+    }
     uint32_t tileIdx = 0U;
     uint32_t cur = start;
     while (cur < end) {
@@ -712,10 +734,12 @@ __aicore__ inline void EngramFetchGradUnique::LoadCoreRange(uint32_t numRecv, GM
 
     AscendC::LocalTensor<int32_t> ub = tempBuf_->Get<int32_t>();
     uint32_t totalBytes = totalBlocks_ * static_cast<uint32_t>(sizeof(int32_t));
+    uint32_t segOffElems = (totalBytes + Mc2Kernel::UB_ALIGN - 1U) / Mc2Kernel::UB_ALIGN *
+                           (Mc2Kernel::UB_ALIGN / static_cast<uint32_t>(sizeof(int32_t)));
     AscendC::DataCopyPadExtParams<int32_t> pad{false, 0, 0, 0};
     AscendC::DataCopyExtParams params{1U, totalBytes, 0U, 0U, 0U};
     AscendC::DataCopyPad(ub, coreStartGMT, params, pad);
-    AscendC::LocalTensor<int32_t> segUb = ub[totalBlocks_];
+    AscendC::LocalTensor<int32_t> segUb = ub[segOffElems];
     AscendC::DataCopyPad(segUb, segCountGMT, params, pad);
     SyncFunc<AscendC::HardEvent::MTE2_S>(*pipe_);
 
@@ -1600,6 +1624,17 @@ __aicore__ inline void EngramFetchGradUnique::ScatterAccumulateParallel(uint32_t
     int32_t runningUniqueOffset = preCoreOffset;
     int32_t prevEntry = 0;
     bool isFirstElement = true;
+    if (start > 0U) {
+        AscendC::GlobalTensor<int32_t> sortedEntryGM;
+        sortedEntryGM.SetGlobalBuffer((__gm__ int32_t *)recvLocalEntryOutGM);
+        AscendC::LocalTensor<int32_t> prevUb = tempBuf_->Get<int32_t>();
+        AscendC::DataCopyPadExtParams<int32_t> prevPad{false, 0, 0, 0};
+        AscendC::DataCopyExtParams prevParams{1U, static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U};
+        AscendC::DataCopyPad(prevUb, sortedEntryGM[start - 1U], prevParams, prevPad);
+        SyncFunc<AscendC::HardEvent::MTE2_S>(*pipe_);
+        prevEntry = prevUb.GetValue(0);
+        isFirstElement = false;
+    }
 
     uint32_t cur = start;
     while (cur < end) {

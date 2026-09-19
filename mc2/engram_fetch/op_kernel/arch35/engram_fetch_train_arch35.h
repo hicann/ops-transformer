@@ -402,7 +402,10 @@ __aicore__ inline void EngramFetchTrainArch35::InitCoreRoles()
     isFlagCore_ = (aivId_ == totalBlocks_ - 1U) && (totalBlocks_ > 1U);
 
     rankCores_ = (totalBlocks_ < numRanks_) ? totalBlocks_ : numRanks_;
-    tokenGroups_ = (totalBlocks_ + rankCores_ - 1U) / rankCores_;
+    tokenGroups_ = totalBlocks_ / rankCores_;
+    if (tokenGroups_ == 0U) {
+        tokenGroups_ = 1U;
+    }
     myOwnerRank_ = aivId_ % rankCores_;
     myTokenGroup_ = aivId_ / rankCores_;
 }
@@ -582,9 +585,12 @@ __aicore__ inline void EngramFetchTrainArch35::SendCountPhase()
 
 __aicore__ inline void EngramFetchTrainArch35::SendCountToPeers()
 {
+    if (!isSender_) {
+        return;
+    }
     LoadSendCountsToUb();
     LocalTensor<int32_t> sendCountsUb = statusBuf_.Get<int32_t>();
-    for (uint32_t dstRank = aivId_; dstRank < numRanks_; dstRank += totalBlocks_) {
+    for (uint32_t dstRank = aivId_; dstRank < numRanks_; dstRank += numSendCores_) {
         int32_t countVal = sendCountsUb.GetValue(dstRank * UB_ALIGN / sizeof(int32_t));
 
         GM_ADDR remoteSendCountAddr = GetRemoteWinAddr(dstRank, sendCountOffset_) + rankId_ * STATE_OFFSET;
@@ -1503,6 +1509,9 @@ __aicore__ inline uint32_t EngramFetchTrainArch35::GatherBatchToTemp(uint32_t ow
     uint32_t batchCompareCnt =
         Ceil(indicesBatchLen * sizeof(int32_t), ALIGNED_LEN_256) * ALIGNED_LEN_256 / sizeof(int32_t);
 
+    // GatherMask原位压缩会破坏positions等差数列，每个ownerRank使用前必须重建，否则同核处理多个ownerRank时
+    // (totalBlocks_ < numRanks_)，后续ownerRank会读到上一个ownerRank压缩并乘4后的脏数据
+    ArithProgression<int32_t>(positions, 0, 1, indicesBatchLen);
     CompareScalar(mask, rankIDs, static_cast<int32_t>(ownerRank), AscendC::CMPMODE::EQ, batchCompareCnt);
 
     uint64_t rsvdCnt = 0;
@@ -1603,8 +1612,6 @@ __aicore__ inline void EngramFetchTrainArch35::CountGatherToTemp()
         CopyIndicesToUb(indicesBatchStart, indicesBatchLen);
         EngramFetchTrainSyncFunc<HardEvent::MTE2_S>();
 
-        LocalTensor<int32_t> positions = positionsBuf_.Get<int32_t>();
-        ArithProgression<int32_t>(positions, 0, 1, indicesBatchLen);
         Div<int32_t>(rankIDs, indicesLocal, divisor, indicesBatchLen);
         PipeBarrier<PIPE_V>();
         EngramFetchTrainSyncFunc<HardEvent::V_S>();
@@ -1740,6 +1747,7 @@ __aicore__ inline void EngramFetchTrainArch35::Process()
         CountGatherAndSortPhase();
         SendCountPhase();
         ExchangeIndices();
+        SyncAll<true>();
         ExchangeTokenWithLocalRead();
         if (aivId_ == 0) {
             WriteNumRecv();

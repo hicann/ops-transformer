@@ -594,7 +594,8 @@ __aicore__ inline void EngramFetchGradArch35::Init(GM_ADDR commContext, GM_ADDR 
         numSendCores_ = (totalBlocks_ > 1U) ? (totalBlocks_ - 1U) : 1U;
     }
     isSender_ = (aivId_ < numSendCores_) || (totalBlocks_ <= 1U);
-    isReceiver_ = (aivId_ >= numSendCores_ && aivId_ < totalBlocks_ - 1U) || (totalBlocks_ <= 1U);
+    // 少核时，flag 核(最后一个核)兼任接收核，否则控核场景无任何接收核，远端梯度行滞留窗口
+    isReceiver_ = (aivId_ >= numSendCores_ && aivId_ < numSendCores_ + numRecvCores_) || (totalBlocks_ <= 1U);
     isFlagCore_ = (aivId_ == totalBlocks_ - 1U);
 
     uint64_t totalCounterEntries = static_cast<uint64_t>(numRanks_) * static_cast<uint64_t>(sendersPerRank_);
@@ -1482,12 +1483,14 @@ __aicore__ inline void EngramFetchGradArch35::ClearWinCounters()
 __aicore__ inline void EngramFetchGradArch35::CrossRankBarrierIssue()
 {
     if (isSender_) {
-        uint32_t dstRank = aivId_ % numRanks_;
-        uint32_t senderIdx = aivId_ / numRanks_;
-        if (senderIdx == 0U && dstRank != rankId_) {
-            uint64_t handle = GetCommHandle(dstRank, 0U);
-            GM_ADDR remoteFlagAddr = GetRemoteWinAddr(dstRank, barrierFlagOffset_) + rankId_ * STATE_OFFSET;
-            WriteNbiChecked(handle, remoteFlagAddr, flagScratchGM_, STATE_OFFSET);
+        // sender 核数可能少于 rank 数（控核场景 numSendCores_ < numRanks_）：按 numSendCores_
+        // 为 stride 循环覆盖全部目的 rank，否则只有部分 rank 能收到本 rank 的 barrier flag
+        for (uint32_t dstRank = aivId_; dstRank < numRanks_; dstRank += numSendCores_) {
+            if (dstRank != rankId_) {
+                uint64_t handle = GetCommHandle(dstRank, 0U);
+                GM_ADDR remoteFlagAddr = GetRemoteWinAddr(dstRank, barrierFlagOffset_) + rankId_ * STATE_OFFSET;
+                WriteNbiChecked(handle, remoteFlagAddr, flagScratchGM_, STATE_OFFSET);
+            }
         }
     }
     if (aivId_ == 0) {
@@ -1509,11 +1512,12 @@ __aicore__ inline void EngramFetchGradArch35::CrossRankBarrierIssue()
 __aicore__ inline void EngramFetchGradArch35::CrossRankBarrierWait()
 {
     if (isSender_) {
-        uint32_t dstRank = aivId_ % numRanks_;
-        uint32_t senderIdx = aivId_ / numRanks_;
-        if (senderIdx == 0U && dstRank != rankId_) {
-            uint64_t handle = GetCommHandle(dstRank, 0U);
-            DrainChecked(handle);
+        // 与 CrossRankBarrierIssue 对称：drain 掉本核发出的全部 flag 写
+        for (uint32_t dstRank = aivId_; dstRank < numRanks_; dstRank += numSendCores_) {
+            if (dstRank != rankId_) {
+                uint64_t handle = GetCommHandle(dstRank, 0U);
+                DrainChecked(handle);
+            }
         }
     }
     SyncAll<true>();
