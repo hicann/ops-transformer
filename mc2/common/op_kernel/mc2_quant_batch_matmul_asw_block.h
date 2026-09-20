@@ -243,6 +243,9 @@ __aicore__ inline void QuantBatchMatmulAswBlock::UpdateBlockParams(uint64_t roun
                                     tilingData_->adaptiveSlidingWin.mTailTile;
         uint64_t singleCoreNSplit = (params_.singleCoreN + tilingData_->adaptiveSlidingWin.nTailTile - 1) /
                                     tilingData_->adaptiveSlidingWin.nTailTile;
+        if (tilingData_->adaptiveSlidingWin.alignNTailSplit) {
+            singleCoreNSplit = DequantBmm::Align(singleCoreNSplit, static_cast<uint64_t>(BMM_BLOCK_NUM));
+        }
         uint64_t mBaseSplitCnt = MMV3DivCeil(params_.singleCoreM, singleCoreMSplit);
         uint64_t nBaseSplitCnt = MMV3DivCeil(params_.singleCoreN, singleCoreNSplit);
         totalSplitCnt_ = mBaseSplitCnt * nBaseSplitCnt;
