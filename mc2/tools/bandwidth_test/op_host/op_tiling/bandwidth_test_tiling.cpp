@@ -66,6 +66,8 @@ constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024U * 1024U; // 系统预留w
 constexpr uint64_t MB_SIZE = 1024UL * 1024UL;
 constexpr uint32_t OP_TYPE_ALL_TO_ALL = 8U; // AlltoAll操作类型
 constexpr uint32_t WORKSPACE_ELEMENT_OFFSET = 512UL;
+constexpr int64_t UB_ALIGN_BYTES = 32;         // 与kernel侧UB_ALIGN一致
+constexpr int64_t MAX_BLOCK_LEN_BYTES = 65535; // kernel侧DataCopyParams.blockLen为uint16_t
 
 // ============ 参数范围约束 ============
 const size_t MAX_GROUP_NAME_LENGTH = 128UL;
@@ -189,6 +191,17 @@ static ge::graphStatus CheckInputTensorShape(gert::TilingContext *context, const
         xDim1 <= 0,
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "x dim1 (data_size)", std::to_string(xDim1).c_str(), "positive"),
         return ge::GRAPH_FAILED);
+
+    // 单行hidden 32B对齐后的字节数不能超过kernel侧DataCopyParams.blockLen(uint16_t)上限，避免拷贝长度截断
+    const gert::CompileTimeTensorDesc *xDesc = context->GetInputDesc(static_cast<size_t>(INPUT_X_INDEX));
+    OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "x"), return ge::GRAPH_FAILED);
+    const int64_t xDtypeSize = static_cast<int64_t>(ge::GetSizeByDataType(xDesc->GetDataType()));
+    const int64_t hAlignBytes = ((xDim1 * xDtypeSize + UB_ALIGN_BYTES - 1) / UB_ALIGN_BYTES) * UB_ALIGN_BYTES;
+    OP_TILING_CHECK(hAlignBytes > MAX_BLOCK_LEN_BYTES,
+                    OP_LOGE_FOR_INVALID_VALUE(
+                        nodeName, "x dim1 (data_size)", std::to_string(xDim1).c_str(),
+                        (std::string("row bytes(32B aligned) <= ") + std::to_string(MAX_BLOCK_LEN_BYTES)).c_str()),
+                    return ge::GRAPH_FAILED);
 
     tilingData.dataSize = static_cast<int32_t>(xDim1);
 
@@ -373,9 +386,10 @@ static ge::graphStatus BandwidthTestTilingFuncImpl(gert::TilingContext *context)
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
 
     auto attrs = context->GetAttrs();
+    OP_TILING_CHECK(attrs == nullptr, OP_LOGE(nodeName, "attrs is nullptr."), return ge::GRAPH_FAILED);
     auto aivNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_AIV_NUM_INDEX);
     uint32_t aivNum = platformAivNum;
-    if (*aivNumPtr > 0 && *aivNumPtr <= platformAivNum) {
+    if (aivNumPtr != nullptr && *aivNumPtr > 0 && *aivNumPtr <= platformAivNum) {
         aivNum = static_cast<uint32_t>(*aivNumPtr);
     }
 

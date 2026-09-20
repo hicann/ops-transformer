@@ -328,6 +328,12 @@ aclnnStatus Mc2Context::CreatMc2Context(const HcclComm &hcclHandle, const std::s
     }
     OP_LOGD("Get rank size success, rankSize is: %u", epRankSize_);
 
+    if (epRankSize_ > HCCL_MAX_RANK_SIZE) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Rank size [%u] exceeds max rank size [%u]", epRankSize_,
+                                HCCL_MAX_RANK_SIZE);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
     auto ret = GetHcclCommResource(hcclHandle, engine, protocol, mc2ContextStruct);
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Get HCCL communication resource failed");
