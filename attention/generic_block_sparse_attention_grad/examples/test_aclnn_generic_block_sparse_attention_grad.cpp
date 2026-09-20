@@ -109,7 +109,6 @@ int main()
     auto ret = Init(deviceId, &context, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-    // 2. BNSD smoke 参数（对齐 GSAG 约束：D=128, blockShape=[1,128]）
     const int64_t B = 1;
     const int64_t N1 = 1;
     const int64_t N2 = 1;
@@ -125,7 +124,6 @@ int main()
     const int64_t windowLeft = -1;
     const int64_t windowRight = -1;
     const double scaleValue = 1.0 / std::sqrt(static_cast<double>(D));
-    // metadata elems = TASK_LIST_OFFSET(80) + B * N1 * J * TASK_ENTRY_SIZE(4)
     const int64_t metaSize = 80 + B * N1 * J * 4;
 
     std::vector<int64_t> qShape = {B, N1, S1, D};
@@ -135,7 +133,6 @@ int main()
     std::vector<int64_t> cntShape = {B, N2, J};
     std::vector<int64_t> metaShape = {metaSize};
 
-    // 3. Host 数据：小常数输入 + 单 KV 块全选 Q
     std::vector<uint16_t> qHost(static_cast<size_t>(GetShapeSize(qShape)), 0x2E66); // ~0.1
     std::vector<uint16_t> kHost(static_cast<size_t>(GetShapeSize(kvShape)), 0x2E66);
     std::vector<uint16_t> vHost(static_cast<size_t>(GetShapeSize(kvShape)), 0x2E66);

@@ -8,8 +8,8 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #pragma once
-#include "common_header.h"
-#include "vector_api/vf_cast_nd2nz.h"
+#include "gsag_common_header.h"
+#include "vector_api/gsag_vf_cast_nd2nz.h"
 using namespace AscendC;
 
 namespace GSAG_ARC35 {
@@ -37,31 +37,22 @@ private:
     uint32_t v_sub_core_idx_;
     int32_t batch_num_;
     int32_t q_seq_len_;
-    int32_t kv_seq_len_;
-    int32_t q_group_;
     int32_t q_head_num_;
     int32_t kv_head_num_;
     int32_t head_dim_;
     int32_t head_dim_align_;
-    int32_t ping_pong_flag_inner{0};
-    int32_t ping_pong_flag_outer{0};
     float softmax_scale_{0.0f};
     uint32_t base_m;
-    uint32_t base_n;
     uint32_t vec_base_m;
     uint32_t vec_base_n;
     GM_ADDR act_seq_q_len;
-    GM_ADDR sparse_block_idx_;
     GlobalTensor<float> lse_gm_;
     GlobalTensor<float> sftg_workspace_;
     GlobalTensor<float> dq_workspace_;
-    GlobalTensor<float> dk_workspace_;
-    GlobalTensor<float> dv_workspace_;
     GlobalTensor<float> dq_sel_workspace_;
     GlobalTensor<int32_t> sparse_idx_gm_;
     uint64_t dq_sel_workspace_offset_{0};
     int64_t dq_sel_core_elems_{0};
-    int32_t q_stride_lse_{1};
     LocalTensor<float> lse_tensor_;
     LocalTensor<float> lse_tensor_ping_;
     LocalTensor<float> lse_tensor_pong_;
@@ -75,7 +66,7 @@ private:
     LocalTensor<float> vec_in_pong_;
     LocalTensor<INPUT_TYPE> vec_out_ping_;
     LocalTensor<INPUT_TYPE> vec_out_pong_;
-    // sftg
+
     LocalTensor<INPUT_TYPE> dy_in_ping_;
     LocalTensor<INPUT_TYPE> dy_in_pong_;
     LocalTensor<INPUT_TYPE> attention_in_ping_;
@@ -89,22 +80,16 @@ private:
     LocalTensor<uint8_t> sftg_tmp_tensor;
     static constexpr uint32_t BLOCK_SIZE = 32;
     static constexpr uint32_t C0_SIZE = 16;
-    static constexpr uint32_t SHAPE_RANK_2D = 2; // ND matrix rank for SoftmaxGradFront SetShapeInfo
+    static constexpr uint32_t SHAPE_RANK_2D = 2;
     static constexpr uint32_t BLOCK_FP32 = BLOCK_SIZE / sizeof(float);
     static constexpr uint32_t BLOCK_INPUT = BLOCK_SIZE / sizeof(INPUT_TYPE);
-    constexpr static uint32_t PRE_TILE_LEN = 60 * 1024;  // pre一次处理元素的个数
     constexpr static uint32_t POST_TILE_LEN = 20 * 1024; // POST一次处理元素的个数
-    // runtInfo
     int32_t s1_process_;
     int32_t s1_process_align_;
     int32_t s2_process_align_;
     int32_t half_s1_process_align_;
-    int32_t data_size;
     int32_t half_s1_process_real_;
-    int64_t lse_gm_offset_;
-    int64_t sftg_gm_offset_;
     int64_t l1_offset_;
-    int32_t runTimeMaskType_{0};
     TEventID event_ping_ = EVENT_ID3;
     TEventID event_pong_ = EVENT_ID4;
     TEventID event_id;
@@ -112,46 +97,34 @@ private:
 public:
     __aicore__ inline VecOp(){};
 
-    __aicore__ inline void Init(GM_ADDR dout, GM_ADDR q, GM_ADDR k, GM_ADDR v, GM_ADDR attention_out,
-                                GM_ADDR softmaxLse, GM_ADDR sparseBlockIdx, GM_ADDR sparseBlockCount, GM_ADDR metadata,
-                                GM_ADDR actualQseqlen, GM_ADDR actualKvseqlen, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-                                GM_ADDR workspace, const TILING_CLASS *tilingData, TBuf<TPosition::VECCALC> &ub_buffer,
-                                uint32_t ub_offset)
+    __aicore__ inline void Init(GM_ADDR softmaxLse, GM_ADDR sparseBlockIdx, GM_ADDR actualQseqlen, GM_ADDR workspace,
+                                const TILING_CLASS *tilingData, TBuf<TPosition::VECCALC> &ub_buffer, uint32_t ub_offset)
     {
         this->v_core_num_ = tilingData->cubeCoreNum * 2; // 2 is the v_core_num_
         this->batch_num_ = tilingData->batchNum;
         this->q_seq_len_ = tilingData->qSeqLen;
-        this->kv_seq_len_ = tilingData->kvSeqLen;
-        this->q_group_ = tilingData->qGroup;
         this->q_head_num_ = tilingData->qHeadNum;
         this->kv_head_num_ = tilingData->kvHeadNum;
         this->head_dim_ = tilingData->headDim;
         this->softmax_scale_ = tilingData->softmaxScale;
         this->head_dim_align_ = RoundUp(head_dim_, static_cast<int32_t>(C0_SIZE));
         this->base_m = tilingData->baseM;
-        this->base_n = tilingData->baseN;
         this->vec_base_m = tilingData->baseM / 2; // 2 is the vec_base_m
         this->vec_base_n = tilingData->baseN;
         this->act_seq_q_len = actualQseqlen;
-        this->sparse_block_idx_ = sparseBlockIdx;
         v_core_idx_ = GetBlockIdx();
         v_sub_core_idx_ = GetSubBlockIdx();
-        q_stride_lse_ = (INPUT_LAYOUT == TND) ? q_head_num_ : 1;
 
-        // gm_tensor — pass explicit sizes so GetValue cannot treat large T offsets as OOB (AIC 264).
         const int64_t sparseIdxElems =
             static_cast<int64_t>(tilingData->batchNum) * tilingData->kvHeadNum * tilingData->numJ * tilingData->maxS1;
         const int64_t lseElems =
             (INPUT_LAYOUT == TND) ?
                 static_cast<int64_t>(tilingData->qSeqLen) * tilingData->qHeadNum :
                 static_cast<int64_t>(tilingData->batchNum) * tilingData->qHeadNum * tilingData->qSeqLen;
-        // Match host GetWorkspaceSize padding (AlignTo 256) so EvenCore DataCopy tails stay in-bound.
         const int64_t sftgElems = ((lseElems * 8) + 255) / 256 * 256;
         lse_gm_.SetGlobalBuffer((__gm__ float *)softmaxLse, lseElems);
         sftg_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->sftgWorkspaceOffset), sftgElems);
         dq_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->dqWorkspaceOffset), tilingData->dqSize);
-        dk_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->dkWorkspaceOffset), tilingData->dkSize);
-        dv_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->dvWorkspaceOffset), tilingData->dkSize);
         dq_sel_workspace_offset_ = tilingData->dqSelWorkspaceOffset;
         dq_sel_core_elems_ = static_cast<int64_t>(base_m) * head_dim_align_;
         const int64_t cubeBlk = static_cast<int64_t>(GetBlockIdx() / 2);
@@ -159,17 +132,6 @@ public:
             (__gm__ float *)(workspace + dq_sel_workspace_offset_) + cubeBlk * 2 * dq_sel_core_elems_,
             2 * dq_sel_core_elems_);
         sparse_idx_gm_.SetGlobalBuffer((__gm__ int32_t *)sparseBlockIdx, sparseIdxElems);
-        (void)sparseBlockCount;
-        (void)metadata;
-        (void)dout;
-        (void)q;
-        (void)k;
-        (void)v;
-        (void)attention_out;
-        (void)actualKvseqlen;
-        (void)dq;
-        (void)dk;
-        (void)dv;
         // local_tensor
         softmax_res_nz_tensor_ = ub_buffer.GetWithOffset<INPUT_TYPE>((vec_base_m + 1) * vec_base_n, ub_offset);
         ub_offset += (vec_base_m + 1) * vec_base_n * sizeof(INPUT_TYPE);
@@ -198,9 +160,8 @@ public:
     }
 
     __aicore__ inline void SendVecPre(const GlobalTensor<float> &dq_workspace, const GlobalTensor<float> &dk_workspace,
-                                      const GlobalTensor<float> &dv_workspace, const GlobalTensor<INPUT_TYPE> &dy_gm,
-                                      const GlobalTensor<INPUT_TYPE> &out_gm, const GlobalTensor<float> &sftg_workspace,
-                                      const TILING_CLASS *tilingData, TBuf<TPosition::VECCALC> &ub_buffer)
+                                      const GlobalTensor<float> &dv_workspace, const TILING_CLASS *tilingData,
+                                      TBuf<TPosition::VECCALC> &ub_buffer)
     {
         constexpr static uint32_t PRE_TILE_LEN = 20 * 1024; // PRE一次处理元素的个数
         EvenCoreInfo info;
@@ -300,7 +261,6 @@ public:
         s1_process_ = runTimeInfo.s1Len;
         s1_process_align_ = runTimeInfo.s1LenAlign;
         s2_process_align_ = runTimeInfo.s2LenAlign;
-        // Match Cube dualDstCtl=1 / each AIV owns mAlign/2 (pad rows may be empty).
         half_s1_process_align_ = s1_process_align_ / 2;
         if (v_sub_core_idx_ == 0) {
             half_s1_process_real_ = half_s1_process_align_ < s1_process_ ? half_s1_process_align_ : s1_process_;
@@ -311,15 +271,12 @@ public:
             }
         }
         l1_offset_ = v_sub_core_idx_ * half_s1_process_align_ * C0_SIZE;
-        data_size = half_s1_process_align_ * s2_process_align_;
 
-        // Always arm event_id + WAIT so SoftmaxGrad can always SET (incl. pad-only AIV).
         lse_tensor_ = pingpong_idx == 0 ? lse_tensor_ping_ : lse_tensor_pong_;
         sftg_front_tensor_ = pingpong_idx == 0 ? sftg_front_tensor_ping_ : sftg_front_tensor_pong_;
         event_id = pingpong_idx == 0 ? event_ping_ : event_pong_;
         WAIT_FLAG(V, MTE2, event_id);
 
-        // Zero pad / invalid rows so SoftmaxGrad (align-sized) does not see garbage.
         const int32_t packElems = half_s1_process_align_ * static_cast<int32_t>(BLOCK_FP32);
         Duplicate(lse_tensor_, 0.0f, packElems);
         Duplicate(sftg_front_tensor_, 0.0f, packElems);
@@ -327,12 +284,8 @@ public:
         WAIT_FLAG(V, MTE2, EVENT_ID0);
 
         if (half_s1_process_real_ > 0) {
-            // Prefetch sparse idx tile into UB (reuse softmax NZ staging; not live yet).
-            // Softmax VF expects [row, 8] with DIST_BRC on element 0 — gather via MTE2
-            // instead of per-element GM GetValue/SetValue (PIPE_S hotspot).
             LocalTensor<int32_t> idxUb = softmax_res_nz_tensor_.template ReinterpretCast<int32_t>();
             const int32_t rowStart = v_sub_core_idx_ * half_s1_process_align_;
-            // half_s1_process_align_ is mAlign/2 (16-aligned m → 8-aligned); pad slots are -1.
             DataCopy(idxUb, sparse_idx_gm_[runTimeInfo.sparseIdxOffset + rowStart], half_s1_process_align_);
             SET_FLAG(MTE2, S, EVENT_ID1);
             WAIT_FLAG(MTE2, S, EVENT_ID1);
@@ -345,8 +298,6 @@ public:
                 int64_t lseOff = 0;
                 int64_t sftgOff = 0;
                 if constexpr (INPUT_LAYOUT == TND) {
-                    // LSE user tensor is TND [T, N]; sftg workspace is written as
-                    // prefix*N*8 + n1*S*8 + t*8 (same as GetSftgGmOffset / SendVecSftgFront).
                     lseOff =
                         (static_cast<int64_t>(runTimeInfo.last_q_seq_sum) + qTok) * q_head_num_ + runTimeInfo.n1Idx;
                     sftgOff = GetSftgGmOffset<INPUT_LAYOUT>(static_cast<int64_t>(runTimeInfo.last_q_seq_sum),
@@ -361,10 +312,8 @@ public:
                 }
                 SET_FLAG(S, MTE2, EVENT_ID1);
                 WAIT_FLAG(S, MTE2, EVENT_ID1);
-                // sftg: 8 fp32 = 32B block — one DataCopy replaces 8x GetValue+SetValue.
                 DataCopy(sftg_front_tensor_[r * static_cast<int32_t>(BLOCK_FP32)], sftg_workspace_[sftgOff],
                          BLOCK_FP32);
-                // lse: Softmax DIST_BRC only needs slot [r*8]; DataCopyPad 1 fp32 (no 8x SetValue).
                 DataCopyPad(lse_tensor_[r * static_cast<int32_t>(BLOCK_FP32)], lse_gm_[lseOff],
                             {static_cast<uint16_t>(1), static_cast<uint32_t>(sizeof(float)), 0, 0, 0},
                             {false, 0, 0, 0});
@@ -374,11 +323,6 @@ public:
         }
     }
 
-    /**
-     * CAUSAL: origin at bottom-right; valid when k <= q + (S2 - S1).
-     * Invalid columns form a contiguous tail per row — Duplicate(NEG_INF) on
-     * 32B-aligned spans; unaligned head of the tail uses SetValue.
-     */
     __aicore__ inline void ApplyCausalAttenMask(const LocalTensor<float> &sUb, const RunTimeInfo &runTimeInfo)
     {
         if (runTimeInfo.mask_type == 0 || half_s1_process_real_ <= 0) {
@@ -390,7 +334,6 @@ public:
         const int32_t s2Len = static_cast<int32_t>(runTimeInfo.s2Len);
         const int32_t causalOffset = runTimeInfo.cur_kv_seq_len - runTimeInfo.cur_q_seq_len;
 
-        // Prefetch sparse idx (softmax NZ staging not live until CastND2NZ after Softmax).
         LocalTensor<int32_t> idxUb = softmax_res_nz_tensor_.template ReinterpretCast<int32_t>();
         DataCopy(idxUb, sparse_idx_gm_[runTimeInfo.sparseIdxOffset + rowStart], half_s1_process_align_);
         SET_FLAG(MTE2, S, EVENT_ID1);
@@ -398,7 +341,6 @@ public:
 
         for (int32_t r = 0; r < half_s1_process_real_; ++r) {
             const int32_t qTok = idxUb.GetValue(r);
-            // first c where kTok = s2Start+c > qTok+causalOffset
             int32_t firstInvalid = qTok + causalOffset - s2Start + 1;
             if (firstInvalid < 0) {
                 firstInvalid = 0;
@@ -407,7 +349,6 @@ public:
                 continue;
             }
             const int32_t rowBase = r * s2_process_align_;
-            // Duplicate requires 32B-aligned UB offset for fp32 → align start up.
             const int32_t firstAlign = RoundUp(firstInvalid, static_cast<int32_t>(BLOCK_FP32));
             for (int32_t c = firstInvalid; c < firstAlign && c < s2Len; ++c) {
                 sUb.SetValue(rowBase + c, NEG_INF);
@@ -432,7 +373,6 @@ public:
     __aicore__ inline void SendVecSoftmax(const LocalTensor<INPUT_TYPE> &dst_l1_tensor,
                                           const LocalTensor<float> &src_ub_tensor, const RunTimeInfo &runTimeInfo)
     {
-        // Pad-only AIV (m < 16 → AIV1): still write zeros into this half of P L1.
         if (half_s1_process_real_ <= 0) {
             const int32_t zeroElems = half_s1_process_align_ * s2_process_align_;
             Duplicate(src_ub_tensor, 0.0f, zeroElems);
@@ -450,14 +390,10 @@ public:
             return;
         }
 
-        runTimeMaskType_ = runTimeInfo.mask_type;
         ApplyCausalAttenMask(src_ub_tensor, runTimeInfo);
-        // Mask may end on PIPE_S (idx GetValue / skip-only rows); Softmax is PIPE_V.
         SET_FLAG(S, V, EVENT_ID1);
         WAIT_FLAG(S, V, EVENT_ID1);
         PipeBarrier<PIPE_V>();
-        // Softmax on real rows only; pad [real, align) to 0 so CastND2NZ/DataCopy
-        // can use half_s1_process_align_ (must match NZ fractal).
         SimpleSoftmax((__ubuf__ float *)src_ub_tensor.GetPhyAddr(), (__ubuf__ float *)src_ub_tensor.GetPhyAddr(),
                       (__ubuf__ float *)lse_tensor_.GetPhyAddr(), half_s1_process_real_, s2_process_align_);
         if (half_s1_process_real_ < half_s1_process_align_) {
@@ -482,13 +418,6 @@ public:
                                               const LocalTensor<float> &softmax_ub_tensor,
                                               const LocalTensor<float> &src_ub_tensor, const RunTimeInfo &runTimeInfo)
     {
-        /*
-         * function: Compute softmaxGrad
-         * input shape：[s1LenAlign / 2, s2LenAlign]
-         * out shape:   [s1LenAlign / 2, s2LenAlign]
-         * dtype:       float
-         */
-        // Pad-only AIV: zero dS L1 half and still SET_FLAG(V,MTE2) for event balance.
         if (half_s1_process_real_ <= 0) {
             const int32_t zeroElems = half_s1_process_align_ * s2_process_align_;
             Duplicate(src_ub_tensor, 0.0f, zeroElems);
@@ -506,7 +435,6 @@ public:
             SET_FLAG(V, MTE2, event_id);
             return;
         }
-        // Pad rows beyond real must be 0 so align-sized SoftmaxGrad/Cast stay in-bounds.
         if (half_s1_process_real_ < half_s1_process_align_) {
             const int32_t padElems = (half_s1_process_align_ - half_s1_process_real_) * s2_process_align_;
             Duplicate(src_ub_tensor[half_s1_process_real_ * s2_process_align_], 0.0f, padElems);
@@ -532,15 +460,10 @@ public:
         SET_FLAG(V, MTE2, event_id);
     }
 
-    /**
-     * ScatterAdd for dQ_sel: Cube Fixpiped [mAlign,D] to GM scratch;
-     * AIV0/AIV1 each take half of real rows, batch rows GM->UB, then AtomicAdd to dq.
-     * Event chain: MTE3<->MTE2 (UB reuse) + MTE2<->MTE3 (load->atomic).
-     */
     __aicore__ inline void ScatterDqSel(const RunTimeInfo &runTimeInfo, TBuf<TPosition::VECCALC> &ub_buffer,
                                         const uint32_t ping_pong_idx)
     {
-        if (!runTimeInfo.use_sparse_gather || !runTimeInfo.need_compute) {
+        if (!runTimeInfo.need_compute) {
             return;
         }
         const int32_t m = runTimeInfo.s1Len;
@@ -548,9 +471,7 @@ public:
             return;
         }
 
-        // 16 rows × D=128 fp32 ≈ 8KB; fewer outer loops / MTE syncs than UB_ROW_SIZE=8.
         constexpr int32_t UB_ROW_SIZE = 16;
-        // Same half split as Softmax dualDst / Gather (mAlign/2), not m/2.
         const int32_t mAlign = runTimeInfo.s1LenAlign;
         const int32_t halfAlign = mAlign / 2;
         const int32_t aivHalf = static_cast<int32_t>(GetSubBlockIdx());
@@ -566,12 +487,9 @@ public:
             return;
         }
 
-        // Keep Scatter staging far from mm/gather overlay (offset 0). FIX_SUMMARY: offset-0
-        // collided with AIV gather and zeroed dq; 200KB sits in the unused tail of 247KB UB.
         constexpr uint32_t SCATTER_UB_OFFSET = 200 * 1024;
         LocalTensor<float> batchUb = ub_buffer.GetWithOffset<float>(UB_ROW_SIZE * head_dim_align_, SCATTER_UB_OFFSET);
 
-        // Layout bases outside the per-row loop.
         const int64_t n1Dim = static_cast<int64_t>(runTimeInfo.n1Idx) * head_dim_;
         int64_t layoutBase = 0;
         int64_t qTokStride = head_dim_;
@@ -718,8 +636,6 @@ private:
             copyParam.blockLen = head_dim_ * sizeof(INPUT_TYPE);
             copyParam.srcStride = (src_stride - head_dim_) * sizeof(INPUT_TYPE);
             copyParam.dstStride = 0;
-            // BNSD tokens are contiguous (srcStride==0). Multi-row DataCopyPad with
-            // 0-gap can hang MTE on arch35; use a single contiguous block instead.
             if (copyParam.srcStride == 0) {
                 DataCopyParams cont;
                 cont.blockCount = 1;
@@ -741,9 +657,8 @@ private:
 
             uint32_t intput_shape_arry[SHAPE_RANK_2D] = {static_cast<uint32_t>(process_size),
                                                          static_cast<uint32_t>(head_dim_)};
-            uint32_t out_shape_arry[SHAPE_RANK_2D] = {
-                static_cast<uint32_t>(process_size),
-                static_cast<uint32_t>(BLOCK_FP32)}; // 8 is the block size for the sftg_front_tensor
+            uint32_t out_shape_arry[SHAPE_RANK_2D] = {static_cast<uint32_t>(process_size),
+                                                      static_cast<uint32_t>(BLOCK_FP32)};
 
             dy_out_tensor.SetShapeInfo(ShapeInfo(SHAPE_RANK_2D, intput_shape_arry, AscendC::DataFormat::ND));
             attention_out_tensor.SetShapeInfo(ShapeInfo(SHAPE_RANK_2D, intput_shape_arry, AscendC::DataFormat::ND));
@@ -907,15 +822,10 @@ private:
     __aicore__ inline void ComputeEvenCoreInfo(EvenCoreInfo &info, const uint32_t data_size,
                                                const uint32_t max_process_size)
     {
-        /*
-         * function: even process data_size
-         */
         uint32_t per_core_size = CeilDiv<uint32_t>(data_size, v_core_num_);
         info.start_idx = v_core_idx_ * per_core_size;
         info.max_process_size = max_process_size;
         info.data_size = data_size;
-        // Tail cores: start_idx can be >= data_size (e.g. T=1024, 56 AIVs, per=19).
-        // Must not do uint32 (data_size - start_idx) underflow.
         if (info.start_idx >= data_size) {
             info.len = 0;
             info.loop_num = 0;
@@ -927,7 +837,6 @@ private:
         info.loop_num = CeilDiv<uint32_t>(info.len, max_process_size);
 
         uint32_t tail = info.len % max_process_size;
-        // 由于DataCopyPad最多处理65535，因此tail部分分成align_tail和pad_tail计算
         if (tail == 0) {
             info.align_tail = max_process_size;
             info.pad_tail = 0;
@@ -935,30 +844,6 @@ private:
             info.align_tail = tail / C0_SIZE * C0_SIZE;
             info.pad_tail = tail - info.align_tail;
         }
-    }
-
-    __aicore__ inline void CopyInLSE(const LocalTensor<float> &dstTensor, const GlobalTensor<float> &srcTensor,
-                                     const int32_t count)
-    {
-        /*
-         * function: Copy lse from global memory to local memory
-         * input shape：(b, n, s, 1) or (t, n, 1)
-         * out shape:   (s, 8)
-         * dtype:       float
-         */
-        uint32_t src_stride;
-        if constexpr (INPUT_LAYOUT == BSND) {
-            src_stride = 0;
-        } else if (INPUT_LAYOUT == BNSD) {
-            src_stride = 0;
-        } else if (INPUT_LAYOUT == TND) {
-            src_stride = (q_head_num_ - 1) * sizeof(float);
-        }
-
-        DataCopyPad(dstTensor, srcTensor,
-                    {static_cast<uint16_t>(count), static_cast<uint32_t>(1 * sizeof(float)),
-                     static_cast<uint32_t>(src_stride), 0, 0},
-                    {false, 0, 0, 0});
     }
 };
 

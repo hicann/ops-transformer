@@ -11,7 +11,7 @@
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
 #if __CCE_AICORE__ == 310
-#include "arc35/generic_block_sparse_attention_grad.h"
+#include "arc35/generic_block_sparse_attention_grad_kernel.h"
 #else
 #include "arc22/generic_block_sparse_attention_grad_interface.h"
 #endif

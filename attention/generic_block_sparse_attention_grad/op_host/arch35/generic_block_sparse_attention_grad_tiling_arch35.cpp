@@ -63,8 +63,6 @@ protected:
                     static_cast<int64_t>(blockShapeY_));
             return false;
         }
-        // BlockY is sparse-block width only. Cube/Softmax tile is fixed baseN=128;
-        // kernel splits each J block into S2 tiles of size <= baseN.
         if (isPackedGQA_ != 1) {
             OP_LOGE(context_->GetNodeName(), "only support is_packed_gqa == 1.");
             return false;
@@ -123,14 +121,18 @@ protected:
             return ge::GRAPH_FAILED;
         }
 
-        if (blockShapeList != nullptr && blockShapeList->GetSize() >= 2) {
-            const int64_t *data = blockShapeList->GetData();
-            blockShapeX_ = static_cast<int32_t>(data[0]);
-            blockShapeY_ = static_cast<int32_t>(data[1]);
-        } else {
-            blockShapeX_ = 1;
-            blockShapeY_ = 128;
+        if (blockShapeList == nullptr) {
+            OP_LOGE(context_->GetNodeName(), "block_shape attr is missing.");
+            return ge::GRAPH_FAILED;
         }
+        if (blockShapeList->GetSize() != 2) {
+            OP_LOGE(context_->GetNodeName(), "block_shape must contain two elements [x, y], got size %zu.",
+                    blockShapeList->GetSize());
+            return ge::GRAPH_FAILED;
+        }
+        const int64_t *data = blockShapeList->GetData();
+        blockShapeX_ = static_cast<int32_t>(data[0]);
+        blockShapeY_ = static_cast<int32_t>(data[1]);
 
         if (idxShape->GetOriginShape().GetDimNum() != 4 || cntShape->GetOriginShape().GetDimNum() != 3) {
             OP_LOGE(context_->GetNodeName(), "sparse_block_idx must be 4D and sparse_block_count must be 3D.");
@@ -213,9 +215,8 @@ protected:
     {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
         auto cubeCoreNum = ascendcPlatform.GetCoreNumAic();
-        // Decouple sparse BlockY from Cube tile: UB/L1 always budgets baseM x baseN.
         uint32_t baseM = BASE_M;
-        uint32_t baseN = BASE_M; // 128; addr_compute S2-tiles each J block
+        uint32_t baseN = BASE_M;
 
         tilingData_.set_BlockX(static_cast<uint32_t>(blockShapeX_));
         tilingData_.set_BlockY(static_cast<uint32_t>(blockShapeY_));
@@ -241,7 +242,6 @@ protected:
 
     ge::graphStatus GetWorkspaceSize() override
     {
-        // Design §4.7: sftg → dq → dk → dv (fp32 user workspace)
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
         uint64_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
         uint64_t usrOffset = 0;
@@ -252,8 +252,6 @@ protected:
         if (strcmp(qLayout_, TND_STR) == 0) {
             dqSize = static_cast<uint64_t>(qSeqLen_) * qHeadNum_ * headDim_;
             dkSize = static_cast<uint64_t>(kvSeqLen_) * kvHeadNum_ * headDim_;
-            // Pad sftg so DataCopy of last EvenCore tail cannot write past the buffer
-            // (T=1024 / 56 AIVs leaves a non-16-aligned tail that may round up).
             sftgSize = static_cast<uint64_t>(AlignTo(static_cast<int64_t>(qSeqLen_) * qHeadNum_ * 8, 256));
         } else {
             dqSize = static_cast<uint64_t>(batchNum_) * qSeqLen_ * qHeadNum_ * headDim_;
@@ -271,7 +269,6 @@ protected:
         usrOffset += dkSize * sizeof(float);
         tilingData_.set_dvWorkspaceOffset(usrOffset);
         usrOffset += dkSize * sizeof(float);
-        // Per-cube dQ_sel scratch (2 ping-pong slots): Fixpipe [baseM, D] then Vector scatter.
         tilingData_.set_dqSelWorkspaceOffset(usrOffset);
         usrOffset += tilingData_.get_cubeCoreNum() * 2 * tilingData_.get_baseM() * headDim_ * sizeof(float);
 
@@ -288,7 +285,6 @@ protected:
 
     uint64_t GetTilingKey() const override
     {
-        // 1000 BF16 BSND, 1001 FP16 BSND, 1002 BF16 BNSD, 1003 FP16 BNSD, 1004 BF16 TND, 1005 FP16 TND
         uint64_t key = 1000;
         key = (dataType_ == ge::DT_BF16) ? key : key + 0b001;
         if (strcmp(qLayout_, BSND_STR) == 0) {

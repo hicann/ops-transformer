@@ -68,20 +68,15 @@ TILING_DATA_FIELD_DEF(int64_t, winRight);
 TILING_DATA_FIELD_DEF(uint64_t, blockShapeX); // block的x维度(Q方向)
 TILING_DATA_FIELD_DEF(uint64_t, blockShapeY); // block的y维度(KV方向)
 
-// selectIdx相关参数
-
 // Layout: 0=TND, 1=BNSD, 2=BSND
 TILING_DATA_FIELD_DEF(uint32_t, inputLayout);
 
-// BNSD格式的最大序列长度（用于计算stride）
-// 当actualSeqLengths为nullptr时，maxQSeqlen也用作统一的qseqlen值
 TILING_DATA_FIELD_DEF(uint32_t, maxQSeqlen); // BNSD格式Q的第三维（S维度），或统一的qseqlen值
 // 当actualSeqLengthsKv为nullptr时，maxKvSeqlen也用作统一的kvseqlen值
 TILING_DATA_FIELD_DEF(uint32_t, maxKvSeqlen); // BNSD/BSND格式KV的S维度
 TILING_DATA_FIELD_DEF(uint32_t, useUniformQSeqlen);
 TILING_DATA_FIELD_DEF(uint32_t, useUniformKvSeqlen);
 
-// TilingKey for kernel dispatch (生成在tiling层)
 TILING_DATA_FIELD_DEF(uint64_t, tilingKey);
 TILING_DATA_FIELD_DEF(uint64_t, gradSize);
 

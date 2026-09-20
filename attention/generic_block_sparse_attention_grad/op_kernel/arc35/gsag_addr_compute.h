@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file addr_compute.h
+ * \file gsag_addr_compute.h
  * \brief Metadata-driven task scheduling for GSAG (design §3.1.2 / §4.2).
  *        Atomic unit (b,n2,j) stays on one AIC; g=0..G-1 continuous.
  *        Each sparse J block (BlockY) is further tiled by baseM (S1) and baseN (S2<=128).
@@ -17,11 +17,9 @@
  */
 
 #pragma once
-#include "common_header.h"
-#include "../../../generic_block_sparse_attention_grad_metadata/op_kernel/generic_block_sparse_attention_grad_metadata.h"
+#include "gsag_common_header.h"
 
 using namespace AscendC;
-using namespace optiling;
 
 namespace GSAG_ARC35 {
 
@@ -94,7 +92,6 @@ public:
         const int32_t m = s1Remain_ > baseM_ ? baseM_ : s1Remain_;
         FillRunTimeInfo(info, m, n);
 
-        // Inner: S1 for current S2 tile; outer: advance S2 within sparse J (ends on last S2 tile).
         s1Offset_ += m;
         s1Remain_ -= m;
         if (s1Remain_ <= 0) {
@@ -135,7 +132,6 @@ private:
             const int64_t countOffset =
                 (static_cast<int64_t>(curB_) * constInfo_.kv_head_num + curN2_) * constInfo_.num_j + curJ_;
             curCount_ = reinterpret_cast<__gm__ int32_t *>(sparseBlockCount_)[countOffset];
-            // Guard against corrupt / out-of-range counts (avoids GetValue into -1 pad → AIC 264).
             if (curCount_ < 0) {
                 curCount_ = 0;
             } else if (curCount_ > constInfo_.max_s1) {
@@ -143,7 +139,6 @@ private:
             }
             curIdxBase_ = countOffset * static_cast<int64_t>(constInfo_.max_s1);
 
-            // Sparse J span (BlockY); compute tiles further split by baseN (<=128).
             curBlockS2Start_ = curJ_ * constInfo_.block_y;
             curKvBlockLen_ = constInfo_.block_y;
             if (curBlockS2Start_ + curKvBlockLen_ > curActS2_) {
@@ -197,20 +192,14 @@ private:
         info.s2LenAlign = RoundUp(static_cast<int64_t>(n), static_cast<int64_t>(C0_SIZE));
         info.sparseIdxOffset = curIdxBase_ + s1Offset_;
         info.sparseCount = m;
-        info.use_sparse_gather = 1;
         // First S1 of an S2 tile: reload this KV slice and init L0C (Fixpipe AtomicAdd across g).
         info.need_copy_kv = (s1Offset_ == 0) ? 1 : 0;
         info.kv_ping_pong_idx = kvPingPong_;
         info.mask_type = static_cast<int32_t>(tilingData_->maskType);
         info.keyGmOffset = GetQKVGmOffset<INPUT_LAYOUT>(curKvPrefix_, curActS2_, constInfo_.kv_head_num,
                                                         constInfo_.head_dim, curB_, tileS2Start, curN2_);
-        info.lseGmOffset = GetLseGmOffset<INPUT_LAYOUT>(curQPrefix_, curActS1_, constInfo_.q_head_num, curB_, 0, n1Cur);
-        info.sftgGmOffset =
-            GetSftgGmOffset<INPUT_LAYOUT>(curQPrefix_, curActS1_, constInfo_.q_head_num, curB_, 0, n1Cur);
-        info.queryGmOffset = 0;
         info.need_compute = 1;
 
-        // Dump dK/dV after last S1 of current S2 tile. Meta-task ends only after last S2 of J.
         const bool lastS1OfS2 = (s1Remain_ - m) <= 0;
         info.is_singlekv_last = lastS1OfS2 ? 1 : 0;
     }
