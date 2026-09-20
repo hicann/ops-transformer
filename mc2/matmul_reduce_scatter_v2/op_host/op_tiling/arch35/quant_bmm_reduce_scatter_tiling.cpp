@@ -843,6 +843,11 @@ ge::graphStatus QuantBmmReduceScatterTiling::DoAdaptSlidWindowTiling()
 #if MC2_DFX_ENABLE
     myWorkSpaceSize_ = 0U;
 #endif
+    // MXFP4 非转置：自适应滑窗的 N 向尾切（nTailTile>1）会导致 mm 库读取非转置 B 的 scale 出错（精度 bug，
+    // 实测 nTailTile=1（不切 N）时 MXFP4 全量用例通过；M 向尾切观察无问题，故保留）。
+    // 此处对"MXFP4 且非转置"强制 nTailTile=1（Tile/Tail 两套），其余量化/转置场景不受影响。
+    const bool forceMxNNoSplit = isMxfp4_ && !args_.isBTrans;
+
     // 主块切分
     uint32_t tempMValue = tileMValue_ == 0 ? MutableRCSTilingDataA5().rankM : tileMValue_;
     args_.mValue = ((quantMode_ == mc2tiling::Mc2QuantMode::PERTENSOR_MODE) ||
@@ -852,6 +857,9 @@ ge::graphStatus QuantBmmReduceScatterTiling::DoAdaptSlidWindowTiling()
 
     QuantBmmReduceScatterHelper mmTile(*this, quantBmmMatmulReducescatterTilingData_->quantBmmV3TileTiling);
     MC2_CHECK_LOG_RET(opName_, mmTile.DoTiling());
+    if (forceMxNNoSplit) {
+        quantBmmMatmulReducescatterTilingData_->quantBmmV3TileTiling.adaptiveSlidingWin.nTailTile = 1;
+    }
     if (MutableRCSTilingDataA5().tailCnt == 0) {
         return ge::GRAPH_SUCCESS;
     }
@@ -864,6 +872,9 @@ ge::graphStatus QuantBmmReduceScatterTiling::DoAdaptSlidWindowTiling()
                        tailMValue_;
     QuantBmmReduceScatterHelper mmTail(*this, quantBmmMatmulReducescatterTilingData_->quantBmmV3TailTiling);
     MC2_CHECK_LOG_RET(opName_, mmTail.DoTiling());
+    if (forceMxNNoSplit) {
+        quantBmmMatmulReducescatterTilingData_->quantBmmV3TailTiling.adaptiveSlidingWin.nTailTile = 1;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
