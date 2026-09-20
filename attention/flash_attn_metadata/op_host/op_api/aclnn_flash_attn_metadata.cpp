@@ -14,6 +14,7 @@
  */
 
 #include "l0_flash_attn_metadata.h"
+#include "acl/acl_rt.h"
 #include "aclnn_kernels/contiguous.h"
 #include "aclnn_kernels/reshape.h"
 #include "aclnn/aclnn_base.h"
@@ -58,8 +59,16 @@ ACLNN_API aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
-    uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
-    uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
+    // Match the effective resources used by ACLNN tiling, including stream core limits.
+    // Keep the same per-resource fallback as opbase InitL2Phase1Context.
+    uint32_t aicCoreNum = 0;
+    uint32_t aivCoreNum = 0;
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum) != ACL_SUCCESS) {
+        aicCoreNum = npuInfo.GetCubeCoreNum();
+    }
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
+        aivCoreNum = npuInfo.GetVectorCoreNum();
+    }
     const char *socVersion = npuInfo.GetSocLongVersion().c_str();
 
     auto output = l0op::FlashAttnMetadata(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional,
