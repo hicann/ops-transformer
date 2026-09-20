@@ -18,6 +18,7 @@
 #include "kernel_tensor.h"
 
 constexpr float FLT_ZERO = 0;
+// The FA softmax maximum uses -FLT_MAX_NEW as the fully masked row sentinel.
 constexpr float FLT_MAX_NEW = 3.402823466e+38F;
 
 enum class SinkInjectStage : uint8_t {
@@ -204,8 +205,7 @@ __simd_vf__ void ComputeScaleValue_8_VF(__ubuf__ uint16_t *lseSink, __ubuf__ T *
         Reg::RegTensor<float> vregInfValue;
         Reg::MaskReg pregCompare;
         constexpr float infValue = 3e+99; // 3e+99 for float inf
-        constexpr uint32_t tmpMin = 0xFF167699;
-        float minValue = *((float *)&tmpMin);
+        constexpr float minValue = -FLT_MAX_NEW;
         Reg::Duplicate<float, float>(vregMinValue, minValue);
         Reg::Duplicate<float, float>(vregInfValue, infValue);
 
@@ -300,8 +300,7 @@ __simd_vf__ void ComputeScaleValue_8_VF_FD(__ubuf__ T *lseSink, __ubuf__ T *lseM
         Reg::RegTensor<float> vregInfValue;
         Reg::MaskReg pregCompare;
         constexpr float infValue = 3e+99; // 3e+99 for float inf
-        constexpr uint32_t tmpMin = 0xFF167699;
-        float minValue = *((float *)&tmpMin);
+        constexpr float minValue = -FLT_MAX_NEW;
         Reg::Duplicate<float, float>(vregInfValue, infValue);
         Reg::Duplicate<float, float>(vregMinValue, minValue);
 
@@ -440,8 +439,7 @@ __simd_vf__ void ComputeScaleValue_16_VF(__ubuf__ uint16_t *lseSink, __ubuf__ ui
         Reg::MaskReg pregCompare;
         Reg::MaskReg pregCompare2;
         constexpr float infValue = 3e+99; // 3e+99 for float inf
-        constexpr uint32_t tmpMin = 0xFF167699;
-        float minValue = *((float *)&tmpMin);
+        constexpr float minValue = -FLT_MAX_NEW;
         Reg::Duplicate<float, float>(vregMinValue, minValue);
         Reg::Duplicate<float, float>(vregInfValue, infValue);
 
@@ -540,8 +538,7 @@ __simd_vf__ void ComputeLogSumExp_8_VF(__ubuf__ T *srcSumLocalInt, __ubuf__ T *s
     Reg::RegTensor<float> vregInfValue;
     Reg::MaskReg pregCompare;
     constexpr float infValue = 3e+99; // 3e+99 for float inf
-    constexpr uint32_t tmpMin = 0xFF167699;
-    float minValue = *((float *)&tmpMin);
+    constexpr float minValue = -FLT_MAX_NEW;
     Reg::Duplicate<float, float>(vregMinValue, minValue);
     Reg::Duplicate<float, float>(vregInfValue, infValue);
 
@@ -591,8 +588,7 @@ __simd_vf__ void ComputeLogSumExp_16_VF(__ubuf__ T *srcSumUb, __ubuf__ T *srcSum
     Reg::MaskReg pregCompare;
     Reg::MaskReg pregCompare2;
     constexpr float infValue = 3e+99; // 3e+99 for float inf
-    constexpr uint32_t tmpMin = 0xFF167699;
-    float minValue = *((float *)&tmpMin);
+    constexpr float minValue = -FLT_MAX_NEW;
     Reg::Duplicate<float, float>(vregMinValue, minValue);
     Reg::Duplicate<float, float>(vregInfValue, infValue);
 
