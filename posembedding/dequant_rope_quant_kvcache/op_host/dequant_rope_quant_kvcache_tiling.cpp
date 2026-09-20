@@ -452,21 +452,6 @@ static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext *contex
         return ge::GRAPH_FAILED;
     }
     int64_t taskNum = tilingInfoDRQK.batch * tilingInfoDRQK.seqlen;
-
-#if (__NPU_ARCH__ == 3510)
-    if (taskNum == 0) {
-        OP_LOGD(nodeName, "taskNum is 0, empty tensor, set block dim to 0.");
-        context->SetBlockDim(0);
-        DequantRopeQuantKvcacheTilingData emptyTiling;
-        emptyTiling.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
-        context->GetRawTilingData()->SetDataSize(emptyTiling.GetDataSize());
-        size_t *currentWorkspace = context->GetWorkspaceSizes(1);
-        OP_CHECK_NULL_WITH_CONTEXT(context, currentWorkspace);
-        currentWorkspace[0] = MINIMAL_WORKSPACE;
-        return ge::GRAPH_SUCCESS;
-    }
-#endif
-
     int64_t taskNumRem = GetRem(taskNum, tilingInfoDRQK.coreNum);
     int64_t frontCoreNum = taskNumRem != 0 ? taskNumRem : tilingInfoDRQK.coreNum;
     int64_t tailCoreNum = taskNum <= tilingInfoDRQK.coreNum ? 0 : tilingInfoDRQK.coreNum - frontCoreNum;
