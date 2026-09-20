@@ -445,6 +445,7 @@ __aicore__ inline void MoeDistributeDispatchV2FullMesh<TemplateMC2TypeFullmeshFu
     expandIdxGMTensor_.SetGlobalBuffer((__gm__ int32_t *)(expandIdxOut));
     elasticInfoGMTensor_.SetGlobalBuffer((__gm__ int32_t *)(elasticInfo));
     scalesGMTensor_.SetGlobalBuffer((__gm__ float *)scales);
+    quantInst_.dynamicScalesOutGMTensor_ = dynamicScalesOutGMTensor_;
     SetTilingDataAndCal(tilingData);
     if (hasExpertScalesFlag_) {
         expertScalesGMTensor_.SetGlobalBuffer((__gm__ float *)expertScales);
