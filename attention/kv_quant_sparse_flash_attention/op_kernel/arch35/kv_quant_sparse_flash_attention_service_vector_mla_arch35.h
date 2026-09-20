@@ -1315,6 +1315,7 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::CopyPhyAddrToGm(LocalTe
         ((validS2 + alignNum - 1) / alignNum * alignNum) * sizeof(int64_t) / bytesPerBlock + appendSentinelBlock;
     dataCopyParams.srcGap = 0U;
     dataCopyParams.dstGap = 0U;
+    // 2：每个位置对应key和value两个地址
     DataCopy(this->kvPhyAddrGm[(bS1Idx + s1Idx) * constInfo.sparseBlockCount * 2], kvPhyAddrUb, dataCopyParams);
 }
 

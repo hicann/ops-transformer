@@ -499,17 +499,16 @@ protected:
             this->bmm1LocalInfo.SetValue(
                 1, params->batchNOffset / this->tilingData->promptAttentionBaseParams.headNumRatio);
             this->bmm1LocalInfo.SetValue(2, params->sInnerOffsetDataSize); // 2: Sinner offset
-            this->bmm1LocalInfo.SetValue(3, (uint32_t)((reinterpret_cast<int64_t>(this->currentKey) >> 32) &
-                                                       0x00000000ffffffff)); // 3: The high position of the pointer key.
-                                                                             // 32: Shift right by 32 bits.
+            this->bmm1LocalInfo.SetValue(
+                // 3: The high position of the pointer key. 32: Shift right by 32 bits.
+                3, (uint32_t)((reinterpret_cast<int64_t>(this->currentKey) >> 32) & 0x00000000ffffffff));
             this->bmm1LocalInfo.SetValue(
                 4, (uint32_t)(reinterpret_cast<int64_t>(this->currentKey))); // 4: The low position of the pointer key.
-            this->bmm1LocalInfo.SetValue(5, (uint32_t)((reinterpret_cast<int64_t>(this->blocktable_ptr) >> 32) &
-                                                       0x00000000ffffffff)); // 5: The high position of the pointer
-                                                                             // blocktable.  32: Shift right by 32 bits.
-            this->bmm1LocalInfo.SetValue(6,
-                                         (uint32_t)(reinterpret_cast<int64_t>(
-                                             this->blocktable_ptr))); // 6: The low position of the pointer blocktable.
+            this->bmm1LocalInfo.SetValue(
+                // 5: The high position of the pointer blocktable.  32: Shift right by 32 bits.
+                5, (uint32_t)((reinterpret_cast<int64_t>(this->blocktable_ptr) >> 32) & 0x00000000ffffffff));
+            // 6: The low position of the pointer blocktable.
+            this->bmm1LocalInfo.SetValue(6, (uint32_t)(reinterpret_cast<int64_t>(this->blocktable_ptr)));
 
             event_t eventIDSToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));
             SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
@@ -847,18 +846,16 @@ protected:
             this->bmm2LocalInfo.SetValue(0, BIdx);
             this->bmm2LocalInfo.SetValue(1, NIdx / this->tilingData->promptAttentionBaseParams.headNumRatio);
             this->bmm2LocalInfo.SetValue(2, sInnerOffsetDataSize); // 2: sinner offset
-            this->bmm2LocalInfo.SetValue(3, (uint32_t)((reinterpret_cast<int64_t>(this->currentValue) >> 32) &
-                                                       0x00000000ffffffff)); // 3: The high position of the pointer
-                                                                             // value.  32: Shift right by 32 bits.
             this->bmm2LocalInfo.SetValue(
-                4,
-                (uint32_t)(reinterpret_cast<int64_t>(this->currentValue))); // 4: The low position of the pointer value.
-            this->bmm2LocalInfo.SetValue(5, (uint32_t)((reinterpret_cast<int64_t>(this->blocktable_ptr) >> 32) &
-                                                       0x00000000ffffffff)); // 5: The high position of the pointer
-                                                                             // blocktable.  32: Shift right by 32 bits.
-            this->bmm2LocalInfo.SetValue(6,
-                                         (uint32_t)(reinterpret_cast<int64_t>(
-                                             this->blocktable_ptr))); // 6:  The low position of the pointer blocktable.
+                // 3: The high position of the pointer value.  32: Shift right by 32 bits.
+                3, (uint32_t)((reinterpret_cast<int64_t>(this->currentValue) >> 32) & 0x00000000ffffffff));
+            this->bmm2LocalInfo.SetValue(4, // 4: The low position of the pointer value.
+                                         (uint32_t)(reinterpret_cast<int64_t>(this->currentValue)));
+            this->bmm2LocalInfo.SetValue(
+                // 5: The high position of the pointer blocktable. 32: Shift right by 32 bits.
+                5, (uint32_t)((reinterpret_cast<int64_t>(this->blocktable_ptr) >> 32) & 0x00000000ffffffff));
+            // 6:  The low position of the pointer blocktable.
+            this->bmm2LocalInfo.SetValue(6, (uint32_t)(reinterpret_cast<int64_t>(this->blocktable_ptr)));
 
             event_t eventIDSToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));
             SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);

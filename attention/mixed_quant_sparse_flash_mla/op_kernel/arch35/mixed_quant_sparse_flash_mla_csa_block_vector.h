@@ -921,14 +921,14 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::DequantKv(LocalTensor<Q_T> an
                                                              ConstInfo<HIGH_PERF> &constInfo)
 {
     LocalTensor<int8_t> kRopeUb;
-    LocalTensor<Q_T> kRopeUbNz = antiKvTensorAsB16[constInfo.dSizeNope * (16 + 1)];
+    LocalTensor<Q_T> kRopeUbNz = antiKvTensorAsB16[constInfo.dSizeNope * (16 + 1)]; // V0单次处理16行数据
     if constexpr (QUANT_MODE == SCALE_CONTIGUOUS_MODE::CONTIGUOUS) {
         kRopeUb = srcTensor.template ReinterpretCast<int8_t>();
         LocalTensor<Q_T> scaleUb = srcTensor.template ReinterpretCast<bfloat16_t>();
         AntiquantVFFp8D448<Q_T, KV_T>(kRopeUbNz, antiKvTensorAsB16, srcTensor, scaleUb, kRopeUb, dealRow);
     } else {
         LocalTensor<float> floatScale = dequantScaleUb.tensor;
-        kRopeUb = srcTensor[448].template ReinterpretCast<int8_t>();
+        kRopeUb = srcTensor[448].template ReinterpretCast<int8_t>(); // 448：每个分组包含448个元素
         CastScale<Q_T, KV_T>(floatScale, srcTensor, dealRow);
         AntiquantVFFp8D448_FloatScale<Q_T, KV_T>(kRopeUbNz, antiKvTensorAsB16, srcTensor, floatScale, kRopeUb, dealRow);
     }

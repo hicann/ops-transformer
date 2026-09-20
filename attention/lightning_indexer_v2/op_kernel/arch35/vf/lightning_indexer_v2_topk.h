@@ -49,13 +49,13 @@ public:
         LocalTensor<uint32_t> hisIndexLocal2 = sharedTmpBuffer[0];
         hisIndexLocal[0] = hisIndexLocal1;
         hisIndexLocal[1] = hisIndexLocal2;
-        histogramsLocal = hisIndexLocal2[LIV2Common::Align(topK, (uint32_t)256)];
-        idx0Local = histogramsLocal[256];
-        idx1Local = idx0Local[256];
-        idx2Local = idx1Local[256];
-        idx3Local = idx2Local[256];
-        nkValueLocal = idx3Local[256];
-        tmpIndexLocal = nkValueLocal[64];
+        histogramsLocal = hisIndexLocal2[LIV2Common::Align(topK, (uint32_t)256)]; // 256：本地内存对齐基线
+        idx0Local = histogramsLocal[256];                                         // 256：同上
+        idx1Local = idx0Local[256];                                               // 256：同上
+        idx2Local = idx1Local[256];                                               // 256：同上
+        idx3Local = idx2Local[256];                                               // 256：同上
+        nkValueLocal = idx3Local[256];                                            // 256：同上
+        tmpIndexLocal = nkValueLocal[64]; // 64：单核/单线程输出元素容量（G维度切分阈值）
     }
 
     __aicore__ inline void operator()(LocalTensor<uint32_t> &mrgValueLocal, LocalTensor<uint32_t> &indicesOutLocal,
@@ -90,15 +90,17 @@ public:
                                                   s2SeqLen);
                 PipeBarrier<PIPE_V>();
                 uint32_t loopBasicIdx = liV2TopkCommon::GetGatherLoopOffset(topK, trunkLen, loopIdx);
+                // 2：使用两个本地存储单元进行循环交替存储
                 liV2Topkb32gather::LiTopKGatherVF(hisIndexLocal[(loopIdx + 1) % 2], hisValueLocal, mrgValueLocal,
+                                                  // 2：同上
                                                   tmpIndexLocal, hisIndexLocal[loopIdx % 2], topK, loopBasicIdx,
                                                   s2SeqLen);
                 if (loopIdx == s2LoopNum - 1) {
                     PipeBarrier<PIPE_V>();
-                    if ((loopIdx + 1) % 2 == 1) { // 2：使用两个本地存储单元进行循环交替存储
+                    if ((loopIdx + 1) % 2 == 1) { // 2：同上
                         AscendC::DataCopy(
                             indicesOutLocal,
-                            hisIndexLocal[(loopIdx + 1) % 2], // 2：使用两个本地存储单元进行循环交替存储
+                            hisIndexLocal[(loopIdx + 1) % 2], // 2：同上
                             LIV2Common::Align(topK, (uint32_t)256)); // 对复制的数据量进行对齐处理，确保其为256的倍数
                     }
                 }

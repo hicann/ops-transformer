@@ -249,10 +249,12 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>:
                 padParams); // 512: Key特征维度; 576: 局部Buffer行跨度
 
     intriParams.blockLen = constInfo.sparseBlockSize * constInfo.dSizeRope * sizeof(KV_T);
-    intriParams.dstStride = 512 / BUFFER_SIZE_BYTE_32B; // 512: 模型特征维度(dSize)
-    DataCopyPad(kvInUb[startRow * 576 + 512], keyRopeGm[keyOffset * 64], intriParams,
-                padParams); // 576: 局部Buffer行跨度（Leading Dimension）; 512: Key特征维度（dSize）;
-                            // 64：RoPE索引数据每Token/块的行跨度（Stride）
+    intriParams.dstStride =
+        // 512: 模型特征维度(dSize)
+        512 / BUFFER_SIZE_BYTE_32B;
+    // 576: 局部Buffer行跨度（Leading Dimension）; 512: Key特征维度（dSize）;
+    // 64：RoPE索引数据每Token/块的行跨度（Stride）
+    DataCopyPad(kvInUb[startRow * 576 + 512], keyRopeGm[keyOffset * 64], intriParams, padParams);
 }
 
 TEMPLATES_DEF_NO_DEFAULT __aicore__ inline uint32_t SFAVectorService<TEMPLATE_ARGS>::CopyInKvSparse(

@@ -734,9 +734,11 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessSparseKv(
             } else {
                 GetRealCmpS2Idx(tokenData, s2, runInfo, constInfo);
             }
-            s2 += 8; // 每次搬运8行
-            if (tokenData[0] == -1 && tokenData[1] == -1 && tokenData[2] == -1 && tokenData[3] == -1 &&
-                tokenData[4] == -1 && tokenData[5] == -1 && tokenData[6] == -1 && tokenData[7] == -1) {
+            s2 += 8;                                                              // 每次搬运8行
+            if (tokenData[0] == -1 && tokenData[1] == -1 && tokenData[2] == -1 && // 2：数组下标
+                tokenData[3] == -1 &&                                             // 3：同上
+                tokenData[4] == -1 && tokenData[5] == -1 && tokenData[6] == -1 && // {4, 5, 6}：同上
+                tokenData[7] == -1) {                                             // 7：同上
                 meetEnd = true;
                 break;
             }
