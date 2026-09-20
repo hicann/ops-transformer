@@ -376,8 +376,8 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
       <tr>
         <td>cacheMode</td>
         <td>输入</td>
-        <td>表示使用分段式或者交错式拼接cos和sin。</td>
-        <td><ul><li>0表示分段式。</li><li>1表示交错式。</li></ul></td>
+        <td>表示mrope模式下cos和sin的拼接方式。</td>
+        <td><ul><li>取值仅支持0和1。</li><li>mrope模式下，0表示分段式，1表示交错式。</li><li>rope模式下（mropeSection为nullptr），该参数不影响计算结果。</li></ul></td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -631,7 +631,7 @@ int main() {
   aclTensor* cosSinCache = nullptr;
   int64_t headSize = 32;
   bool isNeoxStyle = true;
-  int64_t cacheMode = 1;
+  int64_t cacheMode = 0;
   aclTensor *queryOut = nullptr;
   aclTensor *keyOut = nullptr;
 
