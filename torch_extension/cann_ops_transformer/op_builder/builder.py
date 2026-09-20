@@ -8,7 +8,10 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+import fcntl
+import logging
 import os
+import shutil
 from abc import ABC, abstractmethod
 from typing import List, Union
 import torch
@@ -17,6 +20,8 @@ from torch.library import Library
 
 ASCEND_HOME_PATH = "ASCEND_HOME_PATH"
 _as_library = None
+
+logger = logging.getLogger(__name__)
 
 
 def get_as_library():
@@ -172,19 +177,64 @@ class OpBuilder(ABC):
         if self.name in OpBuilder._loaded_ops:
             return OpBuilder._loaded_ops[self.name]
 
-        # Lazy import avoids pulling arg_check into every builder import path.
-        from cann_ops_transformer.utils.arg_check import wrap_op_module
-
-        op_module = load(
-            name=self.name,
-            sources=self.get_absolute_paths(self.sources()),
-            extra_include_paths=self.get_absolute_paths(self.include_paths()),
-            extra_cflags=self.cxx_args(),
-            extra_ldflags=self.extra_ldflags(),
-            verbose=verbose,
+        ext_dir = os.path.expanduser(
+            os.environ.get(
+                "TORCH_EXTENSIONS_DIR", os.path.join("~", ".cache", "torch_extensions")
+            )
         )
-        # Arg type-check proxy; ops can call through load() unchanged.
-        op_module = wrap_op_module(op_module)
-        OpBuilder._loaded_ops[self.name] = op_module
+        os.makedirs(ext_dir, exist_ok=True)
+        lock_path = os.path.join(ext_dir, "%s.compile.lock" % self.name)
 
-        return op_module
+        with open(lock_path, "w") as lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+            if self.name in OpBuilder._loaded_ops:
+                return OpBuilder._loaded_ops[self.name]
+
+            self._remove_stale_torch_lock()
+
+            # Lazy import avoids pulling arg_check into every builder import path.
+            from cann_ops_transformer.utils.arg_check import wrap_op_module
+
+            op_module = load(
+                name=self.name,
+                sources=self.get_absolute_paths(self.sources()),
+                extra_include_paths=self.get_absolute_paths(self.include_paths()),
+                extra_cflags=self.cxx_args(),
+                extra_ldflags=self.extra_ldflags(),
+                verbose=verbose,
+            )
+            # Arg type-check proxy; ops can call through load() unchanged.
+            op_module = wrap_op_module(op_module)
+            OpBuilder._loaded_ops[self.name] = op_module
+            return op_module
+
+    def _remove_stale_torch_lock(self):
+        """Drop torch's FileBaton lock left by a killed JIT compile process.
+
+        The caller must hold the exclusive flock for this op, so the torch
+        lock, if present, cannot belong to a live compile that went through
+        this builder; it is either a leftover of a killed process or absent.
+        """
+        try:
+            from torch.utils.cpp_extension import _get_build_directory
+
+            build_dir = _get_build_directory(self.name, False)
+        except Exception:
+            return
+        torch_lock = os.path.join(build_dir, "lock")
+        if os.path.isdir(torch_lock) or os.path.isfile(torch_lock):
+            logger.warning("Detected stale build lock: %s", torch_lock)
+        if os.path.isdir(torch_lock):
+            try:
+                shutil.rmtree(torch_lock)
+            except OSError as e:
+                logger.warning(
+                    "Failed to remove stale build lock %s: %s", torch_lock, e
+                )
+        elif os.path.isfile(torch_lock):
+            try:
+                os.remove(torch_lock)
+            except OSError as e:
+                logger.warning(
+                    "Failed to remove stale build lock %s: %s", torch_lock, e
+                )
