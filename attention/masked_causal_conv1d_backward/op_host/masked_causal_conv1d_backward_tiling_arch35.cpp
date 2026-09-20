@@ -65,6 +65,13 @@ ge::graphStatus MaskedCausalConv1dBackwardTilingArch35::ValidateGradYShape()
     B_ = static_cast<int64_t>(origin.GetDim(DIM_1));
     H_ = static_cast<int64_t>(origin.GetDim(DIM_2));
 
+    if (S_ <= 0 || B_ <= 0 || H_ <= 0) {
+        std::string incorrectShape =
+            "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " + std::to_string(H_) + "]";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "grad_y", incorrectShape.c_str(),
+                                              "All dimensions of this parameter must be greater than 0");
+        return ge::GRAPH_FAILED;
+    }
     if (B_ <= 0 || B_ > B_MAX) {
         std::string incorrectShape =
             "[" + std::to_string(S_) + ", " + std::to_string(B_) + ", " + std::to_string(H_) + "]";
@@ -431,7 +438,6 @@ ge::graphStatus MaskedCausalConv1dBackwardTilingArch35::ComputeIntraCoreUbTiling
     return ge::GRAPH_SUCCESS;
 }
 
-
 ge::graphStatus MaskedCausalConv1dBackwardTilingArch35::DoOpTiling()
 {
     OP_CHECK_IF(ComputeInterCoreSplit() != ge::GRAPH_SUCCESS,
@@ -537,6 +543,5 @@ void MaskedCausalConv1dBackwardTilingArch35::DumpTilingInfo()
     OP_LOGI(context_->GetNodeName(), "H = %ld", H_);
     OP_LOGI(context_->GetNodeName(), "W = %ld", W_);
 }
-
 
 } // namespace optiling
