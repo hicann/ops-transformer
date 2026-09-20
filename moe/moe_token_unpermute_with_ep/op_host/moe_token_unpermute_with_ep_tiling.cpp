@@ -110,10 +110,6 @@ static inline ge::graphStatus MoeTokenUnpermuteWithEpInputParamCheck(const gert:
                 OP_LOGE(nodeName, "permutedTokens or sortedIndices is nullptr."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(tokensShape->GetStorageShape().GetDimNum() != 2, OP_LOGE(nodeName, "permutedTokens's shape is not 2D."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(tokensShape->GetStorageShape().GetDim(0) == 0 || tokensShape->GetStorageShape().GetDim(1) == 0,
-                OP_LOGE(nodeName, "permutedTokens does not support empty tensor."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(indicesShape->GetStorageShape().GetDim(0) == 0,
-                OP_LOGE(nodeName, "sortedIndices does not support empty tensor."), return ge::GRAPH_FAILED);
 
     if (probsShape != nullptr) {
         int64_t probsDimNum = probsShape->GetStorageShape().GetDimNum();
