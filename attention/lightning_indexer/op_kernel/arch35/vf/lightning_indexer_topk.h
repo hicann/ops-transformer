@@ -16,6 +16,7 @@
 #define LIGHTNING_INDEXER_TOPK_H
 
 #include "kernel_operator.h"
+#include "../../../../lightning_indexer_v2/op_kernel/arch35/common/vf/lightning_indexer_v2_topk_base.h"
 #include "vf_topk_gather.h"
 
 namespace topk {
@@ -31,14 +32,7 @@ class LITopk<uint32_t> {
 public:
     __aicore__ inline uint32_t GetSharedTmpBufferSize()
     {
-        // 2 * LICommon::Align(topK, (uint32_t)256): 两块hisIndexLocal
-        // 5 * 256：histogramsLocal + idxLocal[0-3]
-        // 64：nkValueLocal
-        uint64_t bufferSize1 = (2 * LICommon::Align(topK, (uint32_t)256) + 5 * 256 + 64) * sizeof(uint32_t);
-        // LICommon::Align(topK, (uint32_t)256) + trunkLen：tmpIndexLocal
-        uint64_t bufferSize2 = (LICommon::Align(topK, (uint32_t)256) + trunkLen) * sizeof(uint32_t);
-        uint64_t reuseBufferSize = LICommon::Align(topK, (uint32_t)256) * sizeof(uint32_t);
-        return bufferSize1 + bufferSize2 - reuseBufferSize;
+        return liV2TopkCommon::GetGatherTmpBufferSize<uint32_t, liV2TopkCommon::B32_RADIX_BUFFER_NUM>(topK, trunkLen);
     }
 
     __aicore__ inline void Init(uint32_t topK, uint32_t trunkLen)

@@ -277,52 +277,52 @@ __aicore__ inline void QLIVector<QLIT>::GetKeyScale(const QLICommon::RunInfo &ru
                                                     int64_t batchId, int64_t startS2, int64_t getLen)
 {
     // startS2一定能整除kCacheBlockSize_
-    AscendC::DataCopyPadExtParams<SCALE_T> padParams{false, 0, 0, 0};
-    AscendC::DataCopyExtParams copyInParams;
+    AscendC::DataCopyPadExtParams<SCALE_T> v1PadParams{false, 0, 0, 0};
+    AscendC::DataCopyExtParams v1CopyInParams;
     if constexpr (PAGE_ATTENTION) {
-        int32_t startBlockTableIdx = startS2 / kCacheBlockSize_;
-        int32_t startBlockTableOffset = startS2 % kCacheBlockSize_;
-        int32_t blockTableBatchOffset = batchId * maxBlockNumPerBatch_;
-        copyInParams.blockCount = 1;
-        copyInParams.srcStride = 0;
-        copyInParams.dstStride = 0;
-        copyInParams.rsv = 0;
-        int32_t resUbBaseOffset = 0;
-        if (startBlockTableOffset > 0) {
-            int32_t firstPartLen =
-                kCacheBlockSize_ - startBlockTableOffset > getLen ? getLen : kCacheBlockSize_ - startBlockTableOffset;
-            copyInParams.blockLen = firstPartLen * sizeof(SCALE_T);
-            int32_t blockId = blockTableGm.GetValue(blockTableBatchOffset + startBlockTableIdx);
+        int32_t v1StartBlockIdx = startS2 / kCacheBlockSize_;
+        int32_t v1StartBlockOffset = startS2 % kCacheBlockSize_;
+        int32_t v1BatchBlockOffset = batchId * maxBlockNumPerBatch_;
+        v1CopyInParams.blockCount = 1;
+        v1CopyInParams.srcStride = 0;
+        v1CopyInParams.dstStride = 0;
+        v1CopyInParams.rsv = 0;
+        int32_t v1UbBaseOffset = 0;
+        if (v1StartBlockOffset > 0) {
+            int32_t v1FirstPartLen =
+                kCacheBlockSize_ - v1StartBlockOffset > getLen ? getLen : kCacheBlockSize_ - v1StartBlockOffset;
+            v1CopyInParams.blockLen = v1FirstPartLen * sizeof(SCALE_T);
+            int32_t v1BlockId = blockTableGm.GetValue(v1BatchBlockOffset + v1StartBlockIdx);
             SetFlag<HardEvent::S_MTE2>(KSCALE_S_MTE2_EVENT);
             WaitFlag<HardEvent::S_MTE2>(KSCALE_S_MTE2_EVENT);
             AscendC::DataCopyPad(kScaleUB[16 * (runInfo.kScaleLoop % 2) * s2BaseSize_],
-                                 kScaleGm[blockId * constInfo_.keyDequantScaleStride0 + startBlockTableOffset],
-                                 copyInParams, padParams);
-            startBlockTableIdx++;
-            getLen = getLen - firstPartLen;
-            resUbBaseOffset = firstPartLen;
+                                 kScaleGm[v1BlockId * constInfo_.keyDequantScaleStride0 + v1StartBlockOffset],
+                                 v1CopyInParams, v1PadParams);
+            v1StartBlockIdx++;
+            getLen = getLen - v1FirstPartLen;
+            v1UbBaseOffset = v1FirstPartLen;
         }
-        int32_t getLoopNum = CeilDiv(getLen, kCacheBlockSize_);
-        copyInParams.blockLen = kCacheBlockSize_ * sizeof(SCALE_T);
-        for (int32_t i = 0; i < getLoopNum; i++) {
-            if (i == getLoopNum - 1) {
-                copyInParams.blockLen = (getLen - i * kCacheBlockSize_) * sizeof(SCALE_T);
+        int32_t v1CopyLoopNum = CeilDiv(getLen, kCacheBlockSize_);
+        v1CopyInParams.blockLen = kCacheBlockSize_ * sizeof(SCALE_T);
+        for (int32_t v1LoopIdx = 0; v1LoopIdx < v1CopyLoopNum; v1LoopIdx++) {
+            if (v1LoopIdx == v1CopyLoopNum - 1) {
+                v1CopyInParams.blockLen = (getLen - v1LoopIdx * kCacheBlockSize_) * sizeof(SCALE_T);
             }
-            int32_t blockId = blockTableGm.GetValue(blockTableBatchOffset + startBlockTableIdx + i);
+            int32_t v1BlockId = blockTableGm.GetValue(v1BatchBlockOffset + v1StartBlockIdx + v1LoopIdx);
             SetFlag<HardEvent::S_MTE2>(KSCALE_S_MTE2_EVENT);
             WaitFlag<HardEvent::S_MTE2>(KSCALE_S_MTE2_EVENT);
             AscendC::DataCopyPad(
-                kScaleUB[16 * (runInfo.kScaleLoop % 2) * s2BaseSize_ + resUbBaseOffset + i * kCacheBlockSize_],
-                kScaleGm[blockId * constInfo_.keyDequantScaleStride0], copyInParams, padParams);
+                kScaleUB[16 * (runInfo.kScaleLoop % 2) * s2BaseSize_ + v1UbBaseOffset + v1LoopIdx * kCacheBlockSize_],
+                kScaleGm[v1BlockId * constInfo_.keyDequantScaleStride0], v1CopyInParams, v1PadParams);
         }
     } else {
-        copyInParams.blockCount = 1;
-        copyInParams.blockLen = getLen * sizeof(SCALE_T);
-        copyInParams.srcStride = 0;
-        copyInParams.dstStride = 0;
-        copyInParams.rsv = 0;
+        v1CopyInParams.blockCount = 1;
+        v1CopyInParams.blockLen = getLen * sizeof(SCALE_T);
+        v1CopyInParams.srcStride = 0;
+        v1CopyInParams.dstStride = 0;
+        v1CopyInParams.rsv = 0;
         AscendC::DataCopyPad(kScaleUB[16 * (runInfo.kScaleLoop % 2) * s2BaseSize_],
-                             kScaleGm[runInfo.tensorKeyScaleOffset], copyInParams, padParams);
+                             kScaleGm[runInfo.tensorKeyScaleOffset], v1CopyInParams, v1PadParams);
     }
 }
 

@@ -10,6 +10,7 @@
 add_op_to_compiled_list()
 
 if (BUILD_OPEN_PROJECT)
+    set(lightning_indexer_depends attention/lightning_indexer_v2 CACHE INTERNAL "Dependencies for lightning_indexer")
     target_sources(op_host_aclnnInner PRIVATE
     lightning_indexer_def.cpp
     )

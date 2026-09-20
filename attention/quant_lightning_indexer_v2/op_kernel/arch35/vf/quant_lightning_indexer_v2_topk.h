@@ -19,6 +19,8 @@
 #include "vf_topk.h"
 #include "vf_topk_16_gather_quant_v2.h"
 
+#include "../../../../lightning_indexer_v2/op_kernel/arch35/common/vf/lightning_indexer_v2_topk_base.h"
+
 namespace topk {
 template <typename T>
 class LITopk {
@@ -96,13 +98,7 @@ class LITopk<uint16_t> {
 public:
     __aicore__ inline uint32_t GetSharedTmpBufferSize()
     {
-        // 2 * QLIV2Common::Align(topK, (uint32_t)256): 两块hisIndexLocal;
-        // 3 * 256: histogramsLocal idxHighLocal idxLowLocal; 64: nkValueLocal
-        uint64_t bufferSize1 = (2 * QLIV2Common::Align(topK, (uint32_t)256) + 3 * 256 + 64) * sizeof(uint32_t);
-        // QLIV2Common::Align(topK, (uint32_t)256) + trunkLen：tmpIndexLocal
-        uint64_t bufferSize2 = (QLIV2Common::Align(topK, (uint32_t)256) + trunkLen) * sizeof(uint16_t);
-        uint64_t reuseBufferSize = QLIV2Common::Align(topK, (uint32_t)256) * sizeof(uint32_t);
-        return bufferSize1 + bufferSize2 - reuseBufferSize;
+        return liV2TopkCommon::GetGatherTmpBufferSize<uint16_t, liV2TopkCommon::B16_RADIX_BUFFER_NUM>(topK, trunkLen);
     }
 
     __aicore__ inline void Init(uint32_t topK, uint32_t trunkLen)
@@ -154,8 +150,7 @@ public:
             topkb16gather::LiTopKVF<true>(tmpIndexLocal, hisValueLocal, mrgValueLocal, histogramsLocal, idxHighLocal,
                                           idxLowLocal, nkValueLocal, topK, s2SeqLen);
             PipeBarrier<PIPE_V>();
-            uint32_t curProcess = topK < trunkLen ? loopIdx * trunkLen - QLIV2Common::Align(topK, (uint32_t)256) :
-                                                    (loopIdx - 1) * trunkLen;
+            uint32_t curProcess = liV2TopkCommon::GetGatherLoopOffset(topK, trunkLen, loopIdx);
             topkb16gather::LiTopKGatherVF(hisIndexLocal[(loopIdx + 1) % 2], hisValueLocal, mrgValueLocal, tmpIndexLocal,
                                           hisIndexLocal[loopIdx % 2], topK, curProcess, s2SeqLen);
             if (loopIdx == s2LoopNum - 1) {
@@ -179,8 +174,7 @@ public:
             topkb16gather::LiTopKVF<true>(tmpIndexLocal, hisValueLocal, mrgValueLocal, histogramsLocal, idxHighLocal,
                                           idxLowLocal, nkValueLocal, topK, s2SeqLen);
             PipeBarrier<PIPE_V>();
-            uint32_t curProcess = topK < trunkLen ? loopIdx * trunkLen - QLIV2Common::Align(topK, (uint32_t)256) :
-                                                    (loopIdx - 1) * trunkLen;
+            uint32_t curProcess = liV2TopkCommon::GetGatherLoopOffset(topK, trunkLen, loopIdx);
             topkb16gather::LiTopKGatherVF(hisIndexLocal[(loopIdx + 1) % 2], hisValueLocal, mrgValueLocal, tmpIndexLocal,
                                           hisIndexLocal[loopIdx % 2], topK, curProcess, s2SeqLen);
             PipeBarrier<PIPE_V>();

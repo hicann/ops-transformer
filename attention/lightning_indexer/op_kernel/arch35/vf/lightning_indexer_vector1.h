@@ -16,9 +16,17 @@
 #define LIGHTNING_INDEXER_VECTOR1_H
 
 #include "kernel_operator.h"
-#include "common/lightning_indexer_vector1_base.h"
+#include "../../../../lightning_indexer_v2/op_kernel/arch35/common/vf/lightning_indexer_v2_vector1_base.h"
 
 namespace vector1 {
+using liV2Vector1::BroadcastLane;
+using liV2Vector1::DuplicateZero;
+using liV2Vector1::FloatSortConstCtx;
+using liV2Vector1::FloatSortTraits;
+using liV2Vector1::FloatToSortableKey;
+using liV2Vector1::FloatX2ToSortableKey;
+using liV2Vector1::InitFloatSortConstCtx;
+using liV2Vector1::WeightedAccum;
 
 template <typename T>
 struct UIntSortTraits;
@@ -160,12 +168,6 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<half> &out_, con
                                                                                maskAllB16);
         }
     }
-}
-
-__simd_callee__ inline void BroadcastLane(AscendC::Reg::RegTensor<float> &dst, __local_mem__ float *src,
-                                          uint16_t laneIdx)
-{
-    AscendC::Reg::LoadAlign<float, AscendC::Reg::LoadDist::DIST_BRC_B32>(dst, src + laneIdx);
 }
 
 template <typename W_T>

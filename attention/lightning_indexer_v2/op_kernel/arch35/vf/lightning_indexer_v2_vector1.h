@@ -16,7 +16,7 @@
 #define LIGHTNING_INDEXER_V2_VECTOR1_H
 
 #include "kernel_operator.h"
-#include "common/lightning_indexer_v2_vector1_base.h"
+#include "../common/vf/lightning_indexer_v2_vector1_base.h"
 
 namespace liV2Vector1 {
 

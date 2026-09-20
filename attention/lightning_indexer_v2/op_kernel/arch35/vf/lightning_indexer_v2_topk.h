@@ -18,6 +18,8 @@
 #include "kernel_operator.h"
 #include "vf_topk_gather_v2.h"
 
+#include "../common/vf/lightning_indexer_v2_topk_base.h"
+
 namespace liV2Topk {
 template <typename T>
 class LIV2Topk {
@@ -32,14 +34,7 @@ class LIV2Topk<uint32_t> {
 public:
     __aicore__ inline uint32_t GetSharedTmpBufferSize()
     {
-        // 2 * LIV2Common::Align(topK, (uint32_t)256): 两块hisIndexLocal
-        // 5 * 256：histogramsLocal + idxLocal[0-3]
-        // 64：nkValueLocal
-        uint64_t bufferSize1 = (2 * LIV2Common::Align(topK, (uint32_t)256) + 5 * 256 + 64) * sizeof(uint32_t);
-        // LIV2Common::Align(topK, (uint32_t)256) + trunkLen：tmpIndexLocal
-        uint64_t bufferSize2 = (LIV2Common::Align(topK, (uint32_t)256) + trunkLen) * sizeof(uint32_t);
-        uint64_t reuseBufferSize = LIV2Common::Align(topK, (uint32_t)256) * sizeof(uint32_t);
-        return bufferSize1 + bufferSize2 - reuseBufferSize;
+        return liV2TopkCommon::GetGatherTmpBufferSize<uint32_t, liV2TopkCommon::B32_RADIX_BUFFER_NUM>(topK, trunkLen);
     }
 
     __aicore__ inline void Init(uint32_t topK, uint32_t trunkLen)
@@ -94,8 +89,7 @@ public:
                                                   idx0Local, idx1Local, idx2Local, idx3Local, nkValueLocal, topK,
                                                   s2SeqLen);
                 PipeBarrier<PIPE_V>();
-                uint32_t loopBasicIdx = topK < trunkLen ? loopIdx * trunkLen - LIV2Common::Align(topK, (uint32_t)256) :
-                                                          (loopIdx - 1) * trunkLen;
+                uint32_t loopBasicIdx = liV2TopkCommon::GetGatherLoopOffset(topK, trunkLen, loopIdx);
                 liV2Topkb32gather::LiTopKGatherVF(hisIndexLocal[(loopIdx + 1) % 2], hisValueLocal, mrgValueLocal,
                                                   tmpIndexLocal, hisIndexLocal[loopIdx % 2], topK, loopBasicIdx,
                                                   s2SeqLen);

@@ -16,7 +16,11 @@
 #ifndef VF_TOPK_GATHER_V2_H
 #define VF_TOPK_GATHER_V2_H
 
+#include "../common/vf/vf_topk_base_v2.h"
+
 namespace liV2Topkb32gather {
+using liV2TopkCommon::IndicesAddOffset;
+
 template <typename T>
 __simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__ uint32_t *inputBuf, uint16_t vfLoop,
                                        bool init)
@@ -31,11 +35,6 @@ __simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf_
     Reg::Duplicate(cout0, 0);
     Reg::Duplicate(cout1, 0);
 
-    Reg::RegTensor<uint32_t> cout0U32Even;
-    Reg::RegTensor<uint32_t> cout0U32Odd;
-    Reg::RegTensor<uint32_t> cout1U32Even;
-    Reg::RegTensor<uint32_t> cout1U32Odd;
-
     // 32bit 高16bit
     Reg::RegTensor<uint32_t> vreg0U16;
     // 32bit 低16bit
@@ -48,12 +47,6 @@ __simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf_
     Reg::RegTensor<uint8_t> vreg2;
     Reg::RegTensor<uint8_t> vreg3;
 
-    static constexpr Reg::CastTrait CAST_TRAIT_UINT16_TOUINT32_EVEN = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
-                                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-
-    static constexpr Reg::CastTrait CAST_TRAIT_UINT16_TOUINT32_ODD = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
-                                                                      Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-
     for (uint16_t i = 0; i < vfLoop; ++i) {
         Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(vreg1U16, vreg0U16, inputBuf + i * 256);
         Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(vreg3U16, vreg2U16, inputBuf + (i * 256) + 128);
@@ -65,13 +58,7 @@ __simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf_
         Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN1, Reg::HistogramsType::ACCUMULATE>(cout1, vreg0,
                                                                                                           pregB8);
     }
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout0U32Even, cout0, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout0U32Odd, cout0, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout1U32Even, cout1, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout1U32Odd, cout1, pregB16);
-
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(histogramsBuf, cout0U32Even, cout0U32Odd, pregB32);
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(histogramsBuf + 128, cout1U32Even, cout1U32Odd, pregB32);
+    liV2TopkCommon::StoreHistogramResult(histogramsBuf, cout0, cout1, pregB16, pregB32);
 }
 
 __simd_vf__ void FindFirstTargetBinVFImpl(__ubuf__ uint32_t *idx0Buf, __ubuf__ uint32_t *nkValueBuf,
@@ -81,50 +68,10 @@ __simd_vf__ void FindFirstTargetBinVFImpl(__ubuf__ uint32_t *idx0Buf, __ubuf__ u
 
     Reg::ClearSpr<AscendC::SpecialPurposeReg::AR>();
 
-    Reg::UnalignRegForStore alignIdx0;
-
     Reg::RegTensor<uint32_t> btmK;
     Reg::Duplicate(btmK, bottomK);
 
-    for (uint16_t i = 0; i < (uint16_t)(4); ++i) {
-        Reg::RegTensor<int32_t> idxC;
-        Reg::RegTensor<uint32_t> cout;
-        Reg::RegTensor<uint32_t> sqzIdx0;
-
-        Reg::MaskReg pregGE = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-
-        Reg::Arange(idxC, i * 64);
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(cout, histogramsBuf + i * 64);
-        Reg::Compare<uint32_t, CMPMODE::GE>(pregGE, cout, btmK, pregB32);
-        Reg::Squeeze<uint32_t, Reg::GatherMaskMode::STORE_REG>(sqzIdx0, (Reg::RegTensor<uint32_t> &)idxC, pregGE);
-        Reg::StoreUnAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>(idx0Buf, sqzIdx0, alignIdx0);
-    }
-    Reg::StoreUnAlignPost(idx0Buf, alignIdx0);
-
-    Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-
-    Reg::RegTensor<uint32_t> idx0;
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(idx0, idx0Buf);
-
-    Reg::RegTensor<uint8_t> idxAll1;
-    Reg::RegTensor<uint32_t> idxPrev0;
-    Reg::RegTensor<uint32_t> prevBinValue;
-    Reg::Duplicate(idxAll1, 1);
-
-    Reg::RegTensor<uint32_t> zeroAll;
-    Reg::Duplicate(zeroAll, 0);
-
-    Reg::MaskReg preg0 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::Compare<uint32_t, CMPMODE::EQ>(preg0, idx0, zeroAll, pregB32);
-    Reg::Sub(idxPrev0, idx0, (Reg::RegTensor<uint32_t> &)idxAll1, pregB32);
-    Reg::ShiftRights(idxPrev0, idxPrev0, (int16_t)24, pregB32);
-
-    Reg::Gather(prevBinValue, histogramsBuf, idxPrev0, pregB32);
-    Reg::Select(prevBinValue, zeroAll, prevBinValue, preg0);
-
-    Reg::RegTensor<uint32_t> nextK;
-    Reg::Sub(nextK, btmK, prevBinValue, pregB32);
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(nkValueBuf, nextK, pregB32);
+    liV2TopkCommon::FindTargetBinAndUpdateNextK(idx0Buf, nkValueBuf, histogramsBuf, btmK, pregB32);
 }
 
 template <typename T>
@@ -141,11 +88,6 @@ __simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf
     Reg::Duplicate(cout0, 0);
     Reg::Duplicate(cout1, 0);
 
-    Reg::RegTensor<uint32_t> cout0U32Even;
-    Reg::RegTensor<uint32_t> cout0U32Odd;
-    Reg::RegTensor<uint32_t> cout1U32Even;
-    Reg::RegTensor<uint32_t> cout1U32Odd;
-
     Reg::RegTensor<uint32_t> idx0;
     // 0x000000fc -> 0xfcfcfcfc
     Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(idx0, idx0Buf);
@@ -159,12 +101,6 @@ __simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf
     Reg::RegTensor<uint8_t> vreg1;
     Reg::RegTensor<uint8_t> vreg2;
     Reg::RegTensor<uint8_t> vreg3;
-
-    static constexpr Reg::CastTrait CAST_TRAIT_UINT16_TOUINT32_EVEN = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
-                                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-
-    static constexpr Reg::CastTrait CAST_TRAIT_UINT16_TOUINT32_ODD = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
-                                                                      Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
     for (uint16_t i = 0; i < vfLoop; ++i) {
         Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(vreg1U16, vreg0U16, inputBuf + i * 256);
@@ -181,13 +117,7 @@ __simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf
                                                                                                           pregEQ);
     }
 
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout0U32Even, cout0, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout0U32Odd, cout0, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout1U32Even, cout1, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout1U32Odd, cout1, pregB16);
-
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(histogramsBuf, cout0U32Even, cout0U32Odd, pregB32);
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(histogramsBuf + 128, cout1U32Even, cout1U32Odd, pregB32);
+    liV2TopkCommon::StoreHistogramResult(histogramsBuf, cout0, cout1, pregB16, pregB32);
 }
 
 // kValue新的bottomK
@@ -198,50 +128,10 @@ __simd_vf__ void FindSecondTargetBinVFImpl(__ubuf__ uint32_t *idx1Buf, __ubuf__ 
 
     Reg::ClearSpr<AscendC::SpecialPurposeReg::AR>();
 
-    Reg::UnalignRegForStore alignIdx1;
-
     Reg::RegTensor<uint32_t> btmK1;
     Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(btmK1, kValue);
 
-    for (uint16_t i = 0; i < (uint16_t)(4); ++i) {
-        Reg::RegTensor<int32_t> idxC;
-        Reg::RegTensor<uint32_t> cout;
-        Reg::RegTensor<uint32_t> sqzIdx1;
-
-        Reg::MaskReg pregGE = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-
-        Reg::Arange(idxC, i * 64);
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(cout, histogramsBuf + i * 64);
-        Reg::Compare<uint32_t, CMPMODE::GE>(pregGE, cout, btmK1, pregB32);
-        Reg::Squeeze<uint32_t, Reg::GatherMaskMode::STORE_REG>(sqzIdx1, (Reg::RegTensor<uint32_t> &)idxC, pregGE);
-        Reg::StoreUnAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>(idx1Buf, sqzIdx1, alignIdx1);
-    }
-    Reg::StoreUnAlignPost(idx1Buf, alignIdx1);
-
-    Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-
-    Reg::RegTensor<uint32_t> idx1;
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(idx1, idx1Buf);
-
-    Reg::RegTensor<uint8_t> idxAll1;
-    Reg::RegTensor<uint32_t> idxPrev1;
-    Reg::RegTensor<uint32_t> prevBinValue;
-    Reg::Duplicate(idxAll1, 1);
-
-    Reg::RegTensor<uint32_t> zeroAll;
-    Reg::Duplicate(zeroAll, 0);
-
-    Reg::MaskReg preg1 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::Compare<uint32_t, CMPMODE::EQ>(preg1, idx1, zeroAll, pregB32);
-    Reg::Sub(idxPrev1, idx1, (Reg::RegTensor<uint32_t> &)idxAll1, pregB32);
-    Reg::ShiftRights(idxPrev1, idxPrev1, (int16_t)24, pregB32);
-
-    Reg::Gather(prevBinValue, histogramsBuf, idxPrev1, pregB32);
-    Reg::Select(prevBinValue, zeroAll, prevBinValue, preg1);
-
-    Reg::RegTensor<uint32_t> nextK;
-    Reg::Sub(nextK, btmK1, prevBinValue, pregB32);
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(nkValueBuf, nextK, pregB32);
+    liV2TopkCommon::FindTargetBinAndUpdateNextK(idx1Buf, nkValueBuf, histogramsBuf, btmK1, pregB32);
 }
 
 template <typename T>
@@ -259,11 +149,6 @@ __simd_vf__ void HistogramsThirdVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf_
     Reg::Duplicate(cout0, 0);
     Reg::Duplicate(cout1, 0);
 
-    Reg::RegTensor<uint32_t> cout0U32Even;
-    Reg::RegTensor<uint32_t> cout0U32Odd;
-    Reg::RegTensor<uint32_t> cout1U32Even;
-    Reg::RegTensor<uint32_t> cout1U32Odd;
-
     Reg::RegTensor<uint32_t> idx0;
     Reg::RegTensor<uint32_t> idx1;
     // 0x000000fc -> 0xfcfcfcfc
@@ -279,12 +164,6 @@ __simd_vf__ void HistogramsThirdVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf_
     Reg::RegTensor<uint8_t> vreg1;
     Reg::RegTensor<uint8_t> vreg2;
     Reg::RegTensor<uint8_t> vreg3;
-
-    static constexpr Reg::CastTrait CAST_TRAIT_UINT16_TOUINT32_EVEN = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
-                                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-
-    static constexpr Reg::CastTrait CAST_TRAIT_UINT16_TOUINT32_ODD = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
-                                                                      Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
     for (uint16_t i = 0; i < vfLoop; ++i) {
         Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(vreg1U16, vreg0U16, inputBuf + i * 256);
@@ -307,13 +186,7 @@ __simd_vf__ void HistogramsThirdVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf_
                                                                                                           pregEQ);
     }
 
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout0U32Even, cout0, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout0U32Odd, cout0, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout1U32Even, cout1, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout1U32Odd, cout1, pregB16);
-
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(histogramsBuf, cout0U32Even, cout0U32Odd, pregB32);
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(histogramsBuf + 128, cout1U32Even, cout1U32Odd, pregB32);
+    liV2TopkCommon::StoreHistogramResult(histogramsBuf, cout0, cout1, pregB16, pregB32);
 }
 
 __simd_vf__ void FindThirdTargetBinVFImpl(__ubuf__ uint32_t *idx2Buf, __ubuf__ uint32_t *nkValueBuf,
@@ -323,50 +196,10 @@ __simd_vf__ void FindThirdTargetBinVFImpl(__ubuf__ uint32_t *idx2Buf, __ubuf__ u
 
     Reg::ClearSpr<AscendC::SpecialPurposeReg::AR>();
 
-    Reg::UnalignRegForStore alignIdx2;
-
     Reg::RegTensor<uint32_t> btmK2;
     Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(btmK2, kValue);
 
-    for (uint16_t i = 0; i < (uint16_t)(4); ++i) {
-        Reg::RegTensor<int32_t> idxC;
-        Reg::RegTensor<uint32_t> cout;
-        Reg::RegTensor<uint32_t> sqzIdx2;
-
-        Reg::MaskReg pregGE = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-
-        Reg::Arange(idxC, i * 64);
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(cout, histogramsBuf + i * 64);
-        Reg::Compare<uint32_t, CMPMODE::GE>(pregGE, cout, btmK2, pregB32);
-        Reg::Squeeze<uint32_t, Reg::GatherMaskMode::STORE_REG>(sqzIdx2, (Reg::RegTensor<uint32_t> &)idxC, pregGE);
-        Reg::StoreUnAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>(idx2Buf, sqzIdx2, alignIdx2);
-    }
-    Reg::StoreUnAlignPost(idx2Buf, alignIdx2);
-
-    Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
-
-    Reg::RegTensor<uint32_t> idx2;
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(idx2, idx2Buf);
-
-    Reg::RegTensor<uint8_t> idxAll1;
-    Reg::RegTensor<uint32_t> idxPrev2;
-    Reg::RegTensor<uint32_t> prevBinValue;
-    Reg::Duplicate(idxAll1, 1);
-
-    Reg::RegTensor<uint32_t> zeroAll;
-    Reg::Duplicate(zeroAll, 0);
-
-    Reg::MaskReg preg2 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::Compare<uint32_t, CMPMODE::EQ>(preg2, idx2, zeroAll, pregB32);
-    Reg::Sub(idxPrev2, idx2, (Reg::RegTensor<uint32_t> &)idxAll1, pregB32);
-    Reg::ShiftRights(idxPrev2, idxPrev2, (int16_t)24, pregB32);
-
-    Reg::Gather(prevBinValue, histogramsBuf, idxPrev2, pregB32);
-    Reg::Select(prevBinValue, zeroAll, prevBinValue, preg2);
-
-    Reg::RegTensor<uint32_t> nextK;
-    Reg::Sub(nextK, btmK2, prevBinValue, pregB32);
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(nkValueBuf, nextK, pregB32);
+    liV2TopkCommon::FindTargetBinAndUpdateNextK(idx2Buf, nkValueBuf, histogramsBuf, btmK2, pregB32);
 }
 
 template <typename T>
@@ -383,11 +216,6 @@ __simd_vf__ void HistogramsLastVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__
     Reg::RegTensor<uint16_t> cout1;
     Reg::Duplicate(cout0, 0);
     Reg::Duplicate(cout1, 0);
-
-    Reg::RegTensor<uint32_t> cout0U32Even;
-    Reg::RegTensor<uint32_t> cout0U32Odd;
-    Reg::RegTensor<uint32_t> cout1U32Even;
-    Reg::RegTensor<uint32_t> cout1U32Odd;
 
     Reg::RegTensor<uint32_t> idx0;
     Reg::RegTensor<uint32_t> idx1;
@@ -406,12 +234,6 @@ __simd_vf__ void HistogramsLastVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__
     Reg::RegTensor<uint8_t> vreg1;
     Reg::RegTensor<uint8_t> vreg2;
     Reg::RegTensor<uint8_t> vreg3;
-
-    static constexpr Reg::CastTrait CAST_TRAIT_UINT16_TOUINT32_EVEN = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
-                                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-
-    static constexpr Reg::CastTrait CAST_TRAIT_UINT16_TOUINT32_ODD = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
-                                                                      Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
     for (uint16_t i = 0; i < vfLoop; ++i) {
         Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(vreg1U16, vreg0U16, inputBuf + i * 256);
@@ -438,13 +260,7 @@ __simd_vf__ void HistogramsLastVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__
                                                                                                           pregEQAll);
     }
 
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout0U32Even, cout0, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout0U32Odd, cout0, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_EVEN>(cout1U32Even, cout1, pregB16);
-    Reg::Cast<uint32_t, uint16_t, CAST_TRAIT_UINT16_TOUINT32_ODD>(cout1U32Odd, cout1, pregB16);
-
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(histogramsBuf, cout0U32Even, cout0U32Odd, pregB32);
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(histogramsBuf + 128, cout1U32Even, cout1U32Odd, pregB32);
+    liV2TopkCommon::StoreHistogramResult(histogramsBuf, cout0, cout1, pregB16, pregB32);
 }
 
 __simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t *kValue, __ubuf__ uint32_t *histogramsBuf, __ubuf__ uint32_t *idx0Buf,
@@ -626,19 +442,6 @@ __simd_vf__ void FindLDRealIndexVFImpl(__ubuf__ uint32_t *outputIdxBuf, __ubuf__
     }
 }
 
-__simd_vf__ void IndicesAddOffsetVF(__ubuf__ uint32_t *indicesOutBuf, uint32_t outputIdxOffset, uint32_t vfLoop)
-{
-    Reg::MaskReg pregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-
-    Reg::RegTensor<uint32_t> outIndices;
-
-    for (uint16_t i = 0; i < (uint16_t)(vfLoop); ++i) {
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(outIndices, indicesOutBuf + i * 64);
-        Reg::Adds(outIndices, outIndices, outputIdxOffset, pregB32);
-        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(indicesOutBuf + i * 64, outIndices, pregB32);
-    }
-}
-
 /**
  * @brief LiTopKVF 对一个validLen的输入进行topk算法，输出idx_tmp
  * @param tmpIdxLocal Temp阶段输出的TopKIndex;如果s2SeqLen < 8K作为最终输出 validLen * 4B
@@ -753,13 +556,5 @@ __aicore__ inline void LiTopKLDGatherVF(const LocalTensor<uint32_t> &outputIdxLo
     FindLDRealIndexVFImpl(outputIdxBuf, tmpIdxBuf, hisIdxBuf, topkLoopNum32);
 }
 
-__aicore__ inline void IndicesAddOffset(const LocalTensor<uint32_t> &indicesOutLocal, uint32_t outputIdxOffset,
-                                        uint32_t topK)
-{
-    __ubuf__ uint32_t *indicesOutBuf = (__ubuf__ uint32_t *)indicesOutLocal.GetPhyAddr();
-    const uint16_t repeatSize32 = 64;
-    uint16_t topkLoopNum32 = (topK + repeatSize32 - 1) / repeatSize32;
-    IndicesAddOffsetVF(indicesOutBuf, outputIdxOffset, topkLoopNum32);
-}
 } // namespace liV2Topkb32gather
 #endif

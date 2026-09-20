@@ -10,7 +10,7 @@
 
 /*!
  * \file lightning_indexer_v2_vector1_base.h
- * \brief
+ * \brief Common vector helpers shared by LightningIndexer variants.
  */
 #ifndef LIGHTNING_INDEXER_V2_VECTOR1_BASE_H
 #define LIGHTNING_INDEXER_V2_VECTOR1_BASE_H

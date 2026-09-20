@@ -16,7 +16,10 @@
 #ifndef VF_TOPK_16_GATHER_QUANT_V2_H
 #define VF_TOPK_16_GATHER_QUANT_V2_H
 
+#include "../../../../lightning_indexer_v2/op_kernel/arch35/common/vf/vf_topk_base_v2.h"
+
 namespace topkb16gather {
+using liV2TopkCommon::IndicesAddOffset;
 
 template <typename T>
 __simd_vf__ void HistogramsHighVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf__ uint16_t *inputBuf, uint16_t vfLoop,
@@ -337,28 +340,6 @@ __simd_vf__ void FindRealIndexVFImpl(__ubuf__ uint32_t *outputIdxBuf, __ubuf__ u
 
         Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(outputIdxBuf + i * 64, outputGatherIdx, pregB32);
     }
-}
-
-__simd_vf__ void IndicesAddOffsetVF(__ubuf__ uint32_t *indicesOutBuf, uint32_t outputIdxOffset, uint32_t vfLoop)
-{
-    Reg::MaskReg pregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-
-    Reg::RegTensor<uint32_t> outIndices;
-
-    for (uint16_t i = 0; i < (uint16_t)(vfLoop); ++i) {
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(outIndices, indicesOutBuf + i * 64);
-        Reg::Adds(outIndices, outIndices, outputIdxOffset, pregB32);
-        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(indicesOutBuf + i * 64, outIndices, pregB32);
-    }
-}
-
-__aicore__ inline void IndicesAddOffset(const LocalTensor<uint32_t> &indicesOutLocal, uint32_t outputIdxOffset,
-                                        uint32_t topK)
-{
-    __ubuf__ uint32_t *indicesOutBuf = (__ubuf__ uint32_t *)indicesOutLocal.GetPhyAddr();
-    const uint16_t repeatSize32 = 64;
-    uint16_t topkLoopNum32 = (topK + repeatSize32 - 1) / repeatSize32;
-    IndicesAddOffsetVF(indicesOutBuf, outputIdxOffset, topkLoopNum32);
 }
 
 /**

@@ -26,6 +26,8 @@
 #include "quant_lightning_indexer_v2_service_cube_arch35.h"
 #include "../quant_lightning_indexer_v2_metadata.h"
 
+#include "../../../lightning_indexer_v2/op_kernel/arch35/common/lightning_indexer_v2_kernel_base_arch35.h"
+
 namespace QLIV2Kernel {
 using namespace QLIV2Common;
 using namespace matmul;
@@ -229,11 +231,7 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::InitTilingData(const QLIV2TilingDat
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Preload<QLIV2T>::InitBuffers()
 {
-    if ASCEND_IS_AIV {
-        vectorService.InitBuffers(pipe);
-    } else {
-        matmulService.InitBuffers(pipe);
-    }
+    LIV2Common::InitBuffers(vectorService, matmulService, pipe);
 }
 
 template <typename QLIV2T>
@@ -269,13 +267,7 @@ __aicore__ inline uint32_t QLIV2Preload<QLIV2T>::GetActualSeqLen(uint32_t bIdx, 
                                                                  GlobalTensor<uint32_t> &sequsedQGm,
                                                                  uint32_t defaultSeqLen)
 {
-    if (hasSequsedQ) {
-        return sequsedQGm.GetValue(bIdx);
-    } else if (hasCuSeqlensQ) {
-        return cuSeqlensQGm.GetValue(bIdx + 1) - cuSeqlensQGm.GetValue(bIdx);
-    } else {
-        return defaultSeqLen;
-    }
+    return LIV2Common::GetActualSeqLen(bIdx, hasCuSeqlensQ, hasSequsedQ, cuSeqlensQGm, sequsedQGm, defaultSeqLen);
 }
 
 template <typename QLIV2T>
@@ -312,19 +304,8 @@ template <typename QLIV2T>
 __aicore__ inline uint32_t QLIV2Preload<QLIV2T>::GetS2BaseBlockNumOnMask(uint32_t s1gIdx, uint32_t actS1Size,
                                                                          uint32_t actS2SizeOrig)
 {
-    if (actS2SizeOrig / constInfo.cmpRatio == 0) {
-        return 0;
-    }
-    uint32_t s1Offset = constInfo.s1BaseSize * s1gIdx;
-    int32_t validS2LenBase =
-        static_cast<int32_t>(actS2SizeOrig) - static_cast<int32_t>(actS1Size); // 压缩前的validS2LenBase
-    int32_t validS2Len =
-        (static_cast<int32_t>(s1Offset) + validS2LenBase + static_cast<int32_t>(constInfo.s1BaseSize)) /
-        static_cast<int32_t>(constInfo.cmpRatio);
-    validS2Len = Min(validS2Len, static_cast<int32_t>(actS2SizeOrig) / constInfo.cmpRatio);
-    validS2Len = Max(validS2Len, 1);
-    tempLoopInfo.validS2Len = validS2Len;
-    return (validS2Len + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
+    return LIV2Common::GetMaskedS2BaseBlockNum(s1gIdx, actS1Size, actS2SizeOrig, constInfo.s1BaseSize,
+                                               constInfo.cmpRatio, constInfo.s2BaseSize, &tempLoopInfo.validS2Len);
 }
 
 template <typename QLIV2T>
@@ -444,28 +425,14 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::SplitCoreByAICPU(uint32_t cubeCoreI
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Preload<QLIV2T>::DealActSeqLenIsZero(uint32_t bIdx, uint32_t n2Idx, uint32_t s1Start)
 {
-    if ASCEND_IS_AIV {
-        if (constInfo.outputLayout == LI_LAYOUT::TND) {
-            uint32_t tBase = cuSeqlensQGm.GetValue(bIdx);
-            uint32_t s1Count = cuSeqlensQGm.GetValue(bIdx + 1) - tBase;
-
-            for (uint32_t s1Idx = s1Start; s1Idx < s1Count; s1Idx++) {
-                uint64_t indiceOutOffset =
-                    (static_cast<uint64_t>(tBase) + s1Idx) * constInfo.kHeadNum * constInfo.sparseCount +
-                    static_cast<uint64_t>(n2Idx) * constInfo.sparseCount; // N2轴偏移
-                vectorService.CleanInvalidOutput(indiceOutOffset);
-            }
-        } else if (constInfo.outputLayout == LI_LAYOUT::BSND) {
-            for (uint32_t s1Idx = s1Start; s1Idx < constInfo.qSeqSize; s1Idx++) {
-                // B,S1,N2,K
-                uint64_t indiceOutOffset =
-                    static_cast<uint64_t>(bIdx) * constInfo.qSeqSize * constInfo.kHeadNum * constInfo.sparseCount +
-                    static_cast<uint64_t>(s1Idx) * constInfo.kHeadNum * constInfo.sparseCount +
-                    static_cast<uint64_t>(n2Idx) * constInfo.sparseCount; // N2轴偏移
-                vectorService.CleanInvalidOutput(indiceOutOffset);
-            }
-        }
+    uint32_t tBase = 0U;
+    uint32_t s1Count = tempLoopInfo.actS1Size;
+    if (constInfo.outputLayout == LI_LAYOUT::TND) {
+        tBase = cuSeqlensQGm.GetValue(bIdx);
+        s1Count = cuSeqlensQGm.GetValue(bIdx + 1) - tBase;
     }
+    LIV2Common::DealActSeqLenIsZero<LI_LAYOUT::TND, LI_LAYOUT::BSND>(bIdx, n2Idx, s1Start, tBase, s1Count,
+                                                                     constInfo.sparseCount, constInfo, vectorService);
 }
 
 template <typename QLIV2T>
@@ -553,35 +520,17 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::Init(
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Preload<QLIV2T>::GetBN2Idx(uint32_t bN2Idx)
 {
-    tempLoopInfo.bN2Idx = bN2Idx;
-    tempLoopInfo.bIdx = bN2Idx / constInfo.kHeadNum;
-    tempLoopInfo.n2Idx = bN2Idx % constInfo.kHeadNum;
+    LIV2Common::GetBN2Idx(tempLoopInfo, constInfo, bN2Idx);
 }
 
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Preload<QLIV2T>::CalcS2LoopParams(uint32_t bN2LoopIdx, uint32_t gS1LoopIdx)
 {
-    tempLoopInfo.gS1Idx = gS1LoopIdx;
-    tempLoopInfo.actMBaseSize = constInfo.mBaseSize;
-    uint32_t remainedGS1Size = tempLoopInfo.actS1Size * constInfo.gSize - tempLoopInfo.gS1Idx * constInfo.mBaseSize;
-    if (remainedGS1Size <= constInfo.mBaseSize && remainedGS1Size > 0) {
-        tempLoopInfo.actMBaseSize = tempLoopInfo.mBasicSizeTail;
-    }
-
-    bool isEnd = (bN2LoopIdx == splitCoreInfo.bN2End) && (gS1LoopIdx == splitCoreInfo.gS1End);
-    uint32_t s2BlockNum;
-    if (constInfo.attenMaskFlag) {
-        s2BlockNum = GetS2BaseBlockNumOnMask(gS1LoopIdx, tempLoopInfo.actS1Size, tempLoopInfo.actS2SizeOrig);
-    } else {
+    if (!constInfo.attenMaskFlag) {
         tempLoopInfo.validS2Len = tempLoopInfo.actS2Size;
-        s2BlockNum = (tempLoopInfo.actS2Size + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
     }
-    tempLoopInfo.s2LoopEnd = isEnd ? splitCoreInfo.s2End : s2BlockNum - 1;
-    if (splitCoreInfo.s2Start > 0 || tempLoopInfo.s2LoopEnd < s2BlockNum - 1) {
-        tempLoopInfo.isNeedLD = true;
-    } else {
-        tempLoopInfo.isNeedLD = false;
-    }
+    LIV2Common::CalcS2LoopParams<true>(tempLoopInfo, constInfo, splitCoreInfo, bN2LoopIdx, gS1LoopIdx,
+                                       constInfo.cmpRatio, &tempLoopInfo.validS2Len);
 }
 
 template <typename QLIV2T>
@@ -589,25 +538,7 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::CalcGS1LoopParams(uint32_t bN2LoopI
 {
     GetBN2Idx(bN2LoopIdx);
     GetS1S2ActualSeqLen(tempLoopInfo.bIdx, tempLoopInfo.actS1Size, tempLoopInfo.actS2Size, tempLoopInfo.actS2SizeOrig);
-    if ((tempLoopInfo.actS2Size == 0) || (tempLoopInfo.actS1Size == 0)) {
-        tempLoopInfo.curActSeqLenIsZero = true;
-        return;
-    }
-    tempLoopInfo.curActSeqLenIsZero = false;
-    tempLoopInfo.s2BasicSizeTail = tempLoopInfo.actS2Size % constInfo.s2BaseSize;
-    tempLoopInfo.s2BasicSizeTail =
-        (tempLoopInfo.s2BasicSizeTail == 0) ? constInfo.s2BaseSize : tempLoopInfo.s2BasicSizeTail;
-    tempLoopInfo.mBasicSizeTail = (tempLoopInfo.actS1Size * constInfo.gSize) % constInfo.mBaseSize;
-    tempLoopInfo.mBasicSizeTail =
-        (tempLoopInfo.mBasicSizeTail == 0) ? constInfo.mBaseSize : tempLoopInfo.mBasicSizeTail;
-
-    uint32_t gS1SplitNum = (tempLoopInfo.actS1Size * constInfo.gSize + constInfo.mBaseSize - 1) / constInfo.mBaseSize;
-    tempLoopInfo.gS1LoopEnd = (bN2LoopIdx == splitCoreInfo.bN2End) ? splitCoreInfo.gS1End : gS1SplitNum - 1;
-    if constexpr (Q_LAYOUT_T == LI_LAYOUT::BSND) {
-        if (tempLoopInfo.gS1LoopEnd == gS1SplitNum - 1 && constInfo.qSeqSize > tempLoopInfo.actS1Size) {
-            tempLoopInfo.needDealActS1LessThanS1 = true;
-        }
-    }
+    LIV2Common::CalcGS1LoopParams<Q_LAYOUT_T == LI_LAYOUT::BSND>(tempLoopInfo, constInfo, splitCoreInfo, bN2LoopIdx);
 }
 
 template <typename QLIV2T>
@@ -615,43 +546,13 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::CalcRunInfo(uint32_t loop, uint32_t
                                                          QLIV2Common::RunInfo &runInfo, uint32_t qScaleLoop,
                                                          uint32_t kScaleLoop)
 {
-    runInfo.loop = loop;
-    runInfo.bIdx = tempLoopInfo.bIdx;
-    runInfo.gS1Idx = tempLoopInfo.gS1Idx;
-    runInfo.s2Idx = s2LoopIdx;
-    runInfo.bN2Idx = tempLoopInfo.bN2Idx;
-    runInfo.isValid = s2LoopIdx <= tempLoopInfo.s2LoopEnd;
     runInfo.validS2Len = tempLoopInfo.validS2Len;
     runInfo.qScaleLoop = qScaleLoop;
     runInfo.kScaleLoop = kScaleLoop;
-    runInfo.isNeedLD = tempLoopInfo.isNeedLD;
-    if (runInfo.isNeedLD && s2LoopIdx == tempLoopInfo.s2LoopEnd) {
-        runInfo.saveWorkSpaceIdx = ldInfo.saveWorkSpaceIdx;
-        ldInfo.saveWorkSpaceIdx++;
-    }
-
-    if (!runInfo.isValid) {
+    if (!LIV2Common::InitRunInfo(loop, s2LoopIdx, runInfo, tempLoopInfo, constInfo, splitCoreInfo, ldInfo,
+                                 isOutputIdxOffsetValid)) {
         return; // 需要验证， v1 时候需要runInfo
     }
-
-    runInfo.actS1Size = tempLoopInfo.actS1Size;
-    runInfo.actS2Size = tempLoopInfo.actS2Size;
-    runInfo.actS2SizeOrig = tempLoopInfo.actS2SizeOrig;
-    // 计算实际基本块size
-    runInfo.actMBaseSize = tempLoopInfo.actMBaseSize;
-    runInfo.actualSingleProcessSInnerSize = constInfo.s2BaseSize;
-    uint32_t s2SplitNum = (tempLoopInfo.actS2Size + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
-    if (runInfo.s2Idx == s2SplitNum - 1) {
-        runInfo.actualSingleProcessSInnerSize = tempLoopInfo.s2BasicSizeTail;
-    }
-    runInfo.actualSingleProcessSInnerSizeAlign = QLIV2Common::Align((uint32_t)runInfo.actualSingleProcessSInnerSize,
-                                                                    QLIV2Common::ConstInfo::BUFFER_SIZE_BYTE_32B);
-
-    runInfo.isFirstS2InnerLoop = s2LoopIdx == splitCoreInfo.s2Start;
-    runInfo.isLastS2InnerLoop = s2LoopIdx == tempLoopInfo.s2LoopEnd;
-    runInfo.isAllLoopEnd = (runInfo.bN2Idx == splitCoreInfo.bN2End) && (runInfo.gS1Idx == splitCoreInfo.gS1End) &&
-                           (runInfo.s2Idx == splitCoreInfo.s2End);
-    runInfo.isOutputIdxOffsetValid = isOutputIdxOffsetValid;
     uint64_t qkHeadDim = constInfo.headDim;
     if constexpr (QLIV2T::isMxFp4) {
         qkHeadDim = constInfo.headDim / FP4_PACK_NUM;

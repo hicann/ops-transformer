@@ -22,6 +22,7 @@
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
 #include "../quant_lightning_indexer_common.h"
+#include "../../../lightning_indexer/op_kernel/arch35/common/lightning_indexer_kernel_base_arch35.h"
 #include "quant_lightning_indexer_service_vector_arch35.h"
 #include "quant_lightning_indexer_service_cube_arch35.h"
 
@@ -187,29 +188,15 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::InitTilingData(const Q
 template <typename QLIT>
 __aicore__ inline void QuantLightningIndexerKernel<QLIT>::InitBuffers()
 {
-    if ASCEND_IS_AIV {
-        vectorService.InitBuffers(pipe);
-    } else {
-        matmulService.InitBuffers(pipe);
-    }
+    LIV2Common::InitBuffers(vectorService, matmulService, pipe);
 }
 
 template <typename QLIT>
 __aicore__ inline void QuantLightningIndexerKernel<QLIT>::InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ,
                                                                            __gm__ uint8_t *actualSeqLengthsK)
 {
-    if (actualSeqLengthsK == nullptr) {
-        constInfo.actualLenDims = 0;
-    } else {
-        constInfo.actualLenDims = constInfo.batchSize;
-        actualSeqLengthsGm.SetGlobalBuffer((__gm__ uint32_t *)actualSeqLengthsK, constInfo.actualLenDims);
-    }
-    if (actualSeqLengthsQ == nullptr) {
-        constInfo.actualLenQDims = 0;
-    } else {
-        constInfo.actualLenQDims = constInfo.batchSize;
-        actualSeqLengthsGmQ.SetGlobalBuffer((__gm__ uint32_t *)actualSeqLengthsQ, constInfo.actualLenQDims);
-    }
+    LICommon::InitActualSeqLen(actualSeqLengthsQ, actualSeqLengthsK, constInfo, actualSeqLengthsGmQ,
+                               actualSeqLengthsGm);
 }
 
 template <typename QLIT>
@@ -217,13 +204,7 @@ __aicore__ inline uint32_t QuantLightningIndexerKernel<QLIT>::GetActualSeqLen(
     uint32_t bIdx, uint32_t actualLenDims, bool isAccumSeq, GlobalTensor<uint32_t> &actualSeqLengthsGm,
     uint32_t defaultSeqLen)
 {
-    if (actualLenDims == 0) {
-        return defaultSeqLen;
-    } else if (isAccumSeq && bIdx > 0) {
-        return actualSeqLengthsGm.GetValue(bIdx) - actualSeqLengthsGm.GetValue(bIdx - 1);
-    } else {
-        return actualSeqLengthsGm.GetValue(bIdx);
-    }
+    return LICommon::GetActualSeqLen(bIdx, actualLenDims, isAccumSeq, actualSeqLengthsGm, defaultSeqLen);
 }
 
 template <typename QLIT>
@@ -243,16 +224,8 @@ __aicore__ inline uint32_t QuantLightningIndexerKernel<QLIT>::GetS2BaseBlockNumO
                                                                                       uint32_t actS1Size,
                                                                                       uint32_t actS2SizeOrig)
 {
-    if (actS2SizeOrig == 0) {
-        return 0;
-    }
-    uint32_t s1Offset = constInfo.s1BaseSize * s1gIdx;
-    int32_t validS2LenBase = static_cast<int32_t>(actS2SizeOrig) - static_cast<int32_t>(actS1Size);
-    int32_t validS2Len = (static_cast<int32_t>(s1Offset) + validS2LenBase + static_cast<int32_t>(constInfo.s1BaseSize));
-    validS2Len = Min(validS2Len, static_cast<int32_t>(actS2SizeOrig));
-    validS2Len = Max(validS2Len, 1);
-    tempLoopInfo.validS2Len = validS2Len;
-    return (validS2Len + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
+    return LIV2Common::GetMaskedS2BaseBlockNum(s1gIdx, actS1Size, actS2SizeOrig, constInfo.s1BaseSize, 1U,
+                                               constInfo.s2BaseSize, &tempLoopInfo.validS2Len);
 }
 
 template <typename QLIT>
@@ -371,28 +344,12 @@ template <typename QLIT>
 __aicore__ inline void QuantLightningIndexerKernel<QLIT>::DealActSeqLenIsZero(uint32_t bIdx, uint32_t n2Idx,
                                                                               uint32_t s1Start)
 {
-    if ASCEND_IS_AIV {
-        if (constInfo.outputLayout == LI_LAYOUT::TND) {
-            uint32_t tSize = actualSeqLengthsGmQ.GetValue(constInfo.batchSize - 1);
-            uint32_t tBase = bIdx == 0 ? 0 : actualSeqLengthsGmQ.GetValue(bIdx - 1);
-            uint32_t s1Count = tempLoopInfo.actS1Size;
-
-            for (uint32_t s1Idx = s1Start; s1Idx < s1Count; s1Idx++) {
-                uint64_t indiceOutOffset =
-                    (tBase + s1Idx) * constInfo.kHeadNum * constInfo.sparseCount + // T轴、s1轴偏移
-                    n2Idx * constInfo.sparseCount;                                 // N2轴偏移
-                vectorService.CleanInvalidOutput(indiceOutOffset);
-            }
-        } else if (constInfo.outputLayout == LI_LAYOUT::BSND) {
-            for (uint32_t s1Idx = s1Start; s1Idx < constInfo.qSeqSize; s1Idx++) {
-                // B,S1,N2,K
-                uint64_t indiceOutOffset = bIdx * constInfo.qSeqSize * constInfo.kHeadNum * constInfo.sparseCount +
-                                           s1Idx * constInfo.kHeadNum * constInfo.sparseCount + // B轴、S1轴偏移
-                                           n2Idx * constInfo.sparseCount;                       // N2轴偏移
-                vectorService.CleanInvalidOutput(indiceOutOffset);
-            }
-        }
+    uint32_t tBase = 0U;
+    if (constInfo.outputLayout == QLICommon::LI_LAYOUT::TND) {
+        tBase = bIdx == 0 ? 0 : actualSeqLengthsGmQ.GetValue(bIdx - 1);
     }
+    LIV2Common::DealActSeqLenIsZero<QLICommon::LI_LAYOUT::TND, QLICommon::LI_LAYOUT::BSND>(
+        bIdx, n2Idx, s1Start, tBase, tempLoopInfo.actS1Size, constInfo.sparseCount, constInfo, vectorService);
 }
 
 template <typename QLIT>
@@ -457,30 +414,17 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::Init(
 template <typename QLIT>
 __aicore__ inline void QuantLightningIndexerKernel<QLIT>::GetBN2Idx(uint32_t bN2Idx)
 {
-    tempLoopInfo.bN2Idx = bN2Idx;
-    tempLoopInfo.bIdx = bN2Idx / constInfo.kHeadNum;
-    tempLoopInfo.n2Idx = bN2Idx % constInfo.kHeadNum;
+    LIV2Common::GetBN2Idx(tempLoopInfo, constInfo, bN2Idx);
 }
 
 template <typename QLIT>
 __aicore__ inline void QuantLightningIndexerKernel<QLIT>::CalcS2LoopParams(uint32_t bN2LoopIdx, uint32_t gS1LoopIdx)
 {
-    tempLoopInfo.actMBaseSize = constInfo.mBaseSize;
-    tempLoopInfo.gS1Idx = gS1LoopIdx;
-    uint32_t remainedGS1Size = tempLoopInfo.actS1Size * constInfo.gSize - tempLoopInfo.gS1Idx * constInfo.mBaseSize;
-    if (remainedGS1Size <= constInfo.mBaseSize && remainedGS1Size > 0) {
-        tempLoopInfo.actMBaseSize = tempLoopInfo.mBasicSizeTail;
-    }
-
-    bool isEnd = (bN2LoopIdx == splitCoreInfo.bN2End) && (gS1LoopIdx == splitCoreInfo.gS1End);
-    uint32_t s2BlockNum;
-    if (constInfo.attenMaskFlag) {
-        s2BlockNum = GetS2BaseBlockNumOnMask(gS1LoopIdx, tempLoopInfo.actS1Size, tempLoopInfo.actS2SizeOrig);
-    } else {
+    if (!constInfo.attenMaskFlag) {
         tempLoopInfo.validS2Len = tempLoopInfo.actS2Size;
-        s2BlockNum = (tempLoopInfo.actS2Size + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
     }
-    tempLoopInfo.s2LoopEnd = isEnd ? splitCoreInfo.s2End : s2BlockNum - 1;
+    LIV2Common::CalcS2LoopParams<false>(tempLoopInfo, constInfo, splitCoreInfo, bN2LoopIdx, gS1LoopIdx, 1U,
+                                        &tempLoopInfo.validS2Len);
 }
 
 template <typename QLIT>
@@ -488,25 +432,8 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::CalcGS1LoopParams(uint
 {
     GetBN2Idx(bN2LoopIdx);
     GetS1S2ActualSeqLen(tempLoopInfo.bIdx, tempLoopInfo.actS1Size, tempLoopInfo.actS2Size, tempLoopInfo.actS2SizeOrig);
-    if ((tempLoopInfo.actS2Size == 0) || (tempLoopInfo.actS1Size == 0)) {
-        tempLoopInfo.curActSeqLenIsZero = true;
-        return;
-    }
-    tempLoopInfo.curActSeqLenIsZero = false;
-    tempLoopInfo.s2BasicSizeTail = tempLoopInfo.actS2Size % constInfo.s2BaseSize;
-    tempLoopInfo.s2BasicSizeTail =
-        (tempLoopInfo.s2BasicSizeTail == 0) ? constInfo.s2BaseSize : tempLoopInfo.s2BasicSizeTail;
-    tempLoopInfo.mBasicSizeTail = (tempLoopInfo.actS1Size * constInfo.gSize) % constInfo.mBaseSize;
-    tempLoopInfo.mBasicSizeTail =
-        (tempLoopInfo.mBasicSizeTail == 0) ? constInfo.mBaseSize : tempLoopInfo.mBasicSizeTail;
-
-    uint32_t gS1SplitNum = (tempLoopInfo.actS1Size * constInfo.gSize + constInfo.mBaseSize - 1) / constInfo.mBaseSize;
-    tempLoopInfo.gS1LoopEnd = (bN2LoopIdx == splitCoreInfo.bN2End) ? splitCoreInfo.gS1End : gS1SplitNum - 1;
-    if constexpr (Q_LAYOUT_T == LI_LAYOUT::BSND) {
-        if (tempLoopInfo.gS1LoopEnd == gS1SplitNum - 1 && constInfo.qSeqSize > tempLoopInfo.actS1Size) {
-            tempLoopInfo.needDealActS1LessThanS1 = true;
-        }
-    }
+    LIV2Common::CalcGS1LoopParams<(Q_LAYOUT_T == QLICommon::LI_LAYOUT::BSND)>(tempLoopInfo, constInfo, splitCoreInfo,
+                                                                              bN2LoopIdx);
 }
 
 template <typename QLIT>
@@ -514,37 +441,13 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::CalcRunInfo(uint32_t l
                                                                       QLICommon::RunInfo &runInfo, uint32_t qScaleLoop,
                                                                       uint32_t kScaleLoop)
 {
-    runInfo.loop = loop;
-    runInfo.bIdx = tempLoopInfo.bIdx;
-    runInfo.gS1Idx = tempLoopInfo.gS1Idx;
-    runInfo.s2Idx = s2LoopIdx;
     runInfo.s2Start = splitCoreInfo.s2Start;
-    runInfo.bN2Idx = tempLoopInfo.bN2Idx;
-    runInfo.isValid = s2LoopIdx <= tempLoopInfo.s2LoopEnd;
     runInfo.validS2Len = tempLoopInfo.validS2Len;
     runInfo.qScaleLoop = qScaleLoop;
     runInfo.kScaleLoop = kScaleLoop;
-    if (!runInfo.isValid) {
+    if (!LIV2Common::InitRunInfoBase(loop, s2LoopIdx, runInfo, tempLoopInfo, constInfo, splitCoreInfo)) {
         return;
     }
-
-    runInfo.actS1Size = tempLoopInfo.actS1Size;
-    runInfo.actS2Size = tempLoopInfo.actS2Size;
-    runInfo.actS2SizeOrig = tempLoopInfo.actS2SizeOrig;
-    // 计算实际基本块size
-    runInfo.actualSingleProcessSInnerSize = constInfo.s2BaseSize;
-    runInfo.actMBaseSize = tempLoopInfo.actMBaseSize;
-    uint32_t s2SplitNum = (tempLoopInfo.actS2Size + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
-    if (runInfo.s2Idx == s2SplitNum - 1) {
-        runInfo.actualSingleProcessSInnerSize = tempLoopInfo.s2BasicSizeTail;
-    }
-    runInfo.actualSingleProcessSInnerSizeAlign =
-        QLICommon::Align((uint32_t)runInfo.actualSingleProcessSInnerSize, QLICommon::ConstInfo::BUFFER_SIZE_BYTE_32B);
-
-    runInfo.isLastS2InnerLoop = s2LoopIdx == tempLoopInfo.s2LoopEnd;
-    runInfo.isFirstS2InnerLoop = s2LoopIdx == splitCoreInfo.s2Start;
-    runInfo.isAllLoopEnd = (runInfo.bN2Idx == splitCoreInfo.bN2End) && (runInfo.gS1Idx == splitCoreInfo.gS1End) &&
-                           (runInfo.s2Idx == splitCoreInfo.s2End);
 
     if (runInfo.isFirstS2InnerLoop) {
         uint64_t actualSeqQPrefixSum;
