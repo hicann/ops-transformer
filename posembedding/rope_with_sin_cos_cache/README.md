@@ -264,6 +264,7 @@
 ## 约束说明
 
 - queryIn、keyIn、cosSinCache只支持2维shape输入。
+- queryIn和keyIn的1维大小必须是headSize的整数倍。
 - headSize: 数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数。
 - rotaryDim: 始终小于等于headSize；数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数;mrope模式下应满足rotaryDim = mropeSection[0] + mropeSection[1] + mropeSection[2]。
 - 输入tensor positions的取值应小于cosSinCache的0维maxSeqLen。

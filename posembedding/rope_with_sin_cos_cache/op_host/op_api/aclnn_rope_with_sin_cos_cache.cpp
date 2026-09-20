@@ -151,6 +151,28 @@ static bool CheckShape(const aclTensor *positions, const aclTensor *queryIn, con
     return true;
 }
 
+static bool CheckPositionsShape(const aclTensor *positions, const aclTensor *queryIn, bool isMrope,
+                                uint64_t mropeSectionSize)
+{
+    const auto &positionsShape = positions->GetViewShape();
+    int64_t numTokens = queryIn->GetViewShape()[DIM_ZERO];
+    if (!isMrope) {
+        OP_CHECK(positionsShape.GetDimNum() == DIM_ONE && positionsShape[DIM_ZERO] == numTokens,
+                 OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Expected positions shape to be [%ld] in rope mode, but got %s.",
+                         numTokens, op::ToString(positionsShape).GetString()),
+                 return false);
+        return true;
+    }
+
+    OP_CHECK(positionsShape.GetDimNum() == DIM_NUM &&
+                 positionsShape[DIM_ZERO] == static_cast<int64_t>(mropeSectionSize) &&
+                 positionsShape[DIM_ONE] == numTokens,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Expected positions shape to be [%lu, %ld] in mrope mode, but got %s.",
+                     mropeSectionSize, numTokens, op::ToString(positionsShape).GetString()),
+             return false);
+    return true;
+}
+
 static bool CheckMropeSection(const std::vector<int64_t> &target, const std::vector<std::vector<int64_t>> &support)
 {
     for (const auto &vec : support) {
@@ -183,44 +205,51 @@ static aclnnStatus CheckParams(const aclTensor *positions, const aclTensor *quer
     // 3. 检查shape是否支持
     CHECK_RET(CheckShape(positions, queryIn, keyIn, cosSinCache, queryOut, keyOut), ACLNN_ERR_PARAM_INVALID);
 
-    // 4. 检查mrope模式下是否满足mropeSection[0] + mropeSection[1] + mropeSection[2] == rotaryDim/2
-    if (mropeSection != nullptr) {
-        uint64_t mropeSectionSize = 0U;
-        aclGetIntArraySize(mropeSection, &mropeSectionSize);
-        OP_CHECK((mropeSectionSize == 3 || mropeSectionSize == 4),
+    // 4. 检查positions shape是否与当前rope模式匹配
+    if (mropeSection == nullptr) {
+        CHECK_RET(CheckPositionsShape(positions, queryIn, false, 0), ACLNN_ERR_PARAM_INVALID);
+        return ACLNN_SUCCESS;
+    }
+
+    // 5. 检查mrope模式下是否满足mropeSection[0] + mropeSection[1] + mropeSection[2] == rotaryDim/2
+    uint64_t mropeSectionSize = 0U;
+    aclGetIntArraySize(mropeSection, &mropeSectionSize);
+    OP_CHECK((mropeSectionSize == 3 || mropeSectionSize == 4),
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                     "[aclnnRopeWithSinCosCache] Expected mropeSectionSize is 3 or 4, "
+                     "but got %ld.",
+                     mropeSectionSize),
+             return ACLNN_ERR_PARAM_INVALID);
+    std::vector<int64_t> mropeSectionIn;
+    int64_t mropeSectionSum = 0;
+    mropeSectionIn.reserve(mropeSectionSize);
+    for (size_t i = 0; i < mropeSectionSize; ++i) {
+        OP_CHECK(static_cast<int64_t>((*mropeSection)[i]) >= 0,
                  OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                         "[aclnnRopeWithSinCosCache] Expected mropeSectionSize is 3 or 4, "
+                         "[aclnnRopeWithSinCosCache] The value of mropeSection must be non-negative, "
                          "but got %ld.",
-                         mropeSectionSize),
+                         static_cast<int64_t>((*mropeSection)[i])),
                  return ACLNN_ERR_PARAM_INVALID);
-        std::vector<int64_t> mropeSectionIn;
-        int64_t mropeSectionSum = 0;
-        mropeSectionIn.reserve(mropeSectionSize);
-        for (size_t i = 0; i < mropeSectionSize; ++i) {
-            OP_CHECK(static_cast<int64_t>((*mropeSection)[i]) >= 0,
-                     OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                             "[aclnnRopeWithSinCosCache] The value of mropeSection must be non-negative, "
-                             "but got %ld.",
-                             static_cast<int64_t>((*mropeSection)[i])),
-                     return ACLNN_ERR_PARAM_INVALID);
-            int64_t val = static_cast<int64_t>((*mropeSection)[i]);
-            mropeSectionIn.push_back(val);
-            mropeSectionSum += val;
-        }
-        int64_t rotary_dim = cosSinCache->GetViewShape()[1];
-        // kernel中mropesection[0]>0为mrope模式，否则rope模式
-        if (mropeSectionIn[0] > 0) {
-            OP_CHECK(mropeSectionSum * 2 == rotary_dim,
-                     OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                             "[aclnnRopeWithSinCosCache] The accumulated value of mropeSection"
-                             "should be equal to rotaryDim/2, but got %ld.",
-                             mropeSectionSum),
-                     return ACLNN_ERR_PARAM_INVALID);
-            OP_CHECK(CheckMropeSection(mropeSectionIn, mropeSupportList),
-                     OP_LOGE(ACLNN_ERR_PARAM_INVALID, "[aclnnRopeWithSinCosCache] The input mropeSection "
-                                                      "must be in the supported list."),
-                     return ACLNN_ERR_PARAM_INVALID);
-        }
+        int64_t val = static_cast<int64_t>((*mropeSection)[i]);
+        mropeSectionIn.push_back(val);
+        mropeSectionSum += val;
+    }
+    int64_t rotary_dim = cosSinCache->GetViewShape()[1];
+    // kernel中mropesection[0]>0为mrope模式，否则rope模式
+    if (mropeSectionIn[0] > 0) {
+        CHECK_RET(CheckPositionsShape(positions, queryIn, true, mropeSectionSize), ACLNN_ERR_PARAM_INVALID);
+        OP_CHECK(mropeSectionSum * 2 == rotary_dim,
+                 OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                         "[aclnnRopeWithSinCosCache] The accumulated value of mropeSection"
+                         "should be equal to rotaryDim/2, but got %ld.",
+                         mropeSectionSum),
+                 return ACLNN_ERR_PARAM_INVALID);
+        OP_CHECK(CheckMropeSection(mropeSectionIn, mropeSupportList),
+                 OP_LOGE(ACLNN_ERR_PARAM_INVALID, "[aclnnRopeWithSinCosCache] The input mropeSection "
+                                                  "must be in the supported list."),
+                 return ACLNN_ERR_PARAM_INVALID);
+    } else {
+        CHECK_RET(CheckPositionsShape(positions, queryIn, false, 0), ACLNN_ERR_PARAM_INVALID);
     }
     return ACLNN_SUCCESS;
 }
@@ -235,7 +264,7 @@ aclnnStatus aclnnRopeWithSinCosCacheGetWorkspaceSizeCommon(const aclTensor *posi
     // 固定写法，参数检查
     auto ret = CheckParams(positions, queryIn, keyIn, cosSinCache, mropeSection, queryOut, keyOut);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    CHECK_RET(headSize != 0, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(headSize > 0, ACLNN_ERR_PARAM_INVALID);
 
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();

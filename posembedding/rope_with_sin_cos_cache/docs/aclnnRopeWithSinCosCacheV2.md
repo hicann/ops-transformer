@@ -452,23 +452,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <tr>
         <td> ACLNN_ERR_PARAM_INVALID </td>
         <td> 161002 </td>
-        <td>输入和输出的数据类型和数据格式不在支持的范围之内。</td>
-        </tr>
-        <tr>
-        <td rowspan="2"> ACLNN_ERR_INNER_TILING_ERROR </td>
-        <td rowspan="2"> 561002 </td>
-        <td>多个输入tensor之间的shape信息不匹配。</td>
-        </tr>
-        <tr>
-        <td>输入属性和输入tensor之间的shape信息不匹配。</td>
-        </tr>
-        <tr>
-        <td rowspan="2"> ACLNN_ERR_INNER_TILING_ERROR </td>
-        <td rowspan="2"> 361001 </td>
-        <td>query或者key非64 Byte对齐。</td>
-        </tr>
-        <tr>
-        <td>rotaryDim>headSize。</td>
+        <td>输入和输出的数据类型、数据格式或shape，以及输入属性不满足约束。</td>
         </tr>
     </tbody></table>
 
@@ -518,6 +502,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
 - 确定性计算：
   - aclnnRopeWithSinCosCacheV2默认确定性实现。
 - queryIn、keyIn、cosSinCache只支持2维shape输入。
+- queryIn和keyIn的1维大小必须是headSize的整数倍。
 - queryIn、keyIn、cosSinCache输入的数据类型需要保持一致。
 - headSize：数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数。
 - rotaryDim：始终小于等于headSize；数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数;mrope模式下应满足mropeSection所有元素累加和为rotaryDim值的一半。
