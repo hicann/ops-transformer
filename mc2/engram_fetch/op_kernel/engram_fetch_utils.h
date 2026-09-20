@@ -26,13 +26,15 @@ namespace Mc2Kernel {
 constexpr uint32_t HCCL_MAX_RANK_SIZE = 1024U;
 constexpr uint32_t UB_ALIGN = 32U;
 constexpr uint32_t TILE_BYTES = 32U * 1024U;
+constexpr uint32_t TILE_BYTES_INFER_MAX = 24U * 1024U;
 constexpr uint32_t HCOMM_INIT_SIZE = 512U;
-constexpr uint32_t ENGRAM_BATCH_CAPACITY = 128U;
+constexpr uint32_t ENGRAM_BATCH_CAPACITY = 16U;
 constexpr uint32_t ENGRAM_WQE_BYTES = 64U;
 constexpr uint32_t ENGRAM_BATCH_BUFFER_BYTES = ENGRAM_BATCH_CAPACITY * ENGRAM_WQE_BYTES;
 constexpr int32_t BITS_PER_BYTE = 8;
 constexpr uint32_t ALIGNED_LEN_256 = 256U;
 constexpr uint32_t RELAY_BUFFER_NUM = 2U;
+constexpr uint32_t RELAY_BUFFER_NUM_INFER = 6U;
 
 constexpr uint32_t STATE_OFFSET = 32U;
 constexpr uint32_t WIN_REGION_COUNT = 6U;
@@ -51,28 +53,32 @@ struct EngramCommContext {
 };
 
 struct CoreAssignment {
-    uint32_t assignedRank;
-    uint32_t idxInRankGroup;
-    uint32_t rankGroupSize;
+    uint32_t assignedRank;   // 本核负责的卡
+    uint32_t idxInRankGroup; // 远端核=通道号；本地核=本地token分片序号
+    uint32_t rankGroupSize;  // 远端核=该卡通道数；本地核=本地核总数
 };
 
-__aicore__ inline CoreAssignment GetCoreAssignment(uint32_t totalBlocks, uint32_t aivId, uint32_t numRanks)
+__aicore__ inline CoreAssignment GetCoreAssignment(uint32_t totalBlocks, uint32_t aivId, uint32_t numRanks,
+                                                   uint32_t rankId, uint32_t channelsPerRank)
 {
-    CoreAssignment result{numRanks, 0, 0};
-    uint32_t base = totalBlocks / numRanks;
-    uint32_t remainder = totalBlocks % numRanks;
-    uint32_t accumulated = 0;
-    for (uint32_t r = 0; r < numRanks; r++) {
-        uint32_t groupSize = base + ((r < remainder) ? 1U : 0U);
-        if (aivId < accumulated + groupSize) {
-            result.assignedRank = r;
-            result.rankGroupSize = groupSize;
-            result.idxInRankGroup = aivId - accumulated;
-            return result;
-        }
-        accumulated += groupSize;
+    if (numRanks <= 1U) {
+        return CoreAssignment{rankId, aivId, totalBlocks};
     }
-    return result;
+    // 每张对端卡分到的通道数(=负责该卡的核数)，三者取小：
+    // (totalBlocks-1)/(numRanks-1)：核预算，预留1核干本地拷贝后均摊
+    // MAX_CHANNELS_PER_RANK：限制单卡通道上限
+    // channelsPerRank：handle资源摊到每卡的实际通道数
+    uint32_t maxChannel = (channelsPerRank < MAX_CHANNELS_PER_RANK) ? channelsPerRank : MAX_CHANNELS_PER_RANK;
+    uint32_t usedChannelPerRank = (totalBlocks - 1U) / (numRanks - 1U);
+    usedChannelPerRank = (usedChannelPerRank < maxChannel) ? usedChannelPerRank : maxChannel;
+    uint32_t urmaCores = (numRanks - 1U) * usedChannelPerRank;
+    if (aivId < urmaCores) {
+        uint32_t rankIdx = aivId / usedChannelPerRank;
+        uint32_t assignedRank = (rankIdx < rankId) ? rankIdx : (rankIdx + 1U); // 跳过本卡
+        return CoreAssignment{assignedRank, aivId - rankIdx * usedChannelPerRank, usedChannelPerRank};
+    }
+    // 本地核：全部服务本卡，按(aivId-urmaCores)分片本地token
+    return CoreAssignment{rankId, aivId - urmaCores, totalBlocks - urmaCores};
 }
 
 } // namespace Mc2Kernel

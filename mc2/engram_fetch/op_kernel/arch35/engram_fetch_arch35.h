@@ -102,10 +102,11 @@ private:
     uint32_t channelsPerRank_{1};
     uint64_t ubSize_{0};
     uint32_t indicesBatchSize_{0};
+    uint32_t tileBytes_{TILE_BYTES_INFER_MAX};
     int64_t numTokens_{0};
     int64_t hiddenBytes_{0};
 
-    AscendC::TQueBind<AscendC::TPosition::VECIN, AscendC::TPosition::VECOUT, RELAY_BUFFER_NUM> relayQue_;
+    AscendC::TQueBind<AscendC::TPosition::VECIN, AscendC::TPosition::VECOUT, RELAY_BUFFER_NUM_INFER> relayQue_;
     AscendC::TBuf<> indicesBuf_;
     AscendC::TBuf<> hcommBuf_;
     AscendC::TBuf<> rankCountsBuf_;
@@ -154,11 +155,16 @@ __aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indi
     hiddenBytes_ = tilingData->hiddenBytes;
     ubSize_ = tilingData->ubSize;
 
+    tileBytes_ = AscendC::Ceil(static_cast<uint32_t>(hiddenBytes_), UB_ALIGN) * UB_ALIGN;
+    if (tileBytes_ > TILE_BYTES_INFER_MAX) {
+        tileBytes_ = TILE_BYTES_INFER_MAX;
+    }
+
     tpipe_->InitBuffer(hcommBuf_, HCOMM_INIT_SIZE);
     AscendC::LocalTensor<uint8_t> hcommTensor = hcommBuf_.Get<uint8_t>();
     hcomm_.Init(hcommTensor, HCOMM_INIT_SIZE);
 
-    tpipe_->InitBuffer(relayQue_, RELAY_BUFFER_NUM, TILE_BYTES);
+    tpipe_->InitBuffer(relayQue_, RELAY_BUFFER_NUM_INFER, tileBytes_);
     tpipe_->InitBuffer(hcommBatchBuf_, ENGRAM_BATCH_BUFFER_BYTES);
     AscendC::LocalTensor<uint8_t> hcommBatchTensor = hcommBatchBuf_.Get<uint8_t>();
     AscendC::Duplicate<uint8_t>(hcommBatchTensor, 0U, ENGRAM_BATCH_BUFFER_BYTES);
@@ -173,11 +179,11 @@ __aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indi
     uint32_t hcommHandleBufSize = AscendC::Ceil(numRanks_ * channelsPerRank_ * sizeof(uint64_t), UB_ALIGN) * UB_ALIGN;
     tpipe_->InitBuffer(hcommHandleBuf_, hcommHandleBufSize);
 
-    constexpr uint64_t ubReserved = 8U * 1024U;
     // ScatterByRank 需要: indices + tokenIdxInRank + rankIDs + positions + divisor (各4字节) + mask(每元素1字节近似)
+    constexpr uint64_t ubReserved = 8U * 1024U;
     uint32_t bytesPerIndice = sizeof(int32_t) + sizeof(uint32_t) + sizeof(int32_t) * 3U + 1U;
-    uint64_t usedUb = HCOMM_INIT_SIZE + TILE_BYTES * RELAY_BUFFER_NUM + ENGRAM_BATCH_BUFFER_BYTES + countsBufSize +
-                      offsetsBufSize + commBufferBufSize + hcommHandleBufSize;
+    uint64_t usedUb = HCOMM_INIT_SIZE + tileBytes_ * RELAY_BUFFER_NUM_INFER + ENGRAM_BATCH_BUFFER_BYTES +
+                      countsBufSize + offsetsBufSize + commBufferBufSize + hcommHandleBufSize;
     uint64_t availableUb = (ubSize_ > usedUb + ubReserved) ? (ubSize_ - usedUb - ubReserved) : 0U;
     uint32_t maxBatchSize = static_cast<uint32_t>(availableUb / bytesPerIndice);
     uint32_t numTokens = static_cast<uint32_t>(numTokens_);
@@ -278,7 +284,7 @@ __aicore__ inline void EngramFetchArch35::ScatterByRank(uint32_t batchLen)
     uint32_t runningOffset = 0;
     uint32_t totalBlocks = AscendC::GetBlockNum();
     if (totalBlocks >= numRanks_) {
-        auto coreAssign = GetCoreAssignment(totalBlocks, aivId_, numRanks_);
+        auto coreAssign = GetCoreAssignment(totalBlocks, aivId_, numRanks_, rankId_, channelsPerRank_);
         GatherRankTokens(coreAssign.assignedRank, batchLen, compareCntMax, runningOffset);
     } else {
         for (uint32_t ownerRank = aivId_; ownerRank < numRanks_; ownerRank += totalBlocks) {
@@ -417,14 +423,13 @@ __aicore__ inline void EngramFetchArch35::RemoteFetchRank(uint32_t ownerRank, ui
 __aicore__ inline void EngramFetchArch35::FetchByRank(uint32_t indicesBatchStart)
 {
     uint32_t totalBlocks = AscendC::GetBlockNum();
-    uint32_t maxCh = (channelsPerRank_ < MAX_CHANNELS_PER_RANK) ? channelsPerRank_ : MAX_CHANNELS_PER_RANK;
     if (totalBlocks >= numRanks_) {
-        auto coreAssign = GetCoreAssignment(totalBlocks, aivId_, numRanks_);
-        if (coreAssign.assignedRank == rankId_) {
+        auto coreAssign = GetCoreAssignment(totalBlocks, aivId_, numRanks_, rankId_, channelsPerRank_);
+        if (coreAssign.assignedRank != rankId_) {
+            RemoteFetchRank(coreAssign.assignedRank, indicesBatchStart, coreAssign.idxInRankGroup,
+                            coreAssign.rankGroupSize);
+        } else {
             LocalFetchTokens(indicesBatchStart, coreAssign.idxInRankGroup, coreAssign.rankGroupSize);
-        } else if (coreAssign.idxInRankGroup < maxCh) {
-            uint32_t effectiveStride = (coreAssign.rankGroupSize < maxCh) ? coreAssign.rankGroupSize : maxCh;
-            RemoteFetchRank(coreAssign.assignedRank, indicesBatchStart, coreAssign.idxInRankGroup, effectiveStride);
         }
     } else {
         uint32_t startRank = (aivId_ < numRanks_) ? aivId_ : rankId_;
@@ -445,10 +450,10 @@ __aicore__ inline void EngramFetchArch35::LocalCopySlice(GM_ADDR dst, GM_ADDR sr
     srcGm.SetGlobalBuffer((__gm__ uint8_t *)src);
     dstGm.SetGlobalBuffer((__gm__ uint8_t *)dst);
 
-    uint32_t tileLen = TILE_BYTES;
+    uint32_t tileLen = tileBytes_;
     uint64_t off = 0;
     while (off < len) {
-        uint64_t thisLen = (len - off > TILE_BYTES) ? tileLen : (len - off);
+        uint64_t thisLen = (len - off > tileBytes_) ? tileLen : (len - off);
 
         AscendC::LocalTensor<uint8_t> tmp = relayQue_.AllocTensor<uint8_t>();
         AscendC::DataCopyExtParams mte2Params{1U, static_cast<uint32_t>(thisLen), 0U, 0U, 0U};
