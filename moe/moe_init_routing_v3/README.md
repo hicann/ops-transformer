@@ -30,18 +30,31 @@
     $$
 
   2.以sortedRowIdx做位置映射得出expandedRowIdxOut：
+    - rowIdxType等于1时，输出scatter索引
 
-    $$
-    expandedRowIdxOut[sortedRowIdx[i]]=i
-    $$
+      $$
+      expandedRowIdxOut[i]=sortedRowIdx[i]
+      $$
 
-  3.在drop模式下，对sortedExpertIdx的每个专家统计直方图结果，得出expertTokensCountOrCumsumOutOptional：
+    - rowIdxType等于0时，输出gather索引
+
+      $$
+      expandedRowIdxOut[sortedRowIdx[i]]=i
+      $$
+
+  3.对sortedExpertIdx的每个专家统计直方图结果，得出expertTokensCountOrCumsumOutOptional：
 
     $$
     expertTokensCountOrCumsumOutOptional[i]=Histogram(sortedExpertIdx)
     $$
 
-  4.计算quant结果：
+  4.如果quantMode不等于-1，计算quant结果：
+    - 静态quant
+
+      $$
+      quantResult=round((x∗scaleOptional)+offsetOptional)
+      $$
+
     - 动态quant：
         - 若不输入scale：
             $$
@@ -62,11 +75,32 @@
 
         - 当quantMode为13时，动态量化使用对称量化范围[-8, 7]，scale计算中的分母为7，量化结果沿H维每两个INT4值打包为1个字节。
 
-  5.对quantResult取前NUM\_ROWS个sortedRowIdx的对应位置的值，得出expandedXOut：
+  5.若活跃的expert范围为全专家范围时，按照Scatter索引搬运token；反之按照Gather索引搬运token。在dropPadMode为1时将每个专家需要处理的Token个数对齐为expertCapacity个，超过expertCapacity个的Token会被Drop，不足的会用0填充。得出expandedXOut：
+    - 非量化场景
+      - 按照Scatter索引搬运
 
-    $$
-    expandedXOut[i]=quantResult[sortedRowIdx[i]\%NUM\_ROWS]
-    $$
+        $$
+        expandedXOut[i]=x[scatterRowIdx[i] // K]
+        $$
+
+      - 按照Gather索引搬运
+
+        $$
+        expandedXOut[gatherRowIdx[i]]=x[i // K]
+        $$
+
+    - 量化场景
+      - 按照Scatter索引搬运
+
+        $$
+        expandedXOut[i]=quantResult[scatterRowIdx[i] // K]
+        $$
+
+      - 按照Gather索引搬运
+
+        $$
+        expandedXOut[gatherRowIdx[i]]=quantResult[i // K]
+        $$
 
   6.expandedRowIdxOut的有效元素数量availableIdxNum计算方式为，expertIdx中activeExpertRangeOptional范围内的元素的个数，-1也不在该范围内，表示无效专家，不参与路由计算：
     $$
@@ -94,7 +128,7 @@
       <tr>
         <td>x</td>
         <td>输入</td>
-        <td>MOE的输入，即token特征输入，对应公式中x。</td>
+        <td>MOE的输入，即token特征输入，对应公式中x。shape为(NUM_ROWS, H)；quantMode为9或13的MXFP4/INT4动态量化场景，以及quantMode为-1且x数据类型为FLOAT4_E2M1的非量化透传场景，H要求为偶数。</td>
         <td><ul>
           <li>quantMode=-1：支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8、FLOAT4_E2M1、FLOAT8_E4M3FN、FLOAT8_E5M2;</li>
           <li>quantMode=0、1：支持FLOAT16、BFLOAT16、FLOAT32;</li>
@@ -114,14 +148,14 @@
       <tr>
         <td>scaleOptional</td>
         <td>可选输入</td>
-        <td>表示用于计算quant结果的参数。如果不输入表示计算时不使用scale，对应公式中scale。<br>• quantMode为1的INT8动态量化场景下，如果输入则要求为2D的Tensor，shape为(expertEnd-expertStart, H)。<br>• quantMode为13的INT4动态量化场景下，如果输入则要求shape为(1, H)，表示按H维广播的smooth scale。<br>• 仅quantMode=-1且x的数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，scale数据类型支持FLOAT8_E8M0。</td>
+        <td>表示用于计算quant结果的参数。如果不输入表示计算时不使用scale，对应公式中scale。<br>• 非量化场景下为可选输入，如果输入则要求为1D的Tensor，shape为(NUM_ROWS,)，类型为FLOAT32。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果输入则要求3D的Tensor，shape为(NUM_ROWS, CeilDiv(H, 64), 2)，类型为FLOAT8_E8M0。<br>• 静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]。<br>• quantMode为1的INT8动态量化场景下为可选输入，如果输入则要求为2D的Tensor，shape为(expertEnd-expertStart, H)。<br>• quantMode为13的INT4动态量化场景下为可选输入，如果输入则要求shape为(1, H)，表示按H维广播的smooth scale。<br>• HIF8 PERTENSOR量化场景下（quantMode为7）必须输入，输入要求为1D的Tensor，shape为[1, ]。<br>• MXFP8量化场景下（quantMode为2、3、16、17）不输入。<br>• HIF8直转和HIF8 PERTOKEN量化场景下（quantMode为6、8）不输入。<br>• MXFP4量化场景下（quantMode为9）不输入。<br>• FP8 PerGroup量化场景下（quantMode为4、5、14、15）不输入。<br>• FP8 PerBlock量化场景下（quantMode为11、12）不输入。</td>
         <td>FLOAT32、FLOAT8_E8M0</td>
         <td>ND</td>
       </tr>
       <tr>
         <td>offsetOptional</td>
         <td>可选输入</td>
-        <td>表示用于计算quant结果的偏移值。在非量化场景下和动态quant场景下不输入，对应公式中offsetOptional。</td>
+        <td>表示用于计算quant结果的偏移值，对应公式中offsetOptional。<br>• 静态量化场景必须输入，输入要求为1D的Tensor，shape为[1, ]。<br>• 非量化场景、动态量化（quantMode为1）、MXFP8量化（quantMode为2、3、16、17）、HIF8量化（quantMode为6、7、8）、MXFP4量化（quantMode为9）、FP8 PerGroup量化（quantMode为4、5、14、15）、FP8 PerBlock量化（quantMode为11、12）、INT4动态量化（quantMode为13）。</td>
         <td>FLOAT32</td>
         <td>ND</td>
       </tr>
@@ -177,7 +211,7 @@
       <tr>
         <td>activeExpertRangeOptional</td>
         <td>可选属性</td>
-        <td>长度为2，数组内的值为[expertStart, expertEnd],表示活跃的expert范围在expertStart和expertEnd之间，左闭右开。要求值大于等于0，并且expertEnd不大于expertNum。</td>
+        <td>长度为2，数组内的值为[expertStart, expertEnd],表示活跃的expert范围在expertStart和expertEnd之间，左闭右开。要求值大于等于0，并且expertEnd不大于expertNum；Drop/Pad场景下，expertStart等于0，expertEnd等于expertNum。</td>
         <td>ListInt</td>
         <td>-</td>
       </tr>
@@ -199,21 +233,21 @@
       <tr>
         <td>expandedRowIdxOut</td>
         <td>输出</td>
-        <td>expandedXOut和x的索引映射关系，前availableIdxNum\*H个元素为有效数据，其余无效数据，当rowIdxType为0时，无效数据由-1填充；当rowIdxType为1时，无效数据未初始化。</td>
+        <td>expandedXOut和x的索引映射关系，输出shape为(NUM_ROWS*K, )，前availableIdxNum个元素为有效数据，其余无效数据，当rowIdxType为0时，无效数据由-1填充；当rowIdxType为1时，无效数据未初始化。</td>
         <td>INT32</td>
         <td>ND</td>
       </tr>
       <tr>
         <td>expertTokensCountOrCumsumOut</td>
         <td>输出</td>
-        <td>• 在expertTokensNumType为1的场景下，表示activeExpertRangeOptional范围内expert对应的处理token的总数。<br>• 在expertTokensNumType为2的场景下，表示activeExpertRangeOptional范围内token总数为非0的expert，以及对应expert处理token的总数。<br>• expertTokensNumType为0或1时，输出shape为[expertEnd-expertStart]；expertTokensNumType为2时，输出shape为[expertNum, 2]。</td>
+        <td>• 在expertTokensNumType为0的场景下，表示activeExpertRangeOptional范围内expert在排序后处理token总数的前缀和。<br>• 在expertTokensNumType为1的场景下，表示activeExpertRangeOptional范围内expert对应的处理token的总数。<br>• 在expertTokensNumType为2的场景下，表示activeExpertRangeOptional范围内token总数为非0的expert，以及对应expert处理token的总数。<br>• expertTokensNumType为0或1时，输出shape为[expertEnd-expertStart]；expertTokensNumType为2时，输出shape为[expertNum, 2]。</td>
         <td>INT64</td>
         <td>ND</td>
       </tr>
       <tr>
         <td>expandedScaleOut</td>
         <td>输出</td>
-        <td>输出量化计算过程中scaleOptional的中间值。<br>• 非量化场景下为可选输入，如果输入则要求为1D的Tensor,类型为FLOAT32。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时,如果输入则要求3D的Tensor,类型为FLOAT8_E8M0。当DropPad场景输出是一个1D的Tensor，shape为[expertNum * expertCapacity]，类型为FLOAT32。<br>• quantMode为2、3、9时,数据类型支持FLOAT8_E8M0。<br>• quantMode为16、17时,数据类型支持FLOAT8_E8M0，Shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H,32),2)。<br>• quantMode为4、5、14、15时，数据类型支持FLOAT32，且要求为2D的Tensor，shape为[NUM_ROWS*K, CeilDiv(H, 128)]。<br>• quantMode为11、12时,数据类型支持FLOAT32,且要求为3D的Tensor。<br>• 其余场景数据类型支持FLOAT32。</td>
+        <td>输出量化计算过程中scaleOptional的中间值，输出shape为expandedXOut的shape去掉最后一维之后所有维度的乘积。<br>• 非量化场景下，当scaleOptional输入时，shape为[NUM_ROWS*K]，前availableIdxNum个元素为有效数据，输出FLOAT32类型。当输入x数据类型为FLOAT4_E2M1、FLOAT8_E4M3FN或FLOAT8_E5M2时，如果scaleOptional输入，则expandedScaleOut的shape为[NUM_ROWS*K, CeilDiv(H, 64), 2]，输出FLOAT8_E8M0类型。当Drop/Pad场景输出是一个1D的Tensor，shape为[expertNum * expertCapacity]，输出FLOAT32类型。<br>• 动态量化场景下，当scaleOptional输入时，前availableIdxNum个元素为有效数据。<br>• 静态量化场景下不输出。<br>• MXFP8量化场景下（quantMode为2、3），输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H,32),2)，NUM_ROWS*K的前availableIdxNum行为有效数据。<br>• MXFP8 RoundScale+Amax量化场景下（quantMode为16、17），输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M]，其中M=CeilAlign(CeilDiv(H,32),2)，NUM_ROWS*K的前availableIdxNum行为有效数据。<br>• 按照直转方式量化到HIFLOAT8场景下，expandedScaleOut不输出。<br>• 按照PERTENSOR模式量化到HIFLOAT8场景下，expandedScaleOut不输出。<br>• 按照PERTOKEN模式量化到HIFLOAT8场景下，输出FLOAT32类型，Shape为[NUM_ROWS*K]。<br>• MXFP4量化场景下（quantMode为9），输出FLOAT8_E8M0类型，Shape为[NUM_ROWS*K, M, 2]，其中M=CeilDiv(H, 64)，NUM_ROWS*K的前availableIdxNum行为有效数据。<br>• FP8 PerGroup量化场景下（quantMode为4、5、14、15），输出FLOAT32类型，Shape为[NUM_ROWS*K, CeilDiv(H,128)]，NUM_ROWS*K的前availableIdxNum行为有效数据。<br>• FP8 PerBlock量化场景下（quantMode为11、12），输出FLOAT32类型，Shape为[NUM_ROWS*K, CeilDiv(H,256), 2]，NUM_ROWS*K的前availableIdxNum行为有效数据。</td>
         <td>FLOAT32、FLOAT8_E8M0</td>
         <td>ND</td>
       </tr>
@@ -234,7 +268,7 @@
       - 支持-1、0、1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17，分别表示不量化、静态量化到INT8、动态量化到INT8、MXFP8量化到FLOAT8_E5M2、MXFP8量化到FLOAT8_E4M3FN、FP8 PerGroup量化到FLOAT8_E5M2、FP8 PerGroup量化到FLOAT8_E4M3FN、按直转方式量化到HIFLOAT8、按PERTENSOR模式量化到HIFLOAT8、按PERTOKEN模式量化到HIFLOAT8，MXFP4量化到FLOAT4_E2M1，FP8 PerBlock量化到FLOAT8_E5M2，FP8 PerBlock量化到FLOAT8_E4M3FN，INT4动态量化，FP8 PerGroup量化到FLOAT8_E5M2并启用Amax下限，FP8 PerGroup量化到FLOAT8_E4M3FN并启用Amax下限，MXFP8 RoundScale+Amax量化到FLOAT8_E5M2，MXFP8 RoundScale+Amax量化到FLOAT8_E4M3FN。
       - 支持quantMode为13的INT4动态量化场景，需同时满足：
         - x数据类型为FLOAT32或BFLOAT16，expandedXOut数据类型为INT4。
-        - H为偶数，用于沿H维每两个INT4值打包为1个字节；NUM_ROWS不要求为偶数。
+        - H为偶数，用于沿H维每两个INT4值打包为1个字节。
         - scaleOptional不输入，或输入shape为(1, H)、数据类型为FLOAT32，表示对activeExpertRangeOptional范围内的expert按H维广播smooth scale；offsetOptional不输入。
         - expertTokensNumType为0或1时，expertTokensCountOrCumsumOut的shape为[expertEnd-expertStart]；expertTokensNumType为2时，expertTokensCountOrCumsumOut的shape为[expertNum, 2]。
 
