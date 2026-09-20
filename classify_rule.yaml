@@ -568,7 +568,7 @@ ifa@ops-transformer:
         unrelease:
             test_code:
                 - ops/ops-transformer/attention/incre_flash_attention/op_kernel/arch35
-                - ops/ops-transformer/attention/incre_flash_attention/examples/test_aclnn_incre_flash_attention.cpp
+                - ops/ops-transformer/attention/incre_flash_attention/examples/test_aclnn_incre_flash_attention_v4.cpp
                 - asl/ops/cann/ops/built-in/fusion_pass/graph_fusion/ai_core/incre_flash_attention_fusion_pass_utils.cc
                 - asl/ops/cann/ops/built-in/fusion_pass/graph_fusion/ai_core/incre_flash_attention_fusion_pass_utils.h
                 - asl/ops/cann/ops/built-in/fusion_pass/graph_fusion/ai_core/incre_flash_attention_quant_deploy_pass.cc
@@ -590,7 +590,7 @@ pfa@ops-transformer:
                 - ops/ops-transformer/attention/prompt_flash_attention/op_kernel/unpad_flash_attention_common.h
                 - ops/ops-transformer/attention/prompt_flash_attention/op_kernel/arch22/prompt_flash_attention_base_api.h
                 - ops/ops-transformer/attention/prompt_flash_attention/op_kernel/arch22/prompt_flash_attention_base_common.h
-                - ops/ops-transformer/attention/prompt_flash_attention/examples/test_aclnn_prompt_flash_attention.cpp
+                - ops/ops-transformer/attention/prompt_flash_attention/examples/test_aclnn_prompt_flash_attention_v3.cpp
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch22/attn_infra
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch22/flash_attention_interface.cpp
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch22/flash_attention_regular_decode.h
