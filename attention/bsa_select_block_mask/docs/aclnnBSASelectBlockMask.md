@@ -255,8 +255,8 @@ aclnnStatus aclnnBSASelectBlockMask(
         <tr>
     <td>actualBlockLenQuery（aclIntArray*）</td>
     <td>输入</td>
-    <td>每个query block内实际压缩的有效seq长度，即公式中的actualBlockLenQuery。<br>用于部分压缩场景（如末尾不完整块或仅压缩有效token）。</td>
-    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Xblocks]。</li><li>TND场景：shape为 [TotalBlockNum_Q]（各batch的实际有效Xblocks堆叠，vaildXblocks = ceil（actualSeqQ / blockShapeX））。</li><li>每个元素取值范围 [0, blockShapeX]。</li><li>当actualBlockLen = 0时：对应block的q_cmp填0向量，不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
+    <td>每个query block内实际压缩的有效seq长度，即公式中的actualBlockLenQuery。<br>该参数用于部分压缩场景（如末尾不完整块或仅压缩有效token）。</td>
+    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Xblocks]。</li><li>TND场景：shape为 [TotalBlockNum_Q]（各batch的实际有效Xblocks堆叠，validXblocks = ceil（actualSeqQ / blockShapeX））。</li><li>每个元素取值范围 [0, blockShapeX]。</li><li>当actualBlockLen = 0时：对应block的q_cmp填0向量，不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
     <li>如不配置（传nullptr）：对query进行完整压缩（使用完整blockShapeX长度）。</li></ul></td>
     <td>INT64</td>
     <td>-</td>
@@ -266,8 +266,8 @@ aclnnStatus aclnnBSASelectBlockMask(
         <tr>
     <td>actualBlockLenKey（aclIntArray*）</td>
     <td>输入</td>
-    <td>每个key block内实际压缩的有效seq长度，即公式中的actualBlockLenKey。<br>用于部分压缩场景（如末尾不完整块或仅压缩有效token）。</td>
-    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Yblocks]。</li><li>TND场景：shape为 [TotalBlockNum_K]（各batch的实际有效Yblocks堆叠，vaildYblocks = ceil（actualSeqK / blockShapeY））。</li><li>每个元素取值范围 [0, blockShapeY]。</li><li>当actualBlockLen = 0时：对应block的k_cmp填0向量， 不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
+    <td>每个key block内实际压缩的有效seq长度，即公式中的actualBlockLenKey。<br>该参数用于部分压缩场景（如末尾不完整块或仅压缩有效token）。</td>
+    <td><ul><li>可选输入：<ul><li>BNSD场景：shape为 [B, Yblocks]。</li><li>TND场景：shape为 [TotalBlockNum_K]（各batch的实际有效Yblocks堆叠，validYblocks = ceil（actualSeqK / blockShapeY））。</li><li>每个元素取值范围 [0, blockShapeY]。</li><li>当actualBlockLen = 0时：对应block的k_cmp填0向量， 不会被topK选中。</li><li>当actualBlockLen > 0时：仅对前actualBlockLen个token取均值。</li></ul></li>
     <li>如不配置（传nullptr）：对key进行完整压缩（使用完整blockShapeY长度）。</li></ul></td>
     <td>INT64</td>
     <td>-</td>
@@ -442,7 +442,6 @@ aclnnStatus aclnnBSASelectBlockMask(
 
 ## 约束说明
 
-- 该接口若与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - actualSeqLengths在qInputLayout为 "TND" 时必选；actualSeqLengthsKV在kvInputLayout为 "TND" 时必选。
 - 根据算子支持的输入Layout，query张量Shape中对应的head维度大小记为N1，key张量Shape中对应的head维度大小记为N2。必须满足N1 = N2（仅支持MHA）。
 - headDim = 128。
