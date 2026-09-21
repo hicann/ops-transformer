@@ -45,7 +45,7 @@ static ge::graphStatus AllGatherMatmulV2ExecuteFunc(gert::OpExecuteContext *host
     const auto attrs = host_api_ctx->GetAttrs();
     OPS_ERR_IF(attrs == nullptr, OPS_LOG_E(allGatherV2Info, "attrs is null"), return ge::GRAPH_FAILED);
 
-    const char *blockSizePtr = attrs->GetStr(static_cast<size_t>(ops::AllGatherMMV2AttrIdx::K_BLOCK_SIZE));
+    const int64_t *blockSizePtr = attrs->GetInt(static_cast<size_t>(ops::AllGatherMMV2AttrIdx::K_BLOCK_SIZE));
     const int64_t blockSize = (blockSizePtr != nullptr ? *blockSizePtr : 0);
 
     const char *group = attrs->GetStr(static_cast<size_t>(ops::AllGatherMMV2AttrIdx::K_GROUP));

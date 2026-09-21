@@ -399,14 +399,14 @@ ge::graphStatus InferShapeForBatchMatMul(gert::InferShapeContext *context, const
     auto shape_out = context->GetOutputShape(0);
     auto attrs = context->GetAttrs();
     auto op_name = context->GetNodeName();
+    OP_CHECK_IF(shape_x1 == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "x1"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(shape_x2 == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "x2"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(shape_out == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "output shape"), return ge::GRAPH_FAILED);
     if (CheckIsUnknownDimNum(*shape_x1) || CheckIsUnknownDimNum(*shape_x2)) {
         shape_out->SetDimNum(1);
         shape_out->SetDim(0, UNKNOWN_DIM_NUM);
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(shape_x1 == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "x1"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(shape_x2 == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "x2"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(shape_out == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "output shape"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "attrs"), return ge::GRAPH_FAILED);
 
     const bool *adj_x1 = attrs->GetAttrPointer<bool>(attr_adj_idx);

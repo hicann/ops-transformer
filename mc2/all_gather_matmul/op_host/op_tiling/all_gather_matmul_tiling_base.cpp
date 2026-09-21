@@ -148,28 +148,31 @@ static ge::graphStatus AllGatherParamsCheck(const gert::TilingContext *context)
         return ge::GRAPH_FAILED;
     }
 
-    if (context->GetAttrs() == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attrs");
-    } else {
-        auto gatherIndex = context->GetAttrs()->GetAttrPointer<int64_t>(GATHER_IDX);
-        OP_TILING_CHECK(
-            *gatherIndex != 0,
-            OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "gatherIndex", std::to_string(*gatherIndex).c_str(), "0"),
-            return ge::GRAPH_FAILED);
+    auto attrs = context->GetAttrs();
+    OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attrs"),
+                    return ge::GRAPH_FAILED);
+    auto gatherIndex = attrs->GetAttrPointer<int64_t>(GATHER_IDX);
+    OP_TILING_CHECK(gatherIndex == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "gatherIndex"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        *gatherIndex != 0,
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "gatherIndex", std::to_string(*gatherIndex).c_str(), "0"),
+        return ge::GRAPH_FAILED);
 
-        auto isTransA = context->GetAttrs()->GetAttrPointer<bool>(IS_TRANS_A_IDX);
-        OP_TILING_CHECK(
-            *isTransA != false,
-            OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "isTransA", std::to_string(*isTransA).c_str(), "false"),
-            return ge::GRAPH_FAILED);
-        OP_TILING_CHECK(
-            (valueTwo < KVALUE_MIN || valueTwo >= KVALUE_MAX),
-            OP_LOGE_FOR_INVALID_VALUE(
-                context->GetNodeName(), "k-axis", std::to_string(valueTwo).c_str(),
-                (std::string("[") + std::to_string(KVALUE_MIN) + ", " + std::to_string(KVALUE_MAX) + ")").c_str()),
-            return ge::GRAPH_FAILED);
-    }
-    auto group = context->GetAttrs()->GetAttrPointer<char>(static_cast<int>(GROUP_IDX));
+    auto isTransA = attrs->GetAttrPointer<bool>(IS_TRANS_A_IDX);
+    OP_TILING_CHECK(isTransA == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "isTransA"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        *isTransA != false,
+        OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "isTransA", std::to_string(*isTransA).c_str(), "false"),
+        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        (valueTwo < KVALUE_MIN || valueTwo >= KVALUE_MAX),
+        OP_LOGE_FOR_INVALID_VALUE(
+            context->GetNodeName(), "k-axis", std::to_string(valueTwo).c_str(),
+            (std::string("[") + std::to_string(KVALUE_MIN) + ", " + std::to_string(KVALUE_MAX) + ")").c_str()),
+        return ge::GRAPH_FAILED);
+    auto group = attrs->GetAttrPointer<char>(static_cast<int>(GROUP_IDX));
     OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "group"),
                     return ge::GRAPH_FAILED);
 
@@ -544,7 +547,10 @@ ge::graphStatus AllGatherMatmulTilingBase::AllGatherMatmulTilingFunc(gert::Tilin
     int index = 0;
     Mc2Tiling::AllGatherMatmulTilingData *tilingData = context->GetTilingData<Mc2Tiling::AllGatherMatmulTilingData>();
     mc2tiling::TilingArgs args;
-    group_ = context->GetAttrs()->GetAttrPointer<char>(index++);
+    auto attrs = context->GetAttrs();
+    OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attrs"),
+                    return ge::GRAPH_FAILED);
+    group_ = attrs->GetAttrPointer<char>(index++);
     OP_TILING_CHECK(group_ == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "group"),
                     return ge::GRAPH_FAILED);
     if (AllGatherParamsCheck(context) != ge::GRAPH_SUCCESS) {
@@ -552,10 +558,10 @@ ge::graphStatus AllGatherMatmulTilingBase::AllGatherMatmulTilingFunc(gert::Tilin
         return ge::GRAPH_FAILED;
     }
 
-    auto isTransA = context->GetAttrs()->GetAttrPointer<bool>(index++);
-    auto isTransB = context->GetAttrs()->GetAttrPointer<bool>(index++);
-    auto gatherIndex = context->GetAttrs()->GetAttrPointer<int64_t>(index++);
-    auto commTurnPtr = context->GetAttrs()->GetAttrPointer<int64_t>(index++);
+    auto isTransA = attrs->GetAttrPointer<bool>(index++);
+    auto isTransB = attrs->GetAttrPointer<bool>(index++);
+    auto gatherIndex = attrs->GetAttrPointer<int64_t>(index++);
+    auto commTurnPtr = attrs->GetAttrPointer<int64_t>(index++);
     OP_TILING_CHECK(commTurnPtr == nullptr, OP_LOGE(context->GetNodeName(), "commTurn is nullptr"),
                     return ge::GRAPH_FAILED);
     auto commTurn = *commTurnPtr;
