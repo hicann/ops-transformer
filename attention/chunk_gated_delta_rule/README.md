@@ -152,4 +152,4 @@
 
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| aclnn | [test_aclnn_chunk_gated_delta_rul.cpp](./examples/test_aclnn_chunk_gated_delta_rule.cpp) | 通过[aclnnChunkGatedDeltaRule](./docs/aclnnChunkGatedDeltaRule.md)调用aclnnChunkGatedDeltaRule算子 |
+| aclnn | [test_aclnn_chunk_gated_delta_rule.cpp](./examples/test_aclnn_chunk_gated_delta_rule.cpp) | 通过[aclnnChunkGatedDeltaRule](./docs/aclnnChunkGatedDeltaRule.md)调用aclnnChunkGatedDeltaRule算子 |

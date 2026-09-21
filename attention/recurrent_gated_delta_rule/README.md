@@ -116,4 +116,4 @@
 
 | 调用方式  | 样例代码                                                     | 说明                                                         |
 | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| aclnn接口 | [test_aclnn_recurrent_gated_delta_rul.cpp](./examples/test_aclnn_recurrent_gated_delta_rule.cpp) | 通过[aclnnRecurrentGatedDeltaRule](./docs/aclnnRecurrentGatedDeltaRule.md)调用aclnnRecurrentGatedDeltaRule算子 |
+| aclnn接口 | [test_aclnn_recurrent_gated_delta_rule.cpp](./examples/test_aclnn_recurrent_gated_delta_rule.cpp) | 通过[aclnnRecurrentGatedDeltaRule](./docs/aclnnRecurrentGatedDeltaRule.md)调用aclnnRecurrentGatedDeltaRule算子 |
