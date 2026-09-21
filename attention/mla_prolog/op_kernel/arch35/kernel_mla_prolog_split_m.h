@@ -35,8 +35,8 @@ public:
     static constexpr bool isPertile = MLAPT::isPertile;
 
     using mmQcQrInputType = typename MLAPT::mmQcQrInputType;
-    using mmInputType = typename MLAPT::mmInputType;
     using mmQnInputType = typename MLAPT::mmQnInputType;
+    using mmInputType = typename MLAPT::mmInputType;
     using mmCqOutputType = typename MLAPT::mmCqOutputType;
     using mmCkvKrOutputType = typename MLAPT::mmCkvKrOutputType;
     using mmQcQrOutputType = typename MLAPT::mmQcQrOutputType;
@@ -70,7 +70,7 @@ public:
     __aicore__ inline void Process();
     __aicore__ inline void Init(__gm__ uint8_t *smTokenX, __gm__ uint8_t *weightDq, __gm__ uint8_t *weightUqQr,
                                 __gm__ uint8_t *weightUk, __gm__ uint8_t *weightDkvKr, __gm__ uint8_t *smRmsnormGammaCq,
-                                __gm__ uint8_t *rmsnormGammaCkv, __gm__ uint8_t *ropeSin, __gm__ uint8_t *ropeCos,
+                                __gm__ uint8_t *smRmsnormGammaCkv, __gm__ uint8_t *ropeSin, __gm__ uint8_t *ropeCos,
                                 __gm__ uint8_t *cacheIndex, __gm__ uint8_t *kvCache, __gm__ uint8_t *krCache,
                                 __gm__ uint8_t *dequantScaleX, __gm__ uint8_t *dequantScaleWDq,
                                 __gm__ uint8_t *deqScaleQcQrW, __gm__ uint8_t *dequantScaleWDkvkr,
@@ -213,8 +213,8 @@ private:
     GlobalTensor<kvCacheType> kvCacheGm_;
     GlobalTensor<ropeOutputType> qrOutGm_;
 
-    GlobalTensor<dequantScaleType> dequantScaleXGm_;
     GlobalTensor<dequantScaleType> dequantScaleWDqGm_;
+    GlobalTensor<dequantScaleType> dequantScaleXGm_;
     GlobalTensor<dequantScaleType> dequantScaleWDkvkrGm_;
     GlobalTensor<float> smoothScaleCqGm_;
     GlobalTensor<dequantScaleType> deqScaleQcQrW_; // per-channel反量化参数
@@ -246,14 +246,14 @@ private:
     TBuf<TPosition::VECCALC> quantScaleCkrBuffer_;
     TBuf<TPosition::VECCALC> stepActualSeqBuffer_;
 
-    LocalTensor<ropeComputType> sinLocal_;
     LocalTensor<ropeComputType> cosLocal_;
+    LocalTensor<ropeComputType> sinLocal_;
     LocalTensor<float> dequantScaleWDqLocal_;
     LocalTensor<float> dequantScaleWDkvKrLocal_;
     LocalTensor<rmsNormGammaType> rmsnormGammaCqLocal_;
     LocalTensor<rmsNormGammaType> rmsnormGammaCkvLocal_;
-    LocalTensor<float> smoothScaleCqLocal_;
     LocalTensor<float> quantScaleCkvLocal_;
+    LocalTensor<float> smoothScaleCqLocal_;
     LocalTensor<float> quantScaleCkrLocal_;
     LocalTensor<int64_t> stepActualSeqLocal_;
 
@@ -283,7 +283,7 @@ private:
 template <typename MLAPT>
 __aicore__ inline void MlaPrologV3SplitM<MLAPT>::Init(
     __gm__ uint8_t *smTokenX, __gm__ uint8_t *weightDq, __gm__ uint8_t *weightUqQr, __gm__ uint8_t *weightUk,
-    __gm__ uint8_t *weightDkvKr, __gm__ uint8_t *smRmsnormGammaCq, __gm__ uint8_t *rmsnormGammaCkv,
+    __gm__ uint8_t *weightDkvKr, __gm__ uint8_t *smRmsnormGammaCq, __gm__ uint8_t *smRmsnormGammaCkv,
     __gm__ uint8_t *ropeSin, __gm__ uint8_t *ropeCos, __gm__ uint8_t *cacheIndex, __gm__ uint8_t *kvCache,
     __gm__ uint8_t *krCache, __gm__ uint8_t *dequantScaleX, __gm__ uint8_t *dequantScaleWDq,
     __gm__ uint8_t *deqScaleQcQrW, __gm__ uint8_t *dequantScaleWDkvkr, __gm__ uint8_t *quantScaleCkv,
@@ -309,7 +309,7 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::Init(
     weightUkGm_.SetGlobalBuffer((__gm__ mmQnInputType *)weightUk);
     weightDkvKrGm_.SetGlobalBuffer((__gm__ mmInputType *)weightDkvKr); // NZ
     rmsnormGammaCqGm_.SetGlobalBuffer((__gm__ rmsNormGammaType *)smRmsnormGammaCq);
-    rmsnormGammaCkvGm_.SetGlobalBuffer((__gm__ rmsNormGammaType *)rmsnormGammaCkv);
+    rmsnormGammaCkvGm_.SetGlobalBuffer((__gm__ rmsNormGammaType *)smRmsnormGammaCkv);
     ropeSinGm_.SetGlobalBuffer((__gm__ ropeSinCosType *)ropeSin);
     ropeCosGm_.SetGlobalBuffer((__gm__ ropeSinCosType *)ropeCos);
     if constexpr (MLAPT::cacheMode != CACHE_MODE::ND) {
@@ -572,8 +572,8 @@ __aicore__ inline void MlaPrologV3SplitM<MLAPT>::CubeBufferInit()
 
     SetFlag<HardEvent::M_MTE1>(L0A_EVENT0);
     SetFlag<HardEvent::M_MTE1>(L0A_EVENT1);
-    SetFlag<HardEvent::M_MTE1>(L0B_EVENT0);
     SetFlag<HardEvent::M_MTE1>(L0B_EVENT1);
+    SetFlag<HardEvent::M_MTE1>(L0B_EVENT0);
 
     SetFlag<HardEvent::FIX_M>(L0C_EVENT0);
     SetFlag<HardEvent::FIX_M>(L0C_EVENT1);

@@ -38,14 +38,14 @@ __global__ __aicore__ void mla_prolog(__gm__ uint8_t *tokenX, __gm__ uint8_t *we
     REGISTER_TILING_DEFAULT(optiling::MlaPrologTilingData);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 
-    constexpr auto emptyMode = static_cast<EMPTY_TENSOR_MODE>(EmptyTensorMode);
-    if constexpr (emptyMode == EMPTY_TENSOR_MODE::EMPTY_QUERY) {
+    constexpr auto mpEmptyMode = static_cast<EMPTY_TENSOR_MODE>(EmptyTensorMode);
+    if constexpr (mpEmptyMode == EMPTY_TENSOR_MODE::EMPTY_QUERY) {
         return;
     }
-    constexpr auto cacheMode = static_cast<CACHE_MODE>(CacheMode);
-    constexpr auto actualSeqLenMode = static_cast<ACTUAL_SEQ_MODE>(ActualSeqLenMode);
-    constexpr auto splitMMode = static_cast<SPLIT_M_MODE>(SplitMMode);
-    constexpr uint32_t cvRatio = CvMode == ASCENDC_TPL_MIX_AIC_1_1 ? 1 : 2;
+    constexpr auto mpCacheMode = static_cast<CACHE_MODE>(CacheMode);
+    constexpr auto mpActualSeqLenMode = static_cast<ACTUAL_SEQ_MODE>(ActualSeqLenMode);
+    constexpr auto mpSplitMMode = static_cast<SPLIT_M_MODE>(SplitMMode);
+    constexpr uint32_t mpCvRatio = CvMode == ASCENDC_TPL_MIX_AIC_1_1 ? 1 : 2;
 
     GET_TILING_DATA_WITH_STRUCT(optiling::MlaPrologTilingData, tilingDataIn, tiling);
     const optiling::MlaPrologTilingData *__restrict tilingData = nullptr;
@@ -54,8 +54,9 @@ __global__ __aicore__ void mla_prolog(__gm__ uint8_t *tokenX, __gm__ uint8_t *we
     TPipe pipe;
 
     if constexpr (static_cast<SCENARIO>(Scenario) == SCENARIO::NO_QUANT) {
-        MlaPrologVecS1CubS2<MLAPType<bfloat16_t, bfloat16_t, bfloat16_t, float, cacheMode, EnableDequantOpt,
-                                     EnableGroupComputeOpt, emptyMode, actualSeqLenMode, false, cvRatio, EnableRope>>
+        MlaPrologVecS1CubS2<
+            MLAPType<bfloat16_t, bfloat16_t, bfloat16_t, float, mpCacheMode, EnableDequantOpt, EnableGroupComputeOpt,
+                     mpEmptyMode, mpActualSeqLenMode, false, mpCvRatio, EnableRope>>
             op(&pipe, tilingData, tilingDataBaseParams);
         op.Init(tokenX, weightDq, weightUqQr, weightUk, weightDkvKr, rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos,
                 cacheIndex, kvCacheOut, krCacheOut, dequantScaleX, dequantScaleWDq, dequantScaleWUqQr,
@@ -65,8 +66,9 @@ __global__ __aicore__ void mla_prolog(__gm__ uint8_t *tokenX, __gm__ uint8_t *we
 
     } else if constexpr (static_cast<SCENARIO>(Scenario) == SCENARIO::QUANT &&
                          static_cast<QUANT_MODE>(QuantMode) == QUANT_MODE::PARTIAL_QUANT_KV_NO_QUANT) {
-        MlaPrologVecS1CubS2<MLAPType<bfloat16_t, int8_t, bfloat16_t, float, cacheMode, EnableDequantOpt,
-                                     EnableGroupComputeOpt, emptyMode, actualSeqLenMode, false, cvRatio, EnableRope>>
+        MlaPrologVecS1CubS2<
+            MLAPType<bfloat16_t, int8_t, bfloat16_t, float, mpCacheMode, EnableDequantOpt, EnableGroupComputeOpt,
+                     mpEmptyMode, mpActualSeqLenMode, false, mpCvRatio, EnableRope>>
             op(&pipe, tilingData, tilingDataBaseParams);
         op.Init(tokenX, weightDq, weightUqQr, weightUk, weightDkvKr, rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos,
                 cacheIndex, kvCacheOut, krCacheOut, dequantScaleX, dequantScaleWDq, dequantScaleWUqQr,
@@ -76,8 +78,9 @@ __global__ __aicore__ void mla_prolog(__gm__ uint8_t *tokenX, __gm__ uint8_t *we
 
     } else if constexpr (static_cast<SCENARIO>(Scenario) == SCENARIO::QUANT &&
                          static_cast<QUANT_MODE>(QuantMode) == QUANT_MODE::PARTIAL_QUANT_KV_QUANT_PER_CHANNEL) {
-        MlaPrologVecS1CubS2<MLAPType<bfloat16_t, int8_t, int8_t, float, cacheMode, EnableDequantOpt,
-                                     EnableGroupComputeOpt, emptyMode, actualSeqLenMode, false, cvRatio, EnableRope>>
+        MlaPrologVecS1CubS2<
+            MLAPType<bfloat16_t, int8_t, int8_t, float, mpCacheMode, EnableDequantOpt, EnableGroupComputeOpt,
+                     mpEmptyMode, mpActualSeqLenMode, false, mpCvRatio, EnableRope>>
             op(&pipe, tilingData, tilingDataBaseParams);
         op.Init(tokenX, weightDq, weightUqQr, weightUk, weightDkvKr, rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos,
                 cacheIndex, kvCacheOut, krCacheOut, dequantScaleX, dequantScaleWDq, dequantScaleWUqQr,

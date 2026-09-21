@@ -123,7 +123,7 @@ private:
     template <bool needQnDynamicQuant>
     __aicore__ inline void MatmulQnSyncDynamicQuantAndMulQr(int64_t qcOffset, int64_t weightUkOffset,
                                                             int64_t qnResOffset, int64_t mmQnLoops);
-    __aicore__ inline void CopyInSinCos(int64_t tokenIndex, int64_t curVecToken, int64_t batchOffset,
+    __aicore__ inline void CopyInSinCos(int64_t tokenIndex, int64_t curVecToken, int64_t a22BatchOffset,
                                         int64_t curStepBatchSize);
     __aicore__ inline void RmsNormCq(int64_t tokenIndex, int64_t rmsNormCqOffset, int64_t rmsNormCqResOffset,
                                      int64_t curVecToken, int64_t curBlockTokenOffset);
@@ -138,7 +138,7 @@ private:
                                             LocalTensor<typename MLAPT::ropeComputType> &cosLocalCkvKr,
                                             LocalTensor<typename MLAPT::ropeComputType> &sinLocalCkvKr,
                                             CkvkrParams ropeAndScatterKrParams);
-    __aicore__ inline void ScatterKr(LocalTensor<krCacheType> &outputKrLocal, CkvkrParams ropeAndScatterKrParams);
+    __aicore__ inline void ScatterKr(LocalTensor<krCacheType> &a22OutputKrLocal, CkvkrParams a22RopeAndScatterKrParams);
     __aicore__ inline void RmsNormAndScatterCkv(LocalTensor<dequantScaleType> &dequantScaleXLocal,
                                                 LocalTensor<uint8_t> &shareTmpUb,
                                                 LocalTensor<typename MLAPT::ropeComputType> &cosLocalCkvKr,
@@ -151,10 +151,10 @@ private:
     __aicore__ inline void ScatterCkv(LocalTensor<kvCacheType> &a22OutputLocal, CkvkrParams rmsNormAndScatterCkvParams);
     __aicore__ inline void RmsNormRopeScatterCkvKr(int64_t tokenIndex, int64_t rmsNormCkvOffset, int64_t ropeKrOffset,
                                                    int64_t curVecToken);
-    __aicore__ inline void RopeQr(int64_t ropeQrOffset, int64_t ropeQrResOffset, int64_t curVecToken,
-                                  int64_t curBlockTokenOffset);
     __aicore__ inline void DequantQc(int64_t mmQnPreDequantOffset, int64_t mmQnPreDequantResOffset, int64_t curVecToken,
                                      int64_t curBlockTokenOffset);
+    __aicore__ inline void RopeQr(int64_t ropeQrOffset, int64_t ropeQrResOffset, int64_t curVecToken,
+                                  int64_t curBlockTokenOffset);
     __aicore__ inline void CastQc(int64_t mmQnPreCastOffset, int64_t mmQnPreCastResOffset, int64_t curVecToken);
     // 低时延算力分组场景
     template <bool needQnDynamicQuant>
@@ -1049,7 +1049,7 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::ComputeAivOffset(AivOffset &a
 
 template <typename MLAPT>
 __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::CopyInSinCos(int64_t tokenIndex, int64_t curVecToken,
-                                                                int64_t batchOffset, int64_t curStepBatchSize)
+                                                                int64_t a22BatchOffset, int64_t curStepBatchSize)
 {
     if constexpr (!MLAPT::enableRope) {
         return;
@@ -1069,7 +1069,7 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::CopyInSinCos(int64_t tokenInd
         // 如果curStepBatchSize是偶数，则两个核平分；如果curStepBatchSize是奇数，则奇数核比偶数核多分一个
         // >> 1 是将curStepBatchSize分到每个vec核上；
         uint32_t subBlockIdx_ = blockIdx_ % cvRatio_;
-        int64_t offset = (curStepBatchSize / cvRatio_) * subBlockIdx_ + batchOffset;
+        int64_t offset = (curStepBatchSize / cvRatio_) * subBlockIdx_ + a22BatchOffset;
         GatherSinCos<ropeSinCosType, ropeComputType>(cosLocal_, sinLocal_, ropeCosGm_, ropeSinGm_, offset,
                                                      (curStepBatchSize + cvRatio_ - 1) / cvRatio_, a22ShareTmpUb,
                                                      vectorRow_, baseParams_->dimHeadRope);
@@ -1698,15 +1698,15 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::RopeAndScatterKr(LocalTensor<
 
 template <typename MLAPT>
 __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::ScatterKr(LocalTensor<krCacheType> &a22OutputKrLocal,
-                                                             CkvkrParams ropeAndScatterKrParams)
+                                                             CkvkrParams a22RopeAndScatterKrParams)
 {
     int64_t paTokenIndex;
     if constexpr ((MLAPT::cacheMode == CACHE_MODE::PA_NZ) || (MLAPT::cacheMode == CACHE_MODE::PA_BSND) ||
                   (MLAPT::cacheMode == CACHE_MODE::ND)) {
         if constexpr (MLAPT::cacheMode != CACHE_MODE::ND) {
-            paTokenIndex = cacheIndexGm_(ropeAndScatterKrParams.tokenIndex);
+            paTokenIndex = cacheIndexGm_(a22RopeAndScatterKrParams.tokenIndex);
         } else {
-            paTokenIndex = ropeAndScatterKrParams.tokenIndex;
+            paTokenIndex = a22RopeAndScatterKrParams.tokenIndex;
         }
         if (baseParams_->ckvkrRepoMode == 1U && isPertile) {
             int64_t startOffset;
@@ -1731,12 +1731,12 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::ScatterKr(LocalTensor<krCache
     } else {
         ScatterCacheMultiRows<krCacheType, MLAPT::cacheMode == CACHE_MODE::PA_BLK_NZ>(
             krCacheGm_, a22OutputKrLocal,
-            ScatterCacheParams{baseParams_->blockSize, ropeAndScatterKrParams.cacheOffset, vectorRow_,
+            ScatterCacheParams{baseParams_->blockSize, a22RopeAndScatterKrParams.cacheOffset, vectorRow_,
                                baseParams_->dimHeadRope, baseParams_->dimHeadRope,
                                static_cast<int64_t>(baseParams_->krCacheStride0), baseParams_->seq1Size,
-                               ropeAndScatterKrParams.tokenIndex},
-            ropeAndScatterKrParams.rowsInCurBatch, ropeAndScatterKrParams.cacheOffset,
-            ropeAndScatterKrParams.nextBatchOffset);
+                               a22RopeAndScatterKrParams.tokenIndex},
+            a22RopeAndScatterKrParams.rowsInCurBatch, a22RopeAndScatterKrParams.cacheOffset,
+            a22RopeAndScatterKrParams.nextBatchOffset);
     }
 }
 
@@ -2086,7 +2086,7 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::DequantAndRopeSplitNSyncMMQcQ
     // RopeQrSplitN参数
     uint32_t ropeDstStride = baseParams_->headSizeQr - colQr;
     // CV1:2和1:1，M轴方向切成2块处理
-    uint32_t ropeCnt = (mmQcQrParam_.m + subBlockIdx_) / cvRatio_;
+    uint32_t a22RopeCnt = (mmQcQrParam_.m + subBlockIdx_) / cvRatio_;
     uint32_t ropeCntDown = mmQcQrParam_.m / 2;
     int64_t ropeStride = static_cast<int64_t>(colQr + colQc) * static_cast<int64_t>(baseParams_->numHeadSize);
     uint32_t outputOffsetRope = ropeCntDown * subBlockIdx_ * baseParams_->headSizeQr;
@@ -2098,7 +2098,7 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::DequantAndRopeSplitNSyncMMQcQ
     // 等cube生产足够数据了以后，vec开始消费
     uint32_t dequantLoopCount = 0;
     uint32_t totalDequantLoops = CeilDiv(oriCol, (colQr + colQc));
-    bool needSparseSync = totalDequantLoops > MAX_SYNC_FLAG_COUNT;
+    bool a22NeedSparseSync = totalDequantLoops > MAX_SYNC_FLAG_COUNT;
     while (colOffsetCube < oriCol) { // 循环CeilDiv(oriCol, colCube)次
         colOffsetCube += colCube;
         if (colOffsetCube > oriCol) { // 当oriCol不被colCube整除时，mm最后一个base块需要刷新col end
@@ -2106,9 +2106,9 @@ __aicore__ inline void MlaPrologVecS1CubS2<MLAPT>::DequantAndRopeSplitNSyncMMQcQ
         }
         CrossCoreWaitFlag(FINISH_MM_QCQR_SPLIT_N);
         DequantRopeSplitNDequantLoop(mmQnPreDequantOffset, mmQnPreDequantResOffset, colQc, colQr, colOffsetCube,
-                                     srcStride, dstStride, inputOffset, outputOffset, totalDequantLoops, needSparseSync,
-                                     colOffsetVec, dequantLoopCount);
-        DequantRopeSplitNRopeLoop(ropeQrOffset, ropeQrResOffset, colQc, colQr, colOffsetCube, ropeDstStride, ropeCnt,
+                                     srcStride, dstStride, inputOffset, outputOffset, totalDequantLoops,
+                                     a22NeedSparseSync, colOffsetVec, dequantLoopCount);
+        DequantRopeSplitNRopeLoop(ropeQrOffset, ropeQrResOffset, colQc, colQr, colOffsetCube, ropeDstStride, a22RopeCnt,
                                   ropeStride, inputOffsetRope, outputOffsetRope, deqScaleOffset, deQuantScaleCqOffset,
                                   colOffsetRope);
     }

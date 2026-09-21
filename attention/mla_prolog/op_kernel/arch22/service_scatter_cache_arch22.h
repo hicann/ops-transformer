@@ -107,16 +107,16 @@ __aicore__ inline void ScatterCache(const GlobalTensor<T> &cacheGm, const LocalT
         return;
     }
     if constexpr (!IS_NZ) {
-        int64_t cacheOffset = GetCacheOffset(scatterCacheParams.paTokenIndex, scatterCacheParams.blockSize,
-                                             scatterCacheParams.stride, scatterCacheParams.cacheStride0);
-        DataCopy(cacheGm[cacheOffset], inputLocal, scatterCacheParams.col);
+        int64_t a22CacheOffset = GetCacheOffset(scatterCacheParams.paTokenIndex, scatterCacheParams.blockSize,
+                                                scatterCacheParams.stride, scatterCacheParams.cacheStride0);
+        DataCopy(cacheGm[a22CacheOffset], inputLocal, scatterCacheParams.col);
     } else {
         constexpr uint8_t a22Col0 = ALIGN_BLOCK_SIZE / sizeof(T);
-        int64_t cacheOffset = GetCacheOffset(scatterCacheParams.paTokenIndex, scatterCacheParams.blockSize, a22Col0,
-                                             scatterCacheParams.cacheStride0);
+        int64_t a22CacheOffset = GetCacheOffset(scatterCacheParams.paTokenIndex, scatterCacheParams.blockSize, a22Col0,
+                                                scatterCacheParams.cacheStride0);
         DataCopyParams copyParams{static_cast<uint16_t>(scatterCacheParams.col / a22Col0), 1, 0,
                                   static_cast<uint16_t>(scatterCacheParams.blockSize - 1)};
-        DataCopy(cacheGm[cacheOffset], inputLocal, copyParams);
+        DataCopy(cacheGm[a22CacheOffset], inputLocal, copyParams);
     }
 }
 

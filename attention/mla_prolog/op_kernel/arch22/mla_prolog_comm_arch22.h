@@ -359,8 +359,8 @@ struct MMParams {
     uint32_t k;
     uint32_t orgM;
     uint32_t orgN;
-    uint32_t orgKa;
     uint32_t orgKb;
+    uint32_t orgKa;
     uint32_t orgKc;
     uint32_t baseM;
     uint32_t baseN;
