@@ -289,7 +289,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>输入</td>
             <td>MLA rope部分：Query位置编码的输出。</td>
             <td>
-            -
+            可选项。queryRopeOptional和keyRopeOptional必须同时传入或同时为空指针。
             </td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
@@ -303,7 +303,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>输入</td>
             <td>MLA rope部分：Key位置编码的输出。</td>
             <td>
-            -
+            可选项。queryRopeOptional和keyRopeOptional必须同时传入或同时为空指针。
             </td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
