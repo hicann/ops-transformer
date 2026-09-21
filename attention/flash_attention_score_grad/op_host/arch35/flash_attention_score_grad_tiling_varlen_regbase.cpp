@@ -1674,14 +1674,17 @@ protected:
         std::vector<std::vector<int64_t>> totalBlockInfo(fBaseParams.b, std::vector<int64_t>(TOTAL_BLOCK_DIMENSION));
         std::vector<std::vector<float>> acturalBlockInfo(fBaseParams.b + NUM_TWO,
                                                          std::vector<float>(fBaseParams.s2Outer));
+        std::vector<std::vector<uint64_t>> validBlockCount(fBaseParams.b, std::vector<uint64_t>(fBaseParams.s2Outer));
         FillBlockInfoLoadBalance(totalBlockInfo, acturalBlockInfo);
+        FillColumnValidBlockCount(validBlockCount);
 
         float maxBlockNumPerCore = BinarySearchMaxBlockNumPerCore(acturalBlockInfo);
 
         int64_t blockStarts[CORE_LIST_NUM];
         int64_t blockEnds[CORE_LIST_NUM];
 
-        if (!CaclePerCoreBlockInfo(totalBlockInfo, acturalBlockInfo, maxBlockNumPerCore, blockStarts, blockEnds)) {
+        if (!CaclePerCoreBlockInfo(totalBlockInfo, acturalBlockInfo, validBlockCount, maxBlockNumPerCore, blockStarts,
+                                   blockEnds)) {
             return false;
         }
 
@@ -1716,11 +1719,36 @@ protected:
         return right;
     }
 
+    void FillColumnValidBlockCount(std::vector<std::vector<uint64_t>> &validBlockCount)
+    {
+        for (int64_t b = 0; b < fBaseParams.b; b++) {
+            int64_t actualS1Outer = (fBaseParams.actualSeqQlen[b] + fBaseParams.s1CvInner - 1) / fBaseParams.s1CvInner;
+            int64_t actualS2Len = fBaseParams.actualSeqKvlen[b];
+            for (int64_t s2oIdx = 0; s2oIdx < fBaseParams.s2Outer; s2oIdx++) {
+                int64_t s2IdxLeft = fBaseParams.cvS2Inner * s2oIdx;
+                if (s2IdxLeft >= actualS2Len) {
+                    continue;
+                }
+                int64_t s2IdxRight = std::min(s2IdxLeft + fBaseParams.cvS2Inner, actualS2Len);
+                for (int64_t s1oIdx = 0; s1oIdx < actualS1Outer; s1oIdx++) {
+                    if (fBaseParams.attenMaskOptional == EMPTY_TENSOR ||
+                        CheckUnpadSparseLeftAndRight(s1oIdx, s2IdxLeft, s2IdxRight, b)) {
+                        validBlockCount[b][s2oIdx]++;
+                    }
+                }
+            }
+        }
+    }
+
     bool CaclePerCoreBlockInfo(const std::vector<std::vector<int64_t>> &totalBlockInfo,
-                               const std::vector<std::vector<float>> &acturalBlockInfo, const float maxBlockNumPerCore,
-                               int64_t (&blockStarts)[CORE_LIST_NUM], int64_t (&blockEnds)[CORE_LIST_NUM])
+                               const std::vector<std::vector<float>> &acturalBlockInfo,
+                               const std::vector<std::vector<uint64_t>> &validBlockCount,
+                               const float maxBlockNumPerCore, int64_t (&blockStarts)[CORE_LIST_NUM],
+                               int64_t (&blockEnds)[CORE_LIST_NUM])
     {
         float currentSum = 0;
+        uint64_t currentValidBlockCount = 0;
+        uint64_t maxValidBlockCount = 0;
         int64_t coreIdx = 0;
         uint64_t tndS1S2PrefixSumTmp = 0;
         uint64_t tndS1S2AlignPrefixSumTmp = 0;
@@ -1732,6 +1760,7 @@ protected:
                     (fBaseParams.actualSeqQlen[b] + fBaseParams.s1CvInner - 1) / fBaseParams.s1CvInner;
                 for (int64_t j = 0; j < fBaseParams.s2Outer; j++) {
                     float num = acturalBlockInfo[b][j];
+                    uint64_t blockCount = validBlockCount[b][j];
                     if (coreIdx >= CORE_LIST_NUM) {
                         OP_LOGD("GetBlockInfoOfBNS4TND", " Not support BN2S2.");
                         return false;
@@ -1742,14 +1771,17 @@ protected:
                         int64_t preS2BlockNum = j * actualS1Outer;
                         blockEnds[coreIdx] = preBatchBlockNum + preNGBlockNum + preS2BlockNum;
                         blockStarts[coreIdx + 1] = blockEnds[coreIdx];
+                        maxValidBlockCount = std::max(maxValidBlockCount, currentValidBlockCount);
                         coreIdx += 1;
                         currentSum = num;
+                        currentValidBlockCount = blockCount;
                         tndBaseInfo.tndStartBIdx[coreIdx] = b;
                         tndBaseInfo.tndS1S2PrefixSum[coreIdx] = tndS1S2PrefixSumTmp;
                         tndBaseInfo.tndS1S2AlignPrefixSum[coreIdx] = tndS1S2AlignPrefixSumTmp;
                         tndBaseInfo.tndPrefixSum[coreIdx] = tndPrefixSumTmp;
                     } else {
                         currentSum += num;
+                        currentValidBlockCount += blockCount;
                     }
                 }
             }
@@ -1769,7 +1801,9 @@ protected:
         OP_LOGD("GetBlockInfoOfBNS4TND", " blockIdx = %ld: actualBlock = %f", coreIdx, currentSum);
         blockStarts[0] = 0;
         blockEnds[coreIdx] = totalBlockInfo[fBaseParams.b - 1][1];
+        maxValidBlockCount = std::max(maxValidBlockCount, currentValidBlockCount);
         fBaseParams.blockOuter = coreIdx + 1;
+        tndBaseInfo.normalMaxValidBlockCount = maxValidBlockCount;
         return true;
     }
 

@@ -192,6 +192,18 @@ bool IsTndDeterSwizzleSupported(const FuzzyBaseInfoParamsRegbase &params)
     return IsTndDeterSwizzlePerformanceEnough(params);
 }
 
+bool IsShortTndNonDeterSwizzleBeneficial(const FuzzyBaseInfoParamsRegbase &params, const TndBaseInfo &tndBaseInfo)
+{
+    if (params.b <= 0 || params.b >= TND_SWIZZLE_PREFIX_NUM || tndBaseInfo.normalMaxValidBlockCount == 0) {
+        return false;
+    }
+
+    const uint64_t swizzleMaxLoop = tndBaseInfo.tndS2BlockPrefixSum[params.b];
+    // Keep a 20% margin to cover short-sequence swizzle indexing, padding, and locality overhead.
+    return swizzleMaxLoop > 0 && swizzleMaxLoop * TND_NONDETER_SWIZZLE_PERCENT_BASE <=
+                                     tndBaseInfo.normalMaxValidBlockCount * TND_NONDETER_SWIZZLE_MAX_LOAD_PERCENT;
+}
+
 void ConfigureTndDeterBn2S2Swizzle(FuzzyBaseInfoParamsRegbase &params, const TndBaseInfo &tndBaseInfo)
 {
     // Mode 2 keeps every (B, N2, S2) column on one core, so dK/dV never need a cross-core tail merge.
@@ -864,15 +876,18 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::DoOpTiling()
     // Mode 2 pads every batch's (N2, S2) columns to a full AIC group. Reject schedules whose aggregate
     // valid-slot ratio is too low; otherwise short tail groups serialize batches while most cores stay idle.
     const bool deterTndSwizzleSupported = !fBaseParams.isDeterministic || IsTndDeterSwizzleSupported(fBaseParams);
+    const bool isLongSeqTndSwizzle = fBaseParams.s1 >= TND_SWIZZLE_MIN_S1_SIZE ||
+                                     (fBaseParams.s2 > static_cast<uint32_t>(ConstAxisTemplateNum::NUM128) &&
+                                      fBaseParams.s1 >= TND_SWIZZLE_MIN_S1_SIZE_1);
+    const bool isShortSeqTndSwizzle = !fBaseParams.isDeterministic && !isLongSeqTndSwizzle &&
+                                      IsShortTndNonDeterSwizzleBeneficial(fBaseParams, tndBaseInfo);
     const bool templateSupportCond =
         (fBaseParams.isDeterministic &&
          (fBaseParams.splitAxis == SplitAxisEnum::BN2GS1S2 || fBaseParams.splitAxis == SplitAxisEnum::BN2S2) &&
          fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::DETER_DENSE) && fBaseParams.g == 1 &&
          deterTndSwizzleSupported) ||
         (!fBaseParams.isDeterministic && fBaseParams.splitAxis == SplitAxisEnum::BN2S2 &&
-         (fBaseParams.s1 >= TND_SWIZZLE_MIN_S1_SIZE ||
-          (fBaseParams.s2 > static_cast<uint32_t>(ConstAxisTemplateNum::NUM128) &&
-           fBaseParams.s1 >= TND_SWIZZLE_MIN_S1_SIZE_1)) &&
+         (isLongSeqTndSwizzle || isShortSeqTndSwizzle) &&
          (fBaseParams.sparseType != static_cast<uint8_t>(SparseType::UNSUPPORTED)));
     tndBaseInfo.isTndSwizzle = fBaseParams.enableSwizzle && fBaseParams.layoutType == INPUT_FORMAT_TND &&
                                templateSupportCond && fBaseParams.b < TND_SWIZZLE_PREFIX_NUM &&
@@ -882,10 +897,10 @@ ge::graphStatus FlashAttentionScoreGradTilingNormalRegbase::DoOpTiling()
     }
     OP_LOGI(context_,
             "isExceedL2Cache=[%d], sparseType=[%d], enableSwizzle=[%d], "
-            "deterTndSwizzleSupported=[%d], isTndSwizzle=[%d], isNzOut=[%d].",
+            "deterTndSwizzleSupported=[%d], shortSeqTndSwizzle=[%d], isTndSwizzle=[%d], isNzOut=[%d].",
             static_cast<int>(isExceedL2Cache), static_cast<int>(fBaseParams.sparseType),
             static_cast<int>(fBaseParams.enableSwizzle), static_cast<int>(deterTndSwizzleSupported),
-            tndBaseInfo.isTndSwizzle, fBaseParams.isNzOut);
+            static_cast<int>(isShortSeqTndSwizzle), tndBaseInfo.isTndSwizzle, fBaseParams.isNzOut);
 
     ret = InitTilingData();
     if (ret != ge::GRAPH_SUCCESS) {

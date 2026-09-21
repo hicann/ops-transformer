@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <gtest/gtest.h>
 #include "tiling/platform/platform_ascendc.h"
@@ -7666,4 +7667,77 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_85_tnd_
         "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {21464576};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_86_tnd_bn2s2_short_seq_swizzle)
+{
+    int64_t actualSeqQlen[36] = {71,   159,  242,  323,  436,  608,  740,  824,  944,  1012, 1098, 1183,
+                                 1259, 1419, 1486, 1569, 1725, 1941, 2042, 2166, 2242, 2369, 2456, 2594,
+                                 2674, 2832, 2916, 3083, 3204, 3306, 3503, 3622, 3709, 3853, 4023, 4096};
+    int64_t actualSeqKvlen[36] = {71,   159,  242,  323,  436,  608,  740,  824,  944,  1012, 1098, 1183,
+                                  1259, 1419, 1486, 1569, 1725, 1941, 2042, 2166, 2242, 2369, 2456, 2594,
+                                  2674, 2832, 2916, 3083, 3204, 3306, 3503, 3622, 3709, 3853, 4023, 4096};
+    auto compileInfo = MakeA5CompileInfo();
+    gert::TilingContextPara tilingContextPara(
+        "FlashAttentionScoreGrad",
+        {
+            {{{4096, 128, 192}, {4096, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{4096, 128, 192}, {4096, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{4096, 128, 128}, {4096, 128, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{4096, 128, 128}, {4096, 128, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_UINT8, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2048, 2048}, {2048, 2048}}, ge::DT_BOOL, ge::FORMAT_ND},
+            {{{4096, 128, 8}, {4096, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4096, 128, 8}, {4096, 128, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{4096, 128, 128}, {4096, 128, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{36}, {36}}, ge::DT_INT64, ge::FORMAT_ND, true, actualSeqQlen},
+            {{{36}, {36}}, ge::DT_INT64, ge::FORMAT_ND, true, actualSeqKvlen},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {{{4096, 128, 192}, {4096, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{4096, 128, 192}, {4096, 128, 192}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{4096, 128, 128}, {4096, 128, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(0.088388f)},
+         {"keep_prob", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+         {"pre_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65536)},
+         {"next_tockens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"head_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
+         {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+         {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"seed", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
+        &compileInfo, "Ascend950", A5SocInfo, 262144);
+
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+    constexpr uint64_t tndSwizzleTilingKeyMask = 1ULL << 53;
+    ASSERT_EQ(tilingInfo.tilingKey & tndSwizzleTilingKeyMask, tndSwizzleTilingKeyMask);
+    using TilingData = optiling::fag::FlashAttentionScoreGradTilingDataUs1s2Bbn2gs1s2Regbase<false, false, true, true>;
+    ASSERT_GE(tilingInfo.tilingDataSize, sizeof(TilingData));
+    TilingData tilingData;
+    std::memcpy(&tilingData, tilingInfo.tilingData.get(), sizeof(TilingData));
+
+    EXPECT_EQ(tilingData.s1s2BNGS1S2SplitCoreParams.get_blockOuter(), 32);
+    EXPECT_EQ(tilingData.s1s2BNGS1S2SplitCoreParams.get_maxValidBBLen(), 271);
 }
