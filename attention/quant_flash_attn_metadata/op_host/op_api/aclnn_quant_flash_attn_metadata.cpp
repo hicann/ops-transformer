@@ -14,6 +14,7 @@
  */
 
 #include "l0_quant_flash_attn_metadata.h"
+#include "acl/acl_rt.h"
 #include "aclnn_kernels/contiguous.h"
 #include "aclnn_kernels/reshape.h"
 #include "aclnn/aclnn_base.h"
@@ -56,8 +57,16 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
-    uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
-    uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
+    // 与主算子 ACLNN tiling 保持一致：优先获取当前线程的有效核数（含 stream 控核）。
+    // 查询失败时，与 opbase InitL2Phase1Context 一样回退到硬件平台核数。
+    uint32_t aicCoreNum = 0;
+    uint32_t aivCoreNum = 0;
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum) != ACL_SUCCESS) {
+        aicCoreNum = npuInfo.GetCubeCoreNum();
+    }
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
+        aivCoreNum = npuInfo.GetVectorCoreNum();
+    }
     const char *socVersion = npuInfo.GetSocLongVersion().c_str();
 
     // 宿主侧读取输出 tensor 的 shape 并经 attr 下发: AICPU 侧输出 TensorShape 可能未填充,
