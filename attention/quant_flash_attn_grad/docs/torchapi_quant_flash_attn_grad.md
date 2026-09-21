@@ -211,7 +211,7 @@ cann_ops_transformer.quant_flash_attn_grad(
 | do_descale | Tensor | 必选 | dout的反量化缩放因子 | float32 | ND | (1,) | × |
 | p_scale | Tensor | 必选 | P矩阵的量化缩放因子 | float32 | ND | (1,) | × |
 | ds_scale | Tensor | 必选 | 反量化缩放因子 | float32 | ND | (1,) | × |
-| softmax_lse | Tensor | 必选 | 注意力正向计算的输出softmaxLse | float32 | ND | (B, Q_N, Q_S, 1) | × |
+| softmax_lse | Tensor | 必选 | 注意力正向计算的输出softmaxLse | float32 | ND | (B, Q_N, Q_S) | × |
 | cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,) | × |
 | cu_seqlens_kv | Tensor | 可选 | KV的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,) | × |
 | seqused_q | Tensor | 可选 | 指定每batch中q实际使用的序列长度，截断冗余运算 | int32 | ND | (B,) | × |
