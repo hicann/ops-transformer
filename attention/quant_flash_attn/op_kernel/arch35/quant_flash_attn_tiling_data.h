@@ -80,7 +80,6 @@ struct QuantFlashAttnBaseParams {
     float scaleValue;
     uint8_t iscuSeqLengthsNull;
     uint8_t iscuSeqLengthsKVNull;
-    uint8_t isKvContinuous;
     uint8_t isSoftMaxLseEnable;
     uint32_t coreNum;
     uint32_t outputLayout;

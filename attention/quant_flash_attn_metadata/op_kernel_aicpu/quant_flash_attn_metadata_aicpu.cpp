@@ -208,8 +208,8 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     baseInfo.layoutQuery = ConvertToLayout(layoutQ_);
     baseInfo.layoutKv = ConvertToLayout(layoutKv_);
     if (quantMode_ == 1 || quantMode_ == 6 || quantMode_ == 0) {
-        baseInfo.queryType = load_balance::DataType::INT8;
-        baseInfo.kvType = load_balance::DataType::INT8;
+        baseInfo.queryType = load_balance::DataType::FP8_E4M3FN;
+        baseInfo.kvType = load_balance::DataType::FP8_E4M3FN;
     }
     uint32_t sOuterFactor = 0;
     uint32_t sInnerFactor = 0;
@@ -223,9 +223,16 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     mBaseSize_ = mBaseSize_ * (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
-    param.l2Byte = 0;
-    param.fdTolerance = 300;
-    param.fdOn = 0;
+    if (quantMode_ == 1) {                  // 仅 MXFP8 开启 FlashDecode
+        param.l2Byte = 96U * 1024U * 1024U; // 96: 96MB, 1024: Mb2Kb, 1024:Kb2Mb
+        param.fdTolerance = 10;             // 10: tolerance block
+        param.fdLeastBlock = 3;             // 3: least block
+        param.fdOn = true;
+    } else {
+        param.l2Byte = 0;
+        param.fdTolerance = 300;
+        param.fdOn = false;
+    }
     param.outputLayout = load_balance::OutputLayout::BN2_S1G;
 
     if (isGradEnabled_) {

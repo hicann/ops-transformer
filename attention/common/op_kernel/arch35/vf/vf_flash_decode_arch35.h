@@ -20,6 +20,8 @@
 constexpr float FLT_ZERO = 0;
 // The FA softmax maximum uses -FLT_MAX_NEW as the fully masked row sentinel.
 constexpr float FLT_MAX_NEW = 3.402823466e+38F;
+// FD 聚合侧判断全 mask 行的默认 min 判值，保持既有调用方的历史行为
+constexpr uint32_t FD_LSE_DEFAULT_MIN_CHECK_BITS = 0xFF167699;
 
 enum class SinkInjectStage : uint8_t {
     AT_FA_PROLOGUE,
@@ -252,7 +254,8 @@ __simd_vf__ void ComputeScaleValue_8_VF_FD(__ubuf__ T *lseSink, __ubuf__ T *lseM
                                            __ubuf__ T *lseSum, __ubuf__ T *lseSumTmp, __ubuf__ T *lseOutUb,
                                            __ubuf__ T *lseUb, __ubuf__ T *lseMaxReduce, uint32_t dealCount, uint16_t i,
                                            uint32_t dealRowCount, uint32_t actualCombineLoopSize,
-                                           uint16_t softmaxLseFlag, uint16_t learnableSinkFlag)
+                                           uint16_t softmaxLseFlag, uint16_t learnableSinkFlag,
+                                           float minCheckValue = *((float *)&FD_LSE_DEFAULT_MIN_CHECK_BITS))
 {
     Reg::RegTensor<T> vregLseMax;
     Reg::RegTensor<T> vregLseMaxTmp;
@@ -300,9 +303,8 @@ __simd_vf__ void ComputeScaleValue_8_VF_FD(__ubuf__ T *lseSink, __ubuf__ T *lseM
         Reg::RegTensor<float> vregInfValue;
         Reg::MaskReg pregCompare;
         constexpr float infValue = 3e+99; // 3e+99 for float inf
-        constexpr float minValue = -FLT_MAX_NEW;
         Reg::Duplicate<float, float>(vregInfValue, infValue);
-        Reg::Duplicate<float, float>(vregMinValue, minValue);
+        Reg::Duplicate<float, float>(vregMinValue, minCheckValue);
 
         Reg::Log<T, Reg::MaskMergeMode::ZEROING>(vregRes, vregLseSum, pregTailN);
         Reg::Add<T, Reg::MaskMergeMode::ZEROING>(vregRes, vregRes, vregLseMax, pregTailN);
@@ -326,7 +328,8 @@ __aicore__ inline void ComputeScaleValue_8_FD(const LocalTensor<SINK_T> &tmpSink
                                               const LocalTensor<T> &lseSumUb, const LocalTensor<T> &lseResUb,
                                               const LocalTensor<T> &lseOutputUb, const LocalTensor<T> &lseMaxReduceUb,
                                               uint32_t dealRowCount, uint32_t actualCombineLoopSize,
-                                              bool softmaxLseFlag, bool learnableSinkFlag)
+                                              bool softmaxLseFlag, bool learnableSinkFlag,
+                                              float minCheckValue = *((float *)&FD_LSE_DEFAULT_MIN_CHECK_BITS))
 {
     uint32_t dealCount = dealRowCount * 8;
     uint16_t i = 0;
@@ -350,7 +353,7 @@ __aicore__ inline void ComputeScaleValue_8_FD(const LocalTensor<SINK_T> &tmpSink
     }
     ComputeScaleValue_8_VF_FD<T, SINK_T, SINK_INJECT_STAGE>(
         lseSink, lseMax, lseMaxTmp, lseSum, lseSumTmp, lseOutUb, lseUb, lseMaxReduce, dealCount, i, dealRowCount,
-        actualCombineLoopSize, softmaxLseFlagUint, learnableSinkFlagUint);
+        actualCombineLoopSize, softmaxLseFlagUint, learnableSinkFlagUint, minCheckValue);
 }
 
 // 处理8<g<=16的场景
@@ -518,11 +521,12 @@ __aicore__ inline void ComputeScaleValue_VF_FD(const LocalTensor<SINK_T> &tmpSin
                                                const LocalTensor<T> &lseSumUb, const LocalTensor<T> &lseResUb,
                                                const LocalTensor<T> &lseOutputUb, const LocalTensor<T> &lseMaxUbTmp,
                                                uint32_t dealRowCount, uint32_t actualCombineLoopSize,
-                                               bool softmaxLseFlag, bool learnableSinkFlag)
+                                               bool softmaxLseFlag, bool learnableSinkFlag,
+                                               float minCheckValue = *((float *)&FD_LSE_DEFAULT_MIN_CHECK_BITS))
 {
     ComputeScaleValue_8_FD<T, SINK_T, SINK_INJECT_STAGE>(tmpSinkUb, lseMaxUb, lseSumUb, lseResUb, lseOutputUb,
                                                          lseMaxUbTmp, dealRowCount, actualCombineLoopSize,
-                                                         softmaxLseFlag, learnableSinkFlag);
+                                                         softmaxLseFlag, learnableSinkFlag, minCheckValue);
 }
 
 // 处理g<=8的场景

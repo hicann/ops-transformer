@@ -227,10 +227,12 @@ public:
         }
 
         if constexpr (FLASH_DECODE) {
-            accumOutGm_.SetGlobalBuffer((__gm__ float *)workspace);
-            softmaxFDSumGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfo_.accumOutSize);
-            softmaxFDMaxGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfo_.accumOutSize +
-                                            constInfo_.logSumExpSize);
+            if (constInfo_.enableFlashDecode) {
+                accumOutGm_.SetGlobalBuffer((__gm__ float *)workspace);
+                softmaxFDSumGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfo_.accumOutSize);
+                softmaxFDMaxGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfo_.accumOutSize +
+                                                constInfo_.logSumExpSize);
+            }
         }
     }
 
@@ -441,14 +443,22 @@ public:
     __aicore__ inline void SoftmaxDataCopyOut(RunInfoX runInfo, LocalTensor<float> &sumUb, LocalTensor<float> &maxUb)
     {
         if constexpr (FLASH_DECODE) {
-            if (runInfo.isS2SplitCore) {
-                ComputeLogSumExpAndCopyToGm(runInfo, sumUb, maxUb);
+            if (constInfo_.enableFlashDecode) {
+                if (runInfo.isS2SplitCore) {
+                    ComputeLogSumExpAndCopyToGm(runInfo, sumUb, maxUb);
+                }
             }
         }
 
         if constexpr (FLASH_DECODE) {
-            if (!runInfo.isS2SplitCore && constInfo_.isSoftmaxLseEnable) {
-                SoftmaxLseCopyOut(sumUb, maxUb, runInfo);
+            if (constInfo_.enableFlashDecode) {
+                if (!runInfo.isS2SplitCore && constInfo_.isSoftmaxLseEnable) {
+                    SoftmaxLseCopyOut(sumUb, maxUb, runInfo);
+                }
+            } else {
+                if (constInfo_.isSoftmaxLseEnable) {
+                    SoftmaxLseCopyOut(sumUb, maxUb, runInfo);
+                }
             }
         } else {
             if (constInfo_.isSoftmaxLseEnable) {
@@ -798,8 +808,12 @@ public:
                                                uint32_t mDealSize, uint32_t gmDealRowCount)
     {
         if constexpr (FLASH_DECODE) {
-            if (runInfo.isS2SplitCore) {
-                Bmm2ResForFDCopyOut(runInfo, vec2ResUb, mStartVec, mDealSize);
+            if (constInfo_.enableFlashDecode) {
+                if (runInfo.isS2SplitCore) {
+                    Bmm2ResForFDCopyOut(runInfo, vec2ResUb, mStartVec, mDealSize);
+                } else {
+                    Bmm2ResCastAndCopyOut(runInfo, vec2ResUb, mStartVec, mDealSize, gmDealRowCount);
+                }
             } else {
                 Bmm2ResCastAndCopyOut(runInfo, vec2ResUb, mStartVec, mDealSize, gmDealRowCount);
             }
@@ -928,12 +942,13 @@ public:
         }
     }
 
-    __aicore__ inline void BroadCastAndCopyOut(const RunInfoX &runInfo, LocalTensor<float> &sumUb,
-                                               LocalTensor<float> &maxUb, int64_t gmOffset, int64_t calculateSize)
+    __aicore__ inline void BroadCastAndCopyOut(LocalTensor<float> &sumUb, LocalTensor<float> &maxUb, int64_t gmOffset,
+                                               uint32_t gmDealRowCount)
     {
+        int64_t calculateSize = gmDealRowCount * fp32BaseSize;
         // Copy sum to gm
         LocalTensor<float> sumOutTensor = sumBrdcst_.template AllocTensor<float>();
-        FaVectorApi::BroadcastMaxSum(sumOutTensor, sumUb, runInfo.actVecMSize);
+        FaVectorApi::BroadcastMaxSum(sumOutTensor, sumUb, gmDealRowCount);
         sumBrdcst_.template EnQue(sumOutTensor);
         sumBrdcst_.template DeQue<float>();
         DataCopy(softmaxFDSumGm_[gmOffset], sumOutTensor, calculateSize);
@@ -941,7 +956,7 @@ public:
 
         // Copy max to gm
         LocalTensor<float> maxOutTensor = maxBrdcst_.template AllocTensor<float>();
-        FaVectorApi::BroadcastMaxSum(maxOutTensor, maxUb, runInfo.actVecMSize);
+        FaVectorApi::BroadcastMaxSum(maxOutTensor, maxUb, gmDealRowCount);
         maxBrdcst_.template EnQue(maxOutTensor);
         maxBrdcst_.template DeQue<float>();
         DataCopy(softmaxFDMaxGm_[gmOffset], maxOutTensor, calculateSize);
@@ -954,12 +969,24 @@ public:
         if (unlikely(runInfo.actVecMSize == 0)) {
             return;
         }
-        int64_t calculateSize = runInfo.actVecMSize * fp32BaseSize;
-        // 是否要改成halfMRealSize
+        uint32_t gmDealRowCount;
+        if constexpr (USE_DN) {
+            gmDealRowCount = runInfo.actVecMSize;
+        } else {
+            uint32_t groupsOf32 = (runInfo.actMSize + 31) / 32;
+            if (constInfo_.subBlockIdx == 0) {
+                gmDealRowCount = groupsOf32 * 16 > runInfo.actMSize ? runInfo.actMSize : groupsOf32 * 16;
+            } else {
+                int32_t vec1RemainRows = runInfo.actMSize - 16 * groupsOf32;
+                gmDealRowCount = 0 > vec1RemainRows ? 0 : vec1RemainRows;
+            }
+        }
+        if (gmDealRowCount == 0) {
+            return;
+        }
         int64_t gmOffset = runInfo.faTmpOutWsPos * mBaseSize * fp32BaseSize + runInfo.vecMbaseIdx * fp32BaseSize;
-        // flashDecodeS2Idx?nBufferStartM?
         // Copy sum to gm
-        BroadCastAndCopyOut(runInfo, sumUb, maxUb, gmOffset, calculateSize);
+        BroadCastAndCopyOut(sumUb, maxUb, gmOffset, gmDealRowCount);
     }
 
     __aicore__ inline void Bmm2ResForFDCopyOut(const RunInfoX &runInfo, LocalTensor<T> &vec2ResUb, uint32_t mStartVec,
@@ -1012,22 +1039,11 @@ public:
 
     __aicore__ inline void InitBuffers()
     {
-        uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * sizeof(T);
-        uint32_t mm2ResultSize = mBaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T);
-        uint32_t attenMaskSize = mBaseSize / CV_RATIO * (s2BaseSize >> 1U);
+        // ===== 保留区: 跨section必须存活的buffer, 分配顺序与GetPersistUbSize保持一致 =====
         SoftmaxInitBuffer();
-        tPipe_->InitBuffer(stage2OutBuf_, 64 * dTemplateAlign64 * sizeof(T));
-        tPipe_->InitBuffer(stage1OutQue_[0], 1, 16640); // (32 + 1) * (256 / 32) * 64
-        tPipe_->InitBuffer(stage1OutQue_[1], 1, 16640);
         tPipe_->InitBuffer(commonTBuf_, 512);
-        if constexpr (HAS_MASK) {
-            tPipe_->InitBuffer(attenMaskInQue_[0], 1, attenMaskSize); // 256 * 64
-        }
-
-        if (constInfo_.isSoftmaxLseEnable) {
-            // 8: 适配TND，每行的结果存为8个重复lse元素（32B对齐）
-            this->tPipe_->InitBuffer(softmaxLseQueue_, 1, (mBaseSize >> 1U) * sizeof(float) * 8);
-        }
+        // softmaxLseQueue_常开分配(未使能LSE时空闲), 保证FD静态布局偏移编译期确定
+        this->tPipe_->InitBuffer(softmaxLseQueue_, 1, (mBaseSize >> 1U) * sizeof(float) * 8);
         if constexpr (isFp8) {
             if constexpr (USE_DN) {
                 tPipe_->InitBuffer(vselrIndexesBuf_[static_cast<int>(VselrIndexEnum::DN_INDEX)], 256);
@@ -1059,6 +1075,40 @@ public:
                 }
             }
         }
+
+        // ===== 瞬态区: FD静态Tensor覆盖区, 分配顺序与GetTransientUbSize保持一致 =====
+        tPipe_->InitBuffer(stage2OutBuf_, 64 * dTemplateAlign64 * sizeof(T));
+        // (32 + 1) * (256 / 32) * 64 + 256(pScale): softmax res之后紧跟pScaleSubLoop0Tensor
+        // 写入区(offset 16640, 256字节), 必须预留, 否则越界覆盖后续attenMaskInQue_的mask
+        tPipe_->InitBuffer(stage1OutQue_[0], 1, 16896);
+        tPipe_->InitBuffer(stage1OutQue_[1], 1, 16896);
+        if constexpr (HAS_MASK) {
+            uint32_t attenMaskSize = mBaseSize / CV_RATIO * (s2BaseSize >> 1U);
+            tPipe_->InitBuffer(attenMaskInQue_[0], 1, attenMaskSize); // 256 * 64
+        }
+    }
+
+    // FA保留区字节数(紧跟kernel侧ubBufferManager_的跨核bmm区之后):
+    // softmax状态(12*256) + preLoop(3*256) + brdcst(FLASH_DECODE时2*2048) + commonTBuf(512)
+    // + softmaxLseQueue(2048, 常开) + vselr索引表(isFp8时, 按256上界对齐)
+    static __aicore__ inline constexpr uint32_t GetPersistUbSize()
+    {
+        constexpr uint32_t softmaxSize = (12U + 3U) * 256U;
+        constexpr uint32_t brdcstSize = FLASH_DECODE ? (2U * 2048U) : 0U;
+        constexpr uint32_t commonSize = 512U;
+        constexpr uint32_t lseSize = (mBaseSize >> 1U) * sizeof(float) * 8U;
+        constexpr uint32_t vselrSize = isFp8 ? 256U : 0U;
+        return softmaxSize + brdcstSize + commonSize + lseSize + vselrSize;
+    }
+
+    // FA瞬态区字节数: stage2Out + stage1Out*2 + attenMask, FD静态Tensor业务区(见FD block
+    // GetFdTotalUbSize)须完全落在该区间内, 供static_assert校验
+    static __aicore__ inline constexpr uint32_t GetTransientUbSize()
+    {
+        constexpr uint32_t stage2Size = 64U * dTemplateAlign64 * sizeof(T);
+        constexpr uint32_t stage1Size = 2U * 16896U; // 16896: 16640 + 256(pScale)
+        constexpr uint32_t maskSize = HAS_MASK ? (mBaseSize / CV_RATIO * (s2BaseSize >> 1U)) : 0U;
+        return stage2Size + stage1Size + maskSize;
     }
 
     __aicore__ inline void AllocEventID()

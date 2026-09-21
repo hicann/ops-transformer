@@ -254,7 +254,6 @@ void QuantFlashAttnTilingFp8Impl::SetQFATilingData()
         (qfaInfo_->kvLayout == QfaLayout::TND && cuSeqLenKVFlag_) ? qfaInfo_->bSize : 0;
     tilingData_.baseTiling.quantFlashAttnBaseParams.seqUsedQSize = seqUsedQFlag_ ? qfaInfo_->bSize : 0;
     tilingData_.baseTiling.quantFlashAttnBaseParams.seqUsedKvSize = seqUsedKvFlag_ ? qfaInfo_->bSize : 0;
-    tilingData_.baseTiling.quantFlashAttnBaseParams.isKvContinuous = true;
     tilingData_.baseTiling.quantFlashAttnBaseParams.isSoftMaxLseEnable = qfaInfo_->softmaxLseFlag;
     tilingData_.baseTiling.quantFlashAttnBaseParams.iscuSeqLengthsNull =
         !(cuSeqLenQFlag_ && qfaInfo_->qLayout == QfaLayout::NTD);
@@ -341,7 +340,6 @@ void QuantFlashAttnTilingFp8Impl::PrintAllTilingData()
     OP_LOGD(qfaInfo_->opName, "GQA scaleValue:%f", params.scaleValue);
     OP_LOGD(qfaInfo_->opName, "GQA iscuSeqLengthsNull:%d", params.iscuSeqLengthsNull);
     OP_LOGD(qfaInfo_->opName, "GQA iscuSeqLengthsKVNull:%d", params.iscuSeqLengthsKVNull);
-    OP_LOGD(qfaInfo_->opName, "GQA isKvContinuous:%d", params.isKvContinuous);
     OP_LOGD(qfaInfo_->opName, "GQA isSoftMaxLseEnable:%d", params.isSoftMaxLseEnable);
     OP_LOGD(qfaInfo_->opName, "GQA coreNum:%d", params.coreNum);
     OP_LOGD(qfaInfo_->opName, "GQA outputLayout:%d", params.outputLayout);
