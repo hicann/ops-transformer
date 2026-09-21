@@ -182,3 +182,68 @@ int main() {
     exe = tmp_path / "copy"
     subprocess.run(["g++", "-std=c++17", str(cpp), "-o", str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
+
+
+def test_window_capacity_includes_payload_prefix_and_control(tmp_path):
+    compiler = shutil.which("g++")
+    assert compiler
+    header = ROOT / "op_kernel/allto_allv_grouped_mat_mul_aiv_comm.h"
+    cpp = tmp_path / "window.cpp"
+    exe = tmp_path / "window"
+    cpp.write_text(
+        '#include <cassert>\n#include "' + str(header) + '"\n'
+        "using namespace AlltoAllvGroupedMatMulAiv;\n"
+        "int main() { RuntimeControlLayout c{}; A2avWindowLayout w{};\n"
+        "assert(BuildRuntimeControlLayout(8, 2, c));\n"
+        "assert(BuildWindowLayout(180ULL*1024*1024/2, 1, 16, c, 200ULL*1024*1024, w));\n"
+        "assert(BuildWindowLayout(180ULL*1024*1024/2+1, 1, 16, c, 200ULL*1024*1024, w));\n"
+        "assert(BuildWindowLayout(192ULL*1024*1024/2, 1, 16, c, 0, w));\n"
+        "const auto needed = w.requiredBytes;\n"
+        "assert(BuildWindowLayout(192ULL*1024*1024/2, 1, 16, c, needed, w));\n"
+        "assert(!BuildWindowLayout(192ULL*1024*1024/2, 1, 16, c, needed-1, w));\n"
+        "assert(!BuildWindowLayout(~0ULL, 65535, 16, c, 0, w));\n"
+        "}\n"
+    )
+    subprocess.run([compiler, "-std=c++17", str(cpp), "-o", str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)
+
+
+def test_failed_copies_cannot_publish_ready():
+    source = (ROOT / "op_kernel/allto_allv_grouped_mat_mul_aiv_mode.h").read_text()
+    assert "(void)CopyExpertFromSource" not in source
+    assert "(void)CopyInitialWindowPayload" not in source
+    assert "trap();" not in source
+    # 搬运失败必须先返回，不能继续执行随后的就绪发布。
+    for name in ("CopyInitialWindowPayload<T>", "CopyExpertFromSource<T>"):
+        branches = source.split("if (!" + name)[1:]
+        assert branches
+        for branch in branches:
+            body = branch.split("{", 1)[1].split("}", 1)[0]
+            assert "return;" in body
+            assert "SignalAic" not in body
+            assert "PublishPeerPhase" not in body
+
+
+def test_window_query_failure_is_fatal():
+    source = (
+        ROOT / "op_host/op_tiling/arch22/allto_allv_grouped_mat_mul_tiling_a3.cpp"
+    ).read_text()
+    branch = source.split("if (!windowQuerySucceeded) {", 1)[1].split("}", 1)[0]
+    assert "return ge::GRAPH_FAILED;" in branch
+
+
+def test_unknown_runtime_window_is_not_assumed_200_mib(tmp_path):
+    compiler = shutil.which("g++")
+    assert compiler
+    header = ROOT / "op_kernel/allto_allv_grouped_mat_mul_aiv_comm.h"
+    cpp = tmp_path / "context.cpp"
+    exe = tmp_path / "context"
+    cpp.write_text(
+        '#include <cassert>\n#include "' + str(header) + '"\n'
+        "int main() { AlltoAllvGroupedMatMulAiv::PeerContextMetadata m{};\n"
+        "assert(!AlltoAllvGroupedMatMulAiv::NormalizePeerContextMetadata(0, 8, 0, m));\n"
+        "assert(AlltoAllvGroupedMatMulAiv::NormalizePeerContextMetadata(0, 8, 32ULL*1024*1024, m));\n"
+        "assert(m.windowBytes == 32ULL*1024*1024); }\n"
+    )
+    subprocess.run([compiler, "-std=c++17", str(cpp), "-o", str(exe)], check=True)
+    subprocess.run([str(exe)], check=True)

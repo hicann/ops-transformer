@@ -24,6 +24,20 @@
 #include "adv_api/hccl/hccl.h"
 
 namespace AscendC {
+// 超出有效核数的核不参与计算，仅循环完成 tileCnt 次跨核事件同步；返回 true 表示当前核应直接返回
+template <typename T>
+__aicore__ inline bool SyncIdleCoreAndReturn(T usedCoreNum, uint32_t tileCnt)
+{
+    if (GetBlockIdx() >= usedCoreNum) {
+        for (uint32_t i = 0; i < tileCnt; i++) {
+            CrossCoreSetFlag<0, PIPE_FIX>(EVENT_ID_6);
+            CrossCoreWaitFlag(EVENT_ID_6);
+        }
+        return true;
+    }
+    return false;
+}
+
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
 class MatmulReduceScatterFullMesh
     : public MatmulReduceScatterBase<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float> {
@@ -140,11 +154,7 @@ MatmulReduceScatterFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Floa
     GM_ADDR aGM, GM_ADDR gmToFloat, TCubeTiling &tiling, Mc2Tiling::TileL2Tiling &l2Tiling, HcclHandle &handleId,
     uint32_t tileCnt)
 {
-    if (GetBlockIdx() >= tiling.usedCoreNum) {
-        for (uint32_t i = 0; i < tileCnt; i++) {
-            CrossCoreSetFlag<0, PIPE_FIX>(EVENT_ID_6);
-            CrossCoreWaitFlag(EVENT_ID_6);
-        }
+    if (SyncIdleCoreAndReturn(tiling.usedCoreNum, tileCnt)) {
         return;
     }
     using A_T = typename A_TYPE::T;
@@ -191,11 +201,7 @@ MatmulReduceScatterFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Floa
     GM_ADDR aGM, GM_ADDR gmToFloat, TCubeTiling &tiling, Mc2Tiling::TileL2Tiling &l2Tiling, HcclHandle &handleId,
     uint32_t tileCnt)
 {
-    if (GetBlockIdx() >= tiling.usedCoreNum) {
-        for (uint32_t i = 0; i < tileCnt; i++) {
-            CrossCoreSetFlag<0, PIPE_FIX>(EVENT_ID_6);
-            CrossCoreWaitFlag(EVENT_ID_6);
-        }
+    if (SyncIdleCoreAndReturn(tiling.usedCoreNum, tileCnt)) {
         return;
     }
     using C_T = typename C_TYPE::T;

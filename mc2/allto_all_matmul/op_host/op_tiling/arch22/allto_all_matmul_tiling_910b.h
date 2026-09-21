@@ -76,8 +76,6 @@ protected:
     void CalTilingParam(CoCTiling &cocTilingData, const std::map<int *, AlltoAllMatmulTilingValue> &TilingParamMap,
                         AlltoAllMatmulInfo &info);
     void DecodeTilingData(int32_t code, CoCTiling &cocTilingData);
-    int32_t GetValueFromMKNConditionMap(int32_t m, int32_t k, int32_t n, int32_t defaultValue,
-                                        std::map<int, std::vector<std::vector<int>>> conditionMap);
     ge::graphStatus SetHcclTiling(AlltoAllMatmulTilingData *tilingData);
     void PrintAlltoAllMatmulTilingData(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
 

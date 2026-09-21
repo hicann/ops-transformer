@@ -44,7 +44,6 @@ constexpr uint32_t BLOCK_ALIGN_BYTES = 32U;
 constexpr int32_t MIN_P_VALUE = 1;
 constexpr int32_t MAX_BUFF_BYTES = 200 * 1024 * 1024;
 constexpr int32_t FLAG_BUFF_BYTES = 20 * 1024 * 1024;
-constexpr int32_t MB_BYTES = 1024 * 1024;
 constexpr int32_t HALF_KBYTE = 512;
 constexpr int32_t UB_PINGPONG_SIZE = 2;
 constexpr int32_t MAX_UB_NUM = 97280;
@@ -90,12 +89,6 @@ constexpr int32_t ALLTOALL_MATMUL_NPU910B_TWO_RANK_A16W4_TILINGCODE_DEFAULT = 16
 constexpr int32_t ALLTOALL_MATMUL_NPU910B_FOUR_RANK_A16W4_TILINGCODE_DEFAULT = 24035;
 constexpr int32_t ALLTOALL_MATMUL_NPU910B_EIGHT_RANK_A16W4_TILINGCODE_DEFAULT = 7651;
 
-constexpr int32_t CONDITION_M_ST = 0;
-constexpr int32_t CONDITION_M_END = 1;
-constexpr int32_t CONDITION_K_ST = 2;
-constexpr int32_t CONDITION_K_END = 3;
-constexpr int32_t CONDITION_N_ST = 4;
-constexpr int32_t CONDITION_N_END = 5;
 constexpr uint32_t COUNT_PARAMS_WITH_BIAS = 4;    // [x1, x2, bias, y]
 constexpr uint32_t COUNT_PARAMS_WITHOUT_BIAS = 3; // [x1, x2, y]
 const std::set<int> SUPPORT_RANK_SIZE_910{2, 4, 8};
@@ -913,6 +906,32 @@ ge::graphStatus AlltoAllMatmulTiling910b::CheckAndSetAttrsInfo(AlltoAllMatmulInf
  * @brief 校验量化 scale 的数据类型并选择量化模式
  * @return ge::graphStatus
  */
+// A16 量化（x1 为 FP16/BF16）场景下 x2Scale 必须为 FLOAT；smoothQuant 时 x1Scale 须与 x1 同 dtype
+static ge::graphStatus CheckA16ScaleDtype(const gert::TilingContext *context, const AlltoAllMatmulInfo &info,
+                                          ge::DataType x1Dtype, const char *opName)
+{
+    auto x1ScaleTensorDesc = context->GetOptionalInputDesc(INPUT_X1_SCALE_INDEX);
+    auto x2ScaleTensorDesc = context->GetOptionalInputDesc(INPUT_X2_SCALE_INDEX);
+    OP_TILING_CHECK((x2ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "x2Scale"),
+                    return ge::GRAPH_FAILED);
+    ge::DataType x2ScaleDtype = x2ScaleTensorDesc->GetDataType();
+    OP_TILING_CHECK(x2ScaleDtype != ge::DT_FLOAT,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "x2Scale", Ops::Base::ToString(x2ScaleDtype).c_str(),
+                                                          "The dtype of x2Scale must be FLOAT"),
+                    return ge::GRAPH_FAILED);
+    if (info.isSmoothQuant) {
+        OP_TILING_CHECK((x1ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "x1Scale"),
+                        return ge::GRAPH_FAILED);
+        ge::DataType x1ScaleDtype = x1ScaleTensorDesc->GetDataType();
+        OP_TILING_CHECK(
+            x1ScaleDtype != x1Dtype,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "x1Scale", Ops::Base::ToString(x1ScaleDtype).c_str(),
+                                                  "The dtype of x1Scale must be same as x1 in smoothQuant mode"),
+            return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus AlltoAllMatmulTiling910b::CheckQuantScaleDataType(const AlltoAllMatmulInfo &info, ge::DataType x1Dtype,
                                                                   ge::DataType x2Dtype)
 {
@@ -920,24 +939,8 @@ ge::graphStatus AlltoAllMatmulTiling910b::CheckQuantScaleDataType(const AlltoAll
     auto x2ScaleTensorDesc = context_->GetOptionalInputDesc(INPUT_X2_SCALE_INDEX);
     // 校验 scale 张量，量化模式
     if ((x1Dtype == ge::DT_FLOAT16 || x1Dtype == ge::DT_BF16) && x2Dtype == ge::DT_INT8) {
-        OP_TILING_CHECK((x2ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x2Scale"),
-                        return ge::GRAPH_FAILED);
-        ge::DataType x2ScaleDtype = x2ScaleTensorDesc->GetDataType();
-        OP_TILING_CHECK(
-            x2ScaleDtype != ge::DT_FLOAT,
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "x2Scale", Ops::Base::ToString(x2ScaleDtype).c_str(),
-                                                  "The dtype of x2Scale must be FLOAT"),
-            return ge::GRAPH_FAILED);
-        if (info.isSmoothQuant) {
-            OP_TILING_CHECK((x1ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x1Scale"),
-                            return ge::GRAPH_FAILED);
-            ge::DataType x1ScaleDtype = x1ScaleTensorDesc->GetDataType();
-            OP_TILING_CHECK(
-                x1ScaleDtype != x1Dtype,
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "x1Scale", Ops::Base::ToString(x1ScaleDtype).c_str(),
-                                                      "The dtype of x1Scale must be same as x1 in smoothQuant mode"),
-                return ge::GRAPH_FAILED);
-        }
+        OP_TILING_CHECK(CheckA16ScaleDtype(context_, info, x1Dtype, opName_) != ge::GRAPH_SUCCESS,
+                        OP_LOGE(opName_, "Tiling check scale Dtype failed."), return ge::GRAPH_FAILED);
         quantType = TILINGKEY_TPL_A16W8;
     }
 
@@ -963,24 +966,8 @@ ge::graphStatus AlltoAllMatmulTiling910b::CheckQuantScaleDataType(const AlltoAll
     }
     // A16W4检测
     if ((x1Dtype == ge::DT_FLOAT16 || x1Dtype == ge::DT_BF16) && x2Dtype == ge::DT_INT4) {
-        OP_TILING_CHECK((x2ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x2Scale"),
-                        return ge::GRAPH_FAILED);
-        ge::DataType x2ScaleDtype = x2ScaleTensorDesc->GetDataType();
-        OP_TILING_CHECK(
-            x2ScaleDtype != ge::DT_FLOAT,
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "x2Scale", Ops::Base::ToString(x2ScaleDtype).c_str(),
-                                                  "The dtype of x2Scale must be FLOAT"),
-            return ge::GRAPH_FAILED);
-        if (info.isSmoothQuant) {
-            OP_TILING_CHECK((x1ScaleTensorDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x1Scale"),
-                            return ge::GRAPH_FAILED);
-            ge::DataType x1ScaleDtype = x1ScaleTensorDesc->GetDataType();
-            OP_TILING_CHECK(
-                x1ScaleDtype != x1Dtype,
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "x1Scale", Ops::Base::ToString(x1ScaleDtype).c_str(),
-                                                      "The dtype of x1Scale must be same as x1 in smoothQuant mode"),
-                return ge::GRAPH_FAILED);
-        }
+        OP_TILING_CHECK(CheckA16ScaleDtype(context_, info, x1Dtype, opName_) != ge::GRAPH_SUCCESS,
+                        OP_LOGE(opName_, "Tiling check scale Dtype failed."), return ge::GRAPH_FAILED);
         quantType = TILINGKEY_TPL_A16W4;
     }
 
@@ -1246,45 +1233,13 @@ ge::graphStatus AlltoAllMatmulTiling910b::CheckOpInputInfo(AlltoAllMatmulInfo &i
     return ge::GRAPH_SUCCESS;
 }
 
-int32_t AlltoAllMatmulTiling910b::GetValueFromMKNConditionMap(int32_t m, int32_t k, int32_t n, int32_t defaultValue,
-                                                              std::map<int, std::vector<std::vector<int>>> conditionMap)
-{
-    int32_t value = defaultValue;
-    for (auto &item : conditionMap) {
-        for (auto &condition : item.second) {
-            bool inRange = m > condition[CONDITION_M_ST] && m <= condition[CONDITION_M_END] &&
-                           k > condition[CONDITION_K_ST] && k <= condition[CONDITION_K_END] &&
-                           n > condition[CONDITION_N_ST] && n <= condition[CONDITION_N_END];
-            if (inRange) {
-                return item.first;
-            }
-        }
-    }
-    return value;
-}
-
 void AlltoAllMatmulTiling910b::CalTilingParam(CoCTiling &cocTilingData,
                                               const std::map<int *, AlltoAllMatmulTilingValue> &TilingParamMap,
                                               AlltoAllMatmulInfo &info)
 {
-    int32_t m = info.M;
-    int32_t k = info.K;
-    int32_t n = info.N;
-
-    for (auto &item : TilingParamMap) {
-        auto value = item.second.value;
-        auto conditionMap = item.second.conditionMap;
-        if (!conditionMap.empty()) {
-            *item.first = GetValueFromMKNConditionMap(m, k, n, value, conditionMap);
-        } else if (value != -1) {
-            *item.first = value;
-        }
-    }
-    cocTilingData.ubMoveNum = cocTilingData.ubMoveNum * HALF_KBYTE;
-    if (cocTilingData.m0 >= DEFAULT_ROW) {
-        cocTilingData.k0 = DEFAULT_COL;
-        cocTilingData.n0 = cocTilingData.m0 == DEFAULT_ROW ? DEFAULT_COL : DEFAULT_ROW;
-    }
+    mc2tiling::SetTilingParamsFromConditionMap(static_cast<int32_t>(info.M), static_cast<int32_t>(info.K),
+                                               static_cast<int32_t>(info.N), TilingParamMap);
+    mc2tiling::FinalizeCoCTilingParam(cocTilingData);
 }
 
 void AlltoAllMatmulTiling910b::DecodeTilingData(int32_t code, CoCTiling &cocTilingData)
@@ -1525,18 +1480,7 @@ ge::graphStatus AlltoAllMatmulTiling910b::DoOpTiling()
     MC2_CHECK_LOG_RET(opName_, DoMmCommTiling(tilingData->cocTiling, info));
     MC2_CHECK_LOG_RET(opName_, SetHcclTiling(tilingData));
     // 校验HCCL BUFF空间大小
-    auto attrs = context_->GetAttrs();
-    auto group = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_GROUP_INDEX));
-    uint64_t hcclBuffSize = 0ULL;
-    auto cclRet = mc2tiling::GetCclBufferSize(group, &hcclBuffSize, opName_);
-    if (cclRet == ge::GRAPH_SUCCESS) {
-        OP_TILING_CHECK(hcclBuffSize < MAX_BUFF_BYTES,
-                        OP_LOGE(opName_, "HCCL_BUFFSIZE (%lu Bytes) too small, min required %lu Bytes (%dMB)",
-                                hcclBuffSize, MAX_BUFF_BYTES, MAX_BUFF_BYTES / MB_BYTES),
-                        return ge::GRAPH_FAILED);
-    } else {
-        OP_LOGW(opName_, "Can't get HCCL_BUFFSIZE, skip CCL buffer size validation.");
-    }
+    MC2_CHECK_LOG_RET(opName_, mc2tiling::CheckHcclBuffSize(context_, ATTR_GROUP_INDEX, MAX_BUFF_BYTES, opName_));
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
     auto aicNum = ascendcPlatform.GetCoreNumAic();
     auto aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -1567,14 +1511,7 @@ uint64_t AlltoAllMatmulTiling910b::GetTilingKey() const
  */
 ge::graphStatus AlltoAllMatmulTiling910b::SetHcclTiling(AlltoAllMatmulTilingData *tilingData)
 {
-    auto attrs = context_->GetAttrs();
-    auto group = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_GROUP_INDEX));
-    uint32_t opType = 18; // batch write=18,
-    std::string algConfig = "MultiPut=level0:fullmesh";
-    AscendC::Mc2CcTilingConfig mc2CcTilingConfig(group, opType, algConfig);
-    mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling);
-    mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling);
-    return ge::GRAPH_SUCCESS;
+    return mc2tiling::SetHcclCcTilingConfig(context_, ATTR_GROUP_INDEX, tilingData);
 }
 
 void AlltoAllMatmulTiling910b::CalcQuantTokenNumPerUb(const CoCTiling &cocTilingData, AlltoAllMatmulInfo &info)

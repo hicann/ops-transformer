@@ -60,7 +60,6 @@ private:
     std::string socVersionStr_;
 
     void PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingDataA3 &matmulAlltoAllTilingDataA3);
-    void PrintMMV3TilingData(const std::string &opName, Mc2MatmulV3TilingData &tiling);
     void PrintMatmulAlltoAllTilingInfo(const std::string &opName, MatmulAlltoAllTilingInfoA3 &tilingInfo);
 };
 

@@ -544,11 +544,13 @@ bool NeedToConvertBias(const aclTensor *self, const aclTensor *mat1, const aclTe
     bool batchIsOne = !(mat1DimNum == 3 && mat1->GetViewShape().GetDim(0) != 1);
 
     if (selfDimNum == 1) {
-        canBeBiasFlag = (mat2->GetViewShape().GetDim(1 + rightMove) == self->GetViewShape().GetDim(0)) &&
-                        CheckDtypeSupportBias(self, mat1, mat2) && batchIsOne;
-        // When input tensor is a 2 dimentional tensor
+        canBeBiasFlag =
+            (mat2->GetViewShape().GetDim(1 + static_cast<int64_t>(rightMove)) == self->GetViewShape().GetDim(0)) &&
+            CheckDtypeSupportBias(self, mat1, mat2) && batchIsOne;
+        // When input tensor is a 2 dimensional tensor
     } else if (selfDimNum == 2) {
-        canBeBiasFlag = (selfShape.GetDim(0) == 1) && (selfShape.GetDim(1) == mat2Shape.GetDim(1 + rightMove)) &&
+        canBeBiasFlag = (selfShape.GetDim(0) == 1) &&
+                        (selfShape.GetDim(1) == mat2Shape.GetDim(1 + static_cast<int64_t>(rightMove))) &&
                         CheckDtypeSupportBias(self, mat1, mat2) && batchIsOne;
     }
     OP_LOGI("Current Shape's canBeBiasFlag = %ld", static_cast<int64_t>(canBeBiasFlag));
@@ -571,8 +573,8 @@ bool GetNzSplitKFlag(const aclTensor *self, const aclTensor *mat2, const Format 
     rightMove = (GetOffSet(selfDimNum) != 0);
 
     int64_t m = selfShape.GetDim(rightMove);
-    int64_t k = selfShape.GetDim(rightMove + 1);
-    int64_t n = mat2Shape.GetDim(rightMove + 1);
+    int64_t k = selfShape.GetDim(static_cast<int64_t>(rightMove) + 1);
+    int64_t n = mat2Shape.GetDim(static_cast<int64_t>(rightMove) + 1);
     bool mn_multi = m > n ? m < (MN_MULTI * n) : n < (MN_MULTI * m);
     return (m * n * k < MKN_MAX) && mn_multi;
 }
@@ -591,10 +593,11 @@ bool IsSplitk(const TensorInfo *self, const TensorInfo *mat2)
         NzSplitKFlag = GetNzSplitKFlag(self->tensor, mat2->tensor, self->format, mat2->format);
     }
 
-    int64_t k_dim = selfShape.GetDim(1 + rightMove);
+    int64_t k_dim = selfShape.GetDim(1 + static_cast<int64_t>(rightMove));
     bool dtype_correct = (self->dataType == DataType::DT_FLOAT16) && (mat2->dataType == DataType::DT_FLOAT16);
     return dtype_correct &&
-           k_dim >= SPLIT_K_MULTI * std::max(selfShape.GetDim(rightMove), mat2Shape.GetDim(1 + rightMove)) &&
+           k_dim >= SPLIT_K_MULTI *
+                        std::max(selfShape.GetDim(rightMove), mat2Shape.GetDim(1 + static_cast<int64_t>(rightMove))) &&
            NzSplitKFlag;
 }
 

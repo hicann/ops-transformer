@@ -17,6 +17,7 @@
 #include <vector>
 #include "common/utils/op_mc2.h"
 #include "mc2_log.h"
+#include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "platform/platform_infos_def.h"
 #include "hccl/hccl_types.h"
 
@@ -53,50 +54,12 @@ bool FpMatmulAllToAllTilingBaseA3::IsCapable()
 }
 
 /**
- * @brief 工具函数：判断指定value是否存在于list中
- *
- * @param list: 有效值列表
- * @param value: 给定值
- * @return
- */
-static bool IsContains(const std::vector<uint32_t> &list, uint32_t value)
-{
-    return std::count(list.begin(), list.end(), value) > 0;
-}
-
-/**
  * @brief 校验输入Dtype信息是否合规
  *
  * @param context 框架根据input，output，attrs等信息生成tiling需要的context
  * @param opName  算子名称
  * @return ge::graphStatus
  */
-static ge::graphStatus CheckNonQuantBiasDataType(const gert::CompileTimeTensorDesc *biasTensorDesc,
-                                                 ge::DataType x1Dtype, const char *opName)
-{
-    if (biasTensorDesc != nullptr) {
-        ge::DataType biasDtype = biasTensorDesc->GetDataType();
-        if (x1Dtype == ge::DT_BF16) {
-            OP_TILING_CHECK(
-                (biasDtype != ge::DT_FLOAT),
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "bias", Ops::Base::ToString(biasDtype).c_str(),
-                                                      "The dtype of bias must be FLOAT32 when x1 is BF16"),
-                return ge::GRAPH_FAILED);
-        } else if (x1Dtype == ge::DT_FLOAT16) {
-            OP_TILING_CHECK((x1Dtype != biasDtype),
-                            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                                opName, "bias", Ops::Base::ToString(biasDtype).c_str(),
-                                "The dtype of bias must be the same as that of x1 when x1 is FLOAT16"),
-                            return ge::GRAPH_FAILED);
-        } else {
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, "bias", Ops::Base::ToString(biasDtype).c_str(),
-                                                  "The dtype of bias must be FLOAT16 or BF16 in non-quantized scene");
-            return ge::GRAPH_FAILED;
-        }
-    }
-    return ge::GRAPH_SUCCESS;
-}
-
 ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckA3NonQuantTensorDataType(const gert::TilingContext *context,
                                                                             const char *opName)
 {
@@ -112,14 +75,14 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckA3NonQuantTensorDataType(cons
                         opName, "x1,x2", (Ops::Base::ToString(x1Dtype) + "," + Ops::Base::ToString(x2Dtype)).c_str(),
                         "The dtype of x1 and x2 must be the same"),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!IsContains(NON_QUANT_X_DTYPE_LIST, x1Dtype),
+    OP_TILING_CHECK(!mc2tiling::IsContains(NON_QUANT_X_DTYPE_LIST, x1Dtype),
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
                         opName, "x1,x2", (Ops::Base::ToString(x1Dtype) + "," + Ops::Base::ToString(x2Dtype)).c_str(),
                         "The dtype of x1 and x2 must be in the non-quant range (float16/bf16)"),
                     return ge::GRAPH_FAILED);
     // 校验 bias 数据类型（如果存在
     auto biasTensorDesc = context->GetOptionalInputDesc(INPUT_BIAS_INDEX);
-    if (CheckNonQuantBiasDataType(biasTensorDesc, x1Dtype, opName) != ge::GRAPH_SUCCESS) {
+    if (mc2tiling::CheckNonQuantBiasDataType(biasTensorDesc, x1Dtype, opName) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     // 校验 scale 张量为空（非量化场景
@@ -282,34 +245,6 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::SetHcclTiling()
 }
 
 /**
- * @brief 打印matmul tiling的信息,注：当前蓝区冒烟找不到mc2_log.h的对应方法，暂时自己实现
- *
- * @param opName
- * @param tiling
- */
-void FpMatmulAllToAllTilingBaseA3::PrintMMV3TilingData(const std::string &opName, Mc2MatmulV3TilingData &tiling)
-{
-    PrintTCubeTilingData(opName, tiling.matmulTiling);
-    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.mTileCntL2 %d", tiling.tileL2cacheTiling.mTileCntL2);
-    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.nTileCntL2 %d", tiling.tileL2cacheTiling.nTileCntL2);
-    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.mTileBlock %d", tiling.tileL2cacheTiling.mTileBlock);
-    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.nTileBlock %d", tiling.tileL2cacheTiling.nTileBlock);
-    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.calOrder %d", tiling.tileL2cacheTiling.calOrder);
-    OP_LOGD(opName, " MMtiling.matmulRunInfo.isHf32 %d", tiling.matmulRunInfo.isHf32);
-    OP_LOGD(opName, " MMtiling.matmulRunInfo.isNzA %d", tiling.matmulRunInfo.isNzA);
-    OP_LOGD(opName, " MMtiling.matmulRunInfo.isNzB %d", tiling.matmulRunInfo.isNzB);
-    OP_LOGD(opName, " MMtiling.matmulRunInfo.nd2nzA %d", tiling.matmulRunInfo.nd2nzA);
-    OP_LOGD(opName, " MMtiling.matmulRunInfo.nd2nzB %d", tiling.matmulRunInfo.nd2nzB);
-    OP_LOGD(opName, " MMtiling.matmulRunInfo.transA %d", tiling.matmulRunInfo.transA);
-    OP_LOGD(opName, " MMtiling.matmulRunInfo.transB %d", tiling.matmulRunInfo.transB);
-    OP_LOGD(opName, " MMtiling.l2cacheUseInfo.l2CacheFlag %d", tiling.l2cacheUseInfo.l2CacheFlag);
-    OP_LOGD(opName, " MMtiling.baseAN %d", tiling.baseAN);
-    OP_LOGD(opName, " MMtiling.baseAD %d", tiling.baseAD);
-    OP_LOGD(opName, " MMtiling.baseBN %d", tiling.baseBN);
-    OP_LOGD(opName, " MMtiling.baseBD %d", tiling.baseBD);
-}
-
-/**
  * @brief 打印tilingInfo信息
  *
  * @param opName
@@ -342,12 +277,12 @@ void FpMatmulAllToAllTilingBaseA3::PrintMatmulAlltoAllTilingInfo(const std::stri
 void FpMatmulAllToAllTilingBaseA3::PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingDataA3 &matmulAlltoAllTilingDataA3)
 {
     PrintMatmulAlltoAllTilingInfo(opName_, matmulAlltoAllTilingDataA3.matmulAlltoAllTilingInfo);
-    PrintMMV3TilingData(opName_, matmulAlltoAllTilingDataA3.mc2MmV3TileTilingData);
+    PrintMc2MatmulV3TilingData(opName_, matmulAlltoAllTilingDataA3.mc2MmV3TileTilingData);
     if (matmulAlltoAllTilingDataA3.matmulAlltoAllTilingInfo.tailCnt == 0) {
         return;
     }
     OP_LOGD(opName_, "Matmulalltoall has tail");
-    PrintMMV3TilingData(opName_, matmulAlltoAllTilingDataA3.mc2MmV3TailTilingData);
+    PrintMc2MatmulV3TilingData(opName_, matmulAlltoAllTilingDataA3.mc2MmV3TailTilingData);
 }
 
 /**
@@ -494,7 +429,6 @@ ge::graphStatus FpMatmulAllToAllHelper::GetShapeAttrsInfo()
     args_.mValue = tilingArgs.mValue;
     args_.kValue = tilingArgs.kValue;
     args_.nValue = tilingArgs.nValue;
-
     return ge::GRAPH_SUCCESS;
 }
 

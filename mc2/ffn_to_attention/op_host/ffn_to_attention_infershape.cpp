@@ -16,12 +16,12 @@
 #include "mc2_log.h"
 using namespace ge;
 namespace ops {
-static ge::graphStatus InferShapeFFNToAttention(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeFFNToAttention(gert::InferShapeContext *)
 {
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeFFNToAttention(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeFFNToAttention(gert::InferDataTypeContext *)
 {
     return ge::GRAPH_SUCCESS;
 }

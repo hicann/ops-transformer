@@ -19,7 +19,6 @@ namespace AlltoAllvGroupedMatMulAiv {
 constexpr uint32_t kMaxRankSize = 128U;
 constexpr uint32_t kMaxA2RankSize = 8U;
 constexpr uint64_t kWindowAlignment = 512U;
-constexpr uint64_t kDefaultWindowBytes = 200U * 1024U * 1024U;
 constexpr uint64_t kFlagSlotBytes = 32U;
 constexpr uint64_t kControlFlagStride = kFlagSlotBytes;
 constexpr uint64_t kEpochOffset = 0U;
@@ -30,13 +29,6 @@ struct ExpertMeta {
     uint64_t recvTokenBase = 0U;
     uint32_t tokenCount = 0U;
     uint32_t reserved = 0U;
-};
-
-struct ExpertSourceMeta {
-    uint64_t dstTokenOffset = 0U;
-    uint64_t srcTokenOffset = 0U;
-    uint32_t tokenCount = 0U;
-    uint32_t sourceRank = 0U;
 };
 
 struct WorkspaceLayout {
@@ -51,7 +43,6 @@ struct A2avWindowLayout {
     uint64_t countBytes = 0U;
     uint64_t controlOffset = 0U;
     uint64_t controlBytes = 0U;
-    uint64_t readyOffset = 0U;
     uint64_t totalBytes = 0U;
     uint64_t requiredBytes = 0U;
 };
@@ -60,14 +51,9 @@ struct RuntimeControlLayout {
     uint64_t epochOffset = 0U;
     uint64_t publishSlotsOffset = 0U;
     uint64_t releaseSlotsOffset = 0U;
-    // Only epoch/publish/release live in the peer window.  This boundary must
-    // stay independent of expertPerRank so consecutive shapes reuse one
-    // cross-rank synchronization address.
+    // 对端窗口中仅保存 epoch、发布和释放状态。此边界必须与每卡专家数无关，确保连续运行不同形状时复用同一跨 rank
+    // 同步地址。
     uint64_t peerControlBytes = 0U;
-    // Expert-ready helpers address user workspace, not the peer window.  Keep
-    // their compatibility layout separate from peer-window allocation.
-    uint64_t firstExpertFlagOffset = 0U;
-    uint64_t totalBytes = 0U;
 };
 
 struct PeerContextMetadata {
@@ -92,13 +78,12 @@ A2AVGMM_HOST_DEVICE bool IsSupportedPeerRankSize(uint32_t rankSize, bool isA3)
 A2AVGMM_HOST_DEVICE bool NormalizePeerContextMetadata(uint32_t rankId, uint32_t rankSize, uint64_t windowBytes,
                                                       PeerContextMetadata &metadata)
 {
-    const uint64_t normalizedWindowBytes = windowBytes == 0U ? kDefaultWindowBytes : windowBytes;
-    if (rankSize == 0U || rankSize > kMaxRankSize || rankId >= rankSize || normalizedWindowBytes == 0U) {
+    if (rankSize == 0U || rankSize > kMaxRankSize || rankId >= rankSize || windowBytes == 0U) {
         return false;
     }
     metadata.rankId = rankId;
     metadata.rankSize = rankSize;
-    metadata.windowBytes = normalizedWindowBytes;
+    metadata.windowBytes = windowBytes;
     return true;
 }
 
@@ -129,28 +114,16 @@ A2AVGMM_HOST_DEVICE bool BuildRuntimeControlLayout(uint32_t rankSize, uint32_t e
         return false;
     }
     uint64_t rankSlotsBytes = 0U;
-    uint64_t expertSlotsBytes = 0U;
     layout = {};
     layout.epochOffset = kEpochOffset;
     layout.publishSlotsOffset = kPublishSlotsOffset;
     if (!SafeMulU64(rankSize, kFlagSlotBytes, rankSlotsBytes) ||
-        !SafeMulU64(expertPerRank, kFlagSlotBytes, expertSlotsBytes) ||
         !SafeAddU64(layout.publishSlotsOffset, rankSlotsBytes, layout.releaseSlotsOffset) ||
         !SafeAddU64(layout.releaseSlotsOffset, rankSlotsBytes, layout.peerControlBytes)) {
         layout = {};
         return false;
     }
-    layout.firstExpertFlagOffset = layout.peerControlBytes;
-    if (!SafeAddU64(layout.firstExpertFlagOffset, expertSlotsBytes, layout.totalBytes)) {
-        layout = {};
-        return false;
-    }
     return true;
-}
-
-A2AVGMM_HOST_DEVICE bool IsRankAssignedToWorker(uint32_t rank, uint32_t workerIdx, uint32_t workerNum)
-{
-    return workerNum != 0U && workerIdx < workerNum && rank >= workerIdx && (rank - workerIdx) % workerNum == 0U;
 }
 
 A2AVGMM_HOST_DEVICE uint64_t MulU32ToU64(uint32_t lhs, uint32_t rhs)
@@ -181,16 +154,6 @@ A2AVGMM_HOST_DEVICE bool AlignUpU64(uint64_t value, uint64_t alignment, uint64_t
 A2AVGMM_HOST_DEVICE uint64_t AlignDownU64(uint64_t value, uint64_t alignment)
 {
     return value & ~(alignment - 1U);
-}
-
-A2AVGMM_HOST_DEVICE uint64_t ExpertReadyBytes(uint32_t expertPerRank)
-{
-    return static_cast<uint64_t>(expertPerRank) * kControlFlagStride;
-}
-
-A2AVGMM_HOST_DEVICE uint64_t ExpertReadyOffset(uint64_t readyBase, uint32_t expertIdx)
-{
-    return readyBase + static_cast<uint64_t>(expertIdx) * kControlFlagStride;
 }
 
 A2AVGMM_HOST_DEVICE bool BuildWorkspaceLayout(uint64_t tokenNum, uint64_t hiddenSize, uint64_t dtypeBytes,
@@ -229,86 +192,6 @@ A2AVGMM_HOST_DEVICE bool PrefixRange(PrefixPtr inclusivePrefix, uint32_t countNu
     return true;
 }
 
-A2AVGMM_HOST_DEVICE bool BuildExpertMetadata(const int32_t *recvPrefix, uint32_t rankSize, uint32_t expertPerRank,
-                                             uint64_t tokenCapacity, ExpertMeta *expertMeta,
-                                             ExpertSourceMeta *sourceMeta)
-{
-    if (recvPrefix == nullptr || expertMeta == nullptr || sourceMeta == nullptr || rankSize == 0U ||
-        expertPerRank == 0U) {
-        return false;
-    }
-
-    uint64_t countNum64 = 0U;
-    if (!SafeMulU64(rankSize, expertPerRank, countNum64) || countNum64 == 0U || countNum64 > 0xffffffffULL) {
-        return false;
-    }
-    const uint32_t countNum = static_cast<uint32_t>(countNum64);
-    uint32_t totalBegin = 0U;
-    uint32_t totalEnd = 0U;
-    if (!PrefixRange(recvPrefix, countNum, countNum - 1U, totalBegin, totalEnd) ||
-        static_cast<uint64_t>(totalEnd) != tokenCapacity) {
-        return false;
-    }
-
-    for (uint32_t expertIdx = 0U; expertIdx < expertPerRank; ++expertIdx) {
-        const uint32_t firstSourceIndex = expertIdx * rankSize;
-        const uint32_t lastSourceIndex = firstSourceIndex + rankSize - 1U;
-        uint32_t expertBase = 0U;
-        uint32_t firstSourceEnd = 0U;
-        uint32_t expertEndBegin = 0U;
-        uint32_t expertEnd = 0U;
-        if (!PrefixRange(recvPrefix, countNum, firstSourceIndex, expertBase, firstSourceEnd) ||
-            !PrefixRange(recvPrefix, countNum, lastSourceIndex, expertEndBegin, expertEnd)) {
-            return false;
-        }
-        if (expertEnd < expertBase || static_cast<uint64_t>(expertEnd) > tokenCapacity ||
-            static_cast<uint64_t>(expertEnd - expertBase) > 0xffffffffULL) {
-            return false;
-        }
-        expertMeta[expertIdx].recvTokenBase = expertBase;
-        expertMeta[expertIdx].tokenCount = expertEnd - expertBase;
-        expertMeta[expertIdx].reserved = 0U;
-
-        for (uint32_t sourceRank = 0U; sourceRank < rankSize; ++sourceRank) {
-            const uint32_t sourceIndex = firstSourceIndex + sourceRank;
-            uint32_t sourceBegin = 0U;
-            uint32_t sourceEnd = 0U;
-            if (!PrefixRange(recvPrefix, countNum, sourceIndex, sourceBegin, sourceEnd)) {
-                return false;
-            }
-            ExpertSourceMeta &source = sourceMeta[static_cast<uint64_t>(expertIdx) * rankSize + sourceRank];
-            source.dstTokenOffset = sourceBegin;
-            source.srcTokenOffset = 0U;
-            source.tokenCount = sourceEnd - sourceBegin;
-            source.sourceRank = sourceRank;
-        }
-    }
-    return true;
-}
-
-A2AVGMM_HOST_DEVICE bool GetPeerSourceTokenOffset(const int32_t *peerSendPrefix, uint32_t rankSize,
-                                                  uint32_t expertPerRank, uint32_t dstRank, uint32_t expertIdx,
-                                                  uint64_t &tokenOffset)
-{
-    if (peerSendPrefix == nullptr || rankSize == 0U || expertPerRank == 0U || dstRank >= rankSize ||
-        expertIdx >= expertPerRank) {
-        return false;
-    }
-
-    uint64_t countNum64 = 0U;
-    if (!SafeMulU64(rankSize, expertPerRank, countNum64) || countNum64 == 0U || countNum64 > 0xffffffffULL) {
-        return false;
-    }
-    const uint32_t target = dstRank * expertPerRank + expertIdx;
-    uint32_t begin = 0U;
-    uint32_t end = 0U;
-    if (!PrefixRange(peerSendPrefix, static_cast<uint32_t>(countNum64), target, begin, end)) {
-        return false;
-    }
-    tokenOffset = begin;
-    return true;
-}
-
 A2AVGMM_HOST_DEVICE bool BuildWindowLayout(uint64_t inputTokenNum, uint64_t hiddenSize, uint64_t countNum,
                                            const RuntimeControlLayout &control, uint64_t windowBytes,
                                            A2avWindowLayout &layout)
@@ -339,7 +222,6 @@ A2AVGMM_HOST_DEVICE bool BuildWindowLayout(uint64_t inputTokenNum, uint64_t hidd
     layout.totalBytes = requiredBytes;
     layout.requiredBytes = requiredBytes;
     if (windowBytes == 0U) {
-        layout.readyOffset = control.firstExpertFlagOffset;
         return true;
     }
     if (requiredBytes > windowBytes || controlBytes > windowBytes) {
@@ -356,10 +238,8 @@ A2AVGMM_HOST_DEVICE bool BuildWindowLayout(uint64_t inputTokenNum, uint64_t hidd
         layout = {};
         return false;
     }
-    layout.readyOffset = control.firstExpertFlagOffset;
     return true;
 }
-
 #undef A2AVGMM_HOST_DEVICE
 
 } // namespace AlltoAllvGroupedMatMulAiv
@@ -377,7 +257,7 @@ namespace AlltoAllvGroupedMatMulAiv {
 
 class PeerWindowContext {
 public:
-    __aicore__ inline bool Init(uint32_t is910C)
+    __aicore__ inline bool Init(uint32_t is910C, uint64_t queriedWindowBytes)
     {
         GM_ADDR contextAddress = AscendC::GetHcclContext<AscendC::HCCL_GROUP_ID_0>();
         if (contextAddress == nullptr) {
@@ -387,24 +267,27 @@ public:
         PeerContextMetadata metadata = {};
         if (is910C != 0U) {
             a3Context_ = reinterpret_cast<__gm__ AscendC::HcclContextDef::HcclOpResParam *>(contextAddress);
-            if (!NormalizePeerContextMetadata(a3Context_->rankId, a3Context_->rankNum, a3Context_->winSize, metadata)) {
+            if (!NormalizePeerContextMetadata(a3Context_->rankId, a3Context_->rankNum,
+                                              a3Context_->winSize == 0U ? queriedWindowBytes : a3Context_->winSize,
+                                              metadata)) {
                 return false;
             }
             isA3_ = true;
         } else {
             a2Context_ = reinterpret_cast<__gm__ AscendC::HcclCombineOpParam *>(contextAddress);
-            if (!NormalizePeerContextMetadata(a2Context_->rankId, a2Context_->rankNum, a2Context_->winSize, metadata)) {
+            if (!NormalizePeerContextMetadata(a2Context_->rankId, a2Context_->rankNum,
+                                              a2Context_->winSize == 0U ? queriedWindowBytes : a2Context_->winSize,
+                                              metadata)) {
                 return false;
             }
-            // CANN may select the dynamic peer-window table even for an A2
-            // EP8 group (for example, count_num == 128).  EP capability is
-            // restricted separately by IsSupportedPeerRankSize; the address
-            // representation must still follow the runtime HCCL context.
+            // 在 A2 上，CANN 也可能选择动态对端窗口表，例如 EP8 通信域且 count_num 为 128 时。EP
+            // 能力由IsSupportedPeerRankSize 单独约束； 窗口地址表示仍须遵循运行时 HCCL 上下文。
             if (a2Context_->multiFlag != 0U && a2Context_->data == nullptr) {
                 return false;
             }
         }
-        if (!IsSupportedPeerRankSize(metadata.rankSize, isA3_)) {
+        // 运行时窗口大小为零时使用 Host 成功查询的结果。窗口变化会使公共尾部控制区地址失效。
+        if (metadata.windowBytes != queriedWindowBytes || !IsSupportedPeerRankSize(metadata.rankSize, isA3_)) {
             return false;
         }
 
@@ -471,7 +354,7 @@ __aicore__ inline void CopyPeerGmToLocalGm(AscendC::GlobalTensor<T> dst, AscendC
         return;
     }
 
-    // One tile cannot overlap another transfer. Avoid priming/draining a second event.
+    // 只有一个数据块时无法重叠搬运，无需初始化和等待第二组事件。
     if (count <= ubMoveNum) {
         AscendC::LocalTensor<T> local = buffer0.template Get<T>();
         AscendC::DataCopyExtParams copyParams(1U, static_cast<uint32_t>(count) * sizeof(T), 0U, 0U, 0U);
@@ -504,7 +387,7 @@ __aicore__ inline void CopyPeerGmToLocalGm(AscendC::GlobalTensor<T> dst, AscendC
         AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(eventId);
         pingPongId ^= 1U;
     }
-    // Drain both buffers before publishing ready or reusing these event IDs.
+    // 发布就绪状态或复用事件编号前，等待两个缓冲区的搬运全部完成。
     AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
     AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
 }
@@ -591,20 +474,6 @@ __aicore__ inline void WaitPeerPhase(const PeerWindowContext &context, const A2a
                                               phaseOffset + static_cast<uint64_t>(sourceRank) * kControlFlagStride);
         WaitFlagValue(slot, flagBuffer, epoch);
     }
-}
-
-__aicore__ inline void PublishExpertReady(GM_ADDR workspace, uint64_t readyBase, uint32_t expertIdx, int32_t epoch,
-                                          AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer)
-{
-    __gm__ int32_t *ready = reinterpret_cast<__gm__ int32_t *>(workspace + ExpertReadyOffset(readyBase, expertIdx));
-    StoreFlag(ready, flagBuffer, epoch);
-}
-
-__aicore__ inline void WaitExpertReady(GM_ADDR workspace, uint64_t readyBase, uint32_t expertIdx, int32_t epoch,
-                                       AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer)
-{
-    __gm__ int32_t *ready = reinterpret_cast<__gm__ int32_t *>(workspace + ExpertReadyOffset(readyBase, expertIdx));
-    WaitFlagValue(ready, flagBuffer, epoch);
 }
 
 } // namespace AlltoAllvGroupedMatMulAiv

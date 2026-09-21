@@ -38,7 +38,7 @@ protected:
     MoeDistributeDispatchSetupTilingData *tilingData_ = nullptr;
     std::string groupEp_;
 
-    uint64_t GetTilingKey() const;
+    uint64_t GetTilingKey() const override;
     const void PrintTilingDataInfo();
 
     const ge::graphStatus CheckRequiredAttrValue();

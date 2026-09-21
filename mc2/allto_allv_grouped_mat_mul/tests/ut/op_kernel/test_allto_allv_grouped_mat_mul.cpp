@@ -109,7 +109,6 @@ TEST(AlltoAllvGroupedMatMulV2KernelTest, BuildsTransposedTailExpertGemm)
     EXPECT_EQ(spec.lda, 272U);
     EXPECT_EQ(spec.ldb, 272U);
     EXPECT_EQ(spec.ldc, 130U);
-    EXPECT_TRUE(spec.transposeB);
     EXPECT_TRUE(spec.hasWork);
 }
 
@@ -138,7 +137,6 @@ TEST(AlltoAllvGroupedMatMulV2KernelTest, BuildsOptionalSharedExpertGemm)
 
     ASSERT_TRUE(AivCatlass::BuildSharedGemmSpec<true>(true, 16U, 256U, 128U, spec));
     EXPECT_EQ(spec.ldb, 256U);
-    EXPECT_TRUE(spec.transposeB);
 
     EXPECT_FALSE(AivCatlass::BuildSharedGemmSpec<false>(false, 16U, 256U, 128U, spec));
 }
@@ -147,10 +145,11 @@ TEST(AlltoAllvGroupedMatMulV2KernelTest, NormalizesA2AndA3PeerContextMetadata)
 {
     AivComm::PeerContextMetadata metadata = {};
 
-    ASSERT_TRUE(AivComm::NormalizePeerContextMetadata(1U, 4U, 0U, metadata));
+    EXPECT_FALSE(AivComm::NormalizePeerContextMetadata(1U, 4U, 0U, metadata));
+    ASSERT_TRUE(AivComm::NormalizePeerContextMetadata(1U, 4U, 32U * 1024U * 1024U, metadata));
     EXPECT_EQ(metadata.rankId, 1U);
     EXPECT_EQ(metadata.rankSize, 4U);
-    EXPECT_EQ(metadata.windowBytes, AivComm::kDefaultWindowBytes);
+    EXPECT_EQ(metadata.windowBytes, 32U * 1024U * 1024U);
 
     ASSERT_TRUE(AivComm::NormalizePeerContextMetadata(2U, 8U, 64U * 1024U * 1024U, metadata));
     EXPECT_EQ(metadata.rankId, 2U);

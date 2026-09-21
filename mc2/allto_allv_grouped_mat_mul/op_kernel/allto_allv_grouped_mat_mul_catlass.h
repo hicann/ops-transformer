@@ -29,7 +29,6 @@ struct GemmLaunchSpec {
     uint32_t lda = 0U;
     uint32_t ldb = 0U;
     uint32_t ldc = 0U;
-    bool transposeB = false;
     bool hasWork = false;
 };
 
@@ -71,7 +70,6 @@ A2AVGMM_CATLASS_HOST_DEVICE bool BuildExpertGemmSpec(uint32_t expertIdx,
     spec.lda = k;
     spec.ldb = TRANSPOSE_B ? k : n;
     spec.ldc = n;
-    spec.transposeB = TRANSPOSE_B;
     spec.hasWork = expert.tokenCount != 0U;
     return true;
 }
@@ -95,7 +93,6 @@ A2AVGMM_CATLASS_HOST_DEVICE bool BuildSharedGemmSpec(bool hasSharedExpert, uint3
     spec.lda = k;
     spec.ldb = TRANSPOSE_B ? k : n;
     spec.ldc = n;
-    spec.transposeB = TRANSPOSE_B;
     spec.hasWork = true;
     return true;
 }
@@ -141,18 +138,6 @@ __aicore__ inline bool RunSharedExpertGemm(GM_ADDR input, GM_ADDR weight, GM_ADD
         return info.hasSharedExpert == 0U || info.M == 0U;
     }
     return IsSupportedTile(tiling.m0, tiling.k0, tiling.n0);
-}
-
-__aicore__ inline void CompileCheckCatlassWrappers(GM_ADDR input, GM_ADDR weight, GM_ADDR output,
-                                                   const AlltoAllvGmmInfo &info, const AlltoAllvGmmCoCTiling &tiling)
-{
-    if (false) {
-        AlltoAllvGroupedMatMulAiv::ExpertMeta expert{};
-        (void)RunExpertGemm<bfloat16_t, false>(input, weight, output, 0U, expert, info, tiling);
-        (void)RunExpertGemm<half, true>(input, weight, output, 0U, expert, info, tiling);
-        (void)RunSharedExpertGemm<bfloat16_t, false>(input, weight, output, info, tiling);
-        (void)RunSharedExpertGemm<half, true>(input, weight, output, info, tiling);
-    }
 }
 
 } // namespace AlltoAllvGroupedMatMulCatlass
@@ -261,18 +246,6 @@ __aicore__ inline bool RunSharedExpertGemm(GM_ADDR input, GM_ADDR weight, GM_ADD
         return info.hasSharedExpert == 0U || info.M == 0U;
     }
     return detail::RunConfiguredGemm<Element, TRANSPOSE_B>(spec, tiling, input, weight, output);
-}
-
-__aicore__ inline void CompileCheckCatlassWrappers(GM_ADDR input, GM_ADDR weight, GM_ADDR output,
-                                                   const AlltoAllvGmmInfo &info, const AlltoAllvGmmCoCTiling &tiling)
-{
-    if (false) {
-        AlltoAllvGroupedMatMulAiv::ExpertMeta expert{};
-        (void)RunExpertGemm<bfloat16_t, false>(input, weight, output, 0U, expert, info, tiling);
-        (void)RunExpertGemm<half, true>(input, weight, output, 0U, expert, info, tiling);
-        (void)RunSharedExpertGemm<bfloat16_t, false>(input, weight, output, info, tiling);
-        (void)RunSharedExpertGemm<half, true>(input, weight, output, info, tiling);
-    }
 }
 
 } // namespace AlltoAllvGroupedMatMulCatlass

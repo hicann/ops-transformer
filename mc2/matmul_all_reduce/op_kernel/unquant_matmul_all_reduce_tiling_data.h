@@ -16,6 +16,8 @@
 #ifndef UNQUANT_MATMUL_ALL_REDUCE_TILING_DATA_H
 #define UNQUANT_MATMUL_ALL_REDUCE_TILING_DATA_H
 
+#include <cstddef>
+#include <cstdint>
 #include "kernel_tiling/kernel_tiling.h"
 
 #ifdef __CCE_KT_TEST__

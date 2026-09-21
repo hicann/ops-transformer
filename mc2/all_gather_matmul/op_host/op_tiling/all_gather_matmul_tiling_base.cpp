@@ -106,29 +106,6 @@ static ge::graphStatus CalcMatmulTiling(mc2tiling::TilingArgs &args, ::TCubeTili
 static ge::graphStatus MC2SetWorkspace(gert::TilingContext *context, Mc2Tiling::AllGatherMatmulTilingData &tilingData,
                                        mc2tiling::TilingArgs &args);
 
-static uint32_t MC2_Splite(mc2tiling::TilingArgs &args, uint32_t maxTileCnt = 64)
-{
-    // 检查允许通信的最大次数
-    if (args.commTurn >= maxTileCnt) {
-        args.commTurn = maxTileCnt;
-    }
-
-    uint64_t tileLen = 1;
-    if (args.mValue > args.commTurn) {
-        tileLen = args.mValue / args.commTurn;
-    }
-
-    if (args.inputDtypeSize == 2) {                          // 数据长度为2, 则向 2*64 = 128，则向128对齐
-        tileLen = mc2tiling::AlignUp<uint64_t>(tileLen, 64); // align size
-    } else if (args.inputDtypeSize == 4) {                   // 4 is float32 type size
-        tileLen = mc2tiling::AlignUp<uint64_t>(tileLen, 32); // align size
-    }
-    if (args.mValue > tileLen) {
-        return tileLen;
-    }
-    return args.mValue;
-}
-
 static bool CheckOutputParamDim0(const gert::TilingContext *context)
 {
     auto outputShape = context->GetOutputShape(OUTPUT_IDX);
@@ -248,7 +225,7 @@ ge::graphStatus AllGatherMatmulTilingBase::MCSpliteM(gert::TilingContext *ctx,
 
         CalcMatmulTiling(args, tilingData.tileTiling, tilingData.tileL2Tiling);
     } else if (args.commTurn != 0) {
-        uint64_t splite = MC2_Splite(args);
+        uint64_t splite = mc2tiling::SplitMValueByCommTurn(args.mValue, args.commTurn, args.inputDtypeSize);
 
         // 现在找到1个合适的切分
         auto tileCnt = args.mValue / splite;  // 切的份数

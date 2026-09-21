@@ -98,12 +98,6 @@ __global__ __aicore__ void matmul_allto_all(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias
                 op;
             op.Init(x1, x2, bias, x1_scale, x2_scale, y, workspaceGM, tilingGM);
             op.Process();
-        } else if constexpr (MM_ALLTO_ALL_BIAS_DTYPE == TILINGKEY_TPL_BF16) {
-            MatmulAlltoAll<DTYPE_X1, DTYPE_X2, bfloat16_t, DTYPE_X1_SCALE, DTYPE_X2_SCALE, DTYPE_Y,
-                           MM_ALLTO_ALL_HAS_BIAS, MM_ALLTO_ALL_TRANS_X2>
-                op;
-            op.Init(x1, x2, bias, x1_scale, x2_scale, y, workspaceGM, tilingGM);
-            op.Process();
         }
     }
 #endif

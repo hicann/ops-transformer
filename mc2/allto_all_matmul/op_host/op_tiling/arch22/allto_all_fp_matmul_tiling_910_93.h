@@ -56,7 +56,6 @@ protected:
 private:
     void PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingDataA3 &alltoAllMatmulTilingDataA3);
     void PrintAlltoAllMatmulTilingInfo(const std::string &opName, AlltoAllMatmulTilingInfoA3 &tilingInfo);
-    void PrintMMV3TilingData(const std::string &opName, Mc2MatmulV3TilingData &tiling);
 
     AlltoAllMatmulTilingDataA3 localTilingData_;
     std::string socVersionStr_;

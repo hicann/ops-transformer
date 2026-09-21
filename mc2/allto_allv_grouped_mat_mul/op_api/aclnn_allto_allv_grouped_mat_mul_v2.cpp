@@ -71,9 +71,8 @@ static aclnnStatus CheckAivTensor(const aclTensor *tensor, const char *tensorNam
     }
     const auto storageFormat = tensor->GetStorageFormat();
     const bool isNd = storageFormat == op::Format::FORMAT_ND;
-    // torch_npu describes a rank-3 base-format tensor as NCL when it creates
-    // the aclTensor. Its physical storage is still contiguous ND. Accept that
-    // representation only for the rank-3 GMM weight used by the PTA path.
+    // torch_npu 创建 aclTensor 时将三维基础格式张量描述为 NCL，其物理存储仍为连续 ND。
+    // 仅对 PTA 路径使用的三维，GMM 权重接受此表示。
     const bool isPtaNcl =
         allowPtaNcl && storageFormat == op::Format::FORMAT_NCL && tensor->GetViewShape().GetDimNum() == 3U;
     if (!isNd && !isPtaNcl) {

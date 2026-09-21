@@ -9,17 +9,15 @@
  */
 
 /*!
- * \file gather_moe_distribute_base.h
+ * \file moe_distribute_base_a2.h
  * \brief
  */
 
-#ifndef __GATHER_MOE_DISTRIBUTE_BASE_H__
-#define __GATHER_MOE_DISTRIBUTE_BASE_H__
-
-#pragma once
+#ifndef MOE_DISTRIBUTE_BASE_A2_H
+#define MOE_DISTRIBUTE_BASE_A2_H
 
 constexpr uint32_t LOCAL_NOTIFY_MAX_NUM = 64;
-constexpr uint32_t LOCAL_STREAM_MAX_NUM = 19U;
+constexpr uint32_t LOCAL_STREAM_MAX_NUM = 19;
 constexpr uint32_t AICPU_OP_NOTIFY_MAX_NUM = 2;
 constexpr uint32_t AICPU_MAX_RANK_NUM = 128 * 1024;
 
@@ -199,7 +197,7 @@ struct HcclAiRMAMemInfo {
     uint32_t memMaxNum{0};        // 最大内存数量，等于 HcclAiRMAMemType::MAX_NUM
     uint32_t sizeOfMemDetails{0}; // sizeof(MemDetails)，用于内存校验和偏移计算
     uint64_t memDetailPtr{0};     // MemDetails数组首地址, 个数: HcclAiRMAMemType::MAX_NUM
-                                  // 可往后追加字段
+    // 可往后追加字段
 };
 
 // 全部 Transport QP/Mem 信息
@@ -325,4 +323,4 @@ __aicore__ inline void cacheWriteThrough(__gm__ uint8_t *sourceAddr, uint64_t le
     }
 }
 
-#endif //__GATHER_MOE_DISTRIBUTE_BASE_H__
+#endif // MOE_DISTRIBUTE_BASE_A2_H

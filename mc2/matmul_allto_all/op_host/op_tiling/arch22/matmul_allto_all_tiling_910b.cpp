@@ -45,21 +45,13 @@ constexpr int32_t MATMULALLTOALL_FOUR_RANK_FP16_M0_DEFAULT = 128;
 constexpr int32_t MATMULALLTOALL_EIGHT_RANK_FP16_M0_DEFAULT = 128;
 constexpr int32_t MATMULALLTOALL_EIGHT_RANK_FP16_PVALUE_DEFAULT = 10;
 constexpr int32_t MATMULALLTOALL_EIGHT_RANK_FP16_UBMOVENUM_DEFAULT = 80;
-constexpr int32_t HALF_KBYTE = 512;
 constexpr int32_t DEFAULT_ROW = 128;
 constexpr int32_t DEFAULT_COL = 256;
 constexpr int32_t MAX_BUFF_BYTES = 200 * 1024 * 1024;
 constexpr int32_t FLAG_BUFF_BYTES = 20 * 1024 * 1024;
 constexpr int32_t MAX_BLOCK_COUNT = 2;
 constexpr int32_t MIN_P_VALUE = 1;
-constexpr int32_t ELEMENT_SIZE = 2; // 通信时每个元素均占用2字节
-constexpr int32_t MB_BYTES = 1024 * 1024;
-constexpr int32_t CONDITION_M_ST = 0;
-constexpr int32_t CONDITION_M_END = 1;
-constexpr int32_t CONDITION_K_ST = 2;
-constexpr int32_t CONDITION_K_END = 3;
-constexpr int32_t CONDITION_N_ST = 4;
-constexpr int32_t CONDITION_N_END = 5;
+constexpr int32_t ELEMENT_SIZE = 2;               // 通信时每个元素均占用2字节
 constexpr uint32_t COUNT_PARAMS_WITH_BIAS = 4;    // [x1, x2, bias, y]
 constexpr uint32_t COUNT_PARAMS_WITHOUT_BIAS = 3; // [x1, x2, y]
 const std::set<int> SUPPORT_RANK_SIZE_910B{2, 4, 8};
@@ -703,45 +695,13 @@ ge::graphStatus MatmulAlltoAllTiling910B::CheckOpInputInfo(MatmulAlltoAllInfo &i
     return ge::GRAPH_SUCCESS;
 }
 
-int32_t MatmulAlltoAllTiling910B::GetValueFromMKNConditionMap(int32_t m, int32_t k, int32_t n, int32_t defaultValue,
-                                                              std::map<int, std::vector<std::vector<int>>> conditionMap)
-{
-    int32_t value = defaultValue;
-    for (auto &item : conditionMap) {
-        for (auto &condition : item.second) {
-            bool inRange = m > condition[CONDITION_M_ST] && m <= condition[CONDITION_M_END] &&
-                           k > condition[CONDITION_K_ST] && k <= condition[CONDITION_K_END] &&
-                           n > condition[CONDITION_N_ST] && n <= condition[CONDITION_N_END];
-            if (inRange) {
-                return item.first;
-            }
-        }
-    }
-    return value;
-}
-
 void MatmulAlltoAllTiling910B::CalTilingParam(CoCTiling &cocTilingData,
                                               const std::map<int *, MatmulAlltoAllTilingValue> &TilingParamMap,
                                               MatmulAlltoAllInfo &info)
 {
-    int32_t m = info.M;
-    int32_t k = info.K;
-    int32_t n = info.N;
-
-    for (auto &item : TilingParamMap) {
-        auto value = item.second.value;
-        auto conditionMap = item.second.conditionMap;
-        if (!conditionMap.empty()) {
-            *item.first = GetValueFromMKNConditionMap(m, k, n, value, conditionMap);
-        } else if (value != -1) {
-            *item.first = value;
-        }
-    }
-    cocTilingData.ubMoveNum = cocTilingData.ubMoveNum * HALF_KBYTE;
-    if (cocTilingData.m0 >= DEFAULT_ROW) {
-        cocTilingData.k0 = DEFAULT_COL;
-        cocTilingData.n0 = cocTilingData.m0 == DEFAULT_ROW ? DEFAULT_COL : DEFAULT_ROW;
-    }
+    mc2tiling::SetTilingParamsFromConditionMap(static_cast<int32_t>(info.M), static_cast<int32_t>(info.K),
+                                               static_cast<int32_t>(info.N), TilingParamMap);
+    mc2tiling::FinalizeCoCTilingParam(cocTilingData);
     tileM0 = cocTilingData.m0;
     tileN0 = cocTilingData.n0;
 }
@@ -816,18 +776,7 @@ ge::graphStatus MatmulAlltoAllTiling910B::DoOpTiling()
     MC2_CHECK_LOG_RET(opName_, DoMmCommTiling(tilingData->cocTiling, info));
     MC2_CHECK_LOG_RET(opName_, SetHcclTiling(tilingData));
     // 校验HCCL BUFF空间大小
-    auto attrs = context_->GetAttrs();
-    auto group = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_GROUP_INDEX));
-    uint64_t hcclBuffSize = 0ULL;
-    auto cclRet = mc2tiling::GetCclBufferSize(group, &hcclBuffSize, opName_);
-    if (cclRet == ge::GRAPH_SUCCESS) {
-        OP_TILING_CHECK(hcclBuffSize < MAX_BUFF_BYTES,
-                        OP_LOGE(opName_, "HCCL_BUFFSIZE (%lu Bytes) too small, min required %lu Bytes (%dMB)",
-                                hcclBuffSize, MAX_BUFF_BYTES, MAX_BUFF_BYTES / MB_BYTES),
-                        return ge::GRAPH_FAILED);
-    } else {
-        OP_LOGW(opName_, "Can't get HCCL_BUFFSIZE, skip CCL buffer size validation.");
-    }
+    MC2_CHECK_LOG_RET(opName_, mc2tiling::CheckHcclBuffSize(context_, ATTR_GROUP_INDEX, MAX_BUFF_BYTES, opName_));
 
     // 2. tilingkey
     SetTilingKey();
@@ -864,14 +813,7 @@ uint64_t MatmulAlltoAllTiling910B::GetTilingKey() const
  */
 ge::graphStatus MatmulAlltoAllTiling910B::SetHcclTiling(MatmulAlltoAllTilingData *tilingData)
 {
-    auto attrs = context_->GetAttrs();
-    auto group = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_GROUP_INDEX));
-    uint32_t opType = 18; // batch write=18,
-    std::string algConfig = "MultiPut=level0:fullmesh";
-    AscendC::Mc2CcTilingConfig mc2CcTilingConfig(group, opType, algConfig);
-    mc2CcTilingConfig.GetTiling(tilingData->mc2InitTiling);
-    mc2CcTilingConfig.GetTiling(tilingData->mc2CcTiling);
-    return ge::GRAPH_SUCCESS;
+    return mc2tiling::SetHcclCcTilingConfig(context_, ATTR_GROUP_INDEX, tilingData);
 }
 
 /**

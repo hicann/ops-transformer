@@ -1747,62 +1747,6 @@ struct CountingPrefix {
     }
 };
 
-TEST(AlltoAllvGroupedMatMulAivCommTest, BuildsExpertMajorSourceMinorMetadata)
-{
-    const int32_t recvPrefix[] = {2, 3, 4, 6};
-    AivComm::ExpertMeta expertMeta[2] = {};
-    AivComm::ExpertSourceMeta sourceMeta[4] = {};
-
-    ASSERT_TRUE(AivComm::BuildExpertMetadata(recvPrefix, 2, 2, 6, expertMeta, sourceMeta));
-    EXPECT_EQ(expertMeta[0].recvTokenBase, 0U);
-    EXPECT_EQ(expertMeta[0].tokenCount, 3U);
-    EXPECT_EQ(expertMeta[1].recvTokenBase, 3U);
-    EXPECT_EQ(expertMeta[1].tokenCount, 3U);
-
-    EXPECT_EQ(sourceMeta[0].dstTokenOffset, 0U);
-    EXPECT_EQ(sourceMeta[0].tokenCount, 2U);
-    EXPECT_EQ(sourceMeta[1].dstTokenOffset, 2U);
-    EXPECT_EQ(sourceMeta[1].tokenCount, 1U);
-    EXPECT_EQ(sourceMeta[2].dstTokenOffset, 3U);
-    EXPECT_EQ(sourceMeta[2].tokenCount, 1U);
-    EXPECT_EQ(sourceMeta[3].dstTokenOffset, 4U);
-    EXPECT_EQ(sourceMeta[3].tokenCount, 2U);
-}
-
-TEST(AlltoAllvGroupedMatMulAivCommTest, SupportsZeroTokenExpert)
-{
-    const int32_t recvPrefix[] = {2, 3, 3, 3};
-    AivComm::ExpertMeta expertMeta[2] = {};
-    AivComm::ExpertSourceMeta sourceMeta[4] = {};
-
-    ASSERT_TRUE(AivComm::BuildExpertMetadata(recvPrefix, 2, 2, 3, expertMeta, sourceMeta));
-    EXPECT_EQ(expertMeta[0].recvTokenBase, 0U);
-    EXPECT_EQ(expertMeta[0].tokenCount, 3U);
-    EXPECT_EQ(expertMeta[1].recvTokenBase, 3U);
-    EXPECT_EQ(expertMeta[1].tokenCount, 0U);
-    EXPECT_EQ(sourceMeta[2].dstTokenOffset, 3U);
-    EXPECT_EQ(sourceMeta[3].dstTokenOffset, 3U);
-}
-
-TEST(AlltoAllvGroupedMatMulAivCommTest, ComputesPeerSourceOffsets)
-{
-    const int32_t peer0SendPrefix[] = {2, 3, 6, 6};
-    const int32_t peer1SendPrefix[] = {1, 3, 3, 7};
-    uint64_t offset = 0;
-
-    ASSERT_TRUE(AivComm::GetPeerSourceTokenOffset(peer0SendPrefix, 2, 2, 0, 0, offset));
-    EXPECT_EQ(offset, 0U);
-    ASSERT_TRUE(AivComm::GetPeerSourceTokenOffset(peer0SendPrefix, 2, 2, 0, 1, offset));
-    EXPECT_EQ(offset, 2U);
-    ASSERT_TRUE(AivComm::GetPeerSourceTokenOffset(peer0SendPrefix, 2, 2, 1, 0, offset));
-    EXPECT_EQ(offset, 3U);
-    ASSERT_TRUE(AivComm::GetPeerSourceTokenOffset(peer1SendPrefix, 2, 2, 1, 1, offset));
-    EXPECT_EQ(offset, 3U);
-
-    const int32_t invalidPeerPrefix[] = {-1, 2, 2, 6};
-    EXPECT_FALSE(AivComm::GetPeerSourceTokenOffset(invalidPeerPrefix, 2, 2, 0, 0, offset));
-}
-
 TEST(AlltoAllvGroupedMatMulAivCommTest, ReadsInclusivePrefixRangeInConstantTime)
 {
     std::vector<int32_t> prefix(A2AVGMM_MAX_COUNT_NUM);
@@ -1829,11 +1773,8 @@ TEST(AlltoAllvGroupedMatMulAivCommTest, ValidatesWindowAndReadyLayout)
     EXPECT_EQ(layout.inputBytes, 3072U);
     EXPECT_EQ(layout.controlOffset % AivComm::kWindowAlignment, 0U);
     EXPECT_GE(layout.countsOffset, layout.inputBytes);
-    EXPECT_EQ(layout.readyOffset, control.firstExpertFlagOffset);
     EXPECT_FALSE(AivComm::BuildWindowLayout(6, 256, 4, control, layout.totalBytes - 1U, layout));
     EXPECT_FALSE(AivComm::BuildWindowLayout(UINT64_MAX, 256, 4, control, UINT64_MAX, layout));
-    EXPECT_EQ(AivComm::ExpertReadyBytes(32), 1024U);
-    EXPECT_EQ(AivComm::ExpertReadyOffset(4096, 3), 4192U);
 }
 
 TEST(AlltoAllvGroupedMatMulAivCommTest, KeepsPeerControlOffsetStableAcrossExpertCounts)
@@ -1852,7 +1793,6 @@ TEST(AlltoAllvGroupedMatMulAivCommTest, KeepsPeerControlOffsetStableAcrossExpert
     EXPECT_EQ(controlE2.releaseSlotsOffset, controlE16.releaseSlotsOffset);
     EXPECT_EQ(controlE2.peerControlBytes, 544U);
     EXPECT_EQ(controlE2.peerControlBytes, controlE16.peerControlBytes);
-    EXPECT_NE(controlE2.totalBytes, controlE16.totalBytes);
     EXPECT_EQ(layoutE2.controlOffset, layoutE16.controlOffset);
 }
 } // namespace AlltoAllvGroupedMatMulUT
@@ -1883,7 +1823,6 @@ TEST(AlltoAllvGroupedMatMulCatlassTest, BuildsTailExpertSpec)
     EXPECT_EQ(spec.lda, 272U);
     EXPECT_EQ(spec.ldb, 130U);
     EXPECT_EQ(spec.ldc, 130U);
-    EXPECT_FALSE(spec.transposeB);
 }
 
 TEST(AlltoAllvGroupedMatMulCatlassTest, BuildsTransposedBAndSharedSpecs)
@@ -1891,7 +1830,6 @@ TEST(AlltoAllvGroupedMatMulCatlassTest, BuildsTransposedBAndSharedSpecs)
     const AivComm::ExpertMeta expert{0U, 1U, 0U};
     AivCatlass::GemmLaunchSpec expertSpec = {};
     ASSERT_TRUE(AivCatlass::BuildExpertGemmSpec<true>(1, expert, 272, 130, expertSpec));
-    EXPECT_TRUE(expertSpec.transposeB);
     EXPECT_EQ(expertSpec.ldb, 272U);
 
     AivCatlass::GemmLaunchSpec sharedSpec = {};
@@ -1928,6 +1866,15 @@ TEST(AlltoAllvGroupedMatMulAivModeTest, BuildsExpertMetadataOneExpertAtATime)
     EXPECT_EQ(sourceOffset, 7U);
 }
 
+TEST(AlltoAllvGroupedMatMulAivModeTest, BuildsZeroTokenExpertMetadata)
+{
+    const int32_t recvPrefix[] = {2, 3, 3, 3};
+    AivComm::ExpertMeta expert = {};
+    ASSERT_TRUE(AivMode::BuildExpertMetaForIndex(recvPrefix, 2U, 2U, 1U, 3U, expert));
+    EXPECT_EQ(expert.recvTokenBase, 3U);
+    EXPECT_EQ(expert.tokenCount, 0U);
+}
+
 TEST(AlltoAllvGroupedMatMulAivModeTest, RejectsInvalidExpertMetadata)
 {
     const int32_t invalidPrefix[] = {1, 3, 2, 5};
@@ -1957,17 +1904,12 @@ TEST(AlltoAllvGroupedMatMulAivModeTest, PartitionsInitialWindowCopyAcrossAivTask
     EXPECT_FALSE(AivMode::PartitionElements(10, 3, 3, range));
 }
 
-TEST(AlltoAllvGroupedMatMulAivModeTest, AssignsOneSubblockZeroWorkerPerSourceRank)
+TEST(AlltoAllvGroupedMatMulAivModeTest, CoversAllSourceRanksWithStridedWorkers)
 {
-    EXPECT_TRUE(AivMode::IsSourceWorker(0, 2, 0, 4, 0));
-    EXPECT_TRUE(AivMode::IsSourceWorker(2, 2, 0, 4, 1));
-    EXPECT_FALSE(AivMode::IsSourceWorker(2, 2, 1, 4, 1));
-    EXPECT_FALSE(AivMode::IsSourceWorker(8, 2, 0, 4, 0));
-
     uint32_t workerNum = 0U;
     ASSERT_TRUE(AivMode::GetProducerWorkerCount(40U, 2U, workerNum));
     EXPECT_EQ(workerNum, 20U);
-    // Twenty producer subblocks must cover all 128 ranks by striding 20.
+    // 二十个生产者子块必须以二十为步长覆盖全部一百二十八个 rank。
     std::array<uint32_t, 128> visits = {};
     for (uint32_t worker = 0U; worker < workerNum; ++worker) {
         for (uint32_t rank = worker; rank < visits.size(); rank += workerNum) {

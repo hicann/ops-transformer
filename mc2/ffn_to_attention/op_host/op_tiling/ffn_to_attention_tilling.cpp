@@ -183,10 +183,10 @@ static bool CheckAndSetAttrs(const gert::TilingContext *context, const char *nod
                         "valid group name length"),
                     return false);
     OP_TILING_CHECK(worldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "worldSize"), return false);
-    OP_TILING_CHECK(!CheckAttrShapes(nodeName, tokenInfoTable, tokenData), return false, return false);
+    OP_TILING_CHECK(!CheckAttrShapes(nodeName, tokenInfoTable, tokenData), static_cast<void>(0), return false);
     // 判断是否满足其他限制
     int64_t worldSize = *worldSizePtr;
-    OP_TILING_CHECK(!CheckAttrLimits(nodeName, worldSize, tokenInfoTableShape, tokenDataShape), return false,
+    OP_TILING_CHECK(!CheckAttrLimits(nodeName, worldSize, tokenInfoTableShape, tokenDataShape), static_cast<void>(0),
                     return false);
 
     tilingData.ffnToAttentionInfo.worldSize = *worldSizePtr;
@@ -239,8 +239,8 @@ static bool CheckInputDim0Matches(const char *nodeName, const uint64_t xDim0, co
     return true;
 }
 
-static bool CheckInputDim0Dim1(gert::TilingContext *context, const char *nodeName, FFNToAttentionTilingData &tilingData,
-                               const FFNToAttentionTilingConfig &config)
+static bool CheckInputDim0Dim1(const gert::TilingContext *context, const char *nodeName,
+                               FFNToAttentionTilingData &tilingData, const FFNToAttentionTilingConfig &config)
 {
     const gert::StorageShape *xShape = context->GetInputShape(config.xIndex);
     const gert::StorageShape *sessionIdsShape = context->GetInputShape(config.sessionIdsIndex);
@@ -265,7 +265,7 @@ static bool CheckInputDim0Dim1(gert::TilingContext *context, const char *nodeNam
 
     OP_TILING_CHECK(!CheckInputDim0Matches(nodeName, xDim0, sessionIdsShape, microBatchIdsShape, tokenIdsShape,
                                            expertOffsetsShape, actualTokenNumShape),
-                    return false, return false);
+                    static_cast<void>(0), return false);
     tilingData.ffnToAttentionInfo.H = xDim1;
     return true;
 }
@@ -333,7 +333,7 @@ static bool CheckInputDim(gert::TilingContext *context, const char *nodeName, FF
 
     OP_TILING_CHECK(!CheckRequiredInputDims(nodeName, xShape, sessionIdsShape, microBatchIdsShape, tokenIdsShape,
                                             expertOffsetsShape, actualTokenNumShape),
-                    return false, return false);
+                    static_cast<void>(0), return false);
 
     OP_TILING_CHECK(!CheckInputDim0Dim1(context, nodeName, tilingData, config),
                     OP_LOGE(nodeName, "Check Inputsdim0ordim1 failed!"), return false);
@@ -357,7 +357,7 @@ static bool CheckInputDim(gert::TilingContext *context, const char *nodeName, FF
     return true;
 }
 
-static bool CheckTokenIdDataTypes(gert::TilingContext *context, const char *nodeName,
+static bool CheckTokenIdDataTypes(const gert::TilingContext *context, const char *nodeName,
                                   const FFNToAttentionTilingConfig &config)
 {
     auto sessionIdDesc = context->GetInputDesc(config.sessionIdsIndex);
@@ -432,7 +432,7 @@ static bool CheckInputDataType(gert::TilingContext *context, const char *nodeNam
     return true;
 }
 
-static bool CheckTokenIdFormats(gert::TilingContext *context, const char *nodeName,
+static bool CheckTokenIdFormats(const gert::TilingContext *context, const char *nodeName,
                                 const FFNToAttentionTilingConfig &config)
 {
     auto sessionIdDesc = context->GetInputDesc(config.sessionIdsIndex);
@@ -471,7 +471,7 @@ static bool CheckTokenIdFormats(gert::TilingContext *context, const char *nodeNa
     return true;
 }
 
-static bool CheckExpertMetadataFormats(gert::TilingContext *context, const char *nodeName,
+static bool CheckExpertMetadataFormats(const gert::TilingContext *context, const char *nodeName,
                                        const FFNToAttentionTilingConfig &config)
 {
     auto expertOffsetDesc = context->GetInputDesc(config.expertOffsetsIndex);
@@ -600,7 +600,7 @@ static ge::graphStatus SetHcommCfg(const gert::TilingContext *context, FFNToAtte
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckMc2Context(gert::TilingContext *context, const char *nodeName,
+static ge::graphStatus CheckMc2Context(const gert::TilingContext *context, const char *nodeName,
                                        const FFNToAttentionTilingConfig &config)
 {
     const gert::StorageShape *contextStorageShape = context->GetInputShape(config.contextIndex);
@@ -630,8 +630,8 @@ static ge::graphStatus CheckMc2Context(gert::TilingContext *context, const char 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckCclBufferSize(gert::TilingContext *context, const char *nodeName, const uint32_t attrIndex,
-                                          const uint64_t neededSize)
+static ge::graphStatus CheckCclBufferSize(const gert::TilingContext *context, const char *nodeName,
+                                          const uint32_t attrIndex, const uint64_t neededSize)
 {
     if (attrIndex != UINT32_MAX) {
         auto attrsPtr = context->GetAttrs();
@@ -706,12 +706,12 @@ ge::graphStatus FFNToAttentionTilingFuncBase(gert::TilingContext *context, const
     // Validate ccl_buffer_size when provided (V2 path)
     OP_TILING_CHECK(
         CheckCclBufferSize(context, nodeName, config.attrCclBufferSizeIndex, neededSize) != ge::GRAPH_SUCCESS,
-        return ge::GRAPH_FAILED, return ge::GRAPH_FAILED);
+        static_cast<void>(0), return ge::GRAPH_FAILED);
 
     // Validate ccl_buffer_size when provided (V2 path)
     OP_TILING_CHECK(
         CheckCclBufferSize(context, nodeName, config.attrCclBufferSizeIndex, neededSize) != ge::GRAPH_SUCCESS,
-        return ge::GRAPH_FAILED, return ge::GRAPH_FAILED);
+        static_cast<void>(0), return ge::GRAPH_FAILED);
 
     // Set WorkSpace
     OP_TILING_CHECK(SetWorkSpace(context, nodeName) != ge::GRAPH_SUCCESS,

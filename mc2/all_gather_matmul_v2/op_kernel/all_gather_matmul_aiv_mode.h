@@ -22,7 +22,7 @@
 #endif
 #include "adv_api/hccl/hccl.h"
 #include "kernel_tiling/kernel_tiling.h"
-#include "gather_moe_distribute_base.h"
+#include "../../common/op_kernel/moe_distribute_base_a2.h"
 #include "all_gather_matmul_aiv_mode_tiling.h"
 #include "all_gather_matmul_aiv_mode_util.h"
 #include "all_gather_matmul_aiv_mode_padding.h"

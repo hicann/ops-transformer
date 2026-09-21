@@ -91,7 +91,7 @@ static bool IsMxQuantMode(uint32_t quantMode)
            quantMode == USER_QUANT_MODE_MX_CLIP_E4M3;
 }
 
-static void PrintTilingDataInfo(const char *nodeName, AttentionToFFNTilingData &tilingData)
+static void PrintTilingDataInfo(AttentionToFFNTilingData &tilingData)
 {
     OP_LOGD(ATTN_FFN_INNER_DEBUG, "X is %u.", tilingData.attentionToFFNInfo.X);
     OP_LOGD(ATTN_FFN_INNER_DEBUG, "BS is %u.", tilingData.attentionToFFNInfo.BS);
@@ -176,7 +176,7 @@ static bool CheckShapeAttrRelations(const char *nodeName, const T *ffnTokenInfoT
     return true;
 }
 
-static bool CheckAndSetShapeAttrs(gert::TilingContext *context, const char *nodeName,
+static bool CheckAndSetShapeAttrs(const gert::TilingContext *context, const char *nodeName,
                                   AttentionToFFNTilingData &tilingData, const AttentionToFFNTilingConfig &config)
 {
     auto attrs = context->GetAttrs();
@@ -191,10 +191,10 @@ static bool CheckAndSetShapeAttrs(gert::TilingContext *context, const char *node
     int32_t bs = xShape->GetStorageShape().GetDim(1);
 
     OP_TILING_CHECK(!CheckShapeAttrDims(nodeName, ffnTokenInfoTableDimNum, ffnTokenDataDimNum, attnTokenDataDimNum),
-                    return false, return false);
+                    static_cast<void>(0), return false);
     OP_TILING_CHECK(
         !CheckShapeAttrRelations(nodeName, ffnTokenInfoTableShape, ffnTokenDataShape, attnTokenDataShape, bs),
-        return false, return false);
+        static_cast<void>(0), return false);
 
     // 校验 attentionWorkerNum 的值
     uint32_t attentionWorkerNum = ffnTokenDataShape[0];
@@ -275,7 +275,7 @@ static bool CheckAndSetAttrs(gert::TilingContext *context, const char *nodeName,
 
     OP_TILING_CHECK(!CheckAttrValues(nodeName, moeExpertNum, worldSize, *worldSizePtr, *quantModePtr, *syncFlagPtr,
                                      *ffnStartRankIdPtr, config.allowMxQuantMode),
-                    return false, return false);
+                    static_cast<void>(0), return false);
 
     OP_TILING_CHECK(!CheckAndSetShapeAttrs(context, nodeName, tilingData, config),
                     OP_LOGE(nodeName, "Check and set shape list attrs failed!"), return false);
@@ -358,7 +358,7 @@ static void InitTilingDataByExpert(AttentionToFFNTilingData &tilingData, const i
     tilingData.attentionToFFNInfo.sharedExpertNum = expertRankTableDim1 - tilingData.attentionToFFNInfo.moeExpertNum;
 }
 
-static bool CheckRequiredTensorDataTypes(gert::TilingContext *context, const char *nodeName,
+static bool CheckRequiredTensorDataTypes(const gert::TilingContext *context, const char *nodeName,
                                          const AttentionToFFNTilingConfig &config)
 {
     OP_TILING_CHECK(context->GetInputDesc(config.xIndex) == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"),
@@ -412,7 +412,7 @@ static bool CheckRequiredTensorDataTypes(gert::TilingContext *context, const cha
     return true;
 }
 
-static bool CheckOptionalTensorDataTypes(gert::TilingContext *context, const char *nodeName, const bool isScales,
+static bool CheckOptionalTensorDataTypes(const gert::TilingContext *context, const char *nodeName, const bool isScales,
                                          const bool isActiveMask, const AttentionToFFNTilingConfig &config)
 {
     if (isScales) {
@@ -441,13 +441,13 @@ static bool CheckOptionalTensorDataTypes(gert::TilingContext *context, const cha
 static bool CheckTensorDataType(gert::TilingContext *context, const char *nodeName, const bool isScales,
                                 const bool isActiveMask, const AttentionToFFNTilingConfig &config)
 {
-    OP_TILING_CHECK(!CheckRequiredTensorDataTypes(context, nodeName, config), return false, return false);
-    OP_TILING_CHECK(!CheckOptionalTensorDataTypes(context, nodeName, isScales, isActiveMask, config), return false,
-                    return false);
+    OP_TILING_CHECK(!CheckRequiredTensorDataTypes(context, nodeName, config), static_cast<void>(0), return false);
+    OP_TILING_CHECK(!CheckOptionalTensorDataTypes(context, nodeName, isScales, isActiveMask, config),
+                    static_cast<void>(0), return false);
     return true;
 }
 
-static bool CheckPrimaryTensorFormats(gert::TilingContext *context, const char *nodeName,
+static bool CheckPrimaryTensorFormats(const gert::TilingContext *context, const char *nodeName,
                                       const AttentionToFFNTilingConfig &config)
 {
     OP_TILING_CHECK(context->GetInputDesc(config.xIndex) == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"),
@@ -499,7 +499,7 @@ static bool CheckPrimaryTensorFormats(gert::TilingContext *context, const char *
     return true;
 }
 
-static bool CheckExpertTensorFormats(gert::TilingContext *context, const char *nodeName,
+static bool CheckExpertTensorFormats(const gert::TilingContext *context, const char *nodeName,
                                      const AttentionToFFNTilingConfig &config)
 {
     OP_TILING_CHECK(context->GetInputDesc(config.expertIdsIndex) == nullptr,
@@ -529,7 +529,7 @@ static bool CheckExpertTensorFormats(gert::TilingContext *context, const char *n
     return true;
 }
 
-static bool CheckOptionalTensorFormats(gert::TilingContext *context, const char *nodeName, const bool isScales,
+static bool CheckOptionalTensorFormats(const gert::TilingContext *context, const char *nodeName, const bool isScales,
                                        const bool isActiveMask, const AttentionToFFNTilingConfig &config)
 {
     if (isScales) {
@@ -566,14 +566,14 @@ static bool CheckOptionalTensorFormats(gert::TilingContext *context, const char 
 static bool CheckTensorFormat(gert::TilingContext *context, const char *nodeName, const bool isScales,
                               const bool isActiveMask, const AttentionToFFNTilingConfig &config)
 {
-    OP_TILING_CHECK(!CheckPrimaryTensorFormats(context, nodeName, config), return false, return false);
-    OP_TILING_CHECK(!CheckExpertTensorFormats(context, nodeName, config), return false, return false);
-    OP_TILING_CHECK(!CheckOptionalTensorFormats(context, nodeName, isScales, isActiveMask, config), return false,
-                    return false);
+    OP_TILING_CHECK(!CheckPrimaryTensorFormats(context, nodeName, config), static_cast<void>(0), return false);
+    OP_TILING_CHECK(!CheckExpertTensorFormats(context, nodeName, config), static_cast<void>(0), return false);
+    OP_TILING_CHECK(!CheckOptionalTensorFormats(context, nodeName, isScales, isActiveMask, config),
+                    static_cast<void>(0), return false);
     return true;
 }
 
-static bool CheckPrimaryTensorDims(gert::TilingContext *context, const char *nodeName,
+static bool CheckPrimaryTensorDims(const gert::TilingContext *context, const char *nodeName,
                                    const AttentionToFFNTilingConfig &config)
 {
     const gert::StorageShape *xStorageShape = context->GetInputShape(config.xIndex);
@@ -612,7 +612,7 @@ static bool CheckPrimaryTensorDims(gert::TilingContext *context, const char *nod
     return true;
 }
 
-static bool CheckExpertTensorDims(gert::TilingContext *context, const char *nodeName, const bool isScales,
+static bool CheckExpertTensorDims(const gert::TilingContext *context, const char *nodeName, const bool isScales,
                                   const bool isActiveMask, const AttentionToFFNTilingConfig &config)
 {
     const gert::StorageShape *expertIdStorageShape = context->GetInputShape(config.expertIdsIndex);
@@ -661,8 +661,8 @@ static bool CheckExpertTensorDims(gert::TilingContext *context, const char *node
 static bool CheckTensorDim(gert::TilingContext *context, const char *nodeName, const bool isScales,
                            const bool isActiveMask, const AttentionToFFNTilingConfig &config)
 {
-    OP_TILING_CHECK(!CheckPrimaryTensorDims(context, nodeName, config), return false, return false);
-    OP_TILING_CHECK(!CheckExpertTensorDims(context, nodeName, isScales, isActiveMask, config), return false,
+    OP_TILING_CHECK(!CheckPrimaryTensorDims(context, nodeName, config), static_cast<void>(0), return false);
+    OP_TILING_CHECK(!CheckExpertTensorDims(context, nodeName, isScales, isActiveMask, config), static_cast<void>(0),
                     return false);
     return true;
 }
@@ -730,7 +730,7 @@ static bool CheckExpertRankTableShape(const char *nodeName, const int32_t expert
     return true;
 }
 
-static bool CheckTensorShapeAndSetTinglingData(gert::TilingContext *context, const char *nodeName,
+static bool CheckTensorShapeAndSetTinglingData(const gert::TilingContext *context, const char *nodeName,
                                                AttentionToFFNTilingData &tilingData, const bool isScales,
                                                const bool isActiveMask, const AttentionToFFNTilingConfig &config)
 {
@@ -756,9 +756,9 @@ static bool CheckTensorShapeAndSetTinglingData(gert::TilingContext *context, con
 
     OP_TILING_CHECK(!CheckXAndExpertIdShapes(nodeName, xDim0, xDim1, xDim2, sessionIdDim0, microBatchIdDim0,
                                              layerIdDim0, expertIdsDim0, expertIdsDim1, expertIdsDim2, moeExpertNum),
-                    return false, return false);
+                    static_cast<void>(0), return false);
     OP_TILING_CHECK(!CheckExpertRankTableShape(nodeName, expertRankTableDim0, expertRankTableDim1, moeExpertNum),
-                    return false, return false);
+                    static_cast<void>(0), return false);
 
     if (isScales) {
         const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(config.scalesIndex);
@@ -845,7 +845,7 @@ static uint64_t CalTilingKey(const uint32_t syncFlag, const uint32_t quantMode, 
 }
 
 static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const char *nodeName,
-                                    AttentionToFFNTilingData *tilingData)
+                                    const AttentionToFFNTilingData *tilingData)
 {
     size_t *workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "workSpaces"), return ge::GRAPH_FAILED);
@@ -905,7 +905,7 @@ static ge::graphStatus SetHcommCfg(AttentionToFFNTilingData &tilingData, const s
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckMc2Context(gert::TilingContext *context, const char *nodeName,
+static ge::graphStatus CheckMc2Context(const gert::TilingContext *context, const char *nodeName,
                                        const AttentionToFFNTilingConfig &config)
 {
     const gert::StorageShape *contextStorageShape = context->GetInputShape(config.contextIndex);
@@ -935,7 +935,7 @@ static ge::graphStatus CheckMc2Context(gert::TilingContext *context, const char 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckAttentionCclBufferSize(gert::TilingContext *context, const char *nodeName,
+static ge::graphStatus CheckAttentionCclBufferSize(const gert::TilingContext *context, const char *nodeName,
                                                    const uint32_t attrIndex, const uint64_t neededSize)
 {
     if (attrIndex != UINT32_MAX) {
@@ -995,7 +995,7 @@ static ge::graphStatus CheckAttentionWindowSize(gert::TilingContext *context, co
     // Validate ccl_buffer_size when provided (V2 path)
     OP_TILING_CHECK(
         CheckAttentionCclBufferSize(context, nodeName, config.attrCclBufferSizeIndex, neededSize) != ge::GRAPH_SUCCESS,
-        return ge::GRAPH_FAILED, return ge::GRAPH_FAILED);
+        static_cast<void>(0), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1035,7 +1035,7 @@ ge::graphStatus AttentionToFFNTilingFuncBase(gert::TilingContext *context, const
 
     uint32_t quantMode = tilingData->attentionToFFNInfo.quantMode;
     OP_TILING_CHECK(CheckAttentionWindowSize(context, nodeName, tilingData, quantMode, config) != ge::GRAPH_SUCCESS,
-                    return ge::GRAPH_FAILED, return ge::GRAPH_FAILED);
+                    static_cast<void>(0), return ge::GRAPH_FAILED);
 
     // Set WorkSpace
     OP_TILING_CHECK(SetWorkSpace(context, nodeName, tilingData) != ge::GRAPH_SUCCESS,
@@ -1055,7 +1055,7 @@ ge::graphStatus AttentionToFFNTilingFuncBase(gert::TilingContext *context, const
     // Set numBlocks
     SetAttentionPlatformTilingData(context, nodeName, *tilingData);
 
-    PrintTilingDataInfo(nodeName, *tilingData);
+    PrintTilingDataInfo(*tilingData);
     OP_LOGD("AttentionToFFN", "tiling process finished successfully!!!");
     return ge::GRAPH_SUCCESS;
 }

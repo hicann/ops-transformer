@@ -130,7 +130,7 @@ static ge::DataType InferDataTypeDynamicScales(int64_t quantMode, ge::DataType s
 }
 
 // 校验ep_rank_id与shared expert相关attr的合法性，并输出moeRankNum及共享专家场景标志
-static ge::graphStatus CheckEpRankAndSharedAttrs(gert::InferShapeContext *context, const int64_t *epRankId,
+static ge::graphStatus CheckEpRankAndSharedAttrs(const gert::InferShapeContext *context, const int64_t *epRankId,
                                                  const int64_t *epWorldSize, const int64_t *sharedExpertNum,
                                                  const int64_t *sharedExpertRankNum, int64_t &moeRankNum,
                                                  bool &isSharedDefault, bool &isNoShared)
@@ -171,11 +171,11 @@ static ge::graphStatus CheckEpRankAndSharedAttrs(gert::InferShapeContext *contex
 }
 
 // 计算expandX的token数a及本地专家数localExpertNum
-static void CalcExpandTokenNum(gert::InferShapeContext *context, const int64_t *epRankId, const int64_t *epWorldSize,
-                               const int64_t *sharedExpertNum, const int64_t *sharedExpertRankNum,
-                               const gert::Shape *elasticInfoShape, const bool isSharedDefault, const bool isNoShared,
-                               const int64_t localMoeExpertNum, const int64_t globalBsReal, const int64_t k, int64_t &a,
-                               int64_t &localExpertNum)
+static void CalcExpandTokenNum(const gert::InferShapeContext *context, const int64_t *epRankId,
+                               const int64_t *epWorldSize, const int64_t *sharedExpertNum,
+                               const int64_t *sharedExpertRankNum, const gert::Shape *elasticInfoShape,
+                               const bool isSharedDefault, const bool isNoShared, const int64_t localMoeExpertNum,
+                               const int64_t globalBsReal, const int64_t k, int64_t &a, int64_t &localExpertNum)
 {
     if (*epRankId < *sharedExpertRankNum) {
         localExpertNum = 1;

@@ -52,6 +52,24 @@ struct DecisionNode {
     NodeValue value;     // 阈值或返回值（通过union区分）
 };
 
+// 决策树表项构造辅助函数：决策树数据表由数百行初始化项组成，
+// 直接书写聚合初始化会产生大量逐字相同的样板代码（重复率检测高频命中），
+// 通过以下 constexpr 辅助函数压缩表项书写，语义与原初始化完全一致。
+constexpr DecisionNode Threshold(FeatureType feature, float threshold)
+{
+    return DecisionNode{feature, {.threshold = threshold}};
+}
+
+constexpr DecisionNode Ret(int32_t return_value)
+{
+    return DecisionNode{FeatureType::RETURN_VALUE, {.return_value = return_value}};
+}
+
+constexpr DecisionNode Placeholder()
+{
+    return DecisionNode{FeatureType::PLACEHOLDER, {.threshold = 0.0f}};
+}
+
 inline void PrecomputeFeatures(float features[FEATURE_COUNT], int m, int k, int n, int world_size)
 {
     const int64_t mn = static_cast<int64_t>(m) * n;

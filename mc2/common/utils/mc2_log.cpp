@@ -56,6 +56,28 @@ void PrintMMV3TilingData(const std::string &opName, Mc2Tiling::MC2MatmulV3Tiling
     OP_LOGD(opName, "isHf32 %d", tiling.isHf32);
 }
 
+void PrintMc2MatmulV3TilingData(const std::string &opName, ::Mc2MatmulV3TilingData &tiling)
+{
+    PrintTCubeTilingData(opName, tiling.matmulTiling);
+    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.mTileCntL2 %d", tiling.tileL2cacheTiling.mTileCntL2);
+    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.nTileCntL2 %d", tiling.tileL2cacheTiling.nTileCntL2);
+    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.mTileBlock %d", tiling.tileL2cacheTiling.mTileBlock);
+    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.nTileBlock %d", tiling.tileL2cacheTiling.nTileBlock);
+    OP_LOGD(opName, " MMtiling.tileL2cacheTiling.calOrder %d", tiling.tileL2cacheTiling.calOrder);
+    OP_LOGD(opName, " MMtiling.matmulRunInfo.isHf32 %d", tiling.matmulRunInfo.isHf32);
+    OP_LOGD(opName, " MMtiling.matmulRunInfo.isNzA %d", tiling.matmulRunInfo.isNzA);
+    OP_LOGD(opName, " MMtiling.matmulRunInfo.isNzB %d", tiling.matmulRunInfo.isNzB);
+    OP_LOGD(opName, " MMtiling.matmulRunInfo.nd2nzA %d", tiling.matmulRunInfo.nd2nzA);
+    OP_LOGD(opName, " MMtiling.matmulRunInfo.nd2nzB %d", tiling.matmulRunInfo.nd2nzB);
+    OP_LOGD(opName, " MMtiling.matmulRunInfo.transA %d", tiling.matmulRunInfo.transA);
+    OP_LOGD(opName, " MMtiling.matmulRunInfo.transB %d", tiling.matmulRunInfo.transB);
+    OP_LOGD(opName, " MMtiling.l2cacheUseInfo.l2CacheFlag %d", tiling.l2cacheUseInfo.l2CacheFlag);
+    OP_LOGD(opName, " MMtiling.baseAN %d", tiling.baseAN);
+    OP_LOGD(opName, " MMtiling.baseAD %d", tiling.baseAD);
+    OP_LOGD(opName, " MMtiling.baseBN %d", tiling.baseBN);
+    OP_LOGD(opName, " MMtiling.baseBD %d", tiling.baseBD);
+}
+
 void PrintTCubeTilingData(const std::string &opName, ::TCubeTiling &tiling)
 {
     OP_LOGD(opName, "tiling.usedCoreNum %d", tiling.usedCoreNum);

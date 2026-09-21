@@ -18,6 +18,7 @@
 
 #include <cstdint>
 
+#include "exe_graph/runtime/tiling_context.h"
 #include "register/tilingdata_base.h"
 
 namespace MC2Tiling {
