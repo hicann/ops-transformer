@@ -962,6 +962,10 @@ ge::graphStatus IFATiling::ProcessActualSeqLen()
 {
     if (inputLayout_ == IfaLayout::TND) {
         if (isWorkspace_) {
+            if (ifaContext_->actualSeqLengthsQ.tensor == nullptr) {
+                OP_LOGE(ifaContext_->opName, "TND the query's actual sequence lengths should not be null!");
+                return ge::GRAPH_FAILED;
+            }
             actualSeqLenFlag_ = true;
             maxActualseq_ = sMax_;
             return ge::GRAPH_SUCCESS;
