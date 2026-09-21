@@ -28,10 +28,10 @@
 constexpr uint8_t BUILDER_COMM_ENGINE_AIV = 4;
 constexpr uint32_t BUILDER_CHANNEL_NOTIFY_NUM = 3U;
 
-#define ASC_CHECK(call) \
+#define ASC_CHECK(call, returnVal) \
     do { \
         if (!(call)) { \
-            return false; \
+            return returnVal; \
         } \
     } while (0)
 
@@ -142,16 +142,9 @@ public:
             return devCtx;
         }
 
-        if (HcclEngineCtxCreate(comm_, ctxTag, engine, totalSize, &devCtx) != HCCL_SUCCESS) {
-            return nullptr;
-        }
-
-        if (HcclGetRankId(comm_, &rankId_) != HCCL_SUCCESS) {
-            return nullptr;
-        }
-        if (HcclGetRankSize(comm_, &rankNum_) != HCCL_SUCCESS) {
-            return nullptr;
-        }
+        ASC_CHECK(HcclEngineCtxCreate(comm_, ctxTag, engine, totalSize, &devCtx) == HCCL_SUCCESS, nullptr);
+        ASC_CHECK(HcclGetRankId(comm_, &rankId_) == HCCL_SUCCESS, nullptr);
+        ASC_CHECK(HcclGetRankSize(comm_, &rankNum_) == HCCL_SUCCESS, nullptr);
 
         dataCtx->rankId = rankId_;
         dataCtx->rankSize = rankNum_;
@@ -160,9 +153,9 @@ public:
         if constexpr (DataChannelMode == ChannelMode::URMA) {
             channelHandles = dataCtx->channelHandles;
         }
-        if (!AllocRegAndBuildChannels(DataChannelMode, dataBufTag.c_str(), channelHandles, dataCtx->commBufferAddrs)) {
-            return nullptr;
-        }
+        ASC_CHECK(
+            AllocRegAndBuildChannels(DataChannelMode, dataBufTag.c_str(), channelHandles, dataCtx->commBufferAddrs),
+            nullptr);
 
         if (barrierCtx != nullptr) {
             barrierCtx->rankId = rankId_;
@@ -174,9 +167,7 @@ public:
             regMem.size = BARRIER_BUF_SIZE;
             std::string syncBufTag = std::string(ctxTag) + "syncBuf";
             HcclMemHandle memHandle = nullptr;
-            if (HcclCommMemReg(comm_, syncBufTag.c_str(), &regMem, &memHandle) != HCCL_SUCCESS) {
-                return nullptr;
-            }
+            ASC_CHECK((HcclCommMemReg(comm_, syncBufTag.c_str(), &regMem, &memHandle) == HCCL_SUCCESS), nullptr);
             barrierCtx->commBufferAddrs[barrierCtx->rankId] = reinterpret_cast<uint64_t>(barrierBuf);
             if (!BuildChannels(BarrierChannelMode, false,
                                (BarrierChannelMode == ChannelMode::URMA) ? ::CommProtocol::COMM_PROTOCOL_UBC_CTP :
@@ -185,10 +176,8 @@ public:
                 return nullptr;
             }
         }
+        ASC_CHECK(HcclEngineCtxCopy(comm_, engine, ctxTag, hostCtx, ctxSize, 0) == HCCL_SUCCESS, nullptr);
 
-        if (HcclEngineCtxCopy(comm_, engine, ctxTag, hostCtx, ctxSize, 0) != HCCL_SUCCESS) {
-            return nullptr;
-        }
         return devCtx;
     }
 
@@ -251,9 +240,10 @@ private:
             ChannelHandle channel = 0;
             uint64_t remoteAddr = 0;
             if (useHcclBuf) {
-                ASC_CHECK(AcquireChannelAndRemoteMemHcclBuf(layerId, protocol, peer, channel, remoteAddr));
+                ASC_CHECK(AcquireChannelAndRemoteMemHcclBuf(layerId, protocol, peer, channel, remoteAddr), false);
             } else {
-                ASC_CHECK(AcquireChannelAndRemoteMem(layerId, protocol, memHandle, memTag, peer, channel, remoteAddr));
+                ASC_CHECK(AcquireChannelAndRemoteMem(layerId, protocol, memHandle, memTag, peer, channel, remoteAddr),
+                          false);
             }
             if (channels != nullptr) {
                 channels[peer] = static_cast<uint64_t>(channel);
@@ -269,7 +259,7 @@ private:
         channel = 0;
         remoteAddr = 0;
 
-        ASC_CHECK(AcquireChannel(layerId, protocol, peer, channel, memHandle));
+        ASC_CHECK(AcquireChannel(layerId, protocol, peer, channel, memHandle), false);
 
         uint32_t memNum = 0;
         CommMem *remoteMems = nullptr;
@@ -301,7 +291,7 @@ private:
         channel = 0;
         remoteAddr = 0;
 
-        ASC_CHECK(AcquireChannel(layerId, protocol, peer, channel));
+        ASC_CHECK(AcquireChannel(layerId, protocol, peer, channel), false);
 
         void *remoteBuf = nullptr;
         uint64_t remoteBufSize = 0;

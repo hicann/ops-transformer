@@ -126,69 +126,75 @@ private:
         // edge first, but keep the total tail work within the available cores.
         uint64_t mTile = 1UL;
         uint64_t nTile = 1UL;
-        uint64_t preSplit = 1UL;
-        uint64_t secSplit = 1UL;
-        uint64_t &preSplitValid = runInfo_.mTailSize >= runInfo_.nTailSize ? mTile : nTile;
-        uint64_t &secSplitValid = runInfo_.mTailSize >= runInfo_.nTailSize ? nTile : mTile;
+        bool preIsM = runInfo_.mTailSize >= runInfo_.nTailSize;
+        uint64_t &preSplit = preIsM ? mTile : nTile;
+        uint64_t &secSplit = preIsM ? nTile : mTile;
         uint64_t tileMax = platformInfo_.aicNum / runInfo_.tailBlockCnt;
         uint64_t mTileMax = std::min(tileMax, CeilDiv(runInfo_.baseM, CUBE_BLOCK));
         uint64_t nTileMax = std::min(tileMax, CeilDiv(runInfo_.baseN, CUBE_BLOCK));
-        uint64_t preSplitMax = runInfo_.mTailSize >= runInfo_.nTailSize ? mTileMax : nTileMax;
-        uint64_t secSplitMax = runInfo_.mTailSize >= runInfo_.nTailSize ? nTileMax : mTileMax;
+        uint64_t preSplitMax = preIsM ? mTileMax : nTileMax;
+        uint64_t secSplitMax = preIsM ? nTileMax : mTileMax;
 
         if (enableMTailAlign_) {
-            bool preIsM = (runInfo_.mTailSize >= runInfo_.nTailSize);
-            while (true) {
-                uint64_t newPreTile = preSplit;
-                uint64_t newSecTile = secSplit;
-
-                if (preSplit < preSplitMax &&
-                    CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) {
-                    uint64_t nextTileCount = CalcAlignedSplit(preSplit, secSplit, preSplitMax,
-                                                              preIsM ? runInfo_.mTailSize : runInfo_.nTailSize,
-                                                              preIsM ? runInfo_.baseM : 0UL);
-                    if (nextTileCount > 0) {
-                        newPreTile = nextTileCount;
-                    }
-                }
-
-                if (secSplit < secSplitMax &&
-                    CalUsedCoreNum(runInfo_, newPreTile, secSplit + 1UL) <= platformInfo_.aicNum) {
-                    uint64_t nextTileCount = CalcAlignedSplit(secSplit, newPreTile, secSplitMax,
-                                                              preIsM ? runInfo_.nTailSize : runInfo_.mTailSize,
-                                                              preIsM ? 0UL : runInfo_.baseM);
-                    if (nextTileCount > 0) {
-                        newSecTile = nextTileCount;
-                    }
-                }
-
-                if (newPreTile == preSplit && newSecTile == secSplit) {
-                    break;
-                }
-
-                preSplit = newPreTile;
-                secSplit = newSecTile;
-                preSplitValid = newPreTile;
-                secSplitValid = newSecTile;
-            }
+            CalcAlignedTailSplit(preIsM, preSplitMax, secSplitMax, preSplit, secSplit);
         } else {
-            while ((preSplit < preSplitMax &&
-                    CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) ||
-                   (secSplit < secSplitMax &&
-                    CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum)) {
-                if (preSplit < preSplitMax &&
-                    CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) {
-                    preSplitValid = ++preSplit;
-                }
-                if (secSplit < secSplitMax &&
-                    CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum) {
-                    secSplitValid = ++secSplit;
-                }
-            }
+            CalcPlainTailSplit(preSplitMax, secSplitMax, preSplit, secSplit);
         }
 
         runInfo_.mTailTile = mTile;
         runInfo_.nTailTile = nTile;
+    }
+
+    // Aligned split path: bump the primary/secondary split only in block-aligned
+    // increments until neither side can advance within the available cores.
+    void CalcAlignedTailSplit(bool preIsM, uint64_t preSplitMax, uint64_t secSplitMax, uint64_t &preSplit,
+                              uint64_t &secSplit)
+    {
+        while (true) {
+            uint64_t newPreTile = preSplit;
+            uint64_t newSecTile = secSplit;
+
+            if (preSplit < preSplitMax && CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) {
+                uint64_t nextTileCount =
+                    CalcAlignedSplit(preSplit, secSplit, preSplitMax, preIsM ? runInfo_.mTailSize : runInfo_.nTailSize,
+                                     preIsM ? runInfo_.baseM : 0UL);
+                if (nextTileCount > 0) {
+                    newPreTile = nextTileCount;
+                }
+            }
+
+            if (secSplit < secSplitMax &&
+                CalUsedCoreNum(runInfo_, newPreTile, secSplit + 1UL) <= platformInfo_.aicNum) {
+                uint64_t nextTileCount =
+                    CalcAlignedSplit(secSplit, newPreTile, secSplitMax,
+                                     preIsM ? runInfo_.nTailSize : runInfo_.mTailSize, preIsM ? 0UL : runInfo_.baseM);
+                if (nextTileCount > 0) {
+                    newSecTile = nextTileCount;
+                }
+            }
+
+            if (newPreTile == preSplit && newSecTile == secSplit) {
+                break;
+            }
+
+            preSplit = newPreTile;
+            secSplit = newSecTile;
+        }
+    }
+
+    // Plain split path: grow both splits one at a time while the core budget
+    // allows, using natural (non-aligned) increments.
+    void CalcPlainTailSplit(uint64_t preSplitMax, uint64_t secSplitMax, uint64_t &preSplit, uint64_t &secSplit)
+    {
+        while ((preSplit < preSplitMax && CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) ||
+               (secSplit < secSplitMax && CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum)) {
+            if (preSplit < preSplitMax && CalUsedCoreNum(runInfo_, preSplit + 1UL, secSplit) <= platformInfo_.aicNum) {
+                ++preSplit;
+            }
+            if (secSplit < secSplitMax && CalUsedCoreNum(runInfo_, preSplit, secSplit + 1UL) <= platformInfo_.aicNum) {
+                ++secSplit;
+            }
+        }
     }
 
     void CalcPathSpecificL1()
@@ -225,6 +231,30 @@ private:
         CalScaleFactors(args_, platformInfo_, runInfo_, baseASize, baseBSize, baseScaleASize, baseScaleBSize);
     }
 
+    void AdjustTileCnt(uint64_t &mCnt, uint64_t &nCnt, uint64_t &tempBaseM, uint64_t &tempBaseN)
+    {
+        uint64_t baseMAlignNum = args_.transA ? GetShapeWithDataType<aDataType>(L2_ALIGN_SIZE) : CUBE_BLOCK;
+        uint64_t baseNAlignNum = args_.transB ? CUBE_BLOCK : GetShapeWithDataType<bDataType>(L2_ALIGN_SIZE);
+        while (tempBaseN > tempBaseM * BASEM_BASEN_RATIO && nCnt < platformInfo_.aicNum / NUM_TWO &&
+               tempBaseN != baseNAlignNum) {
+            nCnt = nCnt * NUM_TWO;
+            mCnt = platformInfo_.aicNum / nCnt;
+            tempBaseM = Align(CeilDiv(args_.m, mCnt), baseMAlignNum);
+            tempBaseN = Align(CeilDiv(args_.n, nCnt), baseNAlignNum);
+            mCnt = CeilDiv(args_.m, tempBaseM);
+            nCnt = CeilDiv(args_.n, tempBaseN);
+        }
+        while (tempBaseM >= tempBaseN * BASEM_BASEN_RATIO && mCnt < platformInfo_.aicNum / NUM_TWO &&
+               tempBaseM != baseMAlignNum) {
+            mCnt = mCnt * NUM_TWO;
+            nCnt = platformInfo_.aicNum / mCnt;
+            tempBaseM = Align(CeilDiv(args_.m, mCnt), baseMAlignNum);
+            tempBaseN = Align(CeilDiv(args_.n, nCnt), baseNAlignNum);
+            mCnt = CeilDiv(args_.m, tempBaseM);
+            nCnt = CeilDiv(args_.n, tempBaseN);
+        }
+    }
+
     void AdjustBasicBlock()
     {
         // Re-balance the initial M/N split when the first guess underutilizes
@@ -258,25 +288,7 @@ private:
                 tempBaseN = Align(CeilDiv(args_.n, nCnt), baseNAlignNum);
             }
 
-            while (tempBaseN > tempBaseM * BASEM_BASEN_RATIO && nCnt < platformInfo_.aicNum / NUM_TWO &&
-                   tempBaseN != baseNAlignNum) {
-                nCnt = nCnt * NUM_TWO;
-                mCnt = platformInfo_.aicNum / nCnt;
-                tempBaseM = Align(CeilDiv(args_.m, mCnt), baseMAlignNum);
-                tempBaseN = Align(CeilDiv(args_.n, nCnt), baseNAlignNum);
-                mCnt = CeilDiv(args_.m, tempBaseM);
-                nCnt = CeilDiv(args_.n, tempBaseN);
-            }
-            while (tempBaseM >= tempBaseN * BASEM_BASEN_RATIO && mCnt < platformInfo_.aicNum / NUM_TWO &&
-                   tempBaseM != baseMAlignNum) {
-                mCnt = mCnt * NUM_TWO;
-                nCnt = platformInfo_.aicNum / mCnt;
-                tempBaseM = Align(CeilDiv(args_.m, mCnt), baseMAlignNum);
-                tempBaseN = Align(CeilDiv(args_.n, nCnt), baseNAlignNum);
-                mCnt = CeilDiv(args_.m, tempBaseM);
-                nCnt = CeilDiv(args_.n, tempBaseN);
-            }
-
+            AdjustTileCnt(mCnt, nCnt, tempBaseM, tempBaseN);
             uint64_t kAlignValue = Align(args_.k, baseKAlignNum);
             uint64_t kMaxValue =
                 GetShapeWithDataType<aDataType>(platformInfo_.l0aSize / DB_SIZE) / std::max(tempBaseM, tempBaseN);
