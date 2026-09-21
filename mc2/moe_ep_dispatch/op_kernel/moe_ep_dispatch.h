@@ -197,6 +197,7 @@ private:
     GM_ADDR localSlotWinAddr_{nullptr};
     GM_ADDR payloadStashWinAddr_{nullptr};
     GM_ADDR payloadStashStateWinAddr_{nullptr};
+    GM_ADDR cachedStateAddr_{nullptr};
 
     uint32_t axisBS_{0};
     uint32_t axisH_{0};
@@ -346,6 +347,7 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::Init(
         cachedSlotIdxGMTensor_.SetGlobalBuffer((__gm__ int32_t *)cachedSlotIdx);
         maskBytesAlign_ = Ceil(Ceil(MAX_BATCH_SIZE / sizeof(int32_t), BITS_PER_BYTE), UB_ALIGN) * UB_ALIGN;
         sendSrcTokenIdxAddr_ = cachedSlotIdx;
+        cachedStateAddr_ = workspaceGM;
     } else {
         sendSrcTokenIdxAddr_ = dstBufferSlotIdx;
     }
@@ -1071,9 +1073,12 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::SetLocalSta
         GM_ADDR localStateAddr = GetWinAddrByRankId(mc2Context_, epRankId_, cntWinStateOffset_) + dstRankStateOffset_;
         LocalTensor<int32_t> statusTensor = maskBuf_.GetWithOffset<int32_t>(UB_STRIDE, 0);
         GlobalTensor<int32_t> notifyGMTensor;
+        GlobalTensor<int32_t> statusGMTensor;
         notifyGMTensor.SetGlobalBuffer((__gm__ int32_t *)localStateAddr);
+        statusGMTensor.SetGlobalBuffer((__gm__ int32_t *)cachedStateAddr_);
         Duplicate<int32_t>(statusTensor, 1, UB_STRIDE);
         SyncFunc<AscendC::HardEvent::V_MTE3>();
+        DataCopy(statusGMTensor, statusTensor, UB_STRIDE);
         DataCopy(notifyGMTensor, statusTensor, UB_STRIDE);
     }
     SyncAll<true>();
@@ -1093,9 +1098,8 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::Communicati
             continue;
         }
         uint64_t commHandle = GetCommHandle(mc2Context_, dstRankId, channelIndex_);
-        GM_ADDR srcStateAddr = GetWinAddrByRankId(mc2Context_, epRankId_, cntWinStateOffset_) + dstRankStateOffset_;
         GM_ADDR notifyAddr = GetWinAddrByRankId(mc2Context_, dstRankId, cntWinStateOffset_) + dstRankStateOffset_;
-        hcomm_.WriteNbi<true, PIPE_S, PIPE_MTE3, DATA_CFG>(commHandle, notifyAddr, srcStateAddr, WIN_ADDR_ALIGN);
+        hcomm_.WriteNbi<true, PIPE_S, PIPE_MTE3, DATA_CFG>(commHandle, notifyAddr, cachedStateAddr_, WIN_ADDR_ALIGN);
     }
 }
 
