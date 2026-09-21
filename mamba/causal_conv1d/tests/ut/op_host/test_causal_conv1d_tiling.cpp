@@ -59,8 +59,8 @@ TEST_F(CausalConv1dFnTiling, fn_3d_fp16_b2_s16_d8192_w4_bias)
                               {
                                   {{{2, 16, 8192}, {2, 16, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // x
                                   {{{4, 8192}, {4, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},         // weight
-                                  {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},               // bias
                                   {{{2, 3, 8192}, {2, 3, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // conv_states
+                                  {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},               // bias
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // query_start_loc
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cache_indices
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // initial_state_mode
@@ -82,8 +82,8 @@ TEST_F(CausalConv1dFnTiling, fn_2d_varlen_fp16_d8192_w4)
                               {
                                   {{{32, 8192}, {32, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},     // x (2D varlen)
                                   {{{4, 8192}, {4, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},       // weight
-                                  {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},             // bias
                                   {{{2, 3, 8192}, {2, 3, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // conv_states
+                                  {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},             // bias
                                   {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND}, // query_start_loc (batch=2)
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // cache_indices
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // initial_state_mode
@@ -121,8 +121,8 @@ TEST_F(CausalConv1dUpdateTiling, upd_3d_fp16_b128_s1_d8192_w4_bias)
                               {
                                   {{{128, 1, 8192}, {128, 1, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // x
                                   {{{4, 8192}, {4, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},           // weight
-                                  {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},                 // bias
                                   {{{128, 3, 8192}, {128, 3, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // conv_states
+                                  {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},                 // bias
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                           // query_start_loc
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                           // cache_indices
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // initial_state_mode
@@ -148,8 +148,8 @@ TEST_F(CausalConv1dUpdateTiling, reject_int32_dtype)
                               {
                                   {{{128, 1, 8192}, {128, 1, 8192}}, ge::DT_INT32, ge::FORMAT_ND}, // x (invalid dtype)
                                   {{{4, 8192}, {4, 8192}}, ge::DT_INT32, ge::FORMAT_ND},           // weight
-                                  {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // bias
                                   {{{128, 3, 8192}, {128, 3, 8192}}, ge::DT_INT32, ge::FORMAT_ND}, // conv_states
+                                  {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // bias
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // query_start_loc
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cache_indices
                                   {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // initial_state_mode
@@ -172,8 +172,8 @@ TEST_F(CausalConv1dFnTiling, reject_kernel_width_5)
         {
             {{{2, 16, 8192}, {2, 16, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // x
             {{{5, 8192}, {5, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},         // weight (K=5, invalid)
-            {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},               // bias
             {{{2, 4, 8192}, {2, 4, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // conv_states (stateLen=4 for K=5)
+            {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},               // bias
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
@@ -196,8 +196,8 @@ TEST_F(CausalConv1dFnTiling, reject_state_len_too_small)
         {
             {{{2, 16, 8192}, {2, 16, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // x
             {{{4, 8192}, {4, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},         // weight (K=4)
-            {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},               // bias
             {{{2, 2, 8192}, {2, 2, 8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // conv_states (stateLen=2 < K-1=3)
+            {{{8192}, {8192}}, ge::DT_FLOAT16, ge::FORMAT_ND},               // bias
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},

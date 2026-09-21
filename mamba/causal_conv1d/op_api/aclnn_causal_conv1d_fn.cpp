@@ -176,8 +176,8 @@ static bool CheckConvStatesShape(const aclTensor *convStatesRef, int64_t dim, in
     const int64_t DIM_ALIGN_BYTES = 32;
     auto csShape = convStatesRef->GetViewShape();
     if (csShape.GetDimNum() != 3) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "convStatesRef dim num must be 3 [numCacheLines, stateLen, dim], but got %zuD.",
-                csShape.GetDimNum());
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "convStatesRef dim num must be 3 [numCacheLines, stateLen, dim], but got %zuD.", csShape.GetDimNum());
         return false;
     }
     if (csShape.GetDim(2) != dim) {
@@ -195,8 +195,8 @@ static bool CheckConvStatesShape(const aclTensor *convStatesRef, int64_t dim, in
     }
     int64_t dtypeSize = GetDtypeSize(convStatesRef);
     if (dtypeSize == 0 || (dim * dtypeSize) % DIM_ALIGN_BYTES != 0) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "dim(%ld) * dtypeSize(%ld) must be %ld-byte aligned.", dim, dtypeSize, DIM_ALIGN_BYTES);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "dim(%ld) * dtypeSize(%ld) must be %ld-byte aligned.", dim, dtypeSize,
+                DIM_ALIGN_BYTES);
         return false;
     }
     return true;
@@ -223,8 +223,8 @@ static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convSt
     } else {
         batch = xShape.GetDim(0);
         if (qslPresent && qslSize != batch + 1) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "queryStartLocOptional size(%ld) must equal batch+1(%ld) for 3D x.", qslSize, batch + 1);
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "queryStartLocOptional size(%ld) must equal batch+1(%ld) for 3D x.",
+                    qslSize, batch + 1);
             return false;
         }
     }
@@ -235,8 +235,8 @@ static bool CheckScenarioConstraints(const aclTensor *x, const aclTensor *convSt
     }
     int64_t numCacheLines = convStatesRef->GetViewShape().GetDim(0);
     if (numCacheLines < batch) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "convStatesRef numCacheLines(%ld) must be >= batch(%ld).", numCacheLines, batch);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "convStatesRef numCacheLines(%ld) must be >= batch(%ld).", numCacheLines,
+                batch);
         return false;
     }
     return true;
@@ -294,6 +294,9 @@ aclnnStatus CausalConv1dFnCommonProcess(
     aclTensor *convStatesFinal = const_cast<aclTensor *>(l0op::Contiguous(convStatesRef, uniqueExecutor.get()));
     CHECK_COND(convStatesFinal != nullptr, ACLNN_ERR_PARAM_NULLPTR, "Contiguous convStatesRef failed.");
 
+    aclTensor *yFinal = const_cast<aclTensor *>(l0op::Contiguous(y, uniqueExecutor.get()));
+    CHECK_COND(yFinal != nullptr, ACLNN_ERR_PARAM_NULLPTR, "Contiguous y failed.");
+
     weight = l0op::Contiguous(weight, uniqueExecutor.get());
     CHECK_COND(weight != nullptr, ACLNN_ERR_PARAM_NULLPTR, "Contiguous weight failed.");
 
@@ -321,8 +324,19 @@ aclnnStatus CausalConv1dFnCommonProcess(
 
     bool ok =
         l0op::CausalConv1d(xFinal, weight, convStatesFinal, biasOptional, queryStartLocOptional, cacheIndicesOptional,
-                           initialStateModeOptional, nullptr, activation, nullBlockId, y, uniqueExecutor.get());
+                           initialStateModeOptional, nullptr, activation, nullBlockId, yFinal, uniqueExecutor.get());
     CHECK_RET(ok, ACLNN_ERR_INNER_TILING_ERROR);
+
+    // convStatesRef 是 in-place 输入/输出、y 是输出：非连续时 Contiguous 产出的是临时副本，
+    // kernel 结果只落在副本上，必须 ViewCopy 拷回调用方原始张量，否则更新静默丢失。
+    if (convStatesFinal != convStatesRef) {
+        auto convStatesCopyResult = l0op::ViewCopy(convStatesFinal, convStatesRef, uniqueExecutor.get());
+        CHECK_COND(convStatesCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR, "ViewCopy convStatesRef back failed.");
+    }
+    if (yFinal != y) {
+        auto yCopyResult = l0op::ViewCopy(yFinal, y, uniqueExecutor.get());
+        CHECK_COND(yCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR, "ViewCopy y back failed.");
+    }
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);
@@ -341,7 +355,7 @@ ACLNN_API aclnnStatus aclnnCausalConv1dFnGetWorkspaceSize(
 {
     L2_DFX_PHASE_1(aclnnCausalConv1dFn,
                    DFX_IN(x, weight, convStatesRef, biasOptional, queryStartLocOptional, cacheIndicesOptional,
-                          initialStateModeOptional),
+                          initialStateModeOptional, activation, nullBlockId),
                    DFX_OUT(convStatesRef, y));
     return CausalConv1dFnCommonProcess(
         x, weight, convStatesRef, biasOptional, queryStartLocOptional, cacheIndicesOptional, initialStateModeOptional,

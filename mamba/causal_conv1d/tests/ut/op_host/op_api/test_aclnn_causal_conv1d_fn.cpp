@@ -240,8 +240,8 @@ TEST_F(l2_causal_conv1d_fn_test, Ascend950_fn_cacheIndices_dtype_invalid)
     auto y = TensorDesc({4, 16, 512}, ACL_FLOAT16, ACL_FORMAT_ND);
     const char *activation = "silu";
     auto ut = OP_API_UT(aclnnCausalConv1dFn,
-                        INPUT(x, weight, convStates, nullptr, nullptr, cacheIndices, nullptr, nullptr, nullptr,
-                              nullptr, nullptr, activation, (int64_t)0, (int64_t)0),
+                        INPUT(x, weight, convStates, nullptr, nullptr, cacheIndices, nullptr, nullptr, nullptr, nullptr,
+                              nullptr, activation, (int64_t)0, (int64_t)0),
                         OUTPUT(y));
     uint64_t workspaceSize = 0;
     aclOpExecutor *executor = nullptr;
@@ -524,4 +524,24 @@ TEST_F(l2_causal_conv1d_fn_test, Ascend950_fn_2d_varlen_numCacheLines_less_than_
     aclOpExecutor *executor = nullptr;
     aclnnStatus ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(ret, ACLNN_ERR_PARAM_INVALID);
+}
+
+// convStatesRef (in-place) 与 y 非连续：宿主侧应走 Contiguous 临时张量 + ViewCopy 拷回，
+// 保证状态更新与 y 结果写回调用方原始张量。
+TEST_F(l2_causal_conv1d_fn_test, Ascend950_fn_convStates_y_non_contiguous)
+{
+    auto x = TensorDesc({4, 16, 512}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
+    auto weight = TensorDesc({4, 512}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
+    auto convStates = TensorDesc({4, 4, 512}, ACL_FLOAT16, ACL_FORMAT_ND, {4096, 1024, 1}).ValueRange(-10, 10);
+    auto bias = TensorDesc({512}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
+    auto y = TensorDesc({4, 16, 512}, ACL_FLOAT16, ACL_FORMAT_ND, {16384, 1024, 1});
+    const char *activation = "silu";
+    auto ut = OP_API_UT(aclnnCausalConv1dFn,
+                        INPUT(x, weight, convStates, bias, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                              nullptr, activation, (int64_t)0, (int64_t)0),
+                        OUTPUT(y));
+    uint64_t workspaceSize = 0;
+    aclOpExecutor *executor = nullptr;
+    aclnnStatus ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+    EXPECT_EQ(ret, ACLNN_SUCCESS);
 }
