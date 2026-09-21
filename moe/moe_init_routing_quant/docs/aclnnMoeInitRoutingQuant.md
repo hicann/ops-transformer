@@ -149,7 +149,7 @@ aclnnStatus aclnnMoeInitRoutingQuant(
       <td>输入</td>
       <td>量化计算需要的偏移量。</td>
       <td>-</td>
-      <td>-</td>
+      <td>DOUBLE</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
