@@ -169,42 +169,34 @@ cann_ops_transformer.quant_flash_attn_grad(
 ) -> (Tensor, Tensor, Tensor, Tensor)
 ```
 
-## 枚举说明
-
-`quant_mode` 与 `mask_mode` 在 Python 接口中支持传入 `IntEnum` 枚举或对应 int 值，枚举定义于 `cann_ops_transformer.ops.quant_flash_attn_grad`：
-
-### quant_mode 枚举
-
-| 枚举名 | 值 | 含义 |
-| :--- | :---: | :--- |
-| `HIF8_PER_TENSOR` | 0 | HIFLOAT8 per-tensor 量化 |
-
-### mask_mode 枚举
-
-| 枚举名 | 值 | 含义 |
-| :--- | :---: | :--- |
-| `ALL` | 0 | 全计算模式（默认值） |
-| `CAUSAL` | 3 | Causal 模式 |
-| `WINDOW` | 4 | Sliding Window 模式 |
-
-> [!NOTE]
->
-> 枚举为 `IntEnum`，可直接作为 int 传入底层算子；接口仅支持传入枚举或对应 int 值。当前版本仅支持 mask_mode = 0（`ALL`），其他模式暂不支持。
-
-## 基准信息说明
-
-资料约束中，常见字段释义如下：
-
-|    命名    |                            含义                            |
-| :---------: | :---------------------------------------------------------: |
-|      B      |                Batch,表示输入样本批量大小                |
-|     Q_N     |        输入q tensor的头数，对应q shape中的N        |
-|    KV_N    |    输入k/v tensor的头数，对应k/v shape中的N    |
-|     Q_S     |      输入q tensor的序列长度，对应q shape中的S      |
-|    KV_S    |  输入k/v tensor的序列长度，对应k/v shape中的S  |
-|     D     |          输入q/k/v tensor以及输出dq/dk/dv隐藏层最小的单元尺寸headdim         |
-
 ## 参数说明
+
+### quant_flash_attn_metadata
+
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| num_heads_q | int | 必选 | Query head数 | int32 | - | - | - |
+| num_heads_kv | int | 必选 | Key/Value head数 | int32 | - | - | - |
+| head_dim | int | 必选 | 每个注意力头的维度 | int32 | - | - | - |
+| quant_mode | int/QuantMode | 必选 | 量化模式，支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」 | int32 | - | - | - |
+| cu_seqlens_q | Tensor | 可选 | Q的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,) | × |
+| cu_seqlens_kv | Tensor | 可选 | KV的累积序列长度，用于处理变长序列，第一个元素必须为0 | int32 | ND | (B+1,) | × |
+| seqused_q | Tensor | 可选 | Q的指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,) | × |
+| seqused_kv | Tensor | 可选 | KV的指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,) | × |
+| v_descale | Tensor | 可选 | v的反量化缩放因子 | float32 | ND | (1,) | × |
+| batch_size | int | 可选 | batch大小。若未传入，则从cu_seqlens_q或seqused_q推导。默认值为None | int32 | - | - | - |
+| max_seqlen_q | int | 可选 | 指定查询q序列的长度上限 | int32 | - | - | - |
+| max_seqlen_kv | int | 可选 | 指定键k和值v序列的长度上限 | int32 | - | - | - |
+| mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」 | int32 | - | - | - |
+| win_left | int | 可选 | window左界限 | int32 | - | - | - |
+| win_right | int | 可选 | window右界限 | int32 | - | - | - |
+| layout_q | string | 可选 | 定义输入q张量的布局格式 | string | - | - | - |
+| layout_q_descale | string | 可选 | 定义输入q_descale张量的布局格式 | string | - | - | - |
+| layout_kv | string | 可选 | 定义输入k和v张量的布局格式 | string | - | - | - |
+| layout_out | string | 可选 | 定义输出张量的布局格式 | string | - | - | - |
+| is_grad_enabled | bool | 可选 | 是否启用反向梯度场景的metadata生成。默认值为True。当为True时，metadata用于配套的反向算子quant_flash_attn_grad | BOOL | - | - | - |
+
+### quant_flash_attn_grad
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -237,7 +229,35 @@ cann_ops_transformer.quant_flash_attn_grad(
 | layout_q | string | 可选 | 定义输入q张量的布局格式，支持"BSND"、"BNSD"，默认值为"BSND" | string | - | - | - |
 | layout_kv | string | 可选 | 定义输入k/v张量的布局格式，支持"BSND"、"BNSD"，默认值为"BSND" | string | - | - | - |
 
+### quant_mode 枚举
+`quant_mode`在Python接口中支持传入`IntEnum`枚举或对应int值，枚举定义于`cann_ops_transformer.ops.quant_flash_attn_grad`
+
+| 枚举名 | 值 | 含义 |
+| :--- | :---: | :--- |
+| `HIF8_PER_TENSOR` | 0 | HIFLOAT8 per-tensor 量化 |
+
+### mask_mode 枚举
+与`mask_mode`在Python接口中支持传入`IntEnum`枚举或对应int值，枚举定义于`cann_ops_transformer.ops.quant_flash_attn_grad`
+
+| 枚举名 | 值 | 含义 |
+| :--- | :---: | :--- |
+| `ALL` | 0 | 全计算模式（默认值） |
+| `CAUSAL` | 3 | Causal 模式 |
+| `WINDOW` | 4 | Sliding Window 模式 |
+
+> [!NOTE]
+>
+> 枚举为 `IntEnum`，可直接作为 int 传入底层算子；接口仅支持传入枚举或对应 int 值。当前版本仅支持 mask_mode = 0（`ALL`），其他模式暂不支持。
+
 ## 返回值说明
+
+### quant_flash_attn_metadata
+
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| metadata | Tensor | 必选 | quant_flash_attn_grad的任务切分数据 | int32 | ND | (2, max_schedule_size) | × |
+
+### quant_flash_attn_grad
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 | 非连续Tensor |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -248,48 +268,205 @@ cann_ops_transformer.quant_flash_attn_grad(
 
 ## 约束说明
 
-- 确定性说明：quant_flash_attn_grad默认确定性实现。
-- 入参为空处理：q为空Tensor时直接返回。
-- 仅支持BSND或BNSD layout，且layout_q与layout_kv必须保持一致。
-- 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。
-- quant_flash_attn_metadata和quant_flash_attn_grad的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
-
 ### 特性参数组
 
-|      特性参数组      |     参数字段名称     |    字段分组    |  字段类型  |
-| :-------------------: | :-------------------: | :-------------: | :--------: |
-|      公共参数组      |         q         |      INPUT      |   Tensor   |
-|                      |          k          |      INPUT      | Tensor |
-|                      |         v         |      INPUT      | Tensor |
-|                      |         dout         |      INPUT      | Tensor |
-|                      |         attn_out         |      INPUT      | Tensor |
-|                      |         metadata        |      INPUT(OPTIONAL)      | Tensor |
-|                      |      softmax_scale      | ATTR(OPTIONAL) |   float   |
-|                      |      layout_q      | ATTR(OPTIONAL) |   string   |
-|                      |      layout_kv      | ATTR(OPTIONAL) |   string   |
-|                      |     dq     |     OUTPUT     |   Tensor   |
-|                      |     dk     |     OUTPUT     |   Tensor   |
-|                      |     dv     |     OUTPUT     |   Tensor   |
-|      全量化参数组      |       quant_mode       | ATTR |   int   |
-|                      |       q_descale       | INPUT |   Tensor   |
-|                      |       k_descale       | INPUT |   Tensor   |
-|                      |       v_descale       | INPUT |   Tensor   |
-|                      |       do_descale       | INPUT |   Tensor   |
-|                      |       p_scale       | INPUT |   Tensor   |
-|                      |       ds_scale       | INPUT |   Tensor   |
-|                      |       softmax_lse       | INPUT |   Tensor   |
-|      Mask参数组      |       mask_mode       | ATTR(OPTIONAL) |   int   |
-|                      |       win_left       | ATTR(OPTIONAL) |   int   |
-|                      |      win_right      | ATTR(OPTIONAL) |   int   |
-|                      |      attn_mask      | INPUT(OPTIONAL) |   Tensor   |
-| SeqLens参数组  |   cu_seqlens_q   | INPUT(OPTIONAL) |  Tensor  |
-|                      |  cu_seqlens_kv  | INPUT(OPTIONAL) |  Tensor  |
-|                      |  seqused_q  | INPUT(OPTIONAL) |  Tensor  |
-|                      |  seqused_kv  | INPUT(OPTIONAL) |  Tensor  |
-|                      |  max_seqlen_q  | ATTR(OPTIONAL) |  int  |
-|                      |  max_seqlen_kv  | ATTR(OPTIONAL) |  int  |
-|  Sinks参数组  |     sinks     | INPUT(OPTIONAL) |   Tensor   |
-|   DSink输出参数组   |    dsink    |     OUTPUT     |    Tensor    |
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 200px">
+        <col style="width: 200px">
+        <col style="width: 250px">
+        <col style="width: 150px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>特性参数组</th>
+            <th>参数字段名称</th>
+            <th>字段分组</th>
+            <th>字段类型</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td rowspan="12">公共参数组</td>
+            <td>q</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>k</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>v</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>dout</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>attn_out</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>metadata</td>
+            <td>INPUT(OPTIONAL)</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>softmax_scale</td>
+            <td>ATTR(OPTIONAL)</td>
+            <td>float</td>
+        </tr>
+        <tr>
+            <td>layout_q</td>
+            <td>ATTR(OPTIONAL)</td>
+            <td>string</td>
+        </tr>
+        <tr>
+            <td>layout_kv</td>
+            <td>ATTR(OPTIONAL)</td>
+            <td>string</td>
+        </tr>
+        <tr>
+            <td>dq</td>
+            <td>OUTPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>dk</td>
+            <td>OUTPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>dv</td>
+            <td>OUTPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td rowspan="8">全量化参数组</td>
+            <td>quant_mode</td>
+            <td>ATTR</td>
+            <td>int</td>
+        </tr>
+        <tr>
+            <td>q_descale</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>k_descale</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>v_descale</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>do_descale</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>p_scale</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>ds_scale</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>softmax_lse</td>
+            <td>INPUT</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td rowspan="4">Mask参数组</td>
+            <td>mask_mode</td>
+            <td>ATTR(OPTIONAL)</td>
+            <td>int</td>
+        </tr>
+        <tr>
+            <td>win_left</td>
+            <td>ATTR(OPTIONAL)</td>
+            <td>int</td>
+        </tr>
+        <tr>
+            <td>win_right</td>
+            <td>ATTR(OPTIONAL)</td>
+            <td>int</td>
+        </tr>
+        <tr>
+            <td>attn_mask</td>
+            <td>INPUT(OPTIONAL)</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td rowspan="6">SeqLens参数组</td>
+            <td>cu_seqlens_q</td>
+            <td>INPUT(OPTIONAL)</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>cu_seqlens_kv</td>
+            <td>INPUT(OPTIONAL)</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>seqused_q</td>
+            <td>INPUT(OPTIONAL)</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>seqused_kv</td>
+            <td>INPUT(OPTIONAL)</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>max_seqlen_q</td>
+            <td>ATTR(OPTIONAL)</td>
+            <td>int</td>
+        </tr>
+        <tr>
+            <td>max_seqlen_kv</td>
+            <td>ATTR(OPTIONAL)</td>
+            <td>int</td>
+        </tr>
+        <tr>
+            <td>Sinks参数组</td>
+            <td>sinks</td>
+            <td>INPUT(OPTIONAL)</td>
+            <td>Tensor</td>
+        </tr>
+        <tr>
+            <td>DSink输出参数组</td>
+            <td>dsink</td>
+            <td>OUTPUT</td>
+            <td>Tensor</td>
+        </tr>
+    </tbody>
+</table>
+
+### 基准信息说明
+
+资料约束中，常见字段释义如下：
+
+|    命名    |                            含义                            |
+| :---------: | :---------------------------------------------------------: |
+|      B      |                Batch,表示输入样本批量大小                |
+|     Q_N     |        输入q tensor的头数，对应q shape中的N        |
+|    KV_N    |    输入k/v tensor的头数，对应k/v shape中的N    |
+|     Q_S     |      输入q tensor的序列长度，对应q shape中的S      |
+|    KV_S    |  输入k/v tensor的序列长度，对应k/v shape中的S  |
+|     D     |          输入q/k/v tensor以及输出dq/dk/dv隐藏层最小的单元尺寸headdim         |
 
 ### 参数组约束
 
@@ -298,6 +475,9 @@ cann_ops_transformer.quant_flash_attn_grad(
 - 入参为空的场景处理：
   - 空Tensor指必选输入和输出的shape size为0，即有任意轴为0。
   - 触发空Tensor的用例将全部拦截报错。
+
+- 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+- quant_flash_attn_metadata和quant_flash_attn_grad的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 
 - q、k、v、dout、attn_out校验:
 
@@ -724,6 +904,11 @@ mask_mode参数解释
         </tr>
     </tbody>
 </table>
+
+## 确定性计算
+
+- 确定性说明：quant_flash_attn_grad默认确定性实现。
+
 
 ## 调用示例
 
