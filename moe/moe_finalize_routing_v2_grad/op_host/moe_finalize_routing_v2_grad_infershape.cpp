@@ -15,7 +15,6 @@
 #include "log/log.h"
 #include "register/op_impl_registry.h"
 
-
 using namespace ge;
 namespace ops {
 static constexpr size_t INPUT_0_IDX = 0;
@@ -32,13 +31,13 @@ static constexpr size_t DIM_NUM_2 = 2;
 static constexpr size_t DIM_NUM_3 = 3;
 constexpr int64_t UNKNOWN_RANK_DIM_VALUE = -2;
 
-inline bool IsUnknownRank(const gert::Shape* checkShape) {
-  return checkShape->GetDimNum() == 1 && checkShape->GetDim(0) == UNKNOWN_RANK_DIM_VALUE;
+inline bool IsUnknownRank(const gert::Shape *checkShape)
+{
+    return checkShape->GetDimNum() == 1 && checkShape->GetDim(0) == UNKNOWN_RANK_DIM_VALUE;
 }
 
-
-static ge::graphStatus GetAttrs(const gert::InferShapeContext* context, int64_t& dropPadMode,
-                                int64_t& activeNum, int64_t& expertNum, int64_t& expertCapacity)
+static ge::graphStatus GetAttrs(const gert::InferShapeContext *context, int64_t &dropPadMode, int64_t &activeNum,
+                                int64_t &expertNum, int64_t &expertCapacity)
 {
     dropPadMode = 0;
     activeNum = 0;
@@ -53,21 +52,19 @@ static ge::graphStatus GetAttrs(const gert::InferShapeContext* context, int64_t&
         activeNum = *(attrs->GetAttrPointer<int64_t>(ATTR_1_IDX));
     }
     if (dropPadMode == 1) {
-        OP_CHECK_IF(
-            (attrs->GetAttrNum() <= ATTR_3_IDX),
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                context->GetNodeName(), "expert_num and expert_capacity", "null",
-                "expert_num and expert_capacity is required"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF((attrs->GetAttrNum() <= ATTR_3_IDX),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "expert_num and expert_capacity",
+                                                          "null", "expert_num and expert_capacity is required"),
+                    return ge::GRAPH_FAILED);
         expertNum = *(attrs->GetAttrPointer<int64_t>(ATTR_2_IDX));
         expertCapacity = *(attrs->GetAttrPointer<int64_t>(ATTR_3_IDX));
     }
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetGradExpandedXOutputShape(gert::Shape* gradExpandedXShape,
-                                                   const gert::Shape* expandedRowIdxShape,
-                                                   const gert::Shape* gradYShape, int64_t dropPadMode,
+static ge::graphStatus SetGradExpandedXOutputShape(gert::Shape *gradExpandedXShape,
+                                                   const gert::Shape *expandedRowIdxShape,
+                                                   const gert::Shape *gradYShape, int64_t dropPadMode,
                                                    int64_t activeNum, int64_t expertNum, int64_t expertCapacity)
 {
     gradExpandedXShape->SetDimNum(DIM_NUM_2);
@@ -83,33 +80,32 @@ static ge::graphStatus SetGradExpandedXOutputShape(gert::Shape* gradExpandedXSha
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetGradScalesOutputShape(const gert::InferShapeContext* context, gert::Shape* gradScalesShape,
-                                                const gert::Shape* gradYShape)
+static ge::graphStatus SetGradScalesOutputShape(const gert::InferShapeContext *context, gert::Shape *gradScalesShape,
+                                                const gert::Shape *gradYShape)
 {
     gradScalesShape->SetDimNum(DIM_NUM_2);
     gradScalesShape->SetDim(0, gradYShape->GetDim(0));
     gradScalesShape->SetDim(1, 1);
-    const gert::Shape* scalesShape = context->GetOptionalInputShape(INPUT_3_IDX);
+    const gert::Shape *scalesShape = context->GetOptionalInputShape(INPUT_3_IDX);
     if (scalesShape != nullptr && !IsUnknownRank(scalesShape)) {
-        OP_CHECK_IF(
-            (scalesShape->GetDimNum() != DIM_NUM_2),
-            OP_LOGE_FOR_INVALID_SHAPEDIM(
-                context->GetNodeName(), "scales", (std::to_string(scalesShape->GetDimNum()) + "D").c_str(), "2D"),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF((scalesShape->GetDimNum() != DIM_NUM_2),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "scales",
+                                                 (std::to_string(scalesShape->GetDimNum()) + "D").c_str(), "2D"),
+                    return ge::GRAPH_FAILED);
         gradScalesShape->SetDim(1, scalesShape->GetDim(1));
     }
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeFinalizeRoutingV2GradInferShape(gert::InferShapeContext* context)
+static ge::graphStatus MoeFinalizeRoutingV2GradInferShape(gert::InferShapeContext *context)
 {
-    const gert::Shape* gradYShape = context->GetInputShape(INPUT_0_IDX);
+    const gert::Shape *gradYShape = context->GetInputShape(INPUT_0_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradYShape);
-    const gert::Shape* expandedRowIdxShape = context->GetInputShape(INPUT_1_IDX);
+    const gert::Shape *expandedRowIdxShape = context->GetInputShape(INPUT_1_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, expandedRowIdxShape);
-    gert::Shape* gradExpandedXShape = context->GetOutputShape(OUTPUT_0_IDX);
+    gert::Shape *gradExpandedXShape = context->GetOutputShape(OUTPUT_0_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradExpandedXShape);
-    gert::Shape* gradScalesShape = context->GetOutputShape(OUTPUT_1_IDX);
+    gert::Shape *gradScalesShape = context->GetOutputShape(OUTPUT_1_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context, gradScalesShape);
     if (IsUnknownRank(gradYShape)) {
         *gradExpandedXShape = *gradYShape;
@@ -122,46 +118,43 @@ static ge::graphStatus MoeFinalizeRoutingV2GradInferShape(gert::InferShapeContex
         return ge::GRAPH_SUCCESS;
     }
 
-    OP_CHECK_IF(
-        (gradYShape->GetDimNum() != DIM_NUM_2 || expandedRowIdxShape->GetDimNum() != DIM_NUM_1),
-        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
-            context->GetNodeName(), "grad_y and expanded_row_idx",
-            (std::to_string(gradYShape->GetDimNum()) + "D and " +
-             std::to_string(expandedRowIdxShape->GetDimNum()) + "D").c_str(),
-            "grad_y must be 2D and expanded_row_idx must be 1D"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((gradYShape->GetDimNum() != DIM_NUM_2 || expandedRowIdxShape->GetDimNum() != DIM_NUM_1),
+                OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(context->GetNodeName(), "grad_y and expanded_row_idx",
+                                                          (std::to_string(gradYShape->GetDimNum()) + "D and " +
+                                                           std::to_string(expandedRowIdxShape->GetDimNum()) + "D")
+                                                              .c_str(),
+                                                          "grad_y must be 2D and expanded_row_idx must be 1D"),
+                return ge::GRAPH_FAILED);
 
     int64_t dropPadMode = 0;
     int64_t activeNum = 0;
     int64_t expertNum = 0;
     int64_t expertCapacity = 0;
-    OP_CHECK_IF(
-        (GetAttrs(context, dropPadMode, activeNum, expertNum, expertCapacity) != ge::GRAPH_SUCCESS),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "GetAttrs", "failed", "GetAttrs failed"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((GetAttrs(context, dropPadMode, activeNum, expertNum, expertCapacity) != ge::GRAPH_SUCCESS),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "GetAttrs", "failed", "GetAttrs failed"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        (SetGradExpandedXOutputShape(gradExpandedXShape, expandedRowIdxShape, gradYShape,
-            dropPadMode, activeNum, expertNum, expertCapacity) != ge::GRAPH_SUCCESS),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            context->GetNodeName(), "SetGradExpandedXOutputShape", "failed", "SetGradExpandedXOutputShape failed"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((SetGradExpandedXOutputShape(gradExpandedXShape, expandedRowIdxShape, gradYShape, dropPadMode,
+                                             activeNum, expertNum, expertCapacity) != ge::GRAPH_SUCCESS),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "SetGradExpandedXOutputShape", "failed",
+                                                      "SetGradExpandedXOutputShape failed"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(
-        (SetGradScalesOutputShape(context, gradScalesShape, gradYShape) != ge::GRAPH_SUCCESS),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            context->GetNodeName(), "SetGradScalesOutputShape", "failed", "SetGradScalesOutputShape failed"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((SetGradScalesOutputShape(context, gradScalesShape, gradYShape) != ge::GRAPH_SUCCESS),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "SetGradScalesOutputShape", "failed",
+                                                      "SetGradScalesOutputShape failed"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
-static graphStatus MoeFinalizeRoutingV2GradInferDtype(gert::InferDataTypeContext* context)
+static graphStatus MoeFinalizeRoutingV2GradInferDtype(gert::InferDataTypeContext *context)
 {
     auto gradYtype = context->GetInputDataType(INPUT_0_IDX);
-    auto scaleType = context->GetInputDataType(INPUT_3_IDX);
+    auto scaleType = context->GetOptionalInputDataType(INPUT_3_IDX);
+    auto gradScalesType = (scaleType == ge::DT_UNDEFINED) ? gradYtype : scaleType;
     context->SetOutputDataType(OUTPUT_0_IDX, gradYtype);
-    context->SetOutputDataType(OUTPUT_1_IDX, scaleType);
+    context->SetOutputDataType(OUTPUT_1_IDX, gradScalesType);
     return GRAPH_SUCCESS;
 }
 
