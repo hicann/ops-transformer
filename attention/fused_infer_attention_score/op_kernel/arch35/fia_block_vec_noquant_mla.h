@@ -187,13 +187,14 @@ public:
         if constexpr (FLASH_DECODE) {
             return true;
         }
-        // 非 TND/NTD 非FD布局: 是否初始化完全由 host 下发 needInit 决定(短kv/空kv/短q 置1, 全覆盖场景为0)
-        return constInfo.needInit;
+        // 非 TND/NTD、非 FD: 短序列或 sparse 无效行可能导致任务整体跳过，
+        // 需要预初始化 attentionOut 和 LSE，避免未写回的行保留旧值。
+        return constInfo.needInit || constInfo.isExistRowInvalid;
     }
 
     // [MTE3] ClearOutput: 按 IsInitAttentionOutGm() 决定是否 MTE3(UB->GM) 预写 attentionOut(=0)/softmaxLse(=3e+99)。
-    // TND/NTD 无无效行时不预写; 非 TND/NTD(BNSD)布局由 host 下发 needInit 门控(短kv/空kv/短q 置1; 全覆盖场景为0
-    // 整段跳过, 零 MTE3 流量; mask 越界行由写回时 RowInvalid 当场刷, 不需要预清)。
+    // 非 TND/NTD(BSH/BNSD)布局: FD 默认预写，非 FD 由 host 下发的 needInit 或 isExistRowInvalid 门控。
+    // 整块无有效 KV 时任务会跳过，无法依赖 RowInvalid 或 LSE 写回，必须由预初始化兜底。
     __aicore__ inline void ClearOutput()
     {
         if (IsInitAttentionOutGm()) {
