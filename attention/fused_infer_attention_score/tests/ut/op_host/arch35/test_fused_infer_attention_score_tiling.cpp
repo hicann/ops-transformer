@@ -189,4 +189,82 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(GetCasesFromCsv<FusedInferAttentionTilingUtParam>(ReplaceFileExtension2Csv(__FILE__))),
     PrintCaseInfoString<FusedInferAttentionTilingUtParam>);
 
+class FusedInferAttentionScoreArch35ManualTilingTest : public testing::Test {
+protected:
+    static void SetUpTestCase() {}
+
+    static void TearDownTestCase() {}
+};
+
+TEST_F(FusedInferAttentionScoreArch35ManualTilingTest, tensorlist_kv_batch_not_1_failed)
+{
+    optiling::FusedInferAttentionScoreCompileInfo compileInfo = {};
+
+    const std::string A5SocInfo = "{\n"
+                                  "  \"hardware_info\": {\n"
+                                  "    \"BT_SIZE\": 0,\n"
+                                  "    \"load3d_constraints\": \"1\",\n"
+                                  "    \"Intrinsic_fix_pipe_l0c2out\": false,\n"
+                                  "    \"Intrinsic_data_move_l12ub\": true,\n"
+                                  "    \"Intrinsic_data_move_l0c2ub\": true,\n"
+                                  "    \"Intrinsic_data_move_out2l1_nd2nz\": false,\n"
+                                  "    \"UB_SIZE\": 196608,\n"
+                                  "    \"L2_SIZE\": 117440512,\n"
+                                  "    \"L1_SIZE\": 524288,\n"
+                                  "    \"L0A_SIZE\": 65536,\n"
+                                  "    \"L0B_SIZE\": 65536,\n"
+                                  "    \"L0C_SIZE\": 65536,\n"
+                                  "    \"vector_core_cnt\": 64,\n"
+                                  "    \"cube_core_cnt\": 32,\n"
+                                  "    \"socVersion\": \"Ascend950\"\n"
+                                  "  }\n"
+                                  "}";
+
+    gert::StorageShape queryShape({4, 16, 1024, 128}, {4, 16, 1024, 128});
+    gert::StorageShape kvShapeBad({2, 2, 1024, 128}, {2, 2, 1024, 128});
+    gert::StorageShape kvShapeGood({1, 2, 512, 128}, {1, 2, 512, 128});
+
+    std::vector<gert::TilingContextPara::TensorDescription> inputTensors;
+    std::vector<uint32_t> inputInstanceNum;
+    inputTensors.emplace_back(queryShape, ge::DT_BF16, ge::FORMAT_ND);
+    inputInstanceNum.emplace_back(1);
+    for (int i = 0; i < 4; i++) {
+        const gert::StorageShape &kvShape = (i == 0) ? kvShapeBad : kvShapeGood;
+        inputTensors.emplace_back(kvShape, ge::DT_BF16, ge::FORMAT_ND);
+    }
+    inputInstanceNum.emplace_back(4);
+    for (int i = 0; i < 4; i++) {
+        const gert::StorageShape &kvShape = (i == 0) ? kvShapeBad : kvShapeGood;
+        inputTensors.emplace_back(kvShape, ge::DT_BF16, ge::FORMAT_ND);
+    }
+    inputInstanceNum.emplace_back(4);
+    for (size_t i = 3; i < 31; i++) {
+        inputInstanceNum.emplace_back(0);
+    }
+
+    gert::TilingContextPara tilingContextPara(
+        "FusedInferAttentionScore", inputTensors, {{queryShape, ge::DT_BF16, ge::FORMAT_ND}},
+        {
+            {"num_heads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+            {"scale", Ops::Transformer::AnyValue::CreateFrom<float>(0.08838834764831843f)},
+            {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(65535)},
+            {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"input_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
+            {"num_key_value_heads", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"inner_precise", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
+            {"antiquant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"softmax_lse_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+            {"key_antiquant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"value_antiquant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"query_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"pse_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        inputInstanceNum, {1, 0}, &compileInfo, "Ascend950", 64, 196608, 16384, A5SocInfo);
+
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
 } // namespace FusedInferAttentionScoreUT

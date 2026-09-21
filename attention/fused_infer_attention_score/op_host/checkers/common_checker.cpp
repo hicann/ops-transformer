@@ -30,6 +30,26 @@ using namespace ge;
 using namespace AscendC;
 using namespace arch35FIA;
 
+namespace {
+const char *GetOrdinalSuffix(uint32_t num)
+{
+    uint32_t mod100 = num % 100U;
+    if (mod100 >= 11U && mod100 <= 13U) {
+        return "th";
+    }
+    switch (num % 10U) {
+        case 1U:
+            return "st";
+        case 2U:
+            return "nd";
+        case 3U:
+            return "rd";
+        default:
+            return "th";
+    }
+}
+} // namespace
+
 // 公共校验函数
 ge::graphStatus CommonChecker::CheckInputFormat(const FiaTilingInfo &fiaInfo)
 {
@@ -518,6 +538,21 @@ ge::graphStatus CommonChecker::CheckTensorList(const FiaTilingInfo &fiaInfo)
     }
     if (CheckEmptyTensorList(fiaInfo)) {
         return ge::GRAPH_SUCCESS;
+    }
+    for (uint32_t i = 0; i < fiaInfo.kCache.size(); i++) {
+        std::string tensorIdx = std::to_string(i + 1) + GetOrdinalSuffix(i + 1);
+        OP_CHECK_IF(fiaInfo.kCache[i]->GetStorageShape().GetDim(0) != 1,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        fiaInfo.opName, ("key in the " + tensorIdx + " tensor").c_str(),
+                        std::to_string(fiaInfo.kCache[i]->GetStorageShape().GetDim(0)).c_str(),
+                        "batch of key must be 1 in the tensorlist scenario"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(fiaInfo.vCache[i]->GetStorageShape().GetDim(0) != 1,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        fiaInfo.opName, ("value in the " + tensorIdx + " tensor").c_str(),
+                        std::to_string(fiaInfo.vCache[i]->GetStorageShape().GetDim(0)).c_str(),
+                        "batch of value must be 1 in the tensorlist scenario"),
+                    return ge::GRAPH_FAILED);
     }
     if (!CheckNormalTensorList(fiaInfo)) {
         return ge::GRAPH_FAILED;
