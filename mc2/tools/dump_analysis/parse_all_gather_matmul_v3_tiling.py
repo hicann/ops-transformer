@@ -37,22 +37,22 @@ logging.basicConfig(
 )
 
 # ====== 结构体大小常量（与 apace C++ 定义保持一致）======
-# AllGatherMxMatmulUrmaTilingData 内存布局（536B）:
+# AllGatherMxMatmulUrmaTilingData 内存布局（544B）:
 #   DfxDumpInfo           dumpInfo         offset 0,   424B
 #     WorkspaceLayoutInfo workspaceLayout  offset 0,   208B
 #     uint64_t            peermemDataSize  offset 208, 8B
 #     PeermemLayoutInfo   peermemLayout    offset 216, 208B
 #   QuantMatmulTilingData mmTile           offset 424, 64B
-#   CommTilingData        commTile         offset 488, 40B
-#   uint8_t               isBias           offset 528, 1B  (+7B padding)
-ALL_GATHER_MX_MATMUL_URMA_TILING_DATA_SIZE = 536
+#   CommTilingData        commTile         offset 488, 48B
+#   uint8_t               isBias           offset 536, 1B  (+7B padding)
+ALL_GATHER_MX_MATMUL_URMA_TILING_DATA_SIZE = 544
 TILING_DUMP_SIZE = 2048
 
 # QuantMatmulTilingData (64B = 14*u32 + 3*u8 + 5B padding)
 QUANT_MATMUL_TILING_DATA_SIZE = 64
 
-# CommTilingData (40B = 5*u64)
-COMM_TILING_DATA_SIZE = 40
+# CommTilingData (48B = 6*u64)
+COMM_TILING_DATA_SIZE = 48
 
 # ====== Workspace 结构体大小常量（与 mc2_tiling_struct.h 保持一致）======
 WORKSPACE_SEG_INFO_SIZE = 24  # 8+8+1+7
@@ -72,7 +72,7 @@ OFFSET_PEERMEM_DATA_SIZE = WORKSPACE_LAYOUT_INFO_SIZE  # 208
 OFFSET_PEERMEM_LAYOUT = OFFSET_PEERMEM_DATA_SIZE + 8  # 216
 OFFSET_MM_TILE = DFX_DUMP_INFO_SIZE  # 424
 OFFSET_COMM_TILE = OFFSET_MM_TILE + QUANT_MATMUL_TILING_DATA_SIZE  # 488
-OFFSET_IS_BIAS = OFFSET_COMM_TILE + COMM_TILING_DATA_SIZE  # 528
+OFFSET_IS_BIAS = OFFSET_COMM_TILE + COMM_TILING_DATA_SIZE  # 536
 
 # ====== CommContext 常量（与 Apace::AivComm::CommContext / moe_distribute_comm_ctx.h 镜像保持一致）======
 URMA_MAX_RANK_NUM = 64
@@ -186,16 +186,17 @@ def parse_quant_matmul_tiling_data(data: bytes, offset: int) -> dict:
 
 
 def parse_comm_tiling_data(data: bytes, offset: int) -> dict:
-    """解析 CommTilingData（40B = 5 * uint64_t）。"""
+    """解析 CommTilingData（48B = 6 * uint64_t）。"""
     if offset + COMM_TILING_DATA_SIZE > len(data):
         return {"error": "data too short for CommTilingData"}
-    fields = struct.unpack_from("<5Q", data, offset)
+    fields = struct.unpack_from("<6Q", data, offset)
     return {
         "splitAxisTileSize": fields[0],
         "splitAxisTileCnt": fields[1],
         "splitAxisTailSize": fields[2],
         "splitAxisTailCnt": fields[3],
         "nonSplitAxisSize": fields[4],
+        "slotNum": fields[5],
     }
 
 
@@ -470,7 +471,7 @@ def print_tiling_data(result: dict):
     print_section("QuantMatmulTilingData (mmTile, 64B)")
     print_kv("mmTile", result["mmTile"])
 
-    print_section("CommTilingData (commTile, 40B)")
+    print_section("CommTilingData (commTile, 48B)")
     print_kv("commTile", result["commTile"])
 
     print_section("Extra Fields")
@@ -743,7 +744,7 @@ def main():
         return
 
     # --- 默认: tiling_data 解析 ---
-    logging.info("解析模式: AllGatherMxMatmulUrmaTilingData (MX量化, 536B)")
+    logging.info("解析模式: AllGatherMxMatmulUrmaTilingData (MX量化, 544B)")
 
     struct_size = ALL_GATHER_MX_MATMUL_URMA_TILING_DATA_SIZE
     if len(data) < struct_size:

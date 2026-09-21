@@ -102,9 +102,9 @@ RUNTIME_INFO_CORE_MAX = 128
 ALLTO_ALL_TILING_INFO_SIZE = 88
 
 # Apace (CCU/URMA 路径, 不含 TCubeTiling, 无 CANN 版本漂移)
-# — mc2/common/op_kernel/apace/tiling/comm_tiling_data.h (5×u64)
+# — mc2/common/op_kernel/apace/tiling/comm_tiling_data.h (6×u64)
 # — mc2/common/op_kernel/apace/tiling/quant_matmul_tiling_data.h (定长 u32 字段)
-APACE_COMM_TILING_SIZE = 40
+APACE_COMM_TILING_SIZE = 48
 APACE_QUANT_MATMUL_SIZE = 64
 
 # 当前 ops-transformer 源码的 ground truth（TCubeTiling=200），用于公式回归自检。
@@ -130,7 +130,7 @@ _GT_A2A = {
     "quant.wsLayoutOffset": 576,
     "quant.size": 1816,
     "apace.wsLayoutOffset": 576,
-    "apace.size": 1112,
+    "apace.size": 1120,
 }
 
 PRIM_TYPES = {
@@ -572,7 +572,7 @@ def compute_allto_all_layout(cann=None):
     主线结构: [Mc2InitTiling][Mc2CcTiling][DfxDumpInfo][AlltoAllMatmulTilingInfo]
               [2×tiling 块]
     apace 结构 (无 TCubeTiling, 固定):
-              [Mc2InitTiling][Mc2CcTiling][DfxDumpInfo][CommTiling 40]
+              [Mc2InitTiling][Mc2CcTiling][DfxDumpInfo][CommTiling 48]
               [QuantMatmul 64][localMatmul 4]"""
     base = _base_layout(cann)
     tcube_size = base["tcubeTilingSize"]

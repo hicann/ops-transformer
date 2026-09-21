@@ -575,16 +575,17 @@ def parse_apace_quant_matmul_tiling(data: bytes, offset: int) -> dict:
 
 
 def parse_apace_comm_tiling(data: bytes, offset: int) -> dict:
-    """解析 Apace CommTilingData（40B = 5 * uint64_t）。"""
-    if offset + 40 > len(data):
+    """解析 Apace CommTilingData（48B = 6 * uint64_t）。"""
+    if offset + 48 > len(data):
         return {"error": "data too short for Apace CommTilingData"}
-    values = struct.unpack_from("<5Q", data, offset)
+    values = struct.unpack_from("<6Q", data, offset)
     names = (
         "splitAxisTileSize",
         "splitAxisTileCnt",
         "splitAxisTailSize",
         "splitAxisTailCnt",
         "nonSplitAxisSize",
+        "slotNum",
     )
     return dict(zip(names, values))
 
@@ -640,7 +641,7 @@ def is_valid_workspace_layout(layout: dict) -> bool:
 def detect_tiling_format(data: bytes) -> str:
     """自动区分主线非量化、主线量化和 usingApaceImpl_ CCU tiling。
 
-    新版结构不再携带 quantMode。Apace 的 CommTilingData 为 5 个小于 2^32
+    新版结构不再携带 quantMode。Apace 的 CommTilingData 为 6 个小于 2^32
     的 uint64，主线同位置则是两个相邻 uint32 字段；结合 QMM 尺寸和
     localMatmul(0/1) 可稳定区分。当前非空 DFX WorkspaceLayout 对应 MX 量化通路。
     """
@@ -654,7 +655,7 @@ def detect_tiling_format(data: bytes) -> str:
     )
     comm_values = list(comm.values()) if "error" not in comm else []
     apace_plausible = (
-        len(comm_values) == 5
+        len(comm_values) == 6
         and all(0 <= value < (1 << 32) for value in comm_values)
         and (comm_values[0] > 0 or comm_values[2] > 0)
         and (comm_values[1] > 0 or comm_values[3] > 0)
