@@ -13,8 +13,6 @@
  * \brief Tiling implementation for AlltoAllMatmulV2
  */
 
-#include "arch35/allto_all_matmul_v2_tiling_base.h"
-
 #include <cstdio>
 #include <string>
 #include <cstring>
@@ -23,6 +21,7 @@
 #include "graph/types.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "mc2_exception_dump.h"
+#include "op_host/tiling_templates_registry.h"
 
 using namespace ge;
 
