@@ -1379,7 +1379,9 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::GetKVPhyAddr(uint32_t h
     }
     this->kvPhyAddrGm.SetGlobalBuffer((__gm__ uint32_t *)(workspace + v0TotalOffset));
 
-    const uint32_t kvStride = static_cast<uint32_t>(constInfo.blockSize * constInfo.dSizeVInput);
+    const uint32_t kvStride = (constInfo.keyStride0 != 0) ?
+                                  constInfo.keyStride0 :
+                                  static_cast<uint32_t>(constInfo.blockSize * constInfo.dSizeVInput);
 
     TBuf<> blkTableBuf;
     TBuf<> sparseIdxBuf;
