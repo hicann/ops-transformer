@@ -344,6 +344,13 @@ def flash_attn(
     'PrivateUse1' is the combine key for custom NPU backends.
     """
     _validate_layout_dims(q, k, v, layout_q, layout_kv)
+    # FA 不支持 k/v 的 stride 中含 0
+    for name, tensor in (("k", k), ("v", v)):
+        if 0 in tensor.stride():
+            raise ValueError(
+                f"flash_attn does not support {name} with stride containing 0, "
+                f"got {name}.stride() = {tensor.stride()}"
+            )
     op_module = flash_attn_op_builder.load()
     return op_module.flash_attn(
         q,

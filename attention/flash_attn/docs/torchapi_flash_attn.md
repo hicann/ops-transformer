@@ -333,6 +333,7 @@ cann_ops_transformer.flash_attn(
                         <li>BNSD/BSND/TND：k/v必须连续，传入非连续Tensor会报错</li>
                         <li>PA_BBND：仅dim0支持非连续</li>
                         <li>PA_BNBD/PA_NZ：dim0或dim1支持非连续</li>
+                        <li>注：非连续Tensor每一维的stride均不能为0，否则报错</li>
                     </ul>
                 </li>
             </ul>
