@@ -301,6 +301,9 @@ private:
         xLocal = xLocal * constExpertAlpha1Local;
         xLocal = xLocal + vLocal;
         AscendC::Copy(expandedXLocal[validK * tilingData->hAligned], xLocal, tilingData->h);
+        event_t v2mte = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+        SetFlag<HardEvent::V_MTE2>(v2mte);
+        WaitFlag<HardEvent::V_MTE2>(v2mte);
     }
 
     __aicore__ inline void SetExpandedRowIdxOffset(int64_t rowOuterIdx, int64_t rowInnerIdx, int64_t kOuterIdx,

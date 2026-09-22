@@ -542,6 +542,9 @@ private:
                 xLocal = xLocal * constExpertAlpha1Local;
                 xLocal = xLocal + vLocal;
                 AscendC::Copy(expandedXLocal[khAlignedOffset], xLocal, tilingData->h);
+                event_t v2mte = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+                SetFlag<HardEvent::V_MTE2>(v2mte);
+                WaitFlag<HardEvent::V_MTE2>(v2mte);
             } else {
                 CopyIn(expandedXGm[expandedRowIdxValue * h], expandedXLocal[khAlignedOffset], 1, h);
             }
