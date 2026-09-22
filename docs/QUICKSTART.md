@@ -61,9 +61,9 @@ bash build.sh --pkg --soc=${soc_version} --ops=add_example -j16
 
 | 产品系列 | ${soc_version} 取值 |
 | -------- | ------------------- |
-| Atlas A2 系列（训练/推理） | ascend910b |
-| Atlas A3 系列（训练/推理） | ascend910_93 |
-| 950 系列 | ascend950 |
+| Atlas A2系列（训练/推理） | ascend910b |
+| Atlas A3系列（训练/推理） | ascend910_93 |
+| Ascend 950PR&950DT系列产品 | ascend950 |
 
 若提示如下信息，说明编译成功。
 
