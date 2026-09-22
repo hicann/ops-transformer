@@ -164,6 +164,9 @@ def _get_output_shape_sizes(q, v, layout_q, layout_kv):
     调用前需保证 q/v 维度数已通过 _LAYOUT_EXPECTED_NDIM 校验。"""
     if layout_q == "TND":
         t_size, b_size, s_size, n_size = q.size(0), None, None, q.size(1)
+    elif layout_q == "NTD":
+        # GQA FP8 (quant_mode=6): q 为 [N, T, D], 输出/lse 与 TND 同形 (T/N 主序不同)
+        t_size, b_size, s_size, n_size = q.size(1), None, None, q.size(0)
     elif layout_q == "BSND":
         t_size, b_size, s_size, n_size = None, q.size(0), q.size(1), q.size(2)
     else:
@@ -297,15 +300,24 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             t_size, b_size, s_size, n_size, d_size = _get_output_shape_sizes(
                 q, v, layout_q, layout_kv
             )
-            if layout_q == "TND":
+            if layout_q in ("TND", "NTD"):
+                # NTD (GQA FP8, quant_mode=6) 的 lse 与 TND 同为 (N, T)
                 softmax_out_size = (n_size, t_size)
             else:
                 softmax_out_size = (b_size, n_size, s_size)
 
             if layout_out == "TND":
                 torch._check(
-                    layout_q == "TND",
-                    lambda: f"When the layout of output is TND, the layout of query must be TND, but got {layout_q}",
+                    layout_q == "TND"
+                    or (
+                        layout_q == "NTD"
+                        and int(quant_mode)
+                        == int(
+                            QuantMode.A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32
+                        )
+                    ),
+                    lambda: f"When the layout of output is TND, the layout of query must be TND "
+                    f"(or NTD when quant_mode=6), but got {layout_q}",
                 )
                 attention_out_size = (t_size, n_size, d_size)
             elif layout_out == "BNSD":
