@@ -29,5 +29,8 @@ struct EngramFetchTilingData {
     int64_t numMaxTokensPerRank;
     int64_t totalRecv;
     int64_t commBufferSize;
+    uint32_t sortNumTileData;
+    uint32_t sortTileCount;
+    uint32_t sortTmpUbSize;
 };
 #endif

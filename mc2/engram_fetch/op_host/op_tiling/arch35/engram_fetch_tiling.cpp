@@ -50,6 +50,7 @@ constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024 * 1024;
 constexpr int64_t UB_ALIGN = 32;
 constexpr int64_t FLAG_SCRATCH_SIZE = 32;
 constexpr int64_t WORKSPACE_ALIGN_2MB = 2 * 1024 * 1024;
+constexpr int64_t SIMT_DCACHE_SIZE = 64 * 1024LL; // SortLib SIMT dcache 预留
 
 static int64_t CeilDiv(int64_t x, int64_t y)
 {
@@ -85,6 +86,9 @@ static void PrintEngramFetchTilingData(const EngramFetchTilingData *tilingData, 
     OP_LOGD(nodeName, "numMaxTokensPerRank is %ld", tilingData->numMaxTokensPerRank);
     OP_LOGD(nodeName, "totalRecv is %ld", tilingData->totalRecv);
     OP_LOGD(nodeName, "commBufferSize is %ld", tilingData->commBufferSize);
+    OP_LOGD(nodeName, "sortNumTileData is %u", tilingData->sortNumTileData);
+    OP_LOGD(nodeName, "sortTileCount is %u", tilingData->sortTileCount);
+    OP_LOGD(nodeName, "sortTmpUbSize is %u", tilingData->sortTmpUbSize);
 }
 
 /**
@@ -462,7 +466,7 @@ static ge::graphStatus CheckAttrs(const gert::TilingContext *context)
 /**
  * @brief 设置平台信息
  */
-static ge::graphStatus SetPlatformInfo(gert::TilingContext *context, EngramFetchTilingData &tilingData)
+static ge::graphStatus SetPlatformInfo(gert::TilingContext *context, EngramFetchTilingData &tilingData, bool isTraining)
 {
     const char *nodeName = context->GetNodeName();
 
@@ -475,6 +479,22 @@ static ge::graphStatus SetPlatformInfo(gert::TilingContext *context, EngramFetch
     context->SetBlockDim(numBlocks);
     tilingData.aivNum = aivNum;
     OP_LOGD(nodeName, "aicNum=%u, aivNum=%u, numBlocks=%u", aicNum, aivNum, numBlocks);
+
+    if (isTraining) {
+        // 训练模式 kernel 内借用 SortLib（SIMT）做收端全局排序，须预留 SIMT dcache
+        uint64_t ubSize = 0;
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
+        int64_t availUbSize = static_cast<int64_t>(ubSize) - SIMT_DCACHE_SIZE;
+        OP_TILING_CHECK(availUbSize <= 0,
+                        OP_LOGE(nodeName, "availUbSize(%lld) <= 0, ubSize=%llu, SIMT_DCACHE_SIZE=%lld", availUbSize,
+                                ubSize, SIMT_DCACHE_SIZE),
+                        return ge::GRAPH_FAILED);
+        auto ret = context->SetLocalMemorySize(static_cast<size_t>(availUbSize));
+        OP_TILING_CHECK(ret != ge::GRAPH_SUCCESS,
+                        OP_LOGE(nodeName, "SetLocalMemorySize failed, availUbSize=%lld", availUbSize),
+                        return ge::GRAPH_FAILED);
+        OP_LOGD(nodeName, "SetLocalMemorySize: ubSize=%llu, availUbSize=%lld", ubSize, availUbSize);
+    }
 
     return ge::GRAPH_SUCCESS;
 }
@@ -493,6 +513,9 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
     tilingData.numMaxTokensPerRank = 0;
     tilingData.totalRecv = 0;
     tilingData.commBufferSize = 0;
+    tilingData.sortNumTileData = 0;
+    tilingData.sortTileCount = 0;
+    tilingData.sortTmpUbSize = 0;
 
     auto hiddenSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_HIDDEN_SIZE_INDEX);
     tilingData.hiddenDim = *hiddenSizePtr;
@@ -515,6 +538,12 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     uint64_t ubSize = 0;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
+    if (isTraining) {
+        OP_TILING_CHECK(static_cast<int64_t>(ubSize) <= SIMT_DCACHE_SIZE,
+                        OP_LOGE(nodeName, "ubSize(%llu) <= SIMT_DCACHE_SIZE(%lld)", ubSize, SIMT_DCACHE_SIZE),
+                        return ge::GRAPH_FAILED);
+        ubSize -= SIMT_DCACHE_SIZE;
+    }
     tilingData.ubSize = ubSize;
 
     if (isTraining) {
@@ -535,6 +564,35 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
         if (commBufferSizePtr != nullptr) {
             tilingData.commBufferSize = *commBufferSizePtr;
         }
+
+        // SortLib 参数：请求方对输入 indices 全局排序（key = entry id，规模 numTokens）
+        constexpr uint64_t kSortLibFixedBytes = 5120U;
+        // sortlib 内部 histUb/histCumsumUb 队列按 256 bin × uint16 = 512B 使用
+        // 而 outValueQueue_ 仅按 numTileData 字节分配，故 numTileData 下界为 512
+        constexpr uint64_t kMinTileElems = 512U;
+        constexpr uint64_t kBytesPerElem = 21U;
+        uint64_t budget = tilingData.ubSize;
+        OP_TILING_CHECK(
+            budget < kSortLibFixedBytes + kMinTileElems * kBytesPerElem,
+            OP_LOGE(nodeName, "SortLib UB budget too small: ubSize=%llu, need>=%llu", (unsigned long long)budget,
+                    (unsigned long long)(kSortLibFixedBytes + kMinTileElems * kBytesPerElem)),
+            return ge::GRAPH_FAILED);
+        int64_t numTokensI64 = tilingData.numTokens;
+        int64_t aivNumI64 = static_cast<int64_t>(tilingData.aivNum);
+        uint32_t numTile = static_cast<uint32_t>((numTokensI64 + aivNumI64 - 1) / aivNumI64);
+        uint32_t ubCap = static_cast<uint32_t>((budget - kSortLibFixedBytes) / kBytesPerElem);
+        if (numTile < kMinTileElems) {
+            numTile = kMinTileElems;
+        }
+        if (numTile > ubCap) {
+            numTile = ubCap;
+        }
+        tilingData.sortNumTileData = numTile;
+        tilingData.sortTileCount =
+            static_cast<uint32_t>((numTokensI64 + static_cast<int64_t>(numTile) - 1) / static_cast<int64_t>(numTile));
+        tilingData.sortTmpUbSize = 512U + 7U * ((numTile + 31U) / 32U * 32U) + 256U;
+        OP_LOGD(nodeName, "SortLib params: numTile=%u tileCount=%u tmpUb=%u budget=%llu", tilingData.sortNumTileData,
+                tilingData.sortTileCount, tilingData.sortTmpUbSize, (unsigned long long)budget);
     }
 
     OP_LOGD(nodeName,
@@ -578,25 +636,30 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const EngramFe
         int64_t wsSdispls = AlignTo(numRanks * static_cast<int64_t>(sizeof(int64_t)), UB_ALIGN);
         int64_t wsRdispls = AlignTo(numRanks * static_cast<int64_t>(sizeof(int64_t)), UB_ALIGN);
         int64_t wsSortedIndices = AlignTo(numTokens * static_cast<int64_t>(sizeof(int32_t)), UB_ALIGN);
-        int64_t slotSize = AlignTo(tilingData.numMaxTokensPerRank * static_cast<int64_t>(sizeof(int32_t)), UB_ALIGN);
-        if (slotSize == 0) {
-            slotSize = UB_ALIGN;
-        }
-        int64_t rankCores = (aivNum < numRanks) ? aivNum : numRanks;
-        int64_t numOwnerRanksMax = (numRanks + rankCores - 1) / rankCores;
-        if (numOwnerRanksMax == 0) {
-            numOwnerRanksMax = 1;
-        }
-        int64_t perCoreTempSize = numOwnerRanksMax * slotSize;
-        int64_t wsSortedIndicesTemp = aivNum * perCoreTempSize;
-        int64_t wsPermOutTemp = aivNum * perCoreTempSize;
         int64_t wsCounterScratch = aivNum * UB_ALIGN;
         int64_t wsPartialCounts = aivNum * numRanks * static_cast<int64_t>(sizeof(int32_t));
         int64_t wsIndicesReadyFlag = AlignTo(numRanks * static_cast<int64_t>(sizeof(int32_t)), UB_ALIGN);
         int64_t wsTokenStaging = tilingData.totalRecv * tilingData.hiddenBytes;
 
-        int64_t wsTotal = wsSdispls + wsRdispls + wsSortedIndices + wsSortedIndicesTemp + wsPermOutTemp +
-                          wsCounterScratch + wsPartialCounts + wsIndicesReadyFlag + wsTokenStaging;
+        // SortLib 六段 workspace，与 kernel 侧 InitWorkspaceLayout 逐段一致（按 numTokens 规模）；
+        // 前段尺寸不保证 32B 对齐，与 kernel 一致在排序区前插入对齐 padding
+        int64_t wsBeforeSort = wsSdispls + wsRdispls + wsSortedIndices + wsCounterScratch + wsPartialCounts +
+                               wsIndicesReadyFlag + wsTokenStaging;
+        int64_t wsSortPad = AlignTo(wsBeforeSort, UB_ALIGN) - wsBeforeSort;
+        int64_t numTokensI64 = tilingData.numTokens;
+        OP_TILING_CHECK(numTokensI64 > INT64_MAX / static_cast<int64_t>(sizeof(int32_t)),
+                        OP_LOGE(nodeName, "sort array overflow: numTokens=%lld", numTokensI64),
+                        return ge::GRAPH_FAILED);
+        constexpr int64_t kRadixRounds = 4;
+        int64_t slSeg0 = AlignTo(256LL * kRadixRounds * 4LL, UB_ALIGN);
+        int64_t slSeg1 = AlignTo(static_cast<int64_t>(tilingData.sortTileCount) * 256LL * kRadixRounds * 4LL, UB_ALIGN);
+        int64_t slSeg2 = AlignTo(numTokensI64 * 4LL, UB_ALIGN);
+        int64_t slSeg3 = 2LL * AlignTo(static_cast<int64_t>(tilingData.sortTileCount) * 256LL * 2LL, UB_ALIGN);
+        int64_t slSeg4 = AlignTo(static_cast<int64_t>(tilingData.sortTileCount) * tilingData.sortNumTileData, UB_ALIGN);
+        int64_t slSeg5 = AlignTo(numTokensI64 * 4LL, UB_ALIGN);
+        int64_t wsSortTotal = wsSortPad + slSeg0 + slSeg1 + slSeg2 + slSeg3 + slSeg4 + slSeg5;
+
+        int64_t wsTotal = wsBeforeSort + wsSortTotal;
         wsTotal = ((wsTotal + WORKSPACE_ALIGN_2MB - 1) / WORKSPACE_ALIGN_2MB) * WORKSPACE_ALIGN_2MB;
         wsTotal += SYSTEM_NEED_WORKSPACE;
         workSpaces[0] = static_cast<size_t>(wsTotal);
@@ -646,8 +709,14 @@ static ge::graphStatus EngramFetchTilingFunc(gert::TilingContext *context)
     }
 
     // 3. platform info
-    OP_TILING_CHECK(SetPlatformInfo(context, *tilingData) != ge::GRAPH_SUCCESS,
+    OP_TILING_CHECK(SetPlatformInfo(context, *tilingData, isTraining) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "set platform info failed."), return ge::GRAPH_FAILED);
+
+    if (isTraining) {
+        auto schedRet = context->SetScheduleMode(1);
+        OP_TILING_CHECK(schedRet != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "SetScheduleMode(1) failed"),
+                        return ge::GRAPH_FAILED);
+    }
 
     // 4. set tiling data
     OP_TILING_CHECK(SetTilingData(context, *tilingData, numTokens, isTraining) != ge::GRAPH_SUCCESS,

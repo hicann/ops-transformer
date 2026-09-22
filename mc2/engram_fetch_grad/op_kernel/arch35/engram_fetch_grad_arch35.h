@@ -241,6 +241,7 @@ private:
     TBuf<> statusBuf_;
     TBuf<> tempBuf_;
     TBuf<> indicesBuf_;
+    TBuf<> offBuf_;
     uint32_t indicesBufElements_{0};
     TBuf<> castFp32Buf_;
     TBuf<> accumBuf_;
@@ -461,6 +462,19 @@ __aicore__ inline void EngramFetchGradArch35::LocalCopySlice(GM_ADDR dst, GM_ADD
 __aicore__ inline static uint32_t AlignRowStride(uint32_t hiddenBytes)
 {
     return (hiddenBytes + Mc2Kernel::UB_ALIGN - 1U) / Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN;
+}
+
+__aicore__ inline static uint32_t UnsortTokensPerBuf(int64_t hiddenBytes, uint32_t tileBytes, uint32_t indicesElems)
+{
+    uint32_t tokensPerBuf = 1U;
+    if (hiddenBytes > 0) {
+        uint32_t byTile = static_cast<uint32_t>(static_cast<uint64_t>(tileBytes) / static_cast<uint64_t>(hiddenBytes));
+        tokensPerBuf = (byTile > 1U) ? byTile : 1U;
+    }
+    if (tokensPerBuf > indicesElems) {
+        tokensPerBuf = indicesElems;
+    }
+    return (tokensPerBuf > 0U) ? tokensPerBuf : 1U;
 }
 
 __aicore__ inline static uint32_t MaxGradRowsPerPing(uint32_t hiddenBytes, uint32_t gradSubBatch)
@@ -701,6 +715,11 @@ __aicore__ inline void EngramFetchGradArch35::Init(GM_ADDR commContext, GM_ADDR 
     indicesBufBytes_ = indicesBufSize;
     indicesBufElements_ = indicesBufSize / sizeof(int32_t);
 
+    uint32_t unsortBatch = UnsortTokensPerBuf(hiddenBytes_, tileBytes_, indicesBufElements_);
+    uint32_t offBufBytes =
+        (unsortBatch * sizeof(int64_t) + Mc2Kernel::UB_ALIGN - 1U) / Mc2Kernel::UB_ALIGN * Mc2Kernel::UB_ALIGN;
+    tpipe_->InitBuffer(offBuf_, offBufBytes);
+
     uint32_t maxByPong = MaxGradRowsPerPing(static_cast<uint32_t>(hiddenBytes_), gradSubBatch_);
     if (chunkElems_ == 0U) {
         if (inputDtype_ != Mc2Kernel::ENGRAM_DT_FLOAT) {
@@ -756,36 +775,15 @@ __aicore__ inline uint32_t EngramFetchGradArch35::LoadGradChunk(int64_t pos, int
     GlobalTensor<uint8_t> srcGm;
     srcGm.SetGlobalBuffer((__gm__ uint8_t *)gradFetchedGM_);
     DataCopyPadExtParams<uint8_t> gPad{false, 0, 0, 0};
-
-    uint32_t j = 0;
-    while (j < n) {
-        int32_t runStartIdx = idxUb.GetValue(j);
-        uint32_t runLen = 1;
-        while (j + runLen < n) {
-            int32_t nextIdx = idxUb.GetValue(j + runLen);
-            if (nextIdx == runStartIdx + static_cast<int32_t>(runLen)) {
-                runLen++;
-            } else {
-                break;
-            }
-        }
-
-        uint64_t srcOff = static_cast<uint64_t>(runStartIdx) * static_cast<uint64_t>(hiddenBytes_);
-        uint64_t dstOff = static_cast<uint64_t>(j) * static_cast<uint64_t>(hiddenBytes_);
-        uint64_t runBytesLeft = static_cast<uint64_t>(runLen) * static_cast<uint64_t>(hiddenBytes_);
-        uint64_t curSrcOff = srcOff;
-        uint64_t curDstOff = dstOff;
-        while (runBytesLeft > 0) {
-            uint32_t chunkBytes =
-                (runBytesLeft > MAX_BLOCK_BYTES) ? MAX_BLOCK_BYTES : static_cast<uint32_t>(runBytesLeft);
-            DataCopyExtParams gParams{1U, chunkBytes, 0U, 0U, 0U};
-            DataCopyPad(buf[curDstOff], srcGm[curSrcOff], gParams, gPad);
-            curSrcOff += chunkBytes;
-            curDstOff += chunkBytes;
-            runBytesLeft -= chunkBytes;
-        }
-
-        j += runLen;
+    uint32_t hb32 = static_cast<uint32_t>(hiddenBytes_);
+    LocalTensor<int64_t> offUb = offBuf_.Get<int64_t>();
+    AscendC::Cast<int64_t, int32_t>(offUb, idxUb, AscendC::RoundMode::CAST_NONE, static_cast<int32_t>(n));
+    AscendC::Muls<int64_t>(offUb, offUb, static_cast<int64_t>(hiddenBytes_), static_cast<int32_t>(n));
+    EngramFetchGradSyncFunc<HardEvent::V_S>();
+    for (uint32_t j = 0; j < n; j++) {
+        int64_t srcOff = offUb.GetValue(j);
+        DataCopyExtParams gParams{1U, hb32, 0U, 0U, 0U};
+        DataCopyPad(buf[static_cast<uint64_t>(j) * hiddenBytes_], srcGm[srcOff], gParams, gPad);
     }
     AscendC::SetFlag<HardEvent::MTE2_MTE3>(ppEvtMte2ToMte3_[bufIdx]);
     return n;
@@ -864,13 +862,7 @@ __aicore__ inline void EngramFetchGradArch35::UnsortGrad()
         return;
     }
 
-    uint32_t tokensPerBuf = static_cast<uint32_t>(tileBytes_ / static_cast<uint64_t>(hiddenBytes_));
-    if (tokensPerBuf == 0) {
-        tokensPerBuf = 1;
-    }
-    if (tokensPerBuf > indicesBufElements_) {
-        tokensPerBuf = indicesBufElements_;
-    }
+    uint32_t tokensPerBuf = UnsortTokensPerBuf(hiddenBytes_, tileBytes_, indicesBufElements_);
 
     LocalTensor<uint8_t> buf0 = entryBuf_.Get<uint8_t>();
     LocalTensor<uint8_t> buf1 = gradBuf_.Get<uint8_t>();

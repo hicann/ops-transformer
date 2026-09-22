@@ -19,7 +19,7 @@ if (BUILD_OPEN_PROJECT)  # custom
         OPTYPE engram_fetch_grad engram_fetch_grad ACLNNTYPE aclnn aclnn_inner)
     set(SUB_MC2_COMPILE TRUE PARENT_SCOPE)
     set(MC2_OPT ON PARENT_SCOPE)
-    set(engram_fetch_grad_depends mc2/common mc2/3rd mc2/engram_fetch PARENT_SCOPE)
+    set(engram_fetch_grad_depends mc2/common mc2/3rd PARENT_SCOPE)
 
     set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
     if("${CONDITION_UNIT}" STREQUAL "ascend950")
