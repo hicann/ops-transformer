@@ -97,12 +97,14 @@ struct ConstInfo {
     uint64_t qHeadNum = 0ULL;
     uint64_t kHeadNum;
     uint64_t headDim;
-    uint64_t sparseCount;             // topK选取大小
-    uint64_t kSeqSize = 0ULL;         // kv最大S长度
-    uint64_t qSeqSize = 1ULL;         // q最大S长度
-    uint32_t kCacheBlockSize = 0;     // PA场景的block size
-    uint32_t maxBlockNumPerBatch = 0; // PA场景的最大单batch block number
-    LI_LAYOUT outputLayout;           // 输出的格式
+    uint64_t sparseCount;                // topK选取大小
+    uint64_t kSeqSize = 0ULL;            // kv最大S长度
+    uint64_t qSeqSize = 1ULL;            // q最大S长度
+    uint32_t kCacheBlockSize = 0;        // PA场景的block size
+    uint32_t maxBlockNumPerBatch = 0;    // PA场景的最大单batch block number
+    uint32_t keyStride0 = 0;             // PA场景key的0轴步长（元素个数）
+    uint32_t keyDequantScaleStride0 = 0; // PA场景key scale的0轴步长（元素个数）
+    LI_LAYOUT outputLayout;              // 输出的格式
     bool attenMaskFlag = false;
     uint32_t cmpRatio = 1; // 压缩率
 
