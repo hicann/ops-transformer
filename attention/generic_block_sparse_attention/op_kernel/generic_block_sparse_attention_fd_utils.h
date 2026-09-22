@@ -39,6 +39,9 @@ __aicore__ inline uint32_t CalculateConfigSignature(
     hash = HashConfigValue(hash, tilingData->topK);
     hash = HashConfigValue(hash, tilingData->qBlockNum);
     hash = HashConfigValue(hash, 1U); // Generic kernel currently supports packed GQA only.
+    // Must stay in sync with the metadata scheduler's CalculateConfigSignature.
+    hash = HashConfigValue(hash, tilingData->residualBlockMode);
+    hash = HashConfigValue(hash, tilingData->isConsistentTopk);
     return hash;
 }
 

@@ -67,6 +67,10 @@ TILING_DATA_FIELD_DEF(uint32_t, fdLseSubStride);
 TILING_DATA_FIELD_DEF(uint32_t, fdPartialCapacity);
 TILING_DATA_FIELD_DEF(uint64_t, fdPartialLseOffset);
 TILING_DATA_FIELD_DEF(uint64_t, fdPartialOOffset);
+// 0: do not force-select residual KV block; 1: always include residual KV block.
+TILING_DATA_FIELD_DEF(uint32_t, residualBlockMode);
+// 0: per-Q-block sparseBlockCount; 1: every Q block uses the same topK.
+TILING_DATA_FIELD_DEF(uint32_t, isConsistentTopk);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(GenericBlockSparseAttention, GenericBlockSparseAttentionTilingData)
 
@@ -127,7 +131,8 @@ private:
     uint32_t groupSize_ = 0;
     float scaleValue_ = 0.0f;
     uint32_t softmaxPrecision_ = 0;
-    int64_t isPackedGQA_ = 1;
+    int64_t residualBlockMode_ = 0;
+    bool isConsistentTopk_ = false;
     int64_t softmaxLseFlag_ = 0;
     bool returnSoftmaxlse_ = false;
     bool blockTablePresent_ = false;
@@ -148,6 +153,7 @@ private:
 
     std::string layoutQ_ = "TND";
     std::string layoutKv_ = "TND";
+    int64_t layoutSparsePattern_ = 4;
     int64_t maskType_ = 0;
     int64_t quantType_ = 0;
 

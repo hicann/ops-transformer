@@ -432,4 +432,38 @@ TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, MetadataEncoding)
     ASSERT_EQ(metadata[METADATA_USED_SIZE], 0);
 }
 
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ScheduleInputDefaultsMatchInterface)
+{
+    ScheduleInput input;
+    EXPECT_EQ(input.residualBlockMode, 0);
+    EXPECT_EQ(input.isConsistentTopk, 0);
+}
+
+TEST_F(GenericBlockSparseAttentionMetadataSchedulerTest, ConfigSignatureTracksResidualAndConsistentTopk)
+{
+    ScheduleInput base = MakeDecodeInput();
+    ScheduleResult baseResult;
+    ASSERT_EQ(BuildSchedule(base, baseResult), BSAScheduleStatus::BSA_SUCCESS);
+    const uint32_t baseSignature = baseResult.configSignature;
+    EXPECT_EQ(baseSignature, CalculateConfigSignature(base));
+
+    ScheduleInput residualChanged = MakeDecodeInput();
+    residualChanged.residualBlockMode = 1;
+    EXPECT_NE(CalculateConfigSignature(residualChanged), baseSignature);
+
+    ScheduleInput topkChanged = MakeDecodeInput();
+    topkChanged.isConsistentTopk = 1;
+    EXPECT_NE(CalculateConfigSignature(topkChanged), baseSignature);
+
+    // The reserved topk flag affects the signature, but not scheduling.
+    ScheduleResult topkResult;
+    ASSERT_EQ(BuildSchedule(topkChanged, topkResult), BSAScheduleStatus::BSA_SUCCESS);
+    EXPECT_EQ(topkResult.blockPrefix, baseResult.blockPrefix);
+    EXPECT_EQ(topkResult.saUsedCoreNum, baseResult.saUsedCoreNum);
+    EXPECT_EQ(topkResult.saTotalTaskNum, baseResult.saTotalTaskNum);
+    EXPECT_EQ(topkResult.fdPartialTaskNum, baseResult.fdPartialTaskNum);
+    EXPECT_EQ(topkResult.combineTaskNum, baseResult.combineTaskNum);
+    EXPECT_NE(topkResult.configSignature, baseSignature);
+}
+
 } // namespace

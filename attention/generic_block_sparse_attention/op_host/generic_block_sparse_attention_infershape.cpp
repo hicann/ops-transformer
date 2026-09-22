@@ -26,8 +26,8 @@ static constexpr uint32_t ATTENTION_OUT_INDEX = 0;
 static constexpr uint32_t SOFTMAX_LSE_INDEX = 1;
 
 // Keep attr indices in sync with OpDef / tiling.
-static constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 2;
-static constexpr uint32_t ATTR_LAYOUT_KV_INDEX = 3;
+static constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 1;
+static constexpr uint32_t ATTR_LAYOUT_KV_INDEX = 2;
 static constexpr uint32_t ATTR_RETURN_SOFTMAX_LSE_INDEX = 11;
 
 static constexpr uint32_t TND_DIM_T = 0;

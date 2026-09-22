@@ -60,6 +60,8 @@ struct GenericBlockSparseAttentionTilingData {
     uint32_t fdPartialCapacity;
     uint64_t fdPartialLseOffset;
     uint64_t fdPartialOOffset;
+    uint32_t residualBlockMode;
+    uint32_t isConsistentTopk;
 };
 
 } // namespace GenericBlockSparseAttn

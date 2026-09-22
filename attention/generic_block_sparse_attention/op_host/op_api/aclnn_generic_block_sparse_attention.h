@@ -24,9 +24,10 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
     const aclTensor *vDequantScaleOptional, const aclTensor *pQuantScaleOptional,
     const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional,
     const aclTensor *sequsedKvOptional, const aclTensor *blockTableOptional, const aclIntArray *blockShape,
-    int64_t isPackedGQA, char *layoutQ, char *layoutKv, double scaleValue, int64_t maskType, int64_t quantType,
+    char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, double scaleValue, int64_t maskType, int64_t quantType,
     double dstTypeMax, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t returnSoftmaxlse,
-    aclTensor *attentionOut, aclTensor *softmaxLseOptional, uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t residualBlockMode, bool isConsistentTopk, aclTensor *attentionOut, aclTensor *softmaxLseOptional,
+    uint64_t *workspaceSize, aclOpExecutor **executor);
 
 __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttention(void *workspace,
                                                                                     uint64_t workspaceSize,

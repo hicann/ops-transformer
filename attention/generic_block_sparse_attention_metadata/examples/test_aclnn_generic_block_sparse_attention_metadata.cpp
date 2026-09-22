@@ -43,7 +43,9 @@ constexpr int32_t DEVICE_ID_ARG_INDEX = 1;
 constexpr int64_t GBSA_BLOCK_SHAPE_X = 1;
 constexpr int64_t GBSA_BLOCK_SHAPE_Y = 128;
 constexpr int64_t GBSA_HEAD_DIM = 128;
-constexpr int64_t GBSA_IS_PACKED_GQA = 1;
+constexpr int64_t GBSA_LAYOUT_SPARSE_PATTERN = 4; // KVN_TotalQB_KB
+constexpr int64_t GBSA_RESIDUAL_BLOCK_MODE = 0;
+constexpr bool GBSA_IS_CONSISTENT_TOPK = false;
 constexpr int64_t GBSA_MASK_TYPE = 1;
 constexpr int64_t GBSA_QUANT_TYPE = 0;
 constexpr int64_t GBSA_SOFTMAX_PRECISION = 0;
@@ -335,8 +337,9 @@ aclnnStatus RunCase(CaseContext &context, aclrtStream stream)
         context.sparseBlockIdx.tensor, context.sparseBlockCount.tensor, context.cuSeqLengths.tensor,
         context.cuSeqLengthsKv.tensor, context.seqUsedQ.tensor, context.seqUsedKv.tensor, context.maxQSeqLen,
         context.maxKvSeqLen, context.numQHeads, context.numKvHeads, context.headDim, context.blockShape,
-        GBSA_IS_PACKED_GQA, context.qInputLayout, context.kvInputLayout, GBSA_MASK_TYPE, GBSA_QUANT_TYPE,
-        GBSA_SOFTMAX_PRECISION, GBSA_WINDOW_SIZE, GBSA_WINDOW_SIZE, context.metadata.tensor, &workspaceSize, &executor);
+        context.qInputLayout, context.kvInputLayout, GBSA_LAYOUT_SPARSE_PATTERN, GBSA_MASK_TYPE, GBSA_QUANT_TYPE,
+        GBSA_SOFTMAX_PRECISION, GBSA_WINDOW_SIZE, GBSA_WINDOW_SIZE, GBSA_RESIDUAL_BLOCK_MODE, GBSA_IS_CONSISTENT_TOPK,
+        context.metadata.tensor, &workspaceSize, &executor);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret,
                   "%s: aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize failed, error: %d",
                   context.name.c_str(), ret);

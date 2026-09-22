@@ -43,6 +43,8 @@ struct ScheduleInput {
     int64_t blockIndexStride = 0;
     int64_t qBlockStorageNum = 0;
     int64_t isPackedGQA = 1;
+    int64_t residualBlockMode = 0;
+    int64_t isConsistentTopk = 0;
     int64_t aicCoreNum = 0;
     std::vector<int64_t> qSeqLens; // seqUsed/cuQLens/maxQLen
     // qUnit-major, sparseHead-minor logical order.
@@ -132,6 +134,10 @@ inline uint32_t CalculateConfigSignature(const ScheduleInput &input)
     hash = HashConfigValue(hash, static_cast<uint32_t>(input.blockIndexStride));
     hash = HashConfigValue(hash, static_cast<uint32_t>(input.qBlockStorageNum));
     hash = HashConfigValue(hash, static_cast<uint32_t>(input.isPackedGQA));
+    // residual_block_mode / is_consistent_topk do not change the schedule itself, but they must
+    // participate in the signature so the main op rejects metadata generated with other settings.
+    hash = HashConfigValue(hash, static_cast<uint32_t>(input.residualBlockMode));
+    hash = HashConfigValue(hash, static_cast<uint32_t>(input.isConsistentTopk));
     return hash;
 }
 

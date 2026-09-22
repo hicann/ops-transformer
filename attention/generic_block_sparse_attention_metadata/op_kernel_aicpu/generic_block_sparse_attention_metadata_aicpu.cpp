@@ -72,7 +72,9 @@ bool GenericBlockSparseAttentionMetadataAicpu::Prepare(CpuKernelContext &ctx)
         GetAttrValue(ctx, "num_kv_heads", numKvHeads_) && GetAttrValue(ctx, "head_dim", headDim_) &&
         GetAttrValue(ctx, "block_shape_x", blockShapeX_) && GetAttrValue(ctx, "block_shape_y", blockShapeY_) &&
         GetAttrValue(ctx, "is_packed_gqa", isPackedGQA_) && GetAttrValue(ctx, "q_input_layout", qInputLayout_) &&
-        GetAttrValue(ctx, "aic_core_num", aicCoreNum_);
+        GetAttrValue(ctx, "aic_core_num", aicCoreNum_) &&
+        GetAttrValue(ctx, "residual_block_mode", residualBlockMode_) &&
+        GetAttrValue(ctx, "is_consistent_topk", isConsistentTopk_);
     return attrsValid && CheckInputs();
 }
 
@@ -112,7 +114,8 @@ bool GenericBlockSparseAttentionMetadataAicpu::CheckInputs()
     }
     if ((qInputLayout_ != "TND" && maxQSeqLen_ <= 0) || numQHeads_ <= 0 || numKvHeads_ <= 0 || headDim_ <= 0 ||
         blockShapeX_ != 1 || blockShapeY_ <= 0 || (isPackedGQA_ != 0 && isPackedGQA_ != 1) || aicCoreNum_ <= 0 ||
-        aicCoreNum_ > MAX_AIC_CORE_NUM) {
+        aicCoreNum_ > MAX_AIC_CORE_NUM || residualBlockMode_ != 0 ||
+        (isConsistentTopk_ != 0 && isConsistentTopk_ != 1)) {
         KERNEL_LOG_ERROR("Invalid scheduling attrs for GenericBlockSparseAttentionMetadata.");
         return false;
     }
@@ -288,6 +291,8 @@ bool GenericBlockSparseAttentionMetadataAicpu::GenerateMetadata(const std::vecto
     input.blockIndexStride = blockIndexStride_;
     input.qBlockStorageNum = qBlockStorageNum_;
     input.isPackedGQA = isPackedGQA_;
+    input.residualBlockMode = residualBlockMode_;
+    input.isConsistentTopk = isConsistentTopk_;
     input.aicCoreNum = aicCoreNum_;
     input.qSeqLens = qSeqLens;
     input.validBlockNums = validBlockNums;

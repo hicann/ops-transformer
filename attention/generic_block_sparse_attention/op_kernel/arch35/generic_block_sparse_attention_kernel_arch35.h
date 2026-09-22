@@ -243,7 +243,7 @@ public:
                 continue;
             }
 
-            // TND + isPackedGQA=1: sparseBlockIdx 3D [N_kv, totalQBlocks, topK]
+            // layout_sparse_pattern=KVN_TotalQB_KB: sparseBlockIdx 3D [N_kv, totalQBlocks, topK]
             // totalQBlocks spans storage (cu) blocks; align with metadata qStorageBlockStarts.
             uint32_t globalQBlock = 0;
             for (uint32_t b = 0; b < batchIdx; ++b) {
@@ -436,6 +436,8 @@ private:
         kvBaseTile_ = tilingData->kvBaseTile;
         kStride0_ = tilingData->kStride0;
         vStride0_ = tilingData->vStride0;
+        residualBlockMode_ = tilingData->residualBlockMode;
+        isConsistentTopk_ = tilingData->isConsistentTopk;
     }
 
     __aicore__ inline void CalcOnChipBufTileInfo(
@@ -624,6 +626,8 @@ private:
     // PA_BBND page base strides (elements); may exceed blockSize*Nkv*D when dim0 is strided.
     uint64_t kStride0_;
     uint64_t vStride0_;
+    uint32_t residualBlockMode_;
+    uint32_t isConsistentTopk_;
     // base tile info
     uint32_t qBaseTile_;
     uint32_t kvBaseTile_;

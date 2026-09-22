@@ -51,13 +51,13 @@ constexpr int BLOCKED_KV_DIM_BLOCK_SIZE = 1;
 constexpr int BLOCKED_KV_DIM_KV_HEAD = 2;
 constexpr int BLOCKED_KV_DIM_D = 3;
 
-// TND + isPackedGQA=1 sparseBlockIdx 3D: [N_kv, totalQBlocks, topK]
+// layout_sparse_pattern=KVN_TotalQB_KB: sparseBlockIdx 3D [N_kv, totalQBlocks, topK]
 constexpr int SPARSE_IDX_DIM_KV_HEAD = 0;
 constexpr int SPARSE_IDX_DIM_Q_BLOCK = 1;
 constexpr int SPARSE_IDX_DIM_KV_BLOCK = 2;
 constexpr int SPARSE_IDX_DIM_NUM = 3;
 
-// TND + isPackedGQA=1 sparseBlockCount 2D: [N_kv, totalQBlocks]
+// layout_sparse_pattern=KVN_TotalQB_KB: sparseBlockCount 2D [N_kv, totalQBlocks]
 constexpr int SPARSE_COUNT_DIM_KV_HEAD = 0;
 constexpr int SPARSE_COUNT_DIM_Q_BLOCK = 1;
 constexpr int SPARSE_COUNT_DIM_NUM = 2;
@@ -66,9 +66,9 @@ constexpr int BLOCK_TABLE_DIM_BATCH = 0;
 constexpr int BLOCK_TABLE_DIM_MAX_BLOCKS = 1;
 
 constexpr int ATTR_BLOCK_SHAPE_INDEX = 0;
-constexpr int ATTR_IS_PACKED_GQA_INDEX = 1;
-constexpr int ATTR_Q_INPUT_LAYOUT_INDEX = 2;
-constexpr int ATTR_KV_INPUT_LAYOUT_INDEX = 3;
+constexpr int ATTR_Q_INPUT_LAYOUT_INDEX = 1;
+constexpr int ATTR_KV_INPUT_LAYOUT_INDEX = 2;
+constexpr int ATTR_LAYOUT_SPARSE_PATTERN_INDEX = 3;
 constexpr int ATTR_SCALE_VALUE_INDEX = 4;
 constexpr int ATTR_MASK_TYPE_INDEX = 5;
 constexpr int ATTR_QUANT_TYPE_INDEX = 6;
@@ -77,6 +77,11 @@ constexpr int ATTR_SOFTMAX_PRECISION_INDEX = 8;
 constexpr int ATTR_WIN_LEFT_INDEX = 9;
 constexpr int ATTR_WIN_RIGHT_INDEX = 10;
 constexpr int ATTR_SOFTMAX_LSE_FLAG_INDEX = 11;
+constexpr int ATTR_RESIDUAL_BLOCK_MODE_INDEX = 12;
+constexpr int ATTR_IS_CONSISTENT_TOPK_INDEX = 13;
+
+constexpr int64_t GBSA_RESIDUAL_BLOCK_MODE_NONE = 0;
+constexpr int64_t GBSA_LAYOUT_SPARSE_KVN_TOTALQB_KB = 4;
 
 constexpr uint32_t SOC_VER_950_CODE = 4;
 constexpr uint32_t GBSA_MAX_GROUP_SIZE = 128U;
@@ -193,13 +198,29 @@ ge::graphStatus GBSATiling::ParseCapabilityAttrs(gert::TilingContext *context)
         return ge::GRAPH_FAILED;
     }
 
-    const int64_t *isPackedGqaPtr = attrs->GetInt(ATTR_IS_PACKED_GQA_INDEX);
-    if (isPackedGqaPtr != nullptr) {
-        isPackedGQA_ = *isPackedGqaPtr;
+    const int64_t *layoutSparsePtr = attrs->GetInt(ATTR_LAYOUT_SPARSE_PATTERN_INDEX);
+    if (layoutSparsePtr != nullptr) {
+        layoutSparsePattern_ = *layoutSparsePtr;
     }
-    if (isPackedGQA_ != 1) {
-        OP_LOGE(context->GetNodeName(), "Unsupported isPackedGQA=%ld, only 1 (packed GQA) is supported.", isPackedGQA_);
+    if (layoutSparsePattern_ != GBSA_LAYOUT_SPARSE_KVN_TOTALQB_KB) {
+        OP_LOGE(context->GetNodeName(), "Unsupported layout_sparse_pattern=%ld, only 4 (KVN_TotalQB_KB) is supported.",
+                layoutSparsePattern_);
         return ge::GRAPH_FAILED;
+    }
+
+    const int64_t *residualModePtr = attrs->GetInt(ATTR_RESIDUAL_BLOCK_MODE_INDEX);
+    if (residualModePtr != nullptr) {
+        residualBlockMode_ = *residualModePtr;
+    }
+    if (residualBlockMode_ != GBSA_RESIDUAL_BLOCK_MODE_NONE) {
+        OP_LOGE(context->GetNodeName(), "Unsupported residual_block_mode=%ld, only 0 is supported.",
+                residualBlockMode_);
+        return ge::GRAPH_FAILED;
+    }
+
+    const bool *consistentTopkPtr = attrs->GetBool(ATTR_IS_CONSISTENT_TOPK_INDEX);
+    if (consistentTopkPtr != nullptr) {
+        isConsistentTopk_ = *consistentTopkPtr;
     }
 
     const int64_t *lseFlagPtr = attrs->GetInt(ATTR_SOFTMAX_LSE_FLAG_INDEX);
@@ -433,7 +454,7 @@ ge::graphStatus GBSATiling::ParseQueryKeyShapes(gert::TilingContext *context)
 
 ge::graphStatus GBSATiling::ParseSparseTensors(gert::TilingContext *context)
 {
-    // TND + isPackedGQA=1: sparseBlockIdx 3D [N_kv, totalQBlocks, topK]
+    // layout_sparse_pattern=KVN_TotalQB_KB: sparseBlockIdx 3D [N_kv, totalQBlocks, topK]
     const gert::StorageShape *sparseIdxShape = context->GetInputShape(SPARSE_BLOCK_IDX_INDEX);
     if (sparseIdxShape == nullptr) {
         OP_LOGE(context->GetNodeName(), "sparseBlockIdx shape is nullptr.");
@@ -833,6 +854,8 @@ ge::graphStatus GBSATiling::FillTilingData(gert::TilingContext *context)
     tilingData_->set_fdPartialCapacity(fdPartialCapacity_);
     tilingData_->set_fdPartialLseOffset(fdPartialLseOffset_);
     tilingData_->set_fdPartialOOffset(fdPartialOOffset_);
+    tilingData_->set_residualBlockMode(static_cast<uint32_t>(residualBlockMode_));
+    tilingData_->set_isConsistentTopk(static_cast<uint32_t>(isConsistentTopk_ ? 1 : 0));
 
     return ge::GRAPH_SUCCESS;
 }
