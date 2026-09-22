@@ -145,13 +145,15 @@ public:
             } else {
                 if constexpr (BNBD_FLAG) {
                     // BNBD: token stride within block is embed
-                    kOffset = blockTableId * blockSize * strideKV + nL1Idx * l1NDynamic * embed;
+                    kOffset = static_cast<uint64_t>(blockTableId) * blockSize * strideKV + nL1Idx * l1NDynamic * embed;
                 } else {
-                    kOffset = blockTableId * blockSize * strideKV + nL1Idx * l1NDynamic * strideKV;
+                    kOffset =
+                        static_cast<uint64_t>(blockTableId) * blockSize * strideKV + nL1Idx * l1NDynamic * strideKV;
                 }
             }
         } else {
-            kOffset = nowNIdx * blockSize * strideKV + nL1Idx * l1NDynamic * strideKV;
+            kOffset = static_cast<uint64_t>(nowNIdx) * blockSize * strideKV +
+                      static_cast<uint64_t>(nL1Idx) * l1NDynamic * strideKV;
         }
     }
 

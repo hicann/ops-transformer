@@ -146,7 +146,8 @@ public:
 
     __aicore__ inline void getKVOffset(uint64_t &kOffset, uint32_t nIdx, uint32_t nowNIdx, uint32_t strideKV)
     {
-        kOffset = nIdx * maxKVStackLen * strideKV + nowNIdx * l1NDynamic * strideKV;
+        kOffset = static_cast<uint64_t>(nIdx) * maxKVStackLen * strideKV +
+                  static_cast<uint64_t>(nowNIdx) * l1NDynamic * strideKV;
     }
 
     __aicore__ inline void getKVOffset(AscendC::GlobalTensor<int32_t> &gBlockTable, uint64_t &kOffset, uint32_t nowNIdx,
@@ -166,11 +167,11 @@ public:
         } else {
             if constexpr (std::is_same_v<LayoutB, layout::nZ>) {
                 constexpr uint32_t ELE_NUM_PER_C0 = BYTE_PER_C0 / sizeof(ElementB);
-                kOffset = blockTableId * blockSize * strideKV + startOffset * ELE_NUM_PER_C0;
+                kOffset = static_cast<uint64_t>(blockTableId) * blockSize * strideKV + startOffset * ELE_NUM_PER_C0;
             } else if constexpr (BNBD_FLAG) {
-                kOffset = blockTableId * blockSize * strideKV + startOffset * embed;
+                kOffset = static_cast<uint64_t>(blockTableId) * blockSize * strideKV + startOffset * embed;
             } else {
-                kOffset = blockTableId * blockSize * strideKV + startOffset * strideKV;
+                kOffset = static_cast<uint64_t>(blockTableId) * blockSize * strideKV + startOffset * strideKV;
             }
         }
     }
