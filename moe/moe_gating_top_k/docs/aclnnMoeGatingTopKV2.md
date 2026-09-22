@@ -440,7 +440,7 @@ aclnnStatus aclnnMoeGatingTopKV2(
       <td>计算输入和计算输出是空指针。</td>
     </tr>
     <tr>
-      <td>ACLNN_ERR_PARAM_NULLPTR</td>
+      <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
       <td>输入和输出的数据类型不在支持的范围内。</td>
     </tr>
@@ -452,7 +452,7 @@ aclnnStatus aclnnMoeGatingTopKV2(
       x和biasOptional的shape不匹配。<br />
       k的大小不在1到x_shape[-1] / groupCount * kGroup之间。<br />
       kGroup的大小不在1到groupCount之间。<br />
-      每个group的专家数按32对齐之后<br />
+      每个group的专家数按32对齐之后的总数超过2048。<br />
       计算输入参数的值不满足要求。<br />
       Hash模式下k超过64。<br />
       Hash模式下tid2eid的shape不匹配。<br />

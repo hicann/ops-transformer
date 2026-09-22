@@ -360,7 +360,7 @@ aclnnStatus aclnnMoeGatingTopK(
       <td>计算输入和计算输出是空指针。</td>
     </tr>
     <tr>
-      <td>ACLNN_ERR_PARAM_NULLPTR</td>
+      <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
       <td>输入和输出的数据类型不在支持的范围内。</td>
     </tr>
