@@ -16,6 +16,7 @@
 #include <numeric>
 #include <graph/utils/type_utils.h>
 #include "incre_flash_attention_tiling_base.h"
+#include "../../common/op_host/fia_tiling_schedule_recorder.h"
 #include "incre_flash_attention_tiling_impl.h"
 #include "log/log.h"
 #include "log/error_code.h"
@@ -4365,12 +4366,12 @@ ge::graphStatus IFATiling::DoSubOpTiling(IncreFlashAttentionContext &ifaContext)
     if (RunBigKernelTiling(ifaContext, ifaTilingData) == ge::SUCCESS) {
         context_->SetTilingKey(ifaContext.tilingKey);
         context_->SetBlockDim(ifaContext.numBlocks);
-        context_->SetScheduleMode(BATCH_MODE_SCHEDULE);
+        FiaTilingScheduleRecorder::Set(context_, BATCH_MODE_SCHEDULE);
         IncreFlashAttentionSetTilingData(*context_, ifaTilingData);
         return ge::GRAPH_SUCCESS;
     }
     // 使用SyncAll，需要设置为batchmode模式，所有核同时启动，否则多流方式下执行可能会卡死
-    context_->SetScheduleMode(BATCH_MODE_SCHEDULE);
+    FiaTilingScheduleRecorder::Set(context_, BATCH_MODE_SCHEDULE);
     return ge::GRAPH_FAILED;
 }
 

@@ -110,9 +110,7 @@ protected:
 
     [[nodiscard]] ge::graphStatus SetScheduleMode(ScheduleMode scheduleMode) const
     {
-        // 记录 schedule mode 供 tiling 结果缓存快照使用（thread_local，见 fia_tiling_schedule_recorder.h）
-        FiaTilingScheduleRecorder::Record(static_cast<uint32_t>(scheduleMode));
-        return context_->SetScheduleMode(static_cast<uint32_t>(scheduleMode));
+        return FiaTilingScheduleRecorder::Set(context_, static_cast<uint32_t>(scheduleMode));
     }
 
     template <typename T>
