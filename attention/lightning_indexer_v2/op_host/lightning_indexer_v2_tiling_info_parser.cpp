@@ -26,31 +26,31 @@ constexpr char OP_NAME[] = "LightningIndexerV2";
 ge::graphStatus InitCheckerInfo(gert::TilingContext *context, LIV2TilingInfo &tilingInfo,
                                 lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo &checkerInfo)
 {
-    const char *opName = context->GetNodeName();
-    opName = opName == nullptr ? OP_NAME : opName;
+    const char *liV2OpName = context->GetNodeName();
+    liV2OpName = liV2OpName == nullptr ? OP_NAME : liV2OpName;
     tilingInfo.platformInfo = context->GetPlatformInfo();
     if (tilingInfo.platformInfo == nullptr) {
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "platform_info", "Platform information must be provided");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(liV2OpName, "platform_info", "Platform information must be provided");
         return ge::GRAPH_FAILED;
     }
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo.platformInfo);
     if (ascendcPlatform.GetCoreNumAic() == 0 || ascendcPlatform.GetCoreNumAiv() == 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "core_num", "0",
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(liV2OpName, "core_num", "0",
                                               "AIC and AIV core counts must be greater than 0");
         return ge::GRAPH_FAILED;
     }
     if (context->GetWorkspaceSizes(1) == nullptr || context->GetRawTilingData() == nullptr) {
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "tiling_buffer",
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(liV2OpName, "tiling_buffer",
                                                  "Workspace sizes and raw tiling data must be provided");
         return ge::GRAPH_FAILED;
     }
     if (ascendcPlatform.GetCurNpuArch() != NpuArch::DAV_3510) {
-        OP_LOGE_FOR_INVALID_VALUE(opName, "npu_arch", "non-DAV_3510", "DAV_3510");
+        OP_LOGE_FOR_INVALID_VALUE(liV2OpName, "npu_arch", "non-DAV_3510", "DAV_3510");
         return ge::GRAPH_FAILED;
     }
-    tilingInfo.opName = opName;
+    tilingInfo.opName = liV2OpName;
     tilingInfo.socVersion = ascendcPlatform.GetSocVersion();
-    checkerInfo.opName = opName;
+    checkerInfo.opName = liV2OpName;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -110,7 +110,7 @@ void SetDataLayouts(const lightning_indexer_v2_checker::LightningIndexerV2Checke
     } else {
         tilingInfo.inputQLayout = DataLayout::BSND;
     }
-    if (info.layoutK == lightning_indexer_v2_checker::CheckerLayout::TND) {
+    if (lightning_indexer_v2_checker::CheckerLayout::TND == info.layoutK) {
         tilingInfo.inputKLayout = DataLayout::TND;
     } else if (info.layoutK == lightning_indexer_v2_checker::CheckerLayout::PA_BBND) {
         tilingInfo.inputKLayout = DataLayout::PA_BBND;
@@ -132,9 +132,9 @@ void PopulateTilingInfo(const lightning_indexer_v2_checker::LightningIndexerV2Ch
     tilingInfo.gSize = info.kHeads == 0 ? 0U : static_cast<uint32_t>(info.qHeads / info.kHeads);
     tilingInfo.pageAttentionFlag = info.layoutK == lightning_indexer_v2_checker::CheckerLayout::PA_BBND;
     tilingInfo.blockSize = static_cast<int32_t>(info.blockSize);
-    const gert::Shape *blockShape = info.blockTable.GetShape();
-    if (tilingInfo.pageAttentionFlag && blockShape != nullptr && blockShape->GetDimNum() >= BLOCK_TABLE_RANK) {
-        tilingInfo.maxBlockNumPerBatch = static_cast<uint32_t>(blockShape->GetDim(DIM_IDX_ONE));
+    const gert::Shape *liV2BlockShape = info.blockTable.GetShape();
+    if (tilingInfo.pageAttentionFlag && liV2BlockShape != nullptr && liV2BlockShape->GetDimNum() >= BLOCK_TABLE_RANK) {
+        tilingInfo.maxBlockNumPerBatch = static_cast<uint32_t>(liV2BlockShape->GetDim(DIM_IDX_ONE));
     }
     tilingInfo.inputQType = info.query.desc->GetDataType();
     tilingInfo.inputKType = info.key.desc->GetDataType();
@@ -160,19 +160,19 @@ ge::graphStatus ParseAndCheckLIV2Arch35(gert::TilingContext *context, LIV2Tiling
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(OP_NAME, "context", "Tiling context must not be null");
         return ge::GRAPH_FAILED;
     }
-    lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo checkerInfo;
-    if (InitCheckerInfo(context, tilingInfo, checkerInfo) != ge::GRAPH_SUCCESS) {
+    lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo liV2CheckerInfo;
+    if (InitCheckerInfo(context, tilingInfo, liV2CheckerInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    PopulateCheckerTensors(context, checkerInfo);
-    if (ParseCheckerAttrs(context, checkerInfo) != ge::GRAPH_SUCCESS) {
+    PopulateCheckerTensors(context, liV2CheckerInfo);
+    if (ParseCheckerAttrs(context, liV2CheckerInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const lightning_indexer_v2_checker::LIV2Checker checker(checkerInfo);
+    const lightning_indexer_v2_checker::LIV2Checker checker(liV2CheckerInfo);
     if (checker.Process() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    PopulateTilingInfo(checkerInfo, tilingInfo);
+    PopulateTilingInfo(liV2CheckerInfo, tilingInfo);
     return ge::GRAPH_SUCCESS;
 }
 } // namespace optiling

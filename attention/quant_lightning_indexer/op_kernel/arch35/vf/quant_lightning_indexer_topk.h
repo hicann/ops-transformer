@@ -103,7 +103,7 @@ private:
     LocalTensor<uint32_t> idxLocal3;        // 输入数据第4个8位Buf 256 * 4B
     LocalTensor<uint32_t> nkValueLocal;     // next_k 暂存Buf 64 * 4B
     LocalTensor<uint32_t> tmpIndexLocal;    // 每trunkLen + topK的临时index
-    uint32_t topK = 512;
+    uint32_t topK = 512U;
     uint32_t trunkLen = 8192;
 };
 
@@ -115,10 +115,10 @@ public:
         return liV2TopkCommon::GetGatherTmpBufferSize<uint16_t, liV2TopkCommon::B16_RADIX_BUFFER_NUM>(topK, trunkLen);
     }
 
-    __aicore__ inline void Init(uint32_t topK, uint32_t trunkLen)
+    __aicore__ inline void Init(uint32_t qliTopK, uint32_t qliTrunkLen)
     {
-        this->topK = topK;
-        this->trunkLen = trunkLen;
+        this->topK = qliTopK;
+        this->trunkLen = qliTrunkLen;
     }
 
     __aicore__ inline void InitBuffers(LocalTensor<uint32_t> &sharedTmpBuffer, LocalTensor<uint32_t> &indicesOutLocal)
@@ -179,7 +179,7 @@ private:
     LocalTensor<uint32_t> idxLowLocal;      // 输入数据低8位Buf 256 * 4B
     LocalTensor<uint32_t> nkValueLocal;     // next_k 暂存Buf 64 * 4B
     LocalTensor<uint16_t> tmpIndexLocal;    // 每trunkLen + topK的临时index
-    uint32_t topK = 512;
+    uint32_t topK = 512U;
     uint32_t trunkLen = 16384;
 };
 } // namespace topk

@@ -46,8 +46,8 @@ struct UIntSortConstCtx {
     using UInt = typename Traits::UInt;
     AscendC::Reg::RegTensor<UInt> zeros;
     AscendC::Reg::RegTensor<UInt> allOne;
-    AscendC::Reg::RegTensor<UInt> signMask;
     AscendC::Reg::RegTensor<UInt> nan;
+    AscendC::Reg::RegTensor<UInt> signMask;
 };
 
 template <typename FloatT>
@@ -56,8 +56,8 @@ __simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT> &ctx, 
     using Traits = UIntSortTraits<FloatT>;
     AscendC::Reg::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
     AscendC::Reg::Duplicate(ctx.allOne, Traits::ALL_ONE, maskAll);
-    AscendC::Reg::Duplicate(ctx.signMask, Traits::SIGN_MASK, maskAll);
     AscendC::Reg::Duplicate(ctx.nan, Traits::NAN_MASK, maskAll);
+    AscendC::Reg::Duplicate(ctx.signMask, Traits::SIGN_MASK, maskAll);
 }
 
 template <typename FloatT>
@@ -68,8 +68,8 @@ __simd_callee__ inline void UIntToSortableKey(AscendC::Reg::RegTensor<FloatT> &o
     using Traits = UIntSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
 
-    AscendC::Reg::RegTensor<UInt> regTemp;
     AscendC::Reg::RegTensor<UInt> regMask;
+    AscendC::Reg::RegTensor<UInt> regTemp;
     AscendC::Reg::MaskReg regSelectZero;
     AscendC::Reg::MaskReg regSelectSign;
 

@@ -50,8 +50,8 @@ public:
 
     static constexpr uint32_t MTE2_MTE1_EVENT = EVENT_ID2;
     static constexpr uint32_t MTE1_M_EVENT = EVENT_ID2;
-    static constexpr uint32_t FIX_M_EVENT = EVENT_ID2;
     static constexpr uint32_t M_FIX_EVENT = EVENT_ID3;
+    static constexpr uint32_t FIX_M_EVENT = EVENT_ID2;
 
     static constexpr uint64_t M_BASIC_BLOCK = 256;
     static constexpr uint64_t D_BASIC_BLOCK = 128;
@@ -84,15 +84,15 @@ protected:
     GlobalTensor<K_T> keyGm_;
     GlobalTensor<Q_T> queryGm_;
 
-    TBuf<TPosition::A1> bufQL1_;
-    LocalTensor<Q_T> queryL1_;
     TBuf<TPosition::B1> bufKeyL1_;
     LocalTensor<K_T> keyL1_;
+    TBuf<TPosition::A1> bufQL1_;
+    LocalTensor<Q_T> queryL1_;
 
-    TBuf<TPosition::A2> bufQL0_;
-    LocalTensor<Q_T> queryL0_;
     TBuf<TPosition::B2> bufKeyL0_;
     LocalTensor<K_T> keyL0_;
+    TBuf<TPosition::A2> bufQL0_;
+    LocalTensor<Q_T> queryL0_;
 
     TBuf<TPosition::CO1> bufL0C_;
     LocalTensor<QK_T> cL0_;
@@ -162,7 +162,7 @@ __aicore__ inline void QLIMatmul<QLIT>::ComputeMm1(const QLICommon::RunInfo &run
                                                                       runInfo.loop % 2);
     CrossCoreWaitFlag<QLICommon::ConstInfo::QLI_SYNC_MODE4, PIPE_FIX>(
         QLICommon::ConstInfo::CROSS_VC_EVENT + runInfo.loop % 2 + QLICommon::ConstInfo::AIV0_AIV1_OFFSET);
-    uint64_t s2GmBaseOffset = runInfo.s2Idx * constInfo_.s2BaseSize;
+    uint64_t qliS2GmBaseOffset = runInfo.s2Idx * constInfo_.s2BaseSize;
     uint64_t s1gProcessSize = runInfo.actMBaseSize;
     uint64_t s2ProcessSize = runInfo.actualSingleProcessSInnerSize;
     if (s2BasicBlock_ == 128) {
@@ -171,7 +171,7 @@ __aicore__ inline void QLIMatmul<QLIT>::ComputeMm1(const QLICommon::RunInfo &run
             uint64_t s2L1RealSize =
                 s2GmOffset + s2BasicBlock_ > s2ProcessSize ? s2ProcessSize - s2GmOffset : s2BasicBlock_;
             if (PAGE_ATTENTION) {
-                KeyNd2NzForPA(s2L1RealSize, s2GmBaseOffset + s2GmOffset, runInfo);
+                KeyNd2NzForPA(s2L1RealSize, qliS2GmBaseOffset + s2GmOffset, runInfo);
             } else {
                 KeyNd2Nz(s2L1RealSize, s2GmOffset, runInfo);
             }
@@ -233,27 +233,27 @@ __aicore__ inline void QLIMatmul<QLIT>::ComputeMm1(const QLICommon::RunInfo &run
         }
         for (uint64_t s2GmOffset = 0; s2GmOffset < s2ProcessSize; s2GmOffset += s2BasicBlock_) {
             // 缓存命中不需要进行key的搬运
-            bool keyCacheHit = isKeyCacheValid_ && (s2GmBaseOffset >= keyGmStart_) &&
-                               (s2GmBaseOffset + s2ProcessSize <= keyGmStart_ + keyLoadedSize_);
-            if (!keyCacheHit) {
+            bool qliKeyCacheHit = isKeyCacheValid_ && (qliS2GmBaseOffset >= keyGmStart_) &&
+                                  (qliS2GmBaseOffset + s2ProcessSize <= keyGmStart_ + keyLoadedSize_);
+            if (!qliKeyCacheHit) {
                 WaitFlag<HardEvent::MTE1_MTE2>(KEY_MTE1_MTE2_EVENT + keyL1BufIdx_ % KEY_BUF_NUM);
                 // 缓存未命中，需要从GM搬到L1 min（256, 剩余s2）
-                uint64_t s2TotalRemainNum = runInfo.actS2Size - s2GmBaseOffset;
-                uint64_t s2L1LoadSize = (s2TotalRemainNum < s2BasicBlock_) ? s2TotalRemainNum : s2BasicBlock_;
+                uint64_t s2TotalRemainNum = runInfo.actS2Size - qliS2GmBaseOffset;
+                uint64_t qliS2L1LoadSize = (s2TotalRemainNum < s2BasicBlock_) ? s2TotalRemainNum : s2BasicBlock_;
                 if (PAGE_ATTENTION) {
-                    KeyNd2NzForPA(s2L1LoadSize, s2GmBaseOffset + s2GmOffset, runInfo);
+                    KeyNd2NzForPA(qliS2L1LoadSize, qliS2GmBaseOffset + s2GmOffset, runInfo);
                 } else {
-                    KeyNd2Nz(s2L1LoadSize, s2GmOffset, runInfo);
+                    KeyNd2Nz(qliS2L1LoadSize, s2GmOffset, runInfo);
                 }
 
                 SetFlag<HardEvent::MTE2_MTE1>(MTE2_MTE1_EVENT);
                 WaitFlag<HardEvent::MTE2_MTE1>(MTE2_MTE1_EVENT);
 
                 isKeyCacheValid_ = true;
-                keyGmStart_ = s2GmBaseOffset;
-                keyLoadedSize_ = s2L1LoadSize;
+                keyGmStart_ = qliS2GmBaseOffset;
+                keyLoadedSize_ = qliS2L1LoadSize;
             }
-            uint64_t l1S2Offset = s2GmBaseOffset - keyGmStart_;
+            uint64_t l1S2Offset = qliS2GmBaseOffset - keyGmStart_;
             uint64_t l1TotalSize = keyLoadedSize_;
             // s1gProcessSize当前必定不会超过2倍的s1g basic block
             for (uint64_t s1gGmOffset = 0; s1gGmOffset < s1gProcessSize; s1gGmOffset += constInfo_.mBaseSize) {
@@ -302,8 +302,8 @@ __aicore__ inline void QLIMatmul<QLIT>::ComputeMm1(const QLICommon::RunInfo &run
                     SetFlag<HardEvent::MTE1_MTE2>(QUERY_MTE1_MTE2_EVENT + queryL1Mte1BufIdx_ % QUERY_BUF_NUM);
                 }
             }
-            bool l1FullyUsed = (s2GmBaseOffset + s2ProcessSize >= keyGmStart_ + keyLoadedSize_);
-            if (l1FullyUsed || runInfo.isLastS2InnerLoop) {
+            bool qliL1FullyUsed = (qliS2GmBaseOffset + s2ProcessSize >= keyGmStart_ + keyLoadedSize_);
+            if (qliL1FullyUsed || runInfo.isLastS2InnerLoop) {
                 SetFlag<HardEvent::MTE1_MTE2>(KEY_MTE1_MTE2_EVENT + keyL1BufIdx_ % KEY_BUF_NUM);
                 keyL1BufIdx_++;
                 isKeyCacheValid_ = false;
@@ -321,18 +321,18 @@ template <typename QLIT>
 __aicore__ inline void QLIMatmul<QLIT>::KeyNd2Nz(uint64_t s2L1RealSize, uint64_t s2GmOffset,
                                                  const QLICommon::RunInfo &runInfo)
 {
-    Nd2NzParams nd2nzPara;
-    nd2nzPara.ndNum = 1;
-    nd2nzPara.nValue = s2L1RealSize; // 行数
-    nd2nzPara.dValue = constInfo_.headDim;
-    nd2nzPara.srcDValue = constInfo_.headDim;
-    nd2nzPara.dstNzC0Stride = CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE); // 对齐到16 单位block
-    nd2nzPara.dstNzNStride = 1;
-    nd2nzPara.srcNdMatrixStride = 0;
-    nd2nzPara.dstNzMatrixStride = 0;
+    Nd2NzParams qliNd2nzPara;
+    qliNd2nzPara.ndNum = 1;
+    qliNd2nzPara.nValue = s2L1RealSize; // 行数
+    qliNd2nzPara.dValue = constInfo_.headDim;
+    qliNd2nzPara.srcDValue = constInfo_.headDim;
+    qliNd2nzPara.dstNzC0Stride = CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE); // 对齐到16 单位block
+    qliNd2nzPara.dstNzNStride = 1;
+    qliNd2nzPara.srcNdMatrixStride = 0;
+    qliNd2nzPara.dstNzMatrixStride = 0;
     // 默认一块buf最多放两份
     DataCopy(keyL1_[(keyL1BufIdx_ % KEY_BUF_NUM) * keyBufferOffset_],
-             keyGm_[runInfo.tensorKeyOffset + s2GmOffset * constInfo_.headDim], nd2nzPara);
+             keyGm_[runInfo.tensorKeyOffset + s2GmOffset * constInfo_.headDim], qliNd2nzPara);
 }
 
 // blkNum, blkSize, N2, D
@@ -348,12 +348,13 @@ __aicore__ inline void QLIMatmul<QLIT>::KeyNd2NzForPA(uint64_t s2L1RealSize, uin
             blkTableGm_.GetValue(runInfo.bIdx * constInfo_.maxBlockNumPerBatch + s2BlkId) * constInfo_.keyStride0 +
             s2BlkOffset * constInfo_.headDim;
 
-        uint64_t s2Mte2Size = s2L1RealSize - s2L1Offset;
-        s2Mte2Size = s2BlkOffset + s2Mte2Size >= constInfo_.kCacheBlockSize ? constInfo_.kCacheBlockSize - s2BlkOffset :
-                                                                              s2Mte2Size;
+        uint64_t qliS2Mte2Size = s2L1RealSize - s2L1Offset;
+        qliS2Mte2Size = s2BlkOffset + qliS2Mte2Size >= constInfo_.kCacheBlockSize ?
+                            constInfo_.kCacheBlockSize - s2BlkOffset :
+                            qliS2Mte2Size;
         Nd2NzParams nd2nzPara;
         nd2nzPara.ndNum = 1;
-        nd2nzPara.nValue = s2Mte2Size; // 行数
+        nd2nzPara.nValue = qliS2Mte2Size; // 行数
         nd2nzPara.dValue = constInfo_.headDim;
         nd2nzPara.srcDValue = constInfo_.headDim;
         nd2nzPara.dstNzC0Stride = CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE); // 对齐到16 单位block
@@ -363,7 +364,7 @@ __aicore__ inline void QLIMatmul<QLIT>::KeyNd2NzForPA(uint64_t s2L1RealSize, uin
         DataCopy(keyL1_[(keyL1BufIdx_ % KEY_BUF_NUM) * keyBufferOffset_ + s2L1Offset * FP8_BLOCK_CUBE],
                  keyGm_[keyGmOffset], nd2nzPara);
 
-        s2L1Offset += s2Mte2Size;
+        s2L1Offset += qliS2Mte2Size;
     }
 }
 
@@ -448,19 +449,19 @@ __aicore__ inline void QLIMatmul<QLIT>::Fixp(uint64_t s1gGmOffset, uint64_t s2Gm
 
     // s1gL0RealSize：2*gSize(128)对齐, 最大256
     // s2L0RealSize <= S2_BASIC_BLOCK_L0, 未约束
-    uint32_t nSize = (s2L0RealSize + 7) >> 3 << 3; // 32B对齐
-    uint32_t mSize = (s1gL0RealSize + 1) >> 1 << 1;
+    uint32_t qliNSize = (s2L0RealSize + 7) >> 3 << 3; // 32B对齐
+    uint32_t qliMSize = (s1gL0RealSize + 1) >> 1 << 1;
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
     // 固定参数
-    fixpipeParams.mSize = mSize;
-    fixpipeParams.srcStride = mSize;                                // 已16对齐
+    fixpipeParams.mSize = qliMSize;
+    fixpipeParams.srcStride = qliMSize;                             // 已16对齐
     fixpipeParams.dstStride = UB_BANK_DEPTH_STRIDE / sizeof(float); // 落到同一个bank
     fixpipeParams.dualDstCtl = 1; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
 
     // nSize已保证N方向32B对齐
-    if (nSize <= (256 / sizeof(float))) {
+    if (qliNSize <= (256 / sizeof(float))) {
         // N方向小于一个bank(256B), 只需搬一个ND块, 且不用补齐
-        fixpipeParams.nSize = nSize;
+        fixpipeParams.nSize = qliNSize;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;

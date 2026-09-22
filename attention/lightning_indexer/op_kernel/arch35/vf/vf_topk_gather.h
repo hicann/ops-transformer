@@ -32,8 +32,8 @@ __simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf_
     Reg::Duplicate(cout1, 0);
 
     Reg::RegTensor<uint32_t> cout0U32Even;
-    Reg::RegTensor<uint32_t> cout0U32Odd;
     Reg::RegTensor<uint32_t> cout1U32Even;
+    Reg::RegTensor<uint32_t> cout0U32Odd;
     Reg::RegTensor<uint32_t> cout1U32Odd;
 
     // 32bit 高16bit
@@ -144,14 +144,11 @@ __simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf
     Reg::Duplicate(cout1, 0);
 
     Reg::RegTensor<uint32_t> cout0U32Even;
-    Reg::RegTensor<uint32_t> cout0U32Odd;
     Reg::RegTensor<uint32_t> cout1U32Even;
+    Reg::RegTensor<uint32_t> cout0U32Odd;
     Reg::RegTensor<uint32_t> cout1U32Odd;
 
     Reg::RegTensor<uint32_t> idx0;
-    // 0x000000fc -> 0xfcfcfcfc
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(idx0, idx0Buf);
-
     Reg::RegTensor<uint32_t> vreg0U16;
     Reg::RegTensor<uint32_t> vreg1U16;
     Reg::RegTensor<uint32_t> vreg2U16;
@@ -161,6 +158,9 @@ __simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t *histogramsBuf, __ubuf
     Reg::RegTensor<uint8_t> vreg1;
     Reg::RegTensor<uint8_t> vreg2;
     Reg::RegTensor<uint8_t> vreg3;
+
+    // 0x000000fc -> 0xfcfcfcfc
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(idx0, idx0Buf);
 
     static constexpr Reg::CastTrait CAST_TRAIT_UINT16_TOUINT32_EVEN = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
                                                                        Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
@@ -490,9 +490,8 @@ __simd_vf__ void FindIdxGTOutputVFImpl(__ubuf__ uint32_t *outputIdxBuf, __ubuf__
     Reg::UnalignRegForStore alignIdx;
 
     Reg::RegTensor<uint32_t> kthValue;
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(kthValue, kValue);
-
     Reg::RegTensor<uint32_t> vregInput;
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(kthValue, kValue);
 
     for (uint16_t i = 0; i < (uint16_t)(vfLoop); ++i) {
         Reg::RegTensor<int32_t> idxC;
@@ -523,8 +522,8 @@ __simd_vf__ void FindIdxEQOutputVFImpl(__ubuf__ uint32_t *outputIdxBuf, __ubuf__
     Reg::RegTensor<uint32_t> kthValue;
     Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(kthValue, kValue);
 
-    Reg::RegTensor<uint32_t> vregInput;
     Reg::RegTensor<int32_t> idxC;
+    Reg::RegTensor<uint32_t> vregInput;
     Reg::RegTensor<uint32_t> sqzIdxOut;
 
     for (uint16_t i = 0; i < (uint16_t)(vfLoop); ++i) {
@@ -625,9 +624,9 @@ __aicore__ inline void LiTopKVF(const LocalTensor<uint32_t> &tmpIdxLocal, const 
                                 const LocalTensor<uint32_t> &idx3Local, const LocalTensor<uint32_t> &nkValueLocal,
                                 uint32_t topK, uint32_t validLen)
 {
+    __ubuf__ uint32_t *inputValueBuf = (__ubuf__ uint32_t *)inputValueLocal.GetPhyAddr();
     __ubuf__ uint32_t *tmpIdxBuf = (__ubuf__ uint32_t *)tmpIdxLocal.GetPhyAddr();
     __ubuf__ uint32_t *outputValueBuf = (__ubuf__ uint32_t *)outputValueLocal.GetPhyAddr();
-    __ubuf__ uint32_t *inputValueBuf = (__ubuf__ uint32_t *)inputValueLocal.GetPhyAddr();
     __ubuf__ uint32_t *histogramsBuf = (__ubuf__ uint32_t *)histogramsLocal.GetPhyAddr();
     __ubuf__ uint32_t *idx0Buf = (__ubuf__ uint32_t *)idx0Local.GetPhyAddr();
     __ubuf__ uint32_t *idx1Buf = (__ubuf__ uint32_t *)idx1Local.GetPhyAddr();

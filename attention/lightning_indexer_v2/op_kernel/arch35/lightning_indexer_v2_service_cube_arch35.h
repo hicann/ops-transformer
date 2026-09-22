@@ -45,9 +45,9 @@ public:
     static constexpr uint64_t QUERY_BUF_NUM = 2;
     static constexpr uint64_t L0_BUF_NUM = 2;
 
-    static constexpr uint32_t KEY_MTE1_MTE2_EVENT = EVENT_ID2;
     // KEY_MTE1_MTE2_EVENT + KEY_BUF_NUM;
     static constexpr uint32_t QUERY_MTE1_MTE2_EVENT = EVENT_ID5;
+    static constexpr uint32_t KEY_MTE1_MTE2_EVENT = EVENT_ID2;
     static constexpr uint32_t M_MTE1_EVENT = EVENT_ID3;
 
     static constexpr uint32_t MTE2_MTE1_EVENT = EVENT_ID2;
@@ -198,20 +198,20 @@ __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::ComputeMm1(const LIV2
                     s2L1Offset + S2_BASIC_BLOCK_L0 > s2L1RealSize ? s2L1RealSize - s2L1Offset : S2_BASIC_BLOCK_L0;
                 for (uint64_t s1gL1Offset = 0; s1gL1Offset < s1gL1SizeAlign; s1gL1Offset += M_BASIC_BLOCK) {
                     WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + l0BufIdx_ % L0_BUF_NUM);
-                    uint64_t s1gL0RealSize =
+                    uint64_t liV2S1gL0RealSize =
                         s1gL1Offset + M_BASIC_BLOCK > s1gL1SizeAlign ? s1gL1SizeAlign - s1gL1Offset : M_BASIC_BLOCK;
-                    LoadQueryToL0a(s1gGmOffset, s1gL1Offset, s1gL1SizeAlign, s1gL0RealSize, runInfo);
+                    LoadQueryToL0a(s1gGmOffset, s1gL1Offset, s1gL1SizeAlign, liV2S1gL0RealSize, runInfo);
                     LoadKeyToL0b(s2L1Offset, s2L1RealSize, s2L0RealSize, runInfo);
 
                     SetFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
                     WaitFlag<HardEvent::MTE1_M>(MTE1_M_EVENT);
 
                     WaitFlag<HardEvent::FIX_M>(FIX_M_EVENT + l0BufIdx_ % L0_BUF_NUM);
-                    ComputeL0c(s1gL0RealSize, s2L0RealSize, runInfo);
+                    ComputeL0c(liV2S1gL0RealSize, s2L0RealSize, runInfo);
 
                     SetFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + l0BufIdx_ % L0_BUF_NUM);
 
-                    Fixp(s1gGmOffset + s1gL1Offset, s2GmOffset + s2L1Offset, s1gL0RealSize, s2L0RealSize,
+                    Fixp(s1gGmOffset + s1gL1Offset, s2GmOffset + s2L1Offset, liV2S1gL0RealSize, s2L0RealSize,
                          s1gL1SizeAlign2G, runInfo);
                     SetFlag<HardEvent::FIX_M>(FIX_M_EVENT + l0BufIdx_ % L0_BUF_NUM);
                     l0BufIdx_++;
@@ -362,11 +362,11 @@ __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::Fixp(uint64_t s1gGmOf
 {
     SetFlag<HardEvent::M_FIX>(M_FIX_EVENT + l0BufIdx_ % L0_BUF_NUM);
     WaitFlag<HardEvent::M_FIX>(M_FIX_EVENT + l0BufIdx_ % L0_BUF_NUM);
-    uint32_t nSize = (s2L0RealSize + 7) >> 3 << 3;
+    uint32_t liV2NSize = (s2L0RealSize + 7) >> 3 << 3;
     // L0C->UB
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
     // L0C上的bmm1结果矩阵N方向的size大小；同mmadParams.n；8个元素（32B)对齐
-    fixpipeParams.nSize = nSize;
+    fixpipeParams.nSize = liV2NSize;
     // 有效数据不足16行，只需输出部分行即可;L0C上的bmm1结果矩阵M方向的size大小必须是偶数
     fixpipeParams.mSize = s1gSizeAlign2G;
     // L0C上matmul结果相邻连续数据片断间隔（前面一个数据块的头与后面数据块的头的间隔），单位为16 *sizeof(T)
@@ -376,9 +376,9 @@ __aicore__ inline void LightningIndexerV2ServiceCube<LIT>::Fixp(uint64_t s1gGmOf
     fixpipeParams.dstStride = UB_BANK_DEPTH_STRIDE / sizeof(QK_T);
     // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
     fixpipeParams.dualDstCtl = 1;
-    if (nSize <= (256 / sizeof(float))) {
+    if (liV2NSize <= (256 / sizeof(float))) {
         // N方向小于一个bank(256B), 只需搬一个ND块, 且不用补齐
-        fixpipeParams.nSize = nSize;
+        fixpipeParams.nSize = liV2NSize;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;

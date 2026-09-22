@@ -31,22 +31,22 @@ static const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
     {ge::DT_INT8, "DT_INT8"},                     // int8 type
     {ge::DT_INT16, "DT_INT16"},                   // int16 type
     {ge::DT_UINT16, "DT_UINT16"},                 // uint16 type
-    {ge::DT_UINT8, "DT_UINT8"},                   // uint8 type
     {ge::DT_INT32, "DT_INT32"},                   // uint32 type
+    {ge::DT_UINT8, "DT_UINT8"},                   // uint8 type
     {ge::DT_INT64, "DT_INT64"},                   // int64 type
     {ge::DT_UINT32, "DT_UINT32"},                 // unsigned int32
     {ge::DT_UINT64, "DT_UINT64"},                 // unsigned int64
     {ge::DT_BOOL, "DT_BOOL"},                     // bool type
     {ge::DT_DOUBLE, "DT_DOUBLE"},                 // double type
     {ge::DT_DUAL, "DT_DUAL"},                     // dual output type
-    {ge::DT_DUAL_SUB_INT8, "DT_DUAL_SUB_INT8"},   // dual output int8 type
     {ge::DT_DUAL_SUB_UINT8, "DT_DUAL_SUB_UINT8"}, // dual output uint8 type
+    {ge::DT_DUAL_SUB_INT8, "DT_DUAL_SUB_INT8"},   // dual output int8 type
     {ge::DT_COMPLEX32, "DT_COMPLEX32"},           // complex32 type
     {ge::DT_COMPLEX64, "DT_COMPLEX64"},           // complex64 type
     {ge::DT_COMPLEX128, "DT_COMPLEX128"},         // complex128 type
     {ge::DT_QINT8, "DT_QINT8"},                   // qint8 type
-    {ge::DT_QINT16, "DT_QINT16"},                 // qint16 type
     {ge::DT_QINT32, "DT_QINT32"},                 // qint32 type
+    {ge::DT_QINT16, "DT_QINT16"},                 // qint16 type
     {ge::DT_QUINT8, "DT_QUINT8"},                 // quint8 type
     {ge::DT_QUINT16, "DT_QUINT16"},               // quint16 type
     {ge::DT_RESOURCE, "DT_RESOURCE"},             // resource type
@@ -74,12 +74,12 @@ std::string LIV2DataTypeToSerialString(ge::DataType type)
 static std::vector<int64_t> ToVector(const gert::Shape &shape)
 {
     size_t shapeSize = shape.GetDimNum();
-    std::vector<int64_t> shapeVec(shapeSize, 0);
+    std::vector<int64_t> liV2ShapeVec(shapeSize, 0);
 
     for (size_t i = 0; i < shapeSize; i++) {
-        shapeVec[i] = shape.GetDim(i);
+        liV2ShapeVec[i] = shape.GetDim(i);
     }
-    return shapeVec;
+    return liV2ShapeVec;
 }
 
 static std::string ToStringRaw(const gert::Shape &shape)
@@ -87,8 +87,8 @@ static std::string ToStringRaw(const gert::Shape &shape)
     std::ostringstream oss;
     auto v = ToVector(shape);
     if (v.size() > 0) {
-        for (size_t i = 0; i < v.size() - 1; ++i) {
-            oss << v[i] << ", ";
+        for (size_t liV2Idx = 0; liV2Idx < v.size() - 1; ++liV2Idx) {
+            oss << v[liV2Idx] << ", ";
         }
         oss << v[v.size() - 1];
     }
@@ -172,13 +172,13 @@ ge::graphStatus LIV2InfoParser::GetNpuInfo()
     platformInfo_ = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfo_ == nullptr, OP_LOGE(opName_, "GetPlatformInfo is nullptr."), return ge::GRAPH_FAILED);
 
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo_);
-    uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
-    uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
+    auto liV2AscendcPlatform = platform_ascendc::PlatformAscendC(platformInfo_);
+    uint32_t aivNum = liV2AscendcPlatform.GetCoreNumAiv();
+    uint32_t aicNum = liV2AscendcPlatform.GetCoreNumAic();
     OP_CHECK_IF(aicNum == 0 || aivNum == 0, OP_LOGE(opName_, "num of core obtained is 0."), return GRAPH_FAILED);
 
-    socVersion_ = ascendcPlatform.GetSocVersion();
-    npuArch_ = ascendcPlatform.GetCurNpuArch();
+    socVersion_ = liV2AscendcPlatform.GetSocVersion();
+    npuArch_ = liV2AscendcPlatform.GetCurNpuArch();
     if ((npuArch_ != NpuArch::DAV_2201) && (npuArch_ != NpuArch::DAV_3510)) {
         OP_LOGE(opName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
@@ -204,8 +204,8 @@ void LIV2InfoParser::GetOptionalInputParaInfo()
     opParamInfo_.sequsedK.desc = context_->GetOptionalInputDesc(SEQUSED_K_INDEX);
     opParamInfo_.cmpResidualK.tensor = context_->GetOptionalInputTensor(CMP_RESIDUAL_K_INDEX);
     opParamInfo_.cmpResidualK.desc = context_->GetOptionalInputDesc(CMP_RESIDUAL_K_INDEX);
-    opParamInfo_.blockTable.tensor = context_->GetOptionalInputTensor(BLOCK_TABLE_INDEX);
     opParamInfo_.blockTable.desc = context_->GetOptionalInputDesc(BLOCK_TABLE_INDEX);
+    opParamInfo_.blockTable.tensor = context_->GetOptionalInputTensor(BLOCK_TABLE_INDEX);
     opParamInfo_.outputIdxOffset.tensor = context_->GetOptionalInputTensor(OUTPUT_IDX_OFFSET_INDEX);
     opParamInfo_.outputIdxOffset.desc = context_->GetOptionalInputDesc(OUTPUT_IDX_OFFSET_INDEX);
     opParamInfo_.metadata.tensor = context_->GetOptionalInputTensor(METADATA_INDEX);
@@ -689,8 +689,9 @@ ge::graphStatus LIV2InfoParser::CheckKeyContiguous() const
         } else if (kLayout_ == DataLayout::TND) {
             expectedStrides = {shape.GetDim(1) * shape.GetDim(2), shape.GetDim(2), 1};
         }
-        for (size_t i = checkStartIdx; i < expectedStrides.size(); ++i) {
-            if (i < keyStridesVec_.size() && keyStridesVec_[i] != expectedStrides[i]) {
+        for (size_t liV2StrideIdx = checkStartIdx; liV2StrideIdx < expectedStrides.size(); ++liV2StrideIdx) {
+            if (liV2StrideIdx < keyStridesVec_.size() &&
+                keyStridesVec_[liV2StrideIdx] != expectedStrides[liV2StrideIdx]) {
                 keyNonContiguous = true;
                 break;
             }
@@ -797,22 +798,22 @@ ge::graphStatus LIV2InfoParser::GetBatchSize()
 ge::graphStatus LIV2InfoParser::GetHeadDim()
 {
     // 以query的D维度为基准
-    uint32_t dIndex = DIM_IDX_TWO;
+    uint32_t liV2DIndex = DIM_IDX_TWO;
     // 根据layout确定D维度在shape中的位置
     switch (qLayout_) {
         case DataLayout::TND:
             // TND格式: [Total, N, D] -> D是第2维(索引2)
-            dIndex = DIM_IDX_TWO;
+            liV2DIndex = DIM_IDX_TWO;
             break;
         case DataLayout::BSND:
             // BSND格式: [Batch, SeqLen, N, D] -> D是第3维(索引3)
-            dIndex = DIM_IDX_THREE;
+            liV2DIndex = DIM_IDX_THREE;
             break;
         default:
             OP_LOGE(opName_, "unsupported layout for getting head dim.");
             return ge::GRAPH_FAILED;
     }
-    headDim_ = opParamInfo_.query.shape->GetStorageShape().GetDim(dIndex);
+    headDim_ = opParamInfo_.query.shape->GetStorageShape().GetDim(liV2DIndex);
     OP_CHECK_IF(
         headDim_ != HEAD_DIM_LIMIT,
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "q", ToStringRaw(opParamInfo_.query.shape->GetStorageShape()),
@@ -1023,7 +1024,7 @@ ge::graphStatus LIV2InfoParser::ValidateInputShapesMatch()
     act_seq_q [BatchSize] 可选
     out [BatchSize,S1,N2,topk]
     */
-    uint32_t queryWeightsN1Dim = 1;
+    uint32_t liV2QueryWeightsN1Dim = 1;
     uint32_t outN2Dim = 1;
     if (qLayout_ == DataLayout::TND) {
         if (ValidateInputShapesMatchQtnd() != ge::GRAPH_SUCCESS) {
@@ -1033,11 +1034,11 @@ ge::graphStatus LIV2InfoParser::ValidateInputShapesMatch()
         if (ValidateInputShapesMatchQbsnd() != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
-        queryWeightsN1Dim = DIM_IDX_TWO;
+        liV2QueryWeightsN1Dim = DIM_IDX_TWO;
         outN2Dim = DIM_IDX_TWO;
     }
     // -----------------------check N1-------------------
-    OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(queryWeightsN1Dim) != n1Size_),
+    OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(liV2QueryWeightsN1Dim) != n1Size_),
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                     opName_, "q and w",
                     Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
@@ -1228,8 +1229,8 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo *tilingInfo)
         workspaceSize += V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_DECODE_PARAM_NUM * V1_DECODE_PARAM_ELEM_SIZE * aicNum;
     }
 
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
-    workSpaces[0] = workspaceSize;
+    size_t *liV2WorkSpaces = context_->GetWorkspaceSizes(1);
+    liV2WorkSpaces[0] = workspaceSize;
 
     // -------------set tilingdata-----------------
     tilingData_.set_bSize(tilingInfo->bSize);

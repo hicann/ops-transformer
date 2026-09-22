@@ -131,8 +131,8 @@ protected:
     __aicore__ inline uint32_t GetS2BaseBlockNumOnMask(uint32_t s1gIdx, uint32_t actS1Size, uint32_t actS2SizeOrig);
     // ================================Process functions================================
     __aicore__ inline void ProcessMain();
-    __aicore__ inline void ProcessBaseBlock(uint32_t loop, uint64_t s2LoopIdx, QLICommon::RunInfo runInfo,
-                                            uint32_t qScaleLoop, uint32_t kScaleLoop);
+    __aicore__ inline void ProcessBaseBlock(uint32_t qliLoop, uint64_t s2LoopIdx, QLICommon::RunInfo qliRunInfo,
+                                            uint32_t qliQScaleLoop, uint32_t qliKScaleLoop);
     __aicore__ inline void ProcessInvalid();
     // ================================Params Calc=====================================
     __aicore__ inline void CalcGS1LoopParams(uint32_t bN2Idx);
@@ -231,7 +231,7 @@ __aicore__ inline uint32_t QuantLightningIndexerKernel<QLIT>::GetS2BaseBlockNumO
 template <typename QLIT>
 __aicore__ inline uint32_t QuantLightningIndexerKernel<QLIT>::GetTotalBaseBlockNum()
 {
-    uint32_t totalBlockNum = 0;
+    uint32_t qliTotalBlockNum = 0;
     uint32_t s1GBaseNum, s2BaseNum;
     uint32_t actS1Size, actS2Size, actS2SizeOrig;
     for (uint32_t bIdx = 0; bIdx < constInfo.batchSize; bIdx++) {
@@ -239,16 +239,16 @@ __aicore__ inline uint32_t QuantLightningIndexerKernel<QLIT>::GetTotalBaseBlockN
         s1GBaseNum = CeilDiv(actS1Size, constInfo.s1BaseSize);
         if (!constInfo.attenMaskFlag) {
             s2BaseNum = constInfo.isLDOpen ? CeilDiv(actS2Size, constInfo.s2BaseSize) : (actS2Size > 0 ? 1 : 0);
-            totalBlockNum += s1GBaseNum * s2BaseNum * constInfo.kHeadNum;
+            qliTotalBlockNum += s1GBaseNum * s2BaseNum * constInfo.kHeadNum;
             continue;
         }
-        for (uint32_t s1gIdx = 0; s1gIdx < s1GBaseNum; s1gIdx++) {
+        for (uint32_t s1gIdx = 0; s1gIdx < s1GBaseNum; ++s1gIdx) {
             s2BaseNum = constInfo.isLDOpen ? GetS2BaseBlockNumOnMask(s1gIdx, actS1Size, actS2SizeOrig) :
                                              (actS2Size > 0 ? 1 : 0);
-            totalBlockNum += s2BaseNum * constInfo.kHeadNum;
+            qliTotalBlockNum += s2BaseNum * constInfo.kHeadNum;
         }
     }
-    return totalBlockNum;
+    return qliTotalBlockNum;
 }
 
 // 多核版本，双闭区间。基本原则：计算每个核最少处理的块数, 剩余的部分前面的核每个核多处理一块
@@ -259,9 +259,9 @@ __aicore__ void inline QuantLightningIndexerKernel<QLIT>::SplitCore(uint32_t cur
     uint32_t totalBlockNum = GetTotalBaseBlockNum();
     uint32_t minBlockPerCore = totalBlockNum / coreNum;
     uint32_t deal1MoreBlockCoreNum = totalBlockNum % coreNum;
-    uint32_t lastGS1RemainBlockCnt = 0;
+    uint32_t qliLastGS1RemainBlockCnt = 0;
     uint32_t coreIdx = 0;
-    uint32_t coreDealBlockCnt = coreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
+    uint32_t qliCoreDealBlockCnt = coreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
     coreNum = minBlockPerCore == 0 ? deal1MoreBlockCoreNum : coreNum;
     if (curCoreIdx < coreNum) {
         splitCoreInfo.isCoreEnable = true;
@@ -270,7 +270,7 @@ __aicore__ void inline QuantLightningIndexerKernel<QLIT>::SplitCore(uint32_t cur
         return;
     }
 
-    bool findLastCoreEnd = true;
+    bool qliFindLastCoreEnd = true;
     uint32_t s1GBaseNum, s2BaseNum, s2Loop;
     uint32_t actS1Size, actS2Size, actS2SizeOrig;
     for (uint32_t bN2Idx = 0; bN2Idx < constInfo.batchSize * constInfo.kHeadNum; bN2Idx++) {
@@ -281,37 +281,37 @@ __aicore__ void inline QuantLightningIndexerKernel<QLIT>::SplitCore(uint32_t cur
             s2BaseNum = CeilDiv(actS2Size, constInfo.s2BaseSize);
         }
         if constexpr (Q_LAYOUT_T == LI_LAYOUT::BSND) {
-            if (findLastCoreEnd && (s1GBaseNum == 0U || s2BaseNum == 0U)) {
+            if (qliFindLastCoreEnd && (s1GBaseNum == 0U || s2BaseNum == 0U)) {
                 info.bN2Start = bN2Idx;
                 info.s2Start = 0;
                 info.gS1Start = 0;
-                findLastCoreEnd = false;
+                qliFindLastCoreEnd = false;
             }
         }
         for (uint32_t gS1Idx = 0; gS1Idx < s1GBaseNum; gS1Idx++) {
             if (constInfo.attenMaskFlag) {
                 s2BaseNum = GetS2BaseBlockNumOnMask(gS1Idx, actS1Size, actS2SizeOrig);
             }
-            if (findLastCoreEnd && s2BaseNum == 0U) {
+            if (qliFindLastCoreEnd && s2BaseNum == 0U) {
                 info.gS1Start = gS1Idx;
                 info.bN2Start = bN2Idx;
                 info.s2Start = 0;
-                findLastCoreEnd = false;
+                qliFindLastCoreEnd = false;
             }
             s2Loop = constInfo.isLDOpen ? s2BaseNum : (actS2Size > 0 ? 1 : 0);
             for (uint32_t s2Idx = 0; s2Idx < s2Loop;) {
-                if (findLastCoreEnd) {
+                if (qliFindLastCoreEnd) {
                     info.bN2Start = bN2Idx;
                     info.s2Start = s2Idx;
                     info.gS1Start = gS1Idx;
-                    findLastCoreEnd = false;
+                    qliFindLastCoreEnd = false;
                 }
-                uint32_t s2RemainBaseNum = s2Loop - s2Idx;
-                if (lastGS1RemainBlockCnt + s2RemainBaseNum >= coreDealBlockCnt) {
+                uint32_t qliS2RemainBaseNum = s2Loop - s2Idx;
+                if (qliLastGS1RemainBlockCnt + qliS2RemainBaseNum >= qliCoreDealBlockCnt) {
                     info.bN2End = bN2Idx;
                     info.gS1End = gS1Idx;
                     info.s2End =
-                        constInfo.isLDOpen ? s2Idx + coreDealBlockCnt - lastGS1RemainBlockCnt - 1 : s2BaseNum - 1;
+                        constInfo.isLDOpen ? s2Idx + qliCoreDealBlockCnt - qliLastGS1RemainBlockCnt - 1 : s2BaseNum - 1;
 
                     if (coreIdx == curCoreIdx) {
                         // S2被切N核，那么只有第一个核需要处理LD，其他核不用
@@ -326,13 +326,13 @@ __aicore__ void inline QuantLightningIndexerKernel<QLIT>::SplitCore(uint32_t cur
                         }
                         return;
                     }
-                    findLastCoreEnd = true;
+                    qliFindLastCoreEnd = true;
                     coreIdx++;
                     s2Idx = info.s2End + 1;
-                    lastGS1RemainBlockCnt = 0;
-                    coreDealBlockCnt = coreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
+                    qliLastGS1RemainBlockCnt = 0;
+                    qliCoreDealBlockCnt = coreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
                 } else {
-                    lastGS1RemainBlockCnt += s2RemainBaseNum;
+                    qliLastGS1RemainBlockCnt += qliS2RemainBaseNum;
                     break;
                 }
             }
@@ -533,8 +533,8 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::ProcessMain()
     }
 
     QLICommon::RunInfo runInfo;
-    uint32_t gloop = 0;
-    uint32_t qScaleLoop = 0;
+    uint32_t qliGLoop = 0;
+    uint32_t qScaleLoop = 0U;
     for (uint32_t bN2LoopIdx = splitCoreInfo.bN2Start; bN2LoopIdx <= splitCoreInfo.bN2End; bN2LoopIdx++) {
         CalcGS1LoopParams(bN2LoopIdx);
         if (tempLoopInfo.curActSeqLenIsZero) {
@@ -548,11 +548,11 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::ProcessMain()
                 if ((s2LoopIdx - splitCoreInfo.s2Start) % 16 == 0) {
                     ++kScaleLoop;
                 }
-                ProcessBaseBlock(gloop, s2LoopIdx, runInfo, qScaleLoop, kScaleLoop);
-                ++gloop;
+                ProcessBaseBlock(qliGLoop, s2LoopIdx, runInfo, qScaleLoop, kScaleLoop);
+                ++qliGLoop;
             }
             ++qScaleLoop;
-            splitCoreInfo.s2Start = 0;
+            splitCoreInfo.s2Start = 0U;
         }
         if (tempLoopInfo.needDealActS1LessThanS1) {
             DealActSeqLenIsZero(tempLoopInfo.bIdx, tempLoopInfo.n2Idx, tempLoopInfo.actS1Size);
@@ -570,17 +570,18 @@ __aicore__ inline void QuantLightningIndexerKernel<QLIT>::ProcessMain()
 }
 
 template <typename QLIT>
-__aicore__ inline void QuantLightningIndexerKernel<QLIT>::ProcessBaseBlock(uint32_t loop, uint64_t s2LoopIdx,
-                                                                           QLICommon::RunInfo runInfo,
-                                                                           uint32_t qScaleLoop, uint32_t kScaleLoop)
+__aicore__ inline void QuantLightningIndexerKernel<QLIT>::ProcessBaseBlock(uint32_t qliLoop, uint64_t s2LoopIdx,
+                                                                           QLICommon::RunInfo qliRunInfo,
+                                                                           uint32_t qliQScaleLoop,
+                                                                           uint32_t qliKScaleLoop)
 {
-    CalcRunInfo(loop, s2LoopIdx, runInfo, qScaleLoop, kScaleLoop);
+    CalcRunInfo(qliLoop, s2LoopIdx, qliRunInfo, qliQScaleLoop, qliKScaleLoop);
     if ASCEND_IS_AIC {
-        matmulService.ComputeMm1(runInfo);
+        matmulService.ComputeMm1(qliRunInfo);
     } else {
-        vectorService.ProcessVec1(runInfo);
-        if (runInfo.isLastS2InnerLoop) { // 本核s2last
-            vectorService.ProcessTopK(runInfo);
+        vectorService.ProcessVec1(qliRunInfo);
+        if (qliRunInfo.isLastS2InnerLoop) { // 本核s2last
+            vectorService.ProcessTopK(qliRunInfo);
         }
     }
 }

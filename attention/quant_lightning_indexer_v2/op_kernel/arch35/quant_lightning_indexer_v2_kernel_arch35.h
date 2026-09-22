@@ -312,7 +312,7 @@ template <typename QLIV2T>
 __aicore__ inline void QLIV2Preload<QLIV2T>::SplitCoreByAICPU(uint32_t cubeCoreIdx, uint32_t vecCoreIdx,
                                                               GlobalTensor<uint32_t> &metadataGm)
 {
-    uint32_t liCoreEnableIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_CORE_ENABLE_INDEX);
+    uint32_t qliV2CoreEnableIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_CORE_ENABLE_INDEX);
     uint32_t bN2StartIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_BN2_START_INDEX);
     uint32_t mStartIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_M_START_INDEX);
     uint32_t s2StartIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_S2_START_INDEX);
@@ -320,11 +320,11 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::SplitCoreByAICPU(uint32_t cubeCoreI
     uint32_t mEndIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_M_END_INDEX);
     uint32_t s2EndIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_S2_END_INDEX);
 
-    uint32_t liZeroCoreEnableIndex = GetAttrAbsIndex(0, QLI_V2_CORE_ENABLE_INDEX);
-    if (metadataGm.GetValue(liZeroCoreEnableIndex) == 0) {
+    uint32_t qliV2ZeroCoreEnableIndex = GetAttrAbsIndex(0, QLI_V2_CORE_ENABLE_INDEX);
+    if (metadataGm.GetValue(qliV2ZeroCoreEnableIndex) == 0) {
         isUsedCoreEqZero = true;
     }
-    if (metadataGm.GetValue(liCoreEnableIndex) == 0) {
+    if (metadataGm.GetValue(qliV2CoreEnableIndex) == 0) {
         splitCoreInfo.isCoreEnable = false;
         return;
     } else {

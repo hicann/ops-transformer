@@ -33,8 +33,8 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
     {ge::DT_INT16, "DT_INT16"},                   // int16 type
     {ge::DT_UINT16, "DT_UINT16"},                 // uint16 type
     {ge::DT_UINT8, "DT_UINT8"},                   // uint8 type
-    {ge::DT_INT32, "DT_INT32"},                   // uint32 type
     {ge::DT_INT64, "DT_INT64"},                   // int64 type
+    {ge::DT_INT32, "DT_INT32"},                   // uint32 type
     {ge::DT_UINT32, "DT_UINT32"},                 // unsigned int32
     {ge::DT_UINT64, "DT_UINT64"},                 // unsigned int64
     {ge::DT_BOOL, "DT_BOOL"},                     // bool type
@@ -43,15 +43,15 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
     {ge::DT_DUAL_SUB_INT8, "DT_DUAL_SUB_INT8"},   // dual output int8 type
     {ge::DT_DUAL_SUB_UINT8, "DT_DUAL_SUB_UINT8"}, // dual output uint8 type
     {ge::DT_COMPLEX32, "DT_COMPLEX32"},           // complex32 type
-    {ge::DT_COMPLEX64, "DT_COMPLEX64"},           // complex64 type
     {ge::DT_COMPLEX128, "DT_COMPLEX128"},         // complex128 type
+    {ge::DT_COMPLEX64, "DT_COMPLEX64"},           // complex64 type
     {ge::DT_QINT8, "DT_QINT8"},                   // qint8 type
     {ge::DT_QINT16, "DT_QINT16"},                 // qint16 type
     {ge::DT_QINT32, "DT_QINT32"},                 // qint32 type
     {ge::DT_QUINT8, "DT_QUINT8"},                 // quint8 type
     {ge::DT_QUINT16, "DT_QUINT16"},               // quint16 type
-    {ge::DT_RESOURCE, "DT_RESOURCE"},             // resource type
     {ge::DT_STRING_REF, "DT_STRING_REF"},         // string ref type
+    {ge::DT_RESOURCE, "DT_RESOURCE"},             // resource type
     {ge::DT_STRING, "DT_STRING"},                 // string type
     {ge::DT_VARIANT, "DT_VARIANT"},               // dt_variant type
     {ge::DT_BF16, "DT_BFLOAT16"},                 // dt_bfloat16 type
@@ -75,19 +75,19 @@ static std::string QLIDataTypeToSerialString(ge::DataType type)
 static std::vector<int64_t> ToVector(const gert::Shape &shape)
 {
     size_t shapeSize = shape.GetDimNum();
-    std::vector<int64_t> shapeVec(shapeSize, 0);
+    std::vector<int64_t> qliShapeVec(shapeSize, 0);
 
     for (size_t i = 0; i < shapeSize; i++) {
-        shapeVec[i] = shape.GetDim(i);
+        qliShapeVec[i] = shape.GetDim(i);
     }
-    return shapeVec;
+    return qliShapeVec;
 }
 
 static std::string ToStringRaw(const gert::Shape &shape)
 {
     std::ostringstream oss;
     auto v = ToVector(shape);
-    if (v.size() > 0) {
+    if (!v.empty()) {
         for (size_t i = 0; i < v.size() - 1; ++i) {
             oss << v[i] << ", ";
         }
@@ -249,8 +249,8 @@ void QLIInfoParser::GetInputParaInfo()
     opParamInfo_.query.shape = context_->GetInputShape(QUERY_INDEX);
     opParamInfo_.key.desc = context_->GetInputDesc(KEY_INDEX);
     opParamInfo_.key.shape = context_->GetInputShape(KEY_INDEX);
-    opParamInfo_.weights.desc = context_->GetInputDesc(WEIGTHS_INDEX);
     opParamInfo_.weights.shape = context_->GetInputShape(WEIGTHS_INDEX);
+    opParamInfo_.weights.desc = context_->GetInputDesc(WEIGTHS_INDEX);
     opParamInfo_.query_dequant_scale.desc = context_->GetInputDesc(QUERY_DEQUANT_SCALE_INDEX);
     opParamInfo_.query_dequant_scale.shape = context_->GetInputShape(QUERY_DEQUANT_SCALE_INDEX);
     opParamInfo_.key_dequant_scale.desc = context_->GetInputDesc(KEY_DEQUANT_SCALE_INDEX);
@@ -835,7 +835,7 @@ ge::graphStatus QLIInfoParser::ValidateInputShapesMatch()
     act_seq_q [BatchSize] 可选
     out [BatchSize,S1,N2,topk]
     */
-    uint32_t queryWeightsN1Dim = 1;
+    uint32_t qliQueryWeightsN1Dim = 1;
     uint32_t outN2Dim = 1;
 
     if (qLayout_ == DataLayout::TND) {
@@ -945,12 +945,12 @@ ge::graphStatus QLIInfoParser::ValidateInputShapesMatch()
                             std::to_string(opParamInfo_.attenOut.shape->GetStorageShape().GetDim(1)) +
                             " respectively, they must be same"),
                     return ge::GRAPH_FAILED);
-        queryWeightsN1Dim = DIM_IDX_TWO;
+        qliQueryWeightsN1Dim = DIM_IDX_TWO;
         outN2Dim = DIM_IDX_TWO;
         tSize_ = bSize_ * s1Size_;
     }
     // -----------------------check N1-------------------
-    OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(queryWeightsN1Dim) != n1Size_),
+    OP_CHECK_IF((opParamInfo_.weights.shape->GetStorageShape().GetDim(qliQueryWeightsN1Dim) != n1Size_),
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                     opName_, "query and weights",
                     Ops::Base::ToString(opParamInfo_.query.shape->GetStorageShape()) + " and " +
@@ -1049,11 +1049,11 @@ ge::graphStatus QLIInfoParser::CheckContiguous()
     std::vector<uint32_t> keyStridesVec_;
     std::vector<uint32_t> keyDequantScaleStridesVec_;
 
-    auto keyStrides = context_->GetDynamicInputStride(KEY_INDEX, 0);
+    auto qliKeyStrides = context_->GetDynamicInputStride(KEY_INDEX, 0);
     auto keyDequantScaleStrides = context_->GetDynamicInputStride(KEY_DEQUANT_SCALE_INDEX, 0);
-    if (keyStrides != nullptr && keyStrides->GetDimNum() > 0) {
-        for (size_t i = 0; i < keyStrides->GetDimNum(); i++) {
-            keyStridesVec_.push_back(keyStrides->GetStride(i));
+    if (qliKeyStrides != nullptr && qliKeyStrides->GetDimNum() > 0) {
+        for (size_t i = 0; i < qliKeyStrides->GetDimNum(); i++) {
+            keyStridesVec_.push_back(qliKeyStrides->GetStride(i));
         }
     }
     if (keyDequantScaleStrides != nullptr && keyDequantScaleStrides->GetDimNum() > 0) {
@@ -1070,15 +1070,15 @@ ge::graphStatus QLIInfoParser::CheckContiguous()
     size_t checkStartIdx = (kLayout_ == DataLayout::PA_BSND) ? 1 : 0;
     if (!keyStridesVec_.empty() && opParamInfo_.key.shape != nullptr) {
         auto &shape = opParamInfo_.key.shape->GetStorageShape();
-        std::vector<uint32_t> expectedStrides;
+        std::vector<uint32_t> qliExpectedStrides;
         if (kLayout_ == DataLayout::BSND || kLayout_ == DataLayout::PA_BSND) {
-            expectedStrides = {shape.GetDim(1) * shape.GetDim(2) * shape.GetDim(3), shape.GetDim(2) * shape.GetDim(3),
-                               shape.GetDim(3), 1};
+            qliExpectedStrides = {shape.GetDim(1) * shape.GetDim(2) * shape.GetDim(3),
+                                  shape.GetDim(2) * shape.GetDim(3), shape.GetDim(3), 1};
         } else if (kLayout_ == DataLayout::TND) {
-            expectedStrides = {shape.GetDim(1) * shape.GetDim(2), shape.GetDim(2), 1};
+            qliExpectedStrides = {shape.GetDim(1) * shape.GetDim(2), shape.GetDim(2), 1};
         }
-        for (size_t i = checkStartIdx; i < expectedStrides.size(); ++i) {
-            if (i < keyStridesVec_.size() && keyStridesVec_[i] != expectedStrides[i]) {
+        for (size_t i = checkStartIdx; i < qliExpectedStrides.size(); ++i) {
+            if (i < keyStridesVec_.size() && keyStridesVec_[i] != qliExpectedStrides[i]) {
                 keyNonContiguous = true;
                 break;
             }

@@ -38,7 +38,7 @@ struct TilingOptionalParaInfo {
 };
 
 enum class DataLayout : uint32_t {
-    BSND = 0,
+    BSND = 0U,
     TND = 1,
     PA_BBND = 2
 };

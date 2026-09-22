@@ -368,9 +368,9 @@ __aicore__ inline void LiTopKVF(const LocalTensor<uint16_t> &tmpIdxLocal, const 
                                 const LocalTensor<uint32_t> &idxLowLocal, const LocalTensor<uint32_t> &nkValueLocal,
                                 uint32_t topK, uint32_t validLen)
 {
+    __ubuf__ uint16_t *inputValueBuf = (__ubuf__ uint16_t *)inputValueLocal.GetPhyAddr();
     __ubuf__ uint16_t *tmpIdxBuf = (__ubuf__ uint16_t *)tmpIdxLocal.GetPhyAddr();
     __ubuf__ uint16_t *outputValueBuf = (__ubuf__ uint16_t *)outputValueLocal.GetPhyAddr();
-    __ubuf__ uint16_t *inputValueBuf = (__ubuf__ uint16_t *)inputValueLocal.GetPhyAddr();
     __ubuf__ uint32_t *histogramsBuf = (__ubuf__ uint32_t *)histogramsLocal.GetPhyAddr();
     __ubuf__ uint32_t *idxHighBuf = (__ubuf__ uint32_t *)idxHighLocal.GetPhyAddr();
     __ubuf__ uint32_t *idxLowBuf = (__ubuf__ uint32_t *)idxLowLocal.GetPhyAddr();
@@ -434,8 +434,8 @@ __aicore__ inline void LiTopKGatherVF(const LocalTensor<uint32_t> &outputIdxLoca
     __ubuf__ uint16_t *tmpIdxBuf = (__ubuf__ uint16_t *)tmpIdxLocal.GetPhyAddr();
     __ubuf__ uint32_t *hisIdxBuf = (__ubuf__ uint32_t *)hisIdxLocal.GetPhyAddr();
 
-    const uint16_t repeatSize32 = 64;
     const uint16_t repeatSize16 = 128;
+    const uint16_t repeatSize32 = 64;
     uint16_t topkLoopNum16 = (topK + repeatSize16 - 1) / repeatSize16;
     uint16_t topkLoopNum32 = (topK + repeatSize32 - 1) / repeatSize32;
 

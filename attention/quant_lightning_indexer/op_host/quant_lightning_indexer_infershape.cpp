@@ -47,8 +47,8 @@ static ge::graphStatus InferShapeQuantLightningIndexer(gert::InferShapeContext *
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutQueryPtr);
     const char *inputLayoutKeyPtr = attrs->GetAttrPointer<char>(ATTR_KV_LAYOUT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, inputLayoutKeyPtr);
-    const int64_t *sparse_count = attrs->GetInt(ATTR_SPARSE_COUNT_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context, sparse_count);
+    const int64_t *qliSparseCount = attrs->GetInt(ATTR_SPARSE_COUNT_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context, qliSparseCount);
 
     std::string inputLayoutQueryPtrStr = std::string(inputLayoutQueryPtr);
     std::string inputLayoutKeyPtrStr = std::string(inputLayoutKeyPtr);
@@ -64,12 +64,12 @@ static ge::graphStatus InferShapeQuantLightningIndexer(gert::InferShapeContext *
         outShape->SetDim(0, queryShape->GetDim(0)); // 0:Dim B
         outShape->SetDim(1, queryShape->GetDim(1)); // 1:Dim S
         outShape->SetDim(2, keyHeadNum);            // 2:Dim N
-        outShape->SetDim(3, *sparse_count);         // 3:Dim K
+        outShape->SetDim(3, *qliSparseCount);       // 3:Dim K
     } else {
         outShape->SetDimNum(DIM_NUM_3);
         outShape->SetDim(0, queryShape->GetDim(0)); // 0:Dim T
         outShape->SetDim(1, keyHeadNum);            // 1:output shape's N Dim, 2: key shape's N Dim
-        outShape->SetDim(2, *sparse_count);         // 2:Dim K
+        outShape->SetDim(2, *qliSparseCount);       // 2:Dim K
     }
 
     OP_LOGD(context->GetNodeName(), "QuantLightningIndexer InferShape end.");

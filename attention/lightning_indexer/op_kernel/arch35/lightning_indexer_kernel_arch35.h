@@ -39,16 +39,16 @@ struct TempLoopInfo {
     uint32_t bN2Idx = 0;
     uint32_t n2Idx = 0U;
     uint32_t gS1Idx = 0U;
-    uint32_t gS1LoopEnd = 0U; // gS1方向循环的结束Idx
-    uint32_t s2LoopEnd = 0U;  // S2方向循环的结束Idx
-    uint32_t actS1Size = 1U;  // 当前Batch循环处理的S1轴的实际大小
-    uint32_t actS2Size = 0U;
+    uint32_t gS1LoopEnd = 0U;    // gS1方向循环的结束Idx
+    uint32_t s2LoopEnd = 0U;     // S2方向循环的结束Idx
+    uint32_t actS1Size = 1U;     // 当前Batch循环处理的S1轴的实际大小
     uint32_t actS2SizeOrig = 0U; // 压缩前s2
+    uint32_t actS2Size = 0U;
+    uint32_t actMBaseSize = 0U;    // m轴(gS1)方向实际大小
+    uint32_t mBasicSizeTail = 0U;  // gS1方向循环的尾基本块大小
+    uint32_t s2BasicSizeTail = 0U; // S2方向循环的尾基本块大小
     bool curActSeqLenIsZero = false;
     bool needDealActS1LessThanS1 = false; // S1的实际长度小于shape的S1长度时，是否需要清理输出
-    uint32_t actMBaseSize = 0U;           // m轴(gS1)方向实际大小
-    uint32_t mBasicSizeTail = 0U;         // gS1方向循环的尾基本块大小
-    uint32_t s2BasicSizeTail = 0U;        // S2方向循环的尾基本块大小
 };
 
 template <typename LIT>
@@ -131,7 +131,7 @@ protected:
     __aicore__ inline uint32_t GetS2BaseBlockNumOnMask(uint32_t s1gIdx, uint32_t actS1Size, uint32_t actS2SizeOrig);
     // ================================Process functions================================
     __aicore__ inline void ProcessMain();
-    __aicore__ inline void ProcessBaseBlock(uint32_t loop, uint64_t s2LoopIdx, LICommon::RunInfo runInfo);
+    __aicore__ inline void ProcessBaseBlock(uint32_t liLoop, uint64_t s2LoopIdx, LICommon::RunInfo liRunInfo);
     __aicore__ inline void ProcessInvalid();
     // ================================Params Calc=====================================
     __aicore__ inline void CalcGS1LoopParams(uint32_t bN2Idx);
@@ -231,7 +231,7 @@ __aicore__ inline uint32_t LightningIndexerKernel<LIT>::GetS2BaseBlockNumOnMask(
 template <typename LIT>
 __aicore__ inline uint32_t LightningIndexerKernel<LIT>::GetTotalBaseBlockNum()
 {
-    uint32_t totalBlockNum = 0;
+    uint32_t liTotalBlockNum = 0;
     uint32_t actS1Size, actS2Size, actS2SizeOrig;
     uint32_t s1GBaseNum, s2BaseNum;
     for (uint32_t bIdx = 0; bIdx < constInfo.batchSize; bIdx++) {
@@ -239,16 +239,16 @@ __aicore__ inline uint32_t LightningIndexerKernel<LIT>::GetTotalBaseBlockNum()
         s1GBaseNum = CeilDiv(actS1Size, constInfo.s1BaseSize);
         if (!constInfo.attenMaskFlag) {
             s2BaseNum = constInfo.isLDOpen ? CeilDiv(actS2Size, constInfo.s2BaseSize) : (actS2Size > 0 ? 1 : 0);
-            totalBlockNum += s1GBaseNum * s2BaseNum * constInfo.kHeadNum;
+            liTotalBlockNum += s1GBaseNum * s2BaseNum * constInfo.kHeadNum;
             continue;
         }
         for (uint32_t s1gIdx = 0; s1gIdx < s1GBaseNum; s1gIdx++) {
             s2BaseNum = constInfo.isLDOpen ? GetS2BaseBlockNumOnMask(s1gIdx, actS1Size, actS2SizeOrig) :
                                              (actS2Size > 0 ? 1 : 0);
-            totalBlockNum += s2BaseNum * constInfo.kHeadNum;
+            liTotalBlockNum += s2BaseNum * constInfo.kHeadNum;
         }
     }
-    return totalBlockNum;
+    return liTotalBlockNum;
 }
 
 // 多核版本，双闭区间。基本原则：计算每个核最少处理的块数, 剩余的部分前面的核每个核多处理一块
@@ -256,12 +256,12 @@ template <typename LIT>
 __aicore__ void inline LightningIndexerKernel<LIT>::SplitCore(uint32_t curCoreIdx, uint32_t &coreNum,
                                                               LICommon::SplitCoreInfo &info)
 {
-    uint32_t totalBlockNum = GetTotalBaseBlockNum();
-    uint32_t minBlockPerCore = totalBlockNum / coreNum;
-    uint32_t deal1MoreBlockCoreNum = totalBlockNum % coreNum;
-    uint32_t coreIdx = 0;
-    uint32_t lastGS1RemainBlockCnt = 0;
-    uint32_t coreDealBlockCnt = coreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
+    uint32_t liTotalBlockNum = GetTotalBaseBlockNum();
+    uint32_t minBlockPerCore = liTotalBlockNum / coreNum;
+    uint32_t deal1MoreBlockCoreNum = liTotalBlockNum % coreNum;
+    uint32_t liCoreIdx = 0;
+    uint32_t liLastGS1RemainBlockCnt = 0;
+    uint32_t liCoreDealBlockCnt = liCoreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
     coreNum = minBlockPerCore == 0 ? deal1MoreBlockCoreNum : coreNum;
     if (curCoreIdx < coreNum) {
         splitCoreInfo.isCoreEnable = true;
@@ -270,7 +270,7 @@ __aicore__ void inline LightningIndexerKernel<LIT>::SplitCore(uint32_t curCoreId
         return;
     }
 
-    bool findLastCoreEnd = true;
+    bool liFindLastCoreEnd = true;
     uint32_t actS1Size, actS2Size, actS2SizeOrig;
     uint32_t s1GBaseNum, s2BaseNum, s2Loop;
     for (uint32_t bN2Idx = 0; bN2Idx < constInfo.batchSize * constInfo.kHeadNum; bN2Idx++) {
@@ -281,58 +281,58 @@ __aicore__ void inline LightningIndexerKernel<LIT>::SplitCore(uint32_t curCoreId
             s2BaseNum = CeilDiv(actS2Size, constInfo.s2BaseSize);
         }
         if constexpr (LAYOUT_T == LI_LAYOUT::BSND) {
-            if (findLastCoreEnd && (s1GBaseNum == 0U || s2BaseNum == 0U)) {
+            if (liFindLastCoreEnd && (s1GBaseNum == 0U || s2BaseNum == 0U)) {
                 info.bN2Start = bN2Idx;
                 info.gS1Start = 0;
                 info.s2Start = 0;
-                findLastCoreEnd = false;
+                liFindLastCoreEnd = false;
             }
         }
         for (uint32_t gS1Idx = 0; gS1Idx < s1GBaseNum; gS1Idx++) {
             if (constInfo.attenMaskFlag) {
                 s2BaseNum = GetS2BaseBlockNumOnMask(gS1Idx, actS1Size, actS2SizeOrig);
             }
-            if (findLastCoreEnd && s2BaseNum == 0U) {
+            if (liFindLastCoreEnd && s2BaseNum == 0U) {
                 info.bN2Start = bN2Idx;
                 info.gS1Start = gS1Idx;
                 info.s2Start = 0;
-                findLastCoreEnd = false;
+                liFindLastCoreEnd = false;
             }
             s2Loop = constInfo.isLDOpen ? s2BaseNum : (actS2Size > 0 ? 1 : 0);
             for (uint32_t s2Idx = 0; s2Idx < s2Loop;) {
-                if (findLastCoreEnd) {
+                if (liFindLastCoreEnd) {
                     info.bN2Start = bN2Idx;
                     info.gS1Start = gS1Idx;
                     info.s2Start = s2Idx;
-                    findLastCoreEnd = false;
+                    liFindLastCoreEnd = false;
                 }
-                uint32_t s2RemainBaseNum = s2Loop - s2Idx;
-                if (lastGS1RemainBlockCnt + s2RemainBaseNum >= coreDealBlockCnt) {
+                uint32_t liS2RemainBaseNum = s2Loop - s2Idx;
+                if (liLastGS1RemainBlockCnt + liS2RemainBaseNum >= liCoreDealBlockCnt) {
                     info.bN2End = bN2Idx;
                     info.gS1End = gS1Idx;
                     info.s2End =
-                        constInfo.isLDOpen ? s2Idx + coreDealBlockCnt - lastGS1RemainBlockCnt - 1 : s2BaseNum - 1;
+                        constInfo.isLDOpen ? s2Idx + liCoreDealBlockCnt - liLastGS1RemainBlockCnt - 1 : s2BaseNum - 1;
 
-                    if (coreIdx == curCoreIdx) {
+                    if (liCoreIdx == curCoreIdx) {
                         // S2被切N核，那么只有第一个核需要处理LD，其他核不用
                         if (s2Idx == 0 && info.s2End + 1 < s2BaseNum) {
                             info.isLD = true;
                         }
                         // 最后一个核处理的不是最后一个Batch，表明后面的Batch为空块(S2=0), 调整终点坐标以便清理输出
-                        if (coreIdx == coreNum - 1 && info.bN2End != constInfo.batchSize - 1) {
+                        if (liCoreIdx == coreNum - 1 && info.bN2End != constInfo.batchSize - 1) {
                             info.bN2End = constInfo.batchSize - 1;
                             info.s2End = 0;
                             info.gS1End = 0;
                         }
                         return;
                     }
-                    coreIdx++;
-                    findLastCoreEnd = true;
+                    liCoreIdx++;
+                    liFindLastCoreEnd = true;
                     s2Idx = info.s2End + 1;
-                    lastGS1RemainBlockCnt = 0;
-                    coreDealBlockCnt = coreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
+                    liLastGS1RemainBlockCnt = 0;
+                    liCoreDealBlockCnt = liCoreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
                 } else {
-                    lastGS1RemainBlockCnt += s2RemainBaseNum;
+                    liLastGS1RemainBlockCnt += liS2RemainBaseNum;
                     break;
                 }
             }
@@ -370,10 +370,10 @@ __aicore__ inline void LightningIndexerKernel<LIT>::Init(__gm__ uint8_t *query, 
     InitTilingData(tiling);
     InitActualSeqLen(actualSeqLengthsQ, actualSeqLengthsK);
 
+    pipe = tPipe;
+
     // 获取分核信息
     SplitCore(aiCoreIdx, usedCoreNum, splitCoreInfo);
-
-    pipe = tPipe;
 
     uint64_t offset = 0;
     // vec 把整个s2的score存储在GM，大小为s1BaseSize * 16K * 4
@@ -395,10 +395,10 @@ __aicore__ inline void LightningIndexerKernel<LIT>::Init(__gm__ uint8_t *query, 
     } else {
         matmulService.InitParams(constInfo);
         queryGm.SetGlobalBuffer((__gm__ Q_T *)query);
+        keyGm.SetGlobalBuffer((__gm__ K_T *)key);
         if constexpr (PAGE_ATTENTION) {
             blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
         }
-        keyGm.SetGlobalBuffer((__gm__ K_T *)key);
         matmulService.InitMm1GlobalTensor(blockTableGm, keyGm, queryGm);
     }
     InitBuffers();
@@ -457,8 +457,8 @@ __aicore__ inline void LightningIndexerKernel<LIT>::CalcRunInfo(uint32_t loop, u
     } else {
         actualSeqKPrefixSum = (runInfo.bIdx <= 0) ? 0 : runInfo.bIdx * constInfo.kSeqSize;
     }
-    uint64_t tndBIdxOffsetForK = actualSeqKPrefixSum * constInfo.kHeadNum * constInfo.headDim;
-    keyCoreOffset = tndBIdxOffsetForK + runInfo.s2Idx * constInfo.s2BaseSize * constInfo.kHeadNum * constInfo.headDim;
+    uint64_t liTndBIdxOffsetForK = actualSeqKPrefixSum * constInfo.kHeadNum * constInfo.headDim;
+    keyCoreOffset = liTndBIdxOffsetForK + runInfo.s2Idx * constInfo.s2BaseSize * constInfo.kHeadNum * constInfo.headDim;
     runInfo.tensorQueryOffset = queryCoreOffset;
     runInfo.tensorKeyOffset = keyCoreOffset;
     runInfo.tensorWeightsOffset = weightsCoreOffset;
@@ -519,7 +519,7 @@ __aicore__ inline void LightningIndexerKernel<LIT>::ProcessMain()
     }
 
     LICommon::RunInfo runInfo;
-    uint32_t gloop = 0;
+    uint32_t liGLoop = 0;
     for (uint32_t bN2LoopIdx = splitCoreInfo.bN2Start; bN2LoopIdx <= splitCoreInfo.bN2End; bN2LoopIdx++) {
         CalcGS1LoopParams(bN2LoopIdx);
         if (tempLoopInfo.curActSeqLenIsZero) {
@@ -529,8 +529,8 @@ __aicore__ inline void LightningIndexerKernel<LIT>::ProcessMain()
         for (uint32_t gS1LoopIdx = splitCoreInfo.gS1Start; gS1LoopIdx <= tempLoopInfo.gS1LoopEnd; gS1LoopIdx++) {
             CalcS2LoopParams(bN2LoopIdx, gS1LoopIdx);
             for (int s2LoopIdx = splitCoreInfo.s2Start; s2LoopIdx <= tempLoopInfo.s2LoopEnd; s2LoopIdx++) {
-                ProcessBaseBlock(gloop, s2LoopIdx, runInfo);
-                ++gloop;
+                ProcessBaseBlock(liGLoop, s2LoopIdx, runInfo);
+                ++liGLoop;
             }
             splitCoreInfo.s2Start = 0;
         }
@@ -550,16 +550,16 @@ __aicore__ inline void LightningIndexerKernel<LIT>::ProcessMain()
 }
 
 template <typename LIT>
-__aicore__ inline void LightningIndexerKernel<LIT>::ProcessBaseBlock(uint32_t loop, uint64_t s2LoopIdx,
-                                                                     LICommon::RunInfo runInfo)
+__aicore__ inline void LightningIndexerKernel<LIT>::ProcessBaseBlock(uint32_t liLoop, uint64_t s2LoopIdx,
+                                                                     LICommon::RunInfo liRunInfo)
 {
-    CalcRunInfo(loop, s2LoopIdx, runInfo);
+    CalcRunInfo(liLoop, s2LoopIdx, liRunInfo);
     if ASCEND_IS_AIC {
-        matmulService.ComputeMm1(runInfo);
+        matmulService.ComputeMm1(liRunInfo);
     } else {
-        vectorService.ProcessVec1(runInfo);
-        if (runInfo.isLastS2InnerLoop) { // 本核s2last
-            vectorService.ProcessTopK(runInfo);
+        vectorService.ProcessVec1(liRunInfo);
+        if (liRunInfo.isLastS2InnerLoop) { // 本核s2last
+            vectorService.ProcessTopK(liRunInfo);
         }
     }
 }
