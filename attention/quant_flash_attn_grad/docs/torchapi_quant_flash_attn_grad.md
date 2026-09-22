@@ -697,7 +697,7 @@ cann_ops_transformer.quant_flash_attn_grad(
                 <td>
                     <ul>
                         <li>tensor_type仅支持float32</li>
-                        <li>shape为(B, Q_N, Q_S, 1)</li>
+                        <li>shape为(B, Q_N, Q_S)</li>
                     </ul>
                 </td>
             </tr>
@@ -947,8 +947,8 @@ mask_mode参数解释
     p_scale = torch.ones(1, dtype=torch.float32, device="npu")
     ds_scale = torch.ones(1, dtype=torch.float32, device="npu")
 
-    # softmax_lse: FP32, shape=(B, Q_N, Q_S, 1)
-    softmax_lse = torch.zeros(B, Q_N, Q_S, 1, dtype=torch.float32, device="npu")
+    # softmax_lse: FP32, shape=(B, Q_N, Q_S)
+    softmax_lse = torch.zeros(B, Q_N, Q_S, dtype=torch.float32, device="npu")
 
     try:
         metadata = cann_ops_transformer.quant_flash_attn_metadata(
