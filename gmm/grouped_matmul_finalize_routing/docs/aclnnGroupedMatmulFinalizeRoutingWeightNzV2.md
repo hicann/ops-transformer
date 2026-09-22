@@ -104,7 +104,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
     </tr></thead>
   <tbody>
     <tr>
-      <td>x1</td>
+      <td>x1（aclTensor *）</td>
       <td>输入</td>
       <td>输入x（左矩阵）。</td>
       <td>-</td>
@@ -114,7 +114,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>x2</td>
+      <td>x2（aclTensor *）</td>
       <td>输入</td>
       <td>输入weight（右矩阵）。</td>
       <td>支持昇腾亲和数据排布格式(NZ)。综合约束请参见<a href="#约束说明">约束说明</a>。</td>
@@ -124,7 +124,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>仅转置场景支持非连续</td>
     </tr>
     <tr>
-      <td>scale</td>
+      <td>scale（aclTensor *）</td>
       <td>输入</td>
       <td>量化参数中的缩放因子，per-channel或Mx量化参数。</td>
       <td>-</td>
@@ -134,7 +134,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>bias</td>
+      <td>bias（aclTensor *）</td>
       <td>输入</td>
       <td>矩阵的偏移。</td>
       <td>-</td>
@@ -144,7 +144,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>offsetOptional</td>
+      <td>offsetOptional（aclTensor *）</td>
       <td>输入</td>
       <td>非对称量化的偏移量。</td>
       <td>目前暂未启用。</td>
@@ -154,7 +154,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>antiquantScaleOptional</td>
+      <td>antiquantScaleOptional（aclTensor *）</td>
       <td>输入</td>
       <td>伪量化的缩放因子。</td>
       <td>目前暂未启用。</td>
@@ -164,7 +164,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>antiquantOffsetOptional</td>
+      <td>antiquantOffsetOptional（aclTensor *）</td>
       <td>输入</td>
       <td>伪量化的偏移量。</td>
       <td>目前暂未启用。</td>
@@ -174,7 +174,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>pertokenScaleOptional</td>
+      <td>pertokenScaleOptional（aclTensor *）</td>
       <td>输入</td>
       <td>矩阵计算的反量化参数。</td>
       <td>-</td>
@@ -184,7 +184,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>groupList</td>
+      <td>groupList（aclTensor *）</td>
       <td>输入</td>
       <td>输入和输出分组轴方向的matmul大小分布。</td>
       <td>根据groupListType输入不同格式数据。综合约束请参见<a href="#约束说明">约束说明</a>。</td>
@@ -194,7 +194,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>sharedInput</td>
+      <td>sharedInput（aclTensor *）</td>
       <td>输入</td>
       <td>moe计算中共享专家的输出，需要与moe专家的输出进行combine操作。</td>
       <td>-</td>
@@ -204,7 +204,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>logit</td>
+      <td>logit（aclTensor *）</td>
       <td>输入</td>
       <td>moe专家对各个token的logit大小。</td>
       <td>-</td>
@@ -214,7 +214,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>rowIndex</td>
+      <td>rowIndex（aclTensor *）</td>
       <td>输入</td>
       <td>moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
       <td>-</td>
@@ -224,7 +224,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>dtype</td>
+      <td>dtype（int64_t）</td>
       <td>输入</td>
       <td>计算的输出类型：0：FLOAT；1：FLOAT16；2：BFLOAT16。目前仅支持0。</td>
       <td>-</td>
@@ -234,7 +234,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>sharedInputWeight</td>
+      <td>sharedInputWeight（float）</td>
       <td>输入</td>
       <td>共享专家与moe专家进行combine的系数，sharedInput先与该参数乘，然后在和moe专家结果累加。</td>
       <td>-</td>
@@ -244,7 +244,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>sharedInputOffset</td>
+      <td>sharedInputOffset（int64_t）</td>
       <td>输入</td>
       <td>共享专家输出的在总输出中的偏移。</td>
       <td>-</td>
@@ -254,7 +254,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>transposeX1</td>
+      <td>transposeX1（bool）</td>
       <td>输入</td>
       <td>左矩阵是否转置，仅支持false。</td>
       <td>-</td>
@@ -264,7 +264,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>transposeX2</td>
+      <td>transposeX2（bool）</td>
       <td>输入</td>
       <td>右矩阵是否转置。综合约束请参见<a href="#约束说明">约束说明</a>。</td>
       <td>-</td>
@@ -274,7 +274,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>groupListType</td>
+      <td>groupListType（int64_t）</td>
       <td>输入</td>
       <td>分组模式：配置为0：cumsum模式，即为前缀和；配置为1：count模式。</td>
       <td>-</td>
@@ -284,7 +284,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>tuningConfigOptional</td>
+      <td>tuningConfigOptional（aclIntArray *）</td>
       <td>输入</td>
       <td>数组中的第一个元素表示各个专家处理的token数的预期值，算子tiling时会按照数组的第一个元素合理进行tiling切分，性能更优。数组中的第二个元素设置为1，则算子tiling时会根据实际输入尝试使用更适合的算法，当k<=2048的时候，性能可能更优。从第三个元素开始预留，用户无须填写。未来会进行扩展。兼容历史版本，用户如不使用该参数，不传入（即为nullptr）即可。</td>
       <td>-</td>
@@ -294,7 +294,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>out</td>
+      <td>out（aclTensor *）</td>
       <td>输出</td>
       <td>输出结果。</td>
       <td>-</td>
@@ -304,7 +304,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>✗</td>
     </tr>
     <tr>
-      <td>workspaceSize</td>
+      <td>workspaceSize（uint64_t *）</td>
       <td>输出</td>
       <td>返回需要在Device侧申请的workspace大小。</td>
       <td>-</td>
@@ -314,7 +314,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>executor</td>
+      <td>executor（aclOpExecutor **）</td>
       <td>输出</td>
       <td>返回op执行器，包含了算子计算流程。</td>
       <td>-</td>
