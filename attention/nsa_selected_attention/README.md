@@ -4,7 +4,7 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      ×     |
+|<term>Atlas A3系列产品</term>|      ×     |
 |<term>Atlas A2训练系列产品</term>|      √     |
 |<term>Atlas A2推理系列产品</term>|      ×     |
 
@@ -19,7 +19,7 @@
   selected\_key = Gather(key, topk\_indices[i]),0<=i<selected\_block\_count \\
   selected\_value = Gather(value, topk\_indices[i]),0<=i<selected\_block\_count
   $$
-  
+
   $$
   attention\_out = Softmax(Mask(scale * (query @ selected\_key^T), atten\_mask)) @ selected\_value
   $$
@@ -54,7 +54,7 @@
 - 支持输入query的N和key / value的N不相等，但必须成比例关系，即N_q / N_kv必须是非0整数，称为G(group)，且需满足`G <= 32`。
 - 当attenMaskOptional输入为nullptr时，sparseMode参数不生效，固定为全计算。
 - 关于数据shape的约束，以inputLayout的TND举例（注：T等于各batch S的长度累加和。当各batch的S相等时，`T = B * S`）。其中：
-  
+
   - B（Batchsize）：取值范围为1\~1024。
   - N（Head-Num）：取值范围为1\~128。
   - G（Group）：取值范围为1\~32。

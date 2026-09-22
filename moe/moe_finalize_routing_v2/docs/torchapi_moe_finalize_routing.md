@@ -2,12 +2,12 @@
 
 ## 产品支持情况
 
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
-- <term>Atlas 推理系列产品</term>：支持
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
+- <term>Atlas推理系列产品</term>：支持
+- <term>Atlas训练系列产品</term>：不支持
 
 ## 功能说明
 
@@ -82,7 +82,7 @@ cann_ops_transformer.ops.moe_finalize_routing(
   - `drop_pad_mode`仅支持0或1（列排列模式），不支持2或3（行排列模式）。
   - 仅计算`grad_expanded_x`和`grad_scales`；`x1`、`x2`、`bias`的梯度不会被计算（返回`None`）。如需对`x1`/`x2`求梯度，建议使用外部残差加法替代将其作为正向输入。
   - 正向`expanded_row_idx`采用`(K, R)`布局，反向算子采用`(R, K)`布局，自动反向下框架会自动转置。
-  - **产品支持差异**：`aclnnMoeFinalizeRoutingV2Grad`在<term>Atlas 推理系列产品</term>上不支持，尽管正向`moe_finalize_routing`在该产品上支持。因此在<term>Atlas 推理系列产品</term>上，`moe_finalize_routing`不支持自动反向。
+  - **产品支持差异**：`aclnnMoeFinalizeRoutingV2Grad`在<term>Atlas推理系列产品</term>上不支持，尽管正向`moe_finalize_routing`在该产品上支持。因此在<term>Atlas推理系列产品</term>上，`moe_finalize_routing`不支持自动反向。
 
 ## 调用示例
 

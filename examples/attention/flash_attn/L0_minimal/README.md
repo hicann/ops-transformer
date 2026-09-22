@@ -19,7 +19,7 @@ AscendOps 是一个轻量级，高性能的算子开发工程模板，它集成�
 2. `csrc/flash_attn_minimal/CMakeLists.txt` 算子cmake配置
 
 ## 环境要求
-*   AI处理器：Ascend 950PR/Ascend 950DT
+*   AI处理器：Ascend 950PR&950DT系列产品
 *   Python: 3.8+
 *   PyTorch: 2.6.0+
 *   PyTorchAdapter 7.1.0+

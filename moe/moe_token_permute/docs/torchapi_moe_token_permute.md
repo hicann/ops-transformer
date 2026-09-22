@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -26,10 +26,10 @@
 `moe_token_permute`是基于`torch_npu`的`cann_ops_transformer`扩展接口。该接口根据`indices`将输入`tokens`扩展，并按照专家索引排序，返回排序后的token及其与原始token的映射关系。
 
 <!-- npu="950" id7 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：该接口还支持在permute过程中将输出量化为MXFP8或MXFP4，并返回对应的per-token分块scale。
+- <term>Ascend 950PR&950DT系列产品</term>：该接口还支持在permute过程中将输出量化为MXFP8或MXFP4，并返回对应的per-token分块scale。
 <!-- end id7 -->
 <!-- npu="A3,910b" id8 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持量化模式，按非量化路径执行。
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：不支持量化模式，按非量化路径执行。
 <!-- end id8 -->
 
 ## 函数原型
@@ -55,10 +55,10 @@ cann_ops_transformer.ops.moe_token_permute(
 | `quant_mode` | int | 可选 | 量化模式：`-1`表示不量化；`2`表示MXFP8 E5M2；`3`表示MXFP8 E4M3FN；`9`表示MXFP4 E2M1，默认值为`-1`。 | int64 | - |
 
 <!-- npu="A3,910b" id9 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：`quant_mode`仅支持-1。
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：`quant_mode`仅支持-1。
 <!-- end id9 -->
 <!-- npu="950" id10 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：`quant_mode`支持-1/2/3/9。取值为9时，隐藏维`H`必须为偶数。取值2/3/9时，不支持autograd。
+- <term>Ascend 950PR&950DT系列产品</term>：`quant_mode`支持-1/2/3/9。取值为9时，隐藏维`H`必须为偶数。取值2/3/9时，不支持autograd。
 <!-- end id10 -->
 
 ## 返回值说明

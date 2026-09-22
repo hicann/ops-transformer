@@ -33,14 +33,14 @@ graph LR
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      √     |
-|<term>Atlas 训练系列产品</term>|      ×     |
-|<term>Kirin X90 处理器系列产品</term> | √ |
-|<term>Kirin 9030 处理器系列产品</term> | √ |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      √     |
+|<term>Atlas训练系列产品</term>|      ×     |
+|<term>Kirin X90处理器系列产品</term> | √ |
+|<term>Kirin 9030处理器系列产品</term> | √ |
 
 ---
 
@@ -107,17 +107,17 @@ $$
 | activationFeatureOutOptional | 输出 | 激活函数的输入数据，当前只支持传入 nullptr | - | - |
 | dynQuantScaleOutOptional | 输出 | 动态量化缩放因子，当前只支持传入 nullptr | - | - |
 
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
   - 上表数据类型列中的角标 <sup>1</sup> 代表该系列不支持的数据类型。
   - 输入参数 x、weight均不支持INT16 类型，且 x 不支持INT4 类型。
   - 输入参数 x、weight，输出参数 out在非量化场景支持最多 1024个Tensor，在伪量化支持最多 128个Tensor，在全量化场景最多支持 1个Tensor。
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
   - 上表数据类型列中的角标 <sup>2</sup> 代表该系列不支持的数据类型。
   - 不支持FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT8_E8M0类型。
   - 输入参数 biasOptional不支持BFLOAT16。
   - 输入参数 scaleOptional不支持INT64 类型。
   - 输入参数 x、weight，输出参数 out支持最多 128个Tensor。
-- <term>Kirin X90/Kirin 9030 处理器系列产品</term>：
+- <term>Kirin X90/Kirin 9030处理器系列产品</term>：
   - 不支持BFLOAT16、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT8_E8M0、HIFLOAT8类型。
 
 ---

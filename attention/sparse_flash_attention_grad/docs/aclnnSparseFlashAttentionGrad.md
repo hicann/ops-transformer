@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -159,7 +159,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>ND</td>
             <td>(B,S1,N1,D)、(T1,N1,D)<br>
             B：支持泛化；S1：支持泛化；N1：支持128、64、32、16、8、4、2、1；D：512；T1：B × S1<br>
-            <term>Ascend 950PR/Ascend 950DT</term>的N1额外还支持48、24、12、6、3
+            <term>Ascend 950PR&950DT系列产品</term>的N1额外还支持48、24、12、6、3
             </td>
             <td>√</td>
         </tr>
@@ -326,8 +326,8 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>输入</td>
             <td>选择的块的大小。</td>
             <td>
-            <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>支持1、8、16、32、64<br>
-            <term>Ascend 950PR/Ascend 950DT</term>支持1
+            <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>支持1、8、16、32、64<br>
+            <term>Ascend 950PR&950DT系列产品</term>支持1
             </td>
             <td>INT64</td>
             <td>-</td>
@@ -662,7 +662,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         <tr>
             <td>N1</td>
             <td>1、2、4、8、16、32、64、128<br>
-            <term>Ascend 950PR/Ascend 950DT</term>额外还支持48、24、12、6、3
+            <term>Ascend 950PR&950DT系列产品</term>额外还支持48、24、12、6、3
             </td>
             <td>SparseFA为MQA。</td>
         </tr>
@@ -696,7 +696,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
 
 ## 调用示例
 
-调用示例代码如下（以<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>为例），仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
+调用示例代码如下（以<term>Atlas A2系列产品</term>为例），仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 ```c++
 #include <iostream>

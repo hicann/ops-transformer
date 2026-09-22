@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950DT</term>：支持
+- <term>Ascend 950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -50,7 +50,7 @@
 - 新增`commMode`参数，用户根据该参数指定芯片使用的通信引擎。
 
   <!-- npu="950" id7 -->
-  - <term>Ascend 950DT</term>：支持`ai_cpu`和`ccu`。
+  - <term>Ascend 950DT系列产品</term>：支持`ai_cpu`和`ccu`。
 
   <!-- end id7 -->
 
@@ -302,7 +302,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(
         <td>epWorldSize</td>
         <td>输入</td>
         <td>ep通信域大小。</td>
-        <td><term>Ascend 950DT</term>支持2、4、8、16、32、64、128、256。</td>
+        <td><term>Ascend 950DT系列产品</term>支持2、4、8、16、32、64、128、256。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -552,7 +552,7 @@ aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-注意：由于量化接口仅支持<term>Ascend 950DT</term>，以下示例基于该系列实现。本示例代码以2卡为例，请根据实际环境卡数修改 `EP_WORLD_SIZE`。
+注意：由于量化接口仅支持<term>Ascend 950DT系列产品</term>，以下示例基于该系列实现。本示例代码以2卡为例，请根据实际环境卡数修改 `EP_WORLD_SIZE`。
 
 ```cpp
 #include <thread>
@@ -810,7 +810,7 @@ int LaunchOneThreadAlltoAllvQuantGroupedMatMul(Args &args)
 
 int main(int argc, char *argv[])
 {
-    // 本样例基于Ascend 950DT实现
+    // 本样例基于Ascend 950DT系列产品实现
     int ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclInit failed. ret = %d \n", ret); return ret);
 

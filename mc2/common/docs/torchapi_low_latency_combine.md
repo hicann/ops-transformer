@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -428,12 +428,12 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
 - num_experts + zero_expert_num + copy_expert_num + const_expert_num < MAX_int32。
 - 相关约束：
   <!-- npu="A3" id7 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>：
     - `topk_weights`仅支持传入有效Tensor并进行加权聚合。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
-    - `topk_weights`可传有效Tensor或None或空Tesenor，传有效Tensor时使能topK专家权重功能，传None或空Tesenor时不使能并直接对专家输出求和
+  - <term>Ascend 950PR&950DT系列产品</term>：
+    - `topk_weights`可传有效Tensor或None或空Tesenor，传有效Tensor时开启topK专家权重功能，传None或空Tesenor时不开启并直接对专家输出求和
   <!-- end id8 -->
 - HCCL通信域缓存区大小：
 

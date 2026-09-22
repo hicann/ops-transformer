@@ -1,26 +1,26 @@
 # aclnnGroupedMatmulWeightNz
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/gmm/grouped_matmul)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/gmm/grouped_matmul)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：支持
+- <term>Atlas推理系列产品</term>：支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -35,7 +35,7 @@
       - 输入的weight会被接口按AI处理器亲和数据排布格式（FRACTAL_NZ）解析。
       - 新增参数quantGroupSize，整数型参数，代表分组量化（pergroup）的分组大小，不涉及分组量化时，填0。
       <!-- npu="950" id7 -->
-      - <term>Ascend 950PR/Ascend 950DT</term>：支持quantGroupSize参数，综合约束请参见<a href="#约束说明">约束说明</a>。
+      - <term>Ascend 950PR&950DT系列产品</term>：支持quantGroupSize参数，综合约束请参见<a href="#约束说明">约束说明</a>。
       <!-- end id7 -->
 
   - **计算公式**：
@@ -431,7 +431,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     </table>
 
     <!-- npu="950" id8 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：
+    - <term>Ascend 950PR&950DT系列产品</term>：
       - 上表数据类型列中的角标"1"代表该系列不支持的数据类型。
       - `weight`支持FRACTAL_NZ格式。当最后两根轴其中一根轴为1（即n=1或k=1）时，不支持私有格式，不能调用该接口。可使用aclnnNpuFormatCast接口完成输入Format从ND到AI处理器亲和数据排布格式（NZ）的转换。如原始weight为转置状态且想使用性能更高的非转置通路计算，可使用aclnnPermute接口转为非转置后再调用aclnnNpuFormatCast接口。非全量化场景，当数据类型为FLOAT4_E2M1时，还需要在aclnnNpuFormatCast调用后，调用aclnnCast接口将FLOAT32表示的FLOAT4_E2M1转换为正确的类型。但当为INT4类型时，需要使用aclnnConvertWeightToInt4Pack接口完成数据格式从ND到NZ和数据类型从INT32到INT4的转换。当传入FLOAT32或者INT32时，接口内部每个FLOAT32/INT32识别成8个FLOAT4_E2M1/INT4。
       - `offsetOptional`支持，`antiquantOffsetOptional`暂不支持。综合约束请参见<a href="#约束说明">约束说明</a>。
@@ -442,7 +442,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
     <!-- end id8 -->
 
     <!-- npu="A3,910b" id9 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
       - 上表数据类型列中的角标"2"代表该系列不支持的数据类型。
       - `weight`会被接口按FRACTAL_NZ格式解析。当传入INT32时，接口内部将每个INT32识别成8个INT4。
       - 输入参数`x`、`weight`，输出参数`out`支持最多128个tensor。
@@ -525,7 +525,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
 <!-- npu="A3,910b" id10 -->
 <details>
-<summary><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term></summary>
+<summary><term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term></summary>
 
   - 公共约束
     - tuningConfigOptional控制的weight特殊格式适用于S8S4（A8W4）场景，具体限制见[S8S4（A8W4）场景约束](#a2-a3-weightnz-s8s4场景约束)。
@@ -611,7 +611,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
 <!-- npu="950" id11 -->
 <details>
-<summary><term>Ascend 950PR/Ascend 950DT</term></summary>
+<summary><term>Ascend 950PR&950DT系列产品</term></summary>
 
   - 公共约束
     - tuningConfigOptional控制的weight特殊格式适用于S8S4场景，具体限制见[S8S4场景约束](#ascend950-weightnz-s8s4场景约束)。
@@ -829,7 +829,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="950" id12 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
   MX_A8W4场景下，先调用`aclnnWeightQuantPreprocess`同步预处理weight和weightScale，再将预处理输出直接作为weight和antiquantScaleOptional调用本接口完成分组矩阵乘。
 
@@ -1152,7 +1152,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
   int main()
   {
-      // WeightQuantPreprocess当前仅支持Ascend 950PR/Ascend 950DT。
+      // WeightQuantPreprocess当前仅支持Ascend 950PR&950DT系列产品。
       int32_t deviceId = 0;
       auto ret = AclnnGroupedMatmulWeightNzMxA8W4PreprocessTest(deviceId);
       CHECK_RET(ret == ACL_SUCCESS,
@@ -1830,7 +1830,7 @@ int main()
 }
 ```
 
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
   MxA8W4伪量化（单多单场景）调用示例
 

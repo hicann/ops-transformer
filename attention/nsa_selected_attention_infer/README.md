@@ -4,12 +4,12 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      ×     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      ×     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 |<term>Kirin X90处理器系列产品</term> | √ |
 |<term>Kirin 9030处理器系列产品</term> | √ |
 
@@ -17,15 +17,15 @@
 
 - 算子功能：Native Sparse Attention推理过程中，Selected Attention的计算。
 - 计算公式：
-  
+
   self-attention（自注意力）利用输入样本自身的关系构建了一种注意力模型。其原理是假设有一个长度为$n$的输入样本序列$x$，$x$的每个元素都是一个$d$维向量，可以将每个$d$维向量看作一个token embedding，将这样一条序列经过3个权重矩阵变换得到3个维度为$n*d$的矩阵。
-  
+
   Selected Attention的计算由topk索引取数与attention计算融合而成，外加paged attention取kvCache。首先，通过$topkIndices$索引从$key$中取出$key_{topk}$，从$value$中取出$value_{topk}$，计算self_attention公式如下：
-  
+
   $$
   Attention(query,key,value)=Softmax(\frac{query · key_{topk}^T}{\sqrt{d}})value_{topk}
   $$
-  
+
   其中$query$和$key_{topk}^T$乘积代表输入$x$的注意力，为避免该值变得过大，通常除以$d$的开根号进行缩放，并对每行进行softmax归一化，与$value_{topk}$相乘后得到一个$n*d$的矩阵。
 
 # 参数说明

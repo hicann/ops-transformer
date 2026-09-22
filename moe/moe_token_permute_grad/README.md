@@ -4,12 +4,12 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                             |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+| <term>Ascend 950PR&950DT系列产品</term>                             |    √     |
+| <term>Atlas A3系列产品</term>     |    √     |
+| <term>Atlas A2系列产品</term> |    √     |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
+| <term>Atlas推理系列产品</term>                             |    ×     |
+| <term>Atlas训练系列产品</term>                              |    ×     |
 
 ## 功能说明
 
@@ -19,11 +19,11 @@
   $$
   inputGrad = permutedOutputGrad.indexSelect(0, sortedIndices)
   $$
-  
+
   $$
   inputGrad = inputGrad.reshape(-1, numTopk, hiddenSize)
   $$
-  
+
   $$
   inputGrad = inputGrad.sum(dim = 1)
   $$
@@ -80,8 +80,8 @@
 
 ## 约束说明
 
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：numTopk <= 512。
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：numTopk <= 512。
+- <term>Ascend 950PR&950DT系列产品</term>：
   在调用本接口时，框架内部会转调用[aclnnMoeInitRoutingV2Grad](../moe_init_routing_v2_grad/docs/aclnnMoeInitRoutingV2Grad.md)接口，如果出现参数错误提示，请参考以下参数映射关系：
   - permutedOutputGrad输入等同于aclnnMoeInitRoutingV2Grad接口的gradExpandedX输入。
   - sortedIndices输入等同于aclnnMoeInitRoutingV2Grad接口的expandedRowIdx输入。
@@ -89,7 +89,7 @@
   - paddedMode输入等同于aclnnMoeInitRoutingV2Grad接口的dropPadMode输入。
   - out输出等同于aclnnMoeInitRoutingV2Grad接口的out输出。
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>: 单卡通信量取值范围[2MB，100MB]。
+- <term>Atlas A3系列产品</term>: 单卡通信量取值范围[2MB，100MB]。
 
 ## 调用说明
 

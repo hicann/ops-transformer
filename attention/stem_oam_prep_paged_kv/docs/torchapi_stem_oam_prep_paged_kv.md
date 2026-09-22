@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id8 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id8 -->
 <!-- npu="910" id9 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id9 -->
 
 ## 功能说明
@@ -95,7 +95,7 @@ cann_ops_transformer.stem_oam_prep_paged_kv(
 - stem_block_size % 32 == 0，≤256；stem_stride % 16 == 0，≤64，且stem_stride ≤ stem_block_size，stem_block_size必须是stem_stride的整数倍。
 - 派生值：R = stem_block_size / stem_stride，kflat_dim = stem_stride × 128，k_down_len = num_Kb × R。
 - 边界：kv_seq_lens[b]=0时该batch对应的k_flat/v_bias输出全零；k_scale_cache padding rows（beyond kv_len）→ zero。
-- 仅支持arch35架构（Ascend 950PR/Ascend 950DT）。
+- 仅支持arch35架构（Ascend 950PR&950DT系列产品）。
 
 ## 确定性计算
 

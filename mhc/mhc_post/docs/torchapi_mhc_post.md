@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id5 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="310p" id4 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -67,7 +67,7 @@
 cann_ops_transformer.mhc_post(x, h_res, h_out, h_post) -> Tensor
 ```
 
-其中`h_res`为可选输入，可传入None（仅Ascend 950PR/Ascend 950DT的单算子模式支持传入None，图模式不支持）。
+其中`h_res`为可选输入，可传入None（仅Ascend 950PR&950DT系列产品的单算子模式支持传入None，图模式不支持）。
 
 ## 参数说明
 
@@ -107,7 +107,7 @@ cann_ops_transformer.mhc_post(x, h_res, h_out, h_post) -> Tensor
         <td>h_res</td>
         <td>Tensor</td>
         <td>可选</td>
-        <td>残差连接矩阵，对应公式中的H<sub>l</sub><sup>res</sup>。传入None时跳过Res Mapping，计算公式退化为直接残差连接，仅Ascend 950PR/Ascend 950DT支持传入None，其他产品形态传入None会报错。</td>
+        <td>残差连接矩阵，对应公式中的H<sub>l</sub><sup>res</sup>。传入None时跳过Res Mapping，计算公式退化为直接残差连接，仅Ascend 950PR&950DT系列产品支持传入None，其他产品形态传入None会报错。</td>
         <td>float32</td>
         <td>
             <ul>
@@ -191,7 +191,7 @@ cann_ops_transformer.mhc_post(x, h_res, h_out, h_post) -> Tensor
   - 输出`y`的数据类型与`x`保持一致。
 
 - `h_res`可选约束：
-  - `h_res`传入None时跳过Res Mapping，仅Ascend 950PR/Ascend 950DT支持；Atlas A2/A3系列产品`h_res`为必传参数，传入None会报错。
+  - `h_res`传入None时跳过Res Mapping，仅Ascend 950PR&950DT系列产品支持；Atlas A2/A3系列产品`h_res`为必传参数，传入None会报错。
   - `h_res`传入None仅支持单算子模式调用；图模式（torch.compile）下`h_res`必须传入，传入None会在GE编译阶段报错。
 
 - 维度约束：
@@ -235,7 +235,7 @@ cann_ops_transformer.mhc_post(x, h_res, h_out, h_post) -> Tensor
   y = mhc_post(x, h_res, h_out, h_post)
   print(f"output shape: {y.shape}")
 
-  # h_res缺省时（仅Ascend 950PR/Ascend 950DT支持，且仅支持单算子模式）
+  # h_res缺省时（仅Ascend 950PR&950DT系列产品支持，且仅支持单算子模式）
   y = mhc_post(x, None, h_out, h_post)
   print(f"output shape: {y.shape}")
   ```

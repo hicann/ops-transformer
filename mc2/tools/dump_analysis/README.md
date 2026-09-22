@@ -96,7 +96,7 @@ aiv_mte3_time：AI CORE->片上内存搬运类指令在AI Vector Core上的耗�
   <tr>
     <td>START_A2_CLUSTER</td>
     <td>可选输入</td>
-    <td><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：解析dump数据时，区分是否开始分析多机数据，未输入时默认值为0，输入为1时开启多机分析，需先得到各机解析结果再执行，如:START_A2_CLUSTER=1</td>
+    <td><term>Atlas A2系列产品</term>：解析dump数据时，区分是否开始分析多机数据，未输入时默认值为0，输入为1时开启多机分析，需先得到各机解析结果再执行，如:START_A2_CLUSTER=1</td>
     <td>INT</td>
   </tr>
   <tr>

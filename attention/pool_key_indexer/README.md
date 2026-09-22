@@ -4,12 +4,12 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -74,10 +74,10 @@
 - pool_tail_k取值校验仅对CPU输入在host侧执行；NPU输入经aclnn Tensor变体直传device数据，host侧不做值校验，调用方须自行保证取值合法，否则kernel行为未定义。
 - sparse_indices无效部分填-1；sparse_values无效部分填-inf。
 - mask_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](../../docs/zh/context/sparse_mode_introduction.md)。
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
   - query、pool_key支持FLOAT8_E4M3FN数据类型。
   - quant_mode支持-1（不量化）、0（FP8 per-token-head量化）、1（mxFP8量化）。
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - 不支持FLOAT8_E4M3FN与FLOAT8_E8M0数据类型。
   - quant_mode仅支持-1（不量化），quant_mode为0/1暂不支持。
 

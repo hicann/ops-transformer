@@ -4,28 +4,28 @@
 
 |产品             |  是否支持  |
 |:-------------------------|:----------:|
-| <term>Ascend 950PR/Ascend 950DT</term> |    √    |
-|  <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>   |     √    |
-|  <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>     |     √    |
-| <term>Kirin X90 处理器系列产品</term> | √ |
-| <term>Kirin 9030 处理器系列产品</term> | √ |
+| <term>Ascend 950PR&950DT系列产品</term> |    √    |
+|  <term>Atlas A3系列产品</term>   |     √    |
+|  <term>Atlas A2系列产品</term>     |     √    |
+| <term>Kirin X90处理器系列产品</term> | √ |
+| <term>Kirin 9030处理器系列产品</term> | √ |
 
 ## 功能说明
 
 - 算子功能：MoE网络中，进行AlltoAll操作从其他卡上拿到需要算的token后，将token按照专家顺序重新排列。
 
-- 计算公式：  
+- 计算公式：
   通过双重求和计算当前token在源位置的偏移量：
 
   $$
-  SrcOffset = 
+  SrcOffset =
   \sum_{i=0}^{cur\_rank} \left( \sum_{j=0}^{cur\_expert} {expert\_token\_num\_per\_rank}(i,j) \right)
   $$
 
   通过双重求和计算当前token在目标位置的偏移量：
 
   $$
-  DstOffset = 
+  DstOffset =
   \sum_{j=0}^{cur\_expert} \left( \sum_{i=0}^{cur\_rank} {expert\_token\_num\_per\_rank}(i,j) \right)
   $$
 
@@ -58,7 +58,7 @@
         <td>表示待重新排布的token。</td>
         <td>
         通用：FLOAT16、BF16、INT8<br>
-        <term>Ascend 950PR/Ascend 950DT</term>：FLOAT16、BF16、INT8、FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1、FLOAT4_E1M2
+        <term>Ascend 950PR&950DT系列产品</term>：FLOAT16、BF16、INT8、FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1、FLOAT4_E1M2
         </td>
         <td>ND</td>
       </tr>
@@ -75,7 +75,7 @@
         <td>表示每个token对应的scale，需要随token同样进行重新排布。</td>
         <td>
         通用：FLOAT<br>
-        <term>Ascend 950PR/Ascend 950DT</term>：FLOAT、FLOAT8_E8M0
+        <term>Ascend 950PR&950DT系列产品</term>：FLOAT、FLOAT8_E8M0
         </td>
         <td>ND</td>
       </tr>
@@ -85,7 +85,7 @@
         <td>表示重新排布后的token。</td>
         <td>
         通用：FLOAT16、BF16、INT8<br>
-        <term>Ascend 950PR/Ascend 950DT</term>：FLOAT16、BF16、INT8、FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1、FLOAT4_E1M2
+        <term>Ascend 950PR&950DT系列产品</term>：FLOAT16、BF16、INT8、FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8、FLOAT4_E2M1、FLOAT4_E1M2
         </td>
         <td>ND</td>
       </tr>
@@ -95,7 +95,7 @@
         <td>表示重新排布后的per_token_scales。</td>
         <td>
         通用：FLOAT<br>
-        <term>Ascend 950PR/Ascend 950DT</term>：FLOAT、FLOAT8_E8M0
+        <term>Ascend 950PR&950DT系列产品</term>：FLOAT、FLOAT8_E8M0
         </td>
         <td>ND</td>
       </tr>
@@ -130,7 +130,7 @@
     </tbody>
   </table>
 
-- Kirin X90/Kirin 9030 处理器系列产品: 不支持BFLOAT16。
+- Kirin X90/Kirin 9030处理器系列产品: 不支持BFLOAT16。
 
 ## 约束说明
 
@@ -141,6 +141,6 @@
   - E：表示卡上的专家数，取值无限制。
 - 输入值域限制
   - expert_token_num_type，即输出expert_token_num的模式。0为cumsum模式，1为count模式，默认值为1。当前只支持为1。
-  - idx_type，即输出permute_token_idx的索引类型。0为gather索引，1为scatter索引，默认值为0。Ascend 950PR/Ascend 950DT支持0或1，其余产品仅支持0。
+  - idx_type，即输出permute_token_idx的索引类型。0为gather索引，1为scatter索引，默认值为0。Ascend 950PR&950DT系列产品支持0或1，其余产品仅支持0。
 - 输出类型限制
   - expert_token_num类型应与输入的expert_token_num_per_rank类型保持一致。

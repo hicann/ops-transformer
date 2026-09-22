@@ -1,26 +1,26 @@
 # aclnnGroupedMatmulSwigluQuantV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/gmm/grouped_matmul_swiglu_quant_v2)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/gmm/grouped_matmul_swiglu_quant_v2)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -30,7 +30,7 @@
   相较于[aclnnGroupedMatmulSwigluQuant](../../grouped_matmul_swiglu_quant/docs/aclnnGroupedMatmulSwigluQuant.md)接口，**此接口新增：**
 
     <!-- npu="950" id7 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：
+    - <term>Ascend 950PR&950DT系列产品</term>：
       - 新增了MXFP8、MXFP4、Pertoken量化场景。
       - 参数weight, weightScale, weightAssistMatrix的字段类型变为tensorlist，请根据实际情况选择合适的接口。
     <!-- end id7 -->
@@ -38,7 +38,7 @@
 - 计算公式：
 
   <!-- npu="A3,910b" id8 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     <details>
     <summary>量化场景A8W8（A指激活矩阵，W指权重矩阵，8指INT8数据类型）：</summary>
     <a id="量化场景A8W8"></a>
@@ -217,7 +217,7 @@
 
   <!-- end id8 -->
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     <details>
     <summary>MX量化场景：</summary>
 
@@ -561,7 +561,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
     </table>
 
     <!-- npu="A3,910b" id10 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+    - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
       - weight在A4W4下支持NZ输入转置，其他场景仅支持非转置。INT32为A8W4和A4W4场景下的适配用途，实际1个INT32会被解释为8个INT4数据，A8W8场景不支持ND数据格式。
       - 支持dequantMode参数：A8W4和A4W4场景支持取值0和1，A8W8场景仅支持取值0。
       - 不支持dequantDtype和quantMode参数。
@@ -570,7 +570,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
       - weight、weightScale和weightAssistMatrix支持单Tensor场景（tensorlist长度为1）和多Tensor场景（tensorlist长度大于1）。
     <!-- end id10 -->
     <!-- npu="950" id11 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：
+    - <term>Ascend 950PR&950DT系列产品</term>：
       - weight支持转置，仅支持ND格式。
       - 支持dequantMode参数：MX量化场景支持取值2，Pertoken场景支持取值为0。
       - 支持dequantDtype参数：MX量化场景支持取值0，Pertoken场景支持取值为0、1、27。
@@ -662,7 +662,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
       - aclnnGroupedMatmulSwigluQuantV2默认为确定性实现。
 
   <!-- npu="A3,910b" id12 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     - A8W8/A8W4/A4W4量化场景下需满足以下约束条件：
         - 数据类型需要满足下表：
           <table style="undefined;table-layout: fixed; width: 1134px"><colgroup>
@@ -813,7 +813,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
 
   <!-- end id12 -->
   <!-- npu="950" id13 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     - groupList第1维最大支持1024，即最多支持1024个group。
     - MX量化场景下需满足以下约束条件：
         - 数据类型需要满足下表：
@@ -983,7 +983,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
   <!-- npu="A3,910b" id14 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
 
     ```cpp
     #include <iostream>
@@ -1212,7 +1212,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
 
   <!-- end id14 -->
   <!-- npu="950" id15 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
 
     ```cpp
     #include <iostream>

@@ -1,26 +1,26 @@
 # aclnnAllGatherMatmulV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/mc2/all_gather_matmul_v2)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/mc2/all_gather_matmul_v2)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -30,13 +30,13 @@
     `aclnnAllGatherMatmulV2`接口是对`aclnnAllGatherMatmul`接口的功能拓展，在支持x1和x2输入类型为FLOAT16/BFLOAT16的基础上，新增功能如下：
 
     <!-- npu="950" id7 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：
+    - <term>Ascend 950PR&950DT系列产品</term>：
 
         新增了对低精度数据类型FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8的支持。支持pertensor、perblock、mx[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。
 
     <!-- end id7 -->
     <!-- npu="A3,910b" id8 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+    - <term>Atlas A3系列产品</term>  、<term>Atlas A2系列产品</term>：
 
         新增了对低精度数据类型INT8/INT4的支持。支持pertoken/perchannel[量化方式](../../../docs/zh/context/quant_mode_introduction.md)。
 
@@ -167,7 +167,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
         <td>bias (aclTensor*)</td>
         <td>输入</td>
         <td>即计算公式中的bias。</td>
-        <td><ul><li><term>Ascend 950PR/Ascend 950DT</term>：支持传入一维输入或者空指针。</li><li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：当前版本仅支持传入空指针。</li></ul></td>
+        <td><ul><li><term>Ascend 950PR&950DT系列产品</term>：支持传入一维输入或者空指针。</li><li><term>Atlas A2系列产品</term>：当前版本仅支持传入空指针。</li></ul></td>
         <td>FLOAT16、BFLOAT16、FLOAT</td>
         <td>ND</td>
         <td>1</td>
@@ -277,7 +277,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
         <td>output (aclTensor*)</td>
         <td>输出</td>
         <td>AllGather通信与MatMul计算的结果，即计算公式中的output。</td>
-        <td><ul><li><term>Ascend 950PR/Ascend 950DT</term>：支持空Tensor。</li><li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持空Tensor。</li></ul></td>
+        <td><ul><li><term>Ascend 950PR&950DT系列产品</term>：支持空Tensor。</li><li><term>Atlas A2系列产品</term>：不支持空Tensor。</li></ul></td>
         <td>FLOAT16、BFLOAT16、FLOAT</td>
         <td>ND</td>
         <td>2</td>
@@ -287,7 +287,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
         <td>gatherOut (aclTensor*)</td>
         <td>输出</td>
         <td>仅输出all_gather通信后的结果。即公式中的gatherOut。</td>
-        <td><ul><li><term>Ascend 950PR/Ascend 950DT</term>：支持空Tensor。</li><li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持空Tensor。</li><li>数据类型与x1的数据类型保持一致。</li></ul></td>
+        <td><ul><li><term>Ascend 950PR&950DT系列产品</term>：支持空Tensor。</li><li><term>Atlas A2系列产品</term>：不支持空Tensor。</li><li>数据类型与x1的数据类型保持一致。</li></ul></td>
         <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1、INT8、INT4</td>
         <td>ND</td>
         <td>2</td>
@@ -326,7 +326,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
     </tbody></table>
 
     <!-- npu="A3,910b" id9 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  ：
         - x1、x2：数据类型支持FLOAT16、BFLOAT16、INT8、INT4。
         - bias：在commMode为aiv时，当前版本仅支持输入nullptr。
         - x1Scale：数据类型支持FLOAT。当x1和x2数据类型为FLOAT16/BFLOAT16时，仅支持输入为nullptr。在pertoken场景，shape为(m, 1)。
@@ -337,7 +337,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
         - gatherOut：数据类型支持FLOAT16、BFLOAT16、INT8、INT4。
     <!-- end id9 -->
     <!-- npu="950" id10 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：
+    - <term>Ascend 950PR&950DT系列产品</term>：
         - x1、x2：的数据类型支持FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1。
         - bias：如果x1的数据类型是FLOAT16、BFLOAT16，则bias的数据类型必须为FLOAT16、BFLOAT16。如果x1的数据类型是FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1时，在pertensor和mx量化场景下，bias的数据类型必须为FLOAT。在perblock场景下，仅支持输入为nullptr。
         - x1Scale：当x1和x2数据类型为FLOAT16、BFLOAT16时，仅支持输入为nullptr。在pertensor场景下，shape为[1]。在perblock场景下，shape为[ceilDiv(m, 128), ceilDiv(k, 128)]。在pertensor和perblock场景下，数据类型支持FLOAT。在mx量化场景下，数据类型为FLOAT8_E8M0，shape为(m, ceilDiv(k, 64), 2)。
@@ -433,7 +433,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
   - `aclnnAllGatherMatmulV2`默认确定性实现。
 
 <!-- npu="950" id11 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
     - 输入x1为2维，其维度为\(m, k\)。x2必须是2维，其维度为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。m和n的值不得超过2147483647（INT32_MAX）。
     - x1/x2支持的空tensor场景，m和n可以为空，k不可为空，且需要满足以下条件：
         - m为空，k不为空，n不为空；
@@ -455,7 +455,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
 
 <!-- end id11 -->
 <!-- npu="A3,910b" id12 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>  、<term>Atlas A2系列产品</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。
     - 输入x1必须是2维，其shape为\(m, k\)。
     - 输入x2必须是2维，其shape为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。
@@ -476,7 +476,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="A3,910b" id13 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
     ```c++
     #include <iostream>
@@ -730,7 +730,7 @@ aclnnStatus aclnnAllGatherMatmulV2(
 
 <!-- end id13 -->
 <!-- npu="950" id14 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
     ```c++
     #include <iostream>

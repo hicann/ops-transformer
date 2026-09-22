@@ -4,12 +4,12 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                             |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+| <term>Ascend 950PR&950DT系列产品</term>                             |    √     |
+| <term>Atlas A3系列产品</term>     |    √     |
+| <term>Atlas A2系列产品</term> |    √     |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
+| <term>Atlas推理系列产品</term>                             |    ×     |
+| <term>Atlas训练系列产品</term>                              |    ×     |
 
 ## 功能说明
 
@@ -166,8 +166,8 @@
 
 - **维度格式约束**
 
-  - <term>Ascend 950PR/Ascend 950DT</term>：输入支持两种维度格式：BSND（4维）和TND（3维）。其中T = B × S，表示所有Batch序列长度的累加和。所有带B/S维度的输入需保持维度格式一致（同为4维BSND或同为3维TND）。
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：输入仅支持BSND（4维）格式。
+  - <term>Ascend 950PR&950DT系列产品</term>：输入支持两种维度格式：BSND（4维）和TND（3维）。其中T = B × S，表示所有Batch序列长度的累加和。所有带B/S维度的输入需保持维度格式一致（同为4维BSND或同为3维TND）。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：输入仅支持BSND（4维）格式。
 
   各输入/输出在两种格式下的shape对应关系如下：
 
@@ -188,8 +188,8 @@
 
 - **规格约束**
 
-  - N（针对Ascend 950PR/Ascend 950DT）：N维度支持大于0且不超过8。
-  - N（针对<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>）：N维度仅支持4。
+  - N（针对Ascend 950PR&950DT系列产品）：N维度支持大于0且不超过8。
+  - N（针对<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>）：N维度仅支持4。
   - C：大于0、小于100000且可以被128整除。
   - sk_iter_count：Sinkhorn迭代次数当前仅支持20。
 

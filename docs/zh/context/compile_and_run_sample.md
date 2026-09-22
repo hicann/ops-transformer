@@ -4,7 +4,7 @@
 
 - 如需编译执行算子API，请确保基础环境已搭建完成，包括驱动、固件、CANN软件包、ops包等。
 
-- 算子API的调用流程和编译运行操作详情请参见[《应用开发（C&C++）》](https://hiascend.com/document/redirect/CannCommunityCppInferWizard)中“单算子调用>单算子API执行>调用aclnn接口示例代码”。
+- 算子API的调用流程和编译运行操作详情请参见[《应用开发（C&C++）》](https://hiascend.com/document/redirect/CannCommunityadevguide)中“单算子调用>单算子API执行>调用aclnn接口示例代码”。
 
 ## 编译前准备
 

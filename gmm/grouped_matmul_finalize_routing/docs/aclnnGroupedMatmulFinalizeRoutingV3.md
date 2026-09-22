@@ -1,26 +1,26 @@
 # aclnnGroupedMatmulFinalizeRoutingV3
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/gmm/grouped_matmul_finalize_routing)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/gmm/grouped_matmul_finalize_routing)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -31,10 +31,10 @@
   相较于aclnnGroupedMatmulFinalizeRoutingV2接口，**此接口新增:**
 
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：新增入参tuningConfigOptional，调优参数。数组中的第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值合理进行tiling切分，性能更优。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：新增入参tuningConfigOptional，调优参数。数组中的第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值合理进行tiling切分，性能更优。
     <!-- end id7 -->
     <!-- npu="950" id8 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：新增了MX量化场景，相关信息参考[量化介绍](../../../docs/zh/context/quant_mode_introduction.md)。
+    - <term>Ascend 950PR&950DT系列产品</term>：新增了MX量化场景，相关信息参考[量化介绍](../../../docs/zh/context/quant_mode_introduction.md)。
     <!-- end id8 -->
 
 - 计算公式：
@@ -355,7 +355,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
   </table>
 
   <!-- npu="A3,910b" id9 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
     - x1仅支持INT8。维度为(m, k)，维度m的取值范围为[1,16\*1024\*8]，k支持2048;
     - x2仅支持INT4。当输入为INT32时维度为(e, k, n / 8)，输入转为INT4时维度为(e, k, n)，e取值范围[1,256]，k支持2048，n支持7168。仅支持非转置，即transposeX2必须为false。
@@ -371,7 +371,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 
   <!-- end id9 -->
   <!-- npu="950" id10 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     - x1不支持INT8。
     - x2不支持INT4。维度为(e,k,n)，转置情况下维度为(e,n,k)，e取值范围[1,1024]。
     - scaleOptional支持FLOAT8_E8M0。shape支持四维。x2非转置时维度为(e,Ceil(k/64),n,2)，x2转置时维度为(e,n,Ceil(k/64),2)。数据类型只支持FLOAT8_E8M0，转置属性必须和x2保持一致。
@@ -471,15 +471,15 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 - 确定性计算：
 
   <!-- npu="A3,910b" id11 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：aclnnGroupedMatmulFinalizeRoutingV3默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：aclnnGroupedMatmulFinalizeRoutingV3默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
   <!-- end id11 -->
   <!-- npu="950" id12 -->
-  - <term>Ascend 950PR/Ascend 950DT</term> ：aclnnGroupedMatmulFinalizeRoutingV3默认非确定性实现，不支持通过aclrtCtxSetSysParamOpt开启确定性。
+  - <term>Ascend 950PR&950DT系列产品</term> ：aclnnGroupedMatmulFinalizeRoutingV3默认非确定性实现，不支持通过aclrtCtxSetSysParamOpt开启确定性。
 
   <!-- end id12 -->
 
 <!-- npu="A3,910b" id13 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：仅支持伪量化场景。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：仅支持伪量化场景。
 
   - 输入和输出支持以下数据类型组合：
 
@@ -495,7 +495,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 
 <!-- end id13 -->
 <!-- npu="950" id14 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：仅支持MX全量化场景。
+- <term>Ascend 950PR&950DT系列产品</term>：仅支持MX全量化场景。
 
   - 输入和输出支持以下数据类型组合：
 
@@ -517,7 +517,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="A3,910b" id15 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
   ```Cpp
   #include <iostream>
@@ -825,7 +825,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
 
 <!-- end id15 -->
 <!-- npu="950" id16 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
   ```cpp
   #include <iostream>

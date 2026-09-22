@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -388,7 +388,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>winLeft</td>
                   <td>输入</td>
                   <td>滑窗attention场景下，滑窗需要向前包含多少个token。</td>
-                  <td>不使能时必须为-1，需要与maskType、mask配合使用。</td>
+                  <td>不开启时必须为-1，需要与maskType、mask配合使用。</td>
                   <td>INT64</td>
                   <td>-</td>
                   <td>-</td>
@@ -398,7 +398,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>winRight</td>
                   <td>输入</td>
                   <td>滑窗attention场景下，滑窗需要向后包含多少个token。</td>
-                  <td>不使能时必须为-1，需要与maskType、mask配合使用。</td>
+                  <td>不开启时必须为-1，需要与maskType、mask配合使用。</td>
                   <td>INT64</td>
                   <td>-</td>
                   <td>-</td>
@@ -552,7 +552,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 - sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自Q/K的S维。
 - HeadDim固定为128；N1/N2取值范围[1, 128]，且N1 > N2，N1 % N2 == 0。
 - blockShape：blockShapeX仅支持1；blockShapeY须≥128且为64的倍数；isPackedGQA当前仅支持1；maskType当前仅支持1；softmaxPrecision当前仅支持0。
-- winLeft和winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
+- winLeft和winRight不开启时必须为-1；attenMaskOptional当前应传nullptr。
 - Softmax LSE的head/seq轴语义须与query布局一致。
 - `sparseBlockIdx`第4维maxS1应≥`sparseBlockCount`中所有元素的最大值。
 

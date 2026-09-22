@@ -4,7 +4,7 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
 |<term>Atlas A3训练系列产品</term>|      √     |
 |<term>Atlas A3推理系列产品</term>|      ×     |
 |<term>Atlas A2训练系列产品</term>|      √     |

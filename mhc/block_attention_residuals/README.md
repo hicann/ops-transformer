@@ -4,12 +4,12 @@
 
 | 产品                                                     | 是否支持 |
 | :------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                   |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                  |    ×    |
-| <term>Atlas 推理系列产品</term>                          |    ×    |
-| <term>Atlas 训练系列产品</term>                          |    ×    |
+| <term>Ascend 950PR&950DT系列产品</term>                   |    √    |
+| <term>Atlas A3系列产品</term> |    √    |
+| <term>Atlas A2系列产品</term> |    √    |
+| <term>Atlas 200I/500 A2推理产品</term>                  |    ×    |
+| <term>Atlas推理系列产品</term>                          |    ×    |
+| <term>Atlas训练系列产品</term>                          |    ×    |
 
 ## 功能说明
 
@@ -144,7 +144,7 @@
 - T 大于等于 0，H 大于等于 1，N 取值范围为 1~100。
 - partialBlock、blockRes、projWeight、normWeight、hiddenStates 的数据类型须一致。
 - validBlockNum 须为 -1（默认，使用 N）或等于 blockRes 的 N。
-- <term>Ascend 950PR/Ascend 950DT</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>计算语义一致。
+- <term>Ascend 950PR&950DT系列产品</term>、<term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>计算语义一致。
 
 ## 调用说明
 

@@ -16,14 +16,14 @@
 + 算子功能：GenericBlockSparseAttentionGradMetadata根据KV2Q稀疏块索引表`sparseBlockIdx`/`sparseBlockCount`，根据算法按照顺序展开任务列表，并在AIC核间做负载均衡，供后续GenericBlockSparseAttentionGrad算子消费。
 
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做负载均衡，供后续GenericBlockSparseAttentionGrad算子消费。
   <!-- end id9 -->
 
   - 该算子不建议单独使用，建议与aclnnGenericBlockSparseAttentionGrad配合使用，形成完整工作流。
 - Metadata size计算公式：
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>:
+  - <term>Ascend 950PR&950DT系列产品</term>:
 
     $$
     \text{metaSize} = 80 + B \times N1 \times J \times 4
@@ -165,14 +165,14 @@
   <tr>
     <td class="tg-0pky">winLeft</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">滑窗向前包含token数，不使能时须为-1。</td>
+    <td class="tg-0pky">滑窗向前包含token数，不开启时须为-1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
     <td class="tg-0pky">winRight</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">滑窗向后包含token数，不使能时须为-1。</td>
+    <td class="tg-0pky">滑窗向后包含token数，不开启时须为-1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>

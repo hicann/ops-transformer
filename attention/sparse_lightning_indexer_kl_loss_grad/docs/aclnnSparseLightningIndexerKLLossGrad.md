@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -571,37 +571,37 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGrad(
   - 参数B的支持情况:
 
     <!-- npu="A3,910b" id10 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：B支持1~256。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：B支持1~256。
     <!-- end id10 -->
     <!-- npu="950" id11 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：B>0。
+    - <term>Ascend 950PR&950DT系列产品</term>：B>0。
     <!-- end id11 -->
 
   - 参数S1、S2的支持情况:
 
     <!-- npu="A3,910b" id12 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：S1支持1~8k，S2支持1~512k。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：S1支持1~8k，S2支持1~512k。
     <!-- end id12 -->
     <!-- npu="950" id13 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：S1>0，S2>0。
+    - <term>Ascend 950PR&950DT系列产品</term>：S1>0，S2>0。
     <!-- end id13 -->
 
   - 参数N1的支持情况:
 
     <!-- npu="A3,910b" id14 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：N1支持8、16、32、64。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N1支持8、16、32、64。
     <!-- end id14 -->
     <!-- npu="950" id15 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：N1支持1~128。
+    - <term>Ascend 950PR&950DT系列产品</term>：N1支持1~128。
     <!-- end id15 -->
 
   - 参数K的支持情况:
 
     <!-- npu="A3,910b" id16 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：K支持1~8192。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：K支持1~8192。
     <!-- end id16 -->
     <!-- npu="950" id17 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：K支持1~2048。
+    - <term>Ascend 950PR&950DT系列产品</term>：K支持1~2048。
 
     <!-- end id17 -->
 

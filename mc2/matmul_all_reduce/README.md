@@ -4,12 +4,12 @@
 
 | 产品 | 是否支持 |
 | ---- | :----: |
-| <term>Ascend 950PR/Ascend 950DT</term> | √ |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>   | x |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> | √ |
-| <term>Atlas 200I/500 A2 推理产品</term> | x |
-| <term>Atlas 推理系列产品</term>    | x |
-| <term>Atlas 训练系列产品</term> | x |
+| <term>Ascend 950PR&950DT系列产品</term> | √ |
+| <term>Atlas A3系列产品</term>   | x |
+| <term>Atlas A2系列产品</term> | √ |
+| <term>Atlas 200I/500 A2推理产品</term> | x |
+| <term>Atlas推理系列产品</term>    | x |
+| <term>Atlas训练系列产品</term> | x |
 
 ## 功能说明
 
@@ -273,8 +273,8 @@
 * 输入x1可为二维或者三维，其shape为(b, s, k)或者(m, k)，不支持非连续输入。
 * 输入x2必须是二维。其shape为(k, n)，k轴满足mm算子入参要求，k轴相等，m的范围为[1, 2147483647]，k、n的范围为[1, 65535]。
 * 输入x2的数据格式：
-    * <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持ND（当前版本仅支持二维输入）和FRACTAL_NZ格式（当前版本仅支持四维输入）。
-    * <term>Ascend 950PR/Ascend 950DT</term>：支持ND格式。
+    * <term>Atlas A2系列产品</term>：支持ND（当前版本仅支持二维输入）和FRACTAL_NZ格式（当前版本仅支持四维输入）。
+    * <term>Ascend 950PR&950DT系列产品</term>：支持ND格式。
     * 当x2的数据格式为FRACTAL_NZ时，配合aclnnCalculateMatmulWeightSizeV2和aclnnTransMatmulWeight到数据格式NZ的转换，非连续Tensor仅支持transpose场景。当x2的数据格式为ND时，当前版本仅支持二维输入。
 * 传入的x1、x2、antiquantScale或者output不为空指针。
 * 当输入x1的shape为(b, s, k)时，x3（非空场景）与输出output的shape为(b, s, n)，pertoken_scale的shape为(b*s)；当输入x1的shape为(m, k)时，x3（非空场景）与输出output的shape为(m, n)，pertoken_scale的shape为(m)。
@@ -289,9 +289,9 @@
 * 属性commTurn当前版本仅支持输入0。
 * 在长序列场景，随着b/s或者m的增大，可能出现OOM或者计算超时。
 * 仅支持hccs链路all mesh组网。
-    * <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持1、2、4、8卡。
-    * <term>Ascend 950PR/Ascend 950DT</term>：支持1、2、4、8、16、32、64卡。
-* <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
+    * <term>Atlas A2系列产品</term>：支持1、2、4、8卡。
+    * <term>Ascend 950PR&950DT系列产品</term>：支持1、2、4、8、16、32、64卡。
+* <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
 
 ## 调用说明
 

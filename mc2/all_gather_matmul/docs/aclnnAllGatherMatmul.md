@@ -1,26 +1,26 @@
 # aclnnAllGatherMatmul
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/mc2/all_gather_matmul)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/mc2/all_gather_matmul)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 **说明：** 使用该接口时，请确保驱动固件包和CANN包都为配套的8.0.RC2版本或者配套的更高版本，否则将会引发报错，比如BUS ERROR等。
@@ -204,11 +204,11 @@ aclnnStatus aclnnAllGatherMatmul(
     </tbody></table>
 
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  ：
         - bias：暂不支持输入为非0的场景。
     <!-- end id7 -->
     <!-- npu="950" id8 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：
+    - <term>Ascend 950PR&950DT系列产品</term>：
         - bias：支持输入为非0的场景。
 
     <!-- end id8 -->
@@ -301,18 +301,18 @@ aclnnStatus aclnnAllGatherMatmul(
 - 输出为2维，其shape为(m*rank_size, n), rank_size为卡数。
 
 <!-- npu="910b" id9 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持2、4、8卡，并且仅支持HCCS链路all mesh组网。
+- <term>Atlas A2系列产品</term>：支持2、4、8卡，并且仅支持HCCS链路all mesh组网。
 <!-- end id9 -->
 <!-- npu="A3" id10 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
+- <term>Atlas A3系列产品</term>  ：支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
 <!-- end id10 -->
 <!-- npu="950" id11 -->
-- <term>Ascend 950PR/Ascend 950DT</term>:
+- <term>Ascend 950PR&950DT系列产品</term>:
   - 支持2、4、8、16、32、64卡，并且仅支持HCCS链路all mesh组网。
   - AllGather(x1)集合通信数据总量不能超过63 \* 256MB，集合通信数据总量计算方式为：m \* k \* sizeof(x1_dtype) \* 卡数。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 <!-- end id11 -->
 <!-- npu="910b" id12 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>:一个模型中的通算融合MC2算子，仅支持相同通信域。
+- <term>Atlas A2系列产品</term>:一个模型中的通算融合MC2算子，仅支持相同通信域。
 
 <!-- end id12 -->
 
@@ -323,7 +323,7 @@ aclnnStatus aclnnAllGatherMatmul(
 说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950,A3,910b" id13 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  、<term>Ascend 950PR&950DT系列产品</term>：
 
     ```Cpp
     #include <thread>

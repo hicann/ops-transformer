@@ -4,12 +4,12 @@
 
 |产品             |  是否支持  |
 |:-------------------------|:----------:|
-|  <term>Ascend 950PR/Ascend 950DT</term>   |     √    |
-|  <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>   |     √    |
-|  <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>     |     √    |
-|  <term>Atlas 200I/500 A2 推理产品</term>    |     ×    |
-|  <term>Atlas 推理系列产品</term>    |     √    |
-|  <term>Atlas 训练系列产品</term>    |     ×    |
+|  <term>Ascend 950PR&950DT系列产品</term>   |     √    |
+|  <term>Atlas A3系列产品</term>   |     √    |
+|  <term>Atlas A2系列产品</term>     |     √    |
+|  <term>Atlas 200I/500 A2推理产品</term>    |     ×    |
+|  <term>Atlas推理系列产品</term>    |     √    |
+|  <term>Atlas训练系列产品</term>    |     ×    |
 
 ## 功能说明
 
@@ -23,38 +23,38 @@
   **说明：**
   Routing计算是MoE模型中的一个环节。MoE模型主要由一组专家模型和一个门控模型组成，在计算时，输入的数据会先根据门控网络（Gating Network，包含MoeGatingTopKSoftmax算子）计算出每个数据元素对应权重最高的k个专家，然后该结果会输入MoeInitRouting算子，生成Routing矩阵。在后续，模型中的每个专家会根据Routing矩阵处理其应处理的数据，产生相应的输出。各专家的输出最后与权重加权求和，形成最终的预测结果。
 
-- 计算公式：  
+- 计算公式：
 
   1.对输入expertIdx做排序，得出排序后的结果sortedExpertIdx和对应的序号sortedRowIdx：
-  
+
   $$
   sortedExpertIdx, sortedRowIdx=keyValueSort(expertIdx)
   $$
 
   2.以sortedRowIdx做位置映射得出expandedRowIdxOut：
-  
+
   $$
   expandedRowIdxOut[sortedRowIdx[i]]=i
   $$
-  
+
   3.对x取前numRows个sortedRowIdx的对应位置的值，得出expandedXOut：
-  
+
   $$
   expandedXOut[i]=x[sortedRowIdx[i]\%numRows]
   $$
-  
+
   4.对sortedExpertIdx的每个专家统计直方图结果，再进行Cumsum，得出expertTokensCountOrCumsumOut：
-  
+
   $$
   expertTokensCountOrCumsumOut[i]=Cumsum(Histogram(sortedExpertIdx))
   $$
-  
+
   5.对sortedExpertIdx的每个专家统计直方图结果，得出expertTokensBeforeCapacityOut：
-  
+
   $$
   expertTokensBeforeCapacityOut[i]=Histogram(sortedExpertIdx)
   $$
-  
+
 ## 参数说明
 
   <table style="table-layout: auto; width: 100%">
@@ -79,7 +79,7 @@
       <td>expertIdx</td>
       <td>输入</td>
       <td>为每个Token对应的k个处理专家的序号。</td>
-      <td>Ascend 950PR/Ascend 950DT：INT32、INT64/其他处理器：INT32</td>
+      <td>Ascend 950PR&950DT系列产品：INT32、INT64/其他处理器：INT32</td>
       <td>ND</td>
     </tr>
     <tr>

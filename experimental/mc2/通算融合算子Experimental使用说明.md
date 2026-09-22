@@ -19,7 +19,7 @@
     # bash build.sh --pkg --experimental --soc=ascend910b
     ```
 
-    - --soc：\$\{soc\_version\}表示NPU型号。Atlas A2 训练系列产品/Atlas A2 推理系列产品使用"ascend910b"（默认），Atlas A3 训练系列产品/Atlas A3 推理系列产品使用"ascend910_93"。
+    - --soc：\$\{soc\_version\}表示NPU型号。Atlas A2系列产品使用"ascend910b"（默认），Atlas A3系列产品使用"ascend910_93"。
     - --vendor_name（可选）：\$\{vendor\_name\}表示构建的自定义算子包名，默认名为custom。同一环境中如需要安装多个自定义算子包，则必须使用不同的\$\{vendor\_name\}加以区分。
     - --ops：自定义算子名称。
 

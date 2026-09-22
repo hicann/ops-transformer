@@ -1,7 +1,7 @@
 # TurboQuantSparseFlashAttention PyTorch Extension
 
 This experimental PyTorch interface is maintained with the operator implementation. It is not part of the
-commercial `cann_ops_transformer` interface package.
+community `cann_ops_transformer` interface package.
 
 ## Build and install
 

@@ -4,12 +4,12 @@
 
 | 产品                                                         |  是否支持   |
 | :----------------------------------------------------------- |:-------:|
-| <term>Ascend 950DT</term>                             |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×    |
-| <term>Atlas 推理系列产品</term>                               |    ×    |
-| <term>Atlas 训练系列产品</term>                              |    ×    |
+| <term>Ascend 950DT系列产品</term>                             |    √    |
+| <term>Atlas A3系列产品</term>       |    √    |
+| <term>Atlas A2系列产品</term> |    √    |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×    |
+| <term>Atlas推理系列产品</term>                               |    ×    |
+| <term>Atlas训练系列产品</term>                              |    ×    |
 
 ## 功能说明
 
@@ -70,8 +70,8 @@ $$
 
 其中，$emax$表示该类型最大正规数对应的指数部分的值。
 
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：该算子必须与`MoeDistributeCombineV2`配套使用。
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、Ascend 950DT：该算子必须与`MoeDistributeCombineV2`或`MoeDistributeCombineAddRmsNorm`配套使用。
+- <term>Atlas A2系列产品</term>：该算子必须与`MoeDistributeCombineV2`配套使用。
+- <term>Atlas A3系列产品</term>、Ascend 950DT系列产品：该算子必须与`MoeDistributeCombineV2`或`MoeDistributeCombineAddRmsNorm`配套使用。
 
 > 说明：MoeDistributeCombineV2、MoeDistributeCombineAddRmsNorm算子在后续文档中统称为CombineV2系列算子。
 ・
@@ -321,22 +321,22 @@ $$
  </tbody>
 </table>
 
-* <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+* <term>Atlas A2系列产品</term>：
     * 不支持共享专家场景，不支持`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`属性。
     * 仅支持EP域，无TP域，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，且`tpRecvCounts`输出无有效内容。
     * 不支持`elasticInfoOptional`。
     * 当`commAlg` = "hierarchy"，`expandScalesOut`内容有效。
     * 不支持常量专家场景，不支持`constExpertNum`，使用默认值即可。
-* <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+* <term>Atlas A3系列产品</term>  ：
     * commAlg支持""，"fullmesh_v1"，"fullmesh_v2", "hierarchy"三种输入方式。""：默认值，不开启fullmesh_v2模板；"fullmesh_v1"：不开启fullmesh_v2模板；"fullmesh_v2"：开启fullmesh_v2模板，不支持在各卡`BS`不一致、输入xActiveMask和特殊专家场景下开启；"hierarchy": 开启跨超模板，支持各rank `BS`不一致，仅支持共享专家为0的场景，且不支持二维mask、特殊专家、performanceInfo场景。可变BS场景需为所有rank配置相同且非0的`globalBS`容量，并且不传`xActiveMaskOptional`。
     * `expertScalesOptional`当`commAlg`="hierarchy"场景时，要求为2D Tensor，shape为(BS, K)；当`commAlg`=""、"fullmesh_v1"、"fullmesh_v2"场景时，可传有效Tensor或空指针，有效Tensor为2D Tensor，shape为(BS, K)，传空指针时`expertScalesOptional`无效，不支持空Tensor。
     * epWorldSize取值范围[2, 768]；当commAlg="hierarchy"场景时，取值范围为[16, 256]，且为16的整数倍。
     * moeExpertNum取值范围(0, 1024]；当commAlg="hierarchy"场景时，取值范围为(0, 512]。
     * `expandScalesOut`当`commAlg`="hierarchy"场景时，要求为1D Tensor，shape为(A,)；当`commAlg`=""、"fullmesh_v1"、"fullmesh_v2"场景时暂不支持该输出。
-* <term>Ascend 950DT</term>：
+* <term>Ascend 950DT系列产品</term>：
     * 仅支持EP域，无TP域，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，且`tpRecvCounts`输出无有效内容。
-    * `expertScalesOptional`可传有效Tensor或空指针。传有效Tensor时使能expertScales专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)；传空指针时不使能expertScales专家权重功能。不支持空Tensor。
-    * 使能expertScales专家权重功能时，`expandScalesOut`输出有效；不使能时，该输出无效。
+    * `expertScalesOptional`可传有效Tensor或空指针。传有效Tensor时开启expertScales专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)；传空指针时不开启expertScales专家权重功能。不支持空Tensor。
+    * 开启expertScales专家权重功能时，`expandScalesOut`输出有效；不开启时，该输出无效。
 
 ## 约束说明
 
@@ -368,9 +368,9 @@ $$
     - 当前不支持TP域通信。
 
 - 通信方式约束：
-    - <term>Ascend 950DT</term>：仅支持UB Memory通信。
+    - <term>Ascend 950DT系列产品</term>：仅支持UB Memory通信。
 
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
     - 参数约束：
         - `commAlg`：当前版本支持nullptr，""，"fullmesh"，"hierarchy"四种输入方式，若配置"hierarchy"，建议搭配搭配25.0.RC1.1及以上版本驱动使用。
             - nullptr和""：仅在此场景下，`HCCL_INTRA_PCIE_ENABLE`和`HCCL_INTRA_ROCE_ENABLE`配置生效。当`HCCL_INTRA_PCIE_ENABLE`=1&&`HCCL_INTRA_ROCE_ENABLE`=0时，调用"hierarchy"算法，否则调用"fullmesh"算法。不推荐使用该方式。
@@ -393,7 +393,7 @@ $$
         - `commAlg` = "hierarchy"：要求 >= (`moeExpertNum` + `epWorldSize` / 4) *Align512(`maxBS`* (`H` *2 + 16* Align8(`K`))) *1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8)* 8，Align512(x) = ((x + 512 - 1) / 512) * 512。
     - 组网约束：多机场景仅支持交换机组网，不支持双机直连组网。
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+- <term>Atlas A3系列产品</term>  ：
     - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
     - 参数约束：
         - `elasticInfoOptional`：当前版本不支持，传空指针即可。
@@ -415,7 +415,7 @@ $$
             - `commAlg` = "fullmesh_v1"或""：取值范围(0, 512]。
     - `HCCL_BUFFSIZE`：调用本算子前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求 >= 2且满足>= 2 *(`localExpertNum`* `maxBS` *`epWorldSize`* Align512(Align32(2 *`H`) + 64) + (`K` + `sharedExpertNum`)* `maxBS` *Align512(2* `H`))，`localExpertNum`需使用MoE专家卡的本卡专家数，其中Align512(x) = ((x + 512 - 1) / 512) *512，Align32(x) = ((x + 32 - 1) / 32)* 32。
 
-- <term>Ascend 950DT</term>：
+- <term>Ascend 950DT系列产品</term>：
     - 参数约束：
         - `elasticInfoOptional`：当前版本不支持，传空指针即可。
         - `epWorldSize`：取值范围[2, 1024]。

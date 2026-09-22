@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -193,9 +193,9 @@ dense_lightning_indexer_softmax_lse(
   - TND 场景下：seqused_q ≤ cu_seqlens_q[i+1] - cu_seqlens_q[i]，seqused_k ≤ cu_seqlens_k[i+1] - cu_seqlens_k[i]。
 - 参数 `cmp_residual_k` 需满足 cmp_residual_k[i] < cmp_ratio。
 - 当 cmp_ratio > 1 且 mask_mode = 3 时，必须传入 cmp_residual_k；其余情况不需要传入。
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - 当前不支持 seqused_q、seqused_k、metadata 功能，不建议传入这些参数。
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
   - 当 layout_q 为 BSND 时，不支持传入 cu_seqlens_q；当 layout_k 为 BSND 时，不支持传入 cu_seqlens_k。
   - 当 layout_q 为 TND 时，必须传入 cu_seqlens_q；如果同时传入 seqused_q，应保证由 seqused_q 传入的各 batch query 长度不超过根据 cu_seqlens_q 计算出的各 batch query 长度。当某个 batch 的 seqused_q 小于实际长度时，启用 TND Padding 功能，该 batch 超出部分的输出填充无效值。
   - 当 cmp_ratio > 1 且 mask_mode = 3 时，必须传入 cmp_residual_k。

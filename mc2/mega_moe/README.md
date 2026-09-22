@@ -4,12 +4,12 @@
 
 | 产品                                                         |  是否支持   |
 | :----------------------------------------------------------- |:-------:|
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×    |
-| <term>Atlas 推理系列产品</term>                               |    ×    |
-| <term>Atlas 训练系列产品</term>                              |    ×    |
+| <term>Ascend 950PR&950DT系列产品</term>                             |    √    |
+| <term>Atlas A3系列产品</term>       |    √    |
+| <term>Atlas A2系列产品</term> |    √    |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×    |
+| <term>Atlas推理系列产品</term>                               |    ×    |
+| <term>Atlas训练系列产品</term>                              |    ×    |
 
 ## 功能说明
 
@@ -85,8 +85,8 @@
     | A8W4-FP | FLOAT8_E4M3FN        | FLOAT4_E2M1          |
     | A4W4-FP | FLOAT4_E2M1        | FLOAT4_E2M1            |
 
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持上表中A8W8-FP场景。
-    - <term>Ascend 950PR/Ascend 950DT</term>：不支持上表中A16W16、A8W8-INT、A8W4-INT场景。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持上表中A8W8-FP场景。
+    - <term>Ascend 950PR&950DT系列产品</term>：不支持上表中A16W16、A8W8-INT、A8W4-INT场景。
 
     <details>
     <summary> A16W16 非量化场景</summary>
@@ -892,15 +892,15 @@
 - **通信域约束**：
   - 所有卡的`epWorldSize`、`cclBufferSize`参数取值需保持一致。
   - 通信域各节点的驱动版本应当相同。
-  - <term>Ascend 950PR/Ascend 950DT</term>：Torch接口通过`get_symm_buffer_for_mega_moe`自动计算并申请通信buffer，用户无需自行计算或设置`cclBufferSize`。
+  - <term>Ascend 950PR&950DT系列产品</term>：Torch接口通过`get_symm_buffer_for_mega_moe`自动计算并申请通信buffer，用户无需自行计算或设置`cclBufferSize`。
 
 - **组网约束**：
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：多机通信域要求交换机组网，不支持双机直连组网。
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：多机通信域要求在一个超节点内，不支持双机直连组网和跨超节点组网。
-  - <term>Ascend 950PR/Ascend 950DT</term>：仅支持UB Memory通信协议。
+  - <term>Atlas A2系列产品</term>：多机通信域要求交换机组网，不支持双机直连组网。
+  - <term>Atlas A3系列产品</term>：多机通信域要求在一个超节点内，不支持双机直连组网和跨超节点组网。
+  - <term>Ascend 950PR&950DT系列产品</term>：仅支持UB Memory通信协议。
 
 - **参数约束**：
-  - **<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>**：
+  - **<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>**：
     - 场景配套矩阵：
 
       | 场景 | x | weight1 | weight2 | weightScales1 | weightScales2 | bias1 | bias2 | y | dispatchQuantMode | dispatchQuantOutDtype |
@@ -909,7 +909,7 @@
       | A8W8-INT | BF16 | INT8 | INT8 | UINT64 | UINT64 | – | – | BF16 | 2 | 1（INT8） |
       | A8W4-INT | BF16 | INT4(INT32) | INT4(INT32) | UINT64 | UINT64 | FP32 | FP32 | BF16 | 2 | 1（INT8） |
 
-  - **<term>Ascend 950PR/Ascend 950DT</term>**：
+  - **<term>Ascend 950PR&950DT系列产品</term>**：
     - `activation`支持"swiglu"、"swiglustep"、"swigluoai"和"situglu"，各激活的参数配套关系见参数说明。
     - `BS`为本Rank本次调用的`x`.dim0，支持[1, +∞)，且不得超过创建`sym_buffer`时设置的`numMaxTokensPerRank`。不同Rank的实际`BS`可以不同，同一`sym_buffer`可以复用于多次不同`BS`的调用。
     - `numMaxTokensPerRank`必须大于等于1且所有Rank配置一致，建议设置为`sym_buffer`复用期间所有Rank可能出现的最大单卡`BS`。设置越大，内部申请的通信内存越多。

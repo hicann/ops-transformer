@@ -1,26 +1,26 @@
 # aclnnMoeUpdateExpert
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/mc2/moe_update_expert)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/mc2/moe_update_expert)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -337,7 +337,7 @@ aclnnStatus aclnnMoeUpdateExpert(
    调用过程中使用的`worldSize`、`moeExpertNum`参数取值，所有卡需保持一致，网络不同层中也需保持一致，且需与`aclnnMoeDistributeDispatchV2`、`aclnnMoeDistributeCombineV2`/`aclnnMoeDistributeCombineAddRmsNorm`的对应参数一致。
 
 4. **硬件相关定义**：
-   <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：单卡包含双DIE（“晶粒”或“裸片”），因此参数说明中的“本卡”均指**单DIE**。
+   <term>Atlas A3系列产品</term>  ：单卡包含双DIE（“晶粒”或“裸片”），因此参数说明中的“本卡”均指**单DIE**。
 
 5. **参数shape格式约束**：
    - **BS**：本卡最终输出的token数量，取值范围( 0 < BS ≤ 512 )。
@@ -349,7 +349,7 @@ aclnnStatus aclnnMoeUpdateExpert(
 
 ## 调用示例
 
-以<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  以及<term>Ascend 950PR/Ascend 950DT</term>为例，调用MoeUpdateExpert，MoeDistributeDispatchV2和MoeDistributeCombineAddRmsNorm算子。
+以<term>Atlas A3系列产品</term>  以及<term>Ascend 950PR&950DT系列产品</term>为例，调用MoeUpdateExpert，MoeDistributeDispatchV2和MoeDistributeCombineAddRmsNorm算子。
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 

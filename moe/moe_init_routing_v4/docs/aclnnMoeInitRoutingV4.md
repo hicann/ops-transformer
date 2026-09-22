@@ -1,26 +1,26 @@
 # aclnnMoeInitRoutingV4
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/moe/moe_init_routing_v4)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/moe/moe_init_routing_v4)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -589,7 +589,7 @@ aclnnStatus aclnnMoeInitRoutingV4(
 - 该算子在以下产品型号上支持性能模板，需要额外满足准入条件，否则进入通用模板：
   - 支持性能模板的产品：
     <!-- npu="950" id7 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持
+    - <term>Ascend 950PR&950DT系列产品</term>：支持
     <!-- end id7 -->
   - 性能模板的准入条件：
     <table>
@@ -611,8 +611,8 @@ aclnnStatus aclnnMoeInitRoutingV4(
 - quantMode为9或13的MXFP4/INT4动态量化场景，以及quantMode为-1且x数据类型为FLOAT4_E2M1的非量化透传场景，H要求为偶数。quantMode为13的INT4动态量化场景还需满足：x数据类型为FLOAT32或BFLOAT16，dropPadMode为0，offsetOptional不输入。
 
 - 空tensor处理：
-  - <term>Ascend 950PR/Ascend 950DT</term>：NUM_ROWS=0或K=0时没有路由元素，进入空Tensor处理路径，专家计数为0；输出shape仍需满足相应模式的约束。
-  - <term>Ascend 950PR/Ascend 950DT</term>：NUM_ROWS*K&gt;0且H=0时仍走正常路由流程，生成expandedRowIdxOut和expertTokensCountOrCumsumOut。
+  - <term>Ascend 950PR&950DT系列产品</term>：NUM_ROWS=0或K=0时没有路由元素，进入空Tensor处理路径，专家计数为0；输出shape仍需满足相应模式的约束。
+  - <term>Ascend 950PR&950DT系列产品</term>：NUM_ROWS*K&gt;0且H=0时仍走正常路由流程，生成expandedRowIdxOut和expertTokensCountOrCumsumOut。
 
 ## 调用示例
 

@@ -4,37 +4,37 @@
 
 <!-- npu="950" id1 -->
 
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 
 <!-- end id1 -->
 
 <!-- npu="A3" id2 -->
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 
 <!-- end id2 -->
 
 <!-- npu="910b" id3 -->
 
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 
 <!-- end id3 -->
 
 <!-- npu="310b" id4 -->
 
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 
 <!-- end id4 -->
 
 <!-- npu="310p" id5 -->
 
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 
 <!-- end id5 -->
 
 <!-- npu="910" id6 -->
 
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 
 <!-- end id6 -->
 
@@ -178,8 +178,8 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | layout_kv          | string       | 可选      | k/value布局，须与`layout_q`一致，默认`"TND"`                                                    | string   | -        | -                                                         |
 | mask_mode          | int/MaskMode | 可选      | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前仅支持1（`CAUSAL`），默认1 | int32    | -        | -                                                         |
 | softmax_precision  | int          | 可选      | Softmax精度级别，当前仅支持0，默认0                                                                   | int32    | -        | -                                                         |
-| win_left           | int          | 可选      | 滑窗向前包含token数，不使能时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
-| win_right          | int          | 可选      | 滑窗向后包含token数，不使能时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
+| win_left           | int          | 可选      | 滑窗向前包含token数，不开启时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
+| win_right          | int          | 可选      | 滑窗向后包含token数，不开启时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
 
 ### generic_block_sparse_attention_grad
 
@@ -206,8 +206,8 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | softmax_scale      | float        | 可选      | 缩放因子，建议值$1/\sqrt{D}$，默认1.0                                               | float32          | -        | -                                                                        |
 | mask_mode          | int/MaskMode | 可选      | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前仅支持1，默认1 | int32            | -        | -                                                                        |
 | softmax_precision  | int          | 可选      | Softmax精度级别，当前仅支持0，默认0                                           | int32            | -        | -                                                                        |
-| win_left           | int          | 可选      | 滑窗向前包含token数，不使能时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
-| win_right          | int          | 可选      | 滑窗向后包含token数，不使能时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
+| win_left           | int          | 可选      | 滑窗向前包含token数，不开启时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
+| win_right          | int          | 可选      | 滑窗向后包含token数，不开启时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
 
 ## 返回值说明
 
@@ -513,7 +513,7 @@ $$
 mask_mode参数解释：
 
 - `MaskMode.CAUSAL`（1）：当前默认且唯一支持
-- win_left / win_right：不使能时必须为-1；attn_mask当前应传`None`
+- win_left / win_right：不开启时必须为-1；attn_mask当前应传`None`
 
 #### SeqLens参数组
 

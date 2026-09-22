@@ -3,12 +3,12 @@
 ## 产品支持情况
 | 产品                                                         | 是否支持 |
 | ------------------------------------------------------------ | :------: |
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      ×     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      ×     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -116,7 +116,7 @@
          <tr>
            <td>cmp_ratio</td>
            <td>可选属性</td>
-           <td>用于稀疏计算，表示key的压缩倍数。数据类型支持int32。Atlas A3 推理系列产品支持1/2/4/8/16/32/64/128，Ascend 950PR/Ascend 950DT支持1/4/128，默认值1。</td>
+           <td>用于稀疏计算，表示key的压缩倍数。数据类型支持int32。Atlas A3推理系列产品支持1/2/4/8/16/32/64/128，Ascend 950PR&950DT系列产品支持1/4/128，默认值1。</td>
            <td>INT32</td>
            <td>-</td>
          </tr>
@@ -182,5 +182,5 @@
 -   该接口支持推理场景下使用。
 -   该接口支持aclgraph模式。
 
-## Atlas A3 推理系列产品 调用说明
+## Atlas A3推理系列产品 调用说明
 - 支持单算子模式调用和aclgraph模式调用，作为QuantLightningIndexer算子的前序算子，调用示例见[QuantLightningIndexer调用示例](../quant_lightning_indexer/README.md)。

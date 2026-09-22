@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：不支持
+- <term>Ascend 950PR&950DT系列产品</term>：不支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -301,7 +301,7 @@ aclnnStatus aclnnFFNToAttention(
 - **产品特定约束**：
 
   <!-- npu="A3" id7 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明中的“本卡”均表示单DIE。
+  - <term>Atlas A3系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明中的“本卡”均表示单DIE。
 
   <!-- end id7 -->
 
@@ -310,9 +310,9 @@ aclnnStatus aclnnFFNToAttention(
   | 变量         | 定义与取值范围                                                                           |
   | :----------- | :------------------------------------------------------------------------------------- |
   | Y            | 表示本卡需要分发的最大token数量。|
-  | Bs           | 表示各Attention节点上的发送token数。<ul><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：<code>0 < Bs ≤ 512 </code>。</li></ul> |
-  | H（hidden size） | 表示hidden size隐藏层大小。<ul><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：<code>1024 ≤  H ≤ 8192 </code>。</li></ul> |
-  | HS（hidden and scale size） | 表示hidden与scale隐藏层大小。<ul><li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：<code>1152 ≤  HS ≤ 8320 </code>。</li></ul>|
+  | Bs           | 表示各Attention节点上的发送token数。<ul><li><term>Atlas A3系列产品</term>  ：<code>0 < Bs ≤ 512 </code>。</li></ul> |
+  | H（hidden size） | 表示hidden size隐藏层大小。<ul><li><term>Atlas A3系列产品</term>  ：<code>1024 ≤  H ≤ 8192 </code>。</li></ul> |
+  | HS（hidden and scale size） | 表示hidden与scale隐藏层大小。<ul><li><term>Atlas A3系列产品</term>  ：<code>1152 ≤  HS ≤ 8320 </code>。</li></ul>|
   | MicroBatchNum    | 表示microBatch的大小，目前仅支持<code>MicroBatchNum = 1</code>。 |
   | ExpertNumPerToken    | 表示每个Token对应的发送的Expert数量，<code>ExpertNumPerToken = K + sharedExpertNum</code>。 |
   | K    | 表示选取topK个专家，取值范围为<code>0 < K ≤ 16 </code>。 |

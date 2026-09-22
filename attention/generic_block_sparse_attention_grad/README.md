@@ -4,12 +4,12 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      ×     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      ×     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      ×     |
+|<term>Atlas A2系列产品</term>|      ×     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -201,14 +201,14 @@ $$
   <tr>
     <td class="tg-0pky">winLeft</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">滑窗向前包含token数，不使能时须为-1。</td>
+    <td class="tg-0pky">滑窗向前包含token数，不开启时须为-1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
     <td class="tg-0pky">winRight</td>
     <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">滑窗向后包含token数，不使能时须为-1。</td>
+    <td class="tg-0pky">滑窗向后包含token数，不开启时须为-1。</td>
     <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
@@ -237,7 +237,7 @@ $$
 
 ## 约束说明
 
-* <term>Ascend 950PR/Ascend 950DT</term>：支持FLOAT16、BFLOAT16的query/key/value/dout/out/dQuery/dKey/dValue，且数据类型保持一致；lse为FLOAT32。
+* <term>Ascend 950PR&950DT系列产品</term>：支持FLOAT16、BFLOAT16的query/key/value/dout/out/dQuery/dKey/dValue，且数据类型保持一致；lse为FLOAT32。
 * 须先调用GenericBlockSparseAttentionGradMetadata生成metadata，再调用本算子。
 * layoutQ与layoutKv须相同，取值TND/BNSD/BSND；TND布局下须传入对应cuSeqLengths。
 * sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自Q/K的S维。
@@ -246,7 +246,7 @@ $$
 * isPackedGQA当前仅支持1；
 * maskType当前仅支持1。
 * softmaxPrecision当前仅支持0；
-* winLeft/winRight不使能时必须为-1；attenMaskOptional当前应传nullptr。
+* winLeft/winRight不开启时必须为-1；attenMaskOptional当前应传nullptr。
 * 默认为非确定性实现，暂不支持确定性实现。
 
 ## 调用说明

@@ -4,12 +4,12 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+| <term>Ascend 950PR&950DT系列产品</term>                             |    √     |
+| <term>Atlas A3系列产品</term>       |    ×     |
+| <term>Atlas A2系列产品</term> |    ×     |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
+| <term>Atlas推理系列产品</term>                               |    ×     |
+| <term>Atlas训练系列产品</term>                              |    ×     |
 
 ## 功能说明
 
@@ -81,7 +81,7 @@
   </tr>
  </tbody></table>
 
-  - <term>Ascend 950PR/Ascend 950DT</term>：timeOutOptional参数里的超时时间单位为us，建议配置5000000us，根据实际环境不同超时时间下限可能不同。
+  - <term>Ascend 950PR&950DT系列产品</term>：timeOutOptional参数里的超时时间单位为us，建议配置5000000us，根据实际环境不同超时时间下限可能不同。
 
 ## 约束说明
 

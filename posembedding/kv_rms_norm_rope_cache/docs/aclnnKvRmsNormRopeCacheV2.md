@@ -1,26 +1,26 @@
 # aclnnKvRmsNormRopeCacheV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/posembedding/kv_rms_norm_rope_cache)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/posembedding/kv_rms_norm_rope_cache)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -34,8 +34,8 @@
     |V1|rms_size=Dv=512<br>rope_size=Dk=64<br>vOptional=None|kv合轴模式：对输入张量kv的尾轴，拆分出左半边用于rms_norm计算，右半边用于rope计算，再将计算结果分别scatter到两块cache中。<li>与DeepSeekV3网络结构强相关，仅支持N=1的场景。</li><li>rms_norm计算所需数据Dv和rope计算所需数据Dk由输入kv的D切分而来，Dk、Dv大小需满足Dk+Dv=Dkv。</li>|
     |V2|Dv=128<br>rms_size=Dk=Dkv=192<br>rope_size=64<br>vOptional的shape为[Bkv, Nkv, Skv, Dv]|kv分离模式：对输入张量kv进行rms_norm计算，之后对尾轴前64维进行rope计算并覆盖写回对应元素，最终结果scatter写入到kCacheRef中；对输入张量vOptional进行中间处理，最终结果scatter写入到ckvCacheRef中。<li>支持N=1/2/4/8</li><li>此场景下k与v尾轴分离，kv仅存储k分量尾轴，vOptional则存储v分量尾轴。</li>|
 
-    * <term>Ascend 950PR/Ascend 950DT</term>：仅支持V1场景。
-    * <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持V1和V2场景。
+    * <term>Ascend 950PR&950DT系列产品</term>：仅支持V1场景。
+    * <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：支持V1和V2场景。
 
 - 计算公式：
 
@@ -507,7 +507,7 @@ aclnnStatus aclnnKvRmsNormRopeCacheV2(
           |V1|<li>kRopeScaleOptional和kRopeOffsetOptional的shape支持：[1, Dk]、[Dk,]、[1,]。</li><li>ckvScaleOptional和cKvOffsetOptional的shape支持：[1, Dv]、[Dv,]、[1,]。</li>|
           |V2|<li>kRopeScaleOptional和kRopeOffsetOptional的shape支持：[N, Dk]。</li><li>ckvScaleOptional和cKvOffsetOptional的shape支持：[N, Dv]。</li>|
 
-          * <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：V1场景不支持[1,]，V2场景不支持量化参数项广播。
+          * <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：V1场景不支持[1,]，V2场景不支持量化参数项广播。
 
       * 输入张量均不支持空Tensor。
       * 所有输入均不支持无效值，包括且不限于：±inf，nan。
@@ -515,11 +515,11 @@ aclnnStatus aclnnKvRmsNormRopeCacheV2(
   * cache的数据类型支持：
 
     * 非量化模式：cache类型必须与kv保持一致。
-      * <term>Ascend 950PR/Ascend 950DT</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：可支持BFLOAT16、FLOAT16。
-      * <term>Kirin X90/Kirin 9030 处理器系列产品</term>：仅支持FLOAT16。
+      * <term>Ascend 950PR&950DT系列产品</term>、<term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：可支持BFLOAT16、FLOAT16。
+      * <term>Kirin X90/Kirin 9030处理器系列产品</term>：仅支持FLOAT16。
     * 量化模式：
-      * <term>Ascend 950PR/Ascend 950DT</term>：可支持INT8、HIFLOAT8、FLOAT8E5M2、FLOAT8E4M3FN。
-      * <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Kirin X90/Kirin 9030 处理器系列产品</term>：仅支持INT8。
+      * <term>Ascend 950PR&950DT系列产品</term>：可支持INT8、HIFLOAT8、FLOAT8E5M2、FLOAT8E4M3FN。
+      * <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>、<term>Kirin X90/Kirin 9030处理器系列产品</term>：仅支持INT8。
 
   * 参数说明：
 
@@ -598,8 +598,8 @@ aclnnStatus aclnnKvRmsNormRopeCacheV2(
     </table>
 
     * 静态量化模式支持细节：
-      * Ascend 950PR/Ascend 950DT产品：仅支持V1场景，支持<b>静态对称量化</b>和<b>静态非对称量化</b>。
-      * <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+      * Ascend 950PR&950DT系列产品产品：仅支持V1场景，支持<b>静态对称量化</b>和<b>静态非对称量化</b>。
+      * <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
         - V1场景：对除`Norm`以外的cachemode，仅支持<b>静态对称量化</b>。即使传入合法的offset，也不会被算子处理，仍视为<b>静态对称量化</b>。对`Norm`模式的cachemode，不支持任何静态量化。
         - V2场景：对所有cachemode，支持<b>静态对称量化</b>和<b>静态非对称量化</b>。
 
@@ -623,13 +623,13 @@ aclnnStatus aclnnKvRmsNormRopeCacheV2(
     * 当cacheModeOptional为PA_BLK_BNSD、PA_BLK_NZ时，shape为1维[Bkv *ceil_div(Skv,block_size)]，要求index的value的数值范围为[-1,block_num* block_size)。value/block_size的值不能重复。
 
   * isOutputKv约束：
-    * 作用是输出具体场景的中间处理结果，使能 kRopeOut 和 cKvOut 两项输出。
+    * 作用是输出具体场景的中间处理结果，开启 kRopeOut 和 cKvOut 两项输出。
     * 在cacheModeOptional为PA, PA_BNSD, PA_NZ, PA_BLK_BNSD, PA_BLK_NZ模式时有效。
-    * 在cacheModeOptional为Norm时，仅在V2场景中使能量化模式时有效。
+    * 在cacheModeOptional为Norm时，仅在V2场景中开启量化模式时有效。
 
   * 输入组合约束：
 
-    * 本约束内条目，仅适用于<b>Atlas A3 训练系列产品/Atlas A3 推理系列产品</b>、<b>Atlas A2 训练系列产品/Atlas A2 推理系列产品</b>。
+    * 本约束内条目，仅适用于<b>Atlas A3系列产品</b>、<b>Atlas A2系列产品</b>。
     * 在所有cacheModeOptional下，必定支持`非广播模式`：即`[B, N, S]`三个维度与`kv`严格一致的`旋转位置编码（RoPE）参数`和`量化参数`。
     * 在各种cacheModeOptional下，支持的合法输入shape模式如下表：
 
@@ -679,11 +679,11 @@ aclnnStatus aclnnKvRmsNormRopeCacheV2(
 
   * vOptional：
     * 该参数仅限aclnnKvRmsNormRopeCacheV2接口，aclnnKvRmsNormRopeCache接口不支持该参数！
-    * 该参数仅限<b>Atlas A3 训练系列产品/Atlas A3 推理系列产品</b>、<b>Atlas A2 训练系列产品/Atlas A2 推理系列产品</b>。
+    * 该参数仅限<b>Atlas A3系列产品</b>、<b>Atlas A2系列产品</b>。
       * 该参数仅在<b>kv分离场景(V2)</b>中作为必须入参，在其他类型中会作为无效参数被忽略。
       * 当vOptional存在时，它的类型必须与kv一致，`[B, N, S]`维度也必须与kv一致。
 
-    * Ascend 950PR/Ascend 950DT：不会拦截该参数，但实际功能不支持，也不会处理该参数。
+    * Ascend 950PR&950DT系列产品：不会拦截该参数，但实际功能不支持，也不会处理该参数。
 
 ## 调用示例
 

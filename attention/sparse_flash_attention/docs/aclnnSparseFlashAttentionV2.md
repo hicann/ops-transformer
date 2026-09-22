@@ -1,26 +1,26 @@
 # aclnnSparseFlashAttentionV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/sparse_flash_attention)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/attention/sparse_flash_attention)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -530,11 +530,11 @@ aclnnStatus aclnnSparseFlashAttentionV2(
 - N1支持情况：
 
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     - N1支持1~128。
   <!-- end id7 -->
   <!-- npu="A3,910b" id8 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     - N1支持1/2/4/8/16/32/64/128。
   <!-- end id8 -->
 
@@ -545,15 +545,15 @@ aclnnStatus aclnnSparseFlashAttentionV2(
 - 支持sparse_block_size整除block_size。
 
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     - 只支持sparse_block_size为1。
   <!-- end id9 -->
   <!-- npu="A3,910b" id10 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     - 支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparse_block_size整除block_size
   <!-- end id10 -->
 
-- 参数sinks仅支持Ascend 950PR/Ascend 950DT。
+- 参数sinks仅支持Ascend 950PR&950DT系列产品。
 
 ## 调用示例
 

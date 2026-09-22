@@ -1,27 +1,27 @@
 
 # aclnnFusedInferAttentionScoreV4
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/fused_infer_attention_score)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/attention/fused_infer_attention_score)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：不支持
+- <term>Ascend 950PR&950DT系列产品</term>：不支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -988,7 +988,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
 - PagedAttention的开启必要条件是blocktable存在且有效，同时key、value是按照blocktable中的索引在一片连续内存中排布，在该场景下key、value的inputLayout参数无效。
 
 <!-- npu="910b" id7 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
 
     <table style="undefined;table-layout: fixed; width: 1354px"><colgroup>
         <col style="width: 155px">
@@ -1193,7 +1193,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
 <summary><a id="INT8"></a>int8量化场景：</summary>
 
 <!-- npu="910b" id8 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
 
     <table style="undefined;table-layout: fixed;  width: 1150px">
         <colgroup>
@@ -1356,7 +1356,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
 - 当伪量化参数和KV分离量化参数同时传入时，以KV分离量化参数为准。
 
 <!-- npu="910b" id9 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
 
     <table style="undefined;table-layout: fixed;  width: 2084px">
         <colgroup>
@@ -1508,7 +1508,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
 - actualSeqLengths和actualSeqLengthsKv必须传入
 
 <!-- npu="910b" id10 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
     <div style="overflow-x: auto;">
     <table style="undefined;table-layout: fixed; width: 1390px"><colgroup>
         <col style="width: 210px">
@@ -1924,7 +1924,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
 <summary>当Q_S大于1时：</summary>
 
 <!-- npu="910b" id11 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
 
     <table style="undefined;table-layout: fixed; width: 1080px"><colgroup>
     <col style="width: 180px">
@@ -2065,7 +2065,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
 <summary>当Q_S等于1时（IFA非MTP场景）：</summary>
 
 <!-- npu="910b" id12 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
 
     <table style="undefined;table-layout: fixed; width: 1080px"><colgroup>
     <col style="width: 180px">

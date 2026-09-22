@@ -3,31 +3,31 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 > [!NOTE]
 >
 > <!-- npu="950" id10 -->
-> <term>Ascend 950PR/Ascend 950DT</term>支持`quant_mode=0`（非量化的float16/bfloat16）、`quant_mode=1`（FP8量化）、`quant_mode=2/3`（MXFP4量化）。
+> <term>Ascend 950PR&950DT系列产品</term>支持`quant_mode=0`（非量化的float16/bfloat16）、`quant_mode=1`（FP8量化）、`quant_mode=2/3`（MXFP4量化）。
 > <!-- end id10 -->
 > <!-- npu="910b,A3" id11 -->
-> <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>仅支持`quant_mode=0`（非量化的float16/bfloat16输入）。
+> <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持`quant_mode=0`（非量化的float16/bfloat16输入）。
 > <!-- end id11 -->
 
 ## 功能说明
@@ -112,7 +112,7 @@ cann_ops_transformer.block_sparse_attention(
 | inner_precise | int | 可选 | Softmax计算采取的精度级别，默认1，支持0、1、4 | int64 | - | - | - |
 | actual_seq_lengths | list[int] | TND时必选/其余可选 | 每个batch对应的query实际序列长度 | int64 | - | 长度为B | - |
 | actual_seq_lengths_kv | list[int] | TND时必选/其余可选 | 每个batch对应的key/value实际序列长度 | int64 | - | 长度为B | - |
-| return_softmax_lse | bool | 可选 | 是否使能softmaxLse输出，默认False | BOOL | - | - | - |
+| return_softmax_lse | bool | 可选 | 是否开启softmaxLse输出，默认False | BOOL | - | - | - |
 | mask_type | int | 可选 | attention计算中的掩码类型，默认0，当前仅支持0 | int64 | - | - | - |
 | quant_mode | int | 可选 | 量化模式，默认0。取值含义：0-非量化；1-FP8量化，Q/K/V为float8_e4m3fn；2-MXFP4 OCP量化，量化scale向下截断；3-MXFP4 CX量化，自定义量化量程，量化scale向上截断。MXFP4量化公式见「约束说明」 | int64 | - | - | - |
 | block_size | int | 可选 | PagedAttention的block大小，默认0，当前不支持PagedAttention，仅支持0 | int64 | - | - | - |
@@ -142,10 +142,10 @@ cann_ops_transformer.block_sparse_attention(
 - query的头数N1（由query的shape推断，接口不显式传入）与num_key_value_heads（N2）需满足 N1 >= N2 && N1 % N2 == 0。
 - block_shape必须包含两个元素[block_x, block_y]，值必须大于0，各产品倍数约束如下：
   <!-- npu="950" id7 -->
-  - 在<term>Ascend 950PR/Ascend 950DT</term>上：block_y须为16的倍数；MXFP4量化（`quant_mode=2/3`）时，block_x和block_y均只支持64的倍数。
+  - 在<term>Ascend 950PR&950DT系列产品</term>上：block_y须为16的倍数；MXFP4量化（`quant_mode=2/3`）时，block_x和block_y均只支持64的倍数。
   <!-- end id7 -->
   <!-- npu="910b,A3" id8 -->
-  - 在<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>上：block_y须为128的倍数。
+  - 在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上：block_y须为128的倍数。
   <!-- end id8 -->
 - block_sparse_mask当前必须传入，且shape必须为[batch, headNum, ceilDiv(maxQS, block_x), ceilDiv(maxKVS, block_y)]。
 - actual_seq_lengths在q_input_layout为"TND"时必选；actual_seq_lengths_kv在kv_input_layout为"TND"时必选；两者必须同时配置或同时不配置，仅配置其中之一将被拦截。
@@ -155,7 +155,7 @@ cann_ops_transformer.block_sparse_attention(
   - 1：仅支持query、key、value均为fp16时配置，全部采取fp16数据类型，性能更好但精度较低；
   - 4：混合精度运算，online softmax采取fp16/bf16，rescale采取fp32。
   <!-- npu="950,A3,910b" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>仅支持配置为4；<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>仅支持配置为0或1。
+  - <term>Ascend 950PR&950DT系列产品</term>仅支持配置为4；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持配置为0或1。
   <!-- end id9 -->
 - mask_type当前仅支持0，表示不加mask。
 - block_size当前仅支持0，表示不支持paged cache。
@@ -166,7 +166,7 @@ cann_ops_transformer.block_sparse_attention(
 
 ### quant_mode=1（FP8量化）相关约束
 
-- 仅<term>Ascend 950PR/Ascend 950DT</term>支持。
+- 仅<term>Ascend 950PR&950DT系列产品</term>支持。
 - query、key、value必须同时为float8_e4m3fn，且必须同时提供q_dequant_scale、k_dequant_scale、v_dequant_scale三个反量化缩放因子。
 - 反量化缩放因子的数据类型必须为float32：
   - q_dequant_scale：shape为[Batch, HeadNum, ceilDiv(maxQSeqLength, 128), 1]，在QK矩阵乘法时对query进行反量化；
@@ -176,7 +176,7 @@ cann_ops_transformer.block_sparse_attention(
 
 ### quant_mode=2/3（MXFP4量化）相关约束
 
-- 仅<term>Ascend 950PR/Ascend 950DT</term>支持。
+- 仅<term>Ascend 950PR&950DT系列产品</term>支持。
 - query、key、value为float4_e2m1fn_x2（以uint8伪装传入，D轴为uint8元素个数，逻辑headDim为2*D），需要提供float8_e8m0fnu类型的descale张量：
   - q_dequant_scale：MX量化模式，仅支持Rowwise E8M0 Micro Scaling，shape为：
     - BNSD: [B, Nq, Sq, ceilDiv(D, 64), 2]；

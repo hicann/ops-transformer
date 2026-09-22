@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -104,10 +104,10 @@
     | A4W4-FP | FLOAT4_E2M1        | FLOAT4_E2M1            |
 
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持A16W16、A8W8-INT和A8W4-INT场景。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持A16W16、A8W8-INT和A8W4-INT场景。
     <!-- end id7 -->
     <!-- npu="950" id8 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持A8W8-FP、A8W4-FP和A4W4-FP场景。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持A8W8-FP、A8W4-FP和A4W4-FP场景。
     <!-- end id8 -->
 
     <details>
@@ -641,7 +641,7 @@ sym_buffer.get_local_buffer_tensor(dtype, size=None, offset=0) -> Tensor
 sym_buffer.update_group(group) -> None
 ```
 
-`mask_buffer` 及以上五个 `SymmBuffer` 弹性扩缩容接口当前仅支持 <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>。`SymmBuffer` 默认不创建 `mask_buffer`，因此各代际默认均不会向算子传入该参数。第一次调用 `query_mask_buffer`、`update_mask_buffer` 或 `clean_mask_buffer` 时，才会在 NPU 上创建 shape 为 `[ep_world_size]` 的全 0 int32 掩码；0 表示正常 rank，1 表示失能 rank，失能 rank 会在后续计算和卡间通信中被跳过。
+`mask_buffer` 及以上五个 `SymmBuffer` 弹性扩缩容接口当前仅支持 <term>Atlas A3系列产品</term>。`SymmBuffer` 默认不创建 `mask_buffer`，因此各代际默认均不会向算子传入该参数。第一次调用 `query_mask_buffer`、`update_mask_buffer` 或 `clean_mask_buffer` 时，才会在 NPU 上创建 shape 为 `[ep_world_size]` 的全 0 int32 掩码；0 表示正常 rank，1 表示失能 rank，失能 rank 会在后续计算和卡间通信中被跳过。
 
 - `query_mask_buffer` 接收调用者预先创建的 `mask_status`，其 dtype 必须为 `torch.int32`，shape、所在 NPU 必须与内部 `mask_buffer` 一致。接口通过 D2D 拷贝将当前掩码写入 `mask_status`，不返回 Tensor。
 - `update_mask_buffer` 只更新当前进程中的本地掩码，各 rank 的掩码一致性由调用者保证。当恢复 rank，即 `masked` 输入为 `False` 时，必须调用 `get_local_buffer_tensor` 清空算子现存通信缓存区标志位。样例如下：
@@ -692,7 +692,7 @@ sym_buffer.update_group(group) -> None
         <td>num_max_tokens_per_rank</td>
         <td>int</td>
         <td>必选</td>
-        <td>通信域内各Rank可能出现的最大单卡token数。<term>Ascend 950PR/Ascend 950DT</term>支持各Rank的实际token数不同，每次调用需满足x.shape[0]不大于该值；所有Rank必须配置相同的上界。</td>
+        <td>通信域内各Rank可能出现的最大单卡token数。<term>Ascend 950PR&950DT系列产品</term>支持各Rank的实际token数不同，每次调用需满足x.shape[0]不大于该值；所有Rank必须配置相同的上界。</td>
     </tr>
     <tr>
         <td>num_topk</td>
@@ -754,10 +754,10 @@ sym_buffer.update_group(group) -> None
 ### mega_moe
 
 <!-- npu="A3,910b" id9 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持参数表上角标<sup>1</sup>的描述，不支持的参数使用默认值即可。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持参数表上角标<sup>1</sup>的描述，不支持的参数使用默认值即可。
 <!-- end id9 -->
 <!-- npu="950" id10 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：不支持参数表上角标<sup>2</sup>的描述，不支持的参数使用默认值即可。
+- <term>Ascend 950PR&950DT系列产品</term>：不支持参数表上角标<sup>2</sup>的描述，不支持的参数使用默认值即可。
 <!-- end id10 -->
 
 <table style="undefined;table-layout: fixed; width:1400px"><colgroup>
@@ -1185,25 +1185,25 @@ sym_buffer.update_group(group) -> None
         </tr>
         <tr>
             <td>l1_weights</td>
-            <td>Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品为num_experts_per_rank；Ascend 950PR/Ascend 950DT的逐专家布局为local_moe_expert_num，堆叠布局为1</td>
+            <td>Atlas A2系列产品、Atlas A3系列产品为num_experts_per_rank；Ascend 950PR&950DT系列产品的逐专家布局为local_moe_expert_num，堆叠布局为1</td>
             <td>否（bfloat16/int8/int4场景）/是（float8_e5m2/float8_e4m3fn/float4_E2M1场景）</td>
             <td>不支持</td>
         </tr>
         <tr>
             <td>l2_weights</td>
-            <td>Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品为num_experts_per_rank；Ascend 950PR/Ascend 950DT的逐专家布局为local_moe_expert_num，堆叠布局为1</td>
+            <td>Atlas A2系列产品、Atlas A3系列产品为num_experts_per_rank；Ascend 950PR&950DT系列产品的逐专家布局为local_moe_expert_num，堆叠布局为1</td>
             <td>否（bfloat16/int8/int4场景）/是（float8_e5m2/float8_e4m3fn/float4_E2M1场景）</td>
             <td>不支持</td>
         </tr>
         <tr>
             <td>l1_weights_sf</td>
-            <td>与对应权重的TensorList长度和布局一致；Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品为num_experts_per_rank；Ascend 950PR/Ascend 950DT的逐专家布局为local_moe_expert_num，堆叠布局为1</td>
+            <td>与对应权重的TensorList长度和布局一致；Atlas A2系列产品、Atlas A3系列产品为num_experts_per_rank；Ascend 950PR&950DT系列产品的逐专家布局为local_moe_expert_num，堆叠布局为1</td>
             <td>否</td>
             <td>不支持</td>
         </tr>
         <tr>
             <td>l2_weights_sf</td>
-            <td>与对应权重的TensorList长度和布局一致；Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品为num_experts_per_rank；Ascend 950PR/Ascend 950DT的逐专家布局为local_moe_expert_num，堆叠布局为1</td>
+            <td>与对应权重的TensorList长度和布局一致；Atlas A2系列产品、Atlas A3系列产品为num_experts_per_rank；Ascend 950PR&950DT系列产品的逐专家布局为local_moe_expert_num，堆叠布局为1</td>
             <td>否</td>
             <td>不支持</td>
         </tr>
@@ -1229,7 +1229,7 @@ sym_buffer.update_group(group) -> None
     </table>
 
   <!-- npu="950" id21 -->
-  - Ascend 950PR/Ascend 950DT的MXFP场景支持两种TensorList布局。对于`l1_weights`、`l2_weights`、`l1_weights_sf`和`l2_weights_sf`，逐专家布局下四个TensorList的长度均为`local_moe_expert_num`，权重列表中的Tensor为二维，权重缩放因子列表中的Tensor为三维；堆叠布局下四个TensorList的长度均为1，权重Tensor为三维，权重缩放因子Tensor为四维，且各Tensor的dim0均为`local_moe_expert_num`。四个输入必须采用同一种布局；启用共享专家时，对应的四个共享专家输入也必须采用与MoE专家相同的布局。
+  - Ascend 950PR&950DT系列产品的MXFP场景支持两种TensorList布局。对于`l1_weights`、`l2_weights`、`l1_weights_sf`和`l2_weights_sf`，逐专家布局下四个TensorList的长度均为`local_moe_expert_num`，权重列表中的Tensor为二维，权重缩放因子列表中的Tensor为三维；堆叠布局下四个TensorList的长度均为1，权重Tensor为三维，权重缩放因子Tensor为四维，且各Tensor的dim0均为`local_moe_expert_num`。四个输入必须采用同一种布局；启用共享专家时，对应的四个共享专家输入也必须采用与MoE专家相同的布局。
   <!-- end id21 -->
 
 - **参数一致性约束**：
@@ -1238,11 +1238,11 @@ sym_buffer.update_group(group) -> None
 
 - **通信域约束**：
     - 所有卡的`ep_world_size`参数取值需保持一致。
-    - Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品的通信域缓存区大小应当一致。`ccl_buffer_size` 为 HBM 上分配的 CCL 通信缓冲区**总大小**（Bytes），包含等大小的 **windowIn** 和 **windowOut** 两块空间，校验时以单个空间 `ccl_buffer_size / 2` 为准，需满足：
+    - Atlas A2系列产品、Atlas A3系列产品的通信域缓存区大小应当一致。`ccl_buffer_size` 为 HBM 上分配的 CCL 通信缓冲区**总大小**（Bytes），包含等大小的 **windowIn** 和 **windowOut** 两块空间，校验时以单个空间 `ccl_buffer_size / 2` 为准，需满足：
 
         $$ccl\_buffer\_size\ /\ 2 \ge \mathrm{offsetTokenPerExpert} + \mathrm{offsetTensor} + \mathrm{offsetFlag} + 10\,\mathrm{MB}$$
     <!-- npu="910b" id11 -->
-     **Atlas A2 训练系列产品/Atlas A2 推理系列产品：**
+     **Atlas A2系列产品：**
 
     ```text
     offsetTokenPerExpert = ep_world_size × CeilAlign(ep_world_size × maxExpertPerRank + 1, 128) × 4Byte
@@ -1268,7 +1268,7 @@ sym_buffer.update_group(group) -> None
     <!-- end id11 -->
 
     <!-- npu="A3" id12 -->
-     **Atlas A3 训练系列产品/Atlas A3 推理系列产品：**
+     **Atlas A3系列产品：**
 
     ```text
     offsetTokenPerExpert = ep_world_size × CeilAlign(ep_world_size × maxExpertPerRank + 1, 128) × 4Byte
@@ -1288,7 +1288,7 @@ sym_buffer.update_group(group) -> None
     <!-- end id12 -->
 
     <!-- npu="950" id13 -->
-     **Ascend 950PR/Ascend 950DT：**
+     **Ascend 950PR&950DT系列产品：**
 
     通信buffer由`get_symm_buffer_for_mega_moe`根据通信域配置、`num_max_tokens_per_rank`等参数自动计算并申请，用户无需自行计算或设置`ccl_buffer_size`。`num_max_tokens_per_rank`越大，内部申请的通信内存越多，建议按预期最大单卡token数合理设置。
     <!-- end id13 -->
@@ -1297,19 +1297,19 @@ sym_buffer.update_group(group) -> None
 - **组网约束**：
 
   <!-- npu="910b" id14 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：多机通信域要求交换机组网，不支持双机直连组网。
+  - <term>Atlas A2系列产品</term>：多机通信域要求交换机组网，不支持双机直连组网。
   <!-- end id14 -->
   <!-- npu="A3" id15 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：多机通信域要求在一个超节点内，不支持双机直连组网和跨超节点组网。
+  - <term>Atlas A3系列产品</term>：多机通信域要求在一个超节点内，不支持双机直连组网和跨超节点组网。
   <!-- end id15 -->
   <!-- npu="950" id16 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：仅支持UB Memory通信协议。
+  - <term>Ascend 950PR&950DT系列产品</term>：仅支持UB Memory通信协议。
   <!-- end id16 -->
 
 - **参数约束**：
 
   <!-- npu="A3,910b" id17 -->
-  - **Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品：**
+  - **Atlas A2系列产品、Atlas A3系列产品：**
 
     - 各卡 `num_tokens` 需保持一致，取值范围为 `1 ≤ num_tokens ≤ num_max_tokens_per_rank`。
     - `ep_world_size`：取值为 `2`、`4`、`8`、`16`、`32`、`48`、`64`、`96`、`128`。
@@ -1392,7 +1392,7 @@ sym_buffer.update_group(group) -> None
 
   <!-- end id17 -->
   <!-- npu="950" id18 -->
-  - **Ascend 950PR/Ascend 950DT：**
+  - **Ascend 950PR&950DT系列产品：**
     - `activation`支持"swiglu"、"swiglustep"、"swigluoai"和"situglu"。`activation_clamp`用于配置前三种激活的截断值；`activation_params`用于配置"swigluoai"的`alpha`、`beta`以及"situglu"的`beta`、`linear_beta`。
     - num_tokens（x.dim0）范围[1, +∞)，每次调用必须不大于创建`sym_buffer`时配置的`num_max_tokens_per_rank`。不同Rank的实际num_tokens可以不同，同一个`sym_buffer`也可以用于多次不同num_tokens的调用。
     - `num_max_tokens_per_rank`必须大于等于1，所有Rank取值必须一致，建议设置为`sym_buffer`复用期间所有Rank可能出现的最大单卡token数。超过原上界时需使用更大的上界重新创建`sym_buffer`。
@@ -1524,7 +1524,7 @@ sym_buffer.update_group(group) -> None
   下面示例将两个接口按调用顺序串联：先初始化通信域，再用get_symm_buffer_for_mega_moe构造sym_buffer，最后调用mega_moe运行算子。
 
   <!-- npu="950" id19 -->
-  - **Ascend 950PR/Ascend 950DT**：
+  - **Ascend 950PR&950DT系列产品**：
 
     ```python
     import os
@@ -1761,7 +1761,7 @@ sym_buffer.update_group(group) -> None
   <!-- end id19 -->
 
   <!-- npu="A3,910b" id20 -->
-  - **Atlas A2 训练系列产品/Atlas A2 推理系列产品、Atlas A3 训练系列产品/Atlas A3 推理系列产品**：
+  - **Atlas A2系列产品、Atlas A3系列产品**：
 
     ```python
     import torch

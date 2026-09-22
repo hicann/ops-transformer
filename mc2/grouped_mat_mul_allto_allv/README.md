@@ -4,12 +4,12 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| <term>Ascend 950DT</term>                             |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                               |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+| <term>Ascend 950DT系列产品</term>                             |    √     |
+| <term>Atlas A3系列产品</term>     |    √     |
+| <term>Atlas A2系列产品</term> |    √     |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
+| <term>Atlas推理系列产品</term>                               |    ×     |
+| <term>Atlas训练系列产品</term>                              |    ×     |
 
 ## 功能说明
 
@@ -100,7 +100,7 @@
   <tr>
    <td>epWorldSize</td>
    <td>输入</td>
-   <td>ep通信域size：<br><term>Atlas A2系列产品</term>支持2、4、8；<br><term>Atlas A3系列产品</term>支持8、16、32、64、128；<br><term>Ascend 950DT</term>支持2、4、8、16、32、64。</td>
+   <td>ep通信域size：<br><term>Atlas A2系列产品</term>支持2、4、8；<br><term>Atlas A3系列产品</term>支持8、16、32、64、128；<br><term>Ascend 950DT系列产品</term>支持2、4、8、16、32、64。</td>
    <td>INT64</td>
    <td>ND</td>
   </tr>
@@ -151,9 +151,9 @@
 ## 约束说明
 
 - 通信引擎约束：
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：仅支持AIV通信
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持AI_CPU通信和AIV通信。
-  - <term>Ascend 950DT</term>：支持CCU通信和AI_CPU通信，CCCU仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
+  - <term>Atlas A2系列产品</term>：仅支持AIV通信
+  - <term>Atlas A3系列产品</term>：支持AI_CPU通信和AIV通信。
+  - <term>Ascend 950DT系列产品</term>：支持CCU通信和AI_CPU通信，CCCU仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
 
 - 参数说明里shape使用的变量：
   - BSK：本卡接收的token数，是recvCounts参数累加之和，取值范围(0, 52428800)。
@@ -167,9 +167,9 @@
   - A：本卡发送的token数，是sendCounts参数累加之和。
   - ep通信域内所有卡的A参数的累加和等于所有卡上的BSK参数的累加和。
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  : 单卡通信量在2MB以下可能存在性能劣化。
+- <term>Atlas A3系列产品</term>  : 单卡通信量在2MB以下可能存在性能劣化。
 
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：A和BSK均需在[1, 5000000]范围内，N1不超过32768。通信域内各卡的`HCCL_BUFFSIZE`需按最大发送量设置，满足`HCCL_BUFFSIZE >= max(200, ceil(A * N1 * 2 / 1048576) + 21)`，单位为MiB；FLOAT16和BFLOAT16每个元素均占2字节。
+- <term>Atlas A2系列产品</term>：A和BSK均需在[1, 5000000]范围内，N1不超过32768。通信域内各卡的`HCCL_BUFFSIZE`需按最大发送量设置，满足`HCCL_BUFFSIZE >= max(200, ceil(A * N1 * 2 / 1048576) + 21)`，单位为MiB；FLOAT16和BFLOAT16每个元素均占2字节。
 
 ## 调用说明
 

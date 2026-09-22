@@ -4,23 +4,23 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    ×     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    ×     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                             |    √     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
-| <term>Kirin X90 处理器系列产品</term> | √ |
-| <term>Kirin 9030 处理器系列产品</term> | √ |
+| <term>Ascend 950PR&950DT系列产品</term>                             |    ×     |
+| <term>Atlas A3系列产品</term>     |    ×     |
+| <term>Atlas A2系列产品</term> |    ×     |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
+| <term>Atlas推理系列产品</term>                             |    √     |
+| <term>Atlas训练系列产品</term>                              |    ×     |
+| <term>Kirin X90处理器系列产品</term> | √ |
+| <term>Kirin 9030处理器系列产品</term> | √ |
 
 ## 功能说明
 
-- 算子功能：Swin Transformer网络模型完成Q、K、V的计算。  
-- 计算公式：  
+- 算子功能：Swin Transformer网络模型完成Q、K、V的计算。
+- 计算公式：
 
     $$
     (Q,K,V)=(Quant(Layernorm(x).transpose()) * weight).dequant().transpose().split()
-    $$  
+    $$
 
   其中，weight是Q、K、V三个矩阵权重的拼接。
 
@@ -69,7 +69,7 @@
     <td>表示目标张量转换使用的权重矩阵，维度只支持2维且维度为[H, 3 * H],Device侧的aclTensor。不支持非连续的Tensor。</td>
     <td>INT8</td>
     <td>ND</td>
-  </tr>  
+  </tr>
   <tr>
     <td>bias</td>
     <td>输入</td>

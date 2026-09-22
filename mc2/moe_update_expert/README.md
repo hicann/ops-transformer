@@ -4,12 +4,12 @@
 
 | 产品                                                         |  是否支持   |
 | :----------------------------------------------------------- |:-------:|
-| <term>Ascend 950PR/Ascend 950DT</term>                             |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×    |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×    |
-| <term>Atlas 推理系列产品</term>                               |    ×    |
-| <term>Atlas 训练系列产品</term>                              |    ×    |
+| <term>Ascend 950PR&950DT系列产品</term>                             |    √    |
+| <term>Atlas A3系列产品</term>       |    √    |
+| <term>Atlas A2系列产品</term> |    ×    |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×    |
+| <term>Atlas推理系列产品</term>                               |    ×    |
+| <term>Atlas训练系列产品</term>                              |    ×    |
 
 ## 功能说明
 
@@ -116,7 +116,7 @@
 
 - 调用接口过程中使用的worldSize、moeExpertNum参数取值所有卡需保持一致，网络中不同层中也需保持一致，且和aclnnMoeDistributeDispatchV2, aclnnMoeDistributeCombineV2或aclnnMoeDistributeCombineAddRmsNorm对应参数也保持一致。
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
+- <term>Atlas A3系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
 
 - 参数说明里shape格式说明：
     - BS：表示batch sequence size，即本卡最终输出的token数量，取值范围为0 < BS ≤ 512。

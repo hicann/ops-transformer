@@ -4,14 +4,14 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-| <term>Ascend 950PR/Ascend 950DT</term>              |    ×     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      ×     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                             |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
-|<term>Kirin X90 处理器系列产品</term> | √ |
-|<term>Kirin 9030 处理器系列产品</term> | √ |
+| <term>Ascend 950PR&950DT系列产品</term>              |    ×     |
+|<term>Atlas A3系列产品</term>|      ×     |
+|<term>Atlas A2系列产品</term>|      √     |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
+| <term>Atlas推理系列产品</term>                             |    ×     |
+| <term>Atlas训练系列产品</term>                              |    ×     |
+|<term>Kirin X90处理器系列产品</term> | √ |
+|<term>Kirin 9030处理器系列产品</term> | √ |
 
 ## 功能说明
 
@@ -21,7 +21,7 @@
 
     $$
     (Q,K,V)=((Layernorm(inputX)).transpose() * weight).transpose().split()
-    $$  
+    $$
 
   其中，weight是Q、K、V三个矩阵权重的拼接。
 
@@ -77,7 +77,7 @@
     <td>表示目标张量转换使用的偏移矩阵，维度只支持1维且维度为[3 * H]，Device侧的aclTensor。不支持非连续的Tensor。</td>
     <td>FLOAT16</td>
     <td>ND</td>
-  </tr> 
+  </tr>
   <tr>
     <td>query_output</td>
     <td>输出</td>
@@ -98,11 +98,11 @@
     <td>表示转换之后的张量，公式中的V，Device侧的aclTensor。不支持非连续的Tensor。</td>
     <td>FLOAT16</td>
     <td>ND</td>
-  </tr> 
+  </tr>
 </tbody>
 </table>
 
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：数据类型支持FLOAT16。
+- <term>Atlas A2系列产品</term>：数据类型支持FLOAT16。
 
 ## 约束说明
 

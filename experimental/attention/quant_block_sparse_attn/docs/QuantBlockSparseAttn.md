@@ -4,12 +4,12 @@
 
 | 产品 | 是否支持 |
 | :--- | :---: |
-| <term>Ascend 950PR/Ascend 950DT</term> | √ |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> | × |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> | × |
-| <term>Atlas 200I/500 A2 推理产品</term> | × |
-| <term>Atlas 推理系列产品</term> | × |
-| <term>Atlas 训练系列产品</term> | × |
+| <term>Ascend 950PR&950DT系列产品</term> | √ |
+| <term>Atlas A3系列产品</term> | × |
+| <term>Atlas A2系列产品</term> | × |
+| <term>Atlas 200I/500 A2推理产品</term> | × |
+| <term>Atlas推理系列产品</term> | × |
+| <term>Atlas训练系列产品</term> | × |
 
 ## 功能说明
 
@@ -589,7 +589,7 @@ QuantBlockSparseAttn 算子约束分为 4 个档位，按约束复杂程度递�
   - `attention_out` 数据类型为 `BFLOAT16`，数据格式为 ND。`layout_q="TND"` 时输出 shape 为 `(QueryTokenNum, N1, D_v)`；`layout_q="NTD"` 时 PyTorch 接入层输出仍为 TND 语义的 `(QueryTokenNum, N1, D_v)`。
   - `sparse_q_block_size` 和 `sparse_kv_block_size` 当前均仅支持 128。
   - `layout_q` 当前仅支持 `TND`、`NTD`。
-  - `layout_out` 为预留参数，当前不使能；传入非 `TND` 类型会被拦截。
+  - `layout_out` 为预留参数，当前不开启；传入非 `TND` 类型会被拦截。
   - `quant_mode` 当前主算子仅支持 1，表示 `A8C8_QKV_FP8_P_STATIC_SOFTMAX_FP32`。
   - `softmax_scale` 为 float 属性，取值范围必须为 `(0, 1]`，常用值为 `1 / sqrt(D)`。
 

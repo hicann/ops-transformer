@@ -1,17 +1,17 @@
 # aclnnMsaIndexScore
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/msa_index_score)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/attention/msa_index_score)
 
 ## 产品支持情况
 
 <!-- npu="910b" id1 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="950" id3 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id3 -->
 
 ## 功能说明
@@ -51,7 +51,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](https://gitcode.com/cann/ops-transformer/blob/master/docs/zh/context/two_phase_api.md)，必须先调用 `aclnnMsaIndexScoreGetWorkspaceSize` 接口获取入参并计算所需 workspace 大小，再调用 `aclnnMsaIndexScore` 接口执行计算。
+每个算子分为[两段式接口](https://gitcode.com/cann/ops-transformer/blob/9.2.0/docs/zh/context/two_phase_api.md)，必须先调用 `aclnnMsaIndexScoreGetWorkspaceSize` 接口获取入参并计算所需 workspace 大小，再调用 `aclnnMsaIndexScore` 接口执行计算。
 
 ```cpp
 aclnnStatus aclnnMsaIndexScoreGetWorkspaceSize(

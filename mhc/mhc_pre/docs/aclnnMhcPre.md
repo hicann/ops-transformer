@@ -1,26 +1,26 @@
 # aclnnMhcPre
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/mhc/mhc_pre)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/mhc/mhc_pre)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -267,7 +267,7 @@ aclnnStatus aclnnMhcPre(
   </tbody></table>
 
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     - 参数`phi`的shape仅支持(n<sup>2</sup>+2n, nD)或(2n, nD)。
     - 参数`bias`的shape仅支持(n<sup>2</sup>+2n)或(2n)。
     - 参数`hRes`的shape仅支持(B, S, n, n)或(T, n, n)。
@@ -367,13 +367,13 @@ aclnnStatus aclnnMhcPre(
 
 - 规格约束：
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     - n目前支持4、6、8。
     - D支持1~16384范围以内，需满足D为16对齐。
     - 当alpha=(3)时，支持hRes输出，必须满足以下条件：输入phi=(n<sup>2</sup>+2n, nD)，bias=(n<sup>2</sup>+2n)；输出hMixOptional=(B, S, n<sup>2</sup>+2n)或(T, n<sup>2</sup>+2n)；当alpha=(2)时，hRes输出为0，必须满足以下条件：输入phi=(2n, nD),bias=(2n)，输出hMixOptional=(B, S, 2n) 或 (T, 2n)。
   <!-- end id7 -->
   <!-- npu="A3,910b" id8 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     - n目前支持4。
     - D支持100000范围以内，需满足D为128对齐。
     - 当alpha=(3)时，支持hRes输出，必须满足以下条件：

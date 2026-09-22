@@ -1,26 +1,26 @@
 # aclnnSparseLightningIndexerKLLossGradMetadata
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/sparse_lightning_indexer_kl_loss_grad_metadata)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/attention/sparse_lightning_indexer_kl_loss_grad_metadata)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -28,7 +28,7 @@
 - 算子功能：该算子为AICPU算子，是aclnnSparseLightningIndexerKLLossGrad算子的前置算子。根据aclnnSparseLightningIndexerKLLossGrad算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata。输出结果可作为aclnnSparseLightningIndexerKLLossGrad算子的metadataOptional输入，减少主算子tiling阶段对host array的访问。
 
   **该算子不建议单独使用，建议与aclnnSparseLightningIndexerKLLossGrad算子配合使用，形成完整的工作流。**
-    1. 接收主算子的shape信息，包括batchSize、maxSeqlenQ、maxSeqlenK、numHeadsQ、numHeadsK、headDim、topk、layout和mask信息。
+    1. 接收主算子的shape信息，包括batchSize、maxSeqlenQ、maxSeqlenK、numHeadsQ、numHeadsK、headDim、topk、layout和mask信息 。
     2. 根据每个q对应的有效sparse长度估算负载，并将B/S1合轴后的任务均衡切分到可用AIC核上。
     3. 输出metadata后，后续作为aclnnSparseLightningIndexerKLLossGrad算子的metadataOptional输入使用。
 
@@ -288,13 +288,13 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 
   <ul>
     <!-- npu="950" id7 -->
-    <li><term>Ascend 950PR/Ascend 950DT</term> ：topk仅支持[1, 2048]。</li>
+    <li><term>Ascend 950PR&950DT系列产品</term> ：topk仅支持[1, 2048]。</li>
     <!-- end id7 -->
     <!-- npu="A3" id8 -->
-    <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <li><term>Atlas A3系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
     <!-- end id8 -->
     <!-- npu="910b" id9 -->
-    <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <li><term>Atlas A2系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
     <!-- end id9 -->
   </ul>
 
@@ -387,14 +387,14 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   - layoutQOptional、layoutKOptional须相同。
   - numHeadsQ必须能被numHeadsK整除。
   <!-- npu="950" id10 -->
-  - Ascend 950PR/Ascend 950DT约束：
+  - Ascend 950PR&950DT系列产品约束：
     - layoutQOptional=BSND场景
       - maxSeqlenQ必须传入S1的值。
     - layoutQOptional=TND场景
       - cuSeqlensQOptional必须传入。
   <!-- end id10 -->
   <!-- npu="A3" id11 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>约束：
+  - <term>Atlas A3系列产品</term>约束：
     - BSND场景
       - 必传batchSize、maxSeqlenQ、maxSeqlenK和topk参数，以获取shape信息。
     - TND场景
@@ -402,7 +402,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
   <!-- end id11 -->
   <!-- npu="910b" id12 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>约束：
+  - <term>Atlas A2系列产品</term>约束：
     - BSND场景
       - 必传batchSize、maxSeqlenQ、maxSeqlenK和topk参数，以获取shape信息。
     - TND场景
@@ -443,7 +443,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 <summary><a id="特殊约束"></a>特殊约束</summary>
 
   <!-- npu="950" id13 -->
-  - Ascend 950PR/Ascend 950DT约束：
+  - Ascend 950PR&950DT系列产品约束：
       - Batch取值规则
         - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batch_size获取batch数。
         - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
@@ -452,7 +452,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
         - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
   <!-- end id13 -->
   <!-- npu="A3" id14 -->
-  - Atlas A3 训练系列产品/Atlas A3 推理系列产品约束：
+  - Atlas A3系列产品约束：
     - Batch取值规则
       - 如果batchSize大于0，优先使用batchSize。
       - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqLensQOptional的shape推导batch。
@@ -472,7 +472,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       - maskMode当前仅支持0和3。
   <!-- end id14 -->
   <!-- npu="910b" id15 -->
-  - Atlas A2 训练系列产品/Atlas A2 推理系列产品约束：
+  - Atlas A2系列产品约束：
     - Batch取值规则
       - 如果batchSize大于0，优先使用batchSize。
       - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqLensQOptional的shape推导batch。
@@ -500,7 +500,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   metadata输出为INT32 Tensor，当前shape固定为(64,)，字段布局如下。
   <ul>
   <!-- npu="950" id16 -->
-  <li><term>Ascend 950PR/Ascend 950DT</term> ：
+  <li><term>Ascend 950PR&950DT系列产品</term> ：
   <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 180px">
     <col style="width: 150px">
@@ -544,7 +544,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   </li>
   <!-- end id16 -->
   <!-- npu="A3" id17 -->
-  <li><term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> ：
+  <li><term>Atlas A3系列产品</term> ：
   <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 180px">
     <col style="width: 150px">
@@ -588,7 +588,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   </li>
   <!-- end id17 -->
   <!-- npu="910b" id18 -->
-  <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> ：
+  <li><term>Atlas A2系列产品</term> ：
   <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 180px">
     <col style="width: 150px">

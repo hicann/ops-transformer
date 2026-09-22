@@ -1,26 +1,26 @@
 # aclnnApplyRotaryPosEmbV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/posembedding/apply_rotary_pos_emb)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/posembedding/apply_rotary_pos_emb)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：支持
+- <term>Atlas推理系列产品</term>：支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -205,12 +205,12 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
       <td>表示要执行旋转位置编码的第一个张量，公式中的query，计算结果原地更新。</td>
       <td>
         <ul>
-          <li><term>Atlas 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：</li>
+          <li><term>Atlas推理系列产品</term>、<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：</li>
             <ul>
               <li>不支持空Tensor。</li>
               <li>shape最后一维（D）必须等于128或者64。</li>
             </ul>
-          <li><term>Ascend 950PR/Ascend 950DT</term>：</li>
+          <li><term>Ascend 950PR&950DT系列产品</term>：</li>
             <ul>
               <li>支持空Tensor。</li>
               <li>shape最后一维（D）小于等于1024。</li>
@@ -228,12 +228,12 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
       <td>表示要执行旋转位置编码的第二个张量，公式中的key，计算结果原地更新。</td>
       <td>
         <ul>
-          <li><term>Atlas 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：</li>
+          <li><term>Atlas推理系列产品</term>、<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：</li>
             <ul>
               <li>不支持空Tensor。</li>
               <li>shape最后一维（D）必须等于128或者64。</li>
             </ul>
-          <li><term>Ascend 950PR/Ascend 950DT</term>：</li>
+          <li><term>Ascend 950PR&950DT系列产品</term>：</li>
             <ul>
               <li>支持空Tensor。</li>
               <li>shape最后一维（D）小于等于1024。</li>
@@ -251,14 +251,14 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
       <td>表示参与计算的位置编码张量，公式中的cos。</td>
       <td>
         <ul>
-          <li><term>Atlas 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：</li>
+          <li><term>Atlas推理系列产品</term>、<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：</li>
             <ul>
               <li>不支持空Tensor。</li>
               <li>shape中B维度与queryRef、keyRef的B维度一致。</li>
               <li>shape第3维（N）必须等于1。</li>
               <li>shape最后一维（D）必须等于128或者64。</li>
             </ul>
-          <li><term>Ascend 950PR/Ascend 950DT</term>：</li>
+          <li><term>Ascend 950PR&950DT系列产品</term>：</li>
             <ul>
               <li>支持空Tensor。</li>
               <li>shape中B维度与queryRef、keyRef的B维度一致，或者等于1。</li>
@@ -278,14 +278,14 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
       <td>表示参与计算的位置编码张量，公式中的sin。</td>
       <td>
         <ul>
-          <li><term>Atlas 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：</li>
+          <li><term>Atlas推理系列产品</term>、<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：</li>
             <ul>
               <li>不支持空Tensor。</li>
               <li>shape中B维度与queryRef、keyRef的B维度一致。</li>
               <li>shape第3维（N）必须等于1。</li>
               <li>shape最后一维（D）必须等于128或者64。</li>
             </ul>
-          <li><term>Ascend 950PR/Ascend 950DT</term>：</li>
+          <li><term>Ascend 950PR&950DT系列产品</term>：</li>
             <ul>
               <li>支持空Tensor。</li>
               <li>shape中B维度与queryRef、keyRef的B维度一致，或者等于1。</li>
@@ -306,8 +306,8 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
       <td>
         <ul>
           <li>取值范围：1-BSND、2-SBND、3-BNSD、4-TND。</li>
-          <li><term>Atlas 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持1-BSND的4维Tensor、4-TND的3维Tensor。</li>
-          <li><term>Ascend 950PR/Ascend 950DT</term>：支持1-BSND、2-SBND、3-BNSD的4维Tensor, 4-TND的3维Tensor。</li>
+          <li><term>Atlas推理系列产品</term>、<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持1-BSND的4维Tensor、4-TND的3维Tensor。</li>
+          <li><term>Ascend 950PR&950DT系列产品</term>：支持1-BSND、2-SBND、3-BNSD的4维Tensor, 4-TND的3维Tensor。</li>
         </ul>
       </td>
       <td>int64</td>
@@ -322,8 +322,8 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
       <td>
         <ul>
           <li>取值范围："half"、"interleave"、"quarter"。</li>
-          <li><term>Atlas 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持"half"模式。</li>
-          <li><term>Ascend 950PR/Ascend 950DT</term>：支持"half"、"interleave"、"quarter"模式。</li>
+          <li><term>Atlas推理系列产品</term>、<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持"half"模式。</li>
+          <li><term>Ascend 950PR&950DT系列产品</term>：支持"half"、"interleave"、"quarter"模式。</li>
         </ul>
       </td>
       <td>char</td>
@@ -355,7 +355,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
   </table>
 
   <!-- npu="310p" id7 -->
-  - <term>Atlas 推理系列产品</term>：不支持BFLOAT16
+  - <term>Atlas推理系列产品</term>：不支持BFLOAT16
 
   <!-- end id7 -->
 
@@ -434,7 +434,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
   - aclnnApplyRotaryPosEmbV2默认确定性实现。
 
 <!-- npu="A3,910b,310p" id8 -->
-- <term>Atlas 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+- <term>Atlas推理系列产品</term>、<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
   - layout为1时，queryRef、keyRef、cos、sin输入shape的前2维（B、S）必须相等；layout为4时，第1维（T）必须相等。
   - queryRef、keyRef输入shape的最后一维（D）必须相等，cos、sin输入shape的最后一维（D）必须相等。
   - 输入张量queryRef、keyRef、cos、sin的dtype必须相同。
@@ -449,7 +449,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
 
 <!-- end id8 -->
 <!-- npu="950" id9 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
   - 对于任意layout，queryRef与keyRef除N维度外其他维度必须相同；queryRef、keyRef输入shape的最后一维（D）必须相等，cos、sin输入shape的最后一维（D）必须相等，且小于等于queryRef、keyRef输入shape的最后一维（D）。
   - 输入张量queryRef、keyRef、cos、sin的dtype必须相同。
   - rotaryMode为"half"和"interleave"时，输入shape最后一维必须被2整除；rotaryMode为"quarter"时，输入shape最后一维必须被4整除。

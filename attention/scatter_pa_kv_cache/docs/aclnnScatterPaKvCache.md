@@ -1,26 +1,26 @@
 # aclnnScatterPaKvCache
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/scatter_pa_kv_cache)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/attention/scatter_pa_kv_cache)
 
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -128,10 +128,10 @@
 - 上述场景根据构造的参数来区别，符合第一种入参构造走场景一，符合第二种构造走场景二，符合第三种构造走场景三，符合第四种构造走场景四，符合第五种构造走场景五，符合第六种构造走场景六。场景一、场景二、场景六没有compressLensOptional、seqLensOptional、compressSeqOffsetOptional这三个可选参数。场景四没有compressSeqOffsetOptional可选参数。
 
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：仅支持场景一、二、四、五、六、七。
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：仅支持场景一、二、四、五、六、七。
 <!-- end id7 -->
 <!-- npu="950" id8 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：仅支持场景一、二、三、四、五。
+- <term>Ascend 950PR&950DT系列产品</term>：仅支持场景一、二、三、四、五。
 
 <!-- end id8 -->
 
@@ -334,13 +334,13 @@ aclnnStatus aclnnScatterPaKvCache(
   </tbody></table>
 
   <!-- npu="A3,910b" id9 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
     - 输入key、keyCacheRef、value、valueCacheRef仅支持FLOAT16、BFLOAT16、INT8数据类型，不支持FLOAT、UINT8、INT16、UINT16、INT32、UINT32、HIFLOAT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E1M2、FLOAT4_E2M1。
 
   <!-- end id9 -->
   <!-- npu="950" id10 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：支持参数表中列出的全部数据类型；其中FLOAT4_E1M2、FLOAT4_E2M1仅场景一、场景二且scatterMode为"None"时支持。
+  - <term>Ascend 950PR&950DT系列产品</term>：支持参数表中列出的全部数据类型；其中FLOAT4_E1M2、FLOAT4_E2M1仅场景一、场景二且scatterMode为"None"时支持。
 
   <!-- end id10 -->
 
@@ -453,7 +453,7 @@ aclnnStatus aclnnScatterPaKvCache(
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="950,A3,910b" id11 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：
 
   ```c++
   #include <iostream>

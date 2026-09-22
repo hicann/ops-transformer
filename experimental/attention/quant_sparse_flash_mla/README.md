@@ -4,12 +4,12 @@
 
 | 产品                                                         | 是否支持 |
 | ------------------------------------------------------------ | :------: |
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      ×     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      ×     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      ×     |
+|<term>Atlas A2系列产品</term>|      ×     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -64,24 +64,24 @@
 
 ## 约束说明
 
--   该接口支持aclgraph模式。
--   参数q、ori_kv和cmp_kv中的D仅支持512。
--   参数ori\_kv、cmp\_kv的数据类型必须保持一致，且不可同时为空。
--   参数q中的N1当前支持64/128，ori\_kv、cmp\_kv中的KV\_N仅支持1。
--   参数ori\_kv和cmp\_kv中的block\_size1和block\_size2需为16的倍数，最大支持1024；block\_num1及block_num2为PageAttention时block总数。
--   参数ori\_sparse\_indices与cmp\_sparse\_indices中的K1与K2为一次离散选取的block数，需要保证每行有效值均在前半部分，无效值均在后半部分，当前不支持传入ori\_sparse\_indices，cmp\_sparse\_indices中K2仅支持512/1024。
--   参数cu\_seqlens\_q、cu\_seqlens\_ori\_kv及cu\_seqlens\_cmp\_kv维度为B + 1，要求其值为当前Batch与前序Batch有效token数的累加值，后一个元素的值必须大于等于前一个元素的值。
--   参数seqused\_q维度为B，要求其值表示每个Batch中的有效token数。
--   参数seqused\_ori\_kv、seqused\_cmp\_kv维度为B，表示每个Batch中ori_kv和cmp_kv的真实使用长度。若不传入，seqused\_ori\_kv默认使用全部长度，seqused\_cmp\_kv默认根据seqused\_ori\_kv和cmp\_ratio计算（floor(seqused\_ori\_kv / cmp\_ratio)）。
--   参数cmp\_residual\_kv维度为B，当cmp\_mask\_mode=3且cmp\_ratio≠1时必须传入，用于解决mask计算中的余数问题，防止越界访问。
--   若同时传入seqused\_ori\_kv、seqused\_cmp\_kv和cmp\_residual\_kv，需满足：seqused\_ori\_kv[i] == seqused\_cmp\_kv[i] * cmp\_ratio + cmp\_residual\_kv[i]，且cmp\_residual\_kv[i] < cmp\_ratio。
--   参数ori\_block\_table的shape为2维，其中第一维长度为B，第二维长度不小于所有Batch中最大的S2对应的block数量，即S2\_max / block\_size1向上取整。
--   参数cmp\_block\_table的shape为2维，其中第一维长度为B，第二维长度不小于floor(S2\_max \/ cmp\_ratio)对应的block数量，即floor(S2\_max \/ cmp\_ratio) \/ block\_size2向上取整。
--   ori\_mask\_mode及cmp\_mask\_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](https://gitcode.com/cann/ops-transformer/blob/master/docs/zh/context/sparse_mode_introduction.md)。
--   q、ori_kv、cmp_kv参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Hidden Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
--   Q\_S和S1表示q shape中的S，S2表示ori\_kv shape中的S，Q\_N和N1表示num\_q\_heads，KV\_N和N2表示num\_ori\_kv\_heads和num\_cmp\_kv\_heads；T1表示q shape中的T。
+- 该接口支持aclgraph模式。
+- 参数q、ori_kv和cmp_kv中的D仅支持512。
+- 参数ori\_kv、cmp\_kv的数据类型必须保持一致，且不可同时为空。
+- 参数q中的N1当前支持64/128，ori\_kv、cmp\_kv中的KV\_N仅支持1。
+- 参数ori\_kv和cmp\_kv中的block\_size1和block\_size2需为16的倍数，最大支持1024；block\_num1及block_num2为PageAttention时block总数。
+- 参数ori\_sparse\_indices与cmp\_sparse\_indices中的K1与K2为一次离散选取的block数，需要保证每行有效值均在前半部分，无效值均在后半部分，当前不支持传入ori\_sparse\_indices，cmp\_sparse\_indices中K2仅支持512/1024。
+- 参数cu\_seqlens\_q、cu\_seqlens\_ori\_kv及cu\_seqlens\_cmp\_kv维度为B + 1，要求其值为当前Batch与前序Batch有效token数的累加值，后一个元素的值必须大于等于前一个元素的值。
+- 参数seqused\_q维度为B，要求其值表示每个Batch中的有效token数。
+- 参数seqused\_ori\_kv、seqused\_cmp\_kv维度为B，表示每个Batch中ori_kv和cmp_kv的真实使用长度。若不传入，seqused\_ori\_kv默认使用全部长度，seqused\_cmp\_kv默认根据seqused\_ori\_kv和cmp\_ratio计算（floor(seqused\_ori\_kv / cmp\_ratio)）。
+- 参数cmp\_residual\_kv维度为B，当cmp\_mask\_mode=3且cmp\_ratio≠1时必须传入，用于解决mask计算中的余数问题，防止越界访问。
+- 若同时传入seqused\_ori\_kv、seqused\_cmp\_kv和cmp\_residual\_kv，需满足：seqused\_ori\_kv[i] == seqused\_cmp\_kv[i] * cmp\_ratio + cmp\_residual\_kv[i]，且cmp\_residual\_kv[i] < cmp\_ratio。
+- 参数ori\_block\_table的shape为2维，其中第一维长度为B，第二维长度不小于所有Batch中最大的S2对应的block数量，即S2\_max / block\_size1向上取整。
+- 参数cmp\_block\_table的shape为2维，其中第一维长度为B，第二维长度不小于floor(S2\_max \/ cmp\_ratio)对应的block数量，即floor(S2\_max \/ cmp\_ratio) \/ block\_size2向上取整。
+- ori\_mask\_mode及cmp\_mask\_mode所表示的mask模式的详细介绍见[sparse_mode参数说明](https://gitcode.com/cann/ops-transformer/blob/9.2.0/docs/zh/context/sparse_mode_introduction.md)。
+- q、ori_kv、cmp_kv参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Hidden Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
+- Q\_S和S1表示q shape中的S，S2表示ori\_kv shape中的S，Q\_N和N1表示num\_q\_heads，KV\_N和N2表示num\_ori\_kv\_heads和num\_cmp\_kv\_heads；T1表示q shape中的T。
 
 ## 调用说明
 
--   调用方式：使用npu_ops_tranformer包中的npu_quant_sparse_flash_mla接口进行调用，
+- 调用方式：使用npu_ops_tranformer包中的npu_quant_sparse_flash_mla接口进行调用，
              详见torch_extension/npu_ops_transformer/ops/quant_sparse_flash_mla.py

@@ -137,7 +137,7 @@
     <td>/</td>
     <td>/</td>
     <td>/</td>
-    <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/master/experimental/attention/blitz_sparse_attention/README.md">README文档</a>。</td>
+    <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/9.2.0/experimental/attention/blitz_sparse_attention/README.md">README文档</a>。</td>
   </tr>
   <tr>
     <td>fused_infer_attention_score</td>
@@ -148,7 +148,7 @@
     <td>/</td>
     <td>/</td>
     <td>/</td>
-    <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/master/experimental/attention/fused_infer_attention_score/README.md">README文档</a>。</td>
+    <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/9.2.0/experimental/attention/fused_infer_attention_score/README.md">README文档</a>。</td>
   </tr>
   <tr>
     <td>typhoon_mla</td>
@@ -159,7 +159,7 @@
     <td>/</td>
     <td>/</td>
     <td>/</td>
-    <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/master/experimental/attention/typhoon_mla/README.md">README文档</a>。</td>
+    <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/9.2.0/experimental/attention/typhoon_mla/README.md">README文档</a>。</td>
   </tr>
   <tr>
     <td>fused_gdn_decode</td>
@@ -211,7 +211,7 @@
     # 如要使用DeepSeek-V4，ascend950环境编译命令示例如下：
     # bash build.sh --pkg --experimental --soc=ascend950 --ops=compressor,quant_lightning_indexer,quant_lightning_indexer_metadata,kv_quant_sparse_attn_sharedkv,kv_quant_sparse_attn_sharedkv_metadata
     ```
-    - --soc：\$\{soc\_version\}表示NPU型号。Atlas A2 训练系列产品/Atlas A2 推理系列产品使用"ascend910b"，Atlas A3 训练系列产品/Atlas A3 推理系列产品使用"ascend910_93"。
+    - --soc：\$\{soc\_version\}表示NPU型号。Atlas A2系列产品使用"ascend910b"，Atlas A3系列产品使用"ascend910_93"。
     - --ops：自定义算子名称，多个自定义算子通过`,`分割。
 
     若提示如下信息，说明编译成功。

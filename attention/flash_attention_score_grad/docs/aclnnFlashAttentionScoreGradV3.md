@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -26,7 +26,7 @@
 训练场景下计算注意力的反向输出，即[aclnnFlashAttentionScoreV3](../../flash_attention_score/docs/aclnnFlashAttentionScoreV3.md)的反向计算。**该接口相较于[aclnnFlashAttentionScoreGradV2](./aclnnFlashAttentionScoreGradV2.md)接口，新增sinkInOptional参数和dsinkOut输出**：
 
   <!-- npu="950" id7 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：暂不支持sinkInOptional参数和dsinkOut输出。
+  - <term>Ascend 950PR&950DT系列产品</term>：暂不支持sinkInOptional参数和dsinkOut输出。
   <!-- end id7 -->
   - pseType=1时，与[aclnnFlashAttentionScoreGrad](./aclnnFlashAttentionScoreGrad.md)实现相同。
   - pseType=其他取值时，需要先mul再add。

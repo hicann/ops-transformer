@@ -4,12 +4,12 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      ×     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      ×     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      ×     |
+|<term>Atlas A2系列产品</term>|      ×     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -80,11 +80,10 @@
 
 - 输入init_matrix需为二维非负矩阵（N×N），确保迭代后可形成双随机矩阵。
 - max_iter建议取值范围50\~200，epsilon建议取值范围1e-6~1e-4，平衡收敛效果与计算效率。
-- 仅支持Ascend 950PR/Ascend 950DT硬件环境，其他Atlas系列产品暂不支持。
+- 仅支持Ascend 950PR&950DT系列产品硬件环境，其他Atlas系列产品暂不支持。
 
 ## 调用说明
 
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_mhc_sinkhorn](examples/test_aclnn_mhc_sinkhorn.cpp) | 通过[aclnnMhcSinkhorn](docs/aclnnMhcSinkhorn.md)方式调用算子。|
-  

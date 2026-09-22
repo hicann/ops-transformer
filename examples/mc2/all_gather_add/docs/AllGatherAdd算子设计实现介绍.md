@@ -1,6 +1,6 @@
 # AllGatherAdd算子设计实现详细介绍
 
-**本篇算子设计和实现介绍基于<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>**
+**本篇算子设计和实现介绍基于<term>Atlas A2系列产品</term>**
 
 ## 1.算子分析
 
@@ -419,7 +419,7 @@ extern "C" __global__ __aicore__ void all_gather_add(GM_ADDR aGM, GM_ADDR bGM, G
 ## 编译和运行
 
 编译部署算子请参考开源仓算子README：
-https://gitcode.com/cann/ops-transformer/blob/master/examples/mc2/all_gather_add/README.md
+https://gitcode.com/cann/ops-transformer/blob/9.2.0/examples/mc2/all_gather_add/README.md
 
 ## 算子执行样例
 
