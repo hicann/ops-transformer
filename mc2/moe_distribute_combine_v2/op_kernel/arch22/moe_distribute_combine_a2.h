@@ -128,11 +128,15 @@ public:
     __aicore__ inline void Process();
 
 private:
+    __aicore__ inline void CombineTileTokens(uint32_t tileStart, uint32_t tileTokenCount, int32_t &eventId);
+    __aicore__ inline void InitTilingAndWindow(const MoeDistributeCombineA2TilingData *tilingData);
     __aicore__ inline void LocalWindowCopy();
     __aicore__ inline void AlltoAllDispatch();
     __aicore__ inline void AllocTensorForComm();
     __aicore__ inline void AllocTensorForWindowCopy();
     __aicore__ inline void CalRecvCountsAndOffsets();
+    __aicore__ inline void SumRecvCounts(const TaskInfo &taskInfo, uint32_t expertTileNum, uint32_t numExpertsPerTail);
+    __aicore__ inline void CalWindowOffsets();
     __aicore__ inline void WaitDispatch();
     __aicore__ inline void CalTokenActiveMask();
     __aicore__ inline void ProcessMoeAndCopyExpert(int32_t eventId, uint32_t tokenIdx, uint32_t expertOffset);
@@ -218,12 +222,9 @@ private:
 };
 
 template <TemplateMC2TypeA2Class>
-__aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::Init(
-    GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR expandIdx, GM_ADDR sendCount, GM_ADDR scales, GM_ADDR xActiveMask,
-    GM_ADDR oriX, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR constExpertV, GM_ADDR performanceInfo,
-    GM_ADDR XOut, GM_ADDR workspaceGM, TPipe *pipe, const MoeDistributeCombineA2TilingData *tilingData)
+__aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::InitTilingAndWindow(
+    const MoeDistributeCombineA2TilingData *tilingData)
 {
-    oriXGM_ = oriX;
     rankId_ = tilingData->moeDistributeCombineInfo.epRankId;
     axisBS_ = tilingData->moeDistributeCombineInfo.bs;
     axisH_ = tilingData->moeDistributeCombineInfo.h;
@@ -249,6 +250,16 @@ __aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::Init(
     adumpStatusGM_ = windowInGM_ + Mc2A2Kernel::ADUMP_STATUS_COMBINE_ADDR;
     windowInGM_ = windowInGM_ + Mc2A2Kernel::ADUMP_WIN_SIZE + halfWinSize_ * bufferId_;
     windowOutGM_ = hccl_.GetWindowsOutAddr(rankId_) + Mc2A2Kernel::ADUMP_WIN_SIZE + halfWinSize_ * bufferId_;
+}
+
+template <TemplateMC2TypeA2Class>
+__aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::Init(
+    GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR expandIdx, GM_ADDR sendCount, GM_ADDR scales, GM_ADDR xActiveMask,
+    GM_ADDR oriX, GM_ADDR constExpertAlpha1, GM_ADDR constExpertAlpha2, GM_ADDR constExpertV, GM_ADDR performanceInfo,
+    GM_ADDR XOut, GM_ADDR workspaceGM, TPipe *pipe, const MoeDistributeCombineA2TilingData *tilingData)
+{
+    oriXGM_ = oriX;
+    InitTilingAndWindow(tilingData);
     coreIdx_ = GetBlockIdx();
     expandXGlobal_.SetGlobalBuffer((__gm__ ExpandXType *)expandX);
     expertIdsGlobal_.SetGlobalBuffer((__gm__ ExpandIdxType *)expertIds);
@@ -532,7 +543,15 @@ __aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::CalRecvCou
     taskInfo.SplitCore(axisBS_ * axisK_, aivNum_, coreIdx_);
     uint32_t expertTileNum = CeilDiv(taskInfo.taskNum, MAX_NUM_EXPERTS_PER_TILE);
     uint32_t numExpertsPerTail = taskInfo.taskNum - (expertTileNum - 1) * MAX_NUM_EXPERTS_PER_TILE;
+    SumRecvCounts(taskInfo, expertTileNum, numExpertsPerTail);
+    CalWindowOffsets();
+}
 
+template <TemplateMC2TypeA2Class>
+__aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::SumRecvCounts(const TaskInfo &taskInfo,
+                                                                                    uint32_t expertTileNum,
+                                                                                    uint32_t numExpertsPerTail)
+{
     Duplicate(recvCountLocal_, 0u, moeExpertNum_);
     Duplicate(expertWindowOffsetLocal_, 0u, moeExpertNum_);
 
@@ -565,6 +584,11 @@ __aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::CalRecvCou
 
     CopyGm2Ub(recvCountLocal_, expertRecvCountGlobal_, moeExpertNum_);
     SyncFunc<HardEvent::MTE2_S>();
+}
+
+template <TemplateMC2TypeA2Class>
+__aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::CalWindowOffsets()
+{
     for (uint32_t i = 0u; i < worldSizeTaskInfo_.taskNum; ++i) {
         uint32_t prefixSum = 0;
         uint32_t expertBaseOffset = i * localMoeExpertNum_;
@@ -721,6 +745,38 @@ __aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::AllocTenso
 }
 
 template <TemplateMC2TypeA2Class>
+__aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::CombineTileTokens(uint32_t tileStart,
+                                                                                        uint32_t tileTokenCount,
+                                                                                        int32_t &eventId)
+{
+    for (uint32_t j = 0; j < tileTokenCount; ++j) {
+        uint32_t tokenIdx = tileStart + j;
+        Duplicate(topkSumFloatLocal_, 0.0f, axisH_);
+        for (uint32_t k = 0; k < axisK_; ++k) {
+            uint32_t expertOffset = j * axisK_ + k;
+            if (isInputExpertMaskFlag_ && !expertMaskLocal_(expertOffset)) {
+                continue;
+            }
+            int32_t expertId = expertIdsLocal_(expertOffset);
+            const bool isMoeExpert = expertId < moeExpertNum_;
+            const bool isCopyExpert = expertId >= moeExpertNum_ + zeroExpertNum_ &&
+                                      expertId < moeExpertNum_ + zeroExpertNum_ + copyExpertNum_;
+            if (isMoeExpert || isCopyExpert) {
+                ProcessMoeAndCopyExpert(eventId, tokenIdx, expertOffset);
+                eventId ^= 1;
+            }
+        }
+        PipeBarrier<PIPE_V>();
+        SetFlag<HardEvent::MTE3_V>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE3_V>(EVENT_ID0);
+        Cast(topkSumLocal_, topkSumFloatLocal_, AscendC::RoundMode::CAST_RINT, axisH_);
+        SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
+        WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
+        DataCopy(expandOutGlobal_[tokenIdx * axisH_], topkSumLocal_, axisH_);
+    }
+}
+
+template <TemplateMC2TypeA2Class>
 __aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::LocalWindowCopy()
 {
     tokenTaskInfo_.SplitCore(axisBS_, aivNum_, coreIdx_);
@@ -747,31 +803,7 @@ __aicore__ inline void MoeDistributeCombineA2<TemplateMC2TypeA2Func>::LocalWindo
         SetFlag<HardEvent::V_MTE2>(EVENT_ID0);
         SetFlag<HardEvent::V_MTE2>(EVENT_ID1);
         int32_t eventId = 0;
-        for (uint32_t j = 0; j < tileTokenCount; ++j) {
-            uint32_t tokenIdx = tileStart + j;
-            Duplicate(topkSumFloatLocal_, 0.0f, axisH_);
-            for (uint32_t k = 0; k < axisK_; ++k) {
-                uint32_t expertOffset = j * axisK_ + k;
-                if (isInputExpertMaskFlag_ && !expertMaskLocal_(expertOffset)) {
-                    continue;
-                }
-                int32_t expertId = expertIdsLocal_(expertOffset);
-                const bool isMoeExpert = expertId < moeExpertNum_;
-                const bool isCopyExpert = expertId >= moeExpertNum_ + zeroExpertNum_ &&
-                                          expertId < moeExpertNum_ + zeroExpertNum_ + copyExpertNum_;
-                if (isMoeExpert || isCopyExpert) {
-                    ProcessMoeAndCopyExpert(eventId, tokenIdx, expertOffset);
-                    eventId ^= 1;
-                }
-            }
-            PipeBarrier<PIPE_V>();
-            SetFlag<HardEvent::MTE3_V>(EVENT_ID0);
-            WaitFlag<HardEvent::MTE3_V>(EVENT_ID0);
-            Cast(topkSumLocal_, topkSumFloatLocal_, AscendC::RoundMode::CAST_RINT, axisH_);
-            SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
-            WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
-            DataCopy(expandOutGlobal_[tokenIdx * axisH_], topkSumLocal_, axisH_);
-        }
+        CombineTileTokens(tileStart, tileTokenCount, eventId);
         WaitFlag<HardEvent::V_MTE2>(EVENT_ID0);
         WaitFlag<HardEvent::V_MTE2>(EVENT_ID1);
     }

@@ -117,13 +117,9 @@ graphStatus MoeDistributeCombineGetOpOutput(OpExecuteContext *host_api_ctx, OpOu
     return ge::GRAPH_SUCCESS;
 }
 
-// 获取属性
-graphStatus MoeDistributeCombineGetOpAttrs(OpExecuteContext *host_api_ctx, OpAttrs &opAttrs)
+// 获取通信分组属性
+graphStatus MoeDistributeCombineGetCommGroupAttrs(const gert::RuntimeAttrs *attrs, OpAttrs &opAttrs)
 {
-    const auto attrs = host_api_ctx->GetAttrs();
-    OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "attrs"),
-                return ge::GRAPH_FAILED);
-
     opAttrs.groupEp = attrs->GetStr(static_cast<size_t>(ops::MoeDistributeCombineAttrIdx::K_GROUP_EP));
     OP_CHECK_IF(opAttrs.groupEp == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "groupEp"),
                 return ge::GRAPH_FAILED);
@@ -152,6 +148,12 @@ graphStatus MoeDistributeCombineGetOpAttrs(OpExecuteContext *host_api_ctx, OpAtt
     OP_CHECK_IF(opAttrs.tpRankId == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "tpRankId"),
                 return ge::GRAPH_FAILED);
 
+    return ge::GRAPH_SUCCESS;
+}
+
+// 获取专家与量化属性
+graphStatus MoeDistributeCombineGetExpertQuantAttrs(const gert::RuntimeAttrs *attrs, OpAttrs &opAttrs)
+{
     opAttrs.expertShardType = attrs->GetInt(static_cast<size_t>(ops::MoeDistributeCombineAttrIdx::K_EXPERT_SHARD_TYPE));
     OP_CHECK_IF(opAttrs.expertShardType == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "expertShardType"), return ge::GRAPH_FAILED);
@@ -180,6 +182,22 @@ graphStatus MoeDistributeCombineGetOpAttrs(OpExecuteContext *host_api_ctx, OpAtt
     opAttrs.groupListType = attrs->GetInt(static_cast<size_t>(ops::MoeDistributeCombineAttrIdx::K_GROUP_LIST_TYPE));
     OP_CHECK_IF(opAttrs.groupListType == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "group_list_type"), return ge::GRAPH_FAILED);
+
+    return ge::GRAPH_SUCCESS;
+}
+
+// 获取属性
+graphStatus MoeDistributeCombineGetOpAttrs(OpExecuteContext *host_api_ctx, OpAttrs &opAttrs)
+{
+    const auto attrs = host_api_ctx->GetAttrs();
+    OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "attrs"),
+                return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(MoeDistributeCombineGetCommGroupAttrs(attrs, opAttrs) != ge::GRAPH_SUCCESS,
+                OP_LOGE(moeDistributeCombineInfo, "get comm group attrs failed"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(MoeDistributeCombineGetExpertQuantAttrs(attrs, opAttrs) != ge::GRAPH_SUCCESS,
+                OP_LOGE(moeDistributeCombineInfo, "get expert quant attrs failed"), return ge::GRAPH_FAILED);
+
     return ge::GRAPH_SUCCESS;
 }
 

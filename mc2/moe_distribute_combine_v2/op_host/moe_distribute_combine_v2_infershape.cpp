@@ -14,14 +14,10 @@
  */
 #include "register/op_impl_registry.h"
 #include "mc2_log.h"
+#include "../../common/op_host/mc2_combine_infershape.h"
 #include "platform/platform_info.h"
 using namespace ge;
 namespace ops {
-static constexpr size_t DIM_ONE = 1UL;
-static constexpr size_t DIM_TWO = 2UL;
-static constexpr int64_t NEG_ONE = -1;
-static constexpr int64_t RANK_NUM_PER_NODE = 8;
-
 static constexpr size_t COMBINE_INPUT_EXPAND_X_INDEX = 0;
 static constexpr size_t COMBINE_INPUT_EXPERT_IDS_INDEX = 1;
 static constexpr size_t COMBINE_OUTPUT_X_INDEX = 0;
@@ -32,22 +28,10 @@ static ge::graphStatus InferShapeMoeDistributeCombineV2(gert::InferShapeContext 
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMoeDistributeCombineV2.");
-    // 获取输入shape
-    const gert::Shape *expandXShape = context->GetInputShape(COMBINE_INPUT_EXPAND_X_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expandXShape);
-    const gert::Shape *expertIdsShape = context->GetInputShape(COMBINE_INPUT_EXPERT_IDS_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
-    gert::Shape *xShape = context->GetOutputShape(COMBINE_OUTPUT_X_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
-
-    int64_t bs = ((expertIdsShape->GetDimNum() == 1U) ? NEG_ONE : expertIdsShape->GetDim(0));
-    int64_t h = ((expandXShape->GetDimNum() == 1U) ? NEG_ONE : expandXShape->GetDim(1));
-
-    xShape->SetDimNum(DIM_TWO);
-    xShape->SetDim(0U, bs);
-    xShape->SetDim(1U, h);
-
-    OP_LOGD(context->GetNodeName(), "x shape shape is :%s after infershape.", Ops::Base::ToString(*xShape).c_str());
+    if (Mc2InferShape::InferCombineOutputShape(context, COMBINE_INPUT_EXPAND_X_INDEX, COMBINE_INPUT_EXPERT_IDS_INDEX,
+                                               COMBINE_OUTPUT_X_INDEX) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     OP_LOGD(context->GetNodeName(), "End to do InferShapeMoeDistributeCombineV2.");
     return ge::GRAPH_SUCCESS;
 }
@@ -55,8 +39,7 @@ static ge::graphStatus InferShapeMoeDistributeCombineV2(gert::InferShapeContext 
 static ge::graphStatus InferDataTypeMoeDistributeCombineV2(gert::InferDataTypeContext *context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeCombineV2.");
-    auto xDtype = context->GetInputDataType(COMBINE_INPUT_EXPAND_X_INDEX);
-    context->SetOutputDataType(COMBINE_OUTPUT_X_INDEX, xDtype);
+    Mc2InferShape::InferCombineOutputXDataType(context, COMBINE_INPUT_EXPAND_X_INDEX, COMBINE_OUTPUT_X_INDEX);
     OP_LOGD(context->GetNodeName(), "End to do InferDataTypeMoeDistributeCombineV2.");
     return ge::GRAPH_SUCCESS;
 }

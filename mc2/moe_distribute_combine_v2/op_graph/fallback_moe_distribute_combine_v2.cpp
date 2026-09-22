@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 #include "fallback/fallback_comm.h"
 #include "fallback/fallback.h"
@@ -18,160 +18,182 @@ using namespace gert;
 
 const char *MoeDistributeCombineV2Info = "MoeDistributeCombineV2Fallback";
 
-static graphStatus MoeDistributeCombineV2ExecuteFunc(OpExecuteContext *host_api_ctx)
+namespace {
+struct CombineV2Params {
+    const gert::Tensor *expand_x = nullptr;
+    const gert::Tensor *expert_ids = nullptr;
+    const gert::Tensor *assist_info_for_combine = nullptr;
+    const gert::Tensor *ep_send_counts = nullptr;
+    const gert::Tensor *expert_scales = nullptr;
+    const gert::Tensor *tp_send_counts = nullptr;
+    const gert::Tensor *x_active_mask = nullptr;
+    const gert::Tensor *activation_scale = nullptr;
+    const gert::Tensor *weight_scale = nullptr;
+    const gert::Tensor *group_list = nullptr;
+    const gert::Tensor *shared_expert_x = nullptr;
+    const gert::Tensor *elastic_info = nullptr;
+    const gert::Tensor *ori_x = nullptr;
+    const gert::Tensor *const_expert_alpha_1 = nullptr;
+    const gert::Tensor *const_expert_alpha_2 = nullptr;
+    const gert::Tensor *const_expert_v = nullptr;
+    const gert::Tensor *x = nullptr;
+    const char *group_ep = nullptr;
+    const char *group_tp = nullptr;
+    const int64_t *ep_word_size = nullptr;
+    const int64_t *ep_rank_id = nullptr;
+    const int64_t *moe_expert_num = nullptr;
+    const int64_t *tp_word_size = nullptr;
+    const int64_t *tp_rank_id = nullptr;
+    const int64_t *expert_shard_type = nullptr;
+    const int64_t *shared_expert_num = nullptr;
+    const int64_t *shared_expert_rank_num = nullptr;
+    const int64_t *global_bs_ptr = nullptr;
+    const int64_t *out_dtype_ptr = nullptr;
+    const int64_t *comm_quant_mode_ptr = nullptr;
+    const int64_t *group_list_type_ptr = nullptr;
+    const int64_t *comm_alg_ptr = nullptr;
+    const int64_t *zero_expert_num = nullptr;
+    const int64_t *copy_expert_num = nullptr;
+    const int64_t *const_expert_num = nullptr;
+};
+
+static bool CheckParamNotNull(const void *param, const char *name)
 {
-    OP_LOGD(MoeDistributeCombineV2Info, "start to fallback for moeDistributeCombineV2");
-    OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "host_api_ctx"),
-                return ge::GRAPH_FAILED);
-    const auto expand_x = host_api_ctx->GetInputTensor(static_cast<size_t>(0));
-    OP_CHECK_IF(expand_x == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "expand_x"),
-                return ge::GRAPH_FAILED);
+    if (param == nullptr) {
+        OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, name);
+        return false;
+    }
+    return true;
+}
 
-    const auto expert_ids = host_api_ctx->GetInputTensor(static_cast<size_t>(1));
-    OP_CHECK_IF(expert_ids == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "expert_ids"),
-                return ge::GRAPH_FAILED);
+#define MC2_CHECK_PARAM_NOT_NULL(param, name) \
+    do { \
+        if (!CheckParamNotNull((param), (name))) { \
+            return ge::GRAPH_FAILED; \
+        } \
+    } while (0)
 
-    const auto assist_info_for_combine = host_api_ctx->GetInputTensor(static_cast<size_t>(2));
-    OP_CHECK_IF(assist_info_for_combine == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "assist_info_for_combine"),
-                return ge::GRAPH_FAILED);
+static ge::graphStatus FetchInputs(OpExecuteContext *ctx, CombineV2Params &p)
+{
+    p.expand_x = ctx->GetInputTensor(static_cast<size_t>(0));
+    p.expert_ids = ctx->GetInputTensor(static_cast<size_t>(1));
+    p.assist_info_for_combine = ctx->GetInputTensor(static_cast<size_t>(2));
+    p.ep_send_counts = ctx->GetInputTensor(static_cast<size_t>(3));
+    p.expert_scales = ctx->GetInputTensor(static_cast<size_t>(4));
+    p.tp_send_counts = ctx->GetOptionalInputTensor(static_cast<size_t>(5));
+    p.x_active_mask = ctx->GetOptionalInputTensor(static_cast<size_t>(6));
+    p.activation_scale = ctx->GetOptionalInputTensor(static_cast<size_t>(7));
+    p.weight_scale = ctx->GetOptionalInputTensor(static_cast<size_t>(8));
+    p.group_list = ctx->GetOptionalInputTensor(static_cast<size_t>(9));
+    p.shared_expert_x = ctx->GetOptionalInputTensor(static_cast<size_t>(10));
+    p.elastic_info = ctx->GetOptionalInputTensor(static_cast<size_t>(11));
+    p.ori_x = ctx->GetOptionalInputTensor(static_cast<size_t>(12));
+    p.const_expert_alpha_1 = ctx->GetOptionalInputTensor(static_cast<size_t>(13));
+    p.const_expert_alpha_2 = ctx->GetOptionalInputTensor(static_cast<size_t>(14));
+    p.const_expert_v = ctx->GetOptionalInputTensor(static_cast<size_t>(15));
+    p.x = ctx->GetOutputTensor(static_cast<size_t>(0));
 
-    const auto ep_send_counts = host_api_ctx->GetInputTensor(static_cast<size_t>(3));
-    OP_CHECK_IF(ep_send_counts == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "ep_send_counts"),
-                return ge::GRAPH_FAILED);
+    MC2_CHECK_PARAM_NOT_NULL(p.expand_x, "expand_x");
+    MC2_CHECK_PARAM_NOT_NULL(p.expert_ids, "expert_ids");
+    MC2_CHECK_PARAM_NOT_NULL(p.assist_info_for_combine, "assist_info_for_combine");
+    MC2_CHECK_PARAM_NOT_NULL(p.ep_send_counts, "ep_send_counts");
+    MC2_CHECK_PARAM_NOT_NULL(p.expert_scales, "expert_scales");
+    MC2_CHECK_PARAM_NOT_NULL(p.tp_send_counts, "tp_send_counts");
+    MC2_CHECK_PARAM_NOT_NULL(p.x, "x");
+    return ge::GRAPH_SUCCESS;
+}
 
-    const auto expert_scales = host_api_ctx->GetInputTensor(static_cast<size_t>(4));
-    OP_CHECK_IF(expert_scales == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "expert_scales"),
-                return ge::GRAPH_FAILED);
+static ge::graphStatus FetchAttrs(OpExecuteContext *ctx, CombineV2Params &p)
+{
+    const auto attrs = ctx->GetAttrs();
+    MC2_CHECK_PARAM_NOT_NULL(attrs, "attrs");
 
-    const auto tp_send_counts = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(5));
-    OP_CHECK_IF(tp_send_counts == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "tp_send_counts"),
-                return ge::GRAPH_FAILED);
+    p.group_ep = attrs->GetStr(static_cast<size_t>(0));
+    p.ep_word_size = attrs->GetInt(static_cast<size_t>(1));
+    p.ep_rank_id = attrs->GetInt(static_cast<size_t>(2));
+    p.moe_expert_num = attrs->GetInt(static_cast<size_t>(3));
+    p.group_tp = attrs->GetStr(static_cast<size_t>(4));
+    p.tp_word_size = attrs->GetInt(static_cast<size_t>(5));
+    p.tp_rank_id = attrs->GetInt(static_cast<size_t>(6));
+    p.expert_shard_type = attrs->GetInt(static_cast<size_t>(7));
+    p.shared_expert_num = attrs->GetInt(static_cast<size_t>(8));
+    p.shared_expert_rank_num = attrs->GetInt(static_cast<size_t>(9));
+    p.global_bs_ptr = attrs->GetInt(static_cast<size_t>(10));
+    p.out_dtype_ptr = attrs->GetInt(static_cast<size_t>(11));
+    p.comm_quant_mode_ptr = attrs->GetInt(static_cast<size_t>(12));
+    p.group_list_type_ptr = attrs->GetInt(static_cast<size_t>(13));
+    p.comm_alg_ptr = attrs->GetInt(static_cast<size_t>(14));
+    p.zero_expert_num = attrs->GetInt(static_cast<size_t>(15));
+    p.copy_expert_num = attrs->GetInt(static_cast<size_t>(16));
+    p.const_expert_num = attrs->GetInt(static_cast<size_t>(17));
 
-    const auto x_active_mask = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(6));
+    MC2_CHECK_PARAM_NOT_NULL(p.group_ep, "group_ep");
+    MC2_CHECK_PARAM_NOT_NULL(p.ep_word_size, "ep_word_size");
+    MC2_CHECK_PARAM_NOT_NULL(p.ep_rank_id, "ep_rank_id");
+    MC2_CHECK_PARAM_NOT_NULL(p.moe_expert_num, "moe_expert_num");
+    MC2_CHECK_PARAM_NOT_NULL(p.group_tp, "group_tp");
+    MC2_CHECK_PARAM_NOT_NULL(p.tp_word_size, "tp_word_size");
+    MC2_CHECK_PARAM_NOT_NULL(p.tp_rank_id, "tp_rank_id");
+    MC2_CHECK_PARAM_NOT_NULL(p.expert_shard_type, "expert_shard_type");
+    MC2_CHECK_PARAM_NOT_NULL(p.shared_expert_num, "shared_expert_num");
+    MC2_CHECK_PARAM_NOT_NULL(p.shared_expert_rank_num, "shared_expert_rank_num");
+    MC2_CHECK_PARAM_NOT_NULL(p.global_bs_ptr, "global_bs_ptr");
+    MC2_CHECK_PARAM_NOT_NULL(p.out_dtype_ptr, "out_dtype");
+    MC2_CHECK_PARAM_NOT_NULL(p.comm_quant_mode_ptr, "comm_quant_mode");
+    MC2_CHECK_PARAM_NOT_NULL(p.group_list_type_ptr, "group_list_type");
+    MC2_CHECK_PARAM_NOT_NULL(p.comm_alg_ptr, "comm_alg_ptr");
+    MC2_CHECK_PARAM_NOT_NULL(p.zero_expert_num, "zero_expert_num");
+    MC2_CHECK_PARAM_NOT_NULL(p.copy_expert_num, "copy_expert_num");
+    MC2_CHECK_PARAM_NOT_NULL(p.const_expert_num, "const_expert_num");
+    return ge::GRAPH_SUCCESS;
+}
 
-    const auto activation_scale = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(7));
-
-    const auto weight_scale = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(8));
-
-    const auto group_list = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(9));
-
-    const auto shared_expert_x = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(10));
-
-    const auto elastic_info = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(11));
-
-    const auto ori_x = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(12));
-
-    const auto const_expert_alpha_1 = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(13));
-
-    const auto const_expert_alpha_2 = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(14));
-
-    const auto const_expert_v = host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(15));
-
-    const auto x = host_api_ctx->GetOutputTensor(static_cast<size_t>(0));
-    OP_CHECK_IF(x == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "x"), return ge::GRAPH_FAILED);
-
-    const auto attrs = host_api_ctx->GetAttrs();
-    OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "attrs"),
-                return ge::GRAPH_FAILED);
-
-    const auto *group_ep = attrs->GetStr(static_cast<size_t>(0));
-    OP_CHECK_IF(group_ep == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "group_ep"),
-                return ge::GRAPH_FAILED);
-
-    const auto *ep_word_size = attrs->GetInt(static_cast<size_t>(1));
-    OP_CHECK_IF(ep_word_size == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "ep_word_size"),
-                return ge::GRAPH_FAILED);
-
-    const auto *ep_rank_id = attrs->GetInt(static_cast<size_t>(2));
-    OP_CHECK_IF(ep_rank_id == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "ep_rank_id"),
-                return ge::GRAPH_FAILED);
-
-    const auto *moe_expert_num = attrs->GetInt(static_cast<size_t>(3));
-    OP_CHECK_IF(moe_expert_num == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "moe_expert_num"),
-                return ge::GRAPH_FAILED);
-
-    const auto *group_tp = attrs->GetStr(static_cast<size_t>(4));
-    OP_CHECK_IF(group_tp == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "group_tp"),
-                return ge::GRAPH_FAILED);
-
-    const auto *tp_word_size = attrs->GetInt(static_cast<size_t>(5));
-    OP_CHECK_IF(tp_word_size == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "tp_word_size"),
-                return ge::GRAPH_FAILED);
-
-    const auto *tp_rank_id = attrs->GetInt(static_cast<size_t>(6));
-    OP_CHECK_IF(tp_rank_id == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "tp_rank_id"),
-                return ge::GRAPH_FAILED);
-
-    const auto *expert_shard_type = attrs->GetInt(static_cast<size_t>(7));
-    OP_CHECK_IF(expert_shard_type == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "expert_shard_type"), return ge::GRAPH_FAILED);
-
-    const auto *shared_expert_num = attrs->GetInt(static_cast<size_t>(8));
-    OP_CHECK_IF(shared_expert_num == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "shared_expert_num"), return ge::GRAPH_FAILED);
-
-    const auto *shared_expert_rank_num = attrs->GetInt(static_cast<size_t>(9));
-    OP_CHECK_IF(shared_expert_rank_num == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "shared_expert_rank_num"),
-                return ge::GRAPH_FAILED);
-
-    const int64_t *global_bs_ptr = attrs->GetInt(static_cast<size_t>(10));
-    OP_CHECK_IF(global_bs_ptr == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "global_bs_ptr"),
-                return ge::GRAPH_FAILED);
-
-    const int64_t *out_dtype_ptr = attrs->GetInt(static_cast<size_t>(11));
-    OP_CHECK_IF(out_dtype_ptr == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "out_dtype"),
-                return ge::GRAPH_FAILED);
-
-    const int64_t *comm_quant_mode_ptr = attrs->GetInt(static_cast<size_t>(12));
-    OP_CHECK_IF(comm_quant_mode_ptr == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "comm_quant_mode"), return ge::GRAPH_FAILED);
-
-    const int64_t *group_list_type_ptr = attrs->GetInt(static_cast<size_t>(13));
-    OP_CHECK_IF(group_list_type_ptr == nullptr,
-                OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "group_list_type"), return ge::GRAPH_FAILED);
-
-    const int64_t *comm_alg_ptr = attrs->GetInt(static_cast<size_t>(14));
-    OP_CHECK_IF(comm_alg_ptr == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "comm_alg_ptr"),
-                return ge::GRAPH_FAILED);
-
-    const int64_t *zero_expert_num = attrs->GetInt(static_cast<size_t>(15));
-    OP_CHECK_IF(zero_expert_num == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "zero_expert_num"),
-                return ge::GRAPH_FAILED);
-
-    const int64_t *copy_expert_num = attrs->GetInt(static_cast<size_t>(16));
-    OP_CHECK_IF(copy_expert_num == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "copy_expert_num"),
-                return ge::GRAPH_FAILED);
-
-    const int64_t *const_expert_num = attrs->GetInt(static_cast<size_t>(17));
-    OP_CHECK_IF(const_expert_num == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "const_expert_num"),
-                return ge::GRAPH_FAILED);
-
-    if (elastic_info != nullptr || ori_x != nullptr || const_expert_alpha_1 != nullptr ||
-        const_expert_alpha_2 != nullptr || const_expert_v != nullptr || *zero_expert_num != 0 ||
-        *copy_expert_num != 0 || *const_expert_num != 0) {
+static ge::graphStatus DispatchCombineV2(OpExecuteContext *host_api_ctx, const CombineV2Params &p)
+{
+    if (p.elastic_info != nullptr || p.ori_x != nullptr || p.const_expert_alpha_1 != nullptr ||
+        p.const_expert_alpha_2 != nullptr || p.const_expert_v != nullptr || *p.zero_expert_num != 0 ||
+        *p.copy_expert_num != 0 || *p.const_expert_num != 0) {
         const auto api_ret_newfeature = EXEC_OPAPI_CMD(
-            aclnnMoeDistributeCombineV3, expand_x, expert_ids, assist_info_for_combine, ep_send_counts, expert_scales,
-            tp_send_counts, x_active_mask, activation_scale, weight_scale, group_list, shared_expert_x, elastic_info,
-            ori_x, const_expert_alpha_1, const_expert_alpha_2, const_expert_v, group_ep, *ep_word_size, *ep_rank_id,
-            *moe_expert_num, group_tp, *tp_word_size, *tp_rank_id, *expert_shard_type, *shared_expert_num,
-            *shared_expert_rank_num, *global_bs_ptr, *out_dtype_ptr, *comm_quant_mode_ptr, *group_list_type_ptr,
-            *comm_alg_ptr, *zero_expert_num, *copy_expert_num, *const_expert_num, x);
+            aclnnMoeDistributeCombineV3, p.expand_x, p.expert_ids, p.assist_info_for_combine, p.ep_send_counts,
+            p.expert_scales, p.tp_send_counts, p.x_active_mask, p.activation_scale, p.weight_scale, p.group_list,
+            p.shared_expert_x, p.elastic_info, p.ori_x, p.const_expert_alpha_1, p.const_expert_alpha_2,
+            p.const_expert_v, p.group_ep, *p.ep_word_size, *p.ep_rank_id, *p.moe_expert_num, p.group_tp,
+            *p.tp_word_size, *p.tp_rank_id, *p.expert_shard_type, *p.shared_expert_num, *p.shared_expert_rank_num,
+            *p.global_bs_ptr, *p.out_dtype_ptr, *p.comm_quant_mode_ptr, *p.group_list_type_ptr, *p.comm_alg_ptr,
+            *p.zero_expert_num, *p.copy_expert_num, *p.const_expert_num, p.x);
         OP_CHECK_IF(api_ret_newfeature != ge::GRAPH_SUCCESS,
                     OP_LOGE(MoeDistributeCombineV2Info, "aclnn api error code %u", api_ret_newfeature),
                     return api_ret_newfeature);
     } else {
         const auto api_ret = EXEC_OPAPI_CMD(
-            aclnnMoeDistributeCombineV2, expand_x, expert_ids, assist_info_for_combine, ep_send_counts, expert_scales,
-            tp_send_counts, x_active_mask, activation_scale, weight_scale, group_list, shared_expert_x, group_ep,
-            *ep_word_size, *ep_rank_id, *moe_expert_num, group_tp, *tp_word_size, *tp_rank_id, *expert_shard_type,
-            *shared_expert_num, *shared_expert_rank_num, *global_bs_ptr, *out_dtype_ptr, *comm_quant_mode_ptr,
-            *group_list_type_ptr, *comm_alg_ptr, x);
+            aclnnMoeDistributeCombineV2, p.expand_x, p.expert_ids, p.assist_info_for_combine, p.ep_send_counts,
+            p.expert_scales, p.tp_send_counts, p.x_active_mask, p.activation_scale, p.weight_scale, p.group_list,
+            p.shared_expert_x, p.group_ep, *p.ep_word_size, *p.ep_rank_id, *p.moe_expert_num, p.group_tp,
+            *p.tp_word_size, *p.tp_rank_id, *p.expert_shard_type, *p.shared_expert_num, *p.shared_expert_rank_num,
+            *p.global_bs_ptr, *p.out_dtype_ptr, *p.comm_quant_mode_ptr, *p.group_list_type_ptr, *p.comm_alg_ptr, p.x);
         OP_CHECK_IF(api_ret != ge::GRAPH_SUCCESS,
                     OP_LOGE(MoeDistributeCombineV2Info, "aclnn api error code %u", api_ret), return api_ret);
     }
     return GRAPH_SUCCESS;
+}
+
+#undef MC2_CHECK_PARAM_NOT_NULL
+
+} // namespace
+
+static graphStatus MoeDistributeCombineV2ExecuteFunc(OpExecuteContext *host_api_ctx)
+{
+    OP_LOGD(MoeDistributeCombineV2Info, "start to fallback for moeDistributeCombineV2");
+    if (host_api_ctx == nullptr) {
+        OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, "host_api_ctx");
+        return ge::GRAPH_FAILED;
+    }
+    CombineV2Params params;
+    if (FetchInputs(host_api_ctx, params) != ge::GRAPH_SUCCESS ||
+        FetchAttrs(host_api_ctx, params) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    return DispatchCombineV2(host_api_ctx, params);
 }
 
 IMPL_OP(MoeDistributeCombineV2).OpExecuteFunc(MoeDistributeCombineV2ExecuteFunc);

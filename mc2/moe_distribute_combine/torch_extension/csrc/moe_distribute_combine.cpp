@@ -21,6 +21,30 @@ using npu_utils = at_npu::native::NpuUtils;
 const int DIM_ONE = 1;
 const int DIM_TWO = 2;
 
+static void CheckInputShapeAndDtype(const at::Tensor &expandX, const at::Tensor &expertIds)
+{
+    TORCH_CHECK((expandX.dim() == DIM_TWO) && (expertIds.dim() == DIM_TWO), "The x and expert_ids should be 2D");
+    TORCH_CHECK((expandX.scalar_type() == at::kBFloat16) || (expandX.scalar_type() == at::kHalf) ||
+                    (expandX.scalar_type() == at::kInt),
+                "dtype of expand_x should be BFloat16, Float16 or Int, but got " +
+                    std::string(c10::toString(expandX.scalar_type())));
+    TORCH_CHECK(expertIds.scalar_type() == at::kInt,
+                "dtype of expert_ids should be Int, but got " + std::string(c10::toString(expertIds.scalar_type())));
+}
+
+static at::Tensor CreateOutputTensor(const at::Tensor &expandX, int64_t bs, int64_t h)
+{
+    at::Tensor output;
+    auto localDevice = c10::Device(expandX.device());
+    const c10::OptionalDeviceGuard deviceGuard(localDevice);
+    if (expandX.scalar_type() != at::kInt) {
+        output = at::empty({bs, h}, expandX.options().dtype(expandX.scalar_type()));
+    } else {
+        output = at::empty({bs, h}, expandX.options().dtype(at::kBFloat16));
+    }
+    return output;
+}
+
 /**
  * @brief Warpper for moe_distribute_combine
  */
@@ -37,30 +61,12 @@ at::Tensor NpuMoeDistributeCombine(
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, std::string commAlg, int64_t zeroExpertNum,
     int64_t copyExpertNum, int64_t constExpertNum)
 {
-    TORCH_CHECK((expandX.dim() == DIM_TWO) && (expertIds.dim() == DIM_TWO), "The x and expert_ids should be 2D");
-    TORCH_CHECK((expandX.scalar_type() == at::kBFloat16) || (expandX.scalar_type() == at::kHalf) ||
-                    (expandX.scalar_type() == at::kInt),
-                "dtype of expand_x should be BFloat16, Float16 or Int, but got " +
-                    std::string(c10::toString(expandX.scalar_type())));
-    TORCH_CHECK(expertIds.scalar_type() == at::kInt,
-                "dtype of expert_ids should be Int, but got " + std::string(c10::toString(expertIds.scalar_type())));
-    auto expandXSize = expandX.sizes();
-    auto expertIdsSize = expertIds.sizes();
-
-    int64_t bs = expertIdsSize[0];
-    int64_t h = expandXSize[1];
+    CheckInputShapeAndDtype(expandX, expertIds);
+    int64_t bs = expertIds.size(0);
+    int64_t h = expandX.size(1);
     int64_t globalBsReal = (globalBs == 0) ? (bs * epWorldSize) : globalBs;
 
-    at::Tensor output;
-    {
-        auto localDevice = c10::Device(expandX.device());
-        const c10::OptionalDeviceGuard deviceGuard(localDevice);
-        if (expandX.scalar_type() != at::kInt) {
-            output = at::empty({bs, h}, expandX.options().dtype(expandX.scalar_type()));
-        } else {
-            output = at::empty({bs, h}, expandX.options().dtype(at::kBFloat16));
-        }
-    }
+    at::Tensor output = CreateOutputTensor(expandX, bs, h);
     c10::optional<at::Tensor> nulltensor = c10::nullopt;
     int64_t outDtype = 0;
     int64_t groupListType = 0;
