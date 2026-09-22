@@ -612,6 +612,9 @@ __aicore__ inline void SWAVectorBlock<SMLAT>::ElewiseCompute(const RunInfo &info
                 }
                 if (colEnd > 0) {
                     LocalTensor<int32_t> rowIndexUb = tmpBuff1.Get<int32_t>();
+                    event_t vToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+                    SetFlag<HardEvent::V_MTE2>(vToMte2);
+                    WaitFlag<HardEvent::V_MTE2>(vToMte2);
                     LoadOriSparseIndicesGmToUb(qTokenOffsetForS1, info.n2IdxReal, sparseColStart,
                                                static_cast<int32_t>(colEnd), rowIndexUb);
                     for (uint32_t k = 0; k < colEnd; ++k) {
