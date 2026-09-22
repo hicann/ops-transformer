@@ -682,6 +682,10 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::GetRealS2Idx(int64_t s2GmOf
                                                                   const SLIKLLossGradRunInfo &runInfo)
 {
     int64_t topkGmIdx = (s2GmOffset + s2IdxOffset) / constInfo.sparseBlockSize;
+    if (topkGmIdx < 0 || topkGmIdx >= static_cast<int64_t>(runInfo.kRealSize)) {
+        realS2Idx = -1;
+        return;
+    }
     realS2Idx =
         topKGm.GetValue(runInfo.topkGmBaseOffset + topkGmIdx) * static_cast<int64_t>(constInfo.sparseBlockSize) +
         static_cast<int64_t>((s2GmOffset + s2IdxOffset) % constInfo.sparseBlockSize);
@@ -723,7 +727,10 @@ __aicore__ inline void SLIKLLossVectorService<SLIT>::MergeKv(const SLIKLLossGrad
             mergeMte3Idx = 1 - mergeMte3Idx;
             break;
         }
-        GetRealS2Idx(s2GmOffsetArray + constInfo.sparseBlockSize, s2IdxOffset, s2IdxArray1, runInfo);
+        s2IdxArray1 = -1;
+        if (s2GmOffsetArray + constInfo.sparseBlockSize < s2GmLimit) {
+            GetRealS2Idx(s2GmOffsetArray + constInfo.sparseBlockSize, s2IdxOffset, s2IdxArray1, runInfo);
+        }
         CopyInKv<gatherRope>(mte2Size, mte3Size, mergeMte3Idx, s2IdxArray0, s2IdxArray1, runInfo, srcTensor,
                              srcRopeTensor);
         if ((mte2Size - mte3Size + 2 * constInfo.sparseBlockSize > UB_ROW_SIZE) ||
