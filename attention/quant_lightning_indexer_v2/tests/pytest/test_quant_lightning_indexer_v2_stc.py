@@ -690,9 +690,8 @@ TestCases = {
         "_quant_profiles": ["MXFP8"],
     },
     # maxS2=641，刚好开启 FD；遍历 return_value，并覆盖 LD 的索引偏移。
-    # INT8 的 RV0 随机输入可能在 TopK 边界产生近邻值；RV0 无 value 输出时，
-    # 现有比较器无法用 NPU value 消歧。INT8 的 FD 路径由下一条 RV1 用例覆盖，
-    # RV0 分支则由其余 dtype 及其他 INT8 场景覆盖，避免把比较器限制误报成算子失败。
+    # INT8 的 TopK 边界容易产生落入同一 BF16 格点的近邻 FP32 score；同时覆盖
+    # RV0/RV1，确保 Golden 按 NPU 的 BF16 sortable key 排序，而不是按 FP32 排序。
     "META_70": {
         **BASE,
         "q_seq": [4],
@@ -709,7 +708,7 @@ TestCases = {
         "k_seq": [641],
         "q_head_num": [64],
         "max_seqlen_q": [4],
-        "return_value": [1],
+        "return_value": [0, 1],
         "output_idx_offset": [[0, 3, 0, 7]],
         "_quant_profiles": ["INT8"],
     },
