@@ -355,10 +355,10 @@ public:
 
 private:
     // C 矩阵从 GM 拷贝到 UB（perChannel 场景共用），返回 ubC 供后续 Cast 使用
-    // ubTileStride 类型为 Coord<2, int64_t>（即 LayoutC::Stride），与 MakeCoord(int64_t, 1L) 一致
+    // ubTileStride 类型为 LayoutC::Stride（即 Coord<2, int64_t>），与 MakeCoord(int64_t, 1L) 一致
     CATLASS_DEVICE
     AscendC::LocalTensor<ElementC> &CopyCToUb(MatrixCoord tileOffset, MatrixCoord actualTileShape,
-                                              Coord<2, int64_t> ubTileStride, LayoutC layoutC)
+                                              typename LayoutC::Stride ubTileStride, LayoutC layoutC)
     {
         auto &ubC = ubCList[ubListId];
         LayoutC layoutUbC{actualTileShape, ubTileStride};

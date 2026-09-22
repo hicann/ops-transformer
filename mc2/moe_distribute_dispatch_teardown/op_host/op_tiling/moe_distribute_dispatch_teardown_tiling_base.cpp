@@ -789,7 +789,7 @@ void MoeDistributeDispatchTeardownTilingBase::SetHcommCfg()
     uint32_t opType = OP_TYPE_ALL_TO_ALL;
     std::string algConfigAllToAllStr = "AlltoAll=level0:fullmesh;level1:pairwise";
     AscendC::Mc2CcTilingConfig mc2CcTilingConfig(groupEp_, opType, algConfigAllToAllStr);
-    mc2CcTilingConfig.SetCommEngine(3); // AIV_UB-MEM or AIV_URMA
+    mc2CcTilingConfig.SetCommEngine(mc2tiling::AIV_ENGINE); // AIV_UB-MEM or AIV_URMA
     mc2CcTilingConfig.GetTiling(tilingData_->mc2InitTiling);
     mc2CcTilingConfig.GetTiling(tilingData_->mc2CcTiling);
     reinterpret_cast<Mc2CcTilingInner *>(&tilingData_->mc2CcTiling)->protocal = 1; // 0: UB-MEM, 1: URMA

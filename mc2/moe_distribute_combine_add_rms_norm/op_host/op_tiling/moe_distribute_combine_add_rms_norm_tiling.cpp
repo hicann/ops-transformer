@@ -14,7 +14,6 @@
  */
 
 #include "op_host/op_tiling/mc2_tiling_utils.h"
-#include "tiling/tiling_api.h"
 #include "register/op_def_registry.h"
 #include "../../../moe_distribute_combine_v2/op_host/op_tiling/moe_distribute_combine_tiling_helper.h"
 #include "moe_distribute_combine_add_rms_norm_tiling_base.h"

@@ -19,7 +19,6 @@
 #include "tiling/tiling_api.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "register/op_def_registry.h"
-#include "mc2_log.h"
 #include "tiling_func.h"
 #include "../../../op_kernel/all_gather_matmul_aiv_mode_tiling.h"
 #include "../../../op_kernel/all_gather_matmul_v2_tiling_key.h"
@@ -31,6 +30,8 @@ using namespace Mc2Tiling;
 namespace {
 const char *K_INNER_DEBUG = "AllGatherMatmulAIVMode Tiling Debug";
 constexpr uint32_t ALLGATHER_CORENUM_SIXTEEN = 16;
+// int4 每两个元素占用 1 个字节（elementSize 为 0 表示 int4）
+constexpr uint32_t INT4_ELEMENTS_PER_BYTE = 2;
 constexpr uint32_t ATTR_GROUP_INDEX = 0;
 constexpr uint32_t ATTR_IS_TRANS_X1 = 1;
 constexpr uint32_t ATTR_IS_TRANS_X2 = 2;
@@ -413,7 +414,7 @@ void GetUsrWorkSpaceSize(uint32_t nElemAlign, uint32_t elementSize, uint64_t &us
         } else {
             info.aAlignSize =
                 (info.isTransposeX1 ? static_cast<uint64_t>(info.K) * mAlign : static_cast<uint64_t>(info.M) * kAlign) /
-                2;
+                INT4_ELEMENTS_PER_BYTE;
         }
         userWorkSpaceSize += info.aAlignSize;
     }
@@ -425,7 +426,7 @@ void GetUsrWorkSpaceSize(uint32_t nElemAlign, uint32_t elementSize, uint64_t &us
         } else {
             info.bAlignSize =
                 (info.isTransposeX2 ? static_cast<uint64_t>(info.N) * kAlign : static_cast<uint64_t>(info.K) * nAlign) /
-                2;
+                INT4_ELEMENTS_PER_BYTE;
         }
         userWorkSpaceSize += info.bAlignSize;
     }

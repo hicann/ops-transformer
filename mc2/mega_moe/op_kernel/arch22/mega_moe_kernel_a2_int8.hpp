@@ -639,7 +639,6 @@ private:
                 gmB1.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
             }
             GemmCoord inGroupProblemShape{currentM, params.problemShape.n(), params.problemShape.k()};
-            // LayoutA layoutA = params.layoutA.GetTileLayout(inGroupProblemShape.GetCoordMK());
             LayoutA layoutA{inGroupProblemShape.m(), static_cast<uint32_t>(inGroupProblemShape.k() + ALIGN_512)};
             LayoutB layoutB1 = params.layoutB1;
             LayoutScale layoutScale = params.layoutScale1;
@@ -1366,7 +1365,6 @@ private:
             ResetTokenPerExpert(params, params.EP * paddedExpertNumAligned);
             AscendC::SyncAll<true>();
             exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::CROSS_RANK_SYNC);
-            // shmem.InitStatusTargetSum();
             {
                 // 3 * UB_ALIGN scratch: payload + rdma doorbell + rdma head.
                 // UB at offset 0 is unused at this point in the kernel.

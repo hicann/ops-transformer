@@ -55,6 +55,12 @@ public:
     static constexpr uint32_t MAX_TOPK = 32;
     static constexpr uint32_t MAX_HIDDEN = 10240;
     static constexpr uint32_t MAX_EXPERTS = 1024;
+    // numExperts 按 8 元素对齐（RoundUp 粒度）
+    static constexpr uint32_t EXPERT_COUNT_ALIGNMENT = 8;
+    // int8 量化场景 expandedX 行尾预留 per-token scale 区的元素数
+    static constexpr uint32_t QUANT_ROW_SCALE_RESERVED_INT8_ELEMENTS = 512;
+    // 4 个 int8 元素共享 1 个 float 槽位（行尾 scale 写入位置换算）
+    static constexpr uint32_t FLOAT32_SIZE_IN_INT8_ELEMENTS = 4;
 
     struct Params {
         int64_t numTokens;
@@ -72,7 +78,7 @@ public:
               hidden(hidden_),
               numTopk(numTopk_),
               numExperts(numExperts_),
-              alignedNumExperts(RoundUp<8>(numExperts_)),
+              alignedNumExperts(RoundUp<EXPERT_COUNT_ALIGNMENT>(numExperts_)),
               alignedNumExpertsBytes(static_cast<uint32_t>(alignedNumExperts * sizeof(int32_t))),
               rowStride(CalcRowStride(hidden_))
         {}
@@ -83,7 +89,7 @@ public:
         static constexpr uint32_t CalcRowStride(int64_t hidden_)
         {
             if constexpr (std::is_same_v<ElementDst, int8_t>) {
-                return static_cast<uint32_t>(hidden_) + 512;
+                return static_cast<uint32_t>(hidden_) + QUANT_ROW_SCALE_RESERVED_INT8_ELEMENTS;
             } else {
                 return static_cast<uint32_t>(hidden_);
             }
@@ -407,7 +413,8 @@ private:
         AscendC::PipeBarrier<PIPE_V>();
         AscendC::Cast(dstTensor, halfTmpTensor, AscendC::RoundMode::CAST_TRUNC, count);
         AscendC::PipeBarrier<PIPE_V>();
-        dstTensor.template ReinterpretCast<float>().SetValue(count / 4, 1.0f / dynamicScale);
+        dstTensor.template ReinterpretCast<float>().SetValue(count / FLOAT32_SIZE_IN_INT8_ELEMENTS,
+                                                             1.0f / dynamicScale);
     }
 };
 

@@ -35,6 +35,15 @@ public:
     using Activation = typename DispatchPolicy::Activation;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
     static constexpr uint32_t TILE_LENGTH = DispatchPolicy::TILE_LENGTH;
+    // 2 个 MSD 行 × 每行 gate/up 两路 tile
+    static constexpr uint32_t MSD_ROW_COUNT = 2;
+    static constexpr uint32_t GATE_UP_TILE_COUNT = 2;
+    // int4 每两个元素打包占用 1 个字节
+    static constexpr uint32_t INT4_ELEMENTS_PER_BYTE = 2;
+    // 256B 块内的 int16 元素数，兼作 And 指令单 repeat 处理元素数
+    static constexpr uint32_t AND_INT16_ELEMENTS_PER_REPEAT = 128;
+    // int4 低 4 位有符号偏置（-8..7 编码）
+    static constexpr int32_t INT4_LOW_NIBBLE_BIAS = -8;
     static constexpr uint32_t SCALE_BUFFER_COUNT = 2;
     // 输出侧 scale 缓冲批量：结果 scale 在 UB 中按批累积后写回 GM
     static constexpr uint32_t SCALE_BATCH_COUNT = 256;
@@ -109,13 +118,13 @@ public:
         for (uint32_t i = 0; i < UB_STAGES; ++i) {
             // Two MSD rows, each containing gate and up tiles.
             ubCList[i] = resource.ubBuf.template GetBufferByByte<ElementC>(ubOffset);
-            ubOffset += 4 * TILE_LENGTH * sizeof(ElementC);
+            ubOffset += (MSD_ROW_COUNT * GATE_UP_TILE_COUNT) * TILE_LENGTH * sizeof(ElementC);
             ubWeightAuxList[i] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
-            ubOffset += 2 * TILE_LENGTH * sizeof(float);
+            ubOffset += GATE_UP_TILE_COUNT * TILE_LENGTH * sizeof(float);
             xHighI4TensorList[i] = resource.ubBuf.template GetBufferByByte<int4b_t>(ubOffset);
-            ubOffset += TILE_LENGTH / 2;
+            ubOffset += TILE_LENGTH / INT4_ELEMENTS_PER_BYTE;
             xLowI4TensorList[i] = resource.ubBuf.template GetBufferByByte<int4b_t>(ubOffset);
-            ubOffset += TILE_LENGTH / 2;
+            ubOffset += TILE_LENGTH / INT4_ELEMENTS_PER_BYTE;
 
             eventUbCVMTE2List[i] = eventVMTE2++;
             eventUbCMTE2VList[i] = eventMTE2V++;
@@ -140,7 +149,7 @@ public:
         ubD = resource.ubBuf.template GetBufferByByte<ElementD>(ubOffset);
         ubOffset += TILE_LENGTH * sizeof(ElementD);
         xLowI16Tensor = resource.ubBuf.template GetBufferByByte<int16_t>(ubOffset);
-        ubOffset += 128 * sizeof(int16_t);
+        ubOffset += AND_INT16_ELEMENTS_PER_REPEAT * sizeof(int16_t);
         for (uint32_t i = 0; i < SCALE_BUFFER_COUNT; ++i) {
             ubPerTokenScaleOutputList[i] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
             ubOffset += SCALE_BUFFER_BYTES;
@@ -464,7 +473,8 @@ private:
         Cast(xHighI4Tensor, ubQuantF16, AscendC::RoundMode::CAST_FLOOR, tileLength);
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(eventxHighVMTE3List[stageId]);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(eventxHighVMTE3List[stageId]);
-        DataCopy(gmTileD[tileOffset / 2], xHighI4Tensor.template ReinterpretCast<int8_t>(), tileLength / 2);
+        DataCopy(gmTileD[tileOffset / INT4_ELEMENTS_PER_BYTE], xHighI4Tensor.template ReinterpretCast<int8_t>(),
+                 tileLength / INT4_ELEMENTS_PER_BYTE);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(eventxHighMTE3VList[stageId]);
 
         auto xLowHalfTensor = ubActivation.template ReinterpretCast<half>();
@@ -472,7 +482,7 @@ private:
         uint32_t lenVk = (tileLength / 2) / 128;
         uint32_t lastLenVk = (tileLength % 256) / 2;
         And(xLowHalfTensor.template ReinterpretCast<int16_t>(), ubD.template ReinterpretCast<int16_t>(), xLowI16Tensor,
-            128, lenVk, {1, 1, 1, 8, 8, 0});
+            AND_INT16_ELEMENTS_PER_REPEAT, lenVk, {1, 1, 1, 8, 8, 0});
         if (lastLenVk > 0) {
             And(xLowHalfTensor[lenVk * 128].template ReinterpretCast<int16_t>(),
                 ubD[lenVk * 256].template ReinterpretCast<int16_t>(), xLowI16Tensor, lastLenVk, 1, {1, 1, 1, 8, 8, 0});
@@ -481,14 +491,14 @@ private:
         Cast(xLowHalfTensor2, xLowHalfTensor.template ReinterpretCast<int8_t>(), AscendC::RoundMode::CAST_NONE,
              tileLength);
         PipeBarrier<PIPE_V>();
-        Adds(ubQuantF16, xLowHalfTensor2, static_cast<half>(-8), tileLength);
+        Adds(ubQuantF16, xLowHalfTensor2, static_cast<half>(INT4_LOW_NIBBLE_BIAS), tileLength);
         PipeBarrier<PIPE_V>();
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventxLowMTE3VList[stageId]);
         Cast(xLowI4Tensor, ubQuantF16, AscendC::RoundMode::CAST_NONE, tileLength);
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(eventxLowVMTE3List[stageId]);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(eventxLowVMTE3List[stageId]);
-        DataCopy(gmTileD[branchLength / 2 + tileOffset / 2], xLowI4Tensor.template ReinterpretCast<int8_t>(),
-                 tileLength / 2);
+        DataCopy(gmTileD[branchLength / INT4_ELEMENTS_PER_BYTE + tileOffset / INT4_ELEMENTS_PER_BYTE],
+                 xLowI4Tensor.template ReinterpretCast<int8_t>(), tileLength / INT4_ELEMENTS_PER_BYTE);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(eventxLowMTE3VList[stageId]);
     }
 

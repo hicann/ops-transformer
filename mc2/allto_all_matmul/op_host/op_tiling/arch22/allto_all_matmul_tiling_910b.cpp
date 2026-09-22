@@ -57,6 +57,10 @@ constexpr int32_t CORE_NUM_EIGHT = 8;
 constexpr int32_t CORE_NUM_SIXTEEN = 16;
 // 256B 块大小（与 kernel 侧 allto_all_matmul_util.h 的 HALF_BLOCK_SIZE 对齐）
 constexpr int32_t HALF_BLOCK_SIZE_BYTES = 256;
+// 32B 对齐粒度（DataCopy 32B 对齐要求）
+constexpr int32_t DATA_COPY_ALIGNMENT_BYTES = 32;
+// 512B 块大小（与 kernel 侧 allto_all_matmul_util.h 的 BLOCK_SIZE 对齐）
+constexpr int32_t FULL_BLOCK_SIZE_BYTES = 512;
 // tiling code 位域：低 5+5 位为收/发核数（-1），随后 4 位为 pValue（-1）
 constexpr int32_t TILING_CODE_CORE_MASK = 31;
 constexpr int32_t TILING_CODE_P_MASK = 15;
@@ -64,6 +68,14 @@ constexpr int32_t TILING_CODE_CORE_SHIFT = 5;
 constexpr int32_t TILING_CODE_P_SHIFT = 4;
 // m0 按 128 粒度编码（存储为块数-1）
 constexpr int32_t M0_GRANULARITY = 128;
+// A4W4 场景下的大 m0 tile 值
+constexpr int32_t A4W4_LARGE_M_TILE_ROWS = 256;
+// 通信组规模（rank 数）
+constexpr int32_t RANK_COUNT_TWO = 2;
+constexpr int32_t RANK_COUNT_FOUR = 4;
+constexpr int32_t RANK_COUNT_EIGHT = 8;
+// int4 每两个元素占用 1 个字节
+constexpr int32_t INT4_ELEMENTS_PER_BYTE = 2;
 
 // basic场景tiling默认值
 constexpr int32_t ALLTOALLMATMUL_TWO_RANK_FP16_FIRSTSTEPCORENUM_DEFAULT = 16;
@@ -143,13 +155,13 @@ struct BaseBlock {
 };
 
 template <typename T>
-using Block32B = BaseBlock<T, 32>;
+using Block32B = BaseBlock<T, DATA_COPY_ALIGNMENT_BYTES>;
 
 template <typename T>
 using Block256B = BaseBlock<T, HALF_BLOCK_SIZE_BYTES>;
 
 template <typename T>
-using Block512B = BaseBlock<T, 512>;
+using Block512B = BaseBlock<T, FULL_BLOCK_SIZE_BYTES>;
 
 int32_t RoundNum(int32_t num, int32_t rnd)
 {
@@ -1329,7 +1341,7 @@ void AlltoAllMatmulTiling910b::DoEightRankTiling(CoCTiling &cocTilingData, Allto
     CalTilingParam(cocTilingData, TilingParamMap, info);
     TilingParamDeal(cocTilingData, info, ubSize);
     if (quantType == TILINGKEY_TPL_A4W4) {
-        if (cocTilingData.m0 == 256) {
+        if (cocTilingData.m0 == A4W4_LARGE_M_TILE_ROWS) {
             cocTilingData.allToAllSendCoreNum = CORE_NUM_SIXTEEN;
             cocTilingData.allToAllRecvCoreNum = CORE_NUM_FOUR;
         }
@@ -1433,20 +1445,20 @@ ge::graphStatus AlltoAllMatmulTiling910b::DoMmCommTiling(CoCTiling &cocTilingDat
 {
     if (quantType == TILINGKEY_TPL_A16W8) {
         // A16W8 tiling策略
-        if (info.rankSize == 2) {
+        if (info.rankSize == RANK_COUNT_TWO) {
             AlltoAllMatmulNPU910BTwoRankA16W8Tiling(cocTilingData, info);
-        } else if (info.rankSize == 4) {
+        } else if (info.rankSize == RANK_COUNT_FOUR) {
             AlltoAllMatmulNPU910BFourRankA16W8Tiling(cocTilingData, info);
-        } else if (info.rankSize == 8) {
+        } else if (info.rankSize == RANK_COUNT_EIGHT) {
             AlltoAllMatmulNPU910BEightRankA16W8Tiling(cocTilingData, info);
         }
     } else if (quantType == TILINGKEY_TPL_A16W4) {
         // A16W4 tiling策略
-        if (info.rankSize == 2) {
+        if (info.rankSize == RANK_COUNT_TWO) {
             AlltoAllMatmulNPU910BTwoRankA16W4Tiling(cocTilingData, info);
-        } else if (info.rankSize == 4) {
+        } else if (info.rankSize == RANK_COUNT_FOUR) {
             AlltoAllMatmulNPU910BFourRankA16W4Tiling(cocTilingData, info);
-        } else if (info.rankSize == 8) {
+        } else if (info.rankSize == RANK_COUNT_EIGHT) {
             AlltoAllMatmulNPU910BEightRankA16W4Tiling(cocTilingData, info);
         }
     } else {
@@ -1559,9 +1571,10 @@ void AlltoAllMatmulTiling910b::CalcQuantWorkspaceSize(const CoCTiling &cocTiling
         uint32_t numPerRankM = cocTilingData.m0 * cocTilingData.pValue;
         uint32_t midOutputKSize = orgK * rankSize;
         int64_t quantSize = static_cast<int64_t>(numPerRankM) * midOutputKSize * MAX_BLOCK_COUNT;
-        info.quantSize = quantType == TILINGKEY_TPL_A16W8 ?
-                             quantSize :
-                             (quantSize + 1) / 2; // int8类型每个元素占用1个字节，int4类型每两个元素占用1个字节
+        info.quantSize =
+            quantType == TILINGKEY_TPL_A16W8 ?
+                quantSize :
+                (quantSize + 1) / INT4_ELEMENTS_PER_BYTE; // int8类型每个元素占用1个字节，int4类型每两个元素占用1个字节
         info.quantScaleSize = Block32B<float>::AlignUp(orgM) * sizeof(float) / rankSize; // A反量化参数所需要的空间大小
 
         quantWorkspaceSize = info.quantSize + info.quantScaleSize + info.dequantSize;

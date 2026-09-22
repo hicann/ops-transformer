@@ -42,6 +42,8 @@ constexpr uint32_t ATTR_COMM_ALG_INDEX = 10;
 constexpr uint32_t THREE_DIMS = 3U;
 constexpr uint32_t TWO_DIMS = 2U;
 constexpr uint32_t ONE_DIM = 1U;
+// sharedExpertX 三维布局 (a, b, H) 中 H 所在的 dim 索引
+constexpr uint32_t SHARED_EXPERT_X_H_DIM_INDEX = 2U;
 
 constexpr int64_t MIN_H = 1024;
 constexpr int64_t MAX_H = 8192;
@@ -514,10 +516,11 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckSharedExpertInputSh
                     "sharedExpertX dim0 * dim1 should be equal to Bs");
                 return ge::GRAPH_FAILED;
             }
-            if (sharedExpertXStorageShape->GetStorageShape().GetDim(2) != H) {
+            if (sharedExpertXStorageShape->GetStorageShape().GetDim(SHARED_EXPERT_X_H_DIM_INDEX) != H) {
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                     nodeName_, "sharedExpertX",
-                    (std::string("dim2=") + std::to_string(sharedExpertXStorageShape->GetStorageShape().GetDim(2)))
+                    (std::string("dim2=") +
+                     std::to_string(sharedExpertXStorageShape->GetStorageShape().GetDim(SHARED_EXPERT_X_H_DIM_INDEX)))
                         .c_str(),
                     "sharedExpertX dim2 should be equal to H");
                 return ge::GRAPH_FAILED;

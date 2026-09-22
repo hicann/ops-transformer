@@ -16,7 +16,6 @@
 
 #include <climits>
 
-#include "mc2_log.h"
 #include "graph/utils/type_utils.h"
 #include "register/op_impl_registry.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"

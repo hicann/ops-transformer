@@ -32,6 +32,8 @@ public:
     using DispatchPolicy = EpilogueAtlasA2PerTokenDequantV2BF16<UB_STAGES_>;
     using ArchTag = typename DispatchPolicy::ArchTag;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
+    // ubC/ubD/ubFp32/scaleUb 乒乓双缓冲级数
+    static constexpr int32_t DOUBLE_BUFFER_STAGES = 2;
 
     // Data infos
     using ElementC = typename CType_::Element;
@@ -90,7 +92,7 @@ public:
     {
         n0 = params.n0;
         size_t ubOffset = 0;
-        for (int32_t i = 0; i < 2; i++) {
+        for (int32_t i = 0; i < DOUBLE_BUFFER_STAGES; i++) {
             ubCList[i] = resource.ubBuf.template GetBufferByByte<ElementC>(ubOffset);
             ubOffset += max_len * sizeof(ElementC);
             ubDList[i] = resource.ubBuf.template GetBufferByByte<ElementD>(ubOffset);

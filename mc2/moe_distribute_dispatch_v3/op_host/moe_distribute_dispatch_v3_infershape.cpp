@@ -307,7 +307,7 @@ static ge::graphStatus InferShapeMoeDistributeDispatchV3(gert::InferShapeContext
         if (hasExpertScales) {
             epRecvCountShape->SetDim(
                 0U, *epWorldSize * localExpertNum +
-                        globalBsReal * 2 * k *
+                        globalBsReal * SEND_COUNT_MEMORY_SIZE * k *
                             ((*epWorldSize) /
                              RANK_NUM_PER_NODE)); // 2：globalbs * 2kn memory size, to support different bs in ranks
         } else {

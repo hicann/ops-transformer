@@ -43,6 +43,11 @@ public:
     using ArchTag = typename DispatchPolicy::ArchTag;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
     static constexpr bool IS_A2 = IS_A2_T<IS_A2_>::Value;
+    // ubC/ubD/ubFp32/scaleUb 乒乓双缓冲级数
+    static constexpr int32_t DOUBLE_BUFFER_STAGES = 2;
+    // Muls(fp32) 单个 repeat 处理 64 个元素，repeat 数按 128 元素粒度向上取整
+    static constexpr int32_t MULS_ALIGNMENT_ELEMENTS = 128;
+    static constexpr int32_t MULS_REPEATS_PER_GRANULARITY = 2;
 
     using ElementC = typename CType_::Element;
     using LayoutC = typename CType_::Layout;
@@ -95,7 +100,7 @@ public:
     {
         n0 = params.n0;
         size_t ubOffset = 0;
-        for (int32_t i = 0; i < 2; i++) {
+        for (int32_t i = 0; i < DOUBLE_BUFFER_STAGES; i++) {
             ubCList[i] = resource.ubBuf.template GetBufferByByte<ElementC>(ubOffset);
             ubOffset += max_len * sizeof(ElementC);
             ubDList[i] = resource.ubBuf.template GetBufferByByte<ElementD>(ubOffset);
@@ -198,7 +203,9 @@ public:
         AscendC::PipeBarrier<PIPE_V>();
         for (int32_t row = 0; row < actualBlockShape.m(); ++row) {
             float scale = scaleUb(row);
-            Muls<float, false>(ubCFp32[n0 * row], ubCFp32[n0 * row], scale, -1, (actualBlockShape.n() + 127) / 128 * 2,
+            Muls<float, false>(ubCFp32[n0 * row], ubCFp32[n0 * row], scale, -1,
+                               (actualBlockShape.n() + MULS_ALIGNMENT_ELEMENTS - 1) / MULS_ALIGNMENT_ELEMENTS *
+                                   MULS_REPEATS_PER_GRANULARITY,
                                {1, 1, 8, 8});
         }
         AscendC::PipeBarrier<PIPE_V>();

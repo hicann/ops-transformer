@@ -34,6 +34,8 @@ public:
     using Activation = typename DispatchPolicy::Activation;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
     static constexpr uint32_t TILE_LENGTH = DispatchPolicy::TILE_LENGTH;
+    // ubC 每级缓存 gate/up 两路 tile
+    static constexpr uint32_t GATE_UP_TILE_COUNT = 2;
     static constexpr uint32_t SCALE_BUFFER_COUNT = 2;
     // 输出侧 scale 缓冲批量：结果 scale 在 UB 中按批累积后写回 GM
     static constexpr uint32_t SCALE_BATCH_COUNT = 256;
@@ -106,7 +108,7 @@ public:
         int32_t eventVMTE3 = 0;
         for (uint32_t i = 0; i < UB_STAGES; ++i) {
             ubCList[i] = resource.ubBuf.template GetBufferByByte<ElementC>(ubOffset);
-            ubOffset += 2 * TILE_LENGTH * sizeof(ElementC);
+            ubOffset += GATE_UP_TILE_COUNT * TILE_LENGTH * sizeof(ElementC);
             ubDList[i] = resource.ubBuf.template GetBufferByByte<ElementD>(ubOffset);
             ubOffset += TILE_LENGTH * sizeof(ElementD);
             ubGateFp32List[i] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);

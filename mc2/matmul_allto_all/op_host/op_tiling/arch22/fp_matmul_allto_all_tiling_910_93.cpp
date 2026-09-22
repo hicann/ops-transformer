@@ -414,21 +414,7 @@ ge::graphStatus FpMatmulAllToAllHelper::GetShapeAttrsInfo()
 {
     auto &&tilingArgs = tilingProcesser_.contextInfo.args_;
     args_.opName = tilingProcesser_.opName_;
-    args_.isATrans = tilingArgs.isATrans;
-    args_.isBTrans = tilingArgs.isBTrans;
-    args_.hasBias = tilingArgs.isBias;
-    args_.aType = tilingArgs.geAType;
-    args_.bType = tilingArgs.geBType;
-    args_.cType = tilingArgs.geCType;
-    args_.biasType = tilingArgs.isBias ? tilingArgs.geBiasType : ge::DT_INT32;
-
-    args_.aFormat = ge::FORMAT_ND;
-    args_.bFormat = ge::FORMAT_ND;
-    args_.outFormat = ge::FORMAT_ND;
-
-    args_.mValue = tilingArgs.mValue;
-    args_.kValue = tilingArgs.kValue;
-    args_.nValue = tilingArgs.nValue;
+    mc2tiling::FillMmV3ArgsFromTilingArgs(args_, tilingArgs);
     return ge::GRAPH_SUCCESS;
 }
 

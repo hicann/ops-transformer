@@ -68,6 +68,14 @@ constexpr int64_t PERMUTE_CHUNK = 1024;
 constexpr uint16_t PERMUTE_CHUNK_FLAG_STRIDE = 0;
 // prologue 每核计数区按 AIV 核数上限分配（host 侧 workspace 须按实际 aivNum 分配且 <= 此值）
 constexpr int64_t PERMUTE_MAX_CORES = 128;
+// int8 权重场景下，m * topK 超过该阈值时使用 CombineV1，否则使用 CombineV2
+constexpr int64_t COMBINE_V1_EXPANDED_TOKEN_THRESHOLD = 4096;
+// UB 内多段缓冲的 32B 对齐粒度（DataCopy 32B 对齐要求）
+constexpr uint32_t UB_BUFFER_ALIGNMENT_BYTES = 32;
+// unpermute 场景 int8 权重的 m0 tile 值
+constexpr int32_t UNPERMUTE_INT8_M_TILE_ROWS = 16;
+// ubPreSumR 位于 UB 第 3 段（前两段 ubCumR/ubTpeR 各占 n 个 int32）
+constexpr int32_t PREFIX_SUM_UB_SEGMENT_INDEX = 2;
 
 // Atlas A3 (910_93) kernel.
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
@@ -383,7 +391,7 @@ private:
         isCombineV1 = false;
         if constexpr (std::is_same_v<ElementB, int8_t>) {
             isCombineV1 = true;
-            if (params.problemShape.m() * params.topK <= 4096) {
+            if (params.problemShape.m() * params.topK <= COMBINE_V1_EXPANDED_TOKEN_THRESHOLD) {
                 isCombineV1 = false;
             }
         }
@@ -765,7 +773,7 @@ private:
         AscendC::LocalTensor<int32_t> ubCumR = resource.ubBuf.template GetBufferByByte<int32_t>(0);
         AscendC::LocalTensor<int32_t> ubTpeR = resource.ubBuf.template GetBufferByByte<int32_t>(n * sizeof(int32_t));
         AscendC::LocalTensor<int32_t> ubPreSumR =
-            resource.ubBuf.template GetBufferByByte<int32_t>(2 * n * sizeof(int32_t));
+            resource.ubBuf.template GetBufferByByte<int32_t>(PREFIX_SUM_UB_SEGMENT_INDEX * n * sizeof(int32_t));
 
         for (int64_t g = 0; g < epr; ++g) {
             int64_t prevGroupSum = 0;
@@ -1635,7 +1643,7 @@ private:
                 if (coreIdx == 0) {
                     AscendC::LocalTensor<int32_t> ubSum = resource.ubBuf.template GetBufferByByte<int32_t>(0);
                     AscendC::LocalTensor<int32_t> ubOut = resource.ubBuf.template GetBufferByByte<int32_t>(
-                        AlignUp(params.expertPerRank * sizeof(int32_t), 32));
+                        AlignUp(params.expertPerRank * sizeof(int32_t), UB_BUFFER_ALIGNMENT_BYTES));
                     AscendC::DataCopyPad(ubSum, cumsumMM[(params.EP - 1) * params.expertPerRank],
                                          {1, static_cast<uint16_t>(params.expertPerRank * sizeof(int32_t)), 0, 0}, {});
                     AscendC::DataCopyPad(ubOut, gmExpertTokenNums[0],
@@ -1700,13 +1708,13 @@ private:
                     uboffset += sendRankNum_ * UB_ALIGN;
                     AscendC::LocalTensor<float> gatherMaskOutTensor =
                         resource.ubBuf.template GetBufferByByte<float>(uboffset);
-                    uboffset += AlignUp(params.EP * sizeof(float), 32);
+                    uboffset += AlignUp(params.EP * sizeof(float), UB_BUFFER_ALIGNMENT_BYTES);
                     AscendC::LocalTensor<uint32_t> gatherTmpTensor =
                         resource.ubBuf.template GetBufferByByte<uint32_t>(uboffset);
-                    uboffset += AlignUp(sizeof(uint32_t), 32);
+                    uboffset += AlignUp(sizeof(uint32_t), UB_BUFFER_ALIGNMENT_BYTES);
                     AscendC::LocalTensor<float> statusSumOutTensor =
                         resource.ubBuf.template GetBufferByByte<float>(uboffset);
-                    uboffset += AlignUp(sizeof(float), 32);
+                    uboffset += AlignUp(sizeof(float), UB_BUFFER_ALIGNMENT_BYTES);
                     if (maskBufferAddr == nullptr) {
                         shmem.CrossRankSyncV2Wait(statusTensor, gatherMaskOutTensor, gatherTmpTensor,
                                                   statusSumOutTensor);
@@ -1819,7 +1827,7 @@ private:
 
         int32_t m0 = 32;
         if constexpr (std::is_same_v<ElementB, int8_t>) {
-            m0 = 16;
+            m0 = UNPERMUTE_INT8_M_TILE_ROWS;
         }
 
         icache_preload(ICACHE_PRELOAD_LINES);

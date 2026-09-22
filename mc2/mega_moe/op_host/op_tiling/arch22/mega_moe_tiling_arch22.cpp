@@ -122,6 +122,12 @@ constexpr int64_t DISPATCH_QUANT_MODE_PER_TENSOR = 2;
 
 // A3 发送侧逐 chunk 处理的 chunk 大小（与 kernel 侧 PERMUTE_CHUNK=1024 一致）
 constexpr int64_t MOE_PERMUTE_CHUNK = 1024;
+// SumBeforeRank 每个 rank 的 int32 元素数对齐粒度
+constexpr int64_t SUM_BEFORE_RANK_ALIGNMENT_ELEMENTS = 16;
+// sync 区每个 rank 预留的 int32 元素数（独立于 SumBeforeRank 对齐要求）
+constexpr int64_t SYNC_STATE_ELEMENTS_PER_RANK = 16;
+// expandedRowIdx 工作区的 token 行数对齐粒度
+constexpr int64_t EXPANDED_ROW_INDEX_TOKEN_ALIGNMENT = 256;
 // prologue 每核计数区的核数上限（与 kernel 侧 const_args.hpp PERMUTE_MAX_CORES=128 一致）
 constexpr int64_t PERMUTE_MAX_CORES = 128;
 
@@ -1534,10 +1540,12 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext *context)
             // 接收侧轮表区：每 (chunk, round) 独立一份 [cumsumMM_r | tokenPerExpert_r | preSumBeforeRank_r]，
             // 各 EP*expertPerRank int32（cumsumMM_r 与 GetCumsumForMMAIV 输出同紧凑布局）
             numChunks * info.recvRoundsMax * 3UL * info.worldSize * info.expertPerRank * sizeof(int32_t) +
-            recvBudget * std::max(info.N, n2) * sizeof(int16_t) +                          // GMM1&2 Out
-            recvBudget * std::max(info.K, k2) * sizeof(int16_t) +                          // GMM1&2 input
-            (info.worldSize * (info.expertPerRank + 16 - 1) / 16 * 16 * sizeof(int32_t)) + // SumBeforeRank
-            info.worldSize * sizeof(int32_t) * 16;                                         // sync
+            recvBudget * std::max(info.N, n2) * sizeof(int16_t) + // GMM1&2 Out
+            recvBudget * std::max(info.K, k2) * sizeof(int16_t) + // GMM1&2 input
+            (info.worldSize * (info.expertPerRank + SUM_BEFORE_RANK_ALIGNMENT_ELEMENTS - 1) /
+             SUM_BEFORE_RANK_ALIGNMENT_ELEMENTS * SUM_BEFORE_RANK_ALIGNMENT_ELEMENTS *
+             sizeof(int32_t)) +                                              // SumBeforeRank
+            info.worldSize * sizeof(int32_t) * SYNC_STATE_ELEMENTS_PER_RANK; // sync
         if (info.isQuantRouting == 1U) {
             megeMoeWorkspace += recvBudget * sizeof(float) * 2; // perTokenScale GMM1&2
         }
@@ -1558,8 +1566,8 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext *context)
         const uint64_t recvBudget = info.recvRoundBudget;
         megeMoeWorkspace =
             PERMUTE_MAX_CORES * alignedExpertNum * sizeof(int32_t) + // prologue 每核计数区（独立）
-            ops::CeilAlign(std::min<int64_t>(info.M, MOE_PERMUTE_CHUNK), static_cast<int64_t>(256)) * info.topK *
-                sizeof(int32_t) + // expandedRowIdx（单 chunk，逐 chunk 复用）
+            ops::CeilAlign(std::min<int64_t>(info.M, MOE_PERMUTE_CHUNK), EXPANDED_ROW_INDEX_TOKEN_ALIGNMENT) *
+                info.topK * sizeof(int32_t) + // expandedRowIdx（单 chunk，逐 chunk 复用）
             numChunks * paddedExpertNumAligned * info.worldSize * sizeof(int32_t) + // cumsum（按 chunk 独立，不复用）
             paddedExpertNumAligned * 2UL * sizeof(int32_t) +      // SumBeforeRank ForDispatch/ForCombine
             recvBudget * std::max(info.N, n2) * sizeof(int16_t) + // GMM1&2 Out

@@ -28,7 +28,6 @@
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
-#include "mc2_log.h"
 #include "graph/utils/type_utils.h"
 #include "register/op_def_registry.h"
 #include "platform/platform_infos_def.h"

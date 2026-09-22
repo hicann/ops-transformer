@@ -17,6 +17,8 @@
 #define COPY_L0C_TO_GM_CUSTOM_HPP
 
 namespace Catlass::Gemm::Tile {
+// zN 布局是 4 维张量，src stride 最外层 dim 索引为 3
+constexpr int ZN_STRIDE_OUTERMOST_DIM = 3;
 template <class ElementAccumulator_, class ElementDst_, bool ReluEnable_ = false>
 struct CopyL0CToGmPerChannel {
     using ArchTag = Catlass::Arch::AtlasA2;
@@ -48,7 +50,7 @@ struct CopyL0CToGmPerChannel {
         // Fixpipe layout information
         intriParams.nSize = dstLayout.shape(1);
         intriParams.mSize = dstLayout.shape(0);
-        intriParams.srcStride = srcLayout.stride(3) / srcLayout.stride(0);
+        intriParams.srcStride = srcLayout.stride(ZN_STRIDE_OUTERMOST_DIM) / srcLayout.stride(0);
         intriParams.dstStride = dstLayout.stride(0);
 
         // Fixpipe auxiliary arguments

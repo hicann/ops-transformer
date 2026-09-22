@@ -385,6 +385,27 @@ inline ge::graphStatus SetHcclCcTilingConfig(const gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
+// Copy common fields without coupling the caller to a particular MatmulV3 argument type.
+template <typename MatmulArgsT, typename TilingArgsT>
+inline void FillMmV3ArgsFromTilingArgs(MatmulArgsT &args, const TilingArgsT &tilingArgs)
+{
+    args.isATrans = tilingArgs.isATrans;
+    args.isBTrans = tilingArgs.isBTrans;
+    args.hasBias = tilingArgs.isBias;
+    args.aType = tilingArgs.geAType;
+    args.bType = tilingArgs.geBType;
+    args.cType = tilingArgs.geCType;
+    args.biasType = tilingArgs.isBias ? tilingArgs.geBiasType : ge::DT_INT32;
+
+    args.aFormat = ge::FORMAT_ND;
+    args.bFormat = ge::FORMAT_ND;
+    args.outFormat = ge::FORMAT_ND;
+
+    args.mValue = tilingArgs.mValue;
+    args.kValue = tilingArgs.kValue;
+    args.nValue = tilingArgs.nValue;
+}
+
 // ===== 非量化 A3 tiling 公共校验 =====
 
 // 工具函数：判断指定 value 是否存在于 list 中

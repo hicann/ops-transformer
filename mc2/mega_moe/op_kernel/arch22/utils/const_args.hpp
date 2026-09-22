@@ -39,7 +39,8 @@ constexpr static int64_t PERMUTE_MAX_CORES = 128;
 // 三处同步（SendTokensV3 / RecvTokensV3 / V2 allgather）统一使用该值，需配合
 // ResetTokenPerExpert 每轮清零 flag 区，确保上一轮残留不会撞上本值
 constexpr static int32_t FLAG_VALUE_MAGIC = 123456789; // 0x075BCD15
-// A2/A3 每个 Cube 核附带 1 个 Vector 核，核数 / 2 即 Cube（matmul tile）数
+// 本 A2/A3 混合核 kernel 中，1 个 AIC（Cube）对应 2 个 AIV（Vector）。
+// 调用处 coreNum 以 AIV 核数计，coreNum / AIV_PER_AIC 得到对应的 AIC 核数。
 constexpr static int32_t AIV_PER_AIC = 2;
 // AIC 内 m 维拆分给两个 subblock 处理
 constexpr static int32_t SUBBLOCK_NUM_PER_AIC = 2;

@@ -30,7 +30,6 @@
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
-#include "mc2_log.h"
 #include "ffn_to_attention_tiling_base.h"
 #include "../../op_kernel/ffn_to_attention_tiling.h"
 #include "../../op_kernel/ffn_to_attention_tilling_key.h"
