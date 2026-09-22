@@ -1082,7 +1082,7 @@ inline void ApplyDeterministicConfig()
             workspace_addr = const_cast<void *>(workspace_tensor.storage().data()); \
         } \
         auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor]() -> int { \
-            if (c10_npu::check_enqueue_need_use(acl_stream)) { \
+            if (c10_npu::check_dequeue_need_use(acl_stream)) { \
                 aclrtUseStreamResInCurrentThread(acl_stream); \
             } \
             typedef int (*OpApiFunc)(void *, uint64_t, aclOpExecutor *, const aclrtStream); \
