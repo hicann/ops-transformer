@@ -246,7 +246,7 @@ ge::graphStatus PagedAttentionChecker::CheckMaskShape(const FiaTilingInfo &fiaIn
 }
 
 // check pse shape
-ge::graphStatus PagedAttentionChecker::CheckPseShape(const FiaTilingInfo &fiaInfo)
+ge::graphStatus PagedAttentionChecker::CheckPseShape(const FiaTilingInfo &fiaInfo) const
 {
     if (!fiaInfo.pseShiftFlag) {
         // 若不使能pse，则放弃后续校验
@@ -416,7 +416,7 @@ ge::graphStatus PagedAttentionChecker::CheckPACacheShapeNZNonAntiquant(const Fia
         dataTypeSizeValue = static_cast<float>(BFLOAT16SIZE);
     }
 
-    uint32_t d0Size = BYTE_BLOCK / dataTypeSizeValue;
+    uint32_t d0Size = static_cast<uint32_t>(BYTE_BLOCK / dataTypeSizeValue);
     if (tempD0 != d0Size) {
         std::string reasonMsg = "When PA_NZ is enabled, in " + std::string(QuantModeToSerialString(fiaInfo.quantMode)) +
                                 " " + std::string(SituationToSerialString(fiaInfo.ropeMode)) +
@@ -547,7 +547,7 @@ ge::graphStatus PagedAttentionChecker::CheckBlockTableShape(const FiaTilingInfo 
 }
 
 // check blocksize
-ge::graphStatus PagedAttentionChecker::CheckBlockSizeNonQuant910B(const FiaTilingInfo &fiaInfo)
+ge::graphStatus PagedAttentionChecker::CheckBlockSizeNonQuant910B(const FiaTilingInfo &fiaInfo) const
 {
     if (fiaInfo.ropeMode != RopeMode::NO_ROPE) { // MLA场景 [16, 1024]且16对齐
         if (fiaInfo.blockSize > BLOCK_SIZE_MAX_FOR_NO_QUANT || fiaInfo.blockSize < BLOCK_SIZE_ALIGN_SIZE_16 ||
@@ -596,7 +596,7 @@ ge::graphStatus PagedAttentionChecker::CheckBlockSizeNonQuant910B(const FiaTilin
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckBlockSizeNonQuantOther(const FiaTilingInfo &fiaInfo)
+ge::graphStatus PagedAttentionChecker::CheckBlockSizeNonQuantOther(const FiaTilingInfo &fiaInfo) const
 {
     if (fiaInfo.ropeMode != RopeMode::NO_ROPE) { // MLA场景 [16, 1024]且16对齐
         if (fiaInfo.blockSize > BLOCK_SIZE_MAX_FOR_NO_QUANT || fiaInfo.blockSize < BLOCK_SIZE_ALIGN_SIZE_16 ||
@@ -641,7 +641,7 @@ ge::graphStatus PagedAttentionChecker::CheckBlockSizeNonQuantOther(const FiaTili
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckBlockSizeAntiquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus PagedAttentionChecker::CheckBlockSizeAntiquant(const FiaTilingInfo &fiaInfo) const
 {
     std::unordered_map<ge::DataType, float> typeSizeMap = {{ge::DT_FLOAT16, static_cast<float>(FLOAT16SIZE)},
                                                            {ge::DT_BF16, static_cast<float>(BFLOAT16SIZE)},
@@ -713,7 +713,7 @@ ge::graphStatus PagedAttentionChecker::CheckBlockSizeSupport(const FiaTilingInfo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckNonContiguousSupport(const FiaTilingInfo &fiaInfo)
+ge::graphStatus PagedAttentionChecker::CheckNonContiguousSupport(const FiaTilingInfo &fiaInfo) const
 {
     if (!fiaInfo.hasViewStride || !HasNonContiguousCache(fiaInfo)) {
         return ge::GRAPH_SUCCESS;

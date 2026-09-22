@@ -125,7 +125,7 @@ ge::graphStatus RopeChecker::CheckKRopeContiguous(const FiaTilingInfo &fiaInfo)
     }
 }
 
-ge::graphStatus RopeChecker::CheckShapeConsistency(const FiaTilingInfo &fiaInfo)
+ge::graphStatus RopeChecker::CheckShapeConsistency(const FiaTilingInfo &fiaInfo) const
 {
     if (fiaInfo.ropeMode != RopeMode::ROPE_SPLIT) {
         return ge::GRAPH_SUCCESS;

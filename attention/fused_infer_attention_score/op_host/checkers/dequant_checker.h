@@ -42,48 +42,48 @@ private:
     ge::graphStatus CheckDequantScaleDtypeMLAFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleDtypeGQAPertensor(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleDtypeMXFP8Fullquant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckDequantScaleDtypeFP8GQAFullquant(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckDequantScaleDtypeFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleDtypeFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantModeMLAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantModeGQAPertensor(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantModeMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckDequantModeFP8GQAFullquant(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckDequantModeFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantModeFullquant(const FiaTilingInfo &fiaInfo);
 
     ge::graphStatus CheckTensorExistFullquant(const FiaTilingInfo &fiaInfo, const gert::Tensor *tensor,
                                               const std::string &quantModeName, const std::string &inputName) const;
     ge::graphStatus CheckTensorNotExistFullquant(const FiaTilingInfo &fiaInfo, const gert::Tensor *tensor,
                                                  const std::string &quantModeName, const std::string &inputName) const;
-    ge::graphStatus CheckExistencePertensorFullquant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckExistenceMLAFullquant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckExistenceMXFP8Fullquant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckExistenceFP8GQAFullquant(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckExistencePertensorFullquant(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckExistenceMLAFullquant(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckExistenceMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckExistenceFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const;
 
     ge::graphStatus CheckFeaturePertensorFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckFeatureMLAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckFeatureSupportFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckFeatureMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckFeatureFP8GQAFullquant(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckFeatureFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const;
 
     ge::graphStatus CheckDequantScaleKVMLAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleQueryMLAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleShapePertensor(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckDequantScaleShapeMXFP8(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckDequantScaleShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleBnNBsDShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleNZShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckQuantScale1ShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckQuantScale1ShapeFP8GQA(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckDequantScaleShapeFP8GQA(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckQuantScale1ShapeFP8GQA(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckDequantScaleShapeFP8GQA(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleShapeFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckDequantScaleShapeCrossFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckInputDTypeFullquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckInputLayoutPertensor(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckInputLayoutMLAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckInputLayoutMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckInputLayoutFP8GQAFullquant(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckInputLayoutFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckStrideFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckInputLayoutFullquant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckInputAxisFullquant(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckInputAxisFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckN1SizeFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckN2SizeFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckGSizeFullquant(const FiaTilingInfo &fiaInfo) const;
@@ -94,18 +94,23 @@ private:
     ge::graphStatus CheckSingleParaForAntiquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckAntiquantModeForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckInputKVTypeForAntiquantPerChannel(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType,
-                                                           const gert::Tensor *keyAntiquantScaleTensor);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerToken(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenPA(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTensorHead(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenHead(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenHeadPA(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantMixed(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
-    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenGroup(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType);
+                                                           const gert::Tensor *keyAntiquantScaleTensor) const;
+    ge::graphStatus CheckInputKVTypeForAntiquantPerToken(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType) const;
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenPA(const FiaTilingInfo &fiaInfo,
+                                                           ge::DataType inputKvType) const;
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTensorHead(const FiaTilingInfo &fiaInfo,
+                                                              ge::DataType inputKvType) const;
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenHead(const FiaTilingInfo &fiaInfo,
+                                                             ge::DataType inputKvType) const;
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenHeadPA(const FiaTilingInfo &fiaInfo,
+                                                               ge::DataType inputKvType) const;
+    ge::graphStatus CheckInputKVTypeForAntiquantMixed(const FiaTilingInfo &fiaInfo, ge::DataType inputKvType) const;
+    ge::graphStatus CheckInputKVTypeForAntiquantPerTokenGroup(const FiaTilingInfo &fiaInfo,
+                                                              ge::DataType inputKvType) const;
     ge::graphStatus CheckInputKVTypeForAntiquant(const FiaTilingInfo &fiaInfo);
 
     // Existence
-    ge::graphStatus CheckExistenceForAntiquant(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckExistenceForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckScaleExistenceForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDescExistenceForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckOffsetExistenceForAntiquant(const FiaTilingInfo &fiaInfo) const;
@@ -117,12 +122,12 @@ private:
     ge::graphStatus CheckFeaturePAForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckFeatureRopeForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckFeatureD032ForAntiquant(const FiaTilingInfo &fiaInfo) const;
-    ge::graphStatus CheckStrideForAntiquant(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckStrideForAntiquant(const FiaTilingInfo &fiaInfo) const;
 
     // MultiPara
     ge::graphStatus CheckMultiParaForAntiquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckScaleTypeForAntiquant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus CheckScaleShapeForAntiquant(const FiaTilingInfo &fiaInfo);
+    ge::graphStatus CheckScaleShapeForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckOffsetTypeForAntiquant(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CheckOffsetShapeForAntiquant(const FiaTilingInfo &fiaInfo) const;
 

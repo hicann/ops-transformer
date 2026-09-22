@@ -18,7 +18,7 @@
 #include "register/tilingdata_base.h"
 #include "../../../common/op_host/fia_tiling_base.h"
 #include "../fia_tiling_info.h"
-#include "tiling/tiling_api.h"  //这个头文件顺序必须在手写的tiling data前
+#include "tiling/tiling_api.h" // 这个头文件顺序必须在手写的tiling data前
 #include "../../../common/op_kernel/arch35/flash_attention_score_tiling_regbase_arch35.h"
 #include "../../op_kernel/arch35/fused_infer_attention_score_template_tiling_key.h"
 
@@ -54,14 +54,22 @@ struct FiaPlatFormInfo {
 
 class FusedInferAttentionScoreTilingImpl : public FiaTilingBase {
 public:
-    explicit FusedInferAttentionScoreTilingImpl(gert::TilingContext *context) : FiaTilingBase(context) {}
+    explicit FusedInferAttentionScoreTilingImpl(gert::TilingContext *context)
+        : FiaTilingBase(context)
+    {}
     ~FusedInferAttentionScoreTilingImpl() override = default;
     void InitTilingInfo(TilingInfo *tilingInfo) override
     {
         fiaInfo_ = static_cast<FiaTilingInfo *>(tilingInfo);
     }
-    bool IsCapable() override { return true; }
-    ge::graphStatus DoOpTiling() override { return DoOpTiling(context_, *fiaInfo_); }
+    bool IsCapable() override
+    {
+        return true;
+    }
+    ge::graphStatus DoOpTiling() override
+    {
+        return DoOpTiling(context_, *fiaInfo_);
+    }
     ge::graphStatus DoOpTiling(gert::TilingContext *context, const FiaTilingInfo &fiaInfo);
 
 protected:
@@ -108,7 +116,7 @@ protected:
     void FixParamWithRowInvalid(const FiaTilingInfo &fiaInfo, int64_t &actualSeqLength, int64_t actualSeqLengthKV,
                                 int64_t &preTokensLeftUp, int64_t &nextTokensLeftUp);
     int64_t GetCutBlockNums(int64_t blockSeqLengthKV, int64_t blockSeqLength, int64_t sInner, int64_t sOuter,
-                            int64_t token);
+                            int64_t token) const;
     int64_t GetCalcBlockNumsOneHead(const FiaTilingInfo &fiaInfo, int64_t actualSeqLength, int64_t actualSeqLengthKV,
                                     uint32_t sOuterSize, uint32_t sInnerSize);
     void ComputeSplitNBSeq(const FiaTilingInfo &fiaInfo, const size_t maxCoreNums, uint32_t sOuterSize,
@@ -116,8 +124,8 @@ protected:
     void SplitNBSeq(const FiaTilingInfo &fiaInfo);
     void InitImplParam(const FiaTilingInfo &fiaInfo);
     void InitTilingFlags(const FiaTilingInfo &fiaInfo, const gert::Tensor *actSeqLenQ, uint32_t qDims,
-                         const gert::Tensor *actSeqLenKV, uint32_t kvDims,
-                         const gert::Tensor *actSharedPrefixLen, uint32_t prefixDims);
+                         const gert::Tensor *actSeqLenKV, uint32_t kvDims, const gert::Tensor *actSharedPrefixLen,
+                         uint32_t prefixDims);
     void ComputeLoopParams(const FiaTilingInfo &fiaInfo);
     void ParseActualSeqLengths(const FiaTilingInfo &fiaInfo);
     void SetIsIFA(const FiaTilingInfo &fiaInfo);
@@ -131,24 +139,25 @@ protected:
     ge::graphStatus SplitS2(const FiaTilingInfo &fiaInfo);
     void SetDequantBaseSize(const FiaTilingInfo &fiaInfo);
     ge::graphStatus CalcInnerSize(const FiaTilingInfo &fiaInfo, uint32_t seqSize);
-    void GetActualSeqLength(const FiaTilingInfo &fiaInfo, int64_t &actualSeqLengths, int64_t &actualSeqLengthsKV, uint32_t bIdx);
+    void GetActualSeqLength(const FiaTilingInfo &fiaInfo, int64_t &actualSeqLengths, int64_t &actualSeqLengthsKV,
+                            uint32_t bIdx);
     int64_t SumOfArithmeticSeries(int64_t an, int64_t d) const;
     void ComputeDequantSplitNBSeq(const FiaTilingInfo &fiaInfo, std::vector<int64_t> sOuterLoopTimes,
                                   std::vector<int64_t> sInnerLoopTimes, int64_t sInnerLoopTimesPrefix,
                                   double coreWeightTarget, uint32_t &curCore, const size_t tilingElementArrayLen);
-    int64_t GetAntiQuantCalcBlockNumsOneHead( const FiaTilingInfo &fiaInfo, int64_t outerBlockNums,
-                                              int64_t innerBlockNums, int64_t sInnerLoopTimesPrefix,
-                                              int64_t preTokensLeftUp, int64_t nextTokensLeftUp);
+    int64_t GetAntiQuantCalcBlockNumsOneHead(const FiaTilingInfo &fiaInfo, int64_t outerBlockNums,
+                                             int64_t innerBlockNums, int64_t sInnerLoopTimesPrefix,
+                                             int64_t preTokensLeftUp, int64_t nextTokensLeftUp);
     void GetAntiQuantPreNextTokensLeftUp(const FiaTilingInfo &fiaInfo, int64_t actualSeqLength,
                                          int64_t actualSeqLengthKV, int64_t &preTokensLeftUp,
                                          int64_t &nextTokensLeftUp) const;
-    void FixAntiQuantParamWithRowInvalid(const FiaTilingInfo &fiaInfo, int64_t &actualSeqLength, 
+    void FixAntiQuantParamWithRowInvalid(const FiaTilingInfo &fiaInfo, int64_t &actualSeqLength,
                                          int64_t actualSeqLengthKV, int64_t &preTokensLeftUp,
                                          int64_t &nextTokensLeftUp);
     void DequantCubeSplitBNSeq(const FiaTilingInfo &fiaInfo);
     int64_t GetActualInnerBlockNums(int64_t sInnerIndexStart, int64_t sInnerIndexEnd, int64_t innerBlockNums) const;
     void SplitDequant(const FiaTilingInfo &fiaInfo);
-    ge::graphStatus SetDequantMMTilingData(const gert::TilingContext *context, const FiaTilingInfo &fiaInfo);
+    ge::graphStatus SetDequantMMTilingData(const gert::TilingContext *context, const FiaTilingInfo &fiaInfo) const;
     bool CheckTransposeLayout(const FiaTilingInfo &fiaInfo) const;
     void PrintAllTilingData(const FiaTilingInfo &fiaInfo);
     void PrintInputParams(const FiaTilingInfo &fiaInfo);
@@ -183,5 +192,5 @@ protected:
     bool isRowInvalid_ = false;
 };
 
-}  // namespace optiling
-#endif  // AIR_CXX_RUNTIME_V2_OP_IMPL_FUSEDINFERATTENTIONSCORE_IMPL_H_
+} // namespace optiling
+#endif // AIR_CXX_RUNTIME_V2_OP_IMPL_FUSEDINFERATTENTIONSCORE_IMPL_H_

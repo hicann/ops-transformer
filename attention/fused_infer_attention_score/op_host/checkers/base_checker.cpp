@@ -67,7 +67,7 @@ ge::graphStatus BaseChecker::CheckTensorContiguous(const uint32_t &tensorDimNum,
     if (tensorDimNum == 0 || tensorDimNum == 1) {
         return ge::GRAPH_SUCCESS;
     }
-    uint64_t preStride = 1; // 连续场景最后一维的stride默认为1
+    int64_t preStride = 1; // 连续场景最后一维的stride默认为1
     for (index = tensorDimNum - 1; index >= 0; index--) {
         if (inputShape.GetDim(index) == 1) { // dim=1时步长不影响连续性
             continue;

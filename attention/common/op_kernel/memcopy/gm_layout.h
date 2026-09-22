@@ -234,8 +234,8 @@ struct GmLayout<GmFormat::TND2> {
     __aicore__ inline GmLayout() = default;
     __aicore__ inline void MakeLayout(uint32_t t, uint32_t n, uint32_t d)
     {
-        shape = AscendC::MakeShape(t, n, d);
         uint64_t dStride = 1;
+        shape = AscendC::MakeShape(t, n, d);
         uint64_t nStride = dStride * d;
         uint64_t tStride = nStride * n;
         stride = AscendC::MakeStride(tStride, nStride, dStride);

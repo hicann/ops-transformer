@@ -54,8 +54,8 @@ public:
                                       GmCoord &gmCoord)
     {
         if constexpr (UB_FORMAT == UbFormat::GS1) {
-            auto &offsetCalculator = dstTensor.offsetCalculator;
             uint32_t s1Size = 0;
+            auto &offsetCalculator = dstTensor.offsetCalculator;
             if constexpr (GmLayoutParams<GM_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_TND) {
                 s1Size = offsetCalculator.actualSeqLensQParser.GetActualSeqLength(gmCoord.bIdx);
             } else {

@@ -144,21 +144,21 @@ public:
         return cuSeqLensGm.GetValue(actualLenDims - 1);
     }
 
-    __aicore__ inline uint32_t GetActualLenDims() const
-    {
-        return actualLenDims;
-    }
-
     __aicore__ inline uint64_t GetMxVscaleTBase(uint32_t bIdx) const
     {
+        uint64_t vScaleTBaseOffset = 0;
         if (bIdx == 0) {
             return 0;
         }
-        uint64_t vScaleTBaseOffset = 0;
         for (uint32_t idx = 0; idx < bIdx; idx++) {
             vScaleTBaseOffset += ((GetActualSeqLength(idx) + 63) >> 6);
         }
         return vScaleTBaseOffset;
+    }
+
+    __aicore__ inline uint32_t GetActualLenDims() const
+    {
+        return actualLenDims;
     }
 
 private:

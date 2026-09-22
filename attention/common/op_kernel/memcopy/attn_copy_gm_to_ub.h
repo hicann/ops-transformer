@@ -254,8 +254,8 @@ private:
                 s1Size = offsetCalculator.GetDimS1();
             }
         }
-        uint32_t gIdxStart = gmCoord.gS1Idx / s1Size;
         uint32_t s1IdxStart = gmCoord.gS1Idx % s1Size;
+        uint32_t gIdxStart = gmCoord.gS1Idx / s1Size;
         uint32_t gIdxEnd = (gmCoord.gS1Idx + gmCoord.gS1DealSize) / s1Size;
         uint32_t s1IdxEnd = (gmCoord.gS1Idx + gmCoord.gS1DealSize) % s1Size;
 
@@ -420,8 +420,8 @@ private:
                 }
 
                 // 计算offset
-                uint64_t gmOffset = offsetCalculator.GetOffset(gmCoord.bIdx, gmCoord.n2Idx, curS2Idx, gmCoord.dIdx);
                 uint64_t l1Offset = copyFinishRowCnt * blockElementCnt;
+                uint64_t gmOffset = offsetCalculator.GetOffset(gmCoord.bIdx, gmCoord.n2Idx, curS2Idx, gmCoord.dIdx);
 
                 // DataCopyPad
                 CopySingleMatrixNDToND<KV_T>(dstTensor.tensor[l1Offset], srcTensor.gmTensor[gmOffset], copyRowCnt,
