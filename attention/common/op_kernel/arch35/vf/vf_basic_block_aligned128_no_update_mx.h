@@ -374,7 +374,7 @@ __simd_vf__ void ProcessVec1NoUpdateImpl128Mxfp8FullquantVFSubloop1(
     RegTensor<float> vreg_sel_drop2;
     RegTensor<float> vreg_rowmax_p;
     RegTensor<float> vreg_scale_qk;
-    RegTensor<float> vreg_sink_input;
+    RegTensor<float> vreg_sink_input_algnou1;
     // mxfp8
     RegTensor<bfloat16_t> vreg_p_scale_bf16_0;
     RegTensor<bfloat16_t> vreg_p_scale_bf16_1;
@@ -421,7 +421,7 @@ __simd_vf__ void ProcessVec1NoUpdateImpl128Mxfp8FullquantVFSubloop1(
     MaskReg preg4;
     MaskReg preg5;
     if constexpr (hasSink) {
-        Duplicate(vreg_sink_input, sinkValue);
+        Duplicate(vreg_sink_input_algnou1, sinkValue);
     }
     // MASK
     Duplicate(vreg_min, minValue);
@@ -513,7 +513,7 @@ __simd_vf__ void ProcessVec1NoUpdateImpl128Mxfp8FullquantVFSubloop1(
         }
         Reduce<Reg::ReduceType::MAX, float, float, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_max_tmp, preg_all);
         if constexpr (hasSink) {
-            Max(vreg_input_max, vreg_input_max, vreg_sink_input, preg_all);
+            Max(vreg_input_max, vreg_input_max, vreg_sink_input_algnou1, preg_all);
         }
         Muls(vreg_input_max, vreg_input_max, INV_LN2, preg_all);
         Truncate<T, RoundMode::CAST_CEIL>(vreg_input_max, vreg_input_max, preg_all);

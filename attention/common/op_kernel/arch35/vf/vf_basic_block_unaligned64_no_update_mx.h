@@ -288,7 +288,7 @@ __simd_vf__ void ProcessVec1NoUpdateImpl64Mxfp8FullquantVFSubloop1(
     const T minValue, const float deSCaleKValue = 1.0f, const float sinkValue = 0.0f, const float pScale = 1.0f)
 {
     RegTensor<float> vreg_input_tensor;
-    RegTensor<float> vreg_input_max;
+    RegTensor<float> vreg_input_max_u64nou1;
     RegTensor<float> vreg_exp_max;
     RegTensor<float> vreg_max_broadcast;
     RegTensor<float> vreg_exp;
@@ -413,35 +413,36 @@ __simd_vf__ void ProcessVec1NoUpdateImpl64Mxfp8FullquantVFSubloop1(
             Select(vreg_sel, vreg_min, vreg_input_tensor, preg_compare);
             StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + i * s2BaseSize, vreg_sel,
                                                          preg_src_mask);
-            Reduce<Reg::ReduceType::MAX, float, float, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_sel,
+            Reduce<Reg::ReduceType::MAX, float, float, Reg::MaskMergeMode::ZEROING>(vreg_input_max_u64nou1, vreg_sel,
                                                                                     preg_ori_src_n);
         } else {
             StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)srcUb + i * s2BaseSize, vreg_input_tensor,
                                                          preg_src_mask);
-            Reduce<Reg::ReduceType::MAX, float, float, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_tensor,
-                                                                                    preg_ori_src_n);
+            Reduce<Reg::ReduceType::MAX, float, float, Reg::MaskMergeMode::ZEROING>(vreg_input_max_u64nou1,
+                                                                                    vreg_input_tensor, preg_ori_src_n);
         }
         if constexpr (hasSink) {
-            Max(vreg_input_max, vreg_input_max, vreg_sink_src, preg_ori_src_n);
+            Max(vreg_input_max_u64nou1, vreg_input_max_u64nou1, vreg_sink_src, preg_ori_src_n);
         }
-        Muls(vreg_input_max, vreg_input_max, INV_LN2, preg_all);
-        Truncate<T, RoundMode::CAST_CEIL>(vreg_input_max, vreg_input_max, preg_all);
-        Muls(vreg_input_max, vreg_input_max, LN2, preg_all);
-        Sub(vreg_input_max, vreg_input_max, vreg_ln_p_scale, preg_all);
-        Compare<float, CMPMODE::LE>(preg_compare_max, vreg_input_max, vreg_min, preg_all);
-        Select(vreg_input_max, vreg_min, vreg_input_max, preg_compare_max);
-        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpMaxUb), vreg_input_max, ureg_max, 1);
+        Muls(vreg_input_max_u64nou1, vreg_input_max_u64nou1, INV_LN2, preg_all);
+        Truncate<T, RoundMode::CAST_CEIL>(vreg_input_max_u64nou1, vreg_input_max_u64nou1, preg_all);
+        Muls(vreg_input_max_u64nou1, vreg_input_max_u64nou1, LN2, preg_all);
+        Sub(vreg_input_max_u64nou1, vreg_input_max_u64nou1, vreg_ln_p_scale, preg_all);
+        Compare<float, CMPMODE::LE>(preg_compare_max, vreg_input_max_u64nou1, vreg_min, preg_all);
+        Select(vreg_input_max_u64nou1, vreg_min, vreg_input_max_u64nou1, preg_compare_max);
+        StoreUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpMaxUb), vreg_input_max_u64nou1, ureg_max,
+                                                            1);
     }
     StoreUnAlignPost<T, Reg::PostLiteral::POST_MODE_UPDATE>(((__ubuf__ T *&)tmpMaxUb), ureg_max, 0);
     RegTensor<float> vreg_in_max;
     LoadAlign(vreg_in_max, inMaxUb);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
-    LoadAlign(vreg_input_max, tmpMaxUb2);
+    LoadAlign(vreg_input_max_u64nou1, tmpMaxUb2);
     // loop1的max需要和loop0的max取一个max，保证loop1的max是当前的全局最大max，不要被loop1的max覆盖掉
-    Max(vreg_input_max, vreg_in_max, vreg_input_max, preg_all);
-    ExpSub(vreg_exp_max, vreg_in_max, vreg_input_max, preg_all);
+    Max(vreg_input_max_u64nou1, vreg_in_max, vreg_input_max_u64nou1, preg_all);
+    ExpSub(vreg_exp_max, vreg_in_max, vreg_input_max_u64nou1, preg_all);
     StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)expMaxUb, vreg_exp_max, preg_all);
-    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)maxUb, vreg_input_max, preg_all);
+    StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T *&)maxUb, vreg_input_max_u64nou1, preg_all);
 
     if constexpr (hasDrop == 1) {
         Duplicate<T, Reg::MaskMergeMode::ZEROING, float>(vreg_zero, 0.0f, preg_all);
@@ -564,17 +565,17 @@ template <typename T, typename T2, typename pseShiftType, uint32_t s1BaseSize = 
           bool hasAtten = 0, PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasDrop = 0, bool isMlaSgd = false,
           bool isMlaFullQuant = false, bool hasSink = false>
 __aicore__ inline void ProcessVec1NoUpdateImpl64Mxfp8Fullquant(
-    const LocalTensor<T2> &dstTensor, const LocalTensor<uint8_t> &indexesTensor, const LocalTensor<T> &expSumTensor,
-    const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor, const LocalTensor<T> &expMaxTensor,
-    const LocalTensor<T> &inExpSumTensor, const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &maskTensor,
-    const LocalTensor<pseShiftType> &pseTensor, const LocalTensor<uint8_t> &dropTensor,
-    const LocalTensor<fp8_e8m0_t> &pScaleSubLoop0Tensor, const LocalTensor<uint8_t> &sharedTmpBuffer, uint32_t subLoop,
-    const uint16_t m, const uint32_t originN, const uint32_t pseStride, const float slopes, const float posShift,
-    const T scale, const float dScaleQK, const T minValue, float keepProb,
-    const LocalTensor<T> &queryScaleUb = LocalTensor<T>(), const float deSCaleKValue = 1.0f,
-    const float sinkValue = 0.0f, const float pScale = 1.0f)
+    const LocalTensor<T2> &dstTensor_u64noum, const LocalTensor<uint8_t> &indexesTensor,
+    const LocalTensor<T> &expSumTensor, const LocalTensor<T> &maxTensor, const LocalTensor<T> &srcTensor,
+    const LocalTensor<T> &expMaxTensor, const LocalTensor<T> &inExpSumTensor, const LocalTensor<T> &inMaxTensor,
+    const LocalTensor<uint8_t> &maskTensor, const LocalTensor<pseShiftType> &pseTensor,
+    const LocalTensor<uint8_t> &dropTensor, const LocalTensor<fp8_e8m0_t> &pScaleSubLoop0Tensor,
+    const LocalTensor<uint8_t> &sharedTmpBuffer, uint32_t subLoop, const uint16_t m, const uint32_t originN,
+    const uint32_t pseStride, const float slopes, const float posShift, const T scale, const float dScaleQK,
+    const T minValue, float keepProb, const LocalTensor<T> &queryScaleUb = LocalTensor<T>(),
+    const float deSCaleKValue = 1.0f, const float sinkValue = 0.0f, const float pScale = 1.0f)
 {
-    __ubuf__ T2 *expUb = (__ubuf__ T2 *)dstTensor.GetPhyAddr();
+    __ubuf__ T2 *expUb = (__ubuf__ T2 *)dstTensor_u64noum.GetPhyAddr();
     __ubuf__ pseShiftType *pseUb = (__ubuf__ pseShiftType *)pseTensor.GetPhyAddr();
     __ubuf__ T *expSumUb = (__ubuf__ T *)expSumTensor.GetPhyAddr();
     __ubuf__ T *inExpSumUb = (__ubuf__ T *)inExpSumTensor.GetPhyAddr();
