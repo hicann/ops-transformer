@@ -106,6 +106,7 @@ constexpr int64_t MAX_TOPK = 16;
 constexpr int64_t MIN_EXPERT_PER_RANK = 1;
 constexpr int64_t MAX_EXPERT_PER_RANK = 128;
 constexpr int64_t HIDDEN_SIZE_ALIGN = 512;
+constexpr int64_t INTERMEDIATE_HIDDEN_ALIGN = 256;
 
 // 属性范围限制
 constexpr int64_t MIN_MOE_EXPERT_NUM = 1;
@@ -997,10 +998,10 @@ static ge::graphStatus CheckWeight2Input(gert::TilingContext *context, int64_t h
                     return GRAPH_FAILED);
 
     uint32_t n2 = N / 2;
-    OP_TILING_CHECK(n2 % HIDDEN_SIZE_ALIGN != 0,
+    OP_TILING_CHECK(n2 % INTERMEDIATE_HIDDEN_ALIGN != 0,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(K_OP_NAME, "weight2",
                                                           Ops::Base::ToString(w2Tensor->GetStorageShape()).c_str(),
-                                                          "dim0 (intermediate_hidden) must be aligned to 512"),
+                                                          "dim0 (intermediate_hidden) must be aligned to 256"),
                     return GRAPH_FAILED);
 
     OP_TILING_CHECK(n2 < MIN_INTERMEDIATE_HIDDEN,
