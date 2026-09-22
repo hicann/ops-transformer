@@ -298,6 +298,7 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessReduceMax(uint32_t pin
         AscendC::DataCopyPadExtParams<float> padParams{
             true, 0, static_cast<uint8_t>(DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)) - curBlockSize),
             SOFTMAX_MIN_NUM};
+        AscendC::PipeBarrier<PIPE_MTE2>();
         AscendC::DataCopyPad(reduceMaxSrc0, vec1ResGm[reduceSrcGmOffset_ + REDUCE_BASE_BLOCK_SIZE * blockIdx],
                              dataCopyParams, padParams);
         reduceMaxSrc0Queue_.EnQue<float>(reduceMaxSrc0);
@@ -361,6 +362,7 @@ __aicore__ inline void DenseLISoftmaxLseVector<T>::ProcessReduceSum(uint32_t pin
         AscendC::DataCopyPadExtParams<float> padParams{
             true, 0, static_cast<uint8_t>(DenseLISoftmaxLseCommon::Align(curBlockSize, uint32_t(8)) - curBlockSize),
             SOFTMAX_MIN_NUM};
+        AscendC::PipeBarrier<PIPE_MTE2>();
         AscendC::DataCopyPad(reduceSumSrc0, vec1ResGm[reduceSrcGmOffset_ + REDUCE_BASE_BLOCK_SIZE * blockIdx],
                              dataCopyParams, padParams);
         reduceSumSrc0Queue_.EnQue<float>(reduceSumSrc0);
