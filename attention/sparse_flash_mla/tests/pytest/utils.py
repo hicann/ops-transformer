@@ -12,6 +12,7 @@
 import ast
 import math
 import itertools
+import re
 import numpy as np
 import os
 import pandas as pd
@@ -34,6 +35,45 @@ str_map_dict = {
     "BF16": torch.bfloat16,
     "FP16": torch.float16,
 }
+
+_EXTENDED_RANGE_TOKEN_RE = re.compile(
+    r"(?<![\w.'\"])([+-]?)(inf|nan)(?![\w.'\"])", re.IGNORECASE
+)
+
+
+def parse_datarange(value):
+    """Parse a range while allowing only the INF/NAN numeric extensions."""
+    if value is None or not isinstance(value, str):
+        return value
+    try:
+        return ast.literal_eval(value)
+    except (ValueError, SyntaxError):
+        tokens = {}
+
+        def replace_token(match):
+            sign, token = match.group(1), match.group(2).lower()
+            key = f"__range_token_{len(tokens)}__"
+            if token == "nan":
+                if sign == "-":
+                    raise ValueError("data range does not support negative NaN")
+                tokens[key] = math.nan
+            else:
+                tokens[key] = -math.inf if sign == "-" else math.inf
+            return repr(key)
+
+        substituted = _EXTENDED_RANGE_TOKEN_RE.sub(replace_token, value)
+        parsed = ast.literal_eval(substituted)
+
+        def restore(item):
+            if isinstance(item, str) and item in tokens:
+                return tokens[item]
+            if isinstance(item, list):
+                return [restore(child) for child in item]
+            if isinstance(item, tuple):
+                return tuple(restore(child) for child in item)
+            return item
+
+        return restore(parsed)
 
 
 def normalize_topk_mode(value):
@@ -433,7 +473,7 @@ def generate_case_with_default_param(
     case_param.setdefault("testcase_name", "case_" + str(int(time.time() * 1000000)))
     case_param.update(
         {
-            "q_datarange": ast.literal_eval(param_combinations.get("q_datarange"))
+            "q_datarange": parse_datarange(param_combinations.get("q_datarange"))
             if isinstance(param_combinations.get("q_datarange"), str)
             else (
                 param_combinations.get("q_datarange")
@@ -444,7 +484,7 @@ def generate_case_with_default_param(
     )
     case_param.update(
         {
-            "ori_kv_datarange": ast.literal_eval(
+            "ori_kv_datarange": parse_datarange(
                 param_combinations.get("ori_kv_datarange")
             )
             if isinstance(param_combinations.get("ori_kv_datarange"), str)
@@ -457,7 +497,7 @@ def generate_case_with_default_param(
     )
     case_param.update(
         {
-            "cmp_kv_datarange": ast.literal_eval(
+            "cmp_kv_datarange": parse_datarange(
                 param_combinations.get("cmp_kv_datarange")
             )
             if isinstance(param_combinations.get("cmp_kv_datarange"), str)

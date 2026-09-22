@@ -26,6 +26,31 @@ DATA_RANGE_RIGHT = 10
 RUN_MODE = 1
 
 
+def _nonfinite_fill(shape, left, right):
+    """Return a deterministic tensor for a non-finite data range.
+
+    The finite path deliberately remains at each call site so existing random
+    generation (and its seeded behavior) is unchanged.
+    """
+    left, right = float(left), float(right)
+    if math.isfinite(left) and math.isfinite(right):
+        return None
+    if math.isnan(left) or math.isnan(right):
+        if math.isnan(left) and math.isnan(right):
+            value = math.nan
+        else:
+            raise ValueError(
+                f"data range must use [nan, nan] for a constant NaN, got [{left}, {right}]"
+            )
+    elif left == right:
+        value = left
+    else:
+        raise ValueError(
+            f"non-finite data range must be constant, got [{left}, {right}]"
+        )
+    return torch.full(shape, value, dtype=torch.float32)
+
+
 def is_empty(obj):
     if isinstance(obj, list):
         return len(obj) == 0
@@ -1377,10 +1402,16 @@ def gen_ori_kv(
         ori_max_s2 = max(seqused_ori_kv)
         ori_max_block_num_per_batch = math.ceil(ori_max_s2 / block_size1)
 
-        ori_k_bnsd = (
-            torch.rand((B, N2, ori_max_s2, D)) * (data_range_left - data_range_right)
-            + data_range_left
-        ).to(ori_kv_type)
+        ori_k_bnsd = _nonfinite_fill(
+            (B, N2, ori_max_s2, D), data_range_left, data_range_right
+        )
+        if ori_k_bnsd is None:
+            ori_k_bnsd = (
+                torch.rand((B, N2, ori_max_s2, D))
+                * (data_range_left - data_range_right)
+                + data_range_left
+            )
+        ori_k_bnsd = ori_k_bnsd.to(ori_kv_type)
         ori_block_num_per_batch = []
         ori_block_num_sum = 0
 
@@ -1435,19 +1466,28 @@ def gen_ori_kv(
     elif layout_kv == "TND":
         ori_block_table = None
         ori_max_s2 = get_max_adjacent_diff(cu_seqlens_ori_kv)
-        ori_k_tnd = (
-            torch.rand((T2, N2, D)) * (data_range_left - data_range_right)
-            + data_range_left
-        ).to(ori_kv_type)
+        ori_k_tnd = _nonfinite_fill((T2, N2, D), data_range_left, data_range_right)
+        if ori_k_tnd is None:
+            ori_k_tnd = (
+                torch.rand((T2, N2, D)) * (data_range_left - data_range_right)
+                + data_range_left
+            )
+        ori_k_tnd = ori_k_tnd.to(ori_kv_type)
         ori_k_in_pa_shape = ori_k_tnd
         ori_k = ori_k_tnd
     elif layout_kv == "BSND":
         ori_block_table = None
         ori_max_s2 = S2
-        ori_k_bnsd = (
-            torch.rand((B, ori_max_s2, N2, D)) * (data_range_left - data_range_right)
-            + data_range_left
-        ).to(ori_kv_type)
+        ori_k_bnsd = _nonfinite_fill(
+            (B, ori_max_s2, N2, D), data_range_left, data_range_right
+        )
+        if ori_k_bnsd is None:
+            ori_k_bnsd = (
+                torch.rand((B, ori_max_s2, N2, D))
+                * (data_range_left - data_range_right)
+                + data_range_left
+            )
+        ori_k_bnsd = ori_k_bnsd.to(ori_kv_type)
         ori_k_in_pa_shape = ori_k_bnsd
         ori_k = ori_k_bnsd
 
@@ -1545,10 +1585,16 @@ def gen_cmp_kv(
         cmp_max_s2 = max(int(length) for length in seqused_cmp_kv)
         cmp_max_block_num_per_batch = math.ceil(cmp_max_s2 / block_size2)
 
-        cmp_k = (
-            torch.rand((B, N2, cmp_max_s2, D)) * (data_range_left - data_range_right)
-            + data_range_left
-        ).to(cmp_kv_type)
+        cmp_k = _nonfinite_fill(
+            (B, N2, cmp_max_s2, D), data_range_left, data_range_right
+        )
+        if cmp_k is None:
+            cmp_k = (
+                torch.rand((B, N2, cmp_max_s2, D))
+                * (data_range_left - data_range_right)
+                + data_range_left
+            )
+        cmp_k = cmp_k.to(cmp_kv_type)
         cmp_block_num_per_batch = []
         cmp_block_num_sum = 0
         for cur_cmp_act_kv in seqused_cmp_kv:
@@ -1601,18 +1647,27 @@ def gen_cmp_kv(
     elif layout_kv == "TND":
         T3 = int(T3)
         cmp_block_table = None
-        cmp_k = (
-            torch.rand((T3, N2, D)) * (data_range_left - data_range_right)
-            + data_range_left
-        ).to(cmp_kv_type)
+        cmp_k = _nonfinite_fill((T3, N2, D), data_range_left, data_range_right)
+        if cmp_k is None:
+            cmp_k = (
+                torch.rand((T3, N2, D)) * (data_range_left - data_range_right)
+                + data_range_left
+            )
+        cmp_k = cmp_k.to(cmp_kv_type)
         cmp_k_in_pa_shape = cmp_k
     elif layout_kv == "BSND":
         cmp_block_table = None
         cmp_max_s2 = max(int(length) for length in seqused_cmp_kv)
-        cmp_k = (
-            torch.rand((B, cmp_max_s2, N2, D)) * (data_range_left - data_range_right)
-            + data_range_left
-        ).to(cmp_kv_type)
+        cmp_k = _nonfinite_fill(
+            (B, cmp_max_s2, N2, D), data_range_left, data_range_right
+        )
+        if cmp_k is None:
+            cmp_k = (
+                torch.rand((B, cmp_max_s2, N2, D))
+                * (data_range_left - data_range_right)
+                + data_range_left
+            )
+        cmp_k = cmp_k.to(cmp_kv_type)
         cmp_k_in_pa_shape = cmp_k
 
     # generate cmp_sparse_indices
@@ -1815,10 +1870,13 @@ def gen_data(params, prepare_device_storage=True, generate_golden=True):
     # generate q
     if layout_q == "BSND":
         S1, B = int(S1), int(B)
-        q = (
-            torch.rand((B, S1, N1, D)) * (q_datarange[1] - q_datarange[0])
-            + q_datarange[0]
-        ).to(q_type)
+        q = _nonfinite_fill((B, S1, N1, D), q_datarange[0], q_datarange[1])
+        if q is None:
+            q = (
+                torch.rand((B, S1, N1, D)) * (q_datarange[1] - q_datarange[0])
+                + q_datarange[0]
+            )
+        q = q.to(q_type)
         if seqused_q is None:
             act_q = B * [S1]
             seqused_q = torch.tensor(B * [S1]).to(torch.int32)
@@ -1827,9 +1885,13 @@ def gen_data(params, prepare_device_storage=True, generate_golden=True):
             seqused_q = torch.tensor(seqused_q).to(torch.int32)
     elif layout_q == "TND":
         T1, B = int(T1), int(B)
-        q = (
-            torch.rand((T1, N1, D)) * (q_datarange[1] - q_datarange[0]) + q_datarange[0]
-        ).to(q_type)
+        q = _nonfinite_fill((T1, N1, D), q_datarange[0], q_datarange[1])
+        if q is None:
+            q = (
+                torch.rand((T1, N1, D)) * (q_datarange[1] - q_datarange[0])
+                + q_datarange[0]
+            )
+        q = q.to(q_type)
         if len(cu_seqlens_q) != (B + 1):
             raise ValueError(
                 f"len(cu_seqlens_q) != B + 1, which is {len(cu_seqlens_q)} != {B + 1}"
@@ -1978,9 +2040,15 @@ def gen_data(params, prepare_device_storage=True, generate_golden=True):
         cmp_k = None
         cmp_topk_length = None
 
-    sinks = (
-        torch.rand((N1,)) * (q_datarange[1] - q_datarange[0]) / 10 + q_datarange[0] / 10
-    ).to(torch.float)
+    sinks = _nonfinite_fill((N1,), q_datarange[0], q_datarange[1])
+    if sinks is None:
+        sinks = (
+            torch.rand((N1,)) * (q_datarange[1] - q_datarange[0]) / 10
+            + q_datarange[0] / 10
+        )
+    else:
+        sinks = sinks / 10
+    sinks = sinks.to(torch.float)
 
     # Pytest materializes the A5 PA stride on device. TTK supplies the same
     # storage/stride through its CSV allocation and only needs logical CPU data.

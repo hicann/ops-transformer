@@ -28,6 +28,35 @@ FP8_DATA_RANGE_LEFT = -5
 FP8_DATA_RANGE_RIGHT = 5
 
 
+def _nonfinite_fill(shape, data_range):
+    """Return a constant tensor for an INF/NAN range, or None for finite data."""
+    low, high = (float(data_range[0]), float(data_range[1]))
+    if math.isfinite(low) and math.isfinite(high):
+        return None
+    if math.isnan(low) or math.isnan(high):
+        if math.isnan(low) and math.isnan(high):
+            value = math.nan
+        else:
+            raise ValueError(
+                f"data range must use [nan, nan] for a constant NaN, got [{low}, {high}]"
+            )
+    elif low == high:
+        value = low
+    else:
+        raise ValueError(f"non-finite data range must be constant, got [{low}, {high}]")
+    return torch.full(shape, value, dtype=torch.float32)
+
+
+def _resolve_descale_range(data_range):
+    """Avoid non-finite scale factors masking the data-range signal."""
+    if any(not math.isfinite(float(value)) for value in data_range):
+        return [1.0, 1.0]
+    return [
+        float(data_range[0]) / FP8_DATA_RANGE_LEFT,
+        float(data_range[1]) / FP8_DATA_RANGE_RIGHT,
+    ]
+
+
 def restore_cmp_kv_lengths(
     seqused_cmp_kv, cmp_ratio, cmp_residual_kv=None, cmp_mask_mode=3
 ):
@@ -1023,15 +1052,20 @@ def trans_kv_bnsd_to_tnd(kv_bnsd_npu, cu_seqlens_kv, seqused_kv, B, N2, D, kv_ty
 
 
 def _gen_hif8_tensor(shape, data_range, scale_range):
-    scale = torch.tensor(
-        [random.uniform(*scale_range)],
-        dtype=torch.float32,
-    )
+    if any(not math.isfinite(float(value)) for value in scale_range):
+        scale = torch.ones((1,), dtype=torch.float32)
+    else:
+        scale = torch.tensor(
+            [random.uniform(*scale_range)],
+            dtype=torch.float32,
+        )
 
-    x = (
-        torch.rand(shape, dtype=torch.float32) * (data_range[1] - data_range[0])
-        + data_range[0]
-    )
+    x = _nonfinite_fill(shape, data_range)
+    if x is None:
+        x = (
+            torch.rand(shape, dtype=torch.float32) * (data_range[1] - data_range[0])
+            + data_range[0]
+        )
 
     x_uint8 = trans_float_tensor_to_hifuint8(x)
     x_fp32 = torch.tensor(trans_hifuint8_tensor_to_float(x_uint8))
@@ -1359,18 +1393,9 @@ def gen_data(params, generate_golden=True):
     q_datarange = params.get("q_datarange")
     ori_kv_datarange = params.get("ori_kv_datarange")
     cmp_kv_datarange = params.get("cmp_kv_datarange")
-    q_descale_datarange = [
-        q_datarange[0] / FP8_DATA_RANGE_LEFT,
-        q_datarange[1] / FP8_DATA_RANGE_RIGHT,
-    ]
-    ori_kv_descale_datarange = [
-        ori_kv_datarange[0] / FP8_DATA_RANGE_LEFT,
-        ori_kv_datarange[1] / FP8_DATA_RANGE_RIGHT,
-    ]
-    cmp_kv_descale_datarange = [
-        cmp_kv_datarange[0] / FP8_DATA_RANGE_LEFT,
-        cmp_kv_datarange[1] / FP8_DATA_RANGE_RIGHT,
-    ]
+    q_descale_datarange = _resolve_descale_range(q_datarange)
+    ori_kv_descale_datarange = _resolve_descale_range(ori_kv_datarange)
+    cmp_kv_descale_datarange = _resolve_descale_range(cmp_kv_datarange)
     K1 = params.get("K1")
     ori_kv_topk_mode = params.get("ori_kv_topk_mode", "no")
     cmp_kv_topk_mode = params.get("cmp_kv_topk_mode", "no")
@@ -1455,10 +1480,15 @@ def gen_data(params, generate_golden=True):
 
     # generate sinks tensor (only when isSink=True)
     if isSink:
-        sinks = (
-            torch.rand((N1)) * (q_datarange[1] - q_datarange[0]) / 10
-            + q_datarange[0] / 10
-        ).to(torch.float)
+        sinks = _nonfinite_fill((N1,), q_datarange)
+        if sinks is None:
+            sinks = (
+                torch.rand((N1)) * (q_datarange[1] - q_datarange[0]) / 10
+                + q_datarange[0] / 10
+            )
+        else:
+            sinks = sinks / 10
+        sinks = sinks.to(torch.float)
     else:
         sinks = None
 

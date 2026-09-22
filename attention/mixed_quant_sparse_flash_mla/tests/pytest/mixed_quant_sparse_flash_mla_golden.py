@@ -28,6 +28,102 @@ FP8_DATA_RANGE_LEFT = -5
 FP8_DATA_RANGE_RIGHT = 5
 
 
+def _nonfinite_value(left, right):
+    """Return a constant non-finite range value, or ``None`` for finite data."""
+    left, right = float(left), float(right)
+    if math.isfinite(left) and math.isfinite(right):
+        return None
+    if math.isnan(left) or math.isnan(right):
+        if math.isnan(left) and math.isnan(right):
+            return math.nan
+        raise ValueError(
+            f"data range must use [nan, nan] for a constant NaN, got [{left}, {right}]"
+        )
+    if left == right:
+        return left
+    raise ValueError(f"non-finite data range must be constant, got [{left}, {right}]")
+
+
+def gen_data_in_range(left, right, shape, dtype=torch.float32):
+    """Preserve legacy sampling for finite ranges and fill INF/NAN directly."""
+    value = _nonfinite_value(left, right)
+    if value is None:
+        result = torch.tensor(np.random.uniform(left, right, shape))
+        return result.to(dtype)
+    if dtype in (torch.float8_e4m3fn, torch.float8_e8m0fnu):
+        # quant_mode=1 carries non-finite semantics in its BF16 scale.  The
+        # quant_mode=2 E4M3/E8M0 pair is handled by the helpers below.
+        return torch.ones(shape, dtype=dtype)
+    return torch.full(shape, value, dtype=dtype)
+
+
+def gen_fp8_data_in_range(left, right, shape):
+    """Generate the quant_mode=1 E4M3 payload."""
+    value = _nonfinite_value(left, right)
+    if value is not None:
+        # The BF16 scale carries all non-finite semantics in quant_mode=1.
+        return torch.ones(shape, dtype=torch.float8_e4m3fn)
+    return torch.tensor(np.random.uniform(left, right, shape)).to(torch.float8_e4m3fn)
+
+
+def _e4m3_nonfinite_payload(shape, value, *, signed_inf):
+    """Build raw E4M3 bytes for a constant NaN or signed overflow payload."""
+    if math.isnan(value):
+        raw = 0x7F
+    elif signed_inf:
+        raw = 0x7E if value > 0 else 0xFE
+    else:
+        raw = 0x38  # +1.0 keeps quant_mode=1's BF16 scale authoritative.
+    return torch.full(shape, raw, dtype=torch.uint8).view(torch.float8_e4m3fn)
+
+
+def _e8m0_nonfinite_scale(shape, value):
+    """Build E8M0 bytes used by quant_mode=2.
+
+    E8M0 has no sign bit and reserves 0xff for NaN.  A signed infinity is
+    therefore represented by a signed E4M3 max payload times the largest
+    finite E8M0 scale; NaN is carried by the E4M3 payload with a neutral scale.
+    """
+    raw = 0x7F if math.isnan(value) else 0xFE
+    return torch.full(shape, raw, dtype=torch.uint8).view(torch.float8_e8m0fnu)
+
+
+def resolve_quant_param_range(data_range):
+    """Derive a finite-path scale range without evaluating INF/-INF bounds."""
+    value = _nonfinite_value(data_range[0], data_range[1])
+    if value is not None:
+        return value, value
+    return (
+        data_range[0] / FP8_DATA_RANGE_LEFT,
+        data_range[1] / FP8_DATA_RANGE_RIGHT,
+    )
+
+
+def gen_quant2_data_and_scale(
+    data_range_left,
+    data_range_right,
+    quant_range_left,
+    quant_range_right,
+    data_shape,
+    scale_shape,
+):
+    """Generate a quant_mode=2 E4M3 payload and matching E8M0 scale."""
+    value = _nonfinite_value(data_range_left, data_range_right)
+    if value is None:
+        payload = gen_fp8_data_in_range(data_range_left, data_range_right, data_shape)
+        scale = gen_data_in_range(
+            quant_range_left,
+            quant_range_right,
+            scale_shape,
+            torch.float8_e8m0fnu,
+        )
+        return payload, scale
+    return (
+        _e4m3_nonfinite_payload(data_shape, value, signed_inf=True),
+        _e8m0_nonfinite_scale(scale_shape, value),
+    )
+
+
 def restore_cmp_kv_lengths(
     seqused_cmp_kv, cmp_ratio, cmp_residual_kv=None, cmp_mask_mode=3
 ):
@@ -1554,44 +1650,49 @@ def gen_ori_kv(
     ori_win_right=-1,
 ):
     if quant_mode == 10:
-        quant_param = random.uniform(quant_param_range_left, quant_param_range_right)
+        quant_param = _nonfinite_value(quant_param_range_left, quant_param_range_right)
+        if quant_param is None:
+            quant_param = random.uniform(
+                quant_param_range_left, quant_param_range_right
+            )
         quant_range_left = quant_param
         quant_range_right = quant_param
     else:
         quant_range_left = quant_param_range_left
         quant_range_right = quant_param_range_right
-    ori_kv_quant_param_tensor_npu = torch.tensor(
-        np.random.uniform(
-            quant_range_left,
-            quant_range_right,
-            (B, N2, ori_max_s2, quant_scale_head_dim),
-        )
-    ).to(q_type)
+    ori_kv_quant_param_tensor_npu = gen_data_in_range(
+        quant_range_left,
+        quant_range_right,
+        (B, N2, ori_max_s2, quant_scale_head_dim),
+        q_type,
+    )
     ori_kv_quant_param_tensor = ori_kv_quant_param_tensor_npu.to(q_type)
 
     if quant_mode == 10:
-        ori_k_nope_bnsd_npu = torch.tensor(
-            np.random.uniform(
-                data_range_left, data_range_right, (B, N2, ori_max_s2, nope_head_dim)
-            )
-        ).to(torch.float)
+        ori_k_nope_bnsd_npu = gen_data_in_range(
+            data_range_left,
+            data_range_right,
+            (B, N2, ori_max_s2, nope_head_dim),
+            torch.float,
+        )
         ori_k_nope_bnsd_npu = trans_float_tensor_to_hifuint8(
             ori_k_nope_bnsd_npu, round_mode="hybrid", over_mode=True
         )
         ori_k_nope_bnsd = trans_hifuint8_tensor_to_float(ori_k_nope_bnsd_npu).to(q_type)
     else:
-        ori_k_nope_bnsd_npu = torch.tensor(
-            np.random.uniform(
-                data_range_left, data_range_right, (B, N2, ori_max_s2, nope_head_dim)
-            )
-        ).to(torch.float8_e4m3fn)
+        ori_k_nope_bnsd_npu = gen_fp8_data_in_range(
+            data_range_left,
+            data_range_right,
+            (B, N2, ori_max_s2, nope_head_dim),
+        )
         ori_k_nope_bnsd = ori_k_nope_bnsd_npu.to(q_type)
 
-    ori_k_rope_bnsd = torch.tensor(
-        np.random.uniform(
-            data_range_left, data_range_right, (B, N2, ori_max_s2, rope_head_dim)
-        )
-    ).to(q_type)
+    ori_k_rope_bnsd = gen_data_in_range(
+        data_range_left,
+        data_range_right,
+        (B, N2, ori_max_s2, rope_head_dim),
+        q_type,
+    )
 
     for d_loop in range(quant_scale_head_dim):
         for tile_loop in range(tile_size):
@@ -1766,25 +1867,22 @@ def gen_ori_kv_quant_2_pa(
     ori_win_right=-1,
 ):
     # 1. 生成并处理 Nope (448) 和 Rope (64) -> Feature (512)
-    ori_k_nope_bnsd_npu = torch.tensor(
-        np.random.uniform(
-            data_range_left, data_range_right, (B, N2, ori_max_s2, nope_head_dim)
-        )
-    ).to(torch.float8_e4m3fn)
+    ori_k_nope_bnsd_npu, ori_kv_quant_param_tensor_npu = gen_quant2_data_and_scale(
+        data_range_left,
+        data_range_right,
+        quant_param_range_left,
+        quant_param_range_right,
+        (B, N2, ori_max_s2, nope_head_dim),
+        (B, N2, ori_max_s2, quant_scale_head_dim),
+    )
     ori_k_nope_bnsd = ori_k_nope_bnsd_npu.to(q_type)
-    ori_k_rope_bnsd = torch.tensor(
-        np.random.uniform(
-            data_range_left, data_range_right, (B, N2, ori_max_s2, rope_head_dim)
-        )
-    ).to(q_type)
+    ori_k_rope_bnsd = gen_data_in_range(
+        data_range_left,
+        data_range_right,
+        (B, N2, ori_max_s2, rope_head_dim),
+        q_type,
+    )
     # 2. 生成 Scale (7) 和 Padding (1) -> Metadata (8)
-    ori_kv_quant_param_tensor_npu = torch.tensor(
-        np.random.uniform(
-            quant_param_range_left,
-            quant_param_range_right,
-            (B, N2, ori_max_s2, quant_scale_head_dim),
-        )
-    ).to(torch.float8_e8m0fnu)
     ori_kv_quant_param_tensor = ori_kv_quant_param_tensor_npu.to(q_type)
     ori_pad_tensor = torch.zeros((B, N2, ori_max_s2, pad_d)).to(torch.float8_e8m0fnu)
     # 3. nope部分*scale，转成fp8，保存为bin文件，再转回bf16
@@ -1957,28 +2055,24 @@ def gen_cmp_kv_quant_2_pa(
         return None, None, None, None
     # --- 1. 生成原始数据 ---
     # 量化参数 (7字节)
-    cmp_kv_quant_param_tensor_npu = torch.tensor(
-        np.random.uniform(
-            quant_param_range_left,
-            quant_param_range_right,
-            (B, N2, cmp_max_s2, quant_scale_head_dim),
-        )
-    ).to(torch.float8_e8m0fnu)
+    # Nope 部分 (448字节, FP8)
+    cmp_k_nope_bnsd_npu, cmp_kv_quant_param_tensor_npu = gen_quant2_data_and_scale(
+        data_range_left,
+        data_range_right,
+        quant_param_range_left,
+        quant_param_range_right,
+        (B, N2, cmp_max_s2, nope_head_dim),
+        (B, N2, cmp_max_s2, quant_scale_head_dim),
+    )
     cmp_kv_quant_param_tensor = cmp_kv_quant_param_tensor_npu.to(q_type)
 
-    # Nope 部分 (448字节, FP8)
-    cmp_k_nope_bnsd_npu = torch.tensor(
-        np.random.uniform(
-            data_range_left, data_range_right, (B, N2, cmp_max_s2, nope_head_dim)
-        )
-    ).to(torch.float8_e4m3fn)
-
     # Rope 部分 (64个元素, BF16/FP16)
-    cmp_k_rope_bnsd_npu = torch.tensor(
-        np.random.uniform(
-            data_range_left, data_range_right, (B, N2, cmp_max_s2, rope_head_dim)
-        )
-    ).to(q_type)
+    cmp_k_rope_bnsd_npu = gen_data_in_range(
+        data_range_left,
+        data_range_right,
+        (B, N2, cmp_max_s2, rope_head_dim),
+        q_type,
+    )
 
     # 模拟量化计算 (用于生成golden计算数据)
     cmp_k_nope_bnsd = cmp_k_nope_bnsd_npu.to(q_type)
@@ -2168,44 +2262,49 @@ def gen_cmp_kv(
     if cmp_max_s2 == 0:
         return None, None, None, None, None
     if quant_mode == 10:
-        quant_param = random.uniform(quant_param_range_left, quant_param_range_right)
+        quant_param = _nonfinite_value(quant_param_range_left, quant_param_range_right)
+        if quant_param is None:
+            quant_param = random.uniform(
+                quant_param_range_left, quant_param_range_right
+            )
         quant_range_left = quant_param
         quant_range_right = quant_param
     else:
         quant_range_left = quant_param_range_left
         quant_range_right = quant_param_range_right
-    cmp_kv_quant_param_tensor_npu = torch.tensor(
-        np.random.uniform(
-            quant_range_left,
-            quant_range_right,
-            (B, N2, cmp_max_s2, quant_scale_head_dim),
-        )
-    ).to(q_type)
+    cmp_kv_quant_param_tensor_npu = gen_data_in_range(
+        quant_range_left,
+        quant_range_right,
+        (B, N2, cmp_max_s2, quant_scale_head_dim),
+        q_type,
+    )
     cmp_kv_quant_param_tensor = cmp_kv_quant_param_tensor_npu.to(q_type)
 
     if quant_mode == 10:
-        cmp_k_nope_bnsd_npu = torch.tensor(
-            np.random.uniform(
-                data_range_left, data_range_right, (B, N2, cmp_max_s2, nope_head_dim)
-            )
-        ).to(torch.float)
+        cmp_k_nope_bnsd_npu = gen_data_in_range(
+            data_range_left,
+            data_range_right,
+            (B, N2, cmp_max_s2, nope_head_dim),
+            torch.float,
+        )
         cmp_k_nope_bnsd_npu = trans_float_tensor_to_hifuint8(
             cmp_k_nope_bnsd_npu, round_mode="hybrid", over_mode=True
         )
         cmp_k_nope_bnsd = trans_hifuint8_tensor_to_float(cmp_k_nope_bnsd_npu).to(q_type)
     else:
-        cmp_k_nope_bnsd_npu = torch.tensor(
-            np.random.uniform(
-                data_range_left, data_range_right, (B, N2, cmp_max_s2, nope_head_dim)
-            )
-        ).to(torch.float8_e4m3fn)
+        cmp_k_nope_bnsd_npu = gen_fp8_data_in_range(
+            data_range_left,
+            data_range_right,
+            (B, N2, cmp_max_s2, nope_head_dim),
+        )
         cmp_k_nope_bnsd = cmp_k_nope_bnsd_npu.to(q_type)
 
-    cmp_k_rope_bnsd = torch.tensor(
-        np.random.uniform(
-            data_range_left, data_range_right, (B, N2, cmp_max_s2, rope_head_dim)
-        )
-    ).to(q_type)
+    cmp_k_rope_bnsd = gen_data_in_range(
+        data_range_left,
+        data_range_right,
+        (B, N2, cmp_max_s2, rope_head_dim),
+        q_type,
+    )
 
     for d_loop in range(quant_scale_head_dim):
         for tile_loop in range(tile_size):
@@ -2459,13 +2558,9 @@ def gen_data(params, generate_golden=True):
             ).reshape(T1, N2)
     # generate q
     if layout_q == "BSND":
-        q = torch.tensor(
-            np.random.uniform(q_datarange[0], q_datarange[1], (B, S1, N1, D))
-        ).to(q_type)
+        q = gen_data_in_range(q_datarange[0], q_datarange[1], (B, S1, N1, D), q_type)
     elif layout_q == "TND":
-        q = torch.tensor(
-            np.random.uniform(q_datarange[0], q_datarange[1], (T1, N1, D))
-        ).to(q_type)
+        q = gen_data_in_range(q_datarange[0], q_datarange[1], (T1, N1, D), q_type)
         if len(cu_seqlens_q) != (B + 1):
             raise ValueError(
                 f"len(cu_seqlens_q) != B + 1, which is {len(cu_seqlens_q)} != {B + 1}"
@@ -2509,15 +2604,20 @@ def gen_data(params, generate_golden=True):
     )
     block_num = block_num1 if block_num1 >= block_num2 else block_num2
     # 根据输入的data range，计算scale范围，生成scale tensor，取倒数保存为bin
-    ori_quant_param_range_left = ori_kv_datarange[0] / FP8_DATA_RANGE_LEFT
-    ori_quant_param_range_right = ori_kv_datarange[1] / FP8_DATA_RANGE_RIGHT
-    cmp_quant_param_range_left = cmp_kv_datarange[0] / FP8_DATA_RANGE_LEFT
-    cmp_quant_param_range_right = cmp_kv_datarange[1] / FP8_DATA_RANGE_RIGHT
+    ori_quant_param_range_left, ori_quant_param_range_right = resolve_quant_param_range(
+        ori_kv_datarange
+    )
+    cmp_quant_param_range_left, cmp_quant_param_range_right = resolve_quant_param_range(
+        cmp_kv_datarange
+    )
 
     # generate sinks tensor
-    sinks = torch.tensor(
-        np.random.uniform(q_datarange[0] / 10, q_datarange[1] / 10, (N1))
-    ).to(torch.float)
+    sinks = gen_data_in_range(
+        q_datarange[0] / 10,
+        q_datarange[1] / 10,
+        (N1,),
+        torch.float,
+    )
 
     # generate ori_kv tensor
     if quant_mode == 1:
