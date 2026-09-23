@@ -1116,7 +1116,7 @@ mc2_training@ops-transformer:
             open_source:
                 - ops/ops-transformer/mc2/3rd/quant_batch_matmul_v3/
 
-mc2_inference@ops-transformer:
+mc2_infer@ops-transformer:
     src:
         release:
             huawei_style:
