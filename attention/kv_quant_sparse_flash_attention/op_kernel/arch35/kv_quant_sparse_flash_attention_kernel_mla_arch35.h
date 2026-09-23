@@ -61,6 +61,7 @@ public:
                                 const KvQuantSparseFlashAttentionTilingDataMla *__restrict tiling, TPipe *tPipe);
 #endif
     __aicore__ inline void Process();
+    __aicore__ inline void FreeEvent();
 
 private:
     __aicore__ inline void ProcessMainLoop();
@@ -547,6 +548,18 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockTyp
 
     ICachePreLoad(6);
     ProcessMainLoop();
+    FreeEvent();
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockType>::FreeEvent()
+{
+    if ASCEND_IS_AIC {
+        cubeBlock.UninitLocalBuffer();
+    }
+    if ASCEND_IS_AIV {
+        vecBlock.UninitLocalBuffer();
+    }
 }
 
 template <typename CubeBlockType, typename VecBlockType>

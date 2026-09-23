@@ -72,6 +72,7 @@ public:
 
     // 初始化LocalTensor
     __aicore__ inline void InitLocalBuffer(TPipe *pipe, ConstInfo &constInfo);
+    __aicore__ inline void UninitLocalBuffer();
     // 初始化attentionOutGM
 #if KVQSFA_VERSION >= 2
     __aicore__ inline void CleanOutput(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxMax,
@@ -896,6 +897,7 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::CleanOutput(__gm__ uint
             SetFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId); // 释放剩余ub
             InitOutputSingleCore(constInfo);
             WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
+            GetTPipePtr()->ReleaseEventID<AscendC::HardEvent::MTE3_V>(initOutputEventId);
         }
     }
 }
@@ -927,6 +929,7 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::CleanOutput(__gm__ uint
             SetFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId); // 释放剩余ub
             InitOutputSingleCore(constInfo);
             WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
+            GetTPipePtr()->ReleaseEventID<AscendC::HardEvent::MTE3_V>(initOutputEventId);
         }
     }
 }
@@ -1009,6 +1012,25 @@ __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitLocalBuffer(TPipe *
         InitSinksBuffer(constInfo);
     }
 #endif
+}
+
+TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::UninitLocalBuffer()
+{
+    if ASCEND_IS_AIV {
+        WaitFlag<HardEvent::MTE3_V>(mte3ToVId[0]);
+        WaitFlag<HardEvent::MTE3_V>(mte3ToVId[1]);
+#if KVQSFA_VERSION >= 2
+        WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+#endif
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVId[0]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVId[1]);
+#if KVQSFA_VERSION >= 2
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVLseOutId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3LseOutId);
+#endif
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3Id[0]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3Id[1]);
+    }
 }
 
 TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void QSFAVectorService<TEMPLATE_ARGS>::InitCubeVecSharedParams(
@@ -1534,6 +1556,7 @@ public:
                                         CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx,
                                         __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths) {};
     __aicore__ inline void InitLocalBuffer(TPipe *pipe, ConstInfo &constInfo) {}
+    __aicore__ inline void UninitLocalBuffer() {}
 
     __aicore__ inline void ProcessVec1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputBuf,
                                        Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm1ResBuf,
