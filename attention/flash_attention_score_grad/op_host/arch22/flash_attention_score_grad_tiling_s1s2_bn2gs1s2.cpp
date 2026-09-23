@@ -18,6 +18,8 @@
 #include "op_host/tiling_templates_registry.h"
 #include "../../op_kernel/arch22/flash_attention_score_grad_tiling.h"
 #include "../../op_kernel/arch22/flash_attention_score_grad_template_tiling_key.h"
+#include <memory>
+#include <new>
 
 namespace optiling {
 
@@ -1897,12 +1899,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessTndToBsh()
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
 {
     // [s2OuterIdx][begin, end, length]
-    int64_t(*parseInfo)[ARRAY_LENGTH] = new int64_t[fBaseParams.s2Outer][ARRAY_LENGTH];
+    std::unique_ptr<int64_t[][ARRAY_LENGTH]> parseInfo(
+        new (std::nothrow) int64_t[static_cast<size_t>(fBaseParams.s2Outer)][ARRAY_LENGTH]);
     OP_CHECK_IF(
         parseInfo == nullptr,
         OP_LOGE(context_, "The op [FlashAttentionScoreGrad] received bad params, the reason is: [parseInfo is null]."),
         return ge::GRAPH_FAILED);
-    GetParseS1S2OuterInfo(parseInfo);
+    GetParseS1S2OuterInfo(parseInfo.get());
     int64_t s1s2oCount = parseInfo[fBaseParams.s2Outer - 1][LENGTH_IDX];
 
     // block split
@@ -1912,7 +1915,6 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
     if (blockFactor == 0) {
         OP_LOGE(context_,
                 "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor blockFactor is 0.]");
-        delete[] parseInfo;
         return ge::GRAPH_FAILED;
     }
     int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor;
@@ -1935,8 +1937,6 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
     if (s1s2oCount == 0) {
         OP_LOGE(context_,
                 "The op [FlashAttentionScoreGrad] received bad params, the reason is: [divisor s1s2oCount is 0.]");
-        // free tensor
-        delete[] parseInfo;
         return ge::GRAPH_FAILED;
     }
 
@@ -1949,8 +1949,6 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
     if (blockOuter > CORE_LIST_NUM) {
         OP_LOGE(context_,
                 "The op [FlashAttentionScoreGrad] received bad params, the reason is: [blockEnds array bound.]");
-        // free tensor
-        delete[] parseInfo;
         return ge::GRAPH_FAILED;
     }
     blockEnds[blockOuter - 1] = static_cast<int64_t>(fBaseParams.b) * fBaseParams.n2 * fBaseParams.g *
@@ -2003,8 +2001,6 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
     std::copy(std::begin(blockStarts), std::end(blockStarts), std::begin(fBaseParams.blockStarts));
     std::copy(std::begin(blockEnds), std::end(blockEnds), std::begin(fBaseParams.blockEnds));
 
-    // free tensor
-    delete[] parseInfo;
     return ge::GRAPH_SUCCESS;
 }
 

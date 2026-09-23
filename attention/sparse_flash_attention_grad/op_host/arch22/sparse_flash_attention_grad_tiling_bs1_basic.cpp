@@ -654,6 +654,9 @@ ge::graphStatus SparseFlashAttentionGradBasicTiling::GetBaseShapeInfo()
         OP_CHECK_IF(tmpData.n2 == 0, OP_LOGE(context_, "key headNum is 0"), return ge::GRAPH_FAILED);
         tmpData.g = queryShape.GetDim(DIM_2) / tmpData.n2;
         tmpData.layout = static_cast<uint32_t>(InputLayout::BSND);
+        // BSND 下 kernel 用 S1 做 t1Idx / curS1 分核，S1 须严格为正
+        OP_CHECK_IF(tmpData.s1 <= 0, OP_LOGE(context_, "S1 must be > 0, but got S1=%ld.", tmpData.s1),
+                    return ge::GRAPH_FAILED);
     }
 
     if (tmpData.g <= 0) {
