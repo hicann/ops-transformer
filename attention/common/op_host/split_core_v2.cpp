@@ -234,15 +234,15 @@ void CalcMCache(uint32_t mIdx, const SplitContext &splitContext, const BatchCach
     } else if (mIdx == (splitInfo.mBaseNum[batchCache.bIdx] - 1U) && splitInfo.mTailSize[batchCache.bIdx] != 0U) {
         mCache.mCost = batchCache.typeCost[TAIL_BLOCK][NORMAL_BLOCK] * curNormalS2Num +
                        batchCache.typeCost[TAIL_BLOCK][TAIL_BLOCK] * curTailS2Num;
+        mCache.mNormalBlockCost = batchCache.typeCost[TAIL_BLOCK][NORMAL_BLOCK];
         mCache.mLastBlockCost = curTailS2Num > 0U ? batchCache.typeCost[TAIL_BLOCK][TAIL_BLOCK] :
                                                     batchCache.typeCost[TAIL_BLOCK][NORMAL_BLOCK];
-        mCache.mNormalBlockCost = batchCache.typeCost[TAIL_BLOCK][NORMAL_BLOCK];
     } else {
         mCache.mCost = batchCache.typeCost[NORMAL_BLOCK][NORMAL_BLOCK] * curNormalS2Num +
                        batchCache.typeCost[NORMAL_BLOCK][TAIL_BLOCK] * curTailS2Num;
+        mCache.mNormalBlockCost = batchCache.typeCost[NORMAL_BLOCK][NORMAL_BLOCK];
         mCache.mLastBlockCost = curTailS2Num > 0U ? batchCache.typeCost[NORMAL_BLOCK][TAIL_BLOCK] :
                                                     batchCache.typeCost[NORMAL_BLOCK][NORMAL_BLOCK];
-        mCache.mNormalBlockCost = batchCache.typeCost[NORMAL_BLOCK][NORMAL_BLOCK];
     }
 }
 

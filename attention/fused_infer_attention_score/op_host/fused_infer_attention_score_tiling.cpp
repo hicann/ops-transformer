@@ -1791,8 +1791,8 @@ bool IsGqaIfa(gert::TilingContext &context, const string inputLayoutStr, const i
         if (queryD == 512) { // 512: qD need 512
             return true;
         }
-    } else if ((inputLayoutStr == "BSH") || (inputLayoutStr == "BNSD") || (inputLayoutStr == "BSND") ||
-               (inputLayoutStr == "BNSD_NBSD") || (inputLayoutStr == "BSND_NBSD") || (inputLayoutStr == "BSH_NBSD")) {
+    } else if ((inputLayoutStr == "BNSD_NBSD") || (inputLayoutStr == "BSND_NBSD") || (inputLayoutStr == "BSH_NBSD") ||
+               (inputLayoutStr == "BSH") || (inputLayoutStr == "BNSD") || (inputLayoutStr == "BSND")) {
         if (queryS == 1) {
             return true;
         }

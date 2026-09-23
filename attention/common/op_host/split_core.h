@@ -72,11 +72,9 @@ struct BaseInfo {
     uint32_t gSize{0U};
     uint32_t s1Size{0U};
     uint32_t s2Size{0U};
-    bool isS1G{true};
     bool isAccumSeqS1{false};
     bool isAccumSeqS2{false};
-    std::vector<int64_t> actualSeqS1Size{};
-    std::vector<int64_t> actualSeqS2Size{};
+    bool isS1G{true};
     uint32_t actualLenQDims{0U};
     uint32_t actualLenKvDims{0U};
     bool attenMaskFlag{false};
@@ -84,6 +82,8 @@ struct BaseInfo {
     int64_t preToken{0};
     int64_t nextToken{0};
     int64_t actualSeqPrefixSize{0};
+    std::vector<int64_t> actualSeqS1Size{};
+    std::vector<int64_t> actualSeqS2Size{};
 };
 
 // 分核功能模块输入：切分属性，预留接口，可作为切分方案的参数入口
@@ -177,14 +177,14 @@ struct CostInfo {
 struct SplitContext {
     const BaseInfo &baseInfo{0U};
     const SplitParam &splitParam{};
-    SplitInfo splitInfo{0U};
     CostInfo costInfo{0U};
+    SplitInfo splitInfo{0U};
 
     explicit SplitContext(const BaseInfo &info, const SplitParam &param)
         : baseInfo(info),
           splitParam(param),
-          splitInfo(info.bSize),
-          costInfo(info.bSize)
+          costInfo(info.bSize),
+          splitInfo(info.bSize)
     {}
 };
 
@@ -193,8 +193,8 @@ struct BatchCache {
     uint32_t bIdx{0U};
     uint32_t s1Size{0U};
     uint32_t s2Size{0U};
-    int64_t preTokenLeftUp{0};
     int64_t nextTokenLeftUp{0};
+    int64_t preTokenLeftUp{0};
     BlockCost<int64_t> typeCost{};
 };
 

@@ -207,9 +207,9 @@ struct MCache {
     uint32_t s2Start{0U};
     uint32_t s2End{0U};
     int64_t mCost{0};
-    int64_t mLastBlockCost{0};
     uint32_t mBlock{0U};
     int64_t mNormalBlockCost{0};
+    int64_t mLastBlockCost{0};
 };
 
 // 分核功能模块内部使用：记录分配过程中，当前核的负载信息

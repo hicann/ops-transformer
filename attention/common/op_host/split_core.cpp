@@ -18,7 +18,6 @@
 #include <math.h>
 #include "log/log.h"
 
-
 namespace optiling {
 
 uint32_t GetS1SeqSize(uint32_t bIdx, const BaseInfo &baseInfo)
@@ -154,8 +153,8 @@ Range<uint32_t> CalcS2Range(uint32_t s1GIdx, const BaseInfo &baseInfo, const Spl
     // 2. trans index of token to index of block
     // no valid token
     if (s2FirstToken >= batchCache.s2Size || s2LastToken < 0 || s2LastToken < s2FirstToken) {
-        s2Start = 0U;
         s2End = 0U;
+        s2Start = 0U;
         return std::make_pair(s2Start, s2End);
     }
 
@@ -415,8 +414,8 @@ void AssignByBatch(const SplitContext &splitContext, AssignContext &assignContex
         return;
     }
 
-    const BaseInfo &baseInfo = splitContext.baseInfo;
     const CostInfo &costInfo = splitContext.costInfo;
+    const BaseInfo &baseInfo = splitContext.baseInfo;
 
     while (assignContext.bN2Cost == 0 ||
            IsWithinTolerance(assignContext.coreCache.costLimit,
@@ -772,8 +771,8 @@ void SplitCore(uint32_t coreNum, const BaseInfo &baseInfo, const SplitParam &par
         static_cast<uint32_t>(std::sqrt(static_cast<float>(splitContext.costInfo.totalBlockNum) + 0.25f) + 0.5f);
     minCore = std::min(minCore, maxCore);
 
-    result.maxCost = INT64_MAX;
     result.usedCoreNum = 1U;
+    result.maxCost = INT64_MAX;
 
     SplitResult tmpResult{coreNum, result.vecCubeRatio};
     for (uint32_t i = minCore; i <= maxCore; ++i) {

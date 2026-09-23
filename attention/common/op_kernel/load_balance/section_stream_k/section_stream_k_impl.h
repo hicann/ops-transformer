@@ -226,8 +226,7 @@ private:
     static inline bool IsNeedRecordFDInfo(const AssignContext &assignContext, const SectionStreamKImplResult &result);
     inline void RecordFDInfo(const ComputeContext &computeContext, const AssignContext &assignContext,
                              SectionStreamKImplResult &result);
-    inline bool CheckChooseWithFd(uint32_t sectionNum, const SectionStreamKImplResult &noFd,
-                                  const SectionStreamKImplResult &withFd);
+    inline bool CheckChooseWithFd(const SectionStreamKImplResult &noFd, const SectionStreamKImplResult &withFd);
 
     // assign
     inline void AssignByBatch(const ComputeContext &computeContext, AssignContext &assignContext);
@@ -547,7 +546,6 @@ inline std::pair<int64_t, int64_t> SectionStreamKImpl::CalcBatchTokenNum(uint32_
     int64_t s2Size = static_cast<int64_t>(baseInfo.GetKvSeqSize(bIdx));
     int64_t preToken = baseInfo.GetPreTokenLeftUp(s1Size, s2Size);
     int64_t nextToken = baseInfo.GetNextTokenLeftUp(s1Size, s2Size);
-
     if (preToken + nextToken <= INT64_ZERO || (preToken + s2Size <= INT64_ZERO) || (nextToken + s1Size <= INT64_ZERO)) {
         return std::make_pair(INT64_ZERO, INT64_ZERO);
     }
@@ -673,9 +671,7 @@ inline SectionStreamKImpl::SectionStreamKImplResult SectionStreamKImpl::Schedule
         }
     }
     ScheduleFd(deviceInfo.aivCoreMaxNum, bestResultWithFd);
-    return (CheckChooseWithFd(computeContext.gridInfo.sectionNum, bestResultNoFd, bestResultWithFd)) ?
-               bestResultWithFd :
-               bestResultNoFd;
+    return (CheckChooseWithFd(bestResultNoFd, bestResultWithFd)) ? bestResultWithFd : bestResultNoFd;
 }
 
 inline void SectionStreamKImpl::ScheduleFa(const FaConfig &faConfig, const ComputeContext &computeContext,
@@ -851,7 +847,7 @@ inline void SectionStreamKImpl::RecordFDInfo(const ComputeContext &computeContex
     result.fdTaskNum++;
 }
 
-inline bool SectionStreamKImpl::CheckChooseWithFd(uint32_t sectionNum, const SectionStreamKImplResult &noFd,
+inline bool SectionStreamKImpl::CheckChooseWithFd(const SectionStreamKImplResult &noFd,
                                                   const SectionStreamKImplResult &withFd)
 {
     if (!m_param.fdOn) {

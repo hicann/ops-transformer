@@ -27,6 +27,7 @@ namespace aicpu {
 template <typename T>
 static auto AlignUp(T num1, T num2) -> T
 {
+    static_assert(std::is_integral_v<T>, "must be integer type");
     if (num2 == 0) {
         return 0;
     }
