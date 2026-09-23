@@ -342,6 +342,9 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     this->InitBuffer();
     LocalTensor<T> apiTmpBuffer = this->commonTBuf.template Get<T>();
     DropOutBitModeInit(apiTmpBuffer);
+    event_t eventIdVToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+    AscendC::SetFlag<HardEvent::V_MTE2>(eventIdVToMte2);
+    AscendC::WaitFlag<HardEvent::V_MTE2>(eventIdVToMte2);
     if (this->blockIdx < this->tilingData->multiCoreParams.coreNum) {
         LocalTensor<half> pseHelpBuffer = this->stage1PingBuf.template Get<half>();
         PseInnerAlibiCreate<hasPse>(this->pseAlibiGm, pseHelpBuffer, this->pseInfo);
@@ -1622,6 +1625,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
     uint32_t bmm1ResOriginShape[] = {static_cast<uint32_t>(vecS1TailSize),
                                      static_cast<uint32_t>(extraInfo.s2RealSizeAlign64)};
 
+    AscendC::PipeBarrier<PIPE_V>();
     if constexpr (hasAtten == false) {
         uint64_t mask[2] = {extraInfo.duplicateMask, 0};
         Duplicate<T>(srcTensor[extraInfo.s2RealSizeFloorAlign8], this->negativeFloatScalar, mask, vecS1TailSize, 1,
