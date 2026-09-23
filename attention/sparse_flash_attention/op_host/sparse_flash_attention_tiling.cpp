@@ -2243,7 +2243,7 @@ void SFAInfoParser::GenerateInfo(SFATilingInfo &sfaInfo)
         if ((keyStride0_ != 0) && (n2Size_ != 0) && (qkHeadDim_ != 0)) {
             sfaInfo.keyStride0 = keyStride0_ / (n2Size_ * qkHeadDim_);
         } else if (kvLayout_ == SFALayout::PA_BSND) {
-            sfaInfo.keyStride0 = blockSize_;
+            sfaInfo.keyStride0 = static_cast<uint32_t>(blockSize_);
         } else {
             sfaInfo.keyStride0 = 0; // 非PA无需使用stride
         }

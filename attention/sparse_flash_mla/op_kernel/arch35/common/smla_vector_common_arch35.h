@@ -33,6 +33,7 @@ __aicore__ inline void CopyPhyAddrToGm(LocalTensor<uint32_t> kvPhyAddrUb, int64_
     params.blockLen = ((validS2 + alignNum - 1) / alignNum * alignNum) * sizeof(int64_t) / numPerBlock;
     params.srcGap = 0U;
     params.dstGap = 0U;
+    // 2：每个位置对应key和value两个地址
     DataCopy(phyAddrGm[(bS1Idx + s1Idx) * alignedSparseBlockCount * 2], kvPhyAddrUb, params);
 }
 

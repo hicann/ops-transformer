@@ -743,7 +743,7 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::ProcessSparseKv(
                 break;
             }
             dealRow += CopyInKvSparse(kvInUb, dealRow, tokenData, runInfo, constInfo);
-            if (tokenData[7] == -1) {
+            if (tokenData[7] == -1) { // 7：同上
                 meetEnd = true;
                 break;
             }

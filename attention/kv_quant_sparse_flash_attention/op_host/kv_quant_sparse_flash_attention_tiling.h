@@ -482,8 +482,8 @@ private:
     int64_t gSize_ = 0;
     int64_t s1Size_ = 0;
     int64_t s2Size_ = 0;
-    uint32_t qHeadDim_ = 0;
-    uint32_t kHeadDim_ = 0;
+    int64_t qHeadDim_ = 0;
+    int64_t kHeadDim_ = 0;
     int64_t vHeadDim_ = 0;
     int64_t qTSize_ = 0;  // 仅TND时生效
     int64_t kvTSize_ = 0; // 仅TND时生效
@@ -591,8 +591,8 @@ public:
     int64_t gSize_ = 0;
     int64_t s1Size_ = 0;
     int64_t s2Size_ = 0;
-    uint32_t qHeadDim_ = 0;
-    uint32_t kHeadDim_ = 0;
+    int64_t qHeadDim_ = 0;
+    int64_t kHeadDim_ = 0;
     int64_t vHeadDim_ = 0;
     int32_t ropeHeadDim_ = 0;
     int64_t dSizeKV_ = 0;

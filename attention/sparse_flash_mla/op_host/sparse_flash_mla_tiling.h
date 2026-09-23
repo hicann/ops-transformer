@@ -15,7 +15,6 @@
 #ifndef SPARSE_FLASH_MLA_TILING_H
 #define SPARSE_FLASH_MLA_TILING_H
 
-#include "tiling/tiling_api.h"
 #include "common/smla_host_common_defs.h"
 #include "platform/soc_spec.h"
 
@@ -320,7 +319,7 @@ private:
     int64_t s1Size_ = 0;
     int64_t s2Size_ = 0;
     int64_t cmpS2Size_ = 0; // A5
-    uint32_t qHeadDim_ = 0;
+    int64_t qHeadDim_ = 0;
     uint32_t oriKvHeadDim_ = 0;
     uint32_t cmpKvHeadDim_ = 0;
 
@@ -425,7 +424,7 @@ public:
     int64_t s2Size_ = 0;
     int64_t cmpS2Size_ = 0; // A5
     int64_t qTSize_ = 0;
-    uint32_t qHeadDim_ = 0;
+    int64_t qHeadDim_ = 0;
     uint32_t oriKvHeadDim_ = 0;
     uint32_t cmpKvHeadDim_ = 0;
     int64_t sparseBlockSize_ = 0;
