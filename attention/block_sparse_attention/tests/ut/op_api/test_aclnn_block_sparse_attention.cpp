@@ -66,25 +66,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, normal)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              actualSeqLengths,  // actualSeqLengths
-                              actualSeqLengthsKv,// actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,              // query
+                              key,                // key
+                              value,              // value
+                              blockSparseMask,    // blockSparseMask
+                              nullptr,            // attenMask
+                              blockShape,         // blockShape
+                              actualSeqLengths,   // actualSeqLengths
+                              actualSeqLengthsKv, // actualSeqLengthsKv
+                              nullptr,            // blockTable
+                              qInputLayout,       // qInputLayout
+                              kvInputLayout,      // kvInputLayout
+                              numKvHeads,         // numKeyValueHeads
+                              0,                  // maskType
+                              scaleValue,         // scaleValue
+                              0,                  // innerPrecise
+                              0,                  // blockSize
+                              2147483647,         // preTokens
+                              2147483647,         // nextTokens
+                              0                   // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -109,25 +109,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, unsupported_q_dtype)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -152,25 +152,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, unsupported_kv_dtype)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -195,25 +195,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, block_shape_wrong_dim)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -238,25 +238,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, block_shape_data_contains_negative)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -279,25 +279,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, inputLayout_is_null)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              nullptr,           // qInputLayout
-                              nullptr,           // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              nullptr,         // qInputLayout
+                              nullptr,         // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -322,25 +322,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, unsupported_qInputLayout)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -365,25 +365,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, unsupported_kvInputLayout)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -408,25 +408,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, qInputLayout_kvInputLayout_not_equal)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -451,25 +451,25 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, blockSparseMask_wrong_dim)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              0,                 // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
@@ -495,29 +495,70 @@ TEST_F(aclnn_block_sparse_attention_v1_ut, unsupported_innerPrecise)
     auto attentionOut = TensorDesc({batch, numHeads, qSeqlen, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnBlockSparseAttention,
-                        INPUT(query,             // query
-                              key,               // key
-                              value,             // value
-                              blockSparseMask,   // blockSparseMask
-                              nullptr,           // attenMask
-                              blockShape,        // blockShape
-                              nullptr,           // actualSeqLengths
-                              nullptr,           // actualSeqLengthsKv
-                              nullptr,           // blockTable
-                              qInputLayout,      // qInputLayout
-                              kvInputLayout,     // kvInputLayout
-                              numKvHeads,        // numKeyValueHeads
-                              0,                 // maskType
-                              scaleValue,        // scaleValue
-                              innerPrecise,      // innerPrecise
-                              0,                 // blockSize
-                              2147483647,        // preTokens
-                              2147483647,        // nextTokens
-                              0                  // softmaxLseFlag
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              innerPrecise,    // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
                               ),
                         OUTPUT(attentionOut, nullptr));
 
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
+}
+// 用例 12: BSND 布局（q/kv 一致），补齐 BSND 校验覆盖空白
+TEST_F(aclnn_block_sparse_attention_v1_ut, bsnd_layout_consistent)
+{
+    // BSND 语义为 [batch, seq, head, dim]，按 BSND 顺序构造 shape
+    auto query = TensorDesc({batch, qSeqlen, numHeads, headDim}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto key = TensorDesc({batch, kvSeqlen, numKvHeads, headDim}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto value = TensorDesc({batch, kvSeqlen, numKvHeads, headDim}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto blockSparseMask =
+        TensorDesc({batch, numHeads, qBlockNum, kvBlockNum}, ACL_INT8, ACL_FORMAT_ND).Value(vector<int8_t>{1});
+    auto blockShape = IntArrayDesc(vector<int64_t>{blockShapeX, blockShapeY});
+    char qInputLayout[] = "BSND";
+    char kvInputLayout[] = "BSND";
+    auto attentionOut = TensorDesc({batch, qSeqlen, numHeads, headDim}, ACL_FLOAT16, ACL_FORMAT_ND);
+
+    auto ut = OP_API_UT(aclnnBlockSparseAttention,
+                        INPUT(query,           // query
+                              key,             // key
+                              value,           // value
+                              blockSparseMask, // blockSparseMask
+                              nullptr,         // attenMask
+                              blockShape,      // blockShape
+                              nullptr,         // actualSeqLengths
+                              nullptr,         // actualSeqLengthsKv
+                              nullptr,         // blockTable
+                              qInputLayout,    // qInputLayout
+                              kvInputLayout,   // kvInputLayout
+                              numKvHeads,      // numKeyValueHeads
+                              0,               // maskType
+                              scaleValue,      // scaleValue
+                              0,               // innerPrecise
+                              0,               // blockSize
+                              2147483647,      // preTokens
+                              2147483647,      // nextTokens
+                              0                // softmaxLseFlag
+                              ),
+                        OUTPUT(attentionOut, nullptr));
+
+    uint64_t workspaceSize = 0;
+    aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
+    EXPECT_EQ(aclRet, ACLNN_SUCCESS);
 }
