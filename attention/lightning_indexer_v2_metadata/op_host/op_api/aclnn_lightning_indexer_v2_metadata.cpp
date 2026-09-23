@@ -9,11 +9,12 @@
  */
 
 /*!
-  *\file aclnn_lightning_indexer_v2_metadata.cpp
-  *\brief
+ *\file aclnn_lightning_indexer_v2_metadata.cpp
+ *\brief
  */
 
 #include "aclnn_lightning_indexer_v2_metadata.h"
+#include "acl/acl_rt.h"
 #include "aclnn/aclnn_base.h"
 #include "aclnn_kernels/common/op_error_check.h"
 #include "aclnn_kernels/contiguous.h"
@@ -59,8 +60,14 @@ aclnnStatus aclnnLightningIndexerV2MetadataGetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
-    uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
-    uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
+    uint32_t aicCoreNum = 0;
+    uint32_t aivCoreNum = 0;
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum) != ACL_SUCCESS) {
+        aicCoreNum = npuInfo.GetCubeCoreNum();
+    }
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
+        aivCoreNum = npuInfo.GetVectorCoreNum();
+    }
     const std::string socVersion = npuInfo.GetSocLongVersion();
 
     auto ret = ParamsCheckLiV2(cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
@@ -123,7 +130,7 @@ aclnnStatus aclnnLightningIndexerV2MetadataGetWorkspaceSize(
 }
 
 aclnnStatus aclnnLightningIndexerV2Metadata(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-    aclrtStream stream)
+                                            aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnLightningIndexerV2Metadata);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

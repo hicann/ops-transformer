@@ -67,8 +67,14 @@ aclnnStatus aclnnSparseFlashMlaMetadataGetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
-    uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
-    uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
+    uint32_t aicCoreNum = 0;
+    uint32_t aivCoreNum = 0;
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum) != ACL_SUCCESS) {
+        aicCoreNum = npuInfo.GetCubeCoreNum();
+    }
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
+        aivCoreNum = npuInfo.GetVectorCoreNum();
+    }
     std::string socVersionStr = npuInfo.GetSocLongVersion();
     const char *socVersion = socVersionStr.c_str();
 
@@ -174,8 +180,9 @@ aclnnStatus aclnnSparseFlashMlaMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashMlaMetadata(
-    void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+__attribute__((visibility("default"))) aclnnStatus aclnnSparseFlashMlaMetadata(void *workspace, uint64_t workspaceSize,
+                                                                               aclOpExecutor *executor,
+                                                                               aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnSparseFlashMlaMetadata);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
