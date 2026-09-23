@@ -17,6 +17,10 @@
 
 namespace EngramFetchGradUnique {
 
+constexpr uint32_t ENTRY_BATCH_CAP_HALF = 2U;
+constexpr uint32_t RUN_START_UB_OFFSET = 2U;
+constexpr uint32_t RUN_LEN_UB_OFFSET = 2U;
+constexpr uint32_t ACCUM_LIST_UB_OFFSET = 4U;
 constexpr uint32_t COMPACT_INDEX_UB_OFFSET = 3U;
 constexpr uint32_t DIRECT_FLAG_UB_OFFSET = 4U;
 
@@ -113,15 +117,16 @@ public:
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> RunStartUb()
     {
-        return entryBuf_->Get<int32_t>()[2 * Mc2Kernel::ENTRY_BATCH_CAP];
+        return entryBuf_->Get<int32_t>()[RUN_START_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP];
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> RunLenUb()
     {
-        return entryBuf_->Get<int32_t>()[2 * Mc2Kernel::ENTRY_BATCH_CAP + Mc2Kernel::ENTRY_BATCH_CAP / 2U];
+        return entryBuf_->Get<int32_t>()[RUN_LEN_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP +
+                                         Mc2Kernel::ENTRY_BATCH_CAP / ENTRY_BATCH_CAP_HALF];
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> AccumListUb()
     {
-        return entryBuf_->Get<int32_t>()[4 * Mc2Kernel::ENTRY_BATCH_CAP];
+        return entryBuf_->Get<int32_t>()[ACCUM_LIST_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP];
     }
 
 private:

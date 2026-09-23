@@ -572,11 +572,11 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
         constexpr uint64_t kMinTileElems = 512U;
         constexpr uint64_t kBytesPerElem = 21U;
         uint64_t budget = tilingData.ubSize;
-        OP_TILING_CHECK(
-            budget < kSortLibFixedBytes + kMinTileElems * kBytesPerElem,
-            OP_LOGE(nodeName, "SortLib UB budget too small: ubSize=%llu, need>=%llu", (unsigned long long)budget,
-                    (unsigned long long)(kSortLibFixedBytes + kMinTileElems * kBytesPerElem)),
-            return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(budget < kSortLibFixedBytes + kMinTileElems * kBytesPerElem,
+                        OP_LOGE(nodeName, "SortLib UB budget too small: ubSize=%llu, need>=%llu",
+                                static_cast<unsigned long long>(budget),
+                                static_cast<unsigned long long>(kSortLibFixedBytes + kMinTileElems * kBytesPerElem)),
+                        return ge::GRAPH_FAILED);
         int64_t numTokensI64 = tilingData.numTokens;
         int64_t aivNumI64 = static_cast<int64_t>(tilingData.aivNum);
         uint32_t numTile = static_cast<uint32_t>((numTokensI64 + aivNumI64 - 1) / aivNumI64);
@@ -592,7 +592,7 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
             static_cast<uint32_t>((numTokensI64 + static_cast<int64_t>(numTile) - 1) / static_cast<int64_t>(numTile));
         tilingData.sortTmpUbSize = 512U + 7U * ((numTile + 31U) / 32U * 32U) + 256U;
         OP_LOGD(nodeName, "SortLib params: numTile=%u tileCount=%u tmpUb=%u budget=%llu", tilingData.sortNumTileData,
-                tilingData.sortTileCount, tilingData.sortTmpUbSize, (unsigned long long)budget);
+                tilingData.sortTileCount, tilingData.sortTmpUbSize, static_cast<unsigned long long>(budget));
     }
 
     OP_LOGD(nodeName,

@@ -53,6 +53,7 @@ constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024 * 1024;
 constexpr int64_t SIMT_DCACHE_SIZE = 64 * 1024LL;
 
 constexpr int64_t BUFFER_ALIGNMENT = 2 * 1024 * 1024;
+constexpr uint32_t DOUBLE_BUFFER_NUM = 2U;
 
 static const std::vector<ge::DataType> GRAD_DTYPE_LIST = {ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT};
 
@@ -612,7 +613,7 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
     uint32_t availableForPool = static_cast<uint32_t>(tilingData.ubSize) - static_cast<uint32_t>(permanentUb);
     uint32_t uniqueEntryBytes = Mc2Kernel::FLUSH_CAST_HEAD_BYTES;
     if (tilingData.outputDtype != static_cast<int32_t>(ge::DT_FLOAT)) {
-        uniqueEntryBytes += 2U * static_cast<uint32_t>(AlignTo(hiddenDim * 2, Mc2Kernel::UB_ALIGN));
+        uniqueEntryBytes += DOUBLE_BUFFER_NUM * static_cast<uint32_t>(AlignTo(hiddenDim * 2, Mc2Kernel::UB_ALIGN));
     }
     // cast 缓冲行 stride 同样 32B 对齐（fp32 行）
     uint32_t fp32RowStride = static_cast<uint32_t>(
@@ -666,8 +667,8 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
     constexpr uint64_t kBytesPerElem = 21U;
     if (budget < kSortLibFixedBytes + kMinTileElems * kBytesPerElem) {
         OP_LOGE(nodeName, "SortLib UB budget too small: ubSize=%llu, hookReserve=%llu, need>=%llu",
-                (unsigned long long)tilingData.ubSize, (unsigned long long)hookReserve,
-                (unsigned long long)(kSortLibFixedBytes + kMinTileElems * kBytesPerElem));
+                static_cast<unsigned long long>(tilingData.ubSize), static_cast<unsigned long long>(hookReserve),
+                static_cast<unsigned long long>(kSortLibFixedBytes + kMinTileElems * kBytesPerElem));
         return ge::GRAPH_FAILED;
     }
     uint32_t numTile = static_cast<uint32_t>((totalRecv + tilingData.aivNum - 1) / tilingData.aivNum);
