@@ -52,15 +52,16 @@ public:
     using MM2_OUT_T = typename AscendC::Conditional<QUANT, int32_t, T>::type;
 #endif
 
-    __aicore__ inline IfaMatmulFullQuant() {};
+    __aicore__ inline IfaMatmulFullQuant(){};
     __aicore__ inline void InitParams(uint64_t qHeadNum, uint64_t kvHeadNum, uint64_t headDim, uint64_t headDimRope,
                                       uint64_t qSeqSize, uint32_t mmResUbSize, uint32_t bmm2ResUbSize);
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<KV_T> queryGm, GlobalTensor<ROPE_T> qRopeGm,
-        GlobalTensor<KV_T> keyGm, GlobalTensor<ROPE_T> kRopeGm, GlobalTensor<MM1_OUT_T> mm1ResGm);
+                                               GlobalTensor<KV_T> keyGm, GlobalTensor<ROPE_T> kRopeGm,
+                                               GlobalTensor<MM1_OUT_T> mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm, GlobalTensor<KV_T> valueGm,
-        GlobalTensor<MM2_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm);
+                                               GlobalTensor<MM2_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm);
     __aicore__ inline void InitPageAttentionInfo(GlobalTensor<int32_t> blockTableGm, uint32_t blockSize,
-        uint32_t maxBlockNumPerBatch);
+                                                 uint32_t maxBlockNumPerBatch);
     __aicore__ inline void InitBuffers(TPipe *pipe);
     __aicore__ inline void UpdateKey(GlobalTensor<KV_T> keyGm);
     __aicore__ inline void UpdateValue(GlobalTensor<KV_T> valueGm);
@@ -71,12 +72,14 @@ public:
     __aicore__ inline void ComputeMm2(const ExtraInfoMla &info);
 
 protected:
-    template <typename T> __aicore__ inline T Align(T num, T rnd)
+    template <typename T>
+    __aicore__ inline T Align(T num, T rnd)
     {
         return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
     }
 
-    template <typename T> __aicore__ inline size_t BlockAlign(size_t s)
+    template <typename T>
+    __aicore__ inline size_t BlockAlign(size_t s)
     {
         if constexpr (IsSameType<T, int4b_t>::value) {
             return (s + 63) / 64 * 64;
@@ -88,26 +91,38 @@ protected:
     template <typename DT>
     __aicore__ inline void CopyGmToL1(LocalTensor<DT> &l1Tensor, GlobalTensor<DT> &gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride, uint32_t dstNAlign = 16);
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T>& aL1Tensor, const ExtraInfoMla &info, uint32_t mSize, uint64_t mOffset);
-    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<ROPE_T>& aL1Tensor, const ExtraInfoMla &info, uint32_t mSize, uint64_t mOffset);
-    __aicore__ inline void CopyInMm1BToL1(LocalTensor<KV_T>& bL1Tensor, const ExtraInfoMla &info, uint32_t subNid, uint32_t subNSize, uint32_t nSplitSize);
-    __aicore__ inline void CopyInMm1BRopeToL1(LocalTensor<ROPE_T>& bL1Tensor, const ExtraInfoMla &info, uint32_t subNid, uint32_t subNSize, uint32_t nSplitSize);
-    __aicore__ inline void CopyInMm1BToL1ForPA(LocalTensor<KV_T>& bL1Tensor, const uint64_t keyGmBaseOffset,
-        uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt, uint32_t nActCopyRowCount);
-    __aicore__ inline void CopyInMm1BRopeToL1ForPA(LocalTensor<ROPE_T>& bL1Tensor, const uint64_t keyGmBaseOffset,
-        uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt, uint32_t nActCopyRowCount);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T>& aL1Tensor, const ExtraInfoMla &info, uint32_t mSize, uint64_t mOffset);
-    __aicore__ inline void CopyInMm2BToL1(LocalTensor<KV_T>& aL1Tensor, const ExtraInfoMla &info, uint32_t subKid,
-        uint32_t kSplitSize, uint32_t subNid, uint32_t nSplitSize, uint32_t subKSize, uint32_t subNSize);
-    __aicore__ inline void CopyInMm2BToL1ForPA(LocalTensor<KV_T>& bL1Tensor, const uint64_t valueGmBaseOffset,
-        uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt, uint32_t nActCopyRowCount,
-        uint32_t copyStartColumnCount, uint32_t copyColumnCount);
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T> &aL1Tensor, const ExtraInfoMla &info, uint32_t mSize,
+                                          uint64_t mOffset);
+    __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<ROPE_T> &aL1Tensor, const ExtraInfoMla &info, uint32_t mSize,
+                                              uint64_t mOffset);
+    __aicore__ inline void CopyInMm1BToL1(LocalTensor<KV_T> &bL1Tensor, const ExtraInfoMla &info, uint32_t subNid,
+                                          uint32_t subNSize, uint32_t nSplitSize);
+    __aicore__ inline void CopyInMm1BRopeToL1(LocalTensor<ROPE_T> &bL1Tensor, const ExtraInfoMla &info, uint32_t subNid,
+                                              uint32_t subNSize, uint32_t nSplitSize);
+    __aicore__ inline void CopyInMm1BToL1ForPA(LocalTensor<KV_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
+                                               uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
+                                               uint32_t nActCopyRowCount);
+    __aicore__ inline void CopyInMm1BRopeToL1ForPA(LocalTensor<ROPE_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
+                                                   uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
+                                                   uint32_t nActCopyRowCount);
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const ExtraInfoMla &info, uint32_t mSize,
+                                          uint64_t mOffset);
+    __aicore__ inline void CopyInMm2BToL1(LocalTensor<KV_T> &aL1Tensor, const ExtraInfoMla &info, uint32_t subKid,
+                                          uint32_t kSplitSize, uint32_t subNid, uint32_t nSplitSize, uint32_t subKSize,
+                                          uint32_t subNSize);
+    __aicore__ inline void CopyInMm2BToL1ForPA(LocalTensor<KV_T> &bL1Tensor, const uint64_t valueGmBaseOffset,
+                                               uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
+                                               uint32_t nActCopyRowCount, uint32_t copyStartColumnCount,
+                                               uint32_t copyColumnCount);
 
     template <typename DT>
-    __aicore__ inline void LoadDataL0A(LocalTensor<DT>& aL0Tensor, const LocalTensor<DT>& aL1Tensor, uint32_t kidx, uint32_t kSplitSize, uint32_t mSize, uint32_t subkSize);
+    __aicore__ inline void LoadDataL0A(LocalTensor<DT> &aL0Tensor, const LocalTensor<DT> &aL1Tensor, uint32_t kidx,
+                                       uint32_t kSplitSize, uint32_t mSize, uint32_t subkSize);
     template <typename DT>
-    __aicore__ inline void LoadDataMm1B(LocalTensor<DT>& bL0Tensor, LocalTensor<DT>& bL1Tensor, uint32_t idx, uint32_t kSplitSize, uint32_t kSize, uint32_t nSize);
-    __aicore__ inline void LoadDataMm2B(LocalTensor<KV_T>& bL0Tensor, LocalTensor<KV_T>& bL1Tensor, uint32_t idx, uint32_t nSize, uint32_t subkSize, uint32_t kSplitSize, uint32_t kSize);
+    __aicore__ inline void LoadDataMm1B(LocalTensor<DT> &bL0Tensor, LocalTensor<DT> &bL1Tensor, uint32_t idx,
+                                        uint32_t kSplitSize, uint32_t kSize, uint32_t nSize);
+    __aicore__ inline void LoadDataMm2B(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor, uint32_t idx,
+                                        uint32_t nSize, uint32_t subkSize, uint32_t kSplitSize, uint32_t kSize);
 
 protected:
     // mm1
@@ -143,8 +158,8 @@ protected:
 
 private:
     // L1
-    static constexpr uint32_t L1_PQ_SIZE = (128 * 512 + 128 * 64 * 2);   // QP共用Buffer：128*512 + 128*64*2 = 80K   
-    static constexpr uint32_t L1_KV_SIZE = (128 * 512 + 128 * 64 * 2);  // KV开DB：128*512 + 128*64*2 = 80K * 3 = 240K
+    static constexpr uint32_t L1_PQ_SIZE = (128 * 512 + 128 * 64 * 2); // QP共用Buffer：128*512 + 128*64*2 = 80K
+    static constexpr uint32_t L1_KV_SIZE = (128 * 512 + 128 * 64 * 2); // KV开DB：128*512 + 128*64*2 = 80K * 3 = 240K
 
     static constexpr uint32_t BT_PP_SIZE = (2 * 1024);
 
@@ -207,14 +222,14 @@ private:
     uint32_t bL0BufIter = 0;
     uint32_t cL0BufIter = 0;
     uint32_t biasL1BufIter = 0; // double buffer
-    uint32_t btBufIter = 0; // double buffer
-    bool isFirstIter = true;  
+    uint32_t btBufIter = 0;     // double buffer
+    bool isFirstIter = true;
 };
 
 template <typename IFAT>
 __aicore__ inline void IfaMatmulFullQuant<IFAT>::InitParams(uint64_t qHeadNum, uint64_t kvHeadNum, uint64_t headDim,
-                                                       uint64_t headDimRope, uint64_t qSeqSize, uint32_t mmResUbSize,
-                                                       uint32_t bmm2ResUbSize)
+                                                            uint64_t headDimRope, uint64_t qSeqSize,
+                                                            uint32_t mmResUbSize, uint32_t bmm2ResUbSize)
 {
     this->qHeadNum = qHeadNum;
     this->qSeqSize = qSeqSize;
@@ -225,9 +240,11 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::InitParams(uint64_t qHeadNum, u
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::InitMm1GlobalTensor(GlobalTensor<KV_T> queryGm, GlobalTensor<ROPE_T> qRopeGm,
-                                                                GlobalTensor<KV_T> keyGm, GlobalTensor<ROPE_T> kRopeGm,
-                                                                GlobalTensor<MM1_OUT_T> mm1ResGm)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::InitMm1GlobalTensor(GlobalTensor<KV_T> queryGm,
+                                                                     GlobalTensor<ROPE_T> qRopeGm,
+                                                                     GlobalTensor<KV_T> keyGm,
+                                                                     GlobalTensor<ROPE_T> kRopeGm,
+                                                                     GlobalTensor<MM1_OUT_T> mm1ResGm)
 {
     // mm1
     this->queryGm = queryGm;
@@ -238,9 +255,10 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::InitMm1GlobalTensor(GlobalTenso
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::InitMm2GlobalTensor(
-    GlobalTensor<KV_T> vec1ResGm, GlobalTensor<KV_T> valueGm,
-    GlobalTensor<MM2_OUT_T> mm2ResGm, GlobalTensor<OUT_T> attentionOutGm)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm,
+                                                                     GlobalTensor<KV_T> valueGm,
+                                                                     GlobalTensor<MM2_OUT_T> mm2ResGm,
+                                                                     GlobalTensor<OUT_T> attentionOutGm)
 {
     // mm2
     this->vec1ResGm = vec1ResGm;
@@ -251,7 +269,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::InitMm2GlobalTensor(
 
 template <typename IFAT>
 __aicore__ inline void IfaMatmulFullQuant<IFAT>::InitPageAttentionInfo(GlobalTensor<int32_t> blockTableGm,
-                                                                  uint32_t blockSize, uint32_t maxBlockNumPerBatch)
+                                                                       uint32_t blockSize, uint32_t maxBlockNumPerBatch)
 {
     this->blockTableGm = blockTableGm;
     this->kvCacheBlockSize = blockSize;
@@ -333,8 +351,9 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::FreeEventID()
 
 template <typename IFAT>
 template <typename DT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyGmToL1(LocalTensor<DT>& l1Tensor, GlobalTensor<DT> &gmSrcTensor,
-                                                     uint32_t srcN, uint32_t srcD, uint32_t srcDstride, uint32_t dstNAlign)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyGmToL1(LocalTensor<DT> &l1Tensor, GlobalTensor<DT> &gmSrcTensor,
+                                                            uint32_t srcN, uint32_t srcD, uint32_t srcDstride,
+                                                            uint32_t dstNAlign)
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -354,7 +373,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyGmToL1(LocalTensor<DT>& l1T
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1AToL1(LocalTensor<KV_T> &l1Tensor, const ExtraInfoMla &info, uint32_t mSize, uint64_t mOffset)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1AToL1(LocalTensor<KV_T> &l1Tensor, const ExtraInfoMla &info,
+                                                                uint32_t mSize, uint64_t mOffset)
 {
     auto srcGm = queryGm[info.tensorAOffset + mOffset];
     CopyGmToL1(l1Tensor, srcGm, mSize, headDim, headDim);
@@ -362,15 +382,16 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1AToL1(LocalTensor<KV_T
 
 template <typename IFAT>
 __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1ARopeToL1(LocalTensor<ROPE_T> &l1Tensor,
-                                                                 const ExtraInfoMla &info, uint32_t mSize, uint64_t mOffset)
+                                                                    const ExtraInfoMla &info, uint32_t mSize,
+                                                                    uint64_t mOffset)
 {
     auto srcGm = qRopeGm[info.tensorARopeOffset + mOffset];
     CopyGmToL1(l1Tensor, srcGm, mSize, headDimRope, headDimRope);
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1(LocalTensor<KV_T>& bL1Tensor,
-                                                                                const ExtraInfoMla &info, uint32_t subNid, uint32_t subNSize, uint32_t nSplitSize)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1(LocalTensor<KV_T> &bL1Tensor, const ExtraInfoMla &info,
+                                                                uint32_t subNid, uint32_t subNSize, uint32_t nSplitSize)
 {
     uint64_t dStride = headDim;
     if constexpr (LAYOUT_T == LAYOUT::BSH || LAYOUT_T == LAYOUT::BSND) {
@@ -382,8 +403,9 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1(LocalTensor<KV_T
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1(LocalTensor<ROPE_T>& bL1Tensor,
-                                                                                    const ExtraInfoMla &info, uint32_t subNid, uint32_t subNSize, uint32_t nSplitSize)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1(LocalTensor<ROPE_T> &bL1Tensor,
+                                                                    const ExtraInfoMla &info, uint32_t subNid,
+                                                                    uint32_t subNSize, uint32_t nSplitSize)
 {
     uint64_t dStride = headDimRope;
     if constexpr (LAYOUT_T == LAYOUT::BSH || LAYOUT_T == LAYOUT::BSND) {
@@ -394,9 +416,11 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1(LocalTensor<
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1ForPA(
-    LocalTensor<KV_T>& bL1Tensor, const uint64_t keyGmBaseOffset, uint32_t copyTotalRowCntAlign,
-    uint32_t copyStartRowCnt, uint32_t nActCopyRowCount)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1ForPA(LocalTensor<KV_T> &bL1Tensor,
+                                                                     const uint64_t keyGmBaseOffset,
+                                                                     uint32_t copyTotalRowCntAlign,
+                                                                     uint32_t copyStartRowCnt,
+                                                                     uint32_t nActCopyRowCount)
 {
     if constexpr (KV_LAYOUT_T == LAYOUT::NZ) {
         uint32_t blockElementCnt = 32 / sizeof(KV_T);
@@ -440,9 +464,11 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BToL1ForPA(
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1ForPA(
-    LocalTensor<ROPE_T>& bL1Tensor, const uint64_t kRopeGmBaseOffset, uint32_t copyTotalRowCntAlign,
-    uint32_t copyStartRowCnt, uint32_t nActCopyRowCount)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1ForPA(LocalTensor<ROPE_T> &bL1Tensor,
+                                                                         const uint64_t kRopeGmBaseOffset,
+                                                                         uint32_t copyTotalRowCntAlign,
+                                                                         uint32_t copyStartRowCnt,
+                                                                         uint32_t nActCopyRowCount)
 {
     if constexpr (KV_LAYOUT_T == LAYOUT::NZ) {
         uint32_t blockElementCnt = 32 / sizeof(ROPE_T);
@@ -487,21 +513,22 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm1BRopeToL1ForPA(
 
 template <typename IFAT>
 template <typename DT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataL0A(LocalTensor<DT>& aL0Tensor,
-    const LocalTensor<DT>& aL1Tensor, uint32_t kIdx, uint32_t kSplitSize, uint32_t mSize, uint32_t subkSize)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataL0A(LocalTensor<DT> &aL0Tensor,
+                                                             const LocalTensor<DT> &aL1Tensor, uint32_t kIdx,
+                                                             uint32_t kSplitSize, uint32_t mSize, uint32_t subkSize)
 {
     LocalTensor<DT> srcTensor = aL1Tensor[mSize * kSplitSize * kIdx];
 
     LoadData3DParamsV2<DT> loadData3DParams;
     // SetFmatrixParams
     loadData3DParams.l1H = mSize / 16; // Hin=M1=8
-    loadData3DParams.l1W = 16; // Win=M0
+    loadData3DParams.l1W = 16;         // Win=M0
     loadData3DParams.padList[0] = 0;
     loadData3DParams.padList[1] = 0;
     loadData3DParams.padList[2] = 0;
     loadData3DParams.padList[3] = 255; // 尾部数据不影响滑窗的结果
     // SetLoadToA0Params
-    loadData3DParams.mExtension = mSize; // M
+    loadData3DParams.mExtension = mSize;    // M
     loadData3DParams.kExtension = subkSize; // K
     loadData3DParams.mStartPt = 0;
     loadData3DParams.kStartPt = 0;
@@ -521,8 +548,9 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataL0A(LocalTensor<DT>& aL
 
 template <typename IFAT>
 template <typename DT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm1B(LocalTensor<DT> &l0Tensor,
-    LocalTensor<DT> &l1Tensor, uint32_t idx, uint32_t kSplitSize, uint32_t kSize, uint32_t nSize)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm1B(LocalTensor<DT> &l0Tensor, LocalTensor<DT> &l1Tensor,
+                                                              uint32_t idx, uint32_t kSplitSize, uint32_t kSize,
+                                                              uint32_t nSize)
 {
     // N 方向全载
     LocalTensor<DT> srcTensor = l1Tensor[nSize * kSplitSize * idx];
@@ -542,18 +570,19 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm1B(LocalTensor<DT> &l
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor,
-                                                                                const ExtraInfoMla &info, uint32_t mSize, uint64_t mOffset)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const ExtraInfoMla &info,
+                                                                uint32_t mSize, uint64_t mOffset)
 {
     // 全量拷贝
     auto srcGm = vec1ResGm[(info.loop % PRE_LOAD_NUM_MLA) * mmResUbSize + mOffset];
-    CopyGmToL1(aL1Tensor, srcGm, mSize, info.actualSingleProcessSInnerSize,
-               info.actualSingleProcessSInnerSizeAlign);
+    CopyGmToL1(aL1Tensor, srcGm, mSize, info.actualSingleProcessSInnerSize, info.actualSingleProcessSInnerSizeAlign);
 }
 
 template <typename IFAT>
 __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1(LocalTensor<KV_T> &bL1Tensor, const ExtraInfoMla &info,
-    uint32_t subKid, uint32_t kSplitSize, uint32_t subNid, uint32_t nSplitSize, uint32_t subKSize, uint32_t subNSize)
+                                                                uint32_t subKid, uint32_t kSplitSize, uint32_t subNid,
+                                                                uint32_t nSplitSize, uint32_t subKSize,
+                                                                uint32_t subNSize)
 {
     uint64_t dStride = headDim;
     if constexpr (LAYOUT_T == LAYOUT::BSH || LAYOUT_T == LAYOUT::BSND) {
@@ -565,9 +594,9 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1(LocalTensor<KV_T
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1ForPA(LocalTensor<KV_T>& bL1Tensor,
-    const uint64_t valueGmBaseOffset, uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt, uint32_t nActCopyRowCount,
-    uint32_t copyStartColumnCount, uint32_t copyColumnCount)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1ForPA(
+    LocalTensor<KV_T> &bL1Tensor, const uint64_t valueGmBaseOffset, uint32_t copyTotalRowCntAlign,
+    uint32_t copyStartRowCnt, uint32_t nActCopyRowCount, uint32_t copyStartColumnCount, uint32_t copyColumnCount)
 {
     if constexpr (KV_LAYOUT_T == LAYOUT::NZ) {
         // copyStartColumnCount和copyColumnCount都需要blockElementCnt对齐
@@ -581,7 +610,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1ForPA(LocalTensor
         intriParams.blockCount = copyColumnCount / blockElementCnt;
         intriParams.dstStride = copyTotalRowCntAlign - nActCopyRowCount;
         intriParams.srcStride = kvCacheBlockSize - nActCopyRowCount;
-        DataCopy(bL1Tensor[copyStartRowCnt * blockElementCnt], valueGm[valueGmBaseOffset + copyStartColumnCount * kvCacheBlockSize], intriParams);
+        DataCopy(bL1Tensor[copyStartRowCnt * blockElementCnt],
+                 valueGm[valueGmBaseOffset + copyStartColumnCount * kvCacheBlockSize], intriParams);
     } else {
         uint64_t step = headDim;
         if constexpr (LAYOUT_T == LAYOUT::BSH || LAYOUT_T == LAYOUT::BSND) {
@@ -607,14 +637,16 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::CopyInMm2BToL1ForPA(LocalTensor
         mm1Nd2NzParamsForB.dstNzNStride = 1;
         mm1Nd2NzParamsForB.srcNdMatrixStride = 0;
         mm1Nd2NzParamsForB.dstNzMatrixStride = 0;
-        DataCopy(bL1Tensor[copyStartRowCnt * blockElementCnt], valueGm[valueGmBaseOffset + copyStartColumnCount], mm1Nd2NzParamsForB);
+        DataCopy(bL1Tensor[copyStartRowCnt * blockElementCnt], valueGm[valueGmBaseOffset + copyStartColumnCount],
+                 mm1Nd2NzParamsForB);
     }
 }
 
 template <typename IFAT>
-__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm2B(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor,
-                                                           uint32_t idx, uint32_t nSize, uint32_t subkSize,
-                                                           uint32_t kSplitSize, uint32_t kSize)
+__aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm2B(LocalTensor<KV_T> &bL0Tensor,
+                                                              LocalTensor<KV_T> &bL1Tensor, uint32_t idx,
+                                                              uint32_t nSize, uint32_t subkSize, uint32_t kSplitSize,
+                                                              uint32_t kSize)
 {
     // L1 128 * 256; L0 64 * 128
     uint32_t kloops = subkSize / 32;
@@ -632,7 +664,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::LoadDataMm2B(LocalTensor<KV_T> 
         loadData2DParams.srcStride = kSize / 32;
         loadData2DParams.dstGap = 1;
         loadData2DParams.dstFracGap = 0;
-  
+
         LocalTensor<KV_T> tmpSrcTensor;
         if constexpr (KVINT4) {
             tmpSrcTensor = srcTensor[i * 16 * 64];
@@ -659,7 +691,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
             subM1SizeAct = m1Tail;
             subM1Size = Align(m1Tail, 16U);
         }
-    
+
         const uint32_t nSplitSize = 128; // n方向切分
         uint32_t nloops = (info.actualSingleProcessSInnerSize + nSplitSize - 1) / nSplitSize;
         uint32_t nTail = info.actualSingleProcessSInnerSize - (nloops - 1) * nSplitSize;
@@ -698,15 +730,19 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
                         uint32_t blockElementCnt = 32 / sizeof(KV_T);
                         uint32_t ropeBlockElementCnt = 32 / sizeof(ROPE_T);
 
-                        keyOffset += (uint64_t)(info.n2Idx * headDim * kvCacheBlockSize) + reaminRowCnt * blockElementCnt;
-                        kRopeOffset += (uint64_t)(info.n2Idx * headDimRope * kvCacheBlockSize) + reaminRowCnt * ropeBlockElementCnt;
+                        keyOffset +=
+                            (uint64_t)(info.n2Idx * headDim * kvCacheBlockSize) + reaminRowCnt * blockElementCnt;
+                        kRopeOffset += (uint64_t)(info.n2Idx * headDimRope * kvCacheBlockSize) +
+                                       reaminRowCnt * ropeBlockElementCnt;
                     } else {
                         if constexpr (LAYOUT_T == LAYOUT::BSH || LAYOUT_T == LAYOUT::BSND) {
                             keyOffset += (uint64_t)(info.n2Idx * headDim) + reaminRowCnt * headDim * kvHeadNum;
-                            kRopeOffset += (uint64_t)(info.n2Idx * headDimRope) + reaminRowCnt * headDimRope * kvHeadNum;
+                            kRopeOffset +=
+                                (uint64_t)(info.n2Idx * headDimRope) + reaminRowCnt * headDimRope * kvHeadNum;
                         } else {
                             keyOffset += (uint64_t)(info.n2Idx * headDim * kvCacheBlockSize) + reaminRowCnt * headDim;
-                            kRopeOffset += (uint64_t)(info.n2Idx * headDimRope * kvCacheBlockSize) + reaminRowCnt * headDimRope;
+                            kRopeOffset +=
+                                (uint64_t)(info.n2Idx * headDimRope * kvCacheBlockSize) + reaminRowCnt * headDimRope;
                         }
                     }
                     CopyInMm1BToL1ForPA(kTensor, keyOffset, subNSize, copyFinishRowCnt, copyRowCnt);
@@ -717,7 +753,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
                     curSeqIdx += copyRowCnt;
                 }
             } else {
-                CopyInMm1BToL1(kTensor, info, n, subNSizeAct, nSplitSize); // 拷贝 128 * 512
+                CopyInMm1BToL1(kTensor, info, n, subNSizeAct, nSplitSize);         // 拷贝 128 * 512
                 CopyInMm1BRopeToL1(kRopeTensor, info, n, subNSizeAct, nSplitSize); // 拷贝 128 * 64
             }
 
@@ -727,7 +763,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
             const uint32_t mSplitSizeL0 = 128U;
             uint32_t mLoops = (subM1SizeAct + mSplitSizeL0 - 1) / mSplitSizeL0;
             uint32_t mTail = subM1SizeAct - (mLoops - 1) * mSplitSizeL0;
-            
+
             uint32_t subMSize = mSplitSizeL0;
             uint32_t subMSizeAct = mSplitSizeL0;
 
@@ -767,22 +803,25 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
                 uint32_t kLoops = (kSize + kSplitSize - 1) / kSplitSize;
                 uint32_t subKSize = kSplitSize;
 
-                LocalTensor<int32_t> btC2Tensor = biasBTTensorPingPong[(btBufIter % 2) * (BT_PP_SIZE / sizeof(int32_t))];
+                LocalTensor<int32_t> btC2Tensor =
+                    biasBTTensorPingPong[(btBufIter % 2) * (BT_PP_SIZE / sizeof(int32_t))];
                 if (isFirstIter) {
                     isFirstIter = false;
-                    int32_t biasValue = 1260388352; // 2^21 + 150 * 2^23
+                    int32_t biasValue = 1260388352;                            // 2^21 + 150 * 2^23
                     InitConstValueParams<int32_t> params(1, 16, 0, biasValue); // nSplitSize * 4 / 32B = 16
                     WaitFlag<HardEvent::MTE1_MTE2>(BIAS_EVENT0 + biasL1BufIter % 2);
-                    LocalTensor<int32_t> biasTensor = biasL1Tensor[(biasL1BufIter % 2) * (BT_PP_SIZE / sizeof(int32_t))];
+                    LocalTensor<int32_t> biasTensor =
+                        biasL1Tensor[(biasL1BufIter % 2) * (BT_PP_SIZE / sizeof(int32_t))];
                     InitConstValue(biasTensor, params);
                     SetFlag<HardEvent::MTE2_MTE1>(BIAS_EVENT0 + biasL1BufIter % 2);
                     WaitFlag<HardEvent::MTE2_MTE1>(BIAS_EVENT0 + biasL1BufIter % 2);
-                    
+
                     DataCopy(btC2Tensor, biasTensor, nSplitSize);
                     SetFlag<HardEvent::MTE1_MTE2>(BIAS_EVENT0 + biasL1BufIter % 2);
                 }
 
-                LocalTensor<MMAD_OUT_T> cL0Tensor = cL0TensorPingPong[(cL0BufIter % 2) * (L0C_PP_SIZE / sizeof(MMAD_OUT_T))];
+                LocalTensor<MMAD_OUT_T> cL0Tensor =
+                    cL0TensorPingPong[(cL0BufIter % 2) * (L0C_PP_SIZE / sizeof(MMAD_OUT_T))];
                 LocalTensor<T> cL0TensorFp32 = cL0Tensor.template ReinterpretCast<T>();
 
                 for (uint32_t k = 0; k < kLoops; k++) {
@@ -827,8 +866,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
 
                 // ROPE 计算
                 {
-                    float aVal = -2097152.0; // -2^21
-                    float bVal = 5.0; // 5
+                    float aVal = -2097152.0;                             // -2^21
+                    float bVal = 5.0;                                    // 5
                     InitConstValueParams<float> paramsA(1, 32, 0, aVal); // n*k*4/512B=128*32*4/512
                     InitConstValueParams<float> paramsB(1, 32, 0, bVal); // n*k*4/512B=128*32*4/512
 
@@ -865,14 +904,14 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
                         }
                         Mmad(cL0TensorFp32, aL0TensorFp32, bL0TensorFp32, mmadParams);
                     }
-
+                    PipeBarrier<PIPE_M>();
                     {
                         MmadParams mmadParams;
                         mmadParams.m = subMSize;
                         mmadParams.n = subNSize;
                         mmadParams.k = headDimRope;
                         mmadParams.cmatrixInitVal = false; // true
-                        mmadParams.cmatrixSource = false; // Co1
+                        mmadParams.cmatrixSource = false;  // Co1
                         mmadParams.unitFlag = 0b11;
 
                         if ((mmadParams.m / 16) * (mmadParams.n / 16) < 10) {
@@ -897,21 +936,25 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
 
                 size_t baseOffset = (info.loop % (PRE_LOAD_NUM_MLA)) * mmResUbSize;
 
-                Fixpipe(mm1ResGm[baseOffset + (m1 * M_SPLIT_SIZE + m * mSplitSizeL0) * info.actualSingleProcessSInnerSizeAlign + n * nSplitSize], cL0Tensor,
-                        fixParams);
+                Fixpipe(mm1ResGm[baseOffset +
+                                 (m1 * M_SPLIT_SIZE + m * mSplitSizeL0) * info.actualSingleProcessSInnerSizeAlign +
+                                 n * nSplitSize],
+                        cL0Tensor, fixParams);
 
                 cL0BufIter++;
 #else
                 // ROPE 计算
                 {
                     WaitFlag<HardEvent::FIX_M>(L0C_EVENT0 + cL0BufIter % 2);
-                    LocalTensor<MMAD_OUT_T> tmpcL0Tensor = cL0TensorPingPong[(cL0BufIter % 2) * (L0C_PP_SIZE / sizeof(MMAD_OUT_T))];
+                    LocalTensor<MMAD_OUT_T> tmpcL0Tensor =
+                        cL0TensorPingPong[(cL0BufIter % 2) * (L0C_PP_SIZE / sizeof(MMAD_OUT_T))];
                     LocalTensor<T> cL0Tensor = tmpcL0Tensor.template ReinterpretCast<T>();
 
                     WaitFlag<HardEvent::M_MTE1>(L0A_EVENT0 + aL0BufIter % 2);
                     LocalTensor<KV_T> tmpaL0Tensor = aL0TensorPingPong[(aL0BufIter % 2) * (L0A_PP_SIZE / sizeof(KV_T))];
                     LocalTensor<ROPE_T> aL0Tensor = tmpaL0Tensor.template ReinterpretCast<ROPE_T>();
-                    LoadDataL0A(aL0Tensor, qRopeTensor[(m * mSplitSizeL0 * 32) / sizeof(ROPE_T)], 0, 0, mSize, headDimRope);
+                    LoadDataL0A(aL0Tensor, qRopeTensor[(m * mSplitSizeL0 * 32) / sizeof(ROPE_T)], 0, 0, mSize,
+                                headDimRope);
 
                     LocalTensor<KV_T> tmpbL0Tensor = bL0TensorPingPong[(bL0BufIter % 2) * (L0B_PP_SIZE / sizeof(KV_T))];
                     LocalTensor<ROPE_T> bL0Tensor = tmpbL0Tensor.template ReinterpretCast<ROPE_T>();
@@ -953,7 +996,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
                     auto ropeGmPtr = tmpDstGm.GetPhyAddr();
                     GlobalTensor<T> dstGm;
                     dstGm.SetGlobalBuffer((__gm__ T *)ropeGmPtr);
-                    Fixpipe(dstGm[m * mSplitSizeL0 * info.actualSingleProcessSInnerSizeAlign + n * nSplitSize], cL0Tensor, fixParams);
+                    Fixpipe(dstGm[m * mSplitSizeL0 * info.actualSingleProcessSInnerSizeAlign + n * nSplitSize],
+                            cL0Tensor, fixParams);
 
                     SetFlag<HardEvent::FIX_M>(L0C_EVENT0 + cL0BufIter % 2);
                     cL0BufIter++;
@@ -967,18 +1011,22 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
                     uint32_t subKSize = kSplitSize;
 
                     WaitFlag<HardEvent::FIX_M>(L0C_EVENT0 + cL0BufIter % 2);
-                    LocalTensor<MMAD_OUT_T> cL0Tensor = cL0TensorPingPong[(cL0BufIter % 2) * (L0C_PP_SIZE / sizeof(MMAD_OUT_T))];
+                    LocalTensor<MMAD_OUT_T> cL0Tensor =
+                        cL0TensorPingPong[(cL0BufIter % 2) * (L0C_PP_SIZE / sizeof(MMAD_OUT_T))];
                     for (uint32_t k = 0; k < kLoops; k++) {
                         if (k + 1 == kLoops) {
                             subKSize = kSize - (kLoops - 1) * kSplitSize;
                         }
 
                         WaitFlag<HardEvent::M_MTE1>(L0A_EVENT0 + aL0BufIter % 2);
-                        LocalTensor<KV_T> aL0Tensor = aL0TensorPingPong[(aL0BufIter % 2) * (L0A_PP_SIZE / sizeof(KV_T))];
+                        LocalTensor<KV_T> aL0Tensor =
+                            aL0TensorPingPong[(aL0BufIter % 2) * (L0A_PP_SIZE / sizeof(KV_T))];
 
-                        LoadDataL0A(aL0Tensor, qTensor[(m * mSplitSizeL0 * 32) / sizeof(KV_T)], k, kSplitSize, mSize, subKSize);
+                        LoadDataL0A(aL0Tensor, qTensor[(m * mSplitSizeL0 * 32) / sizeof(KV_T)], k, kSplitSize, mSize,
+                                    subKSize);
 
-                        LocalTensor<KV_T> bL0Tensor = bL0TensorPingPong[(bL0BufIter % 2) * (L0B_PP_SIZE / sizeof(KV_T))];
+                        LocalTensor<KV_T> bL0Tensor =
+                            bL0TensorPingPong[(bL0BufIter % 2) * (L0B_PP_SIZE / sizeof(KV_T))];
 
                         LoadDataMm1B(bL0Tensor, kTensor, k, kSplitSize, subKSize, subNSize);
 
@@ -1015,8 +1063,9 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm1(const ExtraInfoMla &
 
                     size_t baseOffset = (info.loop % (PRE_LOAD_NUM_MLA)) * mmResUbSize;
 
-                    Fixpipe(mm1ResGm[baseOffset + m * mSplitSizeL0 * info.actualSingleProcessSInnerSizeAlign + n * nSplitSize], cL0Tensor,
-                            fixParams);
+                    Fixpipe(mm1ResGm[baseOffset + m * mSplitSizeL0 * info.actualSingleProcessSInnerSizeAlign +
+                                     n * nSplitSize],
+                            cL0Tensor, fixParams);
 
                     SetFlag<HardEvent::FIX_M>(L0C_EVENT0 + cL0BufIter % 2);
                     cL0BufIter++;
@@ -1035,7 +1084,7 @@ template <typename IFAT>
 __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla &info)
 {
     uint32_t mSizeAct = info.gSize * info.s1Size;
-    
+
     uint32_t mSize = Align(mSizeAct, 16U);
     uint32_t nSize = BlockAlign<KV_T>(headDim);
     uint32_t m1Loops = (mSizeAct + M_SPLIT_SIZE - 1) / M_SPLIT_SIZE;
@@ -1044,10 +1093,10 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla &
     uint32_t subM1SizeAct = M_SPLIT_SIZE;
 
     for (uint32_t m1 = 0; m1 < m1Loops; m1++) {
-         if (m1 == (m1Loops - 1)) {
+        if (m1 == (m1Loops - 1)) {
             subM1SizeAct = m1Tail;
             subM1Size = Align(m1Tail, 16U);
-        }      
+        }
 
         uint32_t nSplitSize = 128;
         uint32_t nLoops = (nSize + nSplitSize - 1) / nSplitSize;
@@ -1084,7 +1133,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla &
                     uint64_t valueOffset = idInBlockTable * kvCacheBlockSize * headDim * kvHeadNum;
                     if constexpr (KV_LAYOUT_T == LAYOUT::NZ) {
                         uint32_t blockElementCnt = 32 / sizeof(KV_T);
-                        valueOffset += (uint64_t)(info.n2Idx * headDim * kvCacheBlockSize) + reaminRowCnt * blockElementCnt;
+                        valueOffset +=
+                            (uint64_t)(info.n2Idx * headDim * kvCacheBlockSize) + reaminRowCnt * blockElementCnt;
                     } else {
                         if constexpr (LAYOUT_T == LAYOUT::BSH || LAYOUT_T == LAYOUT::BSND) {
                             valueOffset += (uint64_t)(info.n2Idx * headDim) + reaminRowCnt * headDim * kvHeadNum;
@@ -1092,7 +1142,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla &
                             valueOffset += (uint64_t)(info.n2Idx * headDim * kvCacheBlockSize) + reaminRowCnt * headDim;
                         }
                     }
-                    CopyInMm2BToL1ForPA(vTensor, valueOffset, kSize, copyFinishRowCnt, copyRowCnt, n * nSplitSize, subNSize);
+                    CopyInMm2BToL1ForPA(vTensor, valueOffset, kSize, copyFinishRowCnt, copyRowCnt, n * nSplitSize,
+                                        subNSize);
 
                     // 更新循环变量
                     copyFinishRowCnt += copyRowCnt;
@@ -1117,7 +1168,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla &
                     subMSizeAct = mTail;
                     subMSize = Align(subMSizeAct, 16U);
                 }
-                
+
                 uint32_t ka = 0;
                 if (n == 0) {
                     qpL1BufIter++;
@@ -1143,7 +1194,8 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla &
                 uint32_t subKSize = kSplitSize;
                 uint32_t subKSizeAct = kSplitSize;
 
-                LocalTensor<MMAD_OUT_T> cL0Tensor = cL0TensorPingPong[(cL0BufIter % 2) * (L0C_PP_SIZE / sizeof(MMAD_OUT_T))];
+                LocalTensor<MMAD_OUT_T> cL0Tensor =
+                    cL0TensorPingPong[(cL0BufIter % 2) * (L0C_PP_SIZE / sizeof(MMAD_OUT_T))];
 
                 for (uint32_t k = 0; k < kloops; k++) {
                     if (k == kloops - 1) {
@@ -1169,7 +1221,7 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla &
                     mmadParams.k = subKSizeAct;
                     mmadParams.cmatrixInitVal = (k == 0);
                     mmadParams.cmatrixSource = false;
-                    mmadParams.unitFlag = (k == kloops - 1) ? 0b11: 0b10;
+                    mmadParams.unitFlag = (k == kloops - 1) ? 0b11 : 0b10;
 
                     if ((mmadParams.m / 16) * (mmadParams.n / 16) < 10) {
                         PipeBarrier<PIPE_M>();
@@ -1185,21 +1237,22 @@ __aicore__ inline void IfaMatmulFullQuant<IFAT>::ComputeMm2(const ExtraInfoMla &
                 FixpipeParamsV220 fixParams;
                 fixParams.nSize = subNSize; // 实现切片大小
                 fixParams.mSize = subMSizeAct; // msdIterNum * gSize; // 有效数据不足16行，只需要输出部分行即可
-                fixParams.srcStride = subMSize;   // ((fixParams.mSize + 15) / 16) * 16
-                fixParams.dstStride = headDim; // headdimAlign mm2ResGm两行之间的间隔
+                fixParams.srcStride = subMSize; // ((fixParams.mSize + 15) / 16) * 16
+                fixParams.dstStride = headDim;  // headdimAlign mm2ResGm两行之间的间隔
                 fixParams.ndNum = 1;
                 fixParams.unitFlag = 0b11;
 #ifdef QUANT_MM2_FP16
                 fixParams.quantPre = QuantMode_t::DEQF16;
-                fixParams.deqScalar = 0x3A800000; //117 << (10 + 13)=0x3A800000 float 1/1024  0x3F800000=1.0
+                fixParams.deqScalar = 0x3A800000; // 117 << (10 + 13)=0x3A800000 float 1/1024  0x3F800000=1.0
 #endif
 
-                size_t baseOffset =(info.loop % (PRE_LOAD_NUM_MLA)) * bmm2ResUbSize;
-                Fixpipe(mm2ResGm[ baseOffset + (m1 * M_SPLIT_SIZE + m * mSplitSizeL0) * headDim + nSplitSize * n], cL0Tensor, fixParams);
+                size_t baseOffset = (info.loop % (PRE_LOAD_NUM_MLA)) * bmm2ResUbSize;
+                Fixpipe(mm2ResGm[baseOffset + (m1 * M_SPLIT_SIZE + m * mSplitSizeL0) * headDim + nSplitSize * n],
+                        cL0Tensor, fixParams);
 
                 cL0BufIter++;
 
-                if (n== nLoops - 1) {
+                if (n == nLoops - 1) {
                     SetFlag<HardEvent::MTE1_MTE2>(QP_EVENT0 + (ka % 2));
                 }
             }
