@@ -17,7 +17,7 @@
 #define QUANT_LIGHTNING_INDEXER_V2_CHECKER_H
 
 #include "../../../lightning_indexer_v2/op_host/checkers/checker_context_lightning_indexer_v2.h"
-#include "graph/error_codes.h"
+#include "graph/ge_error_codes.h"
 
 namespace optiling {
 namespace lightning_indexer_v2_checker {

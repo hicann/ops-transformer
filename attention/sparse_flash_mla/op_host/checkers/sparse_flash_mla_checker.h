@@ -12,7 +12,7 @@
 #define SPARSE_FLASH_MLA_CHECKER_H
 
 #include "../sparse_flash_mla_tiling.h"
-#include "graph/error_codes.h"
+#include "graph/ge_error_codes.h"
 
 namespace optiling {
 
