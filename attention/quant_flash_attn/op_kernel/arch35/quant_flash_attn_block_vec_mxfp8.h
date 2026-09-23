@@ -514,8 +514,13 @@ public:
             // bN2Offset = n2Idx * G * T_total + prefixBS1, 内部按 gIdx * T_total + s1Idx 步进
             uint32_t prefixBS1 = qActSeqLensParser_->GetTBase(runInfo.bIdx);
             uint64_t bN2Offset = runInfo.realN2Idx * constInfo_.realGSize * constInfo_.t1Size + prefixBS1;
-            DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx,
-                                                                     gmDealRowCount, constInfo_);
+            if constexpr (USE_DN) {
+                DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx,
+                                                                         gmDealRowCount, constInfo_);
+            } else {
+                DataCopySoftmaxLseTNDtoNTArch35<T, ConstInfoX>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx, gmDealRowCount,
+                                                               constInfo_);
+            }
         } else if constexpr (layout == LayOutTypeEnum::LAYOUT_NTD) {
             uint32_t prefixBS1 = qActSeqLensParser_->GetTBase(runInfo.bIdx);
             uint32_t s1Size = qActSeqLensParser_->GetActualSeqLength(runInfo.bIdx);

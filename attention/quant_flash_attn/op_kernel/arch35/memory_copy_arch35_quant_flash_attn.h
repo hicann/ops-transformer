@@ -321,6 +321,21 @@ __aicore__ inline void DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge(GlobalTensor<fl
                                                                  uint32_t mOffset, uint32_t dealCount,
                                                                  const CONST_INFO_T &constInfo)
 {
+    DataCopyExtParams dataCopyParams;
+    dataCopyParams.blockCount = dealCount;
+    dataCopyParams.blockLen = sizeof(float);
+    dataCopyParams.srcStride = 0;
+    dataCopyParams.dstStride = 0;
+    DataCopyPad(softmaxLseGm[bN2Offset + mOffset], lseSrc, dataCopyParams);
+}
+
+// TND layout LSE 输出转成 N-major 排布 (非 NoGS1Merge 版本, 用 gSize/n2Size)
+// 与 DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge 同语义, 仅把 realGSize 换成 gSize
+template <typename T, typename CONST_INFO_T>
+__aicore__ inline void DataCopySoftmaxLseTNDtoNTArch35(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
+                                                       uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
+                                                       const CONST_INFO_T &constInfo)
+{
     uint32_t startS1Idx = mOffset / constInfo.realGSize;
     uint32_t startGIdx = mOffset % constInfo.realGSize;
     uint32_t endS1Idx = (mOffset + dealCount - 1) / constInfo.realGSize;
@@ -333,40 +348,6 @@ __aicore__ inline void DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge(GlobalTensor<fl
         outOffset = bN2Offset + startGIdx * constInfo.t1Size + s1Idx;
         if (s1Idx != endS1Idx) {
             curDealRowCount = constInfo.realGSize - startGIdx;
-        } else {
-            curDealRowCount = endGIdx + 1 - startGIdx;
-        }
-        DataCopyExtParams dataCopyParams;
-        dataCopyParams.blockCount = curDealRowCount;
-        dataCopyParams.blockLen = sizeof(float);
-        dataCopyParams.srcStride = 0;
-        // 每写一个 float, 跳到下一个 gIdx 对应的 T 行起点: stride = (t1Size - 1) * sizeof(float)
-        dataCopyParams.dstStride = (constInfo.t1Size - 1) * sizeof(float);
-        DataCopyPad(softmaxLseGm[outOffset], lseSrc[ubOffset], dataCopyParams);
-        startGIdx = 0;
-        ubOffset += curDealRowCount * AttentionCommon::FP32_BLOCK_ELEMENT_NUM;
-    }
-}
-
-// TND layout LSE 输出转成 N-major 排布 (非 NoGS1Merge 版本, 用 gSize/n2Size)
-// 与 DataCopySoftmaxLseTNDtoNTArch35NoGS1Merge 同语义, 仅把 realGSize 换成 gSize
-template <typename T, typename CONST_INFO_T>
-__aicore__ inline void DataCopySoftmaxLseTNDtoNTArch35(GlobalTensor<float> softmaxLseGm, LocalTensor<T> lseSrc,
-                                                       uint64_t bN2Offset, uint32_t mOffset, uint32_t dealCount,
-                                                       const CONST_INFO_T &constInfo)
-{
-    uint32_t startS1Idx = mOffset / constInfo.gSize;
-    uint32_t startGIdx = mOffset % constInfo.gSize;
-    uint32_t endS1Idx = (mOffset + dealCount - 1) / constInfo.gSize;
-    uint32_t endGIdx = (mOffset + dealCount - 1) % constInfo.gSize;
-    uint64_t outOffset = 0;
-    uint64_t ubOffset = 0;
-    uint32_t curDealRowCount = 0;
-
-    for (uint32_t s1Idx = startS1Idx; s1Idx <= endS1Idx; s1Idx++) {
-        outOffset = bN2Offset + startGIdx * constInfo.t1Size + s1Idx;
-        if (s1Idx != endS1Idx) {
-            curDealRowCount = constInfo.gSize - startGIdx;
         } else {
             curDealRowCount = endGIdx + 1 - startGIdx;
         }
