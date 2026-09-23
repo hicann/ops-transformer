@@ -79,8 +79,9 @@ aclnnStatus aclnnFFNToAttentionGetWorkspaceSize(const aclTensor *x, const aclTen
 {
     auto retParam = CheckParams(x, sessionIds, microBatchIds, tokenIds, expertOffsets, actualTokenNum, group);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
+    std::string groupName(group);
     aclnnStatus ret = aclnnInnerFFNToAttentionGetWorkspaceSize(
-        x, sessionIds, microBatchIds, tokenIds, expertOffsets, actualTokenNum, attnRankTable, const_cast<char *>(group),
+        x, sessionIds, microBatchIds, tokenIds, expertOffsets, actualTokenNum, attnRankTable, groupName.data(),
         worldSize, tokenInfoTableShape, tokenDataShape, workspaceSize, executor);
     return ret;
 }

@@ -66,13 +66,19 @@ private:
     __aicore__ inline void ReduceMaxInplace(const LocalTensor<float> &srcLocal, uint32_t count);
     __aicore__ inline void QuantInit(GM_ADDR scales);
     __aicore__ inline void ReadSessionMetadata();
+    __aicore__ inline void InitWindowOffsets();
     __aicore__ inline void InitByTinglingData(const AttentionToFFNTilingData *tilingData);
     __aicore__ inline void QuantProcess(uint32_t expertIndex);
     __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId,
                                        uint32_t &endTokenId, uint32_t &sendTokenNum);
     __aicore__ inline void SendTokenToFFN();
     __aicore__ inline void SendTokenToFFNByTokenIdx(uint32_t tokenIdx);
+    __aicore__ inline void SendQuantizedTokenData(GM_ADDR toRankAddr, uint32_t tokenId, uint32_t topkId,
+                                                  GlobalTensor<int8_t> &tokenDataGMTensor,
+                                                  DataCopyExtParams &hCommuCopyOutParams);
     __aicore__ inline void SetFlagToFFN();
+    __aicore__ inline void AggregateFFNSendStatus(uint32_t startFFNId, uint32_t sentFFNNum);
+    __aicore__ inline void SendFlagsToFFN(uint32_t startFFNId, uint32_t endFFNId);
     __aicore__ inline void ActiveMaskCalCnt();
     __aicore__ inline void SetFlagInAttn();
     __aicore__ inline void FindExpertRank(int32_t expertId);
@@ -236,6 +242,22 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::CheckFlag
 }
 
 template <TemplateAttentionToFFNTypeClass>
+__aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SendQuantizedTokenData(
+    GM_ADDR toRankAddr, uint32_t tokenId, uint32_t topkId, GlobalTensor<int8_t> &tokenDataGMTensor,
+    DataCopyExtParams &hCommuCopyOutParams)
+{
+    GM_ADDR tokenData = (__gm__ uint8_t *)(toRankAddr + winOffset_[1] +
+                                           (winTokenDataOffset_ + (tokenId * (axisK_ + sharedExpertNum_) * axisHS_) +
+                                            (topkId * axisHS_)) *
+                                               sizeof(int8_t));
+    tokenDataGMTensor.SetGlobalBuffer((__gm__ int8_t *)tokenData);
+    xOutQueue_.EnQue(xOutTensor_);
+    xOutTensor_ = xOutQueue_.DeQue<int8_t>();
+    DataCopyPad(tokenDataGMTensor, xOutTensor_, hCommuCopyOutParams);
+    xOutQueue_.FreeTensor<int8_t>(xOutTensor_);
+}
+
+template <TemplateAttentionToFFNTypeClass>
 __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SendTokenToFFNByTokenIdx(uint32_t tokenIdx)
 {
     GM_ADDR toRankAddr;
@@ -258,16 +280,7 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SendToken
         SetExpertAndRank(tokenIdx, tokenId, topkId);
         QuantProcess(dstExpertId_);
         CheckFlagAndSetTableGM(toRankId_, toRankAddr, tokenInfoTableGMTensor);
-        GM_ADDR tokenData =
-            (__gm__ uint8_t *)(toRankAddr + winOffset_[1] +
-                               (winTokenDataOffset_ + (tokenId * (axisK_ + sharedExpertNum_) * axisHS_) +
-                                (topkId * axisHS_)) *
-                                   sizeof(int8_t));
-        tokenDataGMTensor.SetGlobalBuffer((__gm__ int8_t *)tokenData);
-        xOutQueue_.EnQue(xOutTensor_);
-        xOutTensor_ = xOutQueue_.DeQue<int8_t>();
-        DataCopyPad(tokenDataGMTensor, xOutTensor_, hCommuCopyOutParams);
-        xOutQueue_.FreeTensor<int8_t>(xOutTensor_);
+        SendQuantizedTokenData(toRankAddr, tokenId, topkId, tokenDataGMTensor, hCommuCopyOutParams);
     } else {
         GlobalTensor<XType> tokenDataGMTensor;
         xInTensor_ = xQueue_.AllocTensor<XType>();
@@ -344,35 +357,48 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SetFlagTo
     SplitToCore(ffnNum_, aivNum_, startFFNId, endFFNId, sentFFNNum);
     statusTensor_.SetValue(0, 1);
     statusTensor_.SetValue(1, layerId_);
-    GlobalTensor<int32_t> tableFlagGMTensor;
-    DataCopyExtParams statusParams = {1U, static_cast<uint32_t>(sizeof(int32_t) * TOKEN_INFO_TABLE_COPY_BLOCK_CNT), 0U,
-                                      0U, 0U};
     if (startFFNId >= ffnNum_) {
         return;
     }
 
     startFFNId += ffnStartRankId_;
     endFFNId += ffnStartRankId_;
-    GM_ADDR toRankAddr;
     if constexpr (isSync) {
-        uint32_t sentFFNNumAlignSize = Ceil(sentFFNNum * sizeof(int32_t), UB_ALIGN) * UB_ALIGN;
-        DataCopyExtParams syncStatusParams = {
-            static_cast<uint16_t>(aivNum_), static_cast<uint32_t>(sentFFNNum * sizeof(int32_t)),
-            static_cast<uint32_t>(aivWorkspaceOffset_ - sentFFNNum * sizeof(int32_t)), 0U, 0U};
-        DataCopyPadExtParams<int32_t> copyPadParams{false, 0U, 0U, 0U};
-        tpipe_->InitBuffer(syncStatusWorkspaceBuf_, aivNum_ * sentFFNNumAlignSize);
-        syncStatusWorkspaceTensor_ = syncStatusWorkspaceBuf_.Get<int32_t>();
-        DataCopyPad(syncStatusWorkspaceTensor_, syncStatusGMTensor_[startFFNId - ffnStartRankId_], syncStatusParams,
-                    copyPadParams);
-        SyncFunc<AscendC::HardEvent::MTE2_V>();
-        LocalTensor<float> syncStatusWorkspaceTensorFloat = syncStatusWorkspaceTensor_.ReinterpretCast<float>();
-        LocalTensor<float> ffnStatusTensorFloat = ffnStatusTensor_.ReinterpretCast<float>();
-        const uint32_t shape[] = {aivNum_, static_cast<uint32_t>(sentFFNNumAlignSize / sizeof(float))};
-        AscendC::ReduceSum<float, AscendC::Pattern::Reduce::RA, true>(ffnStatusTensorFloat,
-                                                                      syncStatusWorkspaceTensorFloat, shape, true);
-        SyncFunc<AscendC::HardEvent::V_S>();
+        AggregateFFNSendStatus(startFFNId, sentFFNNum);
     }
+    SendFlagsToFFN(startFFNId, endFFNId);
+}
 
+template <TemplateAttentionToFFNTypeClass>
+__aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::AggregateFFNSendStatus(uint32_t startFFNId,
+                                                                                              uint32_t sentFFNNum)
+{
+    uint32_t sentFFNNumAlignSize = Ceil(sentFFNNum * sizeof(int32_t), UB_ALIGN) * UB_ALIGN;
+    DataCopyExtParams syncStatusParams = {
+        static_cast<uint16_t>(aivNum_), static_cast<uint32_t>(sentFFNNum * sizeof(int32_t)),
+        static_cast<uint32_t>(aivWorkspaceOffset_ - sentFFNNum * sizeof(int32_t)), 0U, 0U};
+    DataCopyPadExtParams<int32_t> copyPadParams{false, 0U, 0U, 0U};
+    tpipe_->InitBuffer(syncStatusWorkspaceBuf_, aivNum_ * sentFFNNumAlignSize);
+    syncStatusWorkspaceTensor_ = syncStatusWorkspaceBuf_.Get<int32_t>();
+    DataCopyPad(syncStatusWorkspaceTensor_, syncStatusGMTensor_[startFFNId - ffnStartRankId_], syncStatusParams,
+                copyPadParams);
+    SyncFunc<AscendC::HardEvent::MTE2_V>();
+    LocalTensor<float> syncStatusWorkspaceTensorFloat = syncStatusWorkspaceTensor_.ReinterpretCast<float>();
+    LocalTensor<float> ffnStatusTensorFloat = ffnStatusTensor_.ReinterpretCast<float>();
+    const uint32_t shape[] = {aivNum_, static_cast<uint32_t>(sentFFNNumAlignSize / sizeof(float))};
+    AscendC::ReduceSum<float, AscendC::Pattern::Reduce::RA, true>(ffnStatusTensorFloat, syncStatusWorkspaceTensorFloat,
+                                                                  shape, true);
+    SyncFunc<AscendC::HardEvent::V_S>();
+}
+
+template <TemplateAttentionToFFNTypeClass>
+__aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SendFlagsToFFN(uint32_t startFFNId,
+                                                                                      uint32_t endFFNId)
+{
+    GlobalTensor<int32_t> tableFlagGMTensor;
+    DataCopyExtParams statusParams = {1U, static_cast<uint32_t>(sizeof(int32_t) * TOKEN_INFO_TABLE_COPY_BLOCK_CNT), 0U,
+                                      0U, 0U};
+    GM_ADDR toRankAddr;
     for (uint32_t ffnIdx = startFFNId; ffnIdx < endFFNId; ++ffnIdx) {
         if constexpr (isSync) {
             if (ffnStatusTensor_.GetValue(ffnIdx - startFFNId) == 0) {

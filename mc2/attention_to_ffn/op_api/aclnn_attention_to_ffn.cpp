@@ -79,8 +79,9 @@ aclnnStatus aclnnAttentionToFFNGetWorkspaceSize(
 {
     auto retParam = CheckParams(x, sessionId, microBatchId, layerId, expertIds, expertRankTable, group);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
+    std::string groupName(group);
     aclnnStatus ret = aclnnInnerAttentionToFFNGetWorkspaceSize(
-        x, sessionId, microBatchId, layerId, expertIds, expertRankTable, scales, activeMask, const_cast<char *>(group),
+        x, sessionId, microBatchId, layerId, expertIds, expertRankTable, scales, activeMask, groupName.data(),
         worldSize, ffnTokenInfoTableShape, ffnTokenDataShape, attnTokenInfoTableShape, moeExpertNum, quantMode,
         syncFlag, ffnStartRankId, workspaceSize, executor);
     return ret;

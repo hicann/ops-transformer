@@ -79,6 +79,19 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::ReadSessi
 }
 
 template <TemplateAttentionToFFNTypeClass>
+__aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::InitWindowOffsets()
+{
+    winOffset_[0] = 0;
+    winOffset_[1] = Ceil(attentionWorkerNum_ * microBatchNum_ * infoTableLastDimNum_ * sizeof(int32_t), WIN_ALIGN) *
+                    WIN_ALIGN; // token_info_table大小 偏移向上取整
+    winInfoTableOffset_ = (sessionId_ * microBatchNum_ * infoTableLastDimNum_ + microBatchId_ * infoTableLastDimNum_) *
+                          sizeof(int32_t); // tokenInfoTable上当前attnWorkId以及microBatchId偏移
+    winTokenDataOffset_ =
+        (sessionId_ * microBatchNum_ * axisBS_ * (axisK_ + sharedExpertNum_) * axisHS_) +
+        (microBatchId_ * axisBS_ * (axisK_ + sharedExpertNum_) * axisHS_); // tokenData上attnWorkId以及microBatchId偏移
+}
+
+template <TemplateAttentionToFFNTypeClass>
 __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::Init(
     GM_ADDR x, GM_ADDR sessionId, GM_ADDR microBatchId, GM_ADDR layerId, GM_ADDR expertIds, GM_ADDR expertRankTable,
     GM_ADDR scales, GM_ADDR activeMask, GM_ADDR workspaceGM, TPipe *pipe, const AttentionToFFNTilingData *tilingData)
@@ -122,14 +135,7 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::Init(
         attnStatusBuf_ = expertIdsBuf_;
     }
 
-    winOffset_[0] = 0;
-    winOffset_[1] = Ceil(attentionWorkerNum_ * microBatchNum_ * infoTableLastDimNum_ * sizeof(int32_t), WIN_ALIGN) *
-                    WIN_ALIGN; // token_info_table大小 偏移向上取整
-    winInfoTableOffset_ = (sessionId_ * microBatchNum_ * infoTableLastDimNum_ + microBatchId_ * infoTableLastDimNum_) *
-                          sizeof(int32_t); // tokenInfoTable上当前attnWorkId以及microBatchId偏移
-    winTokenDataOffset_ =
-        (sessionId_ * microBatchNum_ * axisBS_ * (axisK_ + sharedExpertNum_) * axisHS_) +
-        (microBatchId_ * axisBS_ * (axisK_ + sharedExpertNum_) * axisHS_); // tokenData上attnWorkId以及microBatchId偏移
+    InitWindowOffsets();
 }
 
 template <TemplateAttentionToFFNTypeClass>

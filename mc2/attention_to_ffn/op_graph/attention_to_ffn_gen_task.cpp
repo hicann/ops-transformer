@@ -12,17 +12,7 @@
  * \file attention_to_ffn_gen_task.cpp
  * \brief
  */
-#include <vector>
-
-#include "common/utils/op_mc2.h"
-#include "platform/platform_info.h"
-
-#include "op_graph/mc2_gen_task_ops_utils.h"
-#include "op_graph/mc2_moe_gen_task_ops_utils.h"
-#include "graph/arg_desc_info.h"
-#include "graph/kernel_launch_info.h"
-#include "register/op_impl_registry.h"
-#include "mc2_log.h"
+#include "common/utils/mc2_gen_task_common_inc.h"
 
 namespace ops {
 constexpr char AICPU_KFC_SERVER_NAME[] = "aicpu kfc server";
