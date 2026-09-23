@@ -226,6 +226,7 @@ public:
                     vecFdBlock_.InitGlobalTensor(this->vecFaBlock_.softmaxFDMaxGm_, this->vecFaBlock_.softmaxFDSumGm_,
                                                  this->vecFaBlock_.accumOutGm_, this->vecFaBlock_.attentionOutGm_,
                                                  keyPtr_);
+                    vecFdBlock_.InitPScaleValue(this->vecFaBlock_.pScaleValue_);
                     if (constInfo_.isSoftmaxLseEnable) {
                         softmaxLseGm_.SetGlobalBuffer((__gm__ float *)softmaxLse);
                         vecFdBlock_.InitSoftmaxLseGm(softmaxLseGm_);

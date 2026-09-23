@@ -82,8 +82,8 @@ def _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q):
     return 0
 
 
-def _calculate_max_schedule_size(batch_size, num_heads_kv):
-    """dim0 按 sectionNum 最坏值(batch*num_heads_kv)动态计算, 开启 section 后
+def _calculate_max_schedule_size(batch_size, num_heads_q):
+    """dim0 按 sectionNum 最坏值(batch*num_heads_q)动态计算, 开启 section 后
     FA/FD 调度区需求随 section 数线性增长, 固定值无法覆盖; 对齐 4096 便于对拍。
     (2, dim0) 布局中第二行即反向 FAG 区, grad 按 shape.GetDim(1)=dim0 推导其偏移。"""
     align_size = 4096
@@ -92,8 +92,8 @@ def _calculate_max_schedule_size(batch_size, num_heads_kv):
     # 按 1 兜底: sn 恒为 1 时需求为 16+(aic+aiv)*16, 4096 预算已覆盖
     batch_size = batch_size if batch_size and batch_size > 0 else 1
     aic_num, aiv_num = _get_core_nums()
-    fa_size = aic_num * METADATA_STRIDE * batch_size * num_heads_kv
-    fd_size = aiv_num * METADATA_STRIDE * batch_size * num_heads_kv
+    fa_size = aic_num * METADATA_STRIDE * batch_size * num_heads_q
+    fd_size = aiv_num * METADATA_STRIDE * batch_size * num_heads_q
 
     schedule_size = head_size + fa_size + fd_size
     return ((schedule_size + align_size - 1) // align_size) * align_size
@@ -243,7 +243,7 @@ class QuantFlashAttnOpBuilder(OpBuilder):
             is_grad_enabled: Optional[bool] = False,
         ):
             b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
-            max_schedule_size = _calculate_max_schedule_size(b_size, num_heads_kv)
+            max_schedule_size = _calculate_max_schedule_size(b_size, num_heads_q)
             return torch.empty((2, max_schedule_size), dtype=torch.int32, device="meta")
 
         @impl(get_as_library(), self.name, "Meta")
@@ -403,7 +403,7 @@ def quant_flash_attn_metadata(
 
     _check_layout_constraint(quant_mode, layout_q, layout_kv, layout_out)
 
-    max_schedule_size = _calculate_max_schedule_size(batch_size, num_heads_kv)
+    max_schedule_size = _calculate_max_schedule_size(batch_size, num_heads_q)
     output = torch.empty((2, max_schedule_size), dtype=torch.int32, device="npu")
 
     op_module = quant_flash_attn_op_builder.load()

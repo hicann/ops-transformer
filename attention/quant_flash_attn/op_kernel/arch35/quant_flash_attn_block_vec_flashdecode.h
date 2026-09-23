@@ -27,19 +27,25 @@
 namespace BaseApi {
 
 // 与 FA 侧 UpdateMinCheckValue 语义一致的 min 判值计算（VF 形式）：
-// DN 路径全 mask 行写入的 max 经过了 scaleValue 乘法 + ln2 量化，
+// DN 路径全 mask 行写入的 max 经过了 scaleValue 乘法 + ln2 量化 + ln(pScale) 偏移，
 // 使用与 vec1 相同的硬件 Truncate(CAST_CEIL) 保证判值 bit 级一致；非 DN 路径保持原始 minValue
 template <bool useDn>
-__simd_vf__ inline void CalcMinCheckValueVF(__ubuf__ float *dstUb, const float minValue, const float scaleValue)
+__simd_vf__ inline void CalcMinCheckValueVF(__ubuf__ float *dstUb, const float minValue, const float scaleValue,
+                                            const float pScale)
 {
     RegTensor<float> vregMin;
     MaskReg pregAll = CreateMask<uint16_t, MaskPattern::ALL>();
     Duplicate(vregMin, minValue);
     if constexpr (useDn) {
+        RegTensor<float> vregPScale;
+        RegTensor<float> vregLnPScale;
+        Duplicate(vregPScale, pScale);
+        Ln(vregLnPScale, vregPScale, pregAll);
         Muls(vregMin, vregMin, scaleValue, pregAll);
         Muls(vregMin, vregMin, INV_LN2, pregAll);
         Truncate<float, RoundMode::CAST_CEIL>(vregMin, vregMin, pregAll);
         Muls(vregMin, vregMin, LN2, pregAll);
+        Sub(vregMin, vregMin, vregLnPScale, pregAll);
     }
     StoreAlign<float, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ float *&)dstUb, vregMin, pregAll);
 }
@@ -150,6 +156,8 @@ protected:
     static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型
     uint32_t negativeIntScalar_ = *((uint32_t *)&BOOL_ATTEN_MASK_SCALAR_VALUE);
 
+    float pScaleValue_{1.0f};
+
     uint64_t actSeqLensKv_ = 0;
     uint64_t actSeqLensQ_ = 0;
     // ================================类成员变量====================================
@@ -198,6 +206,11 @@ public:
     __aicore__ inline void InitSoftmaxLseGm(GlobalTensor<float> softmaxLseGm)
     {
         this->softmaxLseGm_ = softmaxLseGm;
+    }
+
+    __aicore__ inline void InitPScaleValue(float pScaleValue)
+    {
+        this->pScaleValue_ = pScaleValue;
     }
 
     __aicore__ inline void InitParams()
@@ -339,16 +352,16 @@ protected:
                      dealRowCountAlign);
         }
     }
-    __aicore__ inline float CalcMinCheckValue()
+    __aicore__ inline void CalcMinCheckValue()
     {
         // 与 FA 侧 UpdateMinCheckValue 保持一致：DN 路径全 mask 行写入的 max 经过了
-        // scaleValue 乘法 + ln2 量化；非 DN 路径保持原始 minValue
+        // scaleValue 乘法 + ln2 量化 + ln(pScale) 偏移；非 DN 路径保持原始 minValue
         uint32_t minBits = NEGATIVE_MIN_VALUE_FP32_LN2; // NEGATIVE_MIN_VALUE_FP32_LN2
         float minValue = *((float *)&minBits);
         LocalTensor<float> minCheckUb = fdMinCheckBuf_;
-        CalcMinCheckValueVF<useDn>((__ubuf__ float *)minCheckUb.GetPhyAddr(), minValue, constInfo_.scaleValue);
+        CalcMinCheckValueVF<useDn>((__ubuf__ float *)minCheckUb.GetPhyAddr(), minValue, constInfo_.scaleValue,
+                                   pScaleValue_);
         AscendC::PipeBarrier<PIPE_V>();
-        return minCheckUb.GetValue(0);
     }
 
     __aicore__ inline void ComputeScaleValue(LocalTensor<T> &lseExp, uint32_t dealRowCount,
@@ -360,8 +373,11 @@ protected:
 
         LocalTensor<T> sinkExpBuf;
         LocalTensor<T> maxLseUb = fdLseUbBuf_;
-        ComputeScaleValue_VF_FD(sinkExpBuf, lseMax, lseSum, lseExp, maxLseUb, lseMaxUb, dealRowCount,
-                                actualCombineLoopSize, constInfo_.isSoftmaxLseEnable, false, CalcMinCheckValue());
+        // minCheckValue 经 UB 传入 VF（__simd_vf__ 末位运行时标量在 AIV 首次调用会丢失，
+        // 会导致 LSE 在合法的 ln2 量化边界 max=0.0 行误输出 inf）
+        CalcMinCheckValue();
+        ComputeScaleValue_VF_FD_MinUb(sinkExpBuf, lseMax, lseSum, lseExp, maxLseUb, lseMaxUb, fdMinCheckBuf_,
+                                      dealRowCount, actualCombineLoopSize, constInfo_.isSoftmaxLseEnable, false);
     }
 
     __aicore__ inline void Bmm2DataCopyOutTrans(LocalTensor<OUTPUT_T> &attenOutUb, uint32_t startRow,
