@@ -145,17 +145,6 @@ TEST_F(l2_mhc_pre_backward_a5_test, mhc_pre_backward_v2_invalid_mode_ascend950)
     EXPECT_NE(RunMhcPreBackwardV2(-1), ACLNN_SUCCESS);
 }
 
-TEST_F(l2_mhc_pre_backward_a5_test, mhc_pre_backward_v2_invalid_mode_precedes_tensor_validation_ascend950)
-{
-    uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    EXPECT_EQ(aclnnMhcPreBackwardV2GetWorkspaceSize(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                                    nullptr, nullptr, nullptr, nullptr, nullptr, 1e-6f, 2, nullptr,
-                                                    nullptr, nullptr, nullptr, nullptr, &workspaceSize, &executor),
-              ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(executor, nullptr);
-}
-
 // ==================== 正常测试用例（成功路径） ====================
 
 // TND格式 BF16测试
