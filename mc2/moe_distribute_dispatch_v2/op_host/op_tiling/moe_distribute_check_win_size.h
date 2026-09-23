@@ -50,6 +50,24 @@ struct CheckWinSizeData {
     bool isMc2Context;
 };
 
+inline ge::graphStatus CalcMinWinSizeA3(const char *nodeName, CheckWinSizeData &winSizeData)
+{
+    const uint64_t h = winSizeData.h;
+    const uint64_t maxBs = winSizeData.globalBs / winSizeData.epWorldSize;
+    const uint64_t tokenNeedSizeCombine =
+        ((h * MAX_OUT_DTYPE_SIZE + WIN_ADDR_ALIGN - 1UL) / WIN_ADDR_ALIGN) * WIN_ADDR_ALIGN;
+    const uint64_t tokenActualLen =
+        ((h * MAX_OUT_DTYPE_SIZE + UB_ALIGN - 1UL) / UB_ALIGN) * UB_ALIGN + SCALE_EXPAND_IDX_BUFFER;
+    const uint64_t tokenDataAlign = winSizeData.isSetFullMeshV2 ? FULL_MESH_DATA_ALIGN : WIN_ADDR_ALIGN;
+    const uint64_t tokenNeedSizeDispatch = ((tokenActualLen + tokenDataAlign - 1UL) / tokenDataAlign) * WIN_ADDR_ALIGN;
+    winSizeData.totalWinSizeEp =
+        ((maxBs * tokenNeedSizeDispatch * winSizeData.epWorldSize * winSizeData.localMoeExpertNum) +
+         (maxBs * tokenNeedSizeCombine * (winSizeData.k + winSizeData.sharedExpertNum))) *
+        DOUBLE_DATA_BUFFER;
+    OP_LOGD(nodeName, "min required EP window size = %lu Bytes.", winSizeData.totalWinSizeEp);
+    return ge::GRAPH_SUCCESS;
+}
+
 inline ge::graphStatus CheckActualWinSize(const gert::TilingContext *context, const char *nodeName,
                                           const CheckWinSizeData winSizeData, const uint64_t maxWindowSizeEp,
                                           const uint64_t hcclBufferSizeEp, const uint64_t tokenNeedSizeDispatch,
