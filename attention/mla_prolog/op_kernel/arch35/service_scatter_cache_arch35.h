@@ -43,40 +43,39 @@ __aicore__ inline int64_t CeilDiv64(int64_t x, int64_t y)
 
 struct ScatterCacheParams {
     int64_t blockSize;
-    int64_t paTokenIndex;
+    int64_t paTokenIdx;
     int64_t row;
     int64_t col;
-    int64_t stride;
+    int64_t tokenStride;
     int64_t cacheStride0;
-    int64_t seqLength;
-    int64_t tokenIndex;
+    int64_t seqLen;
+    int64_t tokenIdx;
 };
 
-__aicore__ inline int64_t GetCacheOffset(int64_t paTokenIndex, int64_t blockSize, int64_t tokenStride,
-                                         int64_t cacheStride0)
+__aicore__ inline int64_t GetCacheOffset(int64_t tokenIdx, int64_t blkSize, int64_t tknStride, int64_t cacheStride)
 {
-    if (blockSize <= 0) {
-        return paTokenIndex * cacheStride0;
+    if (blkSize <= 0) {
+        return tokenIdx * cacheStride;
     }
-    int64_t blockIndex = paTokenIndex / blockSize;
-    int64_t tokenIndexInBlock = paTokenIndex % blockSize;
-    return blockIndex * cacheStride0 + tokenIndexInBlock * tokenStride;
+    int64_t blkIdx = tokenIdx / blkSize;
+    int64_t idxInBlock = tokenIdx % blkSize;
+    return blkIdx * cacheStride + idxInBlock * tknStride;
 }
 
 template <typename T, bool IS_NZ>
 __aicore__ inline void ScatterCache(const GlobalTensor<T> &cacheGm, const LocalTensor<T> &inputLocal,
                                     const ScatterCacheParams &scatterCacheParams)
 {
-    if (scatterCacheParams.paTokenIndex < 0) {
+    if (scatterCacheParams.paTokenIdx < 0) {
         return;
     }
     if constexpr (!IS_NZ) {
-        int64_t cacheOffset = GetCacheOffset(scatterCacheParams.paTokenIndex, scatterCacheParams.blockSize,
-                                             scatterCacheParams.stride, scatterCacheParams.cacheStride0);
+        int64_t cacheOffset = GetCacheOffset(scatterCacheParams.paTokenIdx, scatterCacheParams.blockSize,
+                                             scatterCacheParams.tokenStride, scatterCacheParams.cacheStride0);
         DataCopy(cacheGm[cacheOffset], inputLocal, scatterCacheParams.col);
     } else {
         constexpr uint8_t col0 = ALIGN_BLOCK_SIZE / sizeof(T);
-        int64_t cacheOffset = GetCacheOffset(scatterCacheParams.paTokenIndex, scatterCacheParams.blockSize, col0,
+        int64_t cacheOffset = GetCacheOffset(scatterCacheParams.paTokenIdx, scatterCacheParams.blockSize, col0,
                                              scatterCacheParams.cacheStride0);
         DataCopyParams copyParams{static_cast<uint16_t>(scatterCacheParams.col / col0), 1, 0,
                                   static_cast<uint16_t>(scatterCacheParams.blockSize - 1)};
@@ -88,15 +87,15 @@ template <typename T, bool IS_NZ>
 __aicore__ inline void ScatterCacheUnAligned(const GlobalTensor<T> &cacheGm, const LocalTensor<T> &inputLocal,
                                              const ScatterCacheParams &scatterCacheParams)
 {
-    if (scatterCacheParams.paTokenIndex < 0) {
+    if (scatterCacheParams.paTokenIdx < 0) {
         return;
     }
     if constexpr (!IS_NZ) {
-        int64_t cacheOffset = GetCacheOffset(scatterCacheParams.paTokenIndex, scatterCacheParams.blockSize,
-                                             scatterCacheParams.stride, scatterCacheParams.cacheStride0);
+        int64_t dstOffset = GetCacheOffset(scatterCacheParams.paTokenIdx, scatterCacheParams.blockSize,
+                                           scatterCacheParams.tokenStride, scatterCacheParams.cacheStride0);
         // blockCount, blockLen, srcStride, dstStride
-        DataCopyParams dataCopyParams{1, static_cast<uint16_t>(scatterCacheParams.col * sizeof(T)), 0, 0};
-        DataCopyPad(cacheGm[cacheOffset], inputLocal, dataCopyParams);
+        DataCopyParams padCopyParams{1, static_cast<uint16_t>(scatterCacheParams.col * sizeof(T)), 0, 0};
+        DataCopyPad(cacheGm[dstOffset], inputLocal, padCopyParams);
     }
 }
 

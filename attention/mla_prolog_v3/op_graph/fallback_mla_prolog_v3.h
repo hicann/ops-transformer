@@ -13,18 +13,18 @@
 
 #include <vector>
 #include "log/log.h"
+#include "../../mla_prolog/op_graph/fallback_mla_prolog.h"
 #include "fallback/fallback_comm.h"
 #include "fallback/fallback.h"
-#include "../../mla_prolog/op_graph/fallback_mla_prolog.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 namespace fallback {
 
-constexpr size_t DEQUANT_SCALE_Q_NOPE_INDEX = 4;
 constexpr size_t QUERY_NORM_INDEX = 5;
 constexpr size_t DEQUANT_SCALE_Q_NORM_INDEX = 6;
+constexpr size_t DEQUANT_SCALE_Q_NOPE_INDEX = 4;
 
 // INPUT
 constexpr size_t TOKEN_X_INDEX_V3 = 0;

@@ -60,33 +60,33 @@ class TensorHolder {
 public:
     TensorHolder(const aclTensor *&output, aclDataType dataType, std::string varName)
     {
-        inner_ = nullptr;
-        name_ = varName;
+        holderTensor_ = nullptr;
+        holderName_ = varName;
         if (output == nullptr) {
             std::vector<int64_t> shape = {0};
             int64_t addr = 0xff;
-            inner_ = aclCreateTensor(shape.data(), shape.size(), dataType, shape.data(), 0, ACL_FORMAT_ND, shape.data(),
-                                     shape.size(), static_cast<void *>(&addr));
-            output = inner_;
+            holderTensor_ = aclCreateTensor(shape.data(), shape.size(), dataType, shape.data(), 0, ACL_FORMAT_ND,
+                                            shape.data(), shape.size(), static_cast<void *>(&addr));
+            output = holderTensor_;
         }
     }
 
     ~TensorHolder()
     {
-        if (inner_) {
-            aclDestroyTensor(inner_);
-            inner_ = nullptr;
+        if (holderTensor_) {
+            aclDestroyTensor(holderTensor_);
+            holderTensor_ = nullptr;
         }
     }
 
     bool CheckTensorConditionalNotNull(bool conditional) const
     {
-        if (inner_ && conditional) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMlaPrologV4", name_.c_str(), "null",
+        if (holderTensor_ && conditional) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMlaPrologV4", holderName_.c_str(), "null",
                                                   "this parameter is required under current configuration");
             return false;
-        } else if (!inner_ && !conditional) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMlaPrologV4", name_.c_str(), "not null",
+        } else if (!holderTensor_ && !conditional) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMlaPrologV4", holderName_.c_str(), "not null",
                                                   "this parameter should be empty under current configuration");
             return false;
         }
@@ -95,12 +95,12 @@ public:
 
     bool IsTensorNotNull() const
     {
-        return inner_ == nullptr;
+        return holderTensor_ == nullptr;
     }
 
 private:
-    const aclTensor *inner_;
-    std::string name_;
+    const aclTensor *holderTensor_;
+    std::string holderName_;
 };
 
 bool CheckWeightQuantModeValidity(int64_t weightQuantMode)
