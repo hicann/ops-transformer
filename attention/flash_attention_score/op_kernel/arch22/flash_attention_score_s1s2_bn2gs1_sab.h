@@ -2151,6 +2151,7 @@ FlashAttentionScoreS1s2Bn2gs1SameAB<implMode, layOutType, hasPse, hasAtten, hasD
     }
 
     if (extraInfo.s2LastLoop && extraInfo.s2RealSize % 64 != 0) {
+        AscendC::PipeBarrier<PIPE_V>();
         uint64_t mask[2] = {extraInfo.duplicateMask, 0};
         Duplicate<T>(srcTensor[extraInfo.s2RealSizeFloorAlign8], this->negativeFloatScalar, mask, vec1S1RealSize, 1,
                      extraInfo.s2RealSizeAlign64 * sizeof(T) / blockBytes);
