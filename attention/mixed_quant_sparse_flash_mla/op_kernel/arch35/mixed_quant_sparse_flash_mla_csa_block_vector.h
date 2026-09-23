@@ -123,6 +123,7 @@ public:
 
     // 初始化LocalTensor
     __aicore__ inline void InitLocalBuffer(ConstInfo<HIGH_PERF> &constInfo, uint32_t ubBaseAddr);
+    __aicore__ inline void InitSinks(ConstInfo<HIGH_PERF> &constInfo);
     __aicore__ inline void InitFDBuffers(FdRunInfo &fdRunInfo);
     // 初始化attentionOutGM
     __aicore__ inline void CleanOutput(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse,
@@ -2275,9 +2276,15 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitLocalBuffer(ConstInfo<HIG
     if constexpr (IS_BATCH_CONSISTENCY) {
         SetFlag<HardEvent::MTE3_MTE2>(INNERCORE_FD_MTE3_MTE2);
     }
+}
 
-    if (this->isSinks) {
-        InitSinksBuffer(constInfo);
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitSinks(ConstInfo<HIGH_PERF> &constInfo)
+{
+    if ASCEND_IS_AIV {
+        if (this->isSinks) {
+            InitSinksBuffer(constInfo);
+        }
     }
 }
 
@@ -2343,6 +2350,7 @@ public:
                                         __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedOriKv,
                                         __gm__ uint8_t *sequsedCmpKv, __gm__ uint8_t *cmpResidualKv) {};
     __aicore__ inline void InitLocalBuffer(ConstInfo<HIGH_PERF> &constInfo, uint32_t ubBaseAddr) {}
+    __aicore__ inline void InitSinks(ConstInfo<HIGH_PERF> &constInfo) {}
     __aicore__ inline void InitFDBuffers(FdRunInfo &fdRunInfo) {}
     __aicore__ inline void ProcessVec1(StaticBuffer<Q_T> &outputBuf, StaticBuffer<T> &bmm1ResBuf,
                                        RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo)
