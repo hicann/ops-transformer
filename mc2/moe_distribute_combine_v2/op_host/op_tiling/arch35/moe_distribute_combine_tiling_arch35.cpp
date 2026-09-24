@@ -214,25 +214,6 @@ inline void SetEpTpInfo(MoeDistributeCombineV2TilingData &tilingData, const uint
     tilingData.moeDistributeCombineV2Info.epRankId = epRankId;
 }
 
-static ge::graphStatus CheckAttrPointers(const char *nodeName, const int64_t *epWorldSizePtr,
-                                         const int64_t *epRankIdPtr, const int64_t *expertShardTypePtr,
-                                         const int64_t *sharedExpertRankNumPtr, const int64_t *moeExpertNumPtr,
-                                         const int64_t *sharedExpertNumPtr)
-{
-    OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "epWorldSize"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(epRankIdPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "epRankId"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(expertShardTypePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertShardType"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(sharedExpertRankNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "sharedExpertRankNum"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(moeExpertNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "moeExpertNum"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(sharedExpertNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "sharedExpertNum"),
-                    return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
-}
-
 static ge::graphStatus GetAttrAndSetTilingData(const gert::TilingContext *context,
                                                MoeDistributeCombineV2TilingData &tilingData, std::string &groupEp)
 {
@@ -246,10 +227,17 @@ static ge::graphStatus GetAttrAndSetTilingData(const gert::TilingContext *contex
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>(ATTRS_MOE_EXPERT_NUM_INDEX);
     auto sharedExpertNumPtr = attrs->GetAttrPointer<int64_t>(static_cast<int>(ATTRS_SHARED_EXPERT_NUM_INDEX));
     // 判空
-    if (CheckAttrPointers(nodeName, epWorldSizePtr, epRankIdPtr, expertShardTypePtr, sharedExpertRankNumPtr,
-                          moeExpertNumPtr, sharedExpertNumPtr) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
+    OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "epWorldSize"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(epRankIdPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "epRankId"), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(expertShardTypePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertShardType"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(sharedExpertRankNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "sharedExpertRankNum"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(moeExpertNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "moeExpertNum"),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(sharedExpertNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "sharedExpertNum"),
+                    return ge::GRAPH_FAILED);
     // 判断是否满足uint32_t及其他限制
     OP_TILING_CHECK(CheckEpAndTpWorldSize(context, groupEp) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "CheckEpAndTpWorldSize failed."), return ge::GRAPH_FAILED);
@@ -425,9 +413,20 @@ static bool CheckAndSetAttrs(const gert::TilingContext *context, MoeDistributeCo
     return true;
 }
 
-inline ge::graphStatus CheckSharedExpertXDim(const char *nodeName, const gert::StorageShape *sharedExpertXShape,
-                                             int64_t expertIdsDim0, int64_t expandXDim1)
+inline ge::graphStatus CheckSharedExpertXShape(const gert::TilingContext *context,
+                                               MoeDistributeCombineV2TilingData &tilingData)
 {
+    const char *nodeName = context->GetNodeName();
+    const gert::StorageShape *sharedExpertXShape = context->GetOptionalInputShape(SHARED_EXPERT_X_INDEX);
+    uint32_t isSharedExpertX = (sharedExpertXShape != nullptr) ? ENABLE : NOT_ENABLE;
+    tilingData.moeDistributeCombineV2Info.hasSharedExpertX = isSharedExpertX;
+    const gert::StorageShape *expandXStorageShape = context->GetInputShape(EXPAND_X_INDEX);
+    int64_t expandXDim1 = expandXStorageShape->GetStorageShape().GetDim(1);
+    const gert::StorageShape *expertIdsStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
+    int64_t expertIdsDim0 = expertIdsStorageShape->GetStorageShape().GetDim(0);
+    if (sharedExpertXShape == nullptr) {
+        return ge::GRAPH_SUCCESS;
+    }
     int64_t sharedExpertXDim0 = sharedExpertXShape->GetStorageShape().GetDim(0);
     int64_t sharedExpertXDim1 = sharedExpertXShape->GetStorageShape().GetDim(1);
     if (sharedExpertXShape->GetStorageShape().GetDimNum() == TWO_DIMS) {
@@ -468,20 +467,6 @@ inline ge::graphStatus CheckSharedExpertXDim(const char *nodeName, const gert::S
     return ge::GRAPH_SUCCESS;
 }
 
-inline ge::graphStatus CheckSharedExpertXShape(const gert::TilingContext *context,
-                                               MoeDistributeCombineV2TilingData &tilingData)
-{
-    const char *nodeName = context->GetNodeName();
-    const gert::StorageShape *sharedExpertXShape = context->GetOptionalInputShape(SHARED_EXPERT_X_INDEX);
-    tilingData.moeDistributeCombineV2Info.hasSharedExpertX = (sharedExpertXShape != nullptr) ? ENABLE : NOT_ENABLE;
-    if (sharedExpertXShape == nullptr) {
-        return ge::GRAPH_SUCCESS;
-    }
-    int64_t expandXDim1 = context->GetInputShape(EXPAND_X_INDEX)->GetStorageShape().GetDim(1);
-    int64_t expertIdsDim0 = context->GetInputShape(EXPERT_IDS_INDEX)->GetStorageShape().GetDim(0);
-    return CheckSharedExpertXDim(nodeName, sharedExpertXShape, expertIdsDim0, expandXDim1);
-}
-
 inline ge::graphStatus CheckEpSendCountShape(const gert::TilingContext *context,
                                              const MoeDistributeCombineV2TilingData &tilingData)
 
@@ -509,9 +494,13 @@ inline ge::graphStatus CheckEpSendCountShape(const gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-inline ge::graphStatus CheckExpandIdxShape(const gert::TilingContext *context, const char *nodeName,
-                                           int64_t expertIdsDim0, int64_t expertIdsDim1)
+inline ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
+                                             MoeDistributeCombineV2TilingData &tilingData)
 {
+    const gert::StorageShape *expertIdsStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
+    int64_t expertIdsDim0 = expertIdsStorageShape->GetStorageShape().GetDim(0);
+    int64_t expertIdsDim1 = expertIdsStorageShape->GetStorageShape().GetDim(1);
+    const char *nodeName = context->GetNodeName();
     // 校验expandIdx的维度
     const gert::StorageShape *expandIdxStorageShape = context->GetInputShape(EXPAND_IDX_INDEX);
     OP_TILING_CHECK(expandIdxStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandIdx"),
@@ -524,12 +513,20 @@ inline ge::graphStatus CheckExpandIdxShape(const gert::TilingContext *context, c
                          ", k=" + std::to_string(expertIdsDim1))
                             .c_str()),
                     return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
-}
+    // 校验xActiveMask的维度
+    const gert::StorageShape *xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
+    if ((OpVersionManager::GetInstance().GetVersion() != OP_VERSION_1) && (xActiveMaskStorageShape != nullptr)) {
+        const int64_t xActiveMaskDim0 = xActiveMaskStorageShape->GetStorageShape().GetDim(0);
+        OP_TILING_CHECK(xActiveMaskDim0 != expertIdsDim0,
+                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                            nodeName, "xActiveMask", std::to_string(xActiveMaskDim0).c_str(),
+                            ("The dim0 of xActiveMask should equal to Bs=" + std::to_string(expertIdsDim0)).c_str()),
+                        return ge::GRAPH_FAILED);
+    }
+    // 校验epSendCount的维度
+    OP_TILING_CHECK(CheckEpSendCountShape(context, tilingData) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "CheckEpSendCountShape failed."), return ge::GRAPH_FAILED);
 
-inline ge::graphStatus CheckExpertScalesShape(const gert::TilingContext *context, const char *nodeName,
-                                              int64_t expertIdsDim0, int64_t expertIdsDim1)
-{
     // 校验expertScales的维度
     const gert::StorageShape *expertScalesStorageShape = context->GetInputShape(EXPERT_SCALES_INDEX);
     OP_TILING_CHECK(expertScalesStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertScales"),
@@ -550,36 +547,6 @@ inline ge::graphStatus CheckExpertScalesShape(const gert::TilingContext *context
             ("[" + std::to_string(expertScalesDim0) + ", " + std::to_string(expertScalesDim1) + "]").c_str(),
             ("expertScales' dim1 should equal to k=" + std::to_string(expertIdsDim1)).c_str()),
         return ge::GRAPH_FAILED);
-    return ge::GRAPH_SUCCESS;
-}
-
-inline ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
-                                             MoeDistributeCombineV2TilingData &tilingData)
-{
-    const gert::StorageShape *expertIdsStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
-    int64_t expertIdsDim0 = expertIdsStorageShape->GetStorageShape().GetDim(0);
-    int64_t expertIdsDim1 = expertIdsStorageShape->GetStorageShape().GetDim(1);
-    const char *nodeName = context->GetNodeName();
-
-    OP_TILING_CHECK(CheckExpandIdxShape(context, nodeName, expertIdsDim0, expertIdsDim1) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CheckExpandIdxShape failed."), return ge::GRAPH_FAILED);
-
-    // 校验xActiveMask的维度
-    const gert::StorageShape *xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
-    if ((OpVersionManager::GetInstance().GetVersion() != OP_VERSION_1) && (xActiveMaskStorageShape != nullptr)) {
-        const int64_t xActiveMaskDim0 = xActiveMaskStorageShape->GetStorageShape().GetDim(0);
-        OP_TILING_CHECK(xActiveMaskDim0 != expertIdsDim0,
-                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                            nodeName, "xActiveMask", std::to_string(xActiveMaskDim0).c_str(),
-                            ("The dim0 of xActiveMask should equal to Bs=" + std::to_string(expertIdsDim0)).c_str()),
-                        return ge::GRAPH_FAILED);
-    }
-    // 校验epSendCount的维度
-    OP_TILING_CHECK(CheckEpSendCountShape(context, tilingData) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CheckEpSendCountShape failed."), return ge::GRAPH_FAILED);
-    // 校验expertScales的维度
-    OP_TILING_CHECK(CheckExpertScalesShape(context, nodeName, expertIdsDim0, expertIdsDim1) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CheckExpertScalesShape failed."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckSharedExpertXShape(context, tilingData) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "CheckSharedExpertXShape failed."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
@@ -616,13 +583,21 @@ inline void CalculateAValue(const MoeDistributeCombineV2TilingData &tilingData, 
     }
 }
 
-static bool CheckAndSetExpandXShape(gert::TilingContext *context, MoeDistributeCombineV2TilingData &tilingData,
-                                    const char *nodeName, uint32_t A, int64_t &expandXDim1)
+static bool CheckTensorShape(gert::TilingContext *context, MoeDistributeCombineV2TilingData &tilingData,
+                             uint32_t localExpertNum)
 {
+    const char *nodeName = context->GetNodeName();
+    // 校验输入expertIds的维度1并设k, bs已校验过
+    const gert::StorageShape *expertIdsStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
+    int64_t expertIdsDim0 = expertIdsStorageShape->GetStorageShape().GetDim(0);
+    int64_t expertIdsDim1 = expertIdsStorageShape->GetStorageShape().GetDim(1);
+
+    uint32_t A = 0;
+    CalculateAValue(tilingData, A, localExpertNum, expertIdsDim1);
     // 校验expandX的维度并设h
     const gert::StorageShape *expandXStorageShape = context->GetInputShape(EXPAND_X_INDEX);
     int64_t expandXDim0 = expandXStorageShape->GetStorageShape().GetDim(0);
-    expandXDim1 = expandXStorageShape->GetStorageShape().GetDim(1);
+    int64_t expandXDim1 = expandXStorageShape->GetStorageShape().GetDim(1);
     OP_TILING_CHECK(expandXDim0 < static_cast<int64_t>(A),
                     OP_LOGE(nodeName,
                             "expandX's dim0 should be greater than or equal to A, "
@@ -643,12 +618,17 @@ static bool CheckAndSetExpandXShape(gert::TilingContext *context, MoeDistributeC
                         return ge::GRAPH_FAILED);
     }
     tilingData.moeDistributeCombineV2Info.h = static_cast<uint32_t>(expandXDim1);
-    return true;
-}
 
-static bool CheckOutputXShape(gert::TilingContext *context, const char *nodeName, int64_t expertIdsDim0,
-                              int64_t expandXDim1)
-{
+    const int64_t maxK =
+        (OpVersionManager::GetInstance().GetVersion() == OP_VERSION_1) ? K_UPPER_BOUND_V1 : K_UPPER_BOUND_V2;
+    OP_TILING_CHECK((expertIdsDim1 <= 0) || (expertIdsDim1 > maxK),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "expertIds(k)", std::to_string(expertIdsDim1).c_str(),
+                                              ("should be in (0, " + std::to_string(maxK) + "]").c_str()),
+                    return false);
+    tilingData.moeDistributeCombineV2Info.k = static_cast<uint32_t>(expertIdsDim1);
+    // 校验expandIdx、epSendCount、expertScales的维度
+    OP_TILING_CHECK(CheckInputTensorShape(context, tilingData) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "CheckInputTensorShape failed."), return false);
     // 校验x的维度
     const gert::StorageShape *xStorageShape = context->GetOutputShape(OUTPUT_X_INDEX);
     OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "x"), return false);
@@ -666,38 +646,7 @@ static bool CheckOutputXShape(gert::TilingContext *context, const char *nodeName
             nodeName, "x(output)", ("[" + std::to_string(xDim0) + ", " + std::to_string(xDim1) + "]").c_str(),
             ("x's dim1 should equal to h=" + std::to_string(expandXDim1)).c_str()),
         return false);
-    return true;
-}
 
-static bool CheckTensorShape(gert::TilingContext *context, MoeDistributeCombineV2TilingData &tilingData,
-                             uint32_t localExpertNum)
-{
-    const char *nodeName = context->GetNodeName();
-    // 校验输入expertIds的维度1并设k, bs已校验过
-    const gert::StorageShape *expertIdsStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
-    int64_t expertIdsDim0 = expertIdsStorageShape->GetStorageShape().GetDim(0);
-    int64_t expertIdsDim1 = expertIdsStorageShape->GetStorageShape().GetDim(1);
-
-    uint32_t A = 0;
-    CalculateAValue(tilingData, A, localExpertNum, expertIdsDim1);
-    int64_t expandXDim1 = 0;
-    if (!CheckAndSetExpandXShape(context, tilingData, nodeName, A, expandXDim1)) {
-        return false;
-    }
-
-    const int64_t maxK =
-        (OpVersionManager::GetInstance().GetVersion() == OP_VERSION_1) ? K_UPPER_BOUND_V1 : K_UPPER_BOUND_V2;
-    OP_TILING_CHECK((expertIdsDim1 <= 0) || (expertIdsDim1 > maxK),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "expertIds(k)", std::to_string(expertIdsDim1).c_str(),
-                                              ("should be in (0, " + std::to_string(maxK) + "]").c_str()),
-                    return false);
-    tilingData.moeDistributeCombineV2Info.k = static_cast<uint32_t>(expertIdsDim1);
-    // 校验expandIdx、epSendCount、expertScales的维度
-    OP_TILING_CHECK(CheckInputTensorShape(context, tilingData) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CheckInputTensorShape failed."), return false);
-    if (!CheckOutputXShape(context, nodeName, expertIdsDim0, expandXDim1)) {
-        return false;
-    }
     return true;
 }
 
@@ -781,43 +730,6 @@ static void SetTilingKey(gert::TilingContext *context)
     OP_LOGD(nodeName, "tilingKey is %lu", tilingKey);
 }
 
-static ge::graphStatus CheckAndSetXActiveMask(gert::TilingContext *context,
-                                              MoeDistributeCombineV2TilingData &tilingData, const char *nodeName)
-{
-    // X active mask
-    const gert::StorageShape *xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
-    bool isTokenMask = (xActiveMaskStorageShape != nullptr);
-    tilingData.moeDistributeCombineV2Info.isTokenMask = isTokenMask;
-    if (OpVersionManager::GetInstance().GetVersion() == OP_VERSION_1) {
-        OP_TILING_CHECK(
-            MoeDistributeCombineTilingHelper::TilingCheckMoeDistributeCombine(context, nodeName) != ge::GRAPH_SUCCESS,
-            OP_LOGE(nodeName, "Tiling check params failed"), return ge::GRAPH_FAILED);
-    } else {
-        OP_TILING_CHECK(MoeDistributeCombineTilingHelper::TilingCheckMoeDistributeCombineA5(
-                            context, nodeName, isTokenMask) != ge::GRAPH_SUCCESS,
-                        OP_LOGE(nodeName, "Tiling check params failed"), return ge::GRAPH_FAILED);
-    }
-    return ge::GRAPH_SUCCESS;
-}
-
-static ge::graphStatus FinalizeA5Tiling(gert::TilingContext *context, MoeDistributeCombineV2TilingData &tilingData,
-                                        uint32_t localMoeExpertNum, const std::string &groupEp, const char *nodeName)
-{
-    OP_TILING_CHECK(CheckCommAttrs(nodeName, tilingData, localMoeExpertNum) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "CheckCommAttrs failed."), return ge::GRAPH_FAILED);
-    // A5 实际物理分配为 HCCL_BUFFSIZE 的 2 倍
-    tilingData.moeDistributeCombineV2Info.totalWinSizeEp = mc2tiling::Mc2TilingUtils::GetMaxWindowSize() * 2UL;
-    OP_TILING_CHECK(SetWorkSpace(context, tilingData, localMoeExpertNum) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "Tiling set workspace Failed"), return ge::GRAPH_FAILED);
-    SetHcclTiling(context, tilingData, groupEp);
-    // Tiling Key support only 1 scenario in current version
-    SetTilingKey(context);
-    // Platform
-    SetPlatformInfo(context, tilingData);
-    PrintTilingDataInfo(nodeName, tilingData);
-    return ge::GRAPH_SUCCESS;
-}
-
 ge::graphStatus MoeDistributeCombineTilingImpl(gert::TilingContext *context, const uint32_t opVersion)
 {
     OpVersionManager::SetVersion(opVersion);
@@ -834,8 +746,17 @@ ge::graphStatus MoeDistributeCombineTilingImpl(gert::TilingContext *context, con
     OP_TILING_CHECK(GetAttrAndSetTilingData(context, *tilingData, groupEp) == ge::GRAPH_FAILED,
                     OP_LOGE(nodeName, "Getting attr failed."), return ge::GRAPH_FAILED);
     // X active mask
-    if (CheckAndSetXActiveMask(context, *tilingData, nodeName) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
+    const gert::StorageShape *xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
+    bool isTokenMask = (xActiveMaskStorageShape != nullptr);
+    tilingData->moeDistributeCombineV2Info.isTokenMask = isTokenMask;
+    if (OpVersionManager::GetInstance().GetVersion() == OP_VERSION_1) {
+        OP_TILING_CHECK(
+            MoeDistributeCombineTilingHelper::TilingCheckMoeDistributeCombine(context, nodeName) != ge::GRAPH_SUCCESS,
+            OP_LOGE(nodeName, "Tiling check params failed"), return ge::GRAPH_FAILED);
+    } else {
+        OP_TILING_CHECK(MoeDistributeCombineTilingHelper::TilingCheckMoeDistributeCombineA5(
+                            context, nodeName, isTokenMask) != ge::GRAPH_SUCCESS,
+                        OP_LOGE(nodeName, "Tiling check params failed"), return ge::GRAPH_FAILED);
     }
     // Check and Set Attrs
     OP_TILING_CHECK(!CheckAndSetAttrs(context, *tilingData, localMoeExpertNum),
@@ -844,9 +765,18 @@ ge::graphStatus MoeDistributeCombineTilingImpl(gert::TilingContext *context, con
     OP_TILING_CHECK(!CheckTensorShape(context, *tilingData, localMoeExpertNum),
                     OP_LOGE(nodeName, "param dim check failed."), return ge::GRAPH_FAILED);
     // Comm
-    if (FinalizeA5Tiling(context, *tilingData, localMoeExpertNum, groupEp, nodeName) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_FAILED;
-    }
+    OP_TILING_CHECK(CheckCommAttrs(nodeName, *tilingData, localMoeExpertNum) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "CheckCommAttrs failed."), return ge::GRAPH_FAILED);
+    // A5 实际物理分配为 HCCL_BUFFSIZE 的 2 倍
+    tilingData->moeDistributeCombineV2Info.totalWinSizeEp = mc2tiling::Mc2TilingUtils::GetMaxWindowSize() * 2UL;
+    OP_TILING_CHECK(SetWorkSpace(context, *tilingData, localMoeExpertNum) != ge::GRAPH_SUCCESS,
+                    OP_LOGE(nodeName, "Tiling set workspace Failed"), return ge::GRAPH_FAILED);
+    SetHcclTiling(context, *tilingData, groupEp);
+    // Tiling Key support only 1 scenario in current version
+    SetTilingKey(context);
+    // Platform
+    SetPlatformInfo(context, *tilingData);
+    PrintTilingDataInfo(nodeName, *tilingData);
     OP_LOGD(nodeName, "Finish MoeDistributeCombine tiling.");
     return ge::GRAPH_SUCCESS;
 }

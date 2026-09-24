@@ -250,6 +250,50 @@ enum class MoeDistributeCombineAttrIdx : size_t {
     K_GROUP_LIST_TYPE
 };
 
+enum class MoeDistributeCombineV2InputIdx : size_t {
+    K_EXPAND_X,
+    K_EXPERT_IDS,
+    K_ASSIST_INFO_FOR_COMBINE,
+    K_EP_SEND_COUNTS,
+    K_EXPERT_SCALES,
+    K_TP_SEND_COUNTS,
+    K_X_ACTIVE_MASK,
+    K_ACTIVATION_SCALE,
+    K_WEIGHT_SCALE,
+    K_GROUP_LIST,
+    K_SHARED_EXPERT_X,
+    K_ELASTIC_INFO,
+    K_ORI_X,
+    K_CONST_EXPERT_ALPHA_1,
+    K_CONST_EXPERT_ALPHA_2,
+    K_CONST_EXPERT_V
+};
+
+enum class MoeDistributeCombineV2OutputIdx : size_t {
+    K_X
+};
+
+enum class MoeDistributeCombineV2AttrIdx : size_t {
+    K_GROUP_EP,
+    K_EP_WORLD_SIZE,
+    K_EP_RANK_ID,
+    K_MOE_EXPERT_NUM,
+    K_GROUP_TP,
+    K_TP_WORLD_SIZE,
+    K_TP_RANK_ID,
+    K_EXPERT_SHARD_TYPE,
+    K_SHARED_EXPERT_NUM,
+    K_SHARED_EXPERT_RANK_NUM,
+    K_GLOBAL_BS,
+    K_OUT_DTYPE,
+    K_COMM_QUANT_MODE,
+    K_GROUP_LIST_TYPE,
+    K_COMM_ALG,
+    K_ZERO_EXPERT_NUM,
+    K_COPY_EXPERT_NUM,
+    K_CONST_EXPERT_NUM
+};
+
 enum class AlltoAllAllGatherBmmAttrIdx : size_t {
     K_GROUP_EP,
     K_GROUP_TP,
