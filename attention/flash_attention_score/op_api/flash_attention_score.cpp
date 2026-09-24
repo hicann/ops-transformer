@@ -14,24 +14,24 @@
 using namespace op;
 
 namespace {
-    bool FakeArray(const aclIntArray *inArray, aclTensor *&outTensor)
-    {
-        OP_LOGD("start fake tensor");
-        if (inArray != nullptr) {
-            OP_LOGD("input array is not nullptr");
-            int64_t size = static_cast<int64_t>(inArray->Size());
-            std::vector<int64_t> shape = {size};
-            outTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_INT64, nullptr,
-                                        0, ACL_FORMAT_ND, shape.data(), shape.size(), nullptr);
-            if (outTensor == nullptr) {
-                OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Try alloc tensor failed");
-                return false;
-            }
+bool FakeArray(const aclIntArray *inArray, aclTensor *&outTensor)
+{
+    OP_LOGD("start fake tensor");
+    if (inArray != nullptr) {
+        OP_LOGD("input array is not nullptr");
+        int64_t size = static_cast<int64_t>(inArray->Size());
+        std::vector<int64_t> shape = {size};
+        outTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_INT64, nullptr, 0, ACL_FORMAT_ND,
+                                    shape.data(), shape.size(), nullptr);
+        if (outTensor == nullptr) {
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Try alloc tensor failed");
+            return false;
         }
-        OP_LOGD("end fake tensor");
-        return true;
     }
+    OP_LOGD("end fake tensor");
+    return true;
 }
+} // namespace
 
 namespace l0op {
 
@@ -44,41 +44,20 @@ const std::array<const aclTensor *, 4> FlashAttentionScore(
     const aclIntArray *actualSeqKvLenOptional, const aclIntArray *qStartIdxOptional,
     const aclIntArray *kvStartIdxOptional, const aclTensor *dScaleQOptional, const aclTensor *dScaleKOptional,
     const aclTensor *dScaleVOptional, const aclTensor *pScaleOptional, const aclTensor *queryRopeOptional,
-    const aclTensor *keyRopeOptional, double scaleValue, double keepProb, int64_t preTockens,
-    int64_t nextTockens, int64_t headNum, const char *inputLayout, int64_t innerPrecise,
-    int64_t sparseMode, int64_t pseType, int64_t seed, int64_t offset, int64_t outDtype, const char *softmaxOutLayout,
-    aclOpExecutor *executor, bool isMaxWorkspace = false)
+    const aclTensor *keyRopeOptional, double scaleValue, double keepProb, int64_t preTockens, int64_t nextTockens,
+    int64_t headNum, const char *inputLayout, int64_t innerPrecise, int64_t sparseMode, int64_t pseType, int64_t seed,
+    int64_t offset, int64_t outDtype, const char *softmaxOutLayout, aclOpExecutor *executor,
+    bool isMaxWorkspace = false)
 {
     L0_DFX(FlashAttentionScore, query, key, value, realShiftOptional, dropMaskOptional, paddingMaskOptional,
-           attenMaskOptional, sinkOptional, prefixOptional, actualSeqQLenOptional, actualSeqKvLenOptional, qStartIdxOptional,
-           kvStartIdxOptional, dScaleQOptional, dScaleKOptional, dScaleVOptional, pScaleOptional, queryRopeOptional,
-           keyRopeOptional, scaleValue, keepProb, preTockens, nextTockens, headNum, inputLayout, innerPrecise, sparseMode,
-           pseType, seed, offset, outDtype, softmaxOutLayout);
+           attenMaskOptional, sinkOptional, prefixOptional, actualSeqQLenOptional, actualSeqKvLenOptional,
+           qStartIdxOptional, kvStartIdxOptional, dScaleQOptional, dScaleKOptional, dScaleVOptional, pScaleOptional,
+           queryRopeOptional, keyRopeOptional, scaleValue, keepProb, preTockens, nextTockens, headNum, inputLayout,
+           innerPrecise, sparseMode, pseType, seed, offset, outDtype, softmaxOutLayout);
 
-    if (realShiftOptional == nullptr) {
-        realShiftOptional = executor->AllocTensor(query->GetDataType(), Format::FORMAT_ND, Format::FORMAT_ND);
-    }
-    if (dropMaskOptional == nullptr) {
-        dropMaskOptional = executor->AllocTensor(DataType::DT_UINT8, Format::FORMAT_ND, Format::FORMAT_ND);
-    }
-    if (paddingMaskOptional == nullptr) {
-        paddingMaskOptional = executor->AllocTensor(query->GetDataType(), Format::FORMAT_ND, Format::FORMAT_ND);
-    }
-    if (attenMaskOptional == nullptr) {
-        attenMaskOptional = executor->AllocTensor(DataType::DT_BOOL, Format::FORMAT_ND, Format::FORMAT_ND);
-    }
-    if (dScaleQOptional == nullptr) {
-        dScaleQOptional = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
-    }
-    if (dScaleKOptional == nullptr) {
-        dScaleKOptional = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
-    }
-    if (dScaleVOptional == nullptr) {
-        dScaleVOptional = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
-    }
-    if (pScaleOptional == nullptr) {
-        pScaleOptional = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
-    }
+    // Preserve absent inputs as nullptr through shape inference and launcher
+    // registration, avoiding workspace-backed placeholders that may alias the
+    // kernel workspace start address.
 
     const aclTensor *prefixOptionalTensor = nullptr;
     if (prefixOptional) {
@@ -86,8 +65,6 @@ const std::array<const aclTensor *, 4> FlashAttentionScore(
         const_cast<aclTensor *>(prefixOptionalTensor)->SetStorageFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(prefixOptionalTensor)->SetViewFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(prefixOptionalTensor)->SetOriginalFormat(Format::FORMAT_ND);
-    } else {
-        prefixOptionalTensor = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
     const aclTensor *actualSeqQLen = nullptr;
@@ -100,8 +77,6 @@ const std::array<const aclTensor *, 4> FlashAttentionScore(
         } else {
             FakeArray(actualSeqQLenOptional, const_cast<aclTensor *&>(actualSeqQLen));
         }
-    } else {
-        actualSeqQLen = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
     const aclTensor *actualSeqKvLen = nullptr;
@@ -114,8 +89,6 @@ const std::array<const aclTensor *, 4> FlashAttentionScore(
         } else {
             FakeArray(actualSeqKvLenOptional, const_cast<aclTensor *&>(actualSeqKvLen));
         }
-    } else {
-        actualSeqKvLen = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
     const aclTensor *qStartIdxOptionalTensor = nullptr;
@@ -124,8 +97,6 @@ const std::array<const aclTensor *, 4> FlashAttentionScore(
         const_cast<aclTensor *>(qStartIdxOptionalTensor)->SetStorageFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(qStartIdxOptionalTensor)->SetViewFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(qStartIdxOptionalTensor)->SetOriginalFormat(Format::FORMAT_ND);
-    } else {
-        qStartIdxOptionalTensor = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
     const aclTensor *kvStartIdxOptionalTensor = nullptr;
@@ -134,34 +105,31 @@ const std::array<const aclTensor *, 4> FlashAttentionScore(
         const_cast<aclTensor *>(kvStartIdxOptionalTensor)->SetStorageFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(kvStartIdxOptionalTensor)->SetViewFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(kvStartIdxOptionalTensor)->SetOriginalFormat(Format::FORMAT_ND);
-    } else {
-        kvStartIdxOptionalTensor = executor->AllocTensor(DataType::DT_INT64, Format::FORMAT_ND, Format::FORMAT_ND);
     }
 
     auto softmaxMaxOut = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
     auto softmaxSumOut = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
     DataType outputDtype = query->GetDataType();
-    if (query->GetDataType() == DataType::DT_FLOAT8_E4M3FN ||
-        query->GetDataType() == DataType::DT_FLOAT8_E5M2 ||
+    if (query->GetDataType() == DataType::DT_FLOAT8_E4M3FN || query->GetDataType() == DataType::DT_FLOAT8_E5M2 ||
         query->GetDataType() == DataType::DT_HIFLOAT8) {
         if (outDtype == 0) {
             outputDtype = DataType::DT_FLOAT16;
-         } else {
+        } else {
             outputDtype = DataType::DT_BF16;
         }
     }
     auto softmaxOutOut = executor->AllocTensor(outputDtype, Format::FORMAT_ND, Format::FORMAT_ND);
     auto attentionOutOut = executor->AllocTensor(outputDtype, Format::FORMAT_ND, Format::FORMAT_ND);
 
-    auto ret = INFER_SHAPE(FlashAttentionScore,
-                           OP_INPUT(query, key, value, realShiftOptional, dropMaskOptional, paddingMaskOptional,
-                                    attenMaskOptional, prefixOptionalTensor, actualSeqQLen, actualSeqKvLen,
-                                    qStartIdxOptionalTensor, kvStartIdxOptionalTensor, dScaleQOptional, dScaleKOptional,
-                                    dScaleVOptional, queryRopeOptional, keyRopeOptional, sinkOptional, pScaleOptional),
-                           OP_OUTPUT(softmaxMaxOut, softmaxSumOut, softmaxOutOut, attentionOutOut),
-                           OP_ATTR(static_cast<float>(scaleValue), static_cast<float>(keepProb),
-                                   preTockens, nextTockens, headNum, inputLayout, innerPrecise,
-                                   sparseMode, pseType, seed, offset, outDtype, softmaxOutLayout));
+    auto ret = INFER_SHAPE(
+        FlashAttentionScore,
+        OP_INPUT(query, key, value, realShiftOptional, dropMaskOptional, paddingMaskOptional, attenMaskOptional,
+                 prefixOptionalTensor, actualSeqQLen, actualSeqKvLen, qStartIdxOptionalTensor, kvStartIdxOptionalTensor,
+                 dScaleQOptional, dScaleKOptional, dScaleVOptional, queryRopeOptional, keyRopeOptional, sinkOptional,
+                 pScaleOptional),
+        OP_OUTPUT(softmaxMaxOut, softmaxSumOut, softmaxOutOut, attentionOutOut),
+        OP_ATTR(static_cast<float>(scaleValue), static_cast<float>(keepProb), preTockens, nextTockens, headNum,
+                inputLayout, innerPrecise, sparseMode, pseType, seed, offset, outDtype, softmaxOutLayout));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "FlashAttentionScore InferShape failed.");
         return {nullptr, nullptr, nullptr, nullptr};
@@ -171,12 +139,11 @@ const std::array<const aclTensor *, 4> FlashAttentionScore(
         FlashAttentionScore,
         OP_INPUT(query, key, value, realShiftOptional, dropMaskOptional, paddingMaskOptional, attenMaskOptional,
                  prefixOptionalTensor, actualSeqQLen, actualSeqKvLen, qStartIdxOptionalTensor, kvStartIdxOptionalTensor,
-                 dScaleQOptional, dScaleKOptional, dScaleVOptional, queryRopeOptional, keyRopeOptional,
-                 sinkOptional, pScaleOptional),
+                 dScaleQOptional, dScaleKOptional, dScaleVOptional, queryRopeOptional, keyRopeOptional, sinkOptional,
+                 pScaleOptional),
         OP_OUTPUT(softmaxMaxOut, softmaxSumOut, softmaxOutOut, attentionOutOut),
-        OP_ATTR(static_cast<float>(scaleValue), static_cast<float>(keepProb), preTockens,
-                nextTockens, headNum, inputLayout, innerPrecise, sparseMode, pseType,
-                seed, offset, outDtype, softmaxOutLayout));
+        OP_ATTR(static_cast<float>(scaleValue), static_cast<float>(keepProb), preTockens, nextTockens, headNum,
+                inputLayout, innerPrecise, sparseMode, pseType, seed, offset, outDtype, softmaxOutLayout));
     if (actualSeqKvLenOptional && isMaxWorkspace) {
         aclDestroyTensor(actualSeqKvLen);
     }
