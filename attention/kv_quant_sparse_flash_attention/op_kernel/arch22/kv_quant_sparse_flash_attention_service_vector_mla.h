@@ -15,6 +15,18 @@
 #ifndef KV_QUANT_SPARSE_FLASH_ATTENTION_SERVICE_VECTOR_MLA_H
 #define KV_QUANT_SPARSE_FLASH_ATTENTION_SERVICE_VECTOR_MLA_H
 
+// TQ4 per-token scale staging reuses the upper half of kvValidSizeGm_.
+// The first 1K int32 values remain the legacy valid-size ring buffer; the
+// upper 1K int32 values are viewed as 4 x 512 FP16 scales (one slot per loop).
+static constexpr uint32_t TQ4_SCALE_HALF_BASE = 2048U;
+static constexpr uint32_t TQ4_SCALE_SLOT_STRIDE = 512U;
+static_assert(TQ4_SCALE_SLOT_STRIDE * sizeof(uint16_t) <= 1024U,
+              "TQ4 half staging exceeds the first 1K of tq4ScaleBuf_");
+static constexpr uint32_t TQ4_SCALE_UB_F32 = 256U;
+static_assert(TQ4_SCALE_UB_F32 * sizeof(float) >= 1024U, "TQ4 fp32 area must start after the half staging area");
+static_assert((TQ4_SCALE_UB_F32 + TQ4_SCALE_SLOT_STRIDE) * sizeof(float) <= 4096U,
+              "TQ4 fp32 scale exceeds tq4ScaleBuf_ (4K)");
+
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "kernel_tiling/kernel_tiling.h"
@@ -79,6 +91,9 @@ public:
                                              int64_t mergeMte3Idx, const RunInfo &runInfo);
     __aicore__ inline void CopyInSingleKv(int64_t &mte2Size, int64_t mte3Size, int64_t mergeMte3Idx, int64_t realS2Idx,
                                           int64_t keyBNBOffset, int64_t s2IdLimit, const RunInfo &runInfo);
+    // Decode packed TQ4 slots into the latent/nope workspace. Each slot is
+    // 256B int4 codes followed by 64 RoPE values and one FP16 scale.
+    __aicore__ inline void Tq4DequantRows(LocalTensor<KV_T> &srcTensor, LocalTensor<K_ROPE_T> &dstB16, int32_t dealRow);
     // ================================Vector1==========================================
     __aicore__ inline void ProcessVec1SingleBuf(const RunInfo &info, const MSplitInfo &mSplitInfo);
     __aicore__ inline void DealBmm1ResBaseBlock(const RunInfo &info, const MSplitInfo &mSplitInfo, uint32_t startRow,
@@ -132,6 +147,7 @@ private:
     static constexpr uint64_t SYNC_INPUT_BUF1_PONG_FLAG = 3;
     static constexpr uint64_t SYNC_INPUT_BUF2_FLAG = 4;
     static constexpr uint64_t SYNC_OUTPUT_BUF1_FLAG = 4;
+    static constexpr uint64_t TQ4_SCALE_SYNC_FLAG = 5;
     static constexpr uint64_t SYNC_OUTPUT_BUF2_FLAG = 5;
     static constexpr uint32_t INPUT1_BUFFER_OFFSET = ConstInfo::BUFFER_SIZE_BYTE_32K;
     static constexpr uint32_t SOFTMAX_TMP_BUFFER_OFFSET = ConstInfo::BUFFER_SIZE_BYTE_512B / sizeof(T);
@@ -142,6 +158,8 @@ private:
     static constexpr T LN2 = 0.6931471805599453094172;
     static constexpr T RECIP_OF_LN2 = 1 / LN2;
     static constexpr T SOFTMAX_MIN_NUM = -2e38;
+    static constexpr int32_t TQ4_DEQUANT_CHUNK = IsSameType<K_ROPE_T, bfloat16_t>::value ? 16 : 4;
+    static constexpr uint32_t TQ4_NOPE_BYTES = 256U;
 
     const KvQuantSparseFlashAttentionTilingDataMla *__restrict tilingData;
 
@@ -167,6 +185,7 @@ private:
     GlobalTensor<KV_T> keyGm_;
     GlobalTensor<int32_t> topkGm_;
     GlobalTensor<int32_t> kvValidSizeGm_;
+    GlobalTensor<uint16_t> tq4ScaleGm_;
 
     // ================================Local Buffer区====================================
     TBuf<> inputBuff1;  // 32K * 2
@@ -192,6 +211,12 @@ private:
     LocalTensor<T> softmaxExpUb;
     LocalTensor<KV_T> kvMergUb_;
     LocalTensor<int32_t> v0ValidSizeUb_;
+
+    TBuf<> tq4CentBuf_;
+    TBuf<> tq4ByteLutBuf_;
+    TBuf<> tq4STIdxBuf_;
+    TBuf<> tq4ScaleBuf_;
+    LocalTensor<float> tq4Cent_;
 };
 
 template <typename QSFAT>
@@ -223,6 +248,60 @@ __aicore__ inline void QSFAVectorService<QSFAT>::InitBuffers(TPipe *pipe)
     kvMergUb_ = inputBuff1.Get<KV_T>();
 
     v0ValidSizeUb_ = v0ValidSizeBuff.Get<int32_t>();
+
+    // TQ4 setup is done once per AIV. The index table is used by vectorized
+    // scale export; the byte LUT packs two BF16 centroids into one uint32.
+    pipe->InitBuffer(tq4STIdxBuf_, ConstInfo::BUFFER_SIZE_BYTE_512B);
+    {
+        LocalTensor<uint32_t> qsfaSTIdxInit = tq4STIdxBuf_.Get<uint32_t>();
+        for (uint32_t i = 0; i < 128U; ++i) {
+            qsfaSTIdxInit.SetValue(i, i * 32U);
+        }
+    }
+    pipe->InitBuffer(tq4ScaleBuf_, ConstInfo::BUFFER_SIZE_BYTE_4K);
+    pipe->InitBuffer(tq4CentBuf_, ConstInfo::BUFFER_SIZE_BYTE_256B);
+    pipe->InitBuffer(tq4ByteLutBuf_, ConstInfo::BUFFER_SIZE_BYTE_1K);
+    tq4Cent_ = tq4CentBuf_.Get<float>();
+    tq4Cent_.SetValue(0, 0.00547294f);
+    tq4Cent_.SetValue(1, 0.01680406f);
+    tq4Cent_.SetValue(2, 0.02857605f);
+    tq4Cent_.SetValue(3, 0.04108622f);
+    tq4Cent_.SetValue(4, 0.05492980f);
+    tq4Cent_.SetValue(5, 0.07101817f);
+    tq4Cent_.SetValue(6, 0.09115373f);
+    tq4Cent_.SetValue(7, 0.12037795f);
+    tq4Cent_.SetValue(8, -0.12091285f);
+    tq4Cent_.SetValue(9, -0.09111122f);
+    tq4Cent_.SetValue(10, -0.07112455f);
+    tq4Cent_.SetValue(11, -0.05513602f);
+    tq4Cent_.SetValue(12, -0.04132067f);
+    tq4Cent_.SetValue(13, -0.02874970f);
+    tq4Cent_.SetValue(14, -0.01700489f);
+    tq4Cent_.SetValue(15, -0.00568677f);
+    if constexpr (IsSameType<K_ROPE_T, bfloat16_t>::value) {
+        LocalTensor<uint32_t> qsfaByteLut = tq4ByteLutBuf_.Get<uint32_t>();
+        for (uint32_t hi = 0; hi < 16U; ++hi) {
+            union {
+                float f;
+                uint32_t u;
+            } cvtHi;
+            cvtHi.f = tq4Cent_.GetValue(hi ^ 8U);
+            uint32_t qsfaHiBits = (cvtHi.u + 0x7FFFU + ((cvtHi.u >> 16) & 1U)) >> 16;
+            for (uint32_t lo = 0; lo < 16U; ++lo) {
+                union {
+                    float f;
+                    uint32_t u;
+                } cvtLo;
+                cvtLo.f = tq4Cent_.GetValue(lo ^ 8U);
+                uint32_t qsfaLoBits = (cvtLo.u + 0x7FFFU + ((cvtLo.u >> 16) & 1U)) >> 16;
+                qsfaByteLut.SetValue(hi * 16U + lo, (qsfaHiBits << 16) | qsfaLoBits);
+            }
+        }
+    }
+    // Keep the aligned tail finite and avoid a non-32B vector tail write
+    // when the valid sequence is shorter than 512 columns.
+    Duplicate(tq4ScaleBuf_.Get<T>()[TQ4_SCALE_UB_F32], static_cast<T>(1.0), TQ4_SCALE_SLOT_STRIDE);
+    PipeBarrier<PIPE_ALL>();
 }
 
 template <typename QSFAT>
@@ -251,6 +330,7 @@ __aicore__ inline void QSFAVectorService<QSFAT>::InitVec0GlobalTensor(const Glob
     this->keyGm_ = keyGm;
     this->blkTableGm_ = blkTableGm;
     this->kvValidSizeGm_ = kvValidSizeGm;
+    this->tq4ScaleGm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint16_t *>(kvValidSizeGm.GetPhyAddr(0)));
 }
 
 template <typename QSFAT>
@@ -350,6 +430,14 @@ __aicore__ inline void QSFAVectorService<QSFAT>::ElewiseCompute(const RunInfo &i
                                                                 uint32_t dealRowCount, uint32_t columnCount)
 {
     Muls(mmResUb, mmResUb, static_cast<T>(tilingData->baseParams.scaleValue), dealRowCount * columnCount);
+    if (constInfo.keyQuantMode == QUANT_MODE::TQ4) {
+        LocalTensor<T> qsfaColScale = tq4ScaleBuf_.Get<T>()[TQ4_SCALE_UB_F32];
+        PipeBarrier<PIPE_V>();
+        for (uint32_t r = 0; r < dealRowCount; ++r) {
+            Mul(mmResUb[r * columnCount], mmResUb[r * columnCount], qsfaColScale, columnCount);
+        }
+        PipeBarrier<PIPE_V>();
+    }
     if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
         // v0的无效值判断
         uint64_t qsfaS2ValidSizeFirstPart = v0ValidSizeUb_.GetValue(128 + info.loop % MERGE_CACHE_GM_BUF_NUM);
@@ -501,6 +589,15 @@ __aicore__ inline void QSFAVectorService<QSFAT>::DealBmm1ResBaseBlock(const RunI
                           info.actualSingleProcessSInnerSize);
 
     PipeBarrier<PIPE_V>();
+    if (constInfo.keyQuantMode == QUANT_MODE::TQ4) {
+        // MLA has K=V.  The score side consumed s_j before softmax, so the
+        // value side applies the same per-column scale after softmax.
+        LocalTensor<T> qsfaScaleF = tq4ScaleBuf_.Get<T>()[TQ4_SCALE_UB_F32];
+        for (uint32_t r = 0; r < dealRowCount; ++r) {
+            Mul(qsfaMmResUb[r * columnCount], qsfaMmResUb[r * columnCount], qsfaScaleF, columnCount);
+        }
+        PipeBarrier<PIPE_V>();
+    }
     LocalTensor<K_ROPE_T> tmpMMResCastTensor = outputBuff1.Get<K_ROPE_T>();
     WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
 
@@ -542,6 +639,28 @@ __aicore__ inline void QSFAVectorService<QSFAT>::ProcessVec1SingleBuf(const RunI
         // 额外偏移128个元素，避免不同loop下v0和v1互相影响
         DataCopyPad(v0ValidSizeUb_[128], kvValidSizeGm_[info.loop % MERGE_CACHE_GM_BUF_NUM * (128 * 2)], dataCopyParams,
                     padParams);
+        if (constInfo.keyQuantMode == QUANT_MODE::TQ4) {
+            DataCopyExtParams qsfaScaleInParams;
+            qsfaScaleInParams.blockCount = 1;
+            qsfaScaleInParams.blockLen = TQ4_SCALE_SLOT_STRIDE * sizeof(uint16_t);
+            qsfaScaleInParams.srcStride = 0;
+            qsfaScaleInParams.dstStride = 0;
+            DataCopyPadExtParams<uint16_t> qsfaScalePad{false, 0, 0, 0};
+            DataCopyPad(tq4ScaleBuf_.Get<uint16_t>(),
+                        tq4ScaleGm_[TQ4_SCALE_HALF_BASE + info.loop % MERGE_CACHE_GM_BUF_NUM * TQ4_SCALE_SLOT_STRIDE],
+                        qsfaScaleInParams, qsfaScalePad);
+            // The scale was produced by MTE3 in MergeKv and is consumed by V.
+            // PipeBarrier alone cannot order these two pipelines.
+            SetFlag<HardEvent::MTE2_V>(TQ4_SCALE_SYNC_FLAG);
+            WaitFlag<HardEvent::MTE2_V>(TQ4_SCALE_SYNC_FLAG);
+            LocalTensor<half> qsfaScaleH = tq4ScaleBuf_.Get<half>();
+            LocalTensor<T> qsfaScaleF = tq4ScaleBuf_.Get<T>()[TQ4_SCALE_UB_F32];
+            uint32_t qsfaValidCol = info.actualSingleProcessSInnerSize;
+            if (qsfaValidCol > 0) {
+                Cast(qsfaScaleF, qsfaScaleH, AscendC::RoundMode::CAST_NONE, qsfaValidCol);
+                PipeBarrier<PIPE_V>();
+            }
+        }
         SetFlag<HardEvent::MTE2_S>(0);
         if (unlikely(qsfaLoopCount == 0)) {
             // scalar同步影响较大，挪到循环内部进行
@@ -594,6 +713,89 @@ __aicore__ inline int64_t QSFAVectorService<QSFAT>::GetKeyBNBOffset(int64_t real
 }
 
 template <typename QSFAT>
+__aicore__ inline void QSFAVectorService<QSFAT>::Tq4DequantRows(LocalTensor<KV_T> &srcTensor,
+                                                                LocalTensor<K_ROPE_T> &dstB16, int32_t dealRow)
+{
+    uint32_t HD = constInfo.headDim;
+    uint32_t ROW_BYTES =
+        QSFAAlign(static_cast<uint32_t>(tilingData->baseParams.dSizeVInput), static_cast<uint32_t>(BYTE_BLOCK));
+    constexpr int32_t CHUNK = TQ4_DEQUANT_CHUNK;
+    constexpr uint32_t CHUNK_ELEMS = CHUNK * 512U;
+    constexpr bool TQ4_FAST_BF16 = IsSameType<K_ROPE_T, bfloat16_t>::value;
+    constexpr uint32_t CHUNK_BYTES = CHUNK * 256U;
+    constexpr uint32_t HALF_ELEMS = TQ4_FAST_BF16 ? CHUNK_BYTES : CHUNK_ELEMS;
+    constexpr uint32_t IDX_ELEMS = TQ4_FAST_BF16 ? CHUNK_BYTES : CHUNK_ELEMS;
+    constexpr uint32_t COMPACT_BYTES = TQ4_FAST_BF16 ? CHUNK_BYTES : 0U;
+    constexpr uint32_t SHALF_BYTE_OFF = TQ4_FAST_BF16 ? COMPACT_BYTES : CHUNK_ELEMS * sizeof(float);
+    constexpr uint32_t IDX_BYTE_OFF = SHALF_BYTE_OFF + HALF_ELEMS * sizeof(half);
+    static_assert(IDX_BYTE_OFF + IDX_ELEMS * sizeof(int32_t) <= ConstInfo::BUFFER_SIZE_BYTE_32K,
+                  "TQ4 dequant scratch exceeds inputBuff2");
+
+    LocalTensor<half> sHalfBase = inputBuff2.Get<half>()[SHALF_BYTE_OFF / sizeof(half)];
+    LocalTensor<int32_t> idxI = inputBuff2.Get<int32_t>()[IDX_BYTE_OFF / sizeof(int32_t)];
+    LocalTensor<uint32_t> idxU = inputBuff2.Get<uint32_t>()[IDX_BYTE_OFF / sizeof(uint32_t)];
+    LocalTensor<int4b_t> srcI4 = srcTensor.template ReinterpretCast<int4b_t>();
+
+    PipeBarrier<PIPE_ALL>();
+    if (unlikely(dealRow <= 0)) {
+        return;
+    }
+
+    if constexpr (TQ4_FAST_BF16) {
+        LocalTensor<uint8_t> compactU8 = inputBuff2.Get<uint8_t>();
+        LocalTensor<uint32_t> byteLut = tq4ByteLutBuf_.Get<uint32_t>();
+        LocalTensor<uint32_t> dstU32 = dstB16.template ReinterpretCast<uint32_t>();
+        LocalTensor<uint8_t> srcU8 = srcTensor.template ReinterpretCast<uint8_t>();
+        uint16_t nibbleBlk = static_cast<uint16_t>((HD / 2U) / BYTE_BLOCK);
+        uint16_t rowGapBlk = static_cast<uint16_t>(ROW_BYTES / BYTE_BLOCK - nibbleBlk);
+        for (int32_t base = 0; base < dealRow; base += CHUNK) {
+            int32_t cur = (base + CHUNK <= dealRow) ? CHUNK : (dealRow - base);
+            uint32_t cnt = static_cast<uint32_t>(cur) * (HD / 2U);
+            DataCopyParams compactParams;
+            compactParams.blockCount = static_cast<uint16_t>(cur);
+            compactParams.blockLen = nibbleBlk;
+            compactParams.srcStride = rowGapBlk;
+            compactParams.dstStride = 0;
+            DataCopy(compactU8, srcU8[base * ROW_BYTES], compactParams);
+            PipeBarrier<PIPE_V>();
+            Cast(sHalfBase, compactU8, RoundMode::CAST_NONE, cnt);
+            PipeBarrier<PIPE_V>();
+            Cast(idxI, sHalfBase, RoundMode::CAST_ROUND, cnt);
+            PipeBarrier<PIPE_V>();
+            ShiftLeft(idxI, idxI, static_cast<int32_t>(2), cnt);
+            PipeBarrier<PIPE_V>();
+            Gather(dstU32[base * (HD / 2U)], byteLut, idxU, 0, cnt);
+            PipeBarrier<PIPE_V>();
+        }
+    } else {
+        LocalTensor<float> workBase = inputBuff2.Get<float>();
+        for (int32_t base = 0; base < dealRow; base += CHUNK) {
+            int32_t cur = (base + CHUNK <= dealRow) ? CHUNK : (dealRow - base);
+            uint32_t cnt = static_cast<uint32_t>(cur) * HD;
+            for (int32_t rr = 0; rr < cur; ++rr) {
+                Cast(sHalfBase[rr * HD], srcI4[(base + rr) * ROW_BYTES * 2], RoundMode::CAST_NONE, HD);
+            }
+            PipeBarrier<PIPE_V>();
+            Adds(sHalfBase, sHalfBase, static_cast<half>(8.0f), cnt);
+            PipeBarrier<PIPE_V>();
+            Muls(sHalfBase, sHalfBase, static_cast<half>(4.0f), cnt);
+            PipeBarrier<PIPE_V>();
+            Cast(idxI, sHalfBase, RoundMode::CAST_ROUND, cnt);
+            PipeBarrier<PIPE_V>();
+            Gather(workBase, tq4Cent_, idxU, 0, cnt);
+            PipeBarrier<PIPE_V>();
+            if constexpr (IsSameType<K_ROPE_T, bfloat16_t>::value) {
+                Cast(dstB16[base * HD], workBase, RoundMode::CAST_RINT, cnt);
+            } else {
+                Cast(dstB16[base * HD], workBase, RoundMode::CAST_ROUND, cnt);
+            }
+            PipeBarrier<PIPE_V>();
+        }
+    }
+    PipeBarrier<PIPE_ALL>();
+}
+
+template <typename QSFAT>
 __aicore__ inline void QSFAVectorService<QSFAT>::CopyInSingleKv(int64_t &mte2Size, int64_t mte3Size,
                                                                 int64_t mergeMte3Idx, int64_t realS2Idx,
                                                                 int64_t keyBNBOffset, int64_t s2IdLimit,
@@ -612,8 +814,10 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyInSingleKv(int64_t &mte2Siz
     DataCopyPadExtParams<KV_T> padParams;
     // 当前仅支持COMBINE模式
     if (constInfo.quantScaleRepoMode == QUANT_SCALE_REPO_MODE::COMBINE) {
-        uint32_t combineBytes = (constInfo.headDim * sizeof(KV_T) + constInfo.headDimRope * sizeof(K_ROPE_T) +
-                                 constInfo.headDim / constInfo.tileSize * sizeof(T));
+        uint32_t combineBytes = (constInfo.keyQuantMode == QUANT_MODE::TQ4) ?
+                                    (constInfo.headDim / 2 + constInfo.headDimRope * sizeof(K_ROPE_T) + sizeof(half)) :
+                                    (constInfo.headDim * sizeof(KV_T) + constInfo.headDimRope * sizeof(K_ROPE_T) +
+                                     constInfo.headDim / constInfo.tileSize * sizeof(T));
         intriParams.blockLen = combineBytes;
         uint32_t combineDim = combineBytes / sizeof(KV_T);
         uint32_t combineDimAlign = CeilAlign(combineBytes, ConstInfo::BUFFER_SIZE_BYTE_32B) / sizeof(KV_T);
@@ -647,8 +851,10 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyInKv(int64_t &mte2Size, int
     int64_t sparseBlockSrcStride =
         ((keyBNBOffset1 > keyBNBOffset2 ? (keyBNBOffset1 - keyBNBOffset2) : (keyBNBOffset2 - keyBNBOffset1)) -
          constInfo.sparseBlockSize);
-    uint32_t combineBytes = (constInfo.headDim * sizeof(KV_T) + constInfo.headDimRope * sizeof(K_ROPE_T) +
-                             constInfo.headDim / constInfo.tileSize * sizeof(T));
+    uint32_t combineBytes = (constInfo.keyQuantMode == QUANT_MODE::TQ4) ?
+                                (constInfo.headDim / 2 + constInfo.headDimRope * sizeof(K_ROPE_T) + sizeof(half)) :
+                                (constInfo.headDim * sizeof(KV_T) + constInfo.headDimRope * sizeof(K_ROPE_T) +
+                                 constInfo.headDim / constInfo.tileSize * sizeof(T));
     int64_t keySrcStride = sparseBlockSrcStride * combineBytes;
     if (unlikely(keySrcStride >= INT32_MAX || keySrcStride < 0 || realS2Idx1 + constInfo.sparseBlockSize >= s2IdLimit ||
                  realS2Idx2 + constInfo.sparseBlockSize >= s2IdLimit) ||
@@ -699,59 +905,122 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyOutMrgeResult(int64_t mte2S
     LocalTensor<half> kvTensorAsFp16 = tmpBuff1.Get<half>();
     uint64_t mask = ConstInfo::BUFFER_SIZE_BYTE_256B / sizeof(half);
     LocalTensor<KV_T> srcTensor = kvMergUb_[mergeMte3Idx % 2 * INPUT1_BUFFER_OFFSET / sizeof(KV_T)];
-    if (dealRow == 1) {
-        Cast(kvTensorAsFp16, srcTensor, RoundMode::CAST_NONE, mask, 4, {1, 1, 8, 4});
-    } else {
-        uint8_t repeatTimes = static_cast<uint8_t>(dealRow);
-        Cast(kvTensorAsFp16, srcTensor, RoundMode::CAST_NONE, mask, repeatTimes, {1, 1, 32, 21}); // 21=(512+64*2+32)/32
-        Cast(kvTensorAsFp16[128], srcTensor[128], RoundMode::CAST_NONE, mask, repeatTimes, {1, 1, 32, 21});
-        Cast(kvTensorAsFp16[256], srcTensor[256], RoundMode::CAST_NONE, mask, repeatTimes, {1, 1, 32, 21});
-        Cast(kvTensorAsFp16[384], srcTensor[384], RoundMode::CAST_NONE, mask, repeatTimes, {1, 1, 32, 21});
-    }
-    PipeBarrier<PIPE_V>();
-    LocalTensor<T> antiQuantScale = tmpBuff2.Get<T>();
-    LocalTensor<T> oriQuantScaleTensor = srcTensor[640].template ReinterpretCast<T>();
-    if (dealRow == 1) {
-        Brcb(antiQuantScale, oriQuantScaleTensor, 1, {1, 4});
-    } else {
-        DataCopyParams params;
-        params.blockCount = dealRow;
-        params.blockLen = 1;
-        params.dstStride = 0;
-        params.srcStride = (constInfo.headDim * sizeof(KV_T) + constInfo.headDimRope * sizeof(K_ROPE_T)) /
-                           ConstInfo::BUFFER_SIZE_BYTE_32B;
-        LocalTensor<T> tmpAntiQuantScale = antiQuantScale[ConstInfo::BUFFER_SIZE_BYTE_1K];
-        DataCopy(tmpAntiQuantScale, oriQuantScaleTensor, params);
-        PipeBarrier<PIPE_V>();
-        Brcb(antiQuantScale, tmpAntiQuantScale, dealRow, {1, 4});
-    }
-    PipeBarrier<PIPE_V>();
-    uint32_t dealLoop = CeilDiv(dealRow, LIMIT_DEAL_ROW);
-    uint32_t dealRowFp32 = LIMIT_DEAL_ROW;
-    uint32_t element = LIMIT_DEAL_ROW * constInfo.headDim;
-    LocalTensor<T> kvTensorAsFp32 = inputBuff2.Get<T>();
     LocalTensor<K_ROPE_T> antiKvTensorAsB16 = tmpBuff1.Get<K_ROPE_T>();
-    for (uint32_t i = 0; i < dealLoop; i++) {
-        if (i == dealLoop - 1) {
-            dealRowFp32 = dealRow - i * LIMIT_DEAL_ROW;
+    if (constInfo.keyQuantMode == QUANT_MODE::TQ4) {
+        // MTE3 and V share tmpBuff1/tmpBuff2 across merge iterations. The
+        // explicit wait is required even when PipeBarrier is present because
+        // this is a cross-pipeline dependency.
+        WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
+        Tq4DequantRows(srcTensor, antiKvTensorAsB16, dealRow);
+
+        uint32_t rowBytes =
+            QSFAAlign(static_cast<uint32_t>(tilingData->baseParams.dSizeVInput), static_cast<uint32_t>(BYTE_BLOCK));
+        uint32_t mergeGmStride = 512U * constInfo.combineHeadDim;
+        uint32_t latentBytes = constInfo.headDim * sizeof(K_ROPE_T);
+        uint32_t ropeBytes = constInfo.headDimRope * sizeof(K_ROPE_T);
+        uint32_t ropeByteOff = constInfo.headDim / 2U;
+
+        // Export one FP16 scale per row to the upper half of the valid-size
+        // workspace. A 32B gather block avoids scalar loads and works for any
+        // dealRow <= 32.
+        {
+            uint32_t scaleByteOff = constInfo.headDim / 2U + ropeBytes;
+            uint16_t rowStrideBlk = static_cast<uint16_t>(rowBytes / BYTE_BLOCK);
+            LocalTensor<half> scaleUb = tmpBuff2.Get<half>();
+            LocalTensor<half> scaleUb32 = tmpBuff2.Get<half>()[512];
+            LocalTensor<half> scaleSrc = srcTensor.template ReinterpretCast<half>()[scaleByteOff / 2U];
+            DataCopyParams scaleParams;
+            scaleParams.blockCount = static_cast<uint16_t>(dealRow);
+            scaleParams.blockLen = 1;
+            scaleParams.srcStride = static_cast<uint16_t>(rowStrideBlk - 1U);
+            scaleParams.dstStride = 0;
+            DataCopy(scaleUb32, scaleSrc, scaleParams);
+            PipeBarrier<PIPE_V>();
+            Gather(scaleUb, scaleUb32, tq4STIdxBuf_.Get<uint32_t>(), 0, static_cast<uint32_t>(dealRow));
+            SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
+            WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF1_FLAG);
+            DataCopyExtParams scaleOutParams;
+            scaleOutParams.blockCount = 1;
+            scaleOutParams.blockLen = static_cast<uint32_t>(dealRow) * sizeof(uint16_t);
+            scaleOutParams.srcStride = 0;
+            scaleOutParams.dstStride = 0;
+            DataCopyPad(
+                tq4ScaleGm_[TQ4_SCALE_HALF_BASE + runInfo.loop % MERGE_CACHE_GM_BUF_NUM * TQ4_SCALE_SLOT_STRIDE +
+                            (s2GmStartOffset + mte3Size)],
+                scaleUb.template ReinterpretCast<uint16_t>(), scaleOutParams);
         }
-        Cast(kvTensorAsFp32, kvTensorAsFp16[i * element], RoundMode::CAST_NONE,
-             static_cast<uint32_t>(dealRowFp32 * constInfo.headDim));
-        PipeBarrier<PIPE_V>();
-        for (uint32_t j = 0; j < constInfo.tileSize / FP32_REPEAT_ELEMENT_NUM; j++) {
-            Mul(kvTensorAsFp32[j * FP32_REPEAT_ELEMENT_NUM], kvTensorAsFp32[j * FP32_REPEAT_ELEMENT_NUM],
-                antiQuantScale[i * LIMIT_DEAL_ROW * 32], FP32_REPEAT_ELEMENT_NUM, 4 * dealRowFp32,
-                {1, 1, 0, 16, 16, 1});
-        }
-        PipeBarrier<PIPE_V>();
-        if constexpr (IsSameType<K_ROPE_T, bfloat16_t>::value) { // bf16 采取四舍六入五成双模式
-            Cast(antiKvTensorAsB16[i * element], kvTensorAsFp32, RoundMode::CAST_RINT,
-                 static_cast<uint32_t>(dealRowFp32 * constInfo.headDim));
+
+        DataCopyExtParams tq4DataCopyParams;
+        tq4DataCopyParams.blockCount = static_cast<uint16_t>(dealRow);
+        tq4DataCopyParams.blockLen = latentBytes;
+        tq4DataCopyParams.srcStride = 0;
+        tq4DataCopyParams.dstStride = (constInfo.combineHeadDim - constInfo.headDim) * sizeof(K_ROPE_T);
+        uint64_t tq4GmBase = runInfo.loop % MERGE_CACHE_GM_BUF_NUM * mergeGmStride +
+                             (s2GmStartOffset + mte3Size) * constInfo.combineHeadDim;
+        DataCopyPad(kvMergeGm_[tq4GmBase], antiKvTensorAsB16, tq4DataCopyParams);
+
+        LocalTensor<K_ROPE_T> tq4KRopeUb = srcTensor[ropeByteOff].template ReinterpretCast<K_ROPE_T>();
+        tq4DataCopyParams.blockLen = ropeBytes;
+        tq4DataCopyParams.srcStride = static_cast<uint32_t>(rowBytes / BYTE_BLOCK) - ropeBytes / BYTE_BLOCK;
+        tq4DataCopyParams.dstStride = (constInfo.combineHeadDim - constInfo.headDimRope) * sizeof(K_ROPE_T);
+        DataCopyPad(kvMergeGm_[tq4GmBase + constInfo.headDim], tq4KRopeUb, tq4DataCopyParams);
+        SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
+        return;
+    } else {
+        if (dealRow == 1) {
+            Cast(kvTensorAsFp16, srcTensor, RoundMode::CAST_NONE, mask, 4, {1, 1, 8, 4});
         } else {
-            Cast(antiKvTensorAsB16[i * element], kvTensorAsFp32, RoundMode::CAST_ROUND,
-                 static_cast<uint32_t>(dealRowFp32 * constInfo.headDim));
+            uint8_t repeatTimes = static_cast<uint8_t>(dealRow);
+            Cast(kvTensorAsFp16, srcTensor, RoundMode::CAST_NONE, mask, repeatTimes,
+                 {1, 1, 32, 21}); // 21=(512+64*2+32)/32
+            Cast(kvTensorAsFp16[128], srcTensor[128], RoundMode::CAST_NONE, mask, repeatTimes, {1, 1, 32, 21});
+            Cast(kvTensorAsFp16[256], srcTensor[256], RoundMode::CAST_NONE, mask, repeatTimes, {1, 1, 32, 21});
+            Cast(kvTensorAsFp16[384], srcTensor[384], RoundMode::CAST_NONE, mask, repeatTimes, {1, 1, 32, 21});
         }
         PipeBarrier<PIPE_V>();
+        LocalTensor<T> antiQuantScale = tmpBuff2.Get<T>();
+        LocalTensor<T> oriQuantScaleTensor = srcTensor[640].template ReinterpretCast<T>();
+        if (dealRow == 1) {
+            Brcb(antiQuantScale, oriQuantScaleTensor, 1, {1, 4});
+        } else {
+            DataCopyParams params;
+            params.blockCount = dealRow;
+            params.blockLen = 1;
+            params.dstStride = 0;
+            params.srcStride = (constInfo.headDim * sizeof(KV_T) + constInfo.headDimRope * sizeof(K_ROPE_T)) /
+                               ConstInfo::BUFFER_SIZE_BYTE_32B;
+            LocalTensor<T> tmpAntiQuantScale = antiQuantScale[ConstInfo::BUFFER_SIZE_BYTE_1K];
+            DataCopy(tmpAntiQuantScale, oriQuantScaleTensor, params);
+            PipeBarrier<PIPE_V>();
+            Brcb(antiQuantScale, tmpAntiQuantScale, dealRow, {1, 4});
+        }
+        PipeBarrier<PIPE_V>();
+        uint32_t dealLoop = CeilDiv(dealRow, LIMIT_DEAL_ROW);
+        uint32_t dealRowFp32 = LIMIT_DEAL_ROW;
+        uint32_t element = LIMIT_DEAL_ROW * constInfo.headDim;
+        LocalTensor<T> kvTensorAsFp32 = inputBuff2.Get<T>();
+        for (uint32_t i = 0; i < dealLoop; i++) {
+            if (i == dealLoop - 1) {
+                dealRowFp32 = dealRow - i * LIMIT_DEAL_ROW;
+            }
+            Cast(kvTensorAsFp32, kvTensorAsFp16[i * element], RoundMode::CAST_NONE,
+                 static_cast<uint32_t>(dealRowFp32 * constInfo.headDim));
+            PipeBarrier<PIPE_V>();
+            for (uint32_t j = 0; j < constInfo.tileSize / FP32_REPEAT_ELEMENT_NUM; j++) {
+                Mul(kvTensorAsFp32[j * FP32_REPEAT_ELEMENT_NUM], kvTensorAsFp32[j * FP32_REPEAT_ELEMENT_NUM],
+                    antiQuantScale[i * LIMIT_DEAL_ROW * 32], FP32_REPEAT_ELEMENT_NUM, 4 * dealRowFp32,
+                    {1, 1, 0, 16, 16, 1});
+            }
+            PipeBarrier<PIPE_V>();
+            if constexpr (IsSameType<K_ROPE_T, bfloat16_t>::value) { // bf16 采取四舍六入五成双模式
+                Cast(antiKvTensorAsB16[i * element], kvTensorAsFp32, RoundMode::CAST_RINT,
+                     static_cast<uint32_t>(dealRowFp32 * constInfo.headDim));
+            } else {
+                Cast(antiKvTensorAsB16[i * element], kvTensorAsFp32, RoundMode::CAST_ROUND,
+                     static_cast<uint32_t>(dealRowFp32 * constInfo.headDim));
+            }
+            PipeBarrier<PIPE_V>();
+        }
     }
 
     LocalTensor<K_ROPE_T> antiKvTensorAsB16Nz = outputBuff1.Get<K_ROPE_T>();
@@ -779,11 +1048,17 @@ __aicore__ inline void QSFAVectorService<QSFAT>::CopyOutMrgeResult(int64_t mte2S
         antiKvTensorAsB16Nz, dataCopyParams);
     SetFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF1_FLAG);
 
-    LocalTensor<K_ROPE_T> kRopeUb = srcTensor[512].template ReinterpretCast<K_ROPE_T>();
+    uint32_t qsfaRopeByteOff = 512;
+    uint16_t qsfaRopeRowStrideBlk = 21;
+    if (constInfo.keyQuantMode == QUANT_MODE::TQ4) {
+        qsfaRopeByteOff = TQ4_NOPE_BYTES;
+        qsfaRopeRowStrideBlk = 13; // ceil(386B / 32B)
+    }
+    LocalTensor<K_ROPE_T> kRopeUb = srcTensor[qsfaRopeByteOff].template ReinterpretCast<K_ROPE_T>();
     LocalTensor<K_ROPE_T> kRopeUbNz = outputBuff2.Get<K_ROPE_T>();
     WaitFlag<AscendC::HardEvent::MTE3_V>(SYNC_OUTPUT_BUF2_FLAG);
     Copy(kRopeUbNz, kRopeUb, constInfo.headDimRope, static_cast<uint8_t>(dealRow),
-         {static_cast<uint16_t>(dealRow), 1, 1, 21});
+         {static_cast<uint16_t>(dealRow), 1, 1, qsfaRopeRowStrideBlk});
     SetFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF2_FLAG);
     WaitFlag<AscendC::HardEvent::V_MTE3>(SYNC_OUTPUT_BUF2_FLAG);
     dataCopyParams.blockCount = constInfo.headDimRope / blockElementNum;

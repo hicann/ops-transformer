@@ -213,6 +213,25 @@ def check_result(expect, npu_result):
             % (real_data.size, data_compe.size)
         )
         return result, 0.0, max_error
+
+    # Report finite-only relative error.  This is useful for quantized
+    # attention diagnostics while preserving the existing pass/fail rules
+    # below (including explicit NaN/Inf handling).
+    finite_mask = np.isfinite(real_data) & np.isfinite(data_compe)
+    if np.any(finite_mask):
+        relative_error = np.abs(real_data[finite_mask] - data_compe[finite_mask]) / (
+            np.abs(real_data[finite_mask]) + 1e-7
+        )
+        print_log(
+            "MERE=%.6e; MARE=%.6e; finite_count=%s"
+            % (
+                float(np.mean(relative_error)),
+                float(np.max(relative_error)),
+                int(np.sum(finite_mask)),
+            )
+        )
+    else:
+        print_log("MERE/MARE unavailable: no finite elements")
     overflows_count = (
         data_compe[np.isinf(data_compe)].size + data_compe[np.isnan(data_compe)].size
     )

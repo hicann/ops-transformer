@@ -72,8 +72,10 @@ def check_valid_param(params):
     if sparse_mode not in (0, 3):
         raise ValueError(f"sparse_mode only supports 0/3, but got {sparse_mode}")
 
-    if key_quant_mode != 2 or value_quant_mode != 2:
-        raise ValueError("key_quant_mode and value_quant_mode must both be 2")
+    if key_quant_mode not in (2, 3) or value_quant_mode != key_quant_mode:
+        raise ValueError(
+            "key_quant_mode and value_quant_mode must both be 2 or both be 3"
+        )
 
     if tile_size != 128:
         raise ValueError(f"tile_size only supports 128, but got {tile_size}")

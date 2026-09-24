@@ -155,7 +155,9 @@ private:
     static constexpr uint32_t M_SPLIT_SIZE = 128;     // m方向切分
     static constexpr uint32_t N_SPLIT_SIZE = 128;     // n方向切分
     static constexpr uint32_t N_WORKSPACE_SIZE = 512; // n方向切分
-    static constexpr uint32_t K_SPLIT_SIZE = 288;     // K方向切分
+    static constexpr uint32_t K_SPLIT_SIZE = 288;     // K方向切分，即 576 的一半
+    // TQ4 的第二段由 nope 尾部和独立的 RoPE 区拼成 288 个元素。
+    static constexpr uint32_t K_SPLIT_NOPE_TAIL_SIZE = 224;
 
     static constexpr uint32_t L1_BLOCK_SIZE = (64 * (512 + 64) * sizeof(Q_T));
     static constexpr uint32_t L1_BLOCK_OFFSET = 64 * (512 + 64); // 72K的元素个数
@@ -248,12 +250,22 @@ private:
     __aicore__ inline void CopyInMm1BRopeToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const uint64_t keyGmBaseOffset,
                                               uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                               uint32_t nActCopyRowCount, uint32_t headSize);
+    __aicore__ inline void CopyInMm1BTq4ToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info, uint32_t nL1,
+                                             uint32_t nL1Size, uint32_t nL1SizeAlign, uint32_t kL1, uint32_t kSize);
+    __aicore__ inline void CopyInMm1KVToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info, uint32_t nL1,
+                                           uint32_t nL1Size, uint32_t nL1SizeAlign, uint32_t kL1, uint32_t kSize);
     __aicore__ inline void CopyInMm2AToL1(LocalTensor<K_ROPE_T> &aL1Tensor, const RunInfo &info, uint32_t mSeqIdx,
                                           uint32_t subMSizeAct, uint32_t nSize, uint32_t nOffset);
     __aicore__ inline void CopyInMm2BToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const uint64_t valueGmBaseOffset,
                                           uint32_t copyTotalRowCntAlign, uint32_t copyStartRowCnt,
                                           uint32_t nActCopyRowCount, uint32_t copyStartColumnCount,
                                           uint32_t copyColumnCount);
+    __aicore__ inline void CopyInMm2BTq4ToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info, uint32_t nL1,
+                                             uint32_t qsfaKL1, uint32_t qsfaKOffset, uint32_t kL0Size,
+                                             uint32_t kL0SizeAlign, uint32_t nL1Size);
+    __aicore__ inline void CopyInMm2KVToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info, uint32_t nL1,
+                                           uint32_t qsfaKL1, uint32_t qsfaKOffset, uint32_t kL0Size,
+                                           uint32_t kL0SizeAlign, uint32_t nL1Size);
     __aicore__ inline void LoadDataMm1A(LocalTensor<K_ROPE_T> &aL0Tensor, LocalTensor<K_ROPE_T> &aL1Tensor,
                                         uint32_t idx, uint32_t kSplitSize, uint32_t mSize, uint32_t kSize);
     __aicore__ inline void LoadDataMm1B(LocalTensor<K_ROPE_T> &bL0Tensor, LocalTensor<K_ROPE_T> &bL1Tensor,
@@ -453,6 +465,58 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BRopeToL1(LocalTensor<
 }
 
 template <typename QSFAT>
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1BTq4ToL1(LocalTensor<K_ROPE_T> &bL1Tensor,
+                                                                   const RunInfo &info, uint32_t nL1, uint32_t nL1Size,
+                                                                   uint32_t nL1SizeAlign, uint32_t kL1, uint32_t kSize)
+{
+    // TQ4 的 vector 输出是行主序 [N, 576]：第一段 K 切分取前 288 个值，
+    // 第二段由 224 个 nope 尾部和独立的 64 个 RoPE 值拼成 288 个元素。
+    uint64_t kvMergeBase = info.loop % 4 * N_WORKSPACE_SIZE * kSize + nL1 * N_SPLIT_SIZE * kSize;
+    if (kL1 == 0) {
+        GlobalTensor<K_ROPE_T> kvMergeSrc = kvMergeGm_[kvMergeBase];
+        DataCopyGmNDToL1<K_ROPE_T>(bL1Tensor, kvMergeSrc, nL1Size, nL1SizeAlign, K_SPLIT_SIZE, kSize);
+        return;
+    }
+    GlobalTensor<K_ROPE_T> kvMergeSrc = kvMergeGm_[kvMergeBase + K_SPLIT_SIZE];
+    DataCopyGmNDToL1<K_ROPE_T>(bL1Tensor, kvMergeSrc, nL1Size, nL1SizeAlign, K_SPLIT_NOPE_TAIL_SIZE, kSize);
+    kvMergeSrc = kvMergeGm_[kvMergeBase + constInfo.headDim];
+    LocalTensor<K_ROPE_T> ropeL1Tensor = bL1Tensor[K_SPLIT_NOPE_TAIL_SIZE * nL1SizeAlign];
+    DataCopyGmNDToL1<K_ROPE_T>(ropeL1Tensor, kvMergeSrc, nL1Size, nL1SizeAlign, constInfo.headDimRope, kSize);
+}
+
+template <typename QSFAT>
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm1KVToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info,
+                                                                 uint32_t nL1, uint32_t nL1Size, uint32_t nL1SizeAlign,
+                                                                 uint32_t kL1, uint32_t kSize)
+{
+    if (constInfo.keyQuantMode == QUANT_MODE::TQ4) {
+        CopyInMm1BTq4ToL1(bL1Tensor, info, nL1, nL1Size, nL1SizeAlign, kL1, kSize);
+        return;
+    }
+    DataCopyParams copyParams;
+    copyParams.blockLen = nL1Size;
+    copyParams.srcStride = constInfo.s2BaseSize - nL1Size;
+    copyParams.dstStride = nL1SizeAlign - nL1Size;
+    if (kL1 == 0) {
+        copyParams.blockCount = K_SPLIT_SIZE / BLOCK_ELEMENT_NUM;
+        DataCopy(bL1Tensor,
+                 kvMergeGm_[info.loop % 4 * N_WORKSPACE_SIZE * kSize + nL1 * N_SPLIT_SIZE * BLOCK_ELEMENT_NUM],
+                 copyParams);
+        return;
+    }
+    copyParams.blockCount = K_SPLIT_NOPE_TAIL_SIZE / BLOCK_ELEMENT_NUM;
+    DataCopy(bL1Tensor,
+             kvMergeGm_[info.loop % 4 * N_WORKSPACE_SIZE * kSize + K_SPLIT_SIZE * constInfo.s2BaseSize +
+                        nL1 * N_SPLIT_SIZE * BLOCK_ELEMENT_NUM],
+             copyParams);
+    copyParams.blockCount = constInfo.headDimRope / BLOCK_ELEMENT_NUM;
+    DataCopy(bL1Tensor[K_SPLIT_NOPE_TAIL_SIZE * nL1SizeAlign],
+             kvMergeGm_[info.loop % 4 * N_WORKSPACE_SIZE * kSize + N_WORKSPACE_SIZE * constInfo.headDim +
+                        nL1 * N_SPLIT_SIZE * BLOCK_ELEMENT_NUM],
+             copyParams);
+}
+
+template <typename QSFAT>
 __aicore__ inline void QSFAMatmulService<QSFAT>::LoadDataMm1A(LocalTensor<K_ROPE_T> &aL0Tensor,
                                                               LocalTensor<K_ROPE_T> &aL1Tensor, uint32_t idx,
                                                               uint32_t kSplitSize, uint32_t mSize, uint32_t kSize)
@@ -541,6 +605,43 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2BToL1(LocalTensor<K_RO
 }
 
 template <typename QSFAT>
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2BTq4ToL1(LocalTensor<K_ROPE_T> &bL1Tensor,
+                                                                   const RunInfo &info, uint32_t nL1, uint32_t qsfaKL1,
+                                                                   uint32_t qsfaKOffset, uint32_t kL0Size,
+                                                                   uint32_t kL0SizeAlign, uint32_t nL1Size)
+{
+    // TQ4 的 merge buffer 为行主序 [N, 576]，按 nL1 直接取 [kL0Size, nL1Size] 子块。
+    constexpr uint32_t K_SIZE = 576;
+    constexpr uint32_t K_L0_STEP = 128;
+    uint64_t kvMergeOffset =
+        info.loop % 4 * N_WORKSPACE_SIZE * K_SIZE + qsfaKL1 * K_L0_STEP * K_SIZE + nL1 * N_SPLIT_SIZE;
+    GlobalTensor<K_ROPE_T> kvMergeSrc = kvMergeGm_[kvMergeOffset];
+    LocalTensor<K_ROPE_T> valueL1Tensor = bL1Tensor[(qsfaKL1 - qsfaKOffset) * K_L0_STEP * N_SPLIT_SIZE];
+    DataCopyGmNDToL1<K_ROPE_T>(valueL1Tensor, kvMergeSrc, kL0Size, kL0SizeAlign, nL1Size, K_SIZE);
+}
+
+template <typename QSFAT>
+__aicore__ inline void QSFAMatmulService<QSFAT>::CopyInMm2KVToL1(LocalTensor<K_ROPE_T> &bL1Tensor, const RunInfo &info,
+                                                                 uint32_t nL1, uint32_t qsfaKL1, uint32_t qsfaKOffset,
+                                                                 uint32_t kL0Size, uint32_t kL0SizeAlign,
+                                                                 uint32_t nL1Size)
+{
+    if (constInfo.valueQuantMode == QUANT_MODE::TQ4) {
+        CopyInMm2BTq4ToL1(bL1Tensor, info, nL1, qsfaKL1, qsfaKOffset, kL0Size, kL0SizeAlign, nL1Size);
+        return;
+    }
+    DataCopyParams copyParams;
+    copyParams.blockLen = kL0Size;
+    copyParams.blockCount = nL1Size / BLOCK_ELEMENT_NUM;
+    copyParams.srcStride = constInfo.s2BaseSize - kL0Size;
+    copyParams.dstStride = kL0SizeAlign - kL0Size;
+    DataCopy(bL1Tensor[(qsfaKL1 - qsfaKOffset) * 128 * N_SPLIT_SIZE],
+             kvMergeGm_[info.loop % 4 * N_WORKSPACE_SIZE * 576 + qsfaKL1 * 128 * BLOCK_ELEMENT_NUM +
+                        nL1 * N_SPLIT_SIZE * constInfo.s2BaseSize],
+             copyParams);
+}
+
+template <typename QSFAT>
 __aicore__ inline void QSFAMatmulService<QSFAT>::CalcTopKBlockInfo(const RunInfo &info, uint32_t &curTopKIdx,
                                                                    uint64_t &curOffsetInSparseBlock, uint32_t curSeqIdx,
                                                                    uint32_t &copyRowCnt, uint64_t &idInTopK)
@@ -619,7 +720,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::ComputeMm1(const RunInfo &info,
     uint32_t nL1Loops = (nSize + N_SPLIT_SIZE - 1) / N_SPLIT_SIZE;
 
     uint32_t kSize = 576;
-    uint32_t kL1Size = 288;
+    uint32_t kL1Size = K_SPLIT_SIZE;
     uint32_t kL1Loops = 2; // 2 : 576/288, mla专用 这里不考虑d泛化
 
     uint32_t kL0Size = 96;
@@ -662,33 +763,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::ComputeMm1(const RunInfo &info,
                 // 从k当中取当前的块
                 LocalTensor<K_ROPE_T> bL1Tensor = l1KVTensor[kb * L1_BLOCK_OFFSET];
                 if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
-                    if (kL1 == 0) {
-                        DataCopyParams copyParams;
-                        copyParams.blockCount = 288 / BLOCK_ELEMENT_NUM;
-                        copyParams.blockLen = nL1Size;
-                        copyParams.srcStride = constInfo.s2BaseSize - nL1Size;
-                        copyParams.dstStride = nL1SizeAlign - nL1Size;
-                        DataCopy(bL1Tensor,
-                                 kvMergeGm_[info.loop % 4 * N_WORKSPACE_SIZE * kSize +
-                                            nL1 * N_SPLIT_SIZE * BLOCK_ELEMENT_NUM],
-                                 copyParams);
-                    } else {
-                        DataCopyParams copyParams;
-                        copyParams.blockCount = 224 / BLOCK_ELEMENT_NUM;
-                        copyParams.blockLen = nL1Size;
-                        copyParams.srcStride = constInfo.s2BaseSize - nL1Size;
-                        copyParams.dstStride = nL1SizeAlign - nL1Size;
-                        DataCopy(bL1Tensor,
-                                 kvMergeGm_[info.loop % 4 * N_WORKSPACE_SIZE * kSize + 288 * constInfo.s2BaseSize +
-                                            nL1 * N_SPLIT_SIZE * BLOCK_ELEMENT_NUM],
-                                 copyParams);
-                        copyParams.blockCount = constInfo.headDimRope / BLOCK_ELEMENT_NUM;
-                        DataCopy(
-                            bL1Tensor[224 * nL1SizeAlign],
-                            kvMergeGm_[info.loop % 4 * N_WORKSPACE_SIZE * kSize + N_WORKSPACE_SIZE * constInfo.headDim +
-                                       nL1 * N_SPLIT_SIZE * BLOCK_ELEMENT_NUM],
-                            copyParams);
-                    }
+                    CopyInMm1KVToL1(bL1Tensor, info, nL1, nL1Size, nL1SizeAlign, kL1, kSize);
                 }
                 SetFlag<HardEvent::MTE2_MTE1>(mte21KVIds[kb]);
                 WaitFlag<HardEvent::MTE2_MTE1>(mte21KVIds[kb]);
@@ -803,15 +878,7 @@ __aicore__ inline void QSFAMatmulService<QSFAT>::ComputeMm2(const RunInfo &info,
                     kL0SizeAlign = QSFAAlign(kL0Size, 16U);
                 }
                 if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
-                    DataCopyParams copyParams;
-                    copyParams.blockLen = kL0Size;
-                    copyParams.blockCount = nL1Size / BLOCK_ELEMENT_NUM;
-                    copyParams.srcStride = constInfo.s2BaseSize - kL0Size;
-                    copyParams.dstStride = kL0SizeAlign - kL0Size;
-                    DataCopy(bL1Tensor[(qsfaKL1 - qsfaKOffset) * 128 * N_SPLIT_SIZE],
-                             kvMergeGm_[info.loop % 4 * N_WORKSPACE_SIZE * 576 + qsfaKL1 * 128 * BLOCK_ELEMENT_NUM +
-                                        nL1 * N_SPLIT_SIZE * constInfo.s2BaseSize],
-                             copyParams);
+                    CopyInMm2KVToL1(bL1Tensor, info, nL1, qsfaKL1, qsfaKOffset, kL0Size, kL0SizeAlign, nL1Size);
                 }
             }
             SetFlag<HardEvent::MTE2_MTE1>(mte21KVIds[qsfaKb]);

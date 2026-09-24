@@ -22,6 +22,20 @@
     $$
 
     其中$\tilde{K},\tilde{V}$为基于某种选择算法（如`LightningIndexer`）得到的重要性较高的Key和Value，一般具有稀疏或分块稀疏的特征，$d_k$为$Q,\tilde{K}$每一个头的维度，$\text{Dequant}(\cdot,\cdot)$为反量化函数。
+
+### INT4（TQ4）量化类型
+
+本算子新增 TurboQuant 4-bit（TQ4）量化类型。当 `key_quant_mode=3` 且 `value_quant_mode=3` 时，key/value 使用 TQ4 packed KV cache；两个量化模式必须同时设置为 3。
+
+TQ4 的每个 KV token 使用一个 386 字节的槽位，布局如下：
+
+- `[0, 256)`：256 字节 packed INT4，每个字节包含两个 4-bit code，对应 512 维 latent/nope 数据；
+- `[256, 384)`：128 字节 BF16 RoPE 数据，对应 64 个 RoPE 元素；
+- `[384, 386)`：2 字节 FP16 token scale。该 scale 是每个 KV token 独立的反量化系数，与属性 `scale_value` 含义不同。
+
+TQ4 使用 16 个 codebook centroid 进行反量化，算子内部通过 byte-LUT 将 packed byte 解码为两个 centroid，再结合 token scale 参与 key/value 计算。TQ4 不需要额外提供 `key_dequant_scale` 和 `value_dequant_scale` 输入，量化参数随 KV cache 槽位存放。
+
+TQ4 面向 MLA-absorb 场景，query 支持 FLOAT16/BFLOAT16，`attention_mode=2`，`rope_head_dim=64`。
 本次公布的`kv_quant_sparse_flash_attention`是面向Sparse Attention的全新算子，针对离散访存进行了指令缩减及搬运聚合的细致优化。
 
 ## 参数说明
@@ -55,14 +69,14 @@
       <tr>
           <td>key</td>
           <td>输入</td>
-          <td>attention结构的K输入。k_nope、query相同数据类型的k_rope和float32的量化参数按D维度拼接得到。layout_kv为"BSND"时shape为[B, KV_S, KV_N, KV_D]。layout_kv为"TND"时shape为[KV_T, KV_N, KV_D]。layout_kv为"PA_BSND"时shape为[block_num, block_size, KV_N, KV_D]，其中block_num为PageAttention时block总数，block_size为一个block的token数，block_size取值为16的整数倍，最大支持到1024。KV_N仅支持1；KV_D值仅支持656，即nope+rope*2+dequant_scale*4=512+64*2+4*4。</td>
+          <td>attention结构的K输入。k_nope、query相同数据类型的k_rope和float32的量化参数按D维度拼接得到。layout_kv为"BSND"时shape为[B, KV_S, KV_N, KV_D]。layout_kv为"TND"时shape为[KV_T, KV_N, KV_D]。layout_kv为"PA_BSND"时shape为[block_num, block_size, KV_N, KV_D]，其中block_num为PageAttention时block总数，block_size为一个block的token数，block_size取值为16的整数倍，最大支持到1024。KV_N仅支持1；KV_D值仅支持656，即nope+rope*2+dequant_scale*4=512+64*2+4*4。TQ4模式（key_quant_mode=3）时改为使用386字节packed槽位。</td>
           <td>FLOAT8_E4M3、INT8、HIFLOAT8</td>
           <td>ND</td>
       </tr>
       <tr>
           <td>value</td>
           <td>输入</td>
-          <td>attention结构的V输入。</td>
+          <td>attention结构的V输入。TQ4模式时使用与key相同的386字节packed槽位。</td>
           <td>FLOAT8_E4M3、INT8、HIFLOAT8</td>
           <td>ND</td>
       </tr>
@@ -83,28 +97,28 @@
       <tr>
           <td>key_quant_mode</td>
           <td>属性</td>
-          <td>代表key的量化模式，仅支持传入2，代表per_tile量化模式。</td>
+          <td>代表key的量化模式，传入2代表per_tile量化模式；新增传入3表示TQ4 INT4量化，且要求value_quant_mode同时传入3。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>value_quant_mode</td>
           <td>属性</td>
-          <td>代表value的量化模式，仅支持传入2，代表per_tile量化模式。</td>
+          <td>代表value的量化模式，传入2代表per_tile量化模式；新增传入3表示TQ4 INT4量化，且要求key_quant_mode同时传入3。</td>
           <td>INT64</td>
           <td>-</td>
       </tr>
       <tr>
           <td>key_dequant_scale</td>
           <td>输入</td>
-          <td>预留参数。</td>
+          <td>预留参数。TQ4模式的 token scale 已随 KV cache 槽位存放，不需要提供该输入。</td>
           <td>-</td>
           <td>-</td>
       </tr>
       <tr>
           <td>value_dequant_scale</td>
           <td>输入</td>
-          <td>预留参数。</td>
+          <td>预留参数。TQ4模式的 token scale 已随 KV cache 槽位存放，不需要提供该输入。</td>
           <td>-</td>
           <td>-</td>
       </tr>
@@ -213,12 +227,17 @@
 
 - 该接口支持图模式。
 - 非PageAttention场景layout\_query和layout\_kv取值需要保持一致。
+- TQ4 INT4 模式仅在 `key_quant_mode=value_quant_mode=3` 时启用，key/value 的 KV_D 必须为 386；模式 3 不支持与模式 2 混用。
+- TQ4 的 query 头维度为 576（nope 512 + rope 64），`attention_mode=2`，`rope_head_dim=64`，KV_N 仅支持 1。
+- TQ4 的 token scale 为 KV cache 槽位中的 FP16 值；属性 `scale_value` 仍用于 query-key 矩阵乘后的整体缩放，两者不可混淆。
 - <term>Ascend 950PR&950DT系列产品</term>：
   - 参数key、value数据类型仅支持float8_e4m3、int8、hifloat8数据类型。
   - 参数sparse\_block\_size仅支持1。
   - 仅在layout_key为PA_BSND时，key支持0轴非连续。
+  - TQ4 INT4 模式（key\_quant\_mode=3、value\_quant\_mode=3）不支持，传入3会被tiling校验拦截。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - query Q_N不支持48。
   - 参数key、value数据类型仅支持int8数据类型。
   - 参数sparse\_block\_size支持[1,16]，且要求是2的幂次方，在PageAttention场景下要求sparse\_block\_size整除block\_size。
   - key不支持非连续。
+  - TQ4 INT4 模式（key\_quant\_mode=3、value\_quant\_mode=3）支持。

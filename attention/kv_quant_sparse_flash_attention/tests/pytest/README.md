@@ -25,12 +25,13 @@
 - `layout_kv`: 支持`BSND`、`TND`、`PA_BSND`
 - 非PA场景要求`layout_query == layout_kv`
 - `q_type`: 仅支持`torch.float16`、`torch.bfloat16`
-- `kv_dtype`: 支持`hifloat8`、`float8_e4m3fn`，也兼容`None`作为`float8_e4m3fn`默认生成路径
+- `kv_dtype`: 常规用例支持`hifloat8`、`float8_e4m3fn`，TQ4 用例使用`int8`承载packed字节，也兼容`None`作为`float8_e4m3fn`默认生成路径
 - `N1`: 仅支持`1/2/4/8/16/32/48/64`
 - `N2`: 仅支持`1`
 - `sparse_mode`: 仅支持`0`和`3`
-- `sparse_block_size`: 当前仅支持`1`
-- `key_quant_mode` / `value_quant_mode`: 仅支持`2`
+- `sparse_block_size`: 普通参数集当前使用`1`；TQ4 参数集覆盖`1`和`4`，PA_BSND场景还要求`block_size`可被`sparse_block_size`整除
+- `key_quant_mode` / `value_quant_mode`: 支持`2`（per-tile）和`3`（TQ4 INT4）；TQ4场景必须同时设置为`3`
+- TQ4 KV cache：每个 token 使用 386 字节槽位，布局为 256B packed INT4 + 128B BF16 RoPE + 2B FP16 token scale；当前单算子用例使用`layout_kv=PA_BSND`、`KV_N=1`、`D=512`、`rope_head_dim=64`
 - `tile_size`: 当前仅支持`128`
 - `quant_scale_repo_mode`: 当前仅支持`1`
 - `attention_mode`: 支持`0`、`2`；当取`2`时，`rope_head_dim`必须为`64`
@@ -116,6 +117,14 @@ bash test_run.sh single                              # 使用默认paramset
 bash test_run.sh single -P my_paramset                # 使用指定的paramset文件
 ```
 
+默认参数集中的 `TQ4_*` 条目覆盖了 TND/BSND query、BF16/FP16 query、不同 KV 长度、稀疏模式、block size、scale 和 codebook 等场景。执行默认 single 流程即可运行这些 TQ4 INT4 单算子用例：
+
+```bash
+bash test_run.sh single -P kv_quant_sparse_flash_attention_paramset
+```
+
+TQ4 用例的 CPU golden 会按算子实际路径使用 256-entry byte-LUT 解码 packed INT4，并先将 codebook 舍入到 query/cache 数据类型，再读取槽位中的 FP16 token scale；结果对比仍通过本目录的精度比较脚本完成。
+
 ### batch_save
 
 从Excel读取参数，生成包含CPU golden的`.pt`用例文件。
@@ -154,6 +163,7 @@ bash test_run.sh batch_exec -P ./custom_pt_dir/       # 执行指定目录下所
 | Testcase_Prefix | Testcase_Number | layout_query | layout_kv | q_type | kv_dtype | B | S1 | S2 | N1 | N2 | D | K | scale_value | key_quant_mode | value_quant_mode | sparse_block_size | tile_size | rope_head_dim | sparse_mode | attention_mode | quant_scale_repo_mode | block_size | block_num | actual_seq_q | actual_seq_kv |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | tnd_sample | 1 | TND | TND | torch.bfloat16 | hifloat8 | 2 | 8 | 8 | 16 | 1 | 512 | 4 | 0.04166666666666666 | 2 | 2 | 1 | 128 | 64 | 3 | 2 | 1 | 256 |  | [5,8] | [6,8] |
+| tq4_sample | 1 | TND | PA_BSND | torch.bfloat16 | int8 | 1 | 4 | 128 | 8 | 1 | 512 | 128 | 0.041666666666666664 | 3 | 3 | 1 | 128 | 64 | 3 | 2 | 1 | 128 | 1 | [4] | [128] |
 
 ## 结果文件
 

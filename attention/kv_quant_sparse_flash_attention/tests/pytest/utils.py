@@ -364,6 +364,12 @@ def convert_param_combination_to_cs_format(param_combination):
         kv_dtype_str = "float8_e4m3fn"
     else:
         kv_dtype_str = str(kv_type)
+    # TQ4 stores two signed 4-bit values per byte, followed by packed RoPE
+    # and one FP16 scale.  Its physical cache slot is therefore different
+    # from the legacy INT8 slot.  Keep the shape conversion in sync with the
+    # kernel-side discriminator (quant mode 3).
+    tq4_slot_dim = D // 2 + rope_head_dim * 2 + 2
+    int8_slot_dim = D + rope_head_dim * 2 + D // tile_size * 4
     if layout_kv == "PA_BSND":
         if layout_query == "BSND":
             shape_input = {
@@ -377,13 +383,13 @@ def convert_param_combination_to_cs_format(param_combination):
                     block_num,
                     block_size,
                     N2,
-                    D + rope_head_dim * 2 + D // tile_size * 4,
+                    tq4_slot_dim if key_quant_mode == 3 else int8_slot_dim,
                 ],
                 "value_cache": [
                     block_num,
                     block_size,
                     N2,
-                    D + rope_head_dim * 2 + D // tile_size * 4,
+                    tq4_slot_dim if value_quant_mode == 3 else int8_slot_dim,
                 ],
                 "query_rope": [B, S1, N1, rope_head_dim],
                 "key_rope": [B, S2, N2, rope_head_dim],
@@ -402,13 +408,13 @@ def convert_param_combination_to_cs_format(param_combination):
                     block_num,
                     block_size,
                     N2,
-                    D + rope_head_dim * 2 + D // tile_size * 4,
+                    tq4_slot_dim if key_quant_mode == 3 else int8_slot_dim,
                 ],
                 "value_cache": [
                     block_num,
                     block_size,
                     N2,
-                    D + rope_head_dim * 2 + D // tile_size * 4,
+                    tq4_slot_dim if value_quant_mode == 3 else int8_slot_dim,
                 ],
                 "query_rope": [T1, N1, rope_head_dim],
                 "key_rope": [B, S2, N2, rope_head_dim],
@@ -425,8 +431,16 @@ def convert_param_combination_to_cs_format(param_combination):
             "sparse_indices": [T1, N2, sparse_blockcount],
             "block_table": [B],
             "query_cache": [T1, N1, D + rope_head_dim],
-            "key_cache": [T2, N2, D + rope_head_dim * 2 + D // tile_size * 4],
-            "value_cache": [T2, N2, D + rope_head_dim * 2 + D // tile_size * 4],
+            "key_cache": [
+                T2,
+                N2,
+                tq4_slot_dim if key_quant_mode == 3 else int8_slot_dim,
+            ],
+            "value_cache": [
+                T2,
+                N2,
+                tq4_slot_dim if value_quant_mode == 3 else int8_slot_dim,
+            ],
             "query_rope": [T1, N1, rope_head_dim],
             "key_rope": [T2, N2, rope_head_dim],
             "dequant_scale": [T2, N2, D // tile_size],

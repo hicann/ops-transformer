@@ -34,6 +34,7 @@ enum class QUANT_MODE {
     PER_CHANNEL = 0,    // GQA支持
     PER_TOKEN_HEAD = 1, // GQA支持
     PER_TILE = 2,       // MLA支持
+    TQ4 = 3,            // MLA TurboQuant 4-bit codebook
 };
 
 enum class ATTENTION_MODE {
