@@ -388,6 +388,12 @@ __aicore__ inline void CompressorBlockVectorFullLoad<COMP>::ComputeVec1()
         uint32_t curLoopCompressedCnt = 0;
         if (ProcessSaveStateLoop(sliceIterator, splitInfo, curLoopBatchNum, baseOffset, isApeFullLoad,
                                  curLoopCompressedCnt)) {
+            // 空轮（本批batch均无压缩块）跳过计算，但游标仍须推进，否则下一轮会
+            // 重复装载/保存同一段batch的mm1，导致队列尾部的batch（如每核第5个）
+            // 从未写入stateCache
+            splitInfo.curBStart += curLoopBatchNum;
+            splitInfo.dealSeqStartIdx += curLoopBatchNum * this->constInfo_.sSize;
+            splitInfo.preCompressedCnt += curLoopCompressedCnt;
             continue;
         }
         ProcessComputeLoop(sliceIterator, splitInfo, loopInfo, baseOffset);

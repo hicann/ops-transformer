@@ -233,9 +233,19 @@ __aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::SplitK()
         mSize += bSeqUsed;
     }
     uint32_t mBaseNum = CeilDivT(mSize, constInfo.mBaseSize);
-    if (constInfo.dBasicBlockNum * mBaseNum < constInfo.usedCoreNum &&
-        constInfo.batchConsistency != BATCH_CONSISTENCY) {
+    // 切m要求每个m组都能分到一个核组：mBaseNum > coreGroupNum 时（如28核下
+    // mBaseNum=4 > coreGroupNum=3），第coreGroupNum组之后的m段没有任何核处理，
+    // 序列尾部的token（压缩块/stateCache）全部丢失，必须改走K轴切分；
+    // 该兜底不依赖确定性开关（确定性模式下同样丢尾，正确性优先）
+    if ((constInfo.dBasicBlockNum * mBaseNum < constInfo.usedCoreNum &&
+         constInfo.batchConsistency != BATCH_CONSISTENCY) ||
+        mBaseNum > constInfo.coreGroupNum) {
         constInfo.kBaseNum = constInfo.usedCoreNum / constInfo.dBasicBlockNum;
+        // K轴最多切 hSize/块宽 段（fp8等1字节类型块宽为32）：超出时裁剪kBaseNum，
+        // 否则kAlignSize上取整后被Trunc截成0（如36核+K=1024+fp8：kBaseNum=36>32
+        // ->kBaseSize=0，仅最后一个核算全K，vec累加36组含未初始化区域，结果全错）
+        uint32_t kBlockSize = static_cast<uint32_t>(BUFFER_SIZE_BYTE_32B / sizeof(X_T));
+        constInfo.kBaseNum = min(constInfo.kBaseNum, constInfo.hSize / kBlockSize);
         uint32_t kAlignSize = CeilDivT(
             Align(constInfo.hSize, static_cast<uint32_t>(BUFFER_SIZE_BYTE_32B / sizeof(X_T))), constInfo.kBaseNum);
         constInfo.kBaseSize = Trunc(kAlignSize, static_cast<uint32_t>(BUFFER_SIZE_BYTE_32B / sizeof(X_T)));
@@ -246,12 +256,17 @@ __aicore__ inline void QuantCompressorKernel<COMP, IS_FULL_LOAD>::SplitK()
     // 每轮固定不变，预计算后主循环直接复用
     if (constInfo.kBaseNum > 1) {
         kStartIdx_ = constInfo.aiCoreIdx / constInfo.dBasicBlockNum;
-        if (constInfo.curGroupIdx + 1 < constInfo.coreGroupNum) {
+        if (kStartIdx_ + 1 < constInfo.kBaseNum) {
             dealKSize_ = constInfo.kBaseSize;
             hStart_ = kStartIdx_ * dealKSize_;
-        } else {
-            dealKSize_ = kStartIdx_ < constInfo.coreGroupNum ? constInfo.hSize - kStartIdx_ * constInfo.kBaseSize : 0;
+        } else if (kStartIdx_ < constInfo.kBaseNum) {
+            // 最后一个有效K段处理剩余部分
+            dealKSize_ = constInfo.hSize - kStartIdx_ * constInfo.kBaseSize;
             hStart_ = kStartIdx_ * constInfo.kBaseSize;
+        } else {
+            // kBaseNum被容量裁剪后（如36核+K=1024+fp8裁剪为32段），超出段数的核空转
+            dealKSize_ = 0;
+            hStart_ = 0;
         }
     } else {
         kStartIdx_ = 0;
