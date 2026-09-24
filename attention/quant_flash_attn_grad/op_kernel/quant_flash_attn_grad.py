@@ -238,7 +238,7 @@ def anti_quant_softmax_grad_front_cast_hif8_vf(
         vreg_res2 = vf.mul(vreg_dx2, vreg_y2, preg_all_32)
         vreg_res1 = vf.add(vreg_res1, vreg_res2, preg_all_32)
         vreg_res = vf.reduce_sum(vreg_res1, preg_all_32)
-        vf.store(out_vec, vreg_res, 1, post_update=True)
+        vf.store(out_vec, vreg_res, 1)
 
 
 def init_dq_workspace(const_info, tensor_info):
