@@ -67,6 +67,8 @@ protected:
         deterMode = 0;
         opName = nullptr;
         inputLayout = nullptr;
+        layoutQuery = nullptr;
+        layoutKey = nullptr;
         maxSeqlenK = 0;
     }
 
@@ -101,6 +103,8 @@ protected:
     bool AnalyzeDimLayout(const gert::Shape &queryShape, const gert::Shape &keyShape, const gert::Shape &weightsShape,
                           const gert::Shape &topKShape, size_t layoutLen);
     bool AnalyzeDtype();
+    bool AnalyzeOptionalDtype();
+    bool CheckOptionalShape();
     bool AnalyzeLayout();
     int64_t GetS2RealSize(int32_t sparseMode, int32_t s1Size, int32_t s2Size, int32_t s1Idx);
     bool InitSparseValidArray(std::vector<int64_t> &sparseValidArray);
