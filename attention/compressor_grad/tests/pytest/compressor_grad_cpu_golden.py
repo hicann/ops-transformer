@@ -14,6 +14,76 @@ import torch
 from typing import Optional, List, Tuple
 
 
+def _compensated_d_score(
+    sm: torch.Tensor,
+    kv: torch.Tensor,
+    dC: torch.Tensor,
+    compute_dtype: torch.dtype,
+) -> torch.Tensor:
+    """NPU-matching d_score computation: Dekker double-product + Kahan compensated
+    column sum + TwoSum exact residual decomposition.
+
+    Parameters:
+        sm:  (N, hd)  softmax weights for the current compression block
+        kv:  (N, hd)  kv values for the current compression block
+        dC:  (hd,)    upstream gradient d_compressed_kv for the current block
+        compute_dtype: torch.float32 (same mode) or torch.float64 (high mode)
+
+    Returns:
+        d_score: (N, hd)  gradient w.r.t. the pre-softmax logits
+    """
+    # Dekker 12-bit split constant for fp32(2^12 + 1).
+    # For fp32 with 24-bit mantissa, a 12-bit split gives exact hi/lo decomposition.
+    split = torch.tensor(4097.0, dtype=compute_dtype, device=sm.device)
+    N, hd = sm.shape
+
+    w = torch.zeros(hd, dtype=compute_dtype, device=sm.device)
+    wcomp = torch.zeros(hd, dtype=compute_dtype, device=sm.device)
+    for i in range(N):
+        sm_i = sm[i]
+        kv_i = kv[i]
+        # Dekker split: sm = sm_hi + sm_lo (exact, 12-bit high / 12-bit low)
+        sm_t = sm_i * split
+        sm_u = sm_t - sm_i
+        sm_hi = sm_t - sm_u
+        sm_lo = sm_i - sm_hi
+        # Dekker split: kv = kv_hi + kv_lo
+        kv_t = kv_i * split
+        kv_u = kv_t - kv_i
+        kv_hi = kv_t - kv_u
+        kv_lo = kv_i - kv_hi
+        # Dekker double-product: p_hi = fl(sm * kv), p_lo = sm * kv - p_hi(exact)
+        p_hi = sm_i * kv_i
+        p1 = sm_hi * kv_hi
+        p2 = sm_lo * kv_hi
+        p3 = sm_hi * kv_lo
+        p4 = sm_lo * kv_lo
+        tmp = p_hi - p1
+        tmp = tmp - p2
+        tmp = tmp - p3
+        p_lo = p4 - tmp
+
+        y = p_hi - wcomp
+        t = w + y
+        c = t - w
+        c = c - y
+        w = t
+        wcomp = c + p_lo
+
+    w_expanded = w.unsqueeze(0)  # (1, hd)
+    s = kv - w_expanded  # (N, hd)  — rounded difference
+    z = s - kv  # (N, hd)  — z ≈ -w (with rounding)
+    a = s - z  # (N, hd)  — a ≈ kv (recovered)
+    b = kv - a  # (N, hd)  — b = residual of kv
+    c = w_expanded + z  # (N, hd)  — c ≈ -w (recovered)
+    e = b - c  # (N, hd)  — error term: s + e = kv - w
+
+    dC_expanded = dC.unsqueeze(0)  # (1, hd)
+    ds = dC_expanded * s + dC_expanded * e  # (N, hd)
+    d_score = sm * ds  # (N, hd)
+    return d_score
+
+
 def compressor_grad_golden(
     x: torch.Tensor,
     wkv: torch.Tensor,
@@ -215,7 +285,6 @@ def compressor_grad_golden(
 
             d_compressed_kv_2d = d_compressed_kv.unsqueeze(0)  # (1,hd) → (N,hd)
             d_kv_block = d_compressed_kv_2d * saved_softmax  # (N,hd)
-            d_score_weighted = d_compressed_kv_2d * saved_kv  # (N,hd)
             # ══════════════════════════════════════════════════════════
             # 【反步 2】softmax 反向 (dim=0, 每列独立)
             # ══════════════════════════════════════════════════════════
@@ -225,13 +294,24 @@ def compressor_grad_golden(
             #   S ⊙ dS → (N,hd)
             #   column_sum → (1,hd)
             #   dZ → (N,hd)
+            #
+            # "same" 口径：使用与 NPU kernel 相同的补偿算术（Dekker 双乘积
+            #   + Kahan 补偿列求和 + TwoSum 精确残差分解），使 B 的 d_score
+            #   计算方法与 A (NPU) 一致，三方比率 A/B 仅反映硬件差异。
+            # "high" 口径：简单算术（float64 精度足够，作为 ground truth）
 
-            softmax_backward_sum = (saved_softmax * d_score_weighted).sum(
-                dim=0, keepdim=True
-            )  # (1,hd)
-            d_score_block = saved_softmax * (
-                d_score_weighted - softmax_backward_sum
-            )  # (N,hd)
+            if matmul_mode == "same":
+                d_score_block = _compensated_d_score(
+                    saved_softmax, saved_kv, d_compressed_kv, compute_dtype
+                )
+            else:
+                d_score_weighted = d_compressed_kv_2d * saved_kv  # (N,hd)
+                softmax_backward_sum = (saved_softmax * d_score_weighted).sum(
+                    dim=0, keepdim=True
+                )  # (1,hd)
+                d_score_block = saved_softmax * (
+                    d_score_weighted - softmax_backward_sum
+                )  # (N,hd)
             d_score_block = d_score_block.view(cmp_ratio, coff, head_dim)
             d_kv_block = d_kv_block.view(cmp_ratio, coff, head_dim)
 
