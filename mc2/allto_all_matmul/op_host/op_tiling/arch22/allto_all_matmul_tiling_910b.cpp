@@ -1598,7 +1598,7 @@ ge::graphStatus AlltoAllMatmulTiling910b::GetWorkspaceSize()
         wsSize += quantWorkspaceSize;
     }
     workspaces[0] = wsSize;
-    OP_LOGD(opName_, "Workspaces[0] size=%ld", workspaces[0]);
+    OP_LOGD(opName_, "Workspaces[0] size=%zu", workspaces[0]);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1614,7 +1614,7 @@ void AlltoAllMatmulTiling910b::PrintAlltoAllMatmulTilingData(CoCTiling &cocTilin
     OP_LOGD(opName_, "info.K: %u", info.K);
     OP_LOGD(opName_, "info.N: %u", info.N);
     OP_LOGD(opName_, "info.rankSize: %u", info.rankSize);
-    OP_LOGD(opName_, "info.hasBias: %d", info.hasBias);
+    OP_LOGD(opName_, "info.hasBias: %u", info.hasBias);
     OP_LOGD(opName_, "cocTilingData.m0: %u", cocTilingData.m0);
     OP_LOGD(opName_, "cocTilingData.pValue: %u", cocTilingData.pValue);
     OP_LOGD(opName_, "cocTilingData.unMoveNum: %u", cocTilingData.ubMoveNum);

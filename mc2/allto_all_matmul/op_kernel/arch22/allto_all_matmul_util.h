@@ -97,7 +97,7 @@ public:
         auto contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
         winContext_ = (__gm__ HcclCombineOpParam *)contextGM0;
 
-        for (int i = 0; i < rankSize; i++) {
+        for (int i = 0; i < rankSize && i < static_cast<int32_t>(sizeof(buff) / sizeof(buff[0])); i++) {
             buff[i] = (GM_ADDR)winContext_->windowsIn[i];
         }
 

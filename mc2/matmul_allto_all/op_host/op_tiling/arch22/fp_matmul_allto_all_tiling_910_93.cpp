@@ -262,11 +262,11 @@ void FpMatmulAllToAllTilingBaseA3::PrintMatmulAlltoAllTilingInfo(const std::stri
     OP_LOGD(opName, "tilingInfo.rankM: %u", tilingInfo.rankM);
     OP_LOGD(opName, "tilingInfo.rankN: %u", tilingInfo.rankN);
     OP_LOGD(opName, "tilingInfo.rankK: %u", tilingInfo.rankK);
-    OP_LOGD(opName, "tilingInfo.mmResultLen: %u", tilingInfo.mmResultLen);
-    OP_LOGD(opName, "tilingInfo.permuteLen: %u", tilingInfo.permuteLen);
+    OP_LOGD(opName, "tilingInfo.mmResultLen: %llu", static_cast<unsigned long long>(tilingInfo.mmResultLen));
+    OP_LOGD(opName, "tilingInfo.permuteLen: %llu", static_cast<unsigned long long>(tilingInfo.permuteLen));
     OP_LOGD(opName, "tilingInfo.biasLen: %u", tilingInfo.biasLen);
     OP_LOGD(opName, "tilingInfo.aicCoreNum: %u", tilingInfo.aicCoreNum);
-    OP_LOGD(opName, "tilingInfo.hcclDataType: %u", tilingInfo.hcclDataType);
+    OP_LOGD(opName, "tilingInfo.hcclDataType: %llu", static_cast<unsigned long long>(tilingInfo.hcclDataType));
 }
 
 /**
@@ -303,7 +303,7 @@ uint64_t FpMatmulAllToAllTilingBaseA3::GetTilingKey() const
     }
     const uint64_t tilingKey =
         GET_TPL_TILING_KEY(x2TransposeFlag, contextInfo.args_.isBias, biasDType, SOC_ASCEND910_93);
-    OP_LOGD(opName_, "x2TransposeFlag,hasBias,biasDtype is: [%d,%d,%d], and tilingKey is [%lu].", x2TransposeFlag,
+    OP_LOGD(opName_, "x2TransposeFlag,hasBias,biasDtype is: [%d,%d,%u], and tilingKey is [%lu].", x2TransposeFlag,
             contextInfo.args_.isBias, biasDType, tilingKey);
     return tilingKey;
 }
@@ -340,8 +340,8 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::GetWorkspaceSize()
     uint64_t workspaceSize_ =
         libApiWorkSpaceSize_ + inferredInfo.mmResultLen + inferredInfo.permuteLen + inferredInfo.biasLen;
     workspaces[0] = workspaceSize_;
-    OP_LOGD(opName_, "Workspaces[0] size=%ld, biasLen=%d, mmResultLen=%d", workspaces[0], inferredInfo.biasLen,
-            inferredInfo.mmResultLen);
+    OP_LOGD(opName_, "Workspaces[0] size=%zu, biasLen=%u, mmResultLen=%llu", workspaces[0], inferredInfo.biasLen,
+            static_cast<unsigned long long>(inferredInfo.mmResultLen));
     return ge::GRAPH_SUCCESS;
 }
 

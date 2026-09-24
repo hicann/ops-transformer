@@ -780,7 +780,7 @@ ge::graphStatus MatmulAlltoAllTiling910B::DoOpTiling()
 
     // 2. tilingkey
     SetTilingKey();
-    OP_LOGD(context_->GetNodeName(), "tilingKey is %u.", tilingKey_);
+    OP_LOGD(context_->GetNodeName(), "tilingKey is %llu.", static_cast<unsigned long long>(tilingKey_));
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
     auto aicNum = ascendcPlatform.GetCoreNumAic();
@@ -830,7 +830,7 @@ ge::graphStatus MatmulAlltoAllTiling910B::GetWorkspaceSize()
         wsSize += tileM0 * numBlocks * WORKSPACE_NUM * tileN0 * 4; // 4 is sizeof uint32_t
     }
     workspaces[0] = wsSize;
-    OP_LOGD(opName_, "Workspaces[0] size=%ld", workspaces[0]);
+    OP_LOGD(opName_, "Workspaces[0] size=%zu", workspaces[0]);
     return ge::GRAPH_SUCCESS;
 }
 

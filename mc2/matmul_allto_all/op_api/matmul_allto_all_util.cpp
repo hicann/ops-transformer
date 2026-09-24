@@ -189,7 +189,7 @@ bool IsTransposeLastTwoDims(const aclTensor *tensor)
 {
     // 当输入tensor的shape小于2或者大于6的时候，返回错误
     if (tensor->GetViewShape().GetDimNum() < 2 || tensor->GetViewShape().GetDimNum() > 6) {
-        OP_LOGD("The view_shape dim is: %ld", tensor->GetViewShape().GetDimNum());
+        OP_LOGD("The view_shape dim is: %zu", static_cast<size_t>(tensor->GetViewShape().GetDimNum()));
         return false;
     }
 

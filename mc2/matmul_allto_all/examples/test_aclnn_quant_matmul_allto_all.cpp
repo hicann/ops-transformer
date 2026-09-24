@@ -83,7 +83,7 @@ int launchOneThreadQuantMatmulAlltoAll(Args &args)
     char hcom_name[128];
     ret = HcclGetCommName(args.hcclComm, hcom_name);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed. ret = %d \n", ret); return -1);
-    LOG_PRINT("[INFO] rank %d hcom: %s stream: %p, context : %p\n", args.rankId, hcom_name, args.stream, args.context);
+    LOG_PRINT("[INFO] rank %u hcom: %s stream: %p, context : %p\n", args.rankId, hcom_name, args.stream, args.context);
 
     std::vector<int64_t> x1Shape = {32, 64};
     std::vector<int64_t> x2Shape = {64, 128};
@@ -158,7 +158,7 @@ int launchOneThreadQuantMatmulAlltoAll(Args &args)
     // （固定写法）同步等待任务执行结束
     ret = aclrtSynchronizeStreamWithTimeout(args.stream, 10000);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
-    LOG_PRINT("device%d aclnnQuantMatmulAlltoAll execute success \n", args.rankId);
+    LOG_PRINT("device%u aclnnQuantMatmulAlltoAll execute success \n", args.rankId);
     // 释放device资源，需要根据具体API的接口定义修改
     if (x1 != nullptr) {
         aclDestroyTensor(x1);

@@ -236,7 +236,7 @@ uint64_t AllToAllFpMatmulTilingBaseA3::GetTilingKey() const
     bool x2TransposeFlag = contextInfo_.args_.isBTrans ? true : false;
     const uint64_t tilingKey = GET_TPL_TILING_KEY(contextInfo_.args_.isBias, x2TransposeFlag, TILINGKEY_TPL_NOQUANT,
                                                   biasDType, SOC_ASCEND910_93);
-    OP_LOGD(opName_, "hasBias,x2TransposeFlag,biasDtype is: [%d,%d,%lu], and tilingKey is [%lu].",
+    OP_LOGD(opName_, "hasBias,x2TransposeFlag,biasDtype is: [%d,%d,%u], and tilingKey is [%lu].",
             contextInfo_.args_.isBias, x2TransposeFlag, biasDType, tilingKey);
     return tilingKey;
 }
@@ -329,10 +329,10 @@ void AllToAllFpMatmulTilingBaseA3::PrintAlltoAllMatmulTilingInfo(const std::stri
     OP_LOGD(opName, "TilingInfo.rankM: %u", tilingInfo.rankM);
     OP_LOGD(opName, "TilingInfo.rankN: %u", tilingInfo.rankN);
     OP_LOGD(opName, "TilingInfo.rankK: %u", tilingInfo.rankK);
-    OP_LOGD(opName, "TilingInfo.commLen: %u", tilingInfo.commLen);
-    OP_LOGD(opName, "TilingInfo.permuteLen: %u", tilingInfo.permuteLen);
+    OP_LOGD(opName, "TilingInfo.commLen: %llu", static_cast<unsigned long long>(tilingInfo.commLen));
+    OP_LOGD(opName, "TilingInfo.permuteLen: %llu", static_cast<unsigned long long>(tilingInfo.permuteLen));
     OP_LOGD(opName, "TilingInfo.biasLen: %u", tilingInfo.biasLen);
-    OP_LOGD(opName, "TilingInfo.hcclDataType: %u", tilingInfo.hcclDataType);
+    OP_LOGD(opName, "TilingInfo.hcclDataType: %llu", static_cast<unsigned long long>(tilingInfo.hcclDataType));
 }
 
 AllToAllFpMatmulTilingBaseA3::AllToAllFpMatmulTilingBaseA3(gert::TilingContext *context)
