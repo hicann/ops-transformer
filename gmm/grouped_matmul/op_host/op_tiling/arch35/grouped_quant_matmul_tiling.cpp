@@ -138,8 +138,11 @@ bool GroupedQmmTiling::CheckWeightTensorListForWeightNz() const
     if (!IsWeightNzMultiTensorLayout()) {
         return true;
     }
-    const uint16_t maxCount =
-        IsWeightNzMultiTensorLayout() && IsMicroScaling() ? GMM_MAX_GROUP_LIST_SIZE : GroupedMatmul::MAX_TENSOR_CONT;
+    OP_CHECK_IF(!IsMicroScaling(),
+                OP_LOGE(inputParams_.opName,
+                        "WeightNz single-multi-single only supports MX A8W8 or MX A4W4, including a single group."),
+                return false);
+    const uint16_t maxCount = GMM_MAX_GROUP_LIST_SIZE;
     const uint16_t weightTensorNum = GetTensorListSize(WEIGHT_INDEX, maxCount);
     const uint16_t scaleTensorNum = GetTensorListSize(SCALE_INDEX, maxCount);
     OP_CHECK_IF(weightTensorNum == 0,

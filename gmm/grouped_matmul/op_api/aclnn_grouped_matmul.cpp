@@ -690,10 +690,12 @@ static bool IsMultiTensorWeight(const gmm::GroupedMatmulParams &gmmParams);
 
 static bool IsWeightNzMultiTensorCase(const gmm::GroupedMatmulParams &gmmParams)
 {
-    return gmmParams.x != nullptr && gmmParams.y != nullptr && gmmParams.weight != nullptr &&
+    // The 950 checker restricts this layout to MX A8W8/A4W4 before the common shape check.
+    return op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && gmmParams.x != nullptr &&
+           gmmParams.y != nullptr && gmmParams.weight != nullptr &&
            gmmParams.apiVersion == gmm::GMMApiVersion::WeightNz && gmmParams.groupType == gmm::SPLIT_M &&
            gmmParams.x->Size() == 1 && gmmParams.y->Size() == 1 && gmmParams.biasOptional == nullptr &&
-           IsMultiTensorWeight(gmmParams);
+           IsMultiTensorWeight(gmmParams) && IsQuant(gmmParams.xDtype, (*gmmParams.weight)[0]->GetDataType());
 }
 
 static uint64_t GetGroupSize(const gmm::GroupedMatmulParams &gmmParams)

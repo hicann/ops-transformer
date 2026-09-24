@@ -1750,11 +1750,19 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckQuantShapeAndFormat() cons
     const size_t yTensorNum = GetInputTensorSize(gmmParams_.y);
     std::string tensorNums = std::string("x=") + std::to_string(xTensorNum) +
                              ", weight=" + std::to_string(weightTensorNum) + ", y=" + std::to_string(yTensorNum);
+    const bool isSplitMSeparatedWeight = gmmParams_.groupType == SPLIT_M && IsMultiTensorWeight();
+    const auto *scaleTensor = GetInputTensor(gmmParams_.scaleOptional);
+    const bool validTensorLayout =
+        xTensorNum == 1 && yTensorNum == 1 &&
+        (isSplitMSeparatedWeight ? (IsWeightNzMultiTensorLayout() && scaleTensor != nullptr &&
+                                    scaleTensor->GetDataType() == DataType::DT_FLOAT8_E8M0) :
+                                   weightTensorNum == 1);
     GMM_CHECK_REPORT(
-        (xTensorNum == 1 && weightTensorNum == 1 && yTensorNum == 1) || IsWeightNzMultiTensorLayout(),
+        validTensorLayout,
         OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
             GetAclnnOpName(), "x, weight and y", tensorNums.c_str(),
-            "in quant case, only single-single-single or weightNz single-multi-single tensor layout is supported"));
+            "in quant case, only single-single-single or WeightNz MX A8W8/MX A4W4 single-multi-single tensor "
+            "list combinations are supported"));
     CHECK_RET(CheckQuantCasesFormat() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     if (GetInputTensor(gmmParams_.weight)->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) {
         CHECK_RET(CheckWeightNzSpecialParams() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
