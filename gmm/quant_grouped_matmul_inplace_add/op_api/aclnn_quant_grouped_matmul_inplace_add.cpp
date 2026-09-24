@@ -7,6 +7,7 @@
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
+#include "../../common/op_api/gmm_tensor_storage_check.h"
 #include "aclnn_quant_grouped_matmul_inplace_add.h"
 
 #include <dlfcn.h>
@@ -427,6 +428,14 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSize(const aclTensor *x
                                                               int64_t groupListType, int64_t groupSize,
                                                               uint64_t *workspaceSize, aclOpExecutor **executor)
 {
+    if (!gmm::CheckTensorStorageBounds(x1, QGMM_INPLACE_ADD_ACLNN_OP_NAME, "x1") ||
+        !gmm::CheckTensorStorageBounds(x2, QGMM_INPLACE_ADD_ACLNN_OP_NAME, "x2") ||
+        !gmm::CheckTensorStorageBounds(scale1Optional, QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale1Optional") ||
+        !gmm::CheckTensorStorageBounds(scale2, QGMM_INPLACE_ADD_ACLNN_OP_NAME, "scale2") ||
+        !gmm::CheckTensorStorageBounds(groupList, QGMM_INPLACE_ADD_ACLNN_OP_NAME, "groupList") ||
+        !gmm::CheckTensorStorageBounds(yRef, QGMM_INPLACE_ADD_ACLNN_OP_NAME, "yRef")) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams params{x1,        x2,   scale1Optional, scale2,
                                                               groupList, yRef, groupListType,  groupSize};
     // Standard syntax, Check parameters.
