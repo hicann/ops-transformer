@@ -150,7 +150,7 @@ struct EngramCommContext {
     uint32_t rankId = 0;
     uint32_t rankSize = 0;
     uint64_t virtualAddrList[HCCL_MAX_RANK_SIZE] = {};
-    uint64_t hcommHandle[HCCL_MAX_RANK_SIZE * 2] = {};
+    uint64_t hcommHandle[HCCL_MAX_RANK_SIZE] = {};
     uint32_t channelsPerRank = 1;
 };
 
@@ -846,9 +846,12 @@ private:
             if (groupSize == 0U) {
                 groupSize = 1U;
             }
-            channelsPerPeer = groupSize * 2U;
+            channelsPerPeer = groupSize;
         }
         resources.context.channelsPerRank = channelsPerPeer;
+        TORCH_CHECK(channelsPerPeer <= HCCL_MAX_RANK_SIZE / rankSize,
+                    "HCCL channel handles exceed capacity, rank size ", rankSize, ", channels per rank ",
+                    channelsPerPeer);
 
         std::vector<ChannelHandle> handlesByRank(rankSize * channelsPerPeer);
         GetHcclCommChannel(commHandle, rankSize, rankId, channelsPerPeer, resources.memHandle, handlesByRank.data());
