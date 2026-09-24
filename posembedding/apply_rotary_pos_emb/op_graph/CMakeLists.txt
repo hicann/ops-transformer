@@ -10,3 +10,6 @@
 
 message(STATUS "=== Debug: start apply_rotary_pos_emb.op_graph.CMakeLists.txt ")
 add_graph_plugin_sources()
+if(TARGET ${GRAPH_PLUGIN_NAME}_obj)
+    target_link_libraries(${GRAPH_PLUGIN_NAME}_obj PUBLIC opp_registry)
+endif()
