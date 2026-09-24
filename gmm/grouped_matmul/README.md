@@ -117,7 +117,7 @@ $$
   - 输入参数 biasOptional不支持BFLOAT16。
   - 输入参数 scaleOptional不支持INT64 类型。
   - 输入参数 x、weight，输出参数 out支持最多 128个Tensor。
-- <term>Kirin X90/Kirin 9030处理器系列产品</term>：
+- <term>Kirin X90处理器系列产品</term>、<term>Kirin 9030处理器系列产品</term>：
   - 不支持BFLOAT16、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT8_E8M0、HIFLOAT8类型。
 
 ---

@@ -516,10 +516,10 @@ aclnnStatus aclnnKvRmsNormRopeCacheV2(
 
     * 非量化模式：cache类型必须与kv保持一致。
       * <term>Ascend 950PR&950DT系列产品</term>、<term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：可支持BFLOAT16、FLOAT16。
-      * <term>Kirin X90/Kirin 9030处理器系列产品</term>：仅支持FLOAT16。
+      * <term>Kirin X90处理器系列产品</term>、<term>Kirin 9030处理器系列产品</term>：仅支持FLOAT16。
     * 量化模式：
       * <term>Ascend 950PR&950DT系列产品</term>：可支持INT8、HIFLOAT8、FLOAT8E5M2、FLOAT8E4M3FN。
-      * <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>、<term>Kirin X90/Kirin 9030处理器系列产品</term>：仅支持INT8。
+      * <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>、<term>Kirin X90处理器系列产品</term>、<term>Kirin 9030处理器系列产品</term>：仅支持INT8。
 
   * 参数说明：
 
