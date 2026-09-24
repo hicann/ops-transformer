@@ -58,6 +58,7 @@ constexpr size_t ATTR_QUANT_SCALE_REPO_MODE_INDEX = 8;
 constexpr size_t ATTR_TILE_SIZE_INDEX = 9;
 constexpr size_t ATTR_QC_QR_SCALE_INDEX = 10;
 constexpr size_t ATTR_KC_SCALE_INDEX = 11;
+constexpr size_t ATTR_DO_ROPE_INDEX = 12;
 
 struct MlaPrologV3FallBackParam : MlaPrologFallBackParam {
     const gert::Tensor *actualAeqLen = nullptr;
@@ -74,6 +75,7 @@ struct MlaPrologV3FallBackParam : MlaPrologFallBackParam {
     int tileSize = 128;
     double qcQrScale = 1.0f;
     double kcScale = 1.0f;
+    bool doRope = true;
 };
 
 graphStatus GetMlaPrologV3OutputTensor(const OpExecuteContext *ctx, MlaPrologV3FallBackParam &param);

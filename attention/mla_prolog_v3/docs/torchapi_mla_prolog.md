@@ -202,7 +202,7 @@ cann_ops_transformer.mla_prolog(
 | rmsnorm_gamma_cq | Tensor | 必选 | 计算 $c^{Q}$ 的 RMSNorm 公式中的 $\gamma$ 参数，不支持非连续，数据格式支持 ND，shape 为`[Hcq]`。 | 与`token_x`一致 | `[Hcq]` |
 | rmsnorm_gamma_ckv | Tensor | 必选 | 计算 $c^{KV}$ 的 RMSNorm 公式中的 $\gamma$ 参数，不支持非连续，数据格式支持 ND，shape 为`[Hckv]`。 | 与`token_x`一致 | `[Hckv]` |
 | kv_cache | Tensor | 必选 | 表示 cache 的索引，计算结果原地更新（对应公式中的 $k^{C}$），仅支持首轴非连续，除首轴外的其余轴必须连续，数据格式支持 ND。PA 模式（`cache_mode`为"PA_BSND"/"PA_NZ"/"PA_BLK_BSND"/"PA_BLK_NZ"）下支持空 Tensor；"BSND"/"TND" 模式下不支持空 Tensor。Nkv 与 N 关联，N 是超参，故不支持 Nkv=0。 | torch.bfloat16；hifloat8 全量化 KV 场景为 torch.uint8 | PA 模式：4维`[BlockNum, BlockSize, Nkv, Dtile]`；"BSND"：4维`[B, S, Nkv, Dtile]`；"TND"：3维`[T, Nkv, Dtile]`，ND格式 |
-| kr_cache | Tensor | 必选 | 用于 key 位置编码的 cache，计算结果原地更新（对应公式中的 $k^{R}$），仅支持首轴非连续，除首轴外的其余轴必须连续，数据格式支持 ND。PA 模式下支持空 Tensor；"BSND"/"TND" 模式下不支持空 Tensor。`rope_sin`/`rope_cos`均为空（或`None`）时不执行 RoPE。 | torch.bfloat16 | 与`kv_cache`布局一致：PA 模式`[BlockNum, BlockSize, Nkv, Dr]`；"BSND"`[B, S, Nkv, Dr]`；"TND"`[T, Nkv, Dr]`，ND格式 |
+| kr_cache | Tensor | 必选 | 用于 key 位置编码的 cache，计算结果原地更新（对应公式中的 $k^{R}$），仅支持首轴非连续，除首轴外的其余轴必须连续，数据格式支持 ND。PA 模式下支持空 Tensor；"BSND"/"TND" 模式下不支持空 Tensor。`ckvkr_repo_mode=1`（kv/kr 合并存储）时必须为空 Tensor（shape 乘积为 0），维度应包含 0，支持 shape 为`(0)`。`rope_sin`/`rope_cos`均为空（或`None`）时不执行 RoPE。 | torch.bfloat16 | 与`kv_cache`布局一致：PA 模式`[BlockNum, BlockSize, Nkv, Dr]`；"BSND"`[B, S, Nkv, Dr]`；"TND"`[T, Nkv, Dr]`；`ckvkr_repo_mode=1`时维度含 0，支持`(0)`，ND格式 |
 | rope_sin | Tensor | 可选 | 用于计算旋转位置编码的正弦参数矩阵，不支持非连续，数据格式支持 ND。与`rope_cos`同时非空时执行 RoPE，维度与`token_x`一致；同时为空（或`None`）时不执行 RoPE；一空一非空为非法输入。默认值为`None`，支持 B=0、S=0、T=0 的空 Tensor。 | torch.bfloat16 | 2维`[T, Dr]`或3维`[B, S, Dr]` |
 | rope_cos | Tensor | 可选 | 用于计算旋转位置编码的余弦参数矩阵，不支持非连续，数据格式支持 ND，约束同`rope_sin`。默认值为`None`。 | torch.bfloat16 | 与`rope_sin`一致 |
 | cache_index | Tensor | PA 模式必选，BSND/TND 可选 | 用于存储`kv_cache`和`kr_cache`的索引，不支持非连续，数据格式支持 ND。`cache_mode`为"PA_BSND"/"PA_NZ"：BS 合轴时 shape 为`[T]`，BS 非合轴时 shape 为`[B, S]`，取值范围需在 `[0, BlockNum*BlockSize)` 内；`cache_mode`为"PA_BLK_BSND"/"PA_BLK_NZ"：BS 合轴时 shape 为`[Sum(Ceil(S_i/BlockSize))]`（S_i 表示第 i 个 batch 的序列长度），BS 非合轴时 shape 为`[B, Ceil(S/BlockSize)]`，取值范围需在 `[0, BlockNum)` 内；`cache_mode`为"BSND"/"TND"：无需传入。PagedAttention 模式下不传该参数会被接口报错拦截。 | torch.int32/torch.int64 | 1维`[T]`或2维`[B, S]` |
@@ -222,7 +222,7 @@ cann_ops_transformer.mla_prolog(
 | weight_quant_mode | int | 可选 | weight_dq、weight_uq_qr、weight_uk、weight_dkv_kr 的量化模式。0：非量化；1：weight_uq_qr 量化（半量化）；2：weight_dq、weight_uq_qr、weight_dkv_kr int8 全量化；3：mxfp8 全量化；4：fp8 全量化；5：hif8 全量化。默认值为 0。 | int | - |
 | kv_cache_quant_mode | int | 可选 | kv_cache 的量化模式。0：非量化；1：per-tensor 量化；2：per-channel 量化；3：per-token-per-group 量化。默认值为 0。 | int | - |
 | query_quant_mode | int | 可选 | query 的量化模式。0：非量化；1：per-token-head 量化。默认值为 0。 | int | - |
-| ckvkr_repo_mode | int | 可选 | kv_cache 和 kr_cache 的存储模式。0：分别存储；1：合并存储。默认值为 0。 | int | - |
+| ckvkr_repo_mode | int | 可选 | kv_cache 和 kr_cache 的存储模式。0：分别存储；1：合并存储。默认值为 0。值为 1 时`kr_cache`必须为空 Tensor，支持 shape 为`(0)`。 | int | - |
 | quant_scale_repo_mode | int | 可选 | 量化 scale 的存储模式。0：scale 和数据分别存储；1：scale 和数据合并存储。默认值为 0。 | int | - |
 | tile_size | int | 可选 | per-token-per-group 量化时每个 tile 的大小，仅在`kv_cache_quant_mode=3`时有效，默认值为 128；`kv_cache_quant_mode=1/2`时无需赋值。 | int | - |
 | qc_qr_scale | float | 可选 | Query 的尺度矫正系数，默认值为 1.0。 | float | - |
@@ -275,6 +275,7 @@ cann_ops_transformer.mla_prolog(
 - `weight_dq`/`weight_uq_qr`/`weight_dkv_kr`必须为 FRACTAL_NZ 格式（通过 `torch_npu.npu_format_cast(t, 29)` 转换），ND 格式会被接口报错拦截。
 - `rope_sin`/`rope_cos`必须成对传入：同时非空时执行 RoPE；同时为空（或`None`）时不执行 RoPE；一空一非空为非法输入，接口报错拦截。
 - `cache_mode`为 PagedAttention 模式（`"PA_BSND"`/`"PA_NZ"`/`"PA_BLK_BSND"`/`"PA_BLK_NZ"`）时，`cache_index`必须传入（非空），否则接口报错拦截；`"BSND"`/`"TND"` 模式可选。
+- `ckvkr_repo_mode=1`时，`kr_cache`维度应包含 0，支持 shape 为`(0)`。
 - `weight_quant_mode=3`（mxfp8）或`weight_quant_mode=5`（hifloat8）时，`dequant_scale_x`/`dequant_scale_w_dq`/`dequant_scale_w_uq_qr`/`dequant_scale_w_dkv_kr`必须同时非空；mode=3 时 dtype 均为 `torch.float8_e8m0fnu`。
 - `weight_quant_mode=5` 且输入为 `torch.uint8` 时，必须显式指定各 `*_dtype` 为 `torch_npu.hifloat8`（枚举值 290）。
 - `kv_cache_quant_mode=1`（per-tensor）且`weight_quant_mode`为全量化（2/3/4/5）时，`quant_scale_ckv`必须传入。

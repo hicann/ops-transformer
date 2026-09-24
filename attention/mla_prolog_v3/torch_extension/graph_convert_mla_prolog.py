@@ -46,10 +46,29 @@ if _TORCHAIR_AVAILABLE:
     def _empty_rope_bf16() -> Tensor:
         return Const(np.array([], dtype=np.float32), dtype=DataType.DT_BF16)
 
+    # GE Bitcast 的 keep_dim 默认 false：源/目标字节宽度不同时会在末轴增维
+    # （如 bf16 4D cache -> HIFLOAT8 会变成 5D），因此只对单字节存储做 dtype 重解释。
+    _ONE_BYTE_GE_DTYPES = (
+        DataType.DT_UINT8,
+        DataType.DT_INT8,
+        DataType.DT_HIFLOAT8,
+        DataType.DT_FLOAT8_E4M3FN,
+        DataType.DT_FLOAT8_E5M2,
+        DataType.DT_FLOAT8_E8M0,
+    )
+
+    def _bitcast_one_byte(tensor: Optional[Tensor], ge_dtype: int) -> Optional[Tensor]:
+        if tensor is None or tensor.dtype == ge_dtype:
+            return tensor
+        if tensor.dtype not in _ONE_BYTE_GE_DTYPES:
+            return tensor
+        return ge.Bitcast(tensor, type=ge_dtype)
+
+    def _bitcast_hif8(tensor: Optional[Tensor]) -> Optional[Tensor]:
+        return _bitcast_one_byte(tensor, DataType.DT_HIFLOAT8)
+
     def _bitcast_e8m0(tensor: Optional[Tensor]) -> Optional[Tensor]:
-        if tensor is None:
-            return None
-        return ge.Bitcast(tensor, type=DataType.DT_FLOAT8_E8M0)
+        return _bitcast_one_byte(tensor, DataType.DT_FLOAT8_E8M0)
 
     def _apply_quant_bitcasts(
         token_x,
@@ -62,13 +81,17 @@ if _TORCHAIR_AVAILABLE:
         dequant_scale_w_uq_qr,
         dequant_scale_w_dkv_kr,
         weight_quant_mode,
+        kv_cache_quant_mode,
     ):
         if weight_quant_mode == 5:
-            token_x = ge.Bitcast(token_x, type=DataType.DT_HIFLOAT8)
-            weight_dq = ge.Bitcast(weight_dq, type=DataType.DT_HIFLOAT8)
-            weight_uq_qr = ge.Bitcast(weight_uq_qr, type=DataType.DT_HIFLOAT8)
-            weight_dkv_kr = ge.Bitcast(weight_dkv_kr, type=DataType.DT_HIFLOAT8)
-            kv_cache = ge.Bitcast(kv_cache, type=DataType.DT_HIFLOAT8)
+            token_x = _bitcast_hif8(token_x)
+            weight_dq = _bitcast_hif8(weight_dq)
+            weight_uq_qr = _bitcast_hif8(weight_uq_qr)
+            weight_dkv_kr = _bitcast_hif8(weight_dkv_kr)
+            # 对齐 PTA force_kv_cache_hifloat8：仅 kv_cache_quant_mode 1/3 时 kv 以 HIFLOAT8 存储，
+            # kv_cache_quant_mode=0/2 时 kv 仍是 bf16，不能做 HIFLOAT8 重解释
+            if kv_cache_quant_mode in (1, 3):
+                kv_cache = _bitcast_hif8(kv_cache)
         if weight_quant_mode == 3:
             dequant_scale_x = _bitcast_e8m0(dequant_scale_x)
             dequant_scale_w_dq = _bitcast_e8m0(dequant_scale_w_dq)
@@ -101,8 +124,8 @@ if _TORCHAIR_AVAILABLE:
             outs[6],
         )
         if weight_quant_mode == 3:
-            dequant_scale_q_norm = ge.Bitcast(
-                dequant_scale_q_norm, type=DataType.DT_UINT8
+            dequant_scale_q_norm = _bitcast_one_byte(
+                dequant_scale_q_norm, DataType.DT_UINT8
             )
         if functional:
             return (
@@ -333,6 +356,7 @@ if _TORCHAIR_AVAILABLE:
             dequant_scale_w_uq_qr,
             dequant_scale_w_dkv_kr,
             weight_quant_mode,
+            kv_cache_quant_mode,
         )
 
         outs = MlaPrologV3(
@@ -447,6 +471,7 @@ if _TORCHAIR_AVAILABLE:
             dequant_scale_w_uq_qr,
             dequant_scale_w_dkv_kr,
             weight_quant_mode,
+            kv_cache_quant_mode,
         )
         kv_cache_copy = ge.TensorMove(kv_cache)
         kr_cache_copy = ge.TensorMove(kr_cache)
