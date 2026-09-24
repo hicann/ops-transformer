@@ -1726,6 +1726,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
   - 无
 - 特性交叉约束
   - 伪量化场景
+    - Q_N, KV_N支持小于等于256
     - inputLayout仅支持BSH, BNSD, BSND, BNSD_BSND, TND
     - key/value的数据类型为INT8时，inputLayout不支持TND
     - Q_S = 1时：
