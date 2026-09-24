@@ -37,7 +37,7 @@ expert_capacity, H).
 requirement of A is consistent with expandedX.Shape support(E, H). E is the total number of experts, and H is the number
 of columns.
  * @li scales: An optional 2D Tensor, represents the scale of expanded_x. Type is:BFloat16, Float16 or Float32.The data
-type requirement of A is consistent with expandedX except in Ascend 950 AI Processor. Shape support(NUM\_ROWS, K),
+type requirement of A is consistent with expandedX except in Ascend 950PR&950DT products. Shape support(NUM\_ROWS, K),
 When scales is null, K is determined by the attribute k (default 1).
 * @li expert_idx: An optional 2D Tensor, represents the indexes of bias. Type is Int32.Shape support(NUM\_ROWS,
 K).Values in Tensor are [0, E-1], if bias exists, expert_idx must exist.

@@ -29,7 +29,7 @@ namespace ge {
       Type is Float32, DT_FLOAT8_E8M0.
       Shape supports (A), (A,S) or (A,K/64,2). Format supports ND. If tokens is FLOAT8,
       per_token_scales must be DT_FLOAT8_E8M0. \n
-  Ascend 950PR/Ascend 950DT support 1D, 2D or 3D (3D only for FP8 tokens). \n
+  Ascend 950PR&950DT products support 1D, 2D or 3D (3D only for FP8 tokens). \n
 * @li expert_topk_weight: A 2D tensor, optional, represents topk weight of each token in rank-order.
       Type is Float32. Shape supports (A, 1). Format supports ND. Must be used together with
       permute_topk_weight: either both provided or neither. \n
@@ -39,7 +39,7 @@ namespace ge {
   Format supports ND.
 * @li permute_per_token_scales: A 1D, 2D or 3D tensor, represents tokens scale in expert-order.
       Type is Float32, DT_FLOAT8_E8M0. Shape supports (A), (A,S) or (A,K/64,2). Format supports ND.
-  Ascend 950PR/Ascend 950DT support 1D, 2D or 3D (3D only for FP8 tokens). \n
+  Ascend 950PR&950DT products support 1D, 2D or 3D (3D only for FP8 tokens). \n
 * @li permute_token_idx: A 1D tensor, represents token idx in rank-order. Type is Int32.
       Shape supports (A). Format supports ND.
 * @li expert_token_num: A 1D tensor, represents tokens nums of experts. Type is Int32 or Int64.
@@ -51,7 +51,7 @@ namespace ge {
 * @li expert_token_num_type: Optional integer, represents the cumsum or count mode. Type is Int. Default: 1. Value
       supports 0-cumsum or 1-count, currently only supports "1".
 * @li idx_type: Optional integer, represents the gather or scatter index. Type is Int. Default: 0. Value
-      supports 0-gather idx or 1-scatter idx. Ascend 950PR/Ascend 950DT supports "0" or "1".
+      supports 0-gather idx or 1-scatter idx. Ascend 950PR&950DT products support "0" or "1".
 */
 REG_OP(MoeReRoutingV2)
     .INPUT(tokens, TensorType({DT_FLOAT16, DT_BF16, DT_INT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_HIFLOAT8,

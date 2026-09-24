@@ -204,8 +204,7 @@ REG_OP(AttentionScore)
     * Format support ND, FRACTAL_NZ. Num of dimension should be same as x.
     *\n
     *\n
-    * The following are the supported data formats and data types (for Atlas A2 Training Series Product/Atlas 800I A2
-    Inference Product/A200I A2 Box Heterogeneous Component):
+    * The following are the supported data formats and data types (for Atlas A2 products):
     *\n
     | Tensor    | x       | weight1/weight2 | bias1/bias2 | scale/offset | deq_scale1/deq_scale2 |
     antiquant_scale1/antiquant_scale2  | antiquant_offset1/antiquant_offset2 | y       | | :-------: | :-----: |
@@ -223,7 +222,7 @@ REG_OP(AttentionScore)
     | float16 | int4            | float16     | -            | -                     | float16 | float16 | float16 | |
     | bfloat16| int4            | float32     | -            | -                     | bfloat16 | bfloat16 | bfloat16|
     *\n
-    * The following are the supported data formats and data types (for Atlas Inference Series Product):
+    * The following are the supported data formats and data types (for Atlas inference products):
     *\n
     | Tensor    | x          | weight1/weight2 | bias1/bias2 | scale/offset | deq_scale1/deq_scale2 |
     antiquant_scale1/antiquant_scale2  | antiquant_offset1/antiquant_offset2 | y          | | :-------: | :--------: |
@@ -233,7 +232,7 @@ REG_OP(AttentionScore)
     Data Type | float16    | float16         | float16     | -            | -                     | - | - | float16    |
     *\n
     * @attention Constraints:
-    * @li Atlas Inference Series Product only support non-quantization high performance no-expert cases; x and y must
+    * @li Atlas inference products only support non-quantization high performance no-expert cases; x and y must
     have two dimensions; activation only supports gelu/fastgelu/relu/silu.
     * @li If expert_tokens is passed, when tokens_index_flag is true, it must be a non-negative monotone non-decreasing
     array; when tokens_index_flag is false, it must be a non-negative array.

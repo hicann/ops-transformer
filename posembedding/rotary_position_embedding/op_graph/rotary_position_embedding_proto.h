@@ -35,14 +35,13 @@ namespace ge {
  * the same as "x", and shape must be the same as "x".
  * @par Attributes:
  * mode: An optional attribute of type int, specifying the mode of rotary position embedding, must be 0-"half",
- * 1-"interleave", 2-"quarter" or 3-"interleave-half". Defaults to 0. Atlas A2 Training Series Product/ Atlas 800I A2
- * Inference Product and Atlas A3 Training Series Product only support 0-"half" and 1-"interleave".
+ * 1-"interleave", 2-"quarter" or 3-"interleave-half". Defaults to 0. Atlas A2 products and Atlas A3 training products
+ * only support 0-"half" and 1-"interleave".
  * @attention Constraints:
  * Let (B, S, N, D) represents the shape of the input "x" (4D) or (T, N, D) for 3D TND layout. Under this
  * representation, the shape constraints of each parameter can be described as follows:
- * @li The D of "x", "cos", "sin", "rotate" and "y" must be equal. For Ascend 950 AI Processor, D should be less or
- * equal to 1024. For Atlas A2 Training Series Product/ Atlas 800I A2 Inference Product and Atlas A3 Training Series
- * Product, D should be less or equal to 896.
+ * @li The D of "x", "cos", "sin", "rotate" and "y" must be equal. For Ascend 950PR&950DT products, D should be less or
+ * equal to 1024. For Atlas A2 products and Atlas A3 training products, D should be less or equal to 896.
  * @li In half, interleave and interleave-half mode, D must be a multiple of 2. In quarter mode, D must be a multiple
  * of 4.
  * @li B, S, N of "cos" and "sin" must meet one of the following four conditions:

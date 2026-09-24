@@ -38,14 +38,14 @@ namespace ge {
 
 * @par Attributes:
 * @li cache_mode: An optional attribute. Describing the format of cache. Defaults to "Norm".
-* This attribute field is only applicable to the Atlas A2 Training Series Product/Atlas A2 Inference Series Product,
-* Atlas A3 Training Series Product/Atlas A3 Inference Series Product, and Ascend950PR/Ascend950DT.
+* This attribute field is only applicable to the Atlas A2 products,
+* Atlas A3 products, and Ascend 950PR&950DT products.
 * other products can only take the default value.
 - If "PA_NZ"(Paged Attention NZ Format), the format of key_cache and value_cache is NZ.
 - If "Norm" or None, the format of key_cache and value_cache is ND.
 * @li scatter_mode: An optional attribute. Describing the format of cache. Defaults to "None".
-* This attribute field is only applicable to the Atlas A2 Training Series Product/Atlas A2 Inference Series Product,
-* Atlas A3 Training Series Product/Atlas A3 Inference Series Product, and Ascend950PR/Ascend950DT.
+* This attribute field is only applicable to the Atlas A2 products,
+* Atlas A3 products, and Ascend 950PR&950DT products.
 * other products can only take the default value.
 - If "Alibi", key and value will compress by alibi mode.
 - If "Rope", key and value will compress by Rope mode.
@@ -54,13 +54,13 @@ namespace ge {
 - If "None" or None, key and value will update normally.
 * @li strides: An optional attribute. A list of 2 integers. The stride of the key and value,
 * its' shape is [stride_k, stride_v].
-* This attribute field is only applicable to the Atlas A2 Training Series Product/Atlas A2 Inference Series Product,
-* Atlas A3 Training Series Product/Atlas A3 Inference Series Product, and Ascend950PR/Ascend950DT.
+* This attribute field is only applicable to the Atlas A2 products,
+* Atlas A3 products, and Ascend 950PR&950DT products.
 * other products can only take the default value.
 * @li offsets: An optional attribute. A list of 2 integers. The offsets of the key and value,
 * its' shape is [offset_k, offset_v].
-* This attribute field is only applicable to the Atlas A2 Training Series Product/Atlas A2 Inference Series Product,
-* Atlas A3 Training Series Product/Atlas A3 Inference Series Product, and Ascend950PR/Ascend950DT.
+* This attribute field is only applicable to the Atlas A2 products,
+* Atlas A3 products, and Ascend 950PR&950DT products.
 * other products can only take the default value.
 
 * @par Outputs:

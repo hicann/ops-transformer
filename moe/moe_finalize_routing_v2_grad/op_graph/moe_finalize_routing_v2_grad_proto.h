@@ -34,7 +34,7 @@ namespace ge {
       when active_num is between (0, R * K), the shape is (active_num, H), otherwise the shape is (R * K, H). When
       drop_pad_mode is 1, it should be a 3D Tensor, the shape is (expert_num, expert_capacity, H). Format supports ND.
 * @li scales: An optional 2D Tensor, represents the scale of expanded_x. Type should be the same as the type of grad_y
-      except in Ascend 950 AI Processor. Shape supports (R, K). Format supports ND.
+      except in Ascend 950PR&950DT products. Shape supports (R, K). Format supports ND.
 * @li expert_idx: An optional 2D Tensor, represents the indexes of bias. Type should be the same as the type of
       expanded_row_idx. When bias is passed in, it should be passed in. Shape supports (R, K). the value range is
       [0, E - 1], E >= 1, and duplicate indexes are allowed. Format supports ND.
@@ -47,7 +47,7 @@ namespace ge {
       (active_num, H), otherwise the shape is (R * K, H). When drop_pad_mode is 1, it should be a 3D Tensor, the shape
 is (expert_num, expert_capacity, H). Format supports ND.
 * @li grad_scales: A 2D Tensor, represents the gradient of scales. Type should be the same as the type of grad_y except
-      in Ascend 950 AI Processor. Shape supports (R, K). This output only makes sense when scales is passed in.
+      in Ascend 950PR&950DT products. Shape supports (R, K). This output only makes sense when scales is passed in.
       Format supports ND.
 
 * @par Attributes:

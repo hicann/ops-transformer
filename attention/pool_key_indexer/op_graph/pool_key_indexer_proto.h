@@ -102,9 +102,9 @@ namespace ge {
  *  - pool_key supports non-contiguous input on axis 0 in the PA_BBND scenario
  *    (the actual stride must be passed via the key_stride0 attribute); all other
  *    axes must be contiguous. Other inputs do not support non-contiguous tensors.
- *  - Ascend950PR/Ascend950DT supports FP8 (float8_e4m3fn) and MX-FP8 (float8_e8m0 scale)
+ *  - Ascend 950PR&950DT products support FP8 (float8_e4m3fn) and MX-FP8 (float8_e8m0 scale)
  *    data types and quantization.
- *  - Atlas A3 training/inference products and Atlas A2 training/inference products
+ *  - Atlas A3 products and Atlas A2 products
  *    do not support FLOAT8_E4M3FN and FLOAT8_E8M0 data types, and do not support
  *    quantization.
  * @endcode

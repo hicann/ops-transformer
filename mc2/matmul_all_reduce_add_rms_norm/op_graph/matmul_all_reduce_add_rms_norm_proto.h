@@ -63,7 +63,7 @@ namespace ge {
 *  and normOut computation input must be the same.
 * @li The x2 matrix can be transposed or not transposed. The x1 matrix cannot be transposed.
 * @li The value of epsilon must be within the value range (0,1).
-* @li The Atlas A2 Training Series Product/Atlas 800I A2 Inference Product/A200I A2 Box Heterogeneous Component support
+* @li The Atlas A2 products support
 1, 2, 4, and 8 cards.
 *
 * - Constraints for WeightQuantMatmulAllReduceAddRmsNorm
@@ -85,7 +85,7 @@ namespace ge {
 * @li The x2 matrix can be transposed or not transposed. The x1 matrix cannot be transposed.
 * @li The value of antiquantGroupSize falls in the range of [32, min(k-1, INT_MAX)] and must be a multiple of 32.
 * @li The value of epsilon must be within the value range (0,1).
-* @li The Atlas A2 Training Series Product/Atlas 800I A2 Inference Product/A200I A2 Box Heterogeneous Component support
+* @li The Atlas A2 products support
 1, 2, 4, and 8 cards.
 *
 * - Constraints for QuantMatmulAllReduceAddRmsNorm
@@ -104,7 +104,7 @@ namespace ge {
 *  input data types of residual, gamma, y, and normOut must be the same.
 * @li The x2 matrix can be transposed or not transposed. The x1 matrix cannot be transposed.
 * @li The value of epsilon must be within the value range (0, 1).
-* @li The Atlas A2 Training Series Product/Atlas 800I A2 Inference Product/A200I A2 Box Heterogeneous Component support
+* @li The Atlas A2 products support
 1, 2, 4, and 8 cards.
 * @attention Constraints:
 * Warning: THIS FUNCTION IS DEPRECATED. It will be removed in a future version.

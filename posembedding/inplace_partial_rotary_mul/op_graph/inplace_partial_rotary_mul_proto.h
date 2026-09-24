@@ -48,8 +48,8 @@ namespace ge {
  * @li Only interleave mode (rotary_mode=1) is supported.
  * @li Inplace execution: input "x" and output "x" share the same tensor, results are written back to input "x".
  * @li cos/sin shapes must satisfy broadcast relationship with "x".
- * @li On Ascend 950PR/Ascend 950DT: input "x" supports only BSND, B1ND, B11D, 111D layouts.
- * @li On Atlas A3/A2 training and inference products: input "x" supports only BS1D, B11D layouts.
+ * @li On Ascend 950PR&950DT products: input "x" supports only BSND, B1ND, B11D, 111D layouts.
+ * @li On Atlas A3 products and Atlas A2 products: input "x" supports only BS1D, B11D layouts.
  */
 REG_OP(InplacePartialRotaryMul)
     .INPUT(x, TensorType({DT_FLOAT16, DT_FLOAT, DT_BFLOAT16}))

@@ -22,9 +22,12 @@ namespace ge {
 /**
    * @brief compute softmax and topk for moe input.
    * @par Inputs:
-   * @li x: A 2D or 3D Tensor, the size of each dimensioin should not exceed the maximum value of int32, which is 2147483647. Type is:BFloat16, Float16 or Float32. Format support ND. 
-            For Ascend 950 AI Processor: The size of the last dimension of x (that is, the number of experts) must be in the range[1, 2048]; Other products have no restrictions.
-   * @li finished: A Tensor, the size of each dimensioin should not exceed the maximum value of int32, which is 2147483647. Type is:Bool. Shape is x_shape[:-1]. Format support ND.
+   * @li x: A 2D or 3D Tensor, the size of each dimensioin should not exceed the maximum value of int32, which is
+   2147483647. Type is:BFloat16, Float16 or Float32. Format support ND. For Ascend 950PR&950DT products: The size of the
+   last dimension of x (that is, the number of experts) must be in the range[1, 2048]; Other products have no
+   restrictions.
+   * @li finished: A Tensor, the size of each dimensioin should not exceed the maximum value of int32, which is
+   2147483647. Type is:Bool. Shape is x_shape[:-1]. Format support ND.
    * @par Outputs:
    * @li y: A Tensor. Type is:BFloat16, Float16 or Float32. The data type must be the same as that of x.
          The size of the non-1 axis must be the same as that of the corresponding axis of x.

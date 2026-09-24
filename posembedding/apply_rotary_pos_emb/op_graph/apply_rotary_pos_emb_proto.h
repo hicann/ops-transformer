@@ -41,15 +41,15 @@ namespace ge {
  * @li The dtype of input tensor query, key, sin, cos must be the same.
  * @li When the rotary_mode is "half" or "interleave", the D dimension must be divisible by 2.
  * when the rotary_mode is "quarter", the D dimension must be divisible by 4
- * @li Atlas Inference Series Product and Atlas Trainning Series Product:
+ * @li Atlas inference products and Atlas training products:
     - support types: float16, float32.
     - support layout: not support.
     - support rotary_mode: not support.
- * @li Atlas A2 Training Series Product/ Atlas 800I A2 Inference Product and Atlas A3 Training Series Product:
+ * @li Atlas A2 products and Atlas A3 training products:
     - support types: float16, float32.
     - support layout: 1.
     - support rotary_mode: not support.
- * @li Ascend 950 AI Processor
+ * @li Ascend 950PR&950DT products
     - support types: float16, float32, bfloat16.
     - support layout: 1, 2, 3, 4.
     - support rotary_mode: "half","interleave","quarter".

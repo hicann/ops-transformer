@@ -22,18 +22,21 @@ namespace ge {
 
 /**
  * @brief Gather the key and value from the corresponding cache based on the block tables and sequence lengths. \n
- *        This operation is typically used in Paged Attention (PA) to retrieve cached key-value pairs for variable-length sequences. \n
+ *        This operation is typically used in Paged Attention (PA) to retrieve cached key-value pairs for
+ variable-length sequences. \n
 
  * @par Inputs:
  * Inputs including:
  * @li key_cache: Key cache tensor. The format and the shape depends on cache_mode. \n
- *   - The Atlas A2 Training Series Product/Atlas 800I A2 Inference Product/A200I A2 Box Heterogeneous Component
- *     and Atlas A3 Training Series Product/Atlas A3 Inference Series Product: The format is ND.
- *   - Ascend 950 AI Processor: Supports the ND (cache_mode = "Norm") and FRACTAL_NZ (cache_mode = "PA_NZ") data formats.
+ *   - The Atlas A2 products
+ *     and Atlas A3 products: The format is ND.
+ *   - Ascend 950PR&950DT products: Supports the ND (cache_mode = "Norm") and FRACTAL_NZ (cache_mode = "PA_NZ") data
+ formats.
  * @li value_cache: Value cache tensor. The format and the shape depends on cache_mode.
- *   - The Atlas A2 Training Series Product/Atlas 800I A2 Inference Product/A200I A2 Box Heterogeneous Component
- *     and Atlas A3 Training Series Product/Atlas A3 Inference Series Product: The format is ND.
- *   - Ascend 950 AI Processor: Supports the ND (cache_mode = "Norm") and FRACTAL_NZ (cache_mode = "PA_NZ") data formats.
+ *   - The Atlas A2 products
+ *     and Atlas A3 products: The format is ND.
+ *   - Ascend 950PR&950DT products: Supports the ND (cache_mode = "Norm") and FRACTAL_NZ (cache_mode = "PA_NZ") data
+ formats.
  * @li block_tables: Tensor mapping logical blocks to physical blocks in each batch. \n
  *   - Data types: int32, int64.
  *   - format: ND
@@ -41,22 +44,25 @@ namespace ge {
  *   - Data types: int32, int64.
  *   - format: ND
  * @li key: Tensor for gathered key values. Shape depends on cache_mode.
- *   - The Atlas A2 Training Series Product/Atlas 800I A2 Inference Product/A200I A2 Box Heterogeneous Component
- *     and Atlas A3 Training Series Product/Atlas A3 Inference Series Product: The format is ND.
- *   - Ascend 950 AI Processor: The format is ND.
+ *   - The Atlas A2 products
+ *     and Atlas A3 products: The format is ND.
+ *   - Ascend 950PR&950DT products: The format is ND.
  * @li value: Tensor for gathered value values. Shape depends on cache_mode.
- *   - The Atlas A2 Training Series Product/Atlas 800I A2 Inference Product/A200I A2 Box Heterogeneous Component
- *     and Atlas A3 Training Series Product/Atlas A3 Inference Series Product: The format is ND.
- *   - Ascend 950 AI Processor: The format is ND.
+ *   - The Atlas A2 products
+ *     and Atlas A3 products: The format is ND.
+ *   - Ascend 950PR&950DT products: The format is ND.
  * @li seq_offset: Optional. Starting offset for each sequence in the block_tables. Shape: [batch]. \n
  *   - Data types: int32, int64.
  *   - format: ND
  *
  * @par Attributes:
- * @li cache_mode: An optional attribute describing the format of key_cache/value_cache. Valid values: "Norm" (default) or "PA_NZ".
+ * @li cache_mode: An optional attribute describing the format of key_cache/value_cache. Valid values: "Norm" (default)
+ or "PA_NZ".
  *
- * @li is_seq_lens_cumsum: An optional boolean attribute indicating whether `seq_lens` is provided as cumulative sum. Defaults to true.
- *   - If true, `seq_lens` has shape [batch + 1], where `seq_lens[i+1] - seq_lens[i]` gives the length of the i-th sequence.
+ * @li is_seq_lens_cumsum: An optional boolean attribute indicating whether `seq_lens` is provided as cumulative sum.
+ Defaults to true.
+ *   - If true, `seq_lens` has shape [batch + 1], where `seq_lens[i+1] - seq_lens[i]` gives the length of the i-th
+ sequence.
  *   - If false, `seq_lens` has shape [batch], directly providing the length of each sequence.
  *
  * @par Outputs:
@@ -86,7 +92,8 @@ namespace ge {
  *   value:         [num_tokens, num_heads * head_size_v]
  *   seq_offset:    [batch] (optional)
  *
- * Special note for PA_NZ mode: enum_aligned has 3 possible values, which depend on the bit-width of key_cache/value_cache data type.
+ * Special note for PA_NZ mode: enum_aligned has 3 possible values, which depend on the bit-width of
+ key_cache/value_cache data type.
  *       b8  (8 bits = 1 byte): elenum_aligned = 32
  *       b16 (16 bits = 2 bytes): elenum_aligned = 16
  *       b32 (32 bits = 4 bytes): elenum_aligned = 8
@@ -108,11 +115,10 @@ REG_OP(GatherPaKvCache)
     .OUTPUT(value, "T")
     .ATTR(cache_mode, String, "Norm")
     .ATTR(is_seq_lens_cumsum, Bool, true)
-    .DATATYPE(T, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT, DT_INT8, DT_UINT8, DT_INT16,
-                            DT_UINT16, DT_INT32, DT_UINT32, DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN}))
-.OP_END_FACTORY_REG(GatherPaKvCache)
+    .DATATYPE(T, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT, DT_INT8, DT_UINT8, DT_INT16, DT_UINT16, DT_INT32, DT_UINT32,
+                             DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN}))
+    .OP_END_FACTORY_REG(GatherPaKvCache)
 
 } // namespace ge
 
 #endif // OPS_OP_PROTO_INC_GatherPaKvCache_H_
-

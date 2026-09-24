@@ -39,7 +39,7 @@ namespace ge {
  * @li partial_slice: An optional attribute of type list int, specifying the slice range of the partial rotary position
  * embedding. The value is a list of two integers. Defaults to {0, 0}.
  * @attention Constraints:
- * @li This operator is only supported on Ascend 950 AI Processor.
+ * @li This operator is only supported on Ascend 950PR&950DT products.
  * @li Currently only interleave mode (rotary_mode=1) is supported. Other modes (half=0, quarter=2,
  * interleave-half=3) are not implemented yet.
  * Let (B, S, N, D) represents the shape of the input "dy". Under this
