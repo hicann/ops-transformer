@@ -57,7 +57,7 @@ std::string ShapeToStringWithoutBracket(const op::Shape &shape)
 
 std::string ViewShapeToString(const aclTensor *tensor)
 {
-    return ShapeToStringWithoutBracket(tensor->GetViewShape());
+    return "[" + ShapeToStringWithoutBracket(tensor->GetViewShape()) + "]";
 }
 } // namespace
 

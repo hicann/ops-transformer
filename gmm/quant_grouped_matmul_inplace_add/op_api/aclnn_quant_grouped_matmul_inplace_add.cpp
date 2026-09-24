@@ -59,7 +59,7 @@ std::string ShapeToStringWithoutBracket(const op::Shape &shape)
 
 std::string ViewShapeToString(const aclTensor *tensor)
 {
-    return ShapeToStringWithoutBracket(tensor->GetViewShape());
+    return "[" + ShapeToStringWithoutBracket(tensor->GetViewShape()) + "]";
 }
 
 #define QGMM_INPLACE_ADD_CHECK_REPORT(cond, retExpr, reportExpr) \
