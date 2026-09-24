@@ -28,9 +28,9 @@
 #include "memory_copy_arch35.h"
 #include "../utils/attn_sink_gs1.h"
 
+using namespace AscendC::Impl::Detail;
 using namespace AscendC;
 using namespace FaVectorApi;
-using namespace AscendC::Impl::Detail;
 
 namespace FlashAttnKernel {
 
@@ -39,22 +39,24 @@ class FANoQuantGqaBlockVecDn {
 public:
     using INPUT_T = typename FA_T::inputType;
     using OUTPUT_T = typename FA_T::outputType;
+    static constexpr FA_LAYOUT LAYOUT_T = FA_T::qLayout;
+    static constexpr FA_LAYOUT LAYOUT_KV = FA_T::kvLayout;
+    static constexpr FA_LAYOUT LAYOUT_OUT = FA_T::attnOutLayout;
     static constexpr uint32_t mBaseSize = (uint32_t)FA_T::mBaseSize;
     static constexpr uint32_t s2BaseSize = (uint32_t)FA_T::s2BaseSize;
     static constexpr uint32_t dBaseSize = (uint32_t)FA_T::dBaseSize;
     static constexpr uint32_t dVBaseSize = (uint32_t)FA_T::dVBaseSize;
-    static constexpr FA_LAYOUT LAYOUT_T = FA_T::qLayout;
-    static constexpr FA_LAYOUT LAYOUT_KV = FA_T::kvLayout;
-    static constexpr FA_LAYOUT LAYOUT_OUT = FA_T::attnOutLayout;
     static constexpr bool PAGE_ATTENTION = FA_T::pageAttention;
     static constexpr bool HAS_MASK = FA_T::hasMask;
 
     using T = float;
     static constexpr uint32_t dTemplateAlign64 = BaseApi::Align64Func((uint16_t)FA_T::dVBaseSize);
 
-    static constexpr uint32_t DB = 2;
-    // 索引使用 loop & (DB - 1) 代替 loop % DB，要求 DB 必须是2的幂，否则位掩码结果错误
-    static_assert(DB > 0 && (DB & (DB - 1)) == 0, "DB must be a power of two for bitmask indexing");
+    // DN alternates its two vector result slots.
+    static constexpr uint32_t DN_VEC_SLOTS = 2;
+    // 索引使用 loop & (DN_VEC_SLOTS - 1) 代替 loop % DN_VEC_SLOTS，要求 DN_VEC_SLOTS 必须是2的幂，否则位掩码结果错误
+    static_assert(DN_VEC_SLOTS > 0 && (DN_VEC_SLOTS & (DN_VEC_SLOTS - 1)) == 0,
+                  "DN_VEC_SLOTS must be a power of two for bitmask indexing");
 
     // 核间同步ID
     static constexpr uint64_t CROSS_CORE_SYNC_MODE = 4;
@@ -77,88 +79,88 @@ public:
     // L1
     static constexpr uint32_t L1_P_BUFCNT = 3U;
     static constexpr uint32_t L1_P_BUF_BYTES = mBaseSize * s2BaseSize * sizeof(INPUT_T);
-    LocalTensor<uint8_t> l1PBuffers_;
+    LocalTensor<uint8_t> l1PBuffersDn_;
 
     // UB
     static constexpr uint32_t UB_MM_RES_BUFCNT = (dBaseSize > 128) ? 2U : 4U;
     static constexpr uint32_t UB_MM_RES_BUF_BYTES =
         mBaseSize / CV_RATIO * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(T);
-    LocalTensor<uint8_t> ubMmResBuffers_;
-    uint32_t mmResBufId_ = 0;
+    LocalTensor<uint8_t> ubMmResBuffersDn_;
+    uint32_t mmResBufIdDn_ = 0;
 
     static constexpr uint32_t UB_VEC2_RES_BUF_BYTES = mBaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T);
-    LocalTensor<T> ubVec2Res_; // 存放vec2阶段VEC的中间处理结果, 并且作为attn_out的输出buffer, 需配对的MTE3和V的同步ID
+    LocalTensor<T> ubVec2ResDn_; // 存放vec2阶段VEC的中间处理结果, 并且作为attn_out的输出buffer, 需配对的MTE3和V的同步ID
 
     static constexpr uint32_t UB_VEC1_RES_BUFCNT = 2U;
     static constexpr uint32_t UB_VEC1_RES_BUF_BYTES = (mBaseSize / CV_RATIO + 1U) * s2BaseSize * sizeof(INPUT_T);
-    LocalTensor<uint8_t> ubVec1ResBuffers_;
-    uint32_t vec1ResUbBufId_ = 0;
+    LocalTensor<uint8_t> ubVec1ResBuffersDn_;
+    uint32_t vec1ResUbBufIdDn_ = 0;
 
     static constexpr uint32_t UB_SOFTMAX_MAX_BUFCNT = 3U;
     static constexpr uint32_t UB_SOFTMAX_MAX_BUF_BYTES = 256U;
-    LocalTensor<T> softmaxSumBuf_;
+    LocalTensor<T> softmaxSumBufDn_;
     static constexpr uint32_t UB_SOFTMAX_SUM_BUFCNT = 3U;
     static constexpr uint32_t UB_SOFTMAX_SUM_BUF_BYTES = 256U;
-    LocalTensor<T> softmaxMaxBuf_;
+    LocalTensor<T> softmaxMaxBufDn_;
     static constexpr uint32_t UB_SOFTMAX_EXP_BUFCNT = 3U;
     static constexpr uint32_t UB_SOFTMAX_EXP_BUF_BYTES = 256U;
-    LocalTensor<T> softmaxExpBuf_;
+    LocalTensor<T> softmaxExpBufDn_;
 
     static constexpr uint32_t UB_LSE_OUT_BUFCNT = 2U;
     static constexpr uint32_t UB_LSE_OUT_BUF_BYTES = 2048U;
-    LocalTensor<uint8_t> ubLseOutBuffers_;
-    uint32_t lseOutUbBufId_ = 0;
+    LocalTensor<uint8_t> ubLseOutBuffersDn_;
+    uint32_t lseOutUbBufIdDn_ = 0;
 
-    const ConstInfo_t &constInfo_;
+    const ConstInfo_t &constInfoDn_;
 
     using SEQLEN_T = uint32_t;
-    SeqLensTool<LAYOUT_T, SEQLEN_T> &qSeqLensTool_;
-    SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool_;
+    SeqLensTool<LAYOUT_T, SEQLEN_T> &qSeqLensToolDn_;
+    SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensToolDn_;
 
     // GM
     static constexpr GmFormat OUT_FORMAT = GetAttentionOutGmFormat<LAYOUT_OUT>();
     using FaGmTensorOut = FaGmTensor<OUTPUT_T, OUT_FORMAT, SEQLEN_T, IS_TND<LAYOUT_OUT>()>;
-    FaGmTensorOut outGmTensor_;
-    CopyAttenOutUbToGm<OUTPUT_T, OUT_FORMAT, GetOutUbFormat<LAYOUT_T>()> copyAttenOutUbToGm_;
-    GlobalTensor<OUTPUT_T> attentionOutGm_;
-    GlobalTensor<float> softmaxLseGm_;
+    FaGmTensorOut outGmTensorDn_;
+    CopyAttenOutUbToGm<OUTPUT_T, OUT_FORMAT, GetOutUbFormat<LAYOUT_T>()> copyAttenOutUbToGmDn_;
+    GlobalTensor<OUTPUT_T> attentionOutGmDn_;
+    GlobalTensor<float> softmaxLseGmDn_;
     GlobalTensor<float> accumOutGm_;
     GlobalTensor<float> softmaxFDSumGm_;
     GlobalTensor<float> softmaxFDMaxGm_;
-    GlobalTensor<float> sinkGm_;
+    GlobalTensor<float> sinkGmDn_;
 
-    T negativeFloatScalar_;
+    T negativeFloatScalarDn_;
 
     // ==================== Functions ======================
     __aicore__ inline FANoQuantGqaBlockVecDn(ConstInfo_t &constInfo, SeqLensTool<LAYOUT_T, SEQLEN_T> &qSeqLensTool,
                                              SeqLensTool<LAYOUT_KV, SEQLEN_T> &kvSeqLensTool)
-        : constInfo_(constInfo),
-          qSeqLensTool_(qSeqLensTool),
-          kvSeqLensTool_(kvSeqLensTool){};
+        : constInfoDn_(constInfo),
+          qSeqLensToolDn_(qSeqLensTool),
+          kvSeqLensToolDn_(kvSeqLensTool){};
 
     __aicore__ inline void InitBlock(__gm__ uint8_t *attenMask, __gm__ uint8_t *learnableSink,
                                      __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut,
                                      __gm__ uint8_t *workspace)
     {
         uint32_t tmp1 = NEGATIVE_MIN_VALUE_FP32;
-        this->negativeFloatScalar_ = *((T *)&tmp1);
+        this->negativeFloatScalarDn_ = *((T *)&tmp1);
 
-        this->attentionOutGm_.SetGlobalBuffer((__gm__ OUTPUT_T *)attentionOut);
-        InitAttenOutBuffer(constInfo_.bSize, constInfo_.n2Size, constInfo_.gSize, constInfo_.s1Size, constInfo_.dSizeV,
-                           outGmTensor_, attentionOut);
+        this->attentionOutGmDn_.SetGlobalBuffer((__gm__ OUTPUT_T *)attentionOut);
+        InitAttenOutBufferDn(constInfoDn_.bSize, constInfoDn_.n2Size, constInfoDn_.gSize, constInfoDn_.s1Size,
+                             constInfoDn_.dSizeV, outGmTensorDn_, attentionOut);
 
-        if (constInfo_.isSoftmaxLseEnable) {
-            softmaxLseGm_.SetGlobalBuffer((__gm__ float *)softmaxLse);
+        if (constInfoDn_.isSoftmaxLseEnable) {
+            softmaxLseGmDn_.SetGlobalBuffer((__gm__ float *)softmaxLse);
         }
 
-        if (constInfo_.enableFlashDecode) {
+        if (constInfoDn_.enableFlashDecode) {
             accumOutGm_.SetGlobalBuffer((__gm__ float *)workspace);
-            softmaxFDSumGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfo_.accumOutSize);
-            softmaxFDMaxGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfo_.accumOutSize +
-                                            constInfo_.logSumExpSize);
+            softmaxFDSumGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfoDn_.accumOutSize);
+            softmaxFDMaxGm_.SetGlobalBuffer((__gm__ float *)workspace + constInfoDn_.accumOutSize +
+                                            constInfoDn_.logSumExpSize);
         }
-        if (constInfo_.learnableSinkFlag) {
-            sinkGm_.SetGlobalBuffer((__gm__ float *)learnableSink);
+        if (constInfoDn_.learnableSinkFlag) {
+            sinkGmDn_.SetGlobalBuffer((__gm__ float *)learnableSink);
         }
     }
 
@@ -167,80 +169,80 @@ public:
         /*--------------------------------------------L1--------------------------------------------*/
         // l1P 三缓冲
         uint32_t addrL1 = 0;
-        l1PBuffers_ = LocalTensor<uint8_t>(TPosition::A1, addrL1, L1_P_BUFCNT * L1_P_BUF_BYTES);
+        l1PBuffersDn_ = LocalTensor<uint8_t>(TPosition::A1, addrL1, L1_P_BUFCNT * L1_P_BUF_BYTES);
 
         /*--------------------------------------------UB--------------------------------------------*/
         uint32_t addrUb = 0;
-        ubMmResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
-                                               UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES); // CV通信BUF
+        ubMmResBuffersDn_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
+                                                 UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES); // CV通信BUF
         addrUb = UB_MM_RES_BUFCNT * UB_MM_RES_BUF_BYTES;
-        ubVec2Res_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_VEC2_RES_BUF_BYTES)
-                         .template ReinterpretCast<T>(); // 输出BUF: attn_out拷出
+        ubVec2ResDn_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb, UB_VEC2_RES_BUF_BYTES)
+                           .template ReinterpretCast<T>(); // 输出BUF: attn_out拷出
         addrUb += UB_VEC2_RES_BUF_BYTES;
-        ubVec1ResBuffers_ = LocalTensor<uint8_t>(
+        ubVec1ResBuffersDn_ = LocalTensor<uint8_t>(
             TPosition::VECIN, addrUb,
             UB_VEC1_RES_BUFCNT * UB_VEC1_RES_BUF_BYTES); // 2 * 32.25K = 64.5K, 输出BUF: softmax结果拷贝至L1
         addrUb += UB_VEC1_RES_BUFCNT * UB_VEC1_RES_BUF_BYTES;
 
         // softmaxSum×3 + softmaxMax×3 + softmaxExp×3，各 256 bytes
-        softmaxSumBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
-                                              UB_SOFTMAX_SUM_BUFCNT * UB_SOFTMAX_SUM_BUF_BYTES)
-                             .template ReinterpretCast<T>(); // 3 * 0.25K = 0.75K, 常驻BUF
+        softmaxSumBufDn_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
+                                                UB_SOFTMAX_SUM_BUFCNT * UB_SOFTMAX_SUM_BUF_BYTES)
+                               .template ReinterpretCast<T>(); // 3 * 0.25K = 0.75K, 常驻BUF
         addrUb += UB_SOFTMAX_SUM_BUFCNT * UB_SOFTMAX_SUM_BUF_BYTES;
-        softmaxMaxBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
-                                              UB_SOFTMAX_MAX_BUFCNT * UB_SOFTMAX_MAX_BUF_BYTES)
-                             .template ReinterpretCast<T>(); // 3 * 0.25K = 0.75K, 常驻BUF
+        softmaxMaxBufDn_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
+                                                UB_SOFTMAX_MAX_BUFCNT * UB_SOFTMAX_MAX_BUF_BYTES)
+                               .template ReinterpretCast<T>(); // 3 * 0.25K = 0.75K, 常驻BUF
         addrUb += UB_SOFTMAX_MAX_BUFCNT * UB_SOFTMAX_MAX_BUF_BYTES;
-        softmaxExpBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
-                                              UB_SOFTMAX_EXP_BUFCNT * UB_SOFTMAX_EXP_BUF_BYTES)
-                             .template ReinterpretCast<T>(); // 3 * 0.25K = 0.75K, 常驻BUF
+        softmaxExpBufDn_ = LocalTensor<uint8_t>(TPosition::VECIN, addrUb,
+                                                UB_SOFTMAX_EXP_BUFCNT * UB_SOFTMAX_EXP_BUF_BYTES)
+                               .template ReinterpretCast<T>(); // 3 * 0.25K = 0.75K, 常驻BUF
         addrUb += UB_SOFTMAX_EXP_BUFCNT * UB_SOFTMAX_EXP_BUF_BYTES;
 
-        ubLseOutBuffers_ = LocalTensor<uint8_t>(
+        ubLseOutBuffersDn_ = LocalTensor<uint8_t>(
             TPosition::VECIN, addrUb,
             UB_LSE_OUT_BUFCNT *
                 UB_LSE_OUT_BUF_BYTES); // 2 * 2K = 4K, 输出BUF: FD中间结果SUM和MAX拷出至GM，或者LSE结果拷出
         addrUb += UB_LSE_OUT_BUFCNT * UB_LSE_OUT_BUF_BYTES;
     }
 
-    __aicore__ inline void ResetSoftmaxBuffer(uint32_t slotIdx, const RunInfo &runInfo)
+    __aicore__ inline void ResetSoftmaxBufferDn(uint32_t slotIdx, const RunInfo &dnRunInfo)
     {
         constexpr uint32_t softmaxBufElementCount = UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T);
-        LocalTensor<T> sumUb = softmaxSumBuf_[slotIdx * softmaxBufElementCount];
-        LocalTensor<T> maxUb = softmaxMaxBuf_[slotIdx * softmaxBufElementCount];
-        if (constInfo_.learnableSinkFlag && runInfo.isFirstFdBlock) {
+        LocalTensor<T> sumUb = softmaxSumBufDn_[slotIdx * softmaxBufElementCount];
+        LocalTensor<T> maxUb = softmaxMaxBufDn_[slotIdx * softmaxBufElementCount];
+        if (constInfoDn_.learnableSinkFlag && dnRunInfo.isFirstFdBlock) {
             Duplicate<T>(sumUb, static_cast<T>(1), softmaxBufElementCount);
 
-            uint32_t gs1Start = runInfo.gS1Idx + runInfo.vecMbaseIdx;
+            uint32_t gs1Start = dnRunInfo.gS1Idx + dnRunInfo.vecMbaseIdx;
 
-            Mutex::Lock<PIPE_MTE2>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+            Mutex::Lock<PIPE_MTE2>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufIdDn_);
             {
                 LocalTensor<float> sinkTmpUb =
-                    ubVec1ResBuffers_[vec1ResUbBufId_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<float>();
+                    ubVec1ResBuffersDn_[vec1ResUbBufIdDn_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<float>();
                 if constexpr (LAYOUT_T == FA_LAYOUT::BSND || LAYOUT_T == FA_LAYOUT::TND) {
-                    AttentionCommon::SinkCopyInS1G(sinkTmpUb, sinkGm_, gs1Start, runInfo.actVecMSize, runInfo.actS1Size,
-                                                   runInfo.n2Idx, constInfo_.gSize);
+                    AttentionCommon::SinkCopyInS1G(sinkTmpUb, sinkGmDn_, gs1Start, dnRunInfo.actVecMSize,
+                                                   dnRunInfo.actS1Size, dnRunInfo.n2Idx, constInfoDn_.gSize);
                 } else if constexpr (LAYOUT_T == FA_LAYOUT::BNSD) {
-                    AttentionCommon::SinkCopyInGS1(sinkTmpUb, sinkGm_, gs1Start, runInfo.actVecMSize, runInfo.actS1Size,
-                                                   runInfo.n2Idx, constInfo_.gSize);
+                    AttentionCommon::SinkCopyInGS1(sinkTmpUb, sinkGmDn_, gs1Start, dnRunInfo.actVecMSize,
+                                                   dnRunInfo.actS1Size, dnRunInfo.n2Idx, constInfoDn_.gSize);
                 }
             }
-            Mutex::Unlock<PIPE_MTE2>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+            Mutex::Unlock<PIPE_MTE2>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufIdDn_);
 
-            Mutex::Lock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+            Mutex::Lock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufIdDn_);
             {
                 LocalTensor<float> sinkTmpUb =
-                    ubVec1ResBuffers_[vec1ResUbBufId_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<float>();
+                    ubVec1ResBuffersDn_[vec1ResUbBufIdDn_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<float>();
 
                 if constexpr (LAYOUT_T == FA_LAYOUT::BNSD) {
-                    AttentionCommon::SinkExpandMaxVf<T, float, true>(maxUb, sinkTmpUb, gs1Start, runInfo.actVecMSize,
-                                                                     runInfo.actS1Size, constInfo_.gSize);
+                    AttentionCommon::SinkExpandMaxVf<T, float, true>(maxUb, sinkTmpUb, gs1Start, dnRunInfo.actVecMSize,
+                                                                     dnRunInfo.actS1Size, constInfoDn_.gSize);
                 } else {
-                    AttentionCommon::SinkExpandMaxVf<T, float, false>(maxUb, sinkTmpUb, gs1Start, runInfo.actVecMSize,
-                                                                      runInfo.actS1Size, constInfo_.gSize);
+                    AttentionCommon::SinkExpandMaxVf<T, float, false>(maxUb, sinkTmpUb, gs1Start, dnRunInfo.actVecMSize,
+                                                                      dnRunInfo.actS1Size, constInfoDn_.gSize);
                 }
             }
-            Mutex::Unlock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+            Mutex::Unlock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufIdDn_);
         } else {
             Duplicate<T>(sumUb, static_cast<T>(0), softmaxBufElementCount);
             Duplicate<T>(maxUb, static_cast<T>(-std::numeric_limits<float>::infinity()), softmaxBufElementCount);
@@ -263,128 +265,129 @@ public:
 
     __aicore__ inline void FreeEventID() {}
 
-    __aicore__ inline void ProcessVec1(RunInfo runInfo)
+    __aicore__ inline void ProcessVec1(RunInfo dnRunInfo)
     {
-        uint32_t mmResUbBufId = mmResBufId_;
-        mmResBufId_ = (mmResBufId_ + 1) % UB_MM_RES_BUFCNT;
-        uint32_t pL1BufId = runInfo.loop % L1_P_BUFCNT;
+        uint32_t mmResUbBufId = mmResBufIdDn_;
+        mmResBufIdDn_ = (mmResBufIdDn_ + 1) % UB_MM_RES_BUFCNT;
+        uint32_t pL1BufId = dnRunInfo.loop % L1_P_BUFCNT;
         uint32_t mmSyncIdx = CC_MM_0 + mmResUbBufId;
         uint32_t v1c2CrossCoreSyncIdx = CC_L1P_0 + pL1BufId;
-        LocalTensor<INPUT_T> pL1Tensor = l1PBuffers_[pL1BufId * L1_P_BUF_BYTES].template ReinterpretCast<INPUT_T>();
-        auto mm1ResUbTensor = ubMmResBuffers_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<T>();
+        LocalTensor<INPUT_T> pL1Tensor = l1PBuffersDn_[pL1BufId * L1_P_BUF_BYTES].template ReinterpretCast<INPUT_T>();
+        auto mm1ResUbTensor = ubMmResBuffersDn_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<T>();
 
-        if (unlikely(runInfo.isFirstS2Loop)) {
-            ResetSoftmaxBuffer(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT, runInfo);
+        if (unlikely(dnRunInfo.isFirstS2Loop)) {
+            ResetSoftmaxBufferDn(dnRunInfo.mloop % UB_SOFTMAX_SUM_BUFCNT, dnRunInfo);
             AscendC::PipeBarrier<PIPE_V>();
         }
 
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
-        ProcessVec1Dn(pL1Tensor, mm1ResUbTensor, runInfo);
+        ProcessVec1Dn(pL1Tensor, mm1ResUbTensor, dnRunInfo);
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx); // 通知BMM2: Vec1已读完mmRes, 可覆写
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(v1c2CrossCoreSyncIdx);
-        Vec1PostProcess(runInfo);
+        Vec1PostProcessDn(dnRunInfo);
     }
 
     __aicore__ inline void ClearOutput()
     {
-        if (constInfo_.needInitOutput) {
-            uint32_t vecCoreNum = 2 * constInfo_.coreNum;
-            uint64_t tSize = constInfo_.bSize * constInfo_.s1Size;
+        if (constInfoDn_.needInitOutput) {
+            uint32_t vecCoreNum = 2 * constInfoDn_.coreNum;
+            uint64_t tSize = constInfoDn_.bSize * constInfoDn_.s1Size;
             if constexpr (LAYOUT_T == FA_LAYOUT::TND) {
-                tSize = qSeqLensTool_.cuSeqLensParser.GetTSize();
+                tSize = qSeqLensToolDn_.cuSeqLensParser.GetTSize();
             }
-            uint64_t attenOutTotalSize = tSize * constInfo_.n2Size * constInfo_.gSize * constInfo_.dSizeV;
+            uint64_t attenOutTotalSize = tSize * constInfoDn_.n2Size * constInfoDn_.gSize * constInfoDn_.dSizeV;
 
             static constexpr OUTPUT_T ATTEN_OUT_INIT_VAL = 0;
             static constexpr uint32_t ATTEN_OUT_POP_BUF_START_ADDR = 0;
             static constexpr uint32_t ATTEN_OUT_POP_BUF_ELE_SIZE = BUFFER_SIZE_BYTE_32K / sizeof(OUTPUT_T);
             AttentionCommon::InitOutput<OUTPUT_T, EVENT_ID0, ATTEN_OUT_POP_BUF_START_ADDR, ATTEN_OUT_POP_BUF_ELE_SIZE,
-                                        true>(attentionOutGm_, attenOutTotalSize, vecCoreNum, ATTEN_OUT_INIT_VAL);
+                                        true>(attentionOutGmDn_, attenOutTotalSize, vecCoreNum, ATTEN_OUT_INIT_VAL);
 
-            if (constInfo_.isSoftmaxLseEnable) {
-                uint64_t lseTotalSize = tSize * constInfo_.n2Size * constInfo_.gSize;
+            if (constInfoDn_.isSoftmaxLseEnable) {
+                uint64_t lseTotalSize = tSize * constInfoDn_.n2Size * constInfoDn_.gSize;
 
                 static constexpr float LSE_INIT_VAL = 3e+99;
                 static constexpr uint32_t LSE_POP_BUF_START_ADDR = BUFFER_SIZE_BYTE_32K;
                 static constexpr uint32_t LSE_POP_BUF_ELE_SIZE = BUFFER_SIZE_BYTE_32K / sizeof(float);
                 AttentionCommon::InitOutput<float, EVENT_ID1, LSE_POP_BUF_START_ADDR, LSE_POP_BUF_ELE_SIZE, true>(
-                    softmaxLseGm_, lseTotalSize, vecCoreNum, LSE_INIT_VAL);
+                    softmaxLseGmDn_, lseTotalSize, vecCoreNum, LSE_INIT_VAL);
             }
 
             SyncAll();
         }
     }
 
-    __aicore__ inline void InitAttenOutBuffer(uint32_t batchSize, uint32_t n2Size, uint32_t gSize, uint32_t qSeqSize,
-                                              uint32_t headDim, FaGmTensorOut &outGmTensor, __gm__ uint8_t *gm)
+    __aicore__ inline void InitAttenOutBufferDn(uint32_t batchSize, uint32_t n2Size, uint32_t gSize, uint32_t qSeqSize,
+                                                uint32_t headDim, FaGmTensorOut &outGmTensor, __gm__ uint8_t *gm)
     {
         outGmTensor.gmTensor.SetGlobalBuffer((__gm__ OUTPUT_T *)gm);
         if constexpr (GmLayoutParams<OUT_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_BNGSD) {
-            outGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim, qSeqLensTool_.seqUsedParser);
+            outGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim,
+                                              qSeqLensToolDn_.seqUsedParser);
         } else {
-            outGmTensor.offsetCalculator.Init(n2Size, gSize, headDim, qSeqLensTool_.cuSeqLensParser);
+            outGmTensor.offsetCalculator.Init(n2Size, gSize, headDim, qSeqLensToolDn_.cuSeqLensParser);
         }
     }
 
-    __aicore__ inline void SoftmaxDataCopyOut(RunInfo runInfo, LocalTensor<float> &sumUb, LocalTensor<float> &maxUb)
+    __aicore__ inline void SoftmaxDataCopyOutDn(RunInfo dnRunInfo, LocalTensor<float> &sumUb, LocalTensor<float> &maxUb)
     {
-        if (constInfo_.enableFlashDecode) {
-            if (runInfo.isS2SplitCore) {
-                ComputeLogSumExpAndCopyToGm(runInfo, sumUb, maxUb);
+        if (constInfoDn_.enableFlashDecode) {
+            if (dnRunInfo.isS2SplitCore) {
+                ComputeLogSumExpAndCopyToGmDn(dnRunInfo, sumUb, maxUb);
             }
         }
 
-        if (constInfo_.enableFlashDecode) {
-            if (!runInfo.isS2SplitCore && constInfo_.isSoftmaxLseEnable) {
-                SoftmaxLseCopyOut(sumUb, maxUb, runInfo);
+        if (constInfoDn_.enableFlashDecode) {
+            if (!dnRunInfo.isS2SplitCore && constInfoDn_.isSoftmaxLseEnable) {
+                SoftmaxLseCopyOutDn(sumUb, maxUb, dnRunInfo);
             }
         } else {
-            if (constInfo_.isSoftmaxLseEnable) {
-                SoftmaxLseCopyOut(sumUb, maxUb, runInfo);
+            if (constInfoDn_.isSoftmaxLseEnable) {
+                SoftmaxLseCopyOutDn(sumUb, maxUb, dnRunInfo);
             }
         }
     }
 
-    __aicore__ inline void SoftmaxLseCopyOut(LocalTensor<float> &softmaxSumTmp, LocalTensor<float> &softmaxMaxTmp,
-                                             RunInfo &runInfo)
+    __aicore__ inline void SoftmaxLseCopyOutDn(LocalTensor<float> &softmaxSumTmp, LocalTensor<float> &softmaxMaxTmp,
+                                               RunInfo &dnRunInfo)
     {
-        if (unlikely(runInfo.actVecMSize == 0)) {
+        if (unlikely(dnRunInfo.actVecMSize == 0)) {
             return;
         }
 
-        Mutex::Lock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
-        uint32_t vecMIdx = runInfo.gS1Idx + runInfo.vecMbaseIdx;
+        Mutex::Lock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
+        uint32_t vecMIdx = dnRunInfo.gS1Idx + dnRunInfo.vecMbaseIdx;
         LocalTensor<float> lseUb =
-            ubLseOutBuffers_[lseOutUbBufId_ * UB_LSE_OUT_BUF_BYTES].template ReinterpretCast<float>();
-        ComputeLseOutputVF(lseUb, softmaxSumTmp, softmaxMaxTmp, runInfo.actVecMSize);
-        Mutex::Unlock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
-        Mutex::Lock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
+            ubLseOutBuffersDn_[lseOutUbBufIdDn_ * UB_LSE_OUT_BUF_BYTES].template ReinterpretCast<float>();
+        ComputeLseOutputVF(lseUb, softmaxSumTmp, softmaxMaxTmp, dnRunInfo.actVecMSize);
+        Mutex::Unlock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
+        Mutex::Lock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
         if constexpr (LAYOUT_T == FA_LAYOUT::TND) {
-            uint32_t prefixBS1 = qSeqLensTool_.cuSeqLensParser.GetTBase(runInfo.bIdx);
-            uint64_t bN2Offset = runInfo.n2Idx * constInfo_.gSize * constInfo_.t1Size + prefixBS1;
-            DataCopySoftmaxLseTNDtoNTArch35<T, ConstInfo_t>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx,
-                                                            runInfo.actVecMSize, constInfo_);
+            uint32_t prefixBS1 = qSeqLensToolDn_.cuSeqLensParser.GetTBase(dnRunInfo.bIdx);
+            uint64_t bN2Offset = dnRunInfo.n2Idx * constInfoDn_.gSize * constInfoDn_.t1Size + prefixBS1;
+            DataCopySoftmaxLseTNDtoNTArch35<T, ConstInfo_t>(softmaxLseGmDn_, lseUb, bN2Offset, vecMIdx,
+                                                            dnRunInfo.actVecMSize, constInfoDn_);
         } else if constexpr (LAYOUT_T == FA_LAYOUT::BSND) {
-            uint64_t bN2Offset = runInfo.bIdx * constInfo_.n2Size * constInfo_.gSize * constInfo_.s1Size +
-                                 runInfo.n2Idx * constInfo_.gSize * constInfo_.s1Size;
-            uint64_t qActSeqLens = qSeqLensTool_.seqUsedParser.GetActualSeqLength(runInfo.bIdx);
-            DataCopySoftmaxLseBSNDArch35<T, ConstInfo_t>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx, runInfo.actVecMSize,
-                                                         constInfo_);
+            uint64_t bN2Offset = dnRunInfo.bIdx * constInfoDn_.n2Size * constInfoDn_.gSize * constInfoDn_.s1Size +
+                                 dnRunInfo.n2Idx * constInfoDn_.gSize * constInfoDn_.s1Size;
+            uint64_t qActSeqLens = qSeqLensToolDn_.seqUsedParser.GetActualSeqLength(dnRunInfo.bIdx);
+            DataCopySoftmaxLseBSNDArch35<T, ConstInfo_t>(softmaxLseGmDn_, lseUb, bN2Offset, vecMIdx,
+                                                         dnRunInfo.actVecMSize, constInfoDn_);
         } else if constexpr (LAYOUT_T == FA_LAYOUT::BNSD) {
-            uint64_t bN2Offset = runInfo.bIdx * constInfo_.n2Size * constInfo_.gSize * constInfo_.s1Size +
-                                 runInfo.n2Idx * constInfo_.gSize * constInfo_.s1Size;
-            uint64_t qActSeqLens = qSeqLensTool_.seqUsedParser.GetActualSeqLength(runInfo.bIdx);
-            DataCopySoftmaxLseBNSDArch35<T, ConstInfo_t>(softmaxLseGm_, lseUb, bN2Offset, vecMIdx, runInfo.actVecMSize,
-                                                         constInfo_, qActSeqLens);
+            uint64_t bN2Offset = dnRunInfo.bIdx * constInfoDn_.n2Size * constInfoDn_.gSize * constInfoDn_.s1Size +
+                                 dnRunInfo.n2Idx * constInfoDn_.gSize * constInfoDn_.s1Size;
+            uint64_t qActSeqLens = qSeqLensToolDn_.seqUsedParser.GetActualSeqLength(dnRunInfo.bIdx);
+            DataCopySoftmaxLseBNSDArch35<T, ConstInfo_t>(softmaxLseGmDn_, lseUb, bN2Offset, vecMIdx,
+                                                         dnRunInfo.actVecMSize, constInfoDn_, qActSeqLens);
         }
-        Mutex::Unlock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
-        lseOutUbBufId_ = (lseOutUbBufId_ + 1) % UB_LSE_OUT_BUFCNT;
+        Mutex::Unlock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
+        lseOutUbBufIdDn_ = (lseOutUbBufIdDn_ + 1) % UB_LSE_OUT_BUFCNT;
     }
 
     __aicore__ inline void ProcessVec1Dn(LocalTensor<INPUT_T> &pL1Tensor, LocalTensor<T> &mm1ResUbTensor,
-                                         RunInfo runInfo)
+                                         RunInfo dnRunInfo)
     {
-        if (unlikely(runInfo.actVecMSize == 0)) {
+        if (unlikely(dnRunInfo.actVecMSize == 0)) {
             return;
         }
 
@@ -396,131 +399,131 @@ public:
 
         LocalTensor<uint8_t> attenMaskUb;
         LocalTensor<T> sumUb =
-            softmaxSumBuf_[(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) * (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
+            softmaxSumBufDn_[(dnRunInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) * (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
         LocalTensor<T> maxUb =
-            softmaxMaxBuf_[(runInfo.mloop % UB_SOFTMAX_MAX_BUFCNT) * (UB_SOFTMAX_MAX_BUF_BYTES / sizeof(T))];
+            softmaxMaxBufDn_[(dnRunInfo.mloop % UB_SOFTMAX_MAX_BUFCNT) * (UB_SOFTMAX_MAX_BUF_BYTES / sizeof(T))];
         LocalTensor<T> expUb =
-            softmaxExpBuf_[(runInfo.loop % UB_SOFTMAX_EXP_BUFCNT) * (UB_SOFTMAX_EXP_BUF_BYTES / sizeof(T))];
+            softmaxExpBufDn_[(dnRunInfo.loop % UB_SOFTMAX_EXP_BUFCNT) * (UB_SOFTMAX_EXP_BUF_BYTES / sizeof(T))];
 
-        Mutex::Lock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+        Mutex::Lock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufIdDn_);
 
         float descaleQK = 1.0;
 
         LocalTensor<INPUT_T> stage1CastTensor =
-            ubVec1ResBuffers_[vec1ResUbBufId_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<INPUT_T>();
+            ubVec1ResBuffersDn_[vec1ResUbBufIdDn_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<INPUT_T>();
         FaVectorApi::ProcessVec1VfDn<T, INPUT_T, true, false, s2BaseSize>(
-            stage1CastTensor, sumUb, maxUb, mm1ResUbTensor, expUb, nullptr, attenMaskUb, runInfo.actMSizeAlign32 >> 1,
-            runInfo.actSingleLoopS2SizeAlign, runInfo.actSingleLoopS2Size, static_cast<T>(constInfo_.scaleValue),
-            descaleQK, negativeFloatScalar_, 0.0F, false);
+            stage1CastTensor, sumUb, maxUb, mm1ResUbTensor, expUb, nullptr, attenMaskUb, dnRunInfo.actMSizeAlign32 >> 1,
+            dnRunInfo.actSingleLoopS2SizeAlign, dnRunInfo.actSingleLoopS2Size, static_cast<T>(constInfoDn_.scaleValue),
+            descaleQK, negativeFloatScalarDn_, 0.0F, false);
 
-        Mutex::Unlock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
-        Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
+        Mutex::Unlock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufIdDn_);
+        Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufIdDn_);
         LocalTensor<INPUT_T> mm2AL1Tensor = pL1Tensor;
 
-        if (runInfo.actSingleLoopS2Size > vec1S2CopyLenDn) {
-            DataCopy(mm2AL1Tensor[constInfo_.subBlockIdx * vec1HalfS1BaseSize * runInfo.actSingleLoopS2SizeAlign],
+        if (dnRunInfo.actSingleLoopS2Size > vec1S2CopyLenDn) {
+            DataCopy(mm2AL1Tensor[constInfoDn_.subBlockIdx * vec1HalfS1BaseSize * dnRunInfo.actSingleLoopS2SizeAlign],
                      stage1CastTensor,
                      {vec1S2CopyCountDn, vec1S2CopyLenDn, 1,
-                      static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign - vec1S2CopyLenDn)});
-            DataCopy(mm2AL1Tensor[constInfo_.subBlockIdx * vec1HalfS1BaseSize * runInfo.actSingleLoopS2SizeAlign +
+                      static_cast<uint16_t>(dnRunInfo.actSingleLoopS2SizeAlign - vec1S2CopyLenDn)});
+            DataCopy(mm2AL1Tensor[constInfoDn_.subBlockIdx * vec1HalfS1BaseSize * dnRunInfo.actSingleLoopS2SizeAlign +
                                   vec1S2strideDn],
                      stage1CastTensor[vec1ResOffsetDn],
-                     {vec1S2CopyCountDn, static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign - vec1S2CopyLenDn),
-                      static_cast<uint16_t>(s2BaseSize - runInfo.actSingleLoopS2SizeAlign + 1), vec1S2CopyLenDn});
+                     {vec1S2CopyCountDn, static_cast<uint16_t>(dnRunInfo.actSingleLoopS2SizeAlign - vec1S2CopyLenDn),
+                      static_cast<uint16_t>(s2BaseSize - dnRunInfo.actSingleLoopS2SizeAlign + 1), vec1S2CopyLenDn});
         } else {
-            DataCopy(mm2AL1Tensor[constInfo_.subBlockIdx * vec1HalfS1BaseSize * runInfo.actSingleLoopS2SizeAlign],
+            DataCopy(mm2AL1Tensor[constInfoDn_.subBlockIdx * vec1HalfS1BaseSize * dnRunInfo.actSingleLoopS2SizeAlign],
                      stage1CastTensor,
-                     {vec1S2CopyCountDn, static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign),
-                      static_cast<uint16_t>(vec1S2CopyLenDn - runInfo.actSingleLoopS2SizeAlign + 1), 0});
+                     {vec1S2CopyCountDn, static_cast<uint16_t>(dnRunInfo.actSingleLoopS2SizeAlign),
+                      static_cast<uint16_t>(vec1S2CopyLenDn - dnRunInfo.actSingleLoopS2SizeAlign + 1), 0});
         }
 
-        Mutex::Unlock<PIPE_MTE3>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
-        vec1ResUbBufId_ = (vec1ResUbBufId_ + 1U) % UB_VEC1_RES_BUFCNT;
+        Mutex::Unlock<PIPE_MTE3>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufIdDn_);
+        vec1ResUbBufIdDn_ = (vec1ResUbBufIdDn_ + 1U) % UB_VEC1_RES_BUFCNT;
     }
 
-    __aicore__ inline void Vec1PostProcess(RunInfo runInfo)
+    __aicore__ inline void Vec1PostProcessDn(RunInfo dnRunInfo)
     {
         LocalTensor<T> sumUb =
-            softmaxSumBuf_[(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) * (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
+            softmaxSumBufDn_[(dnRunInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) * (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
         LocalTensor<T> maxUb =
-            softmaxMaxBuf_[(runInfo.mloop % UB_SOFTMAX_MAX_BUFCNT) * (UB_SOFTMAX_MAX_BUF_BYTES / sizeof(T))];
+            softmaxMaxBufDn_[(dnRunInfo.mloop % UB_SOFTMAX_MAX_BUFCNT) * (UB_SOFTMAX_MAX_BUF_BYTES / sizeof(T))];
 
-        if (unlikely(runInfo.isLastS2Loop)) {
-            SoftmaxDataCopyOut(runInfo, sumUb, maxUb);
+        if (unlikely(dnRunInfo.isLastS2Loop)) {
+            SoftmaxDataCopyOutDn(dnRunInfo, sumUb, maxUb);
         }
     }
 
-    __aicore__ inline void Bmm2DataCopyOutTrans(const RunInfo &info, LocalTensor<OUTPUT_T> &attenOutUb,
-                                                uint32_t vecMIdx, uint32_t dealRowCount)
+    __aicore__ inline void Bmm2DataCopyOutTransDn(const RunInfo &dnInfo, LocalTensor<OUTPUT_T> &attenOutUb,
+                                                  uint32_t vecMIdx, uint32_t dealRowCount)
     {
         FaUbTensor<OUTPUT_T> ubTensor{.tensor = attenOutUb, .rowCount = dealRowCount, .colCount = dTemplateAlign64};
-        GmCoord gmCoord{.bIdx = info.bIdx,
-                        .n2Idx = info.n2Idx,
-                        .gS1Idx = info.gS1Idx + info.vecMbaseIdx + vecMIdx,
+        GmCoord gmCoord{.bIdx = dnInfo.bIdx,
+                        .n2Idx = dnInfo.n2Idx,
+                        .gS1Idx = dnInfo.gS1Idx + dnInfo.vecMbaseIdx + vecMIdx,
                         .dIdx = 0,
                         .gS1DealSize = dealRowCount,
-                        .dDealSize = (uint32_t)constInfo_.dSizeV};
-        copyAttenOutUbToGm_(outGmTensor_, ubTensor, gmCoord);
+                        .dDealSize = (uint32_t)constInfoDn_.dSizeV};
+        copyAttenOutUbToGmDn_(outGmTensorDn_, ubTensor, gmCoord);
     }
 
-    __aicore__ inline void BroadCastAndCopyOut(const RunInfo &runInfo, LocalTensor<float> &sumUb,
-                                               LocalTensor<float> &maxUb, int64_t gmOffset, int64_t calculateSize)
+    __aicore__ inline void BroadCastAndCopyOutDn(const RunInfo &dnRunInfo, LocalTensor<float> &sumUb,
+                                                 LocalTensor<float> &maxUb, int64_t gmOffset, int64_t calculateSize)
     {
         LocalTensor<float> sumBrdcstBuf =
-            ubLseOutBuffers_[lseOutUbBufId_ * UB_LSE_OUT_BUF_BYTES].template ReinterpretCast<float>();
-        Mutex::Lock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
-        FaVectorApi::BroadcastMaxSum(sumBrdcstBuf, sumUb, runInfo.actVecMSize);
-        Mutex::Unlock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
-        Mutex::Lock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
+            ubLseOutBuffersDn_[lseOutUbBufIdDn_ * UB_LSE_OUT_BUF_BYTES].template ReinterpretCast<float>();
+        Mutex::Lock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
+        FaVectorApi::BroadcastMaxSum(sumBrdcstBuf, sumUb, dnRunInfo.actVecMSize);
+        Mutex::Unlock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
+        Mutex::Lock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
         DataCopy(softmaxFDSumGm_[gmOffset], sumBrdcstBuf, calculateSize);
-        Mutex::Unlock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
-        lseOutUbBufId_ = (lseOutUbBufId_ + 1U) % UB_LSE_OUT_BUFCNT;
+        Mutex::Unlock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
+        lseOutUbBufIdDn_ = (lseOutUbBufIdDn_ + 1U) % UB_LSE_OUT_BUFCNT;
 
         LocalTensor<float> maxBrdcstBuf =
-            ubLseOutBuffers_[lseOutUbBufId_ * UB_LSE_OUT_BUF_BYTES].template ReinterpretCast<float>();
-        Mutex::Lock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
-        FaVectorApi::BroadcastMaxSum(maxBrdcstBuf, maxUb, runInfo.actVecMSize);
-        Mutex::Unlock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
-        Mutex::Lock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
+            ubLseOutBuffersDn_[lseOutUbBufIdDn_ * UB_LSE_OUT_BUF_BYTES].template ReinterpretCast<float>();
+        Mutex::Lock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
+        FaVectorApi::BroadcastMaxSum(maxBrdcstBuf, maxUb, dnRunInfo.actVecMSize);
+        Mutex::Unlock<PIPE_V>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
+        Mutex::Lock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
         DataCopy(softmaxFDMaxGm_[gmOffset], maxBrdcstBuf, calculateSize);
-        Mutex::Unlock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufId_);
-        lseOutUbBufId_ = (lseOutUbBufId_ + 1U) % UB_LSE_OUT_BUFCNT;
+        Mutex::Unlock<PIPE_MTE3>(UB_OUT_LSE_OUT_EVENT0 + lseOutUbBufIdDn_);
+        lseOutUbBufIdDn_ = (lseOutUbBufIdDn_ + 1U) % UB_LSE_OUT_BUFCNT;
     }
 
-    __aicore__ inline void ComputeLogSumExpAndCopyToGm(const RunInfo &runInfo, LocalTensor<float> &sumUb,
-                                                       LocalTensor<float> &maxUb)
+    __aicore__ inline void ComputeLogSumExpAndCopyToGmDn(const RunInfo &dnRunInfo, LocalTensor<float> &sumUb,
+                                                         LocalTensor<float> &maxUb)
     {
-        if (unlikely(runInfo.actVecMSize == 0)) {
+        if (unlikely(dnRunInfo.actVecMSize == 0)) {
             return;
         }
-        int64_t calculateSize = runInfo.actVecMSize * fp32BaseSize;
-        int64_t gmOffset = runInfo.faTmpOutWsPos * mBaseSize * fp32BaseSize + runInfo.vecMbaseIdx * fp32BaseSize;
+        int64_t calculateSize = dnRunInfo.actVecMSize * fp32BaseSize;
+        int64_t gmOffset = dnRunInfo.faTmpOutWsPos * mBaseSize * fp32BaseSize + dnRunInfo.vecMbaseIdx * fp32BaseSize;
         // Copy sum to gm
-        BroadCastAndCopyOut(runInfo, sumUb, maxUb, gmOffset, calculateSize);
+        BroadCastAndCopyOutDn(dnRunInfo, sumUb, maxUb, gmOffset, calculateSize);
     }
 
-    __aicore__ inline void Bmm2ResForFDCopyOut(const RunInfo &runInfo, LocalTensor<T> &ubVec2Res, uint32_t mStartVec,
-                                               uint32_t mDealSize)
+    __aicore__ inline void Bmm2ResForFDCopyOutDn(const RunInfo &dnRunInfo, LocalTensor<T> &ubVec2Res,
+                                                 uint32_t mStartVec, uint32_t mDealSize)
     {
         int64_t dSizeAligned64 = (int64_t)dVBaseSize;
-        uint64_t gmOffset = runInfo.faTmpOutWsPos * mBaseSize * constInfo_.dSizeV +
-                            (runInfo.vecMbaseIdx + mStartVec) * constInfo_.dSizeV;
+        uint64_t gmOffset = dnRunInfo.faTmpOutWsPos * mBaseSize * constInfoDn_.dSizeV +
+                            (dnRunInfo.vecMbaseIdx + mStartVec) * constInfoDn_.dSizeV;
 
         DataCopyExtParams dataCopyParams;
         dataCopyParams.blockCount = mDealSize;
-        dataCopyParams.blockLen = constInfo_.dSizeV * sizeof(T);
-        dataCopyParams.srcStride = (dSizeAligned64 - constInfo_.dSizeV) / (AttentionCommon::BYTE_BLOCK / sizeof(T));
+        dataCopyParams.blockLen = constInfoDn_.dSizeV * sizeof(T);
+        dataCopyParams.srcStride = (dSizeAligned64 - constInfoDn_.dSizeV) / (AttentionCommon::BYTE_BLOCK / sizeof(T));
         dataCopyParams.dstStride = 0;
 
         DataCopyPad(accumOutGm_[gmOffset], ubVec2Res, dataCopyParams);
     }
 
-    __aicore__ inline void ProcessVec2(RunInfo runInfo)
+    __aicore__ inline void ProcessVec2(RunInfo dnRunInfo)
     {
-        uint32_t mmResUbBufId = mmResBufId_;
-        mmResBufId_ = (mmResBufId_ + 1) % UB_MM_RES_BUFCNT;
+        uint32_t mmResUbBufId = mmResBufIdDn_;
+        mmResBufIdDn_ = (mmResBufIdDn_ + 1) % UB_MM_RES_BUFCNT;
         uint32_t mmSyncIdx = CC_MM_0 + mmResUbBufId;
-        if (unlikely(runInfo.actVecMSize == 0)) {
+        if (unlikely(dnRunInfo.actVecMSize == 0)) {
             CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
             CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx);
             return;
@@ -530,25 +533,25 @@ public:
         {
             Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
             LocalTensor<T> mm2ResUbTensor =
-                ubMmResBuffers_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<T>();
-            if (unlikely(runInfo.isFirstS2Loop)) {
-                uint32_t vec2CalcSize = runInfo.actVecMSize * dTemplateAlign64;
-                DataCopy(ubVec2Res_, mm2ResUbTensor, vec2CalcSize);
+                ubMmResBuffersDn_[mmResUbBufId * UB_MM_RES_BUF_BYTES].template ReinterpretCast<T>();
+            if (unlikely(dnRunInfo.isFirstS2Loop)) {
+                uint32_t vec2CalcSize = dnRunInfo.actVecMSize * dTemplateAlign64;
+                DataCopy(ubVec2ResDn_, mm2ResUbTensor, vec2CalcSize);
             } else {
                 LocalTensor<T> expUb =
-                    softmaxExpBuf_[(runInfo.loop % UB_SOFTMAX_EXP_BUFCNT) * (UB_SOFTMAX_EXP_BUF_BYTES / sizeof(T))];
+                    softmaxExpBufDn_[(dnRunInfo.loop % UB_SOFTMAX_EXP_BUFCNT) * (UB_SOFTMAX_EXP_BUF_BYTES / sizeof(T))];
                 LocalTensor<T> pScaleUb;
 
                 float deSCalePreVValue = 1.0f;
-                if (!runInfo.isLastS2Loop) {
+                if (!dnRunInfo.isLastS2Loop) {
                     FlashUpdateNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false, false>(
-                        ubVec2Res_, mm2ResUbTensor, ubVec2Res_, expUb, pScaleUb, runInfo.actVecMSize, dTemplateAlign64,
-                        1.0, 1.0);
+                        ubVec2ResDn_, mm2ResUbTensor, ubVec2ResDn_, expUb, pScaleUb, dnRunInfo.actVecMSize,
+                        dTemplateAlign64, 1.0, 1.0);
                 } else {
-                    LocalTensor<float> sumUb = softmaxSumBuf_[(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) *
-                                                              (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
+                    LocalTensor<float> sumUb = softmaxSumBufDn_[(dnRunInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) *
+                                                                (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
                     FlashUpdateLastNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false, false>(
-                        ubVec2Res_, mm2ResUbTensor, ubVec2Res_, expUb, pScaleUb, sumUb, runInfo.actVecMSize,
+                        ubVec2ResDn_, mm2ResUbTensor, ubVec2ResDn_, expUb, pScaleUb, sumUb, dnRunInfo.actVecMSize,
                         dTemplateAlign64, 1.0, 1.0);
                 }
             }
@@ -556,32 +559,32 @@ public:
         }
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(mmSyncIdx); // 通知下个BMM1: Vec2已读完mmRes, slot空闲
 
-        if (runInfo.isLastS2Loop) {
-            if (unlikely(runInfo.isFirstS2Loop)) {
+        if (dnRunInfo.isLastS2Loop) {
+            if (unlikely(dnRunInfo.isFirstS2Loop)) {
                 Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
-                LocalTensor<float> sumUb =
-                    softmaxSumBuf_[(runInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) * (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
+                LocalTensor<float> sumUb = softmaxSumBufDn_[(dnRunInfo.mloop % UB_SOFTMAX_SUM_BUFCNT) *
+                                                            (UB_SOFTMAX_SUM_BUF_BYTES / sizeof(T))];
                 LastDivNew<T, INPUT_T, OUTPUT_T, dTemplateAlign64, false>(
-                    ubVec2Res_, ubVec2Res_, sumUb, runInfo.actVecMSize, (uint16_t)dTemplateAlign64, 0.0F);
+                    ubVec2ResDn_, ubVec2ResDn_, sumUb, dnRunInfo.actVecMSize, (uint16_t)dTemplateAlign64, 0.0F);
                 Mutex::Unlock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
             }
             uint32_t mStartVec = 0;
-            uint32_t mDealSize = runInfo.actVecMSize;
-            if (constInfo_.enableFlashDecode && runInfo.isS2SplitCore) {
+            uint32_t mDealSize = dnRunInfo.actVecMSize;
+            if (constInfoDn_.enableFlashDecode && dnRunInfo.isS2SplitCore) {
                 Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
-                Bmm2ResForFDCopyOut(runInfo, ubVec2Res_, mStartVec, mDealSize);
+                Bmm2ResForFDCopyOutDn(dnRunInfo, ubVec2ResDn_, mStartVec, mDealSize);
                 Mutex::Unlock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
             } else {
                 LocalTensor<OUTPUT_T> attenOut;
                 int64_t dSizeAligned64 = (int64_t)dVBaseSize;
 
-                attenOut.SetAddr(ubVec2Res_.address_);
+                attenOut.SetAddr(ubVec2ResDn_.address_);
                 Mutex::Lock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
-                Cast(attenOut, ubVec2Res_, RoundMode::CAST_ROUND, mDealSize * dSizeAligned64);
+                Cast(attenOut, ubVec2ResDn_, RoundMode::CAST_ROUND, mDealSize * dSizeAligned64);
                 Mutex::Unlock<PIPE_V>(UB_OUT_VEC2_RES_EVENT0);
 
                 Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
-                Bmm2DataCopyOutTrans(runInfo, attenOut, mStartVec, mDealSize);
+                Bmm2DataCopyOutTransDn(dnRunInfo, attenOut, mStartVec, mDealSize);
                 Mutex::Unlock<PIPE_MTE3>(UB_OUT_VEC2_RES_EVENT0);
             }
         }

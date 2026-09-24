@@ -17,8 +17,11 @@
 #include "arch35/flash_attn_template_tiling_key.h"
 #include "utils/flash_attn_common_def.h"
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
-#include "arch35/flash_attn_kernel_dn.h"
-#include "arch35/flash_attn_kernel_nd.h"
+#include "arch35/flash_attn_block_cube_dn.h"
+#include "arch35/flash_attn_block_vec_dn.h"
+#include "arch35/flash_attn_block_cube_nd.h"
+#include "arch35/flash_attn_block_vec_nd.h"
+#include "arch35/flash_attn_kernel.h"
 
 using namespace AscendC;
 
@@ -144,9 +147,9 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key
         using VecDummy = FlashAttnKernel::FANoQuantGqaBlockVecDummyDn<FA_T>;
         using CubeDummy = FlashAttnKernel::FANoQuantGqaBlockCubeDummyDn<FA_T>;
 #ifdef __DAV_C310_CUBE__
-        using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernelDn<FA_T, CubeBlock, VecDummy, VecDummy>;
+        using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernel<FA_T, CubeBlock, VecDummy, VecDummy, true>;
 #else
-        using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernelDn<FA_T, CubeDummy, VecFaBlock, VecFdBlock>;
+        using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernel<FA_T, CubeDummy, VecFaBlock, VecFdBlock, true>;
 #endif
         Kernel op;
         op.Init(query, key, value, blockTable, cuSeqLensQ, cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata,
@@ -159,9 +162,9 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t *query, __gm__ uint8_t *key
         using VecDummy = FlashAttnKernel::FANoQuantGqaBlockVecDummyNd<FA_T>;
         using CubeDummy = FlashAttnKernel::FANoQuantGqaBlockCubeDummyNd<FA_T>;
 #ifdef __DAV_C310_CUBE__
-        using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernelNd<FA_T, CubeBlock, VecDummy, VecDummy>;
+        using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernel<FA_T, CubeBlock, VecDummy, VecDummy, false>;
 #else
-        using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernelNd<FA_T, CubeDummy, VecFaBlock, VecFdBlock>;
+        using Kernel = FlashAttnKernel::FlashAttentionNoQuantGqaKernel<FA_T, CubeDummy, VecFaBlock, VecFdBlock, false>;
 #endif
         Kernel op;
         op.Init(query, key, value, blockTable, cuSeqLensQ, cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata,

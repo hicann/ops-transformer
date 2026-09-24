@@ -62,10 +62,6 @@ transformer-1@ops-transformer:
     src:
         release:
             huawei_style:
-                - ops/ops-transformer/attention/incre_flash_attention/op_kernel/ifa_public_define.h
-                - ops/ops-transformer/attention/incre_flash_attention/op_kernel/incre_flash_attention.cpp
-                - ops/ops-transformer/attention/incre_flash_attention/op_kernel/incre_flash_attention_allvec_new.h
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch22/
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fia_tiling_info.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fia_tiling_info.cpp
                 - ops/ops-transformer/attention/common/op_host/fia_tiling_base.h
@@ -73,7 +69,6 @@ transformer-1@ops-transformer:
                 - ops/ops-transformer/attention/common/op_host/fia_tiling_templates_registry.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch35/fia_tiling_nonquant_gqa.cpp
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_host/arch35/fia_tiling_nonquant_gqa.h
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch22/
                 - ops/ops-transformer/attention/common/op_kernel/buffers_policy.h
                 - ops/ops-transformer/attention/common/op_kernel/attn_buffer_manager.h
                 - ops/ops-transformer/attention/common/op_kernel/attn_buffer.h
@@ -114,11 +109,6 @@ transformer-1@ops-transformer:
             kernel_style: null
         unrelease:
             test_code:
-                - ops/ops-transformer/attention/incre_flash_attention/README.md
-                - ops/ops-transformer/attention/incre_flash_attention/CMakeLists.txt
-                - ops/ops-transformer/attention/incre_flash_attention/tests/
-                - ops/ops-transformer/attention/incre_flash_attention/docs/
-                - ops/ops-transformer/attention/incre_flash_attention/examples/
                 - ops/ops-transformer/attention/flash_attn/tests/
                 - ops/ops-transformer/attention/recurrent_gated_delta_rule/tests/
                 - ops/ops-transformer/attention/recurrent_gated_delta_rule/examples/
