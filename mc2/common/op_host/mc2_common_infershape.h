@@ -46,5 +46,7 @@ struct CommParas {
 
 ge::graphStatus AllGatherMatmulCommonInferShape(gert::InferShapeContext *context, const size_t gatherIndex);
 ge::graphStatus InferMatmulReduceScatterCommon(gert::InferShapeContext *context);
+ge::graphStatus InferMatmulOutputDataType(gert::InferDataTypeContext *context, size_t inputIndex,
+                                          size_t yDtypeAttrIndex, size_t outputIndex);
 } // namespace ops
 #endif // MC2_COMMON_INFERSHAPE_H_

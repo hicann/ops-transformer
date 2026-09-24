@@ -16,6 +16,7 @@
 #ifndef CATLASS_GEMM_KERNEL_ALLTOALL_ALLTO_ALL_MATMUL_HPP
 #define CATLASS_GEMM_KERNEL_ALLTOALL_ALLTO_ALL_MATMUL_HPP
 
+#include "../../../common/op_kernel/mc2_matmul_aiv_kernel_common.h"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_catlass.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_coord.hpp"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_gemm_coord.hpp"
@@ -117,35 +118,7 @@ public:
     inline __aicore__ void GetBlockIdx(int32_t loopIdx, int32_t mLoop, int32_t nLoop, int32_t swizzlDirect,
                                        int32_t swizzlCount, int64_t &mIdx, int64_t &nIdx)
     {
-        uint32_t inBatchIdx = loopIdx % (mLoop * nLoop);
-        if (swizzlDirect == 0) {
-            uint32_t tileBlockLoop = (mLoop + swizzlCount - 1) / swizzlCount;
-            uint32_t tileBlockIdx = inBatchIdx / (swizzlCount * nLoop);
-            uint32_t inTileBlockIdx = inBatchIdx % (swizzlCount * nLoop);
-            uint32_t nRow = swizzlCount;
-            if (tileBlockIdx == tileBlockLoop - 1) {
-                nRow = mLoop - swizzlCount * tileBlockIdx;
-            }
-            mIdx = tileBlockIdx * swizzlCount + inTileBlockIdx % nRow;
-            nIdx = inTileBlockIdx / nRow;
-            if (tileBlockIdx % 2 != 0) {
-                nIdx = nLoop - nIdx - 1;
-            }
-        } else if (swizzlDirect == 1) {
-            uint32_t tileBlockLoop = (nLoop + swizzlCount - 1) / swizzlCount;
-            uint32_t tileBlockIdx = inBatchIdx / (swizzlCount * mLoop);
-            uint32_t inTileBlockIdx = inBatchIdx % (swizzlCount * mLoop);
-
-            uint32_t nCol = swizzlCount;
-            if (tileBlockIdx == tileBlockLoop - 1) {
-                nCol = nLoop - swizzlCount * tileBlockIdx;
-            }
-            nIdx = tileBlockIdx * swizzlCount + inTileBlockIdx % nCol;
-            mIdx = inTileBlockIdx / nCol;
-            if (tileBlockIdx % 2 != 0) {
-                mIdx = mLoop - mIdx - 1;
-            }
-        }
+        Mc2MatmulAiv::GetSwizzledBlockIdx(loopIdx, mLoop, nLoop, swizzlDirect, swizzlCount, mIdx, nIdx);
     }
 
     inline __aicore__ GemmCoord GetBlockIdCoord(int32_t loopOffset, int32_t mLoop, int32_t nLoop, int32_t swizzlDirect,
@@ -159,17 +132,14 @@ public:
 
     inline __aicore__ GemmCoord GetBlockLocCoord(GemmCoord blockIdxCoord)
     {
-        return GemmCoord(blockIdxCoord.m() * L1TileShape::M, blockIdxCoord.n() * L1TileShape::N,
-                         blockIdxCoord.k() * L1TileShape::K);
+        return Mc2MatmulAiv::GetBlockLocCoord<L1TileShape>(blockIdxCoord);
     }
 
     inline __aicore__ GemmCoord GetBlockSizeCoord(GemmCoord blockIdxCoord, GemmCoord blockLocCoord, int32_t mLoop,
                                                   int32_t mSize, int32_t nLoop, int32_t nSize, int32_t kSize)
     {
-        uint32_t mActual = (blockIdxCoord.m() == (mLoop - 1)) ? (mSize - blockLocCoord.m()) : L1TileShape::M;
-        uint32_t nActual = (blockIdxCoord.n() == (nLoop - 1)) ? (nSize - blockLocCoord.n()) : L1TileShape::N;
-        uint32_t kActual = kSize;
-        return GemmCoord(mActual, nActual, kActual);
+        return Mc2MatmulAiv::GetBlockSizeCoord<L1TileShape>(blockIdxCoord, blockLocCoord, mLoop, mSize, nLoop, nSize,
+                                                            kSize);
     }
 
     template <>

@@ -19,7 +19,8 @@ template <TemplateAGMMClass>
 __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::CrossRankSyncV1(int32_t flag_idx, int32_t flag_data)
 {
     if (aivIdx == 0 && blockIdx == rankId) {
-        SetBuffFlagByAdd((__gm__ int32_t *)stateAddrPerRank[rankId] + FLAG_OFFSET + flag_idx, uBuf_, FLAG_VALUE);
+        Mc2AivSync::SetBuffFlagByAdd((__gm__ int32_t *)stateAddrPerRank[rankId] + FLAG_OFFSET + flag_idx, uBuf_,
+                                     FLAG_VALUE);
     } else if (aivIdx == 0 && blockIdx < worldSize) {
         CheckBuffFlag((__gm__ int32_t *)stateAddrPerRank[blockIdx] + FLAG_OFFSET + flag_idx, uBuf_,
                       FLAG_VALUE * flag_data);
@@ -30,7 +31,8 @@ template <TemplateAGMMClass>
 __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::CrossRankSyncV2(int32_t flag_idx, int32_t flag_data)
 {
     if (aivIdx == 0 && blockIdx < worldSize) {
-        SetBuffFlagByAdd((__gm__ int32_t *)stateAddrPerRank[blockIdx] + FLAG_OFFSET + flag_idx, uBuf_, FLAG_VALUE);
+        Mc2AivSync::SetBuffFlagByAdd((__gm__ int32_t *)stateAddrPerRank[blockIdx] + FLAG_OFFSET + flag_idx, uBuf_,
+                                     FLAG_VALUE);
     }
     if (aivIdx == 0 && blockIdx == rankId) {
         CheckBuffFlag((__gm__ int32_t *)stateAddrPerRank[rankId] + FLAG_OFFSET + flag_idx, uBuf_,
@@ -91,14 +93,14 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::AllGatherPerTok
     int32_t scale_st = rankId * scale_size;
     __gm__ supportX1Type *scale = reinterpret_cast<__gm__ supportX1Type *>(x1ScaleGM_);
     __gm__ supportX1Type *scaleOut = reinterpret_cast<__gm__ supportX1Type *>(gm_scale_workspace);
-    SetAndWaitAivSync(FLAG_VALUE);
+    Mc2AivSync::SetAndWaitAivSync(FLAG_VALUE);
     // 将本卡的scale拷贝到buff中
     if (aivIdx == 0 && rankId == blockIdx) {
         MoveResultFromSrcToDst(
             scale, reinterpret_cast<__gm__ supportX1Type *>(stateAddrPerRank[rankId]) + buff_st + scale_st, scale_size);
     }
     CrossRankSyncV1(FLAG_TWO_IDX, FLAG_VALUE);
-    SetAndWaitAivSync(FLAG_VALUE);
+    Mc2AivSync::SetAndWaitAivSync(FLAG_VALUE);
     // 将其他卡的scale拷贝到buff中
     scale_st = blockIdx * scale_size;
     if (aivIdx == 0 && blockIdx < worldSize) {
@@ -106,9 +108,9 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::AllGatherPerTok
             reinterpret_cast<__gm__ supportX1Type *>(stateAddrPerRank[blockIdx]) + buff_st + scale_st,
             scaleOut + scale_st, scale_size);
     }
-    SetAndWaitAivSync(FLAG_VALUE);
+    Mc2AivSync::SetAndWaitAivSync(FLAG_VALUE);
     CrossRankSyncV2(FLAG_THREE_IDX, FLAG_VALUE);
-    SetAndWaitAivSync(FLAG_VALUE);
+    Mc2AivSync::SetAndWaitAivSync(FLAG_VALUE);
 }
 
 template <TemplateAGMMClass>
@@ -166,18 +168,18 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::MoveToOtherRank
         auto event_id = (move_idx & 1) ? EVENT_ID0 : EVENT_ID1;
         LocalTensor<supportX1Type> copyTensor = (move_idx & 1) ? copyTensor0 : copyTensor1;
         WaitFlag<HardEvent::MTE3_MTE2>(event_id);
-        CopyGmToUbufAlignB16(copyTensor, gm_src, 1, block_len, 0, 0);
+        Mc2AivDataCopy::CopyGmToUbufAlignB16(copyTensor, gm_src, 1, block_len, 0, 0);
         SetFlag<HardEvent::MTE2_MTE3>(event_id);
         WaitFlag<HardEvent::MTE2_MTE3>(event_id);
         int32_t dst_rank = rank_st % rank_scope;
         for (int32_t cycle_idx = 0; cycle_idx < group_num; ++cycle_idx) {
             if (dst_rank != rankId && dst_rank < worldSize) {
                 if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                    CopyUbufToGmAlignB16((__gm__ int8_t *)stateAddrPerRank[dst_rank] + rank_offset / 2, copyTensor, 1,
-                                         block_len, 0, 0);
+                    Mc2AivDataCopy::CopyUbufToGmAlignB16((__gm__ int8_t *)stateAddrPerRank[dst_rank] + rank_offset / 2,
+                                                         copyTensor, 1, block_len, 0, 0);
                 } else {
-                    CopyUbufToGmAlignB16((__gm__ X1Type *)stateAddrPerRank[dst_rank] + rank_offset, copyTensor, 1,
-                                         block_len, 0, 0);
+                    Mc2AivDataCopy::CopyUbufToGmAlignB16((__gm__ X1Type *)stateAddrPerRank[dst_rank] + rank_offset,
+                                                         copyTensor, 1, block_len, 0, 0);
                 }
             }
             dst_rank = (dst_rank + skip_num) % rank_scope;
@@ -225,20 +227,22 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::MoveResultFromP
             if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
                 gm_src_offset_k_align = gm_src_offset_k_align / 2;
             }
-            CopyGmToUbuf(ub_buff_st, gm_src + gm_src_offset_k_align, actual_move_m,
-                         actual_k_move_num_in_peer_mem * Catlass::SizeOfBits<X1Type>::value / (8 * 32),
-                         (k_align - actual_k_move_num_in_peer_mem) * Catlass::SizeOfBits<X1Type>::value / (8 * 32), 0);
+            Mc2AivDataCopy::CopyGmToUbuf(
+                ub_buff_st, gm_src + gm_src_offset_k_align, actual_move_m,
+                actual_k_move_num_in_peer_mem * Catlass::SizeOfBits<X1Type>::value / (8 * 32),
+                (k_align - actual_k_move_num_in_peer_mem) * Catlass::SizeOfBits<X1Type>::value / (8 * 32), 0);
             SetFlag<HardEvent::MTE2_MTE3>(event_id);
             WaitFlag<HardEvent::MTE2_MTE3>(event_id);
             int64_t gm_src_offset = static_cast<int64_t>(move_idx) * max_move_m * k + k_move_idx * max_move_k;
             if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
                 gm_src_offset = gm_src_offset / 2;
             }
-            CopyUbufToGmAlignB16(gm_dst + gm_src_offset, ub_buff_st, actual_move_m,
-                                 actual_k_move_num_in_out * Catlass::SizeOfBits<X1Type>::value / 8,
-                                 (actual_k_move_num_in_peer_mem - actual_k_move_num_in_out) *
-                                     Catlass::SizeOfBits<X1Type>::value / (8 * 32),
-                                 (k - actual_k_move_num_in_out) * Catlass::SizeOfBits<X1Type>::value / (8 * 32));
+            Mc2AivDataCopy::CopyUbufToGmAlignB16(
+                gm_dst + gm_src_offset, ub_buff_st, actual_move_m,
+                actual_k_move_num_in_out * Catlass::SizeOfBits<X1Type>::value / 8,
+                (actual_k_move_num_in_peer_mem - actual_k_move_num_in_out) * Catlass::SizeOfBits<X1Type>::value /
+                    (8 * 32),
+                (k - actual_k_move_num_in_out) * Catlass::SizeOfBits<X1Type>::value / (8 * 32));
             SetFlag<HardEvent::MTE3_MTE2>(event_id);
         }
     }
@@ -263,10 +267,10 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::MoveResultToDst
         auto event_id = (move_idx & 1) ? EVENT_ID0 : EVENT_ID1;
         LocalTensor<supportX1Type> copyTensor = (move_idx & 1) ? copyTensor0 : copyTensor1;
         WaitFlag<HardEvent::MTE3_MTE2>(event_id);
-        CopyGmToUbufAlignB16(copyTensor, gm_src, 1, actual_move_size * sizeof(supportX1Type), 0, 0);
+        Mc2AivDataCopy::CopyGmToUbufAlignB16(copyTensor, gm_src, 1, actual_move_size * sizeof(supportX1Type), 0, 0);
         SetFlag<HardEvent::MTE2_MTE3>(event_id);
         WaitFlag<HardEvent::MTE2_MTE3>(event_id);
-        CopyUbufToGmAlignB16(gm_dst, copyTensor, 1, actual_move_size * sizeof(supportX1Type), 0, 0);
+        Mc2AivDataCopy::CopyUbufToGmAlignB16(gm_dst, copyTensor, 1, actual_move_size * sizeof(supportX1Type), 0, 0);
         gm_src += max_ub_ping_pong_size;
         gm_dst += max_ub_ping_pong_size;
         SetFlag<HardEvent::MTE3_MTE2>(event_id);

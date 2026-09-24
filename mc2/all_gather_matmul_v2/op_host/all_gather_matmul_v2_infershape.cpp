@@ -50,22 +50,9 @@ static ge::graphStatus InferShapeAllGatherMatmulV2(gert::InferShapeContext *cont
 
 static ge::graphStatus InferDataTypeAllGatherMatmulV2(gert::InferDataTypeContext *context)
 {
-    auto attrs = context->GetAttrs();
-    OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    // 如果是bf16/fp16 输入和输出保持一致，如果是fp8 则使用y_dtype
+    OP_LOGE_IF(InferMatmulOutputDataType(context, INDEX_IN_X1, INDEX_ATTR_Y_DTYPE, INDEX_OUT) != GRAPH_SUCCESS,
+               GRAPH_FAILED, context->GetNodeName(), "Infer output dtype failed.");
     const auto x1Dtype = context->GetInputDataType(INDEX_IN_X1);
-    ge::DataType yDtype = ge::DataType::DT_UNDEFINED;
-    if ((x1Dtype == ge::DataType::DT_FLOAT16) || (x1Dtype == ge::DataType::DT_BF16)) {
-        yDtype = x1Dtype;
-    } else {
-        const int64_t *yDtypePtr = attrs->GetInt(INDEX_ATTR_Y_DTYPE);
-        if (yDtypePtr == nullptr || *yDtypePtr == static_cast<int64_t>(ge::DataType::DT_UNDEFINED)) {
-            OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "yDtype", "DT_UNDEFINED", "valid dtype value");
-            return ge::GRAPH_FAILED;
-        }
-        yDtype = static_cast<ge::DataType>(*yDtypePtr);
-    }
-    context->SetOutputDataType(INDEX_OUT, yDtype);
     context->SetOutputDataType(INDEX_GATHER_OUT, x1Dtype);
     return GRAPH_SUCCESS;
 }

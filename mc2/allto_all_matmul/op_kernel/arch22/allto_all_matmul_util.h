@@ -15,6 +15,8 @@
 #ifndef ALL_TO_ALL_MATMUL_UTIL
 #define ALL_TO_ALL_MATMUL_UTIL
 
+#include "../../../common/op_kernel/mc2_aiv_data_copy_common.h"
+#include "../../../common/op_kernel/mc2_aiv_sync_common.h"
 #include "allto_all_matmul_tiling.h"
 #include "adv_api/hccl/hccl.h"
 #include "../../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_numeric_size.hpp"
@@ -153,29 +155,14 @@ public:
     __aicore__ inline void CopyGmToUbufAlignB16(LocalTensor<T> ubTensor, __gm__ T *src, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
-        DataCopyExtParams dataCopyParams(nBurst,    // blockCount
-                                         lenBurst,  // blockLen
-                                         srcStride, // srcStride
-                                         dstStride, // dstStride
-                                         0);
-        GlobalTensor<T> gmTensor;
-        gmTensor.SetGlobalBuffer(src);
-        DataCopyPadExtParams<T> padParams;
-        DataCopyPad(ubTensor, gmTensor, dataCopyParams, padParams);
+        Mc2AivDataCopy::CopyGmToUbufAlignB16(ubTensor, src, nBurst, lenBurst, srcStride, dstStride);
     }
 
     template <typename T>
     __aicore__ inline void CopyUbufToGmAlignB16(__gm__ T *dst, LocalTensor<T> ubTensor, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
-        DataCopyExtParams dataCopyParams(nBurst,    // blockCount
-                                         lenBurst,  // blockLen
-                                         srcStride, // srcStride
-                                         dstStride, // dstStride
-                                         0);
-        GlobalTensor<T> gmTensor;
-        gmTensor.SetGlobalBuffer(dst);
-        DataCopyPad(gmTensor, ubTensor, dataCopyParams);
+        Mc2AivDataCopy::CopyUbufToGmAlignB16(dst, ubTensor, nBurst, lenBurst, srcStride, dstStride);
     }
 
     __aicore__ inline void CheckBuffFlag(__gm__ int32_t *buff, int32_t flag)
@@ -319,7 +306,7 @@ __aicore__ inline void SetAndWaitAivSync(uint64_t flagIdx, int32_t pipeDepth = 2
 
 __aicore__ inline void SetAicSync(uint64_t flagIdx)
 {
-    AscendC::CrossCoreSetFlag<0x2, PIPE_MTE3>(flagIdx);
+    Mc2AivSync::SetAicSync(flagIdx);
 }
 
 template <typename T>

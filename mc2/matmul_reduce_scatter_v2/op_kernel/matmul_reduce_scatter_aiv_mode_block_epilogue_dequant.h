@@ -15,14 +15,8 @@
 #ifndef MATMUL_REDUCE_SCATTER_AIV_MODE_BLOCK_EPILOGUE_DEQUANT_H
 #define MATMUL_REDUCE_SCATTER_AIV_MODE_BLOCK_EPILOGUE_DEQUANT_H
 
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_catlass.hpp"
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/arch/tla_arch_resource.hpp"
+#include "../../common/op_kernel/mc2_matmul_aiv_mode_dequant_common.h"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tla_epilogue_dispatch_policy.hpp"
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_gemm_coord.hpp"
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tla_gemm_gemm_type.hpp"
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/tla_matrix_coord.hpp"
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/layout/tla_layout_layout.hpp"
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/detail/tla_detail_callback.hpp"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/epilogue/tile/tla_epilogue_copy_gm_to_ub.hpp"
 
 namespace Catlass::Epilogue::Block {
@@ -38,26 +32,22 @@ public:
 
     // Data infos
     using ArchTag = ArchTag_;
-    using ElementC = typename CType_::Element;
-    using LayoutC = typename CType_::Layout;
-    using ElementScale = typename ScaleType_::Element;
-    using LayoutScale = typename ScaleType_::Layout;
-    using ElementPerTokenScale = typename PerTokenScaleType_::Element;
-    using LayoutPerTokenScale = typename PerTokenScaleType_::Layout;
+    using DequantDataInfo = Mc2MatmulAivDequant::DataInfo<CType_, ScaleType_, PerTokenScaleType_, DType_>;
+    using ElementC = typename DequantDataInfo::ElementC;
+    using LayoutC = typename DequantDataInfo::LayoutC;
+    using ElementScale = typename DequantDataInfo::ElementScale;
+    using LayoutScale = typename DequantDataInfo::LayoutScale;
+    using ElementPerTokenScale = typename DequantDataInfo::ElementPerTokenScale;
+    using LayoutPerTokenScale = typename DequantDataInfo::LayoutPerTokenScale;
     using ElementBias = typename BiasType_::Element;
     using LayoutBias = typename BiasType_::Layout;
-    using ElementD = typename DType_::Element;
-    using LayoutD = typename DType_::Layout;
+    using ElementD = typename DequantDataInfo::ElementD;
+    using LayoutD = typename DequantDataInfo::LayoutD;
 
     // Check data infos
-    static_assert(std::is_same_v<ElementC, int32_t> &&
-                      (std::is_same_v<ElementD, half> || std::is_same_v<ElementD, bfloat16_t>) &&
-                      std::is_same_v<ElementScale, float> && std::is_same_v<ElementPerTokenScale, float>,
+    static_assert(DequantDataInfo::IS_ELEMENT_TYPE_VALID,
                   "The element type template parameters of BlockEpilogue are wrong");
-    static_assert(std::is_same_v<LayoutC, layout::RowMajor> && std::is_same_v<LayoutScale, layout::VectorLayout> &&
-                      std::is_same_v<LayoutPerTokenScale, layout::VectorLayout> &&
-                      std::is_same_v<LayoutD, layout::RowMajor>,
-                  "The layout template parameters of BlockEpilogue are wrong");
+    static_assert(DequantDataInfo::IS_LAYOUT_VALID, "The layout template parameters of BlockEpilogue are wrong");
 
     // Tile compute ops
     using TileRowBroadcastMul = TileRowBroadcastMul_;
@@ -91,43 +81,31 @@ public:
     CATLASS_DEVICE
     BlockEpilogue(Arch::Resource<ArchTag> const &resource)
     {
-        size_t ubOffset = 0;
-        int32_t eventVMTE2 = 0;
-        int32_t eventMTE2V = 0;
-        int32_t eventMTE3V = 0;
-        int32_t eventVMTE3 = 0;
+        Mc2MatmulAivDequant::UbTensorAllocator<Arch::Resource<ArchTag>> ubAllocator(resource);
+        Mc2MatmulAivDequant::EventIdAllocator eventAllocator;
         for (uint32_t i = 0; i < UB_STAGES; ++i) {
-            ubCList[i] = resource.ubBuf.template GetBufferByByte<ElementC>(ubOffset);
-            ubOffset += TileShape::COUNT * sizeof(ElementC);
-            ubScaleList[i] = resource.ubBuf.template GetBufferByByte<ElementScale>(ubOffset);
-            ubOffset += TileShape::COLUMN * sizeof(ElementScale);
-            ubPerTokenScaleList[i] = resource.ubBuf.template GetBufferByByte<ElementPerTokenScale>(ubOffset);
-            ubOffset += TileShape::ROW * sizeof(ElementPerTokenScale);
-            ubBiasList[i] = resource.ubBuf.template GetBufferByByte<ElementBias>(ubOffset);
-            ubOffset += TileShape::COLUMN * sizeof(ElementBias);
-            ubDList[i] = resource.ubBuf.template GetBufferByByte<ElementD>(ubOffset);
-            ubOffset += TileShape::COUNT * sizeof(ElementD);
+            ubCList[i] = ubAllocator.template Allocate<ElementC>(TileShape::COUNT);
+            ubScaleList[i] = ubAllocator.template Allocate<ElementScale>(TileShape::COLUMN);
+            ubPerTokenScaleList[i] = ubAllocator.template Allocate<ElementPerTokenScale>(TileShape::ROW);
+            ubBiasList[i] = ubAllocator.template Allocate<ElementBias>(TileShape::COLUMN);
+            ubDList[i] = ubAllocator.template Allocate<ElementD>(TileShape::COUNT);
 
-            eventUbCVMTE2List[i] = eventVMTE2++;
-            eventUbBiasVMTE2List[i] = eventVMTE2++;
-            eventUbCMTE2VList[i] = eventMTE2V++;
-            eventUbBiasMTE2VList[i] = eventMTE2V++;
-            eventUbScaleMTE2VList[i] = eventMTE2V++;
-            eventUbPerTokenScaleMTE2VList[i] = eventMTE2V++;
-            eventUbDMTE3VList[i] = eventMTE3V++;
-            eventUbDVMTE3List[i] = eventVMTE3++;
+            eventUbCVMTE2List[i] = eventAllocator.NextVMte2();
+            eventUbBiasVMTE2List[i] = eventAllocator.NextVMte2();
+            eventUbCMTE2VList[i] = eventAllocator.NextMte2V();
+            eventUbBiasMTE2VList[i] = eventAllocator.NextMte2V();
+            eventUbScaleMTE2VList[i] = eventAllocator.NextMte2V();
+            eventUbPerTokenScaleMTE2VList[i] = eventAllocator.NextMte2V();
+            eventUbDMTE3VList[i] = eventAllocator.NextMte3V();
+            eventUbDVMTE3List[i] = eventAllocator.NextVMte3();
         }
-        ubCFp32 = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
-        ubOffset += TileShape::COUNT * sizeof(float);
+        ubCFp32 = ubAllocator.template Allocate<float>(TileShape::COUNT);
         if constexpr (AscendC::IsSameType<ElementBias, bfloat16_t>::value ||
                       AscendC::IsSameType<ElementBias, half>::value) {
-            ubBiasFp32 = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
-            ubOffset += TileShape::COLUMN * sizeof(float);
+            ubBiasFp32 = ubAllocator.template Allocate<float>(TileShape::COLUMN);
         }
-        ubMul = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
-        ubOffset += TileShape::COUNT * sizeof(float);
-        ubPerTokenScaleBrcb = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
-        ubOffset += TileShape::ROW * BYTE_PER_BLK;
+        ubMul = ubAllocator.template Allocate<float>(TileShape::COUNT);
+        ubPerTokenScaleBrcb = ubAllocator.template AllocateBytes<float>(TileShape::ROW * BYTE_PER_BLK);
         ubPerTokenMul = ubMul;
         ubBiasAdd = ubMul;
     }

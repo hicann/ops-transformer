@@ -18,9 +18,6 @@
 
 #include "graph/utils/type_utils.h"
 
-using namespace AscendC;
-using namespace ge;
-
 namespace optiling {
 ge::graphStatus AllGatherMatmulTilingV2Func(gert::TilingContext *context);
 } // namespace optiling

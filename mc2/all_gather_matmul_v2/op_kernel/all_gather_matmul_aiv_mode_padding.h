@@ -18,9 +18,7 @@
 
 #pragma once
 
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/arch/tla_arch_resource.hpp"
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/arch/tla_arch_cross_core_sync.hpp"
-#include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/kernel/tla_gemm_kernel_padding_matmul.hpp"
+#include "../../common/op_kernel/mc2_matmul_aiv_padding_common.h"
 #include "all_gather_matmul_aiv_mode_util.h"
 
 using namespace AscendC;
@@ -37,45 +35,9 @@ template <class ArchTag_, class AType_, class BType_>
 class TemplatePadder {
 public:
     using ArchTag = ArchTag_;
-    using ElementA = typename AType_::Element;
     using LayoutA = typename AType_::Layout;
-    using ElementB = typename BType_::Element;
     using LayoutB = typename BType_::Layout;
-    static const uint32_t COMPUTE_LENGTH_A = 96 * 1024 / sizeof(ElementA);
-    using PaddingA = PaddingMatrix<ArchTag, ElementA, LayoutA, COMPUTE_LENGTH_A>;
-    static const uint32_t COMPUTE_LENGTH_B = 96 * 1024 / sizeof(ElementB);
-    using PaddingB = PaddingMatrix<ArchTag, ElementB, LayoutB, COMPUTE_LENGTH_B>;
-    /// Parameters structure
-    struct Params {
-        // Data members
-        GM_ADDR ptrA;
-        LayoutA layoutA;
-        GM_ADDR ptrB;
-        LayoutB layoutB;
-        GM_ADDR ptrWA;    // A矩阵padding地址
-        LayoutA layoutWA; // A矩阵padding布局
-        GM_ADDR ptrWB;    // B矩阵padding地址
-        LayoutB layoutWB; // B矩阵padding布局
-        bool alignA;      // A矩阵是否padding
-        bool alignB;      // B矩阵是否padding
-        // Methods
-        CATLASS_HOST_DEVICE
-        Params() {}
-        CATLASS_HOST_DEVICE
-        Params(GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_, GM_ADDR ptrWA_, LayoutA layoutWA_,
-               GM_ADDR ptrWB_, LayoutB layoutWB_, bool alignA_, bool alignB_)
-            : ptrA(ptrA_),
-              layoutA(layoutA_),
-              ptrB(ptrB_),
-              layoutB(layoutB_),
-              ptrWA(ptrWA_),
-              layoutWA(layoutWA_),
-              ptrWB(ptrWB_),
-              layoutWB(layoutWB_),
-              alignA(alignA_),
-              alignB(alignB_)
-        {}
-    };
+    using Params = Mc2MatmulAivPadding::MatmulPaddingParams<LayoutA, LayoutB>;
     // Methods
     CATLASS_DEVICE
     TemplatePadder() {}
@@ -84,25 +46,8 @@ public:
     template <>
     CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)
     {
-        if (params.alignA) {
-            AscendC::GlobalTensor<ElementA> gmA;
-            AscendC::GlobalTensor<ElementA> gmWA;
-            gmA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA *>(params.ptrA));
-            gmWA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA *>(params.ptrWA));
-            PaddingA paddingA(resource);
-            paddingA(gmWA, gmA, params.layoutWA, params.layoutA);
-        }
-        if (params.alignB) {
-            AscendC::GlobalTensor<ElementB> gmB;
-            AscendC::GlobalTensor<ElementB> gmWB;
-            gmB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB *>(params.ptrB));
-            gmWB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB *>(params.ptrWB));
-            PaddingB paddingB(resource);
-            paddingB(gmWB, gmB, params.layoutWB, params.layoutB);
-        }
-        // 0x0 synchronization control between AI Core
-        Catlass::Arch::CrossCoreBarrier<0x0, PIPE_MTE3>();
-        Catlass::Arch::CrossCoreSetFlag<0x2, PIPE_MTE3>(flagAivFinishPadding);
+        Mc2MatmulAivPadding::PadMatmulInputs<ArchTag, AType_, BType_>(resource, params);
+        Mc2MatmulAivPadding::NotifyMatmulPaddingFinished(flagAivFinishPadding);
     }
 
 private:

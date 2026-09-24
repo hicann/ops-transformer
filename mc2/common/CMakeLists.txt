@@ -16,6 +16,7 @@ if (BUILD_OPEN_PROJECT)
         op_host/op_tiling/hccl_performance_arch35.cpp
         op_host/op_tiling/matmul_formulaic_tiling.cpp
         op_host/op_tiling/matmul_performance.cpp
+        op_host/op_tiling/mc2_matmul_aiv_mode_common.cpp
         op_host/op_tiling/mc2_fit_based_balance_tiling.cpp
         utils/mc2_hcom_topo_info.cpp
         utils/mc2_comm_algo_selector.cpp

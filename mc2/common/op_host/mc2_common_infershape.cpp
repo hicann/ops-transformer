@@ -184,4 +184,24 @@ ge::graphStatus InferMatmulReduceScatterCommon(gert::InferShapeContext *context)
     yShape->SetDim(1, commParas.dimN);
     return GRAPH_SUCCESS;
 }
+
+ge::graphStatus InferMatmulOutputDataType(gert::InferDataTypeContext *context, size_t inputIndex,
+                                          size_t yDtypeAttrIndex, size_t outputIndex)
+{
+    auto attrs = context->GetAttrs();
+    OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    const auto inputDtype = context->GetInputDataType(inputIndex);
+    if ((inputDtype == ge::DataType::DT_FLOAT16) || (inputDtype == ge::DataType::DT_BF16)) {
+        context->SetOutputDataType(outputIndex, inputDtype);
+        return ge::GRAPH_SUCCESS;
+    }
+
+    const int64_t *yDtype = attrs->GetInt(yDtypeAttrIndex);
+    if (yDtype == nullptr || *yDtype == static_cast<int64_t>(ge::DataType::DT_UNDEFINED)) {
+        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "yDtype", "DT_UNDEFINED", "valid dtype value");
+        return ge::GRAPH_FAILED;
+    }
+    context->SetOutputDataType(outputIndex, static_cast<ge::DataType>(*yDtype));
+    return ge::GRAPH_SUCCESS;
+}
 } // namespace ops

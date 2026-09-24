@@ -16,7 +16,9 @@
 #ifndef __ALL_GATHER_MATMUL_AIV_MODE_TILING_H__
 #define __ALL_GATHER_MATMUL_AIV_MODE_TILING_H__
 
+#include <cstddef>
 #include <cstdint>
+#include <type_traits>
 #include "kernel_tiling/kernel_tiling.h"
 
 constexpr static int32_t MAX_BLOCK_COUNT = 2;
@@ -82,6 +84,12 @@ struct CoCTiling {
 
     int32_t is91093 = -1;
 };
+
+static_assert(std::is_standard_layout_v<CoCTiling>);
+static_assert(offsetof(CoCTiling, m0) == 5 * sizeof(int32_t));
+static_assert(offsetof(CoCTiling, commDataSplit) == 16 * sizeof(int32_t));
+static_assert(offsetof(CoCTiling, is91093) == 27 * sizeof(int32_t));
+static_assert(sizeof(CoCTiling) == 28 * sizeof(int32_t));
 
 struct AllGatherMatmulAIVModeTilingData {
     Mc2InitTiling mc2InitTiling;

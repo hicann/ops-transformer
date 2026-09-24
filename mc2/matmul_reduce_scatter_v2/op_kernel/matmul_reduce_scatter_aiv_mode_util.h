@@ -14,6 +14,9 @@
  */
 #ifndef MATMUL_REDUCE_SCATTER_AIV_MODE_UTIL
 #define MATMUL_REDUCE_SCATTER_AIV_MODE_UTIL
+#include "../../common/op_kernel/mc2_aiv_data_copy_common.h"
+#include "../../common/op_kernel/mc2_aiv_sync_common.h"
+#include "../../common/op_kernel/mc2_matmul_aiv_kernel_common.h"
 #include "matmul_reduce_scatter_v2_aiv_mode_tiling.h"
 
 using namespace AscendC;
@@ -53,9 +56,6 @@ constexpr uint32_t TILE_SHAPE_64 = 64;
 constexpr uint32_t TILE_SHAPE_128 = 128;
 constexpr uint32_t TILE_SHAPE_256 = 256;
 constexpr uint32_t TILE_SHAPE_512 = 512;
-constexpr uint32_t UB_BUFFER_NUM = 2;
-constexpr uint32_t AIV_CROSS_CORE_SYNC_MODE = 0;
-constexpr uint32_t AIC_CROSS_CORE_SYNC_MODE = 2;
 constexpr uint32_t RAND_BASE = 3;
 
 template <typename T, size_t SIZE>
@@ -104,36 +104,7 @@ __aicore__ inline int32_t CeilDev(int32_t num, int32_t div)
 __aicore__ inline void GetSwizzledBlockIdx(int32_t loop_idx, int32_t m_loop, int32_t n_loop, int32_t swizzl_direction,
                                            int32_t swizzl_count, int64_t &m_idx, int64_t &n_idx)
 {
-    uint32_t in_batch_idx = loop_idx % (m_loop * n_loop);
-    if (swizzl_direction == 0) { // Zn
-        uint32_t tile_block_loop = (m_loop + swizzl_count - 1) / swizzl_count;
-        uint32_t tile_block_idx = in_batch_idx / (swizzl_count * n_loop);
-        uint32_t in_tile_block_idx = in_batch_idx % (swizzl_count * n_loop);
-
-        uint32_t n_row = swizzl_count;
-        if (tile_block_idx == tile_block_loop - 1) {
-            n_row = m_loop - swizzl_count * tile_block_idx;
-        }
-        m_idx = tile_block_idx * swizzl_count + in_tile_block_idx % n_row;
-        n_idx = in_tile_block_idx / n_row;
-        if (tile_block_idx % UB_BUFFER_NUM != 0) {
-            n_idx = n_loop - n_idx - 1;
-        }
-    } else if (swizzl_direction == 1) { // Nz
-        uint32_t tile_block_loop = (n_loop + swizzl_count - 1) / swizzl_count;
-        uint32_t tile_block_idx = in_batch_idx / (swizzl_count * m_loop);
-        uint32_t in_tile_block_idx = in_batch_idx % (swizzl_count * m_loop);
-
-        uint32_t n_col = swizzl_count;
-        if (tile_block_idx == tile_block_loop - 1) {
-            n_col = n_loop - swizzl_count * tile_block_idx;
-        }
-        m_idx = in_tile_block_idx / n_col;
-        n_idx = tile_block_idx * swizzl_count + in_tile_block_idx % n_col;
-        if (tile_block_idx % UB_BUFFER_NUM != 0) {
-            m_idx = m_loop - m_idx - 1;
-        }
-    }
+    Mc2MatmulAiv::GetSwizzledBlockIdx(loop_idx, m_loop, n_loop, swizzl_direction, swizzl_count, m_idx, n_idx);
 }
 
 class CommBase {
@@ -262,16 +233,7 @@ public:
 
     __aicore__ inline void SetBuffFlagByAdd(__gm__ int32_t *buff, int32_t flag)
     {
-        PipeBarrier<PIPE_ALL>();
-        LocalTensor<int32_t> ubTensor = uBuf_.AllocTensor<int32_t>();
-        ubTensor(0) = flag;
-        PipeBarrier<PIPE_ALL>();
-        SetAtomicAdd<int32_t>();
-        PipeBarrier<PIPE_ALL>();
-        CopyUbufToGmAlignB16(buff, ubTensor, 1, sizeof(int32_t), 0, 0);
-        PipeBarrier<PIPE_ALL>();
-        SetAtomicNone();
-        PipeBarrier<PIPE_ALL>();
+        Mc2AivSync::SetBuffFlagByAdd(buff, uBuf_, flag);
     }
 
     __aicore__ inline void CheckBuffFlag(__gm__ int32_t *buff, int32_t flag)
@@ -312,57 +274,28 @@ public:
     __aicore__ inline void CopyGmToUbufAlignB16(LocalTensor<T> ubTensor, __gm__ T *src, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
-        DataCopyExtParams dataCopyParams(nBurst,    // blockCount
-                                         lenBurst,  // blockLen
-                                         srcStride, // srcStride
-                                         dstStride, // dstStride
-                                         0);
-        GlobalTensor<T> gmTensor;
-        gmTensor.SetGlobalBuffer(src);
-        DataCopyPadExtParams<T> padParams;
-        DataCopyPad(ubTensor, gmTensor, dataCopyParams, padParams);
+        Mc2AivDataCopy::CopyGmToUbufAlignB16(ubTensor, src, nBurst, lenBurst, srcStride, dstStride);
     }
 
     template <typename T>
     __aicore__ inline void CopyUbufToGmAlignB16(__gm__ T *dst, LocalTensor<T> ubTensor, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
-        DataCopyExtParams dataCopyParams(nBurst,    // blockCount
-                                         lenBurst,  // blockLen
-                                         srcStride, // srcStride
-                                         dstStride, // dstStride
-                                         0);
-        GlobalTensor<T> gmTensor;
-        gmTensor.SetGlobalBuffer(dst);
-        DataCopyPad(gmTensor, ubTensor, dataCopyParams);
+        Mc2AivDataCopy::CopyUbufToGmAlignB16(dst, ubTensor, nBurst, lenBurst, srcStride, dstStride);
     }
 
     template <typename T>
     __aicore__ inline void CopyGmToUbuf(LocalTensor<T> ubTensor, __gm__ T *src, uint16_t nBurst, uint32_t lenBurst,
                                         uint16_t srcStride, uint16_t dstStride)
     {
-        DataCopyParams dataCopyParams(nBurst,    // blockCount
-                                      lenBurst,  // blockLen
-                                      srcStride, // srcStride
-                                      dstStride  // dstStride
-        );
-        GlobalTensor<T> gmTensor;
-        gmTensor.SetGlobalBuffer(src);
-        DataCopy(ubTensor, gmTensor, dataCopyParams);
+        Mc2AivDataCopy::CopyGmToUbuf(ubTensor, src, nBurst, lenBurst, srcStride, dstStride);
     }
 
     template <typename T>
     __aicore__ inline void CopyUbufToGm(__gm__ T *dst, LocalTensor<T> ubTensor, uint16_t nBurst, uint16_t lenBurst,
                                         uint16_t srcStride, uint16_t dstStride)
     {
-        DataCopyParams dataCopyParams(nBurst,    // blockCount
-                                      lenBurst,  // blockLen
-                                      srcStride, // srcStride
-                                      dstStride  // dstStride
-        );
-        GlobalTensor<T> gmTensor;
-        gmTensor.SetGlobalBuffer(dst);
-        DataCopy(gmTensor, ubTensor, dataCopyParams);
+        Mc2AivDataCopy::CopyUbufToGm(dst, ubTensor, nBurst, lenBurst, srcStride, dstStride);
     }
 
     template <typename T>
@@ -378,18 +311,17 @@ public:
     template <pipe_t pipe, uint64_t mode>
     inline __aicore__ void FFTSCrossCoreSync(uint64_t flag_id)
     {
-        AscendC::CrossCoreSetFlag<mode, pipe>(flag_id);
+        Mc2AivSync::FFTSCrossCoreSync<pipe, mode>(flag_id);
     }
 
     __aicore__ inline void SetAndWaitAivSync(uint64_t flag_idx, int32_t pipe_depth = 2)
     {
-        FFTSCrossCoreSync<PIPE_MTE3, AIV_CROSS_CORE_SYNC_MODE>(flag_idx + pipe_depth);
-        WaitEvent(flag_idx + pipe_depth);
+        Mc2AivSync::SetAndWaitAivSync(flag_idx, pipe_depth);
     }
 
     __aicore__ inline void SetAicSync(uint64_t flag_idx)
     {
-        FFTSCrossCoreSync<PIPE_MTE3, AIC_CROSS_CORE_SYNC_MODE>(flag_idx);
+        Mc2AivSync::SetAicSync(flag_idx);
     }
 
     __aicore__ inline void CrossRankSyncV1(int32_t flag_idx, int32_t flag_data)

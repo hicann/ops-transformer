@@ -28,6 +28,8 @@
 #include "block_mmad_preload_fixpipe.h"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tile/tla_gemm_tile_copy.hpp"
 #include "../../3rd/template_linear_algebra/op_kernel/template_linear_algebra/gemm/tile/tla_gemm_tile_mmad.hpp"
+#include "../../common/op_kernel/mc2_aiv_sync_common.h"
+#include "../../common/op_kernel/mc2_matmul_aiv_kernel_common.h"
 
 using namespace AscendC;
 
@@ -150,23 +152,8 @@ public:
     {
         uint32_t kIdx = 0;
         int64_t mIdx, nIdx;
-        GetBlockIdx(loopOffset, mLoop, nLoop, swizzlDirect, swizzlCount, mIdx, nIdx);
+        Mc2MatmulAiv::GetSwizzledBlockIdx(loopOffset, mLoop, nLoop, swizzlDirect, swizzlCount, mIdx, nIdx);
         return GemmCoord{static_cast<uint32_t>(mIdx), static_cast<uint32_t>(nIdx), kIdx}; // idx在uint32_t范围内
-    }
-
-    inline __aicore__ GemmCoord GetBlockLocCoord(GemmCoord blockIdxCoord)
-    {
-        return GemmCoord{blockIdxCoord.m() * L1TileShape::M, blockIdxCoord.n() * L1TileShape::N,
-                         blockIdxCoord.k() * L1TileShape::K};
-    }
-
-    inline __aicore__ GemmCoord GetBlockSizeCoord(GemmCoord blockIdxCoord, GemmCoord blockLocCoord, int32_t mLoop,
-                                                  int32_t mSize, int32_t nLoop, int32_t nSize, int32_t kSize)
-    {
-        uint32_t mActual = (blockIdxCoord.m() == (mLoop - 1)) ? (mSize - blockLocCoord.m()) : L1TileShape::M;
-        uint32_t nActual = (blockIdxCoord.n() == (nLoop - 1)) ? (nSize - blockLocCoord.n()) : L1TileShape::N;
-        uint32_t kActual = kSize;
-        return GemmCoord{mActual, nActual, kActual};
     }
 
     // Per-block geometry shared by the local-block matmul loops below.
@@ -186,9 +173,10 @@ public:
     inline __aicore__ LocalBlockInfo GetLocalBlockInfo(int32_t loopIdx, Params const &params)
     {
         GemmCoord blockIdxCoord = GetBlockIdCoord(loopIdx, mLoops, nLoops, params.swizzlDirect, params.swizzlCount);
-        GemmCoord blockLocCoord = GetBlockLocCoord(blockIdxCoord);
-        GemmCoord blockSizeCoord = GetBlockSizeCoord(blockIdxCoord, blockLocCoord, mLoops, params.problemShape.m(),
-                                                     nLoops, params.problemShape.n(), params.problemShape.k());
+        GemmCoord blockLocCoord = Mc2MatmulAiv::GetBlockLocCoord<L1TileShape>(blockIdxCoord);
+        GemmCoord blockSizeCoord =
+            Mc2MatmulAiv::GetBlockSizeCoord<L1TileShape>(blockIdxCoord, blockLocCoord, mLoops, params.problemShape.m(),
+                                                         nLoops, params.problemShape.n(), params.problemShape.k());
         MatrixCoord offsetA{blockLocCoord.m(), blockLocCoord.k()};
         MatrixCoord offsetB{blockLocCoord.k(), blockLocCoord.n()};
         MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};
@@ -202,9 +190,10 @@ public:
             hasNextBlock = true;
             GemmCoord nextBlockIdCoord =
                 GetBlockIdCoord(nextLoopIdx, mLoops, nLoops, params.swizzlDirect, params.swizzlCount);
-            nextBlockLocCoord = GetBlockLocCoord(nextBlockIdCoord);
-            nextBlockSizeCoord = GetBlockSizeCoord(nextBlockIdCoord, nextBlockLocCoord, mLoops, params.problemShape.m(),
-                                                   nLoops, params.problemShape.n(), params.problemShape.k());
+            nextBlockLocCoord = Mc2MatmulAiv::GetBlockLocCoord<L1TileShape>(nextBlockIdCoord);
+            nextBlockSizeCoord = Mc2MatmulAiv::GetBlockSizeCoord<L1TileShape>(
+                nextBlockIdCoord, nextBlockLocCoord, mLoops, params.problemShape.m(), nLoops, params.problemShape.n(),
+                params.problemShape.k());
         }
         MatrixCoord offsetNextA{nextBlockLocCoord.m(), nextBlockLocCoord.k()};
         MatrixCoord offsetNextB{nextBlockLocCoord.k(), nextBlockLocCoord.n()};
@@ -294,9 +283,10 @@ public:
         int32_t dstBlockIdx = loopOffset % ctx.otherRankNum;
         GemmCoord blockIdxCoord =
             GetBlockIdCoord(loopOffsetInBlock, ctx.actualPValue, nLoops, params.swizzlDirect, params.swizzlCount);
-        GemmCoord blockLocCoord = GetBlockLocCoord(blockIdxCoord);
-        GemmCoord blockSizeCoord = GetBlockSizeCoord(blockIdxCoord, blockLocCoord, ctx.actualPValue, ctx.blockM, nLoops,
-                                                     params.problemShape.n(), params.problemShape.k());
+        GemmCoord blockLocCoord = Mc2MatmulAiv::GetBlockLocCoord<L1TileShape>(blockIdxCoord);
+        GemmCoord blockSizeCoord =
+            Mc2MatmulAiv::GetBlockSizeCoord<L1TileShape>(blockIdxCoord, blockLocCoord, ctx.actualPValue, ctx.blockM,
+                                                         nLoops, params.problemShape.n(), params.problemShape.k());
         MatrixCoord offsetA{blockLocCoord.m(), blockLocCoord.k()};
         MatrixCoord offsetB{blockLocCoord.k(), blockLocCoord.n()};
         MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};
@@ -328,9 +318,10 @@ public:
             int32_t nextDstBlockIdx = nextLoopOffset % ctx.otherRankNum;
             GemmCoord nextBlockIdCoord = GetBlockIdCoord(nextLoopOffsetInBlock, ctx.actualPValue, nLoops,
                                                          params.swizzlDirect, params.swizzlCount);
-            nextBlockLocCoord = GetBlockLocCoord(nextBlockIdCoord);
-            nextBlockSizeCoord = GetBlockSizeCoord(nextBlockIdCoord, nextBlockLocCoord, ctx.actualPValue, ctx.blockM,
-                                                   nLoops, params.problemShape.n(), params.problemShape.k());
+            nextBlockLocCoord = Mc2MatmulAiv::GetBlockLocCoord<L1TileShape>(nextBlockIdCoord);
+            nextBlockSizeCoord = Mc2MatmulAiv::GetBlockSizeCoord<L1TileShape>(
+                nextBlockIdCoord, nextBlockLocCoord, ctx.actualPValue, ctx.blockM, nLoops, params.problemShape.n(),
+                params.problemShape.k());
             MatrixCoord offsetNextA{nextBlockLocCoord.m(), nextBlockLocCoord.k()};
             MatrixCoord offsetNextB{nextBlockLocCoord.k(), nextBlockLocCoord.n()};
             aNextIsLocal = (nextDstBlockIdx == params.rankIdx);
@@ -399,7 +390,7 @@ public:
                                  gmANextIn[info.gmOffsetNextA], gmBInt8[info.gmOffsetNextB], info.blockSizeCoord,
                                  info.nextBlockSizeCoord, info.isFirstBlock, info.hasNextBlock);
             }
-            FFTSCrossCoreSync<PIPE_FIX, 2>(ctx.flagIdx);
+            Mc2AivSync::FFTSCrossCoreSync<PIPE_FIX, 2>(ctx.flagIdx);
         }
     }
 
@@ -424,7 +415,7 @@ public:
                           gmDst[info.gmOffsetC], params.layoutC, gmAInNext[info.gmOffsetNextA], gmB[info.gmOffsetNextB],
                           info.blockSizeCoord, info.nextBlockSizeCoord, info.isFirstBlock, info.hasNextBlock);
             }
-            FFTSCrossCoreSync<PIPE_FIX, 2>(ctx.flagIdx);
+            Mc2AivSync::FFTSCrossCoreSync<PIPE_FIX, 2>(ctx.flagIdx);
         }
     }
 

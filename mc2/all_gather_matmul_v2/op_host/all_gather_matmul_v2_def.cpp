@@ -13,6 +13,7 @@
  * \brief
  */
 #include "register/op_def_registry.h"
+#include "../../common/op_host/mc2_matmul_v2_op_def_common.h"
 
 namespace ops {
 class AllGatherMatmulV2 : public OpDef {
@@ -26,15 +27,7 @@ public:
         DefineAttributes();
 
         OpAICoreConfig aicore_config;
-        aicore_config.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape,复用二进制,后续图支持后修改
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
+        Mc2OpDef::ConfigureMatmulV2DynamicAicore(aicore_config)
             .ExtendCfgInfo("opFile.value", "all_gather_matmul_v2_apt");
         this->AICore().AddConfig("ascend950", aicore_config);
         this->MC2().HcclGroup("group");
@@ -44,15 +37,7 @@ public:
         DefineAicoreConfig910bOptionalInputs(aicore_config_910b);
         DefineAicoreConfig910bOutputs(aicore_config_910b);
 
-        aicore_config_910b.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("jitCompile.flag", "static_false") // 动态shape,复用二进制,后续图支持后修改
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
+        Mc2OpDef::ConfigureMatmulV2DynamicAicore(aicore_config_910b);
         this->AICore().AddConfig("ascend910b", aicore_config_910b);
         this->AICore().AddConfig("ascend910_93", aicore_config_910b);
         this->MC2().HcclGroup("group");
@@ -101,26 +86,12 @@ private:
             .AutoContiguous();
         this->Input("x1_scale")
             .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                       ge::DT_FLOAT,       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
+            .DataType(Mc2OpDef::GetMatmulV2ScaleDataTypes())
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("x2_scale")
             .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,
-                       ge::DT_FLOAT,       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0,
-                       ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
+            .DataType(Mc2OpDef::GetMatmulV2ScaleDataTypes())
             .FormatList({ge::FORMAT_ND});
         this->Input("quant_scale")
             .ParamType(OPTIONAL)

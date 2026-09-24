@@ -15,6 +15,8 @@
 #ifndef MATMUL_ALLTO_ALL_UTIL_ARCH22
 #define MATMUL_ALLTO_ALL_UTIL_ARCH22
 
+#include "../../../common/op_kernel/mc2_aiv_data_copy_common.h"
+#include "../../../common/op_kernel/mc2_aiv_sync_common.h"
 #include "matmul_allto_all_tiling.h"
 
 namespace {
@@ -32,7 +34,6 @@ constexpr static int32_t FLAG_VALUE = 1;
 constexpr static int32_t USED_UB_SIZE = 160 * 1024;
 constexpr static int32_t FLAG_OFFSET = 180 * 1024 * 1024 / sizeof(int32_t);
 constexpr static uint32_t UB_OFFSET = 97440 / sizeof(int16_t); // 2 是 size of T
-constexpr static uint64_t AIC_SYNC_MODE = 2U;
 } // namespace
 
 template <typename T, size_t SIZE>
@@ -113,47 +114,31 @@ public:
     template <pipe_t pipe, uint64_t mode>
     __aicore__ inline void FFTSCrossCoreSync(uint64_t flag_id)
     {
-        AscendC::CrossCoreSetFlag<mode, pipe>(flag_id);
+        Mc2AivSync::FFTSCrossCoreSync<pipe, mode>(flag_id);
     }
 
     __aicore__ inline void SetAndWaitAivSync(uint64_t flag_idx, int32_t pipe_depth = 2)
     {
-        FFTSCrossCoreSync<PIPE_MTE3, 0>(flag_idx + pipe_depth);
-        WaitEvent(flag_idx + pipe_depth);
+        Mc2AivSync::SetAndWaitAivSync(flag_idx, pipe_depth);
     }
 
     __aicore__ inline void SetAicSync(uint64_t flag_idx)
     {
-        FFTSCrossCoreSync<PIPE_MTE3, AIC_SYNC_MODE>(flag_idx);
+        Mc2AivSync::SetAicSync(flag_idx);
     }
 
     template <typename T>
     __aicore__ inline void CopyGmToUbufAlignB16(LocalTensor<T> ubTensor, __gm__ T *src, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
-        DataCopyExtParams dataCopyParams(nBurst,    // blockCount
-                                         lenBurst,  // blockLen
-                                         srcStride, // srcStride
-                                         dstStride, // dstStride
-                                         0);
-        GlobalTensor<T> gmTensor;
-        gmTensor.SetGlobalBuffer(src);
-        DataCopyPadExtParams<T> padParams;
-        DataCopyPad(ubTensor, gmTensor, dataCopyParams, padParams);
+        Mc2AivDataCopy::CopyGmToUbufAlignB16(ubTensor, src, nBurst, lenBurst, srcStride, dstStride);
     }
 
     template <typename T>
     __aicore__ inline void CopyUbufToGmAlignB16(__gm__ T *dst, LocalTensor<T> ubTensor, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
-        DataCopyExtParams dataCopyParams(nBurst,    // blockCount
-                                         lenBurst,  // blockLen
-                                         srcStride, // srcStride
-                                         dstStride, // dstStride
-                                         0);
-        GlobalTensor<T> gmTensor;
-        gmTensor.SetGlobalBuffer(dst);
-        DataCopyPad(gmTensor, ubTensor, dataCopyParams);
+        Mc2AivDataCopy::CopyUbufToGmAlignB16(dst, ubTensor, nBurst, lenBurst, srcStride, dstStride);
     }
 
     __aicore__ inline void CheckBuffFlag(__gm__ int32_t *buff, int32_t flag)

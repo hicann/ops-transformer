@@ -17,6 +17,7 @@
 #define __TILING_FUNC_H__
 
 #include <cmath>
+#include <map>
 #include <vector>
 #include "../../../op_kernel/all_gather_matmul_aiv_mode_tiling.h"
 #include "register/op_def_registry.h"
@@ -63,12 +64,8 @@ inline bool IsMatrixAligned(uint32_t m, uint32_t n, bool transpose, uint32_t nEl
 }
 
 namespace optiling {
-constexpr int32_t CONDITION_M_ST = 0;
-constexpr int32_t CONDITION_M_END = 1;
-constexpr int32_t CONDITION_K_ST = 2;
-constexpr int32_t CONDITION_K_END = 3;
-constexpr int32_t CONDITION_N_ST = 4;
-constexpr int32_t CONDITION_N_END = 5;
+using MknConditionMap = std::map<int, std::vector<std::vector<int>>>;
+
 constexpr int32_t RANKSIZE_TWO = 2;
 constexpr int32_t RANKSIZE_FOUR = 4;
 constexpr int32_t RANKSIZE_EIGHT = 8;
@@ -82,23 +79,19 @@ constexpr int32_t INPUT_DTYPE = 2;
 constexpr int32_t MIN_P_VALUE = 1;
 constexpr uint32_t MAX_BLOCK_COUNT = 2;
 
-// Tiling Code Mask
-constexpr int32_t COMMDATASPLIT_MASK = 0b11111;
-constexpr int32_t COMMDATASPLIT_BNUM = 5;
-constexpr int32_t COMMNPUSPLIT_MASK = 0b11111;
-constexpr int32_t COMMNPUSPLIT_BNUM = 5;
-constexpr int32_t COMMDIRECT_MASK = 0b1;
-constexpr int32_t COMMDIRECT_BNUM = 1;
-constexpr int32_t UBMOVENUM_MASK = 0b11111111;
-constexpr int32_t UBMOVENUM_BNUM = 8;
-constexpr int32_t PVALUE_MASK = 0b1111;
-constexpr int32_t PVALUE_BNUM = 4;
-constexpr int32_t SWIZZLCOUNT_MASK = 0b1111;
-constexpr int32_t SWIZZLCOUNT_BNUM = 4;
-constexpr int32_t SWIZZLDIRECT_MASK = 0b1;
-constexpr int32_t SWIZZLDIRECT_BNUM = 1;
-constexpr int32_t M0_MASK = 0b1;
-constexpr int32_t M0_BNUM = 1;
+struct TilingCodeField {
+    uint32_t mask;
+    uint32_t bitCount;
+};
+
+constexpr TilingCodeField COMM_DATA_SPLIT_FIELD = {0b11111U, 5U};
+constexpr TilingCodeField COMM_NPU_SPLIT_FIELD = {0b11111U, 5U};
+constexpr TilingCodeField COMM_DIRECT_FIELD = {0b1U, 1U};
+constexpr TilingCodeField UB_MOVE_NUM_FIELD = {0b11111111U, 8U};
+constexpr TilingCodeField P_VALUE_FIELD = {0b1111U, 4U};
+constexpr TilingCodeField SWIZZLE_COUNT_FIELD = {0b1111U, 4U};
+constexpr TilingCodeField SWIZZLE_DIRECT_FIELD = {0b1U, 1U};
+constexpr TilingCodeField M0_FIELD = {0b1U, 1U};
 
 // Tiling Code Default Value
 constexpr int32_t ALLGATHERV2_MATMUL_NPU910B_TWO_RANK_INT8_CODE_DEFAULT = 428889128;
@@ -115,7 +108,7 @@ constexpr int32_t ALLGATHERV2_MATMUL_NPU91093_EIGHT_RANK_FP16_CODE_DEFAULT = 428
 ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext *context);
 
 // Tiling Code Encode Map
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BEightRankINT4CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU910BEightRankINT4CodeMap = {
     {26231856, {{-1, 176, -1, 2147483647, -1, 2816}}},
     {59253808, {{176, 366, -1, 2147483647, -1, 2816}}},
     {160465960, {{366, 3284, -1, 2147483647, -1, 2816}}},
@@ -129,7 +122,7 @@ static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BEi
     {59773992, {{3284, 2147483647, -1, 2147483647, 4096, 2147483647}}}};
 
 // Tiling Code Encode Map
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BTwoRankINT8CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU910BTwoRankINT8CodeMap = {
     {428364840, {{-1, 1536, -1, 2147483647, -1, 2147483647}}},
     {428377128, {{1536, 4096, -1, 2147483647, -1, 2147483647}}},
     {428889128, {{4096, 5632, -1, 2147483647, -1, 2147483647}}},
@@ -138,7 +131,7 @@ static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BTw
     {27305000, {{22528, 28160, -1, 2147483647, -1, 2147483647}}},
     {27345968, {{28160, 2147483647, -1, 2147483647, -1, 2147483647}}}};
 
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BFourRankINT8CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU910BFourRankINT8CodeMap = {
     {428360744, {{-1, 1536, -1, 2147483647, -1, 2147483647}}},
     {428364840, {{1536, 2560, -1, 2147483647, -1, 2147483647}}},
     {294147112, {{2560, 4096, -1, 2147483647, -1, 2147483647}}},
@@ -146,7 +139,7 @@ static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BFo
     {428889128, {{6656, 16896, -1, 2147483647, -1, 2147483647}}},
     {428901416, {{16896, 2147483647, -1, 2147483647, -1, 2147483647}}}};
 
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BEightRankINT8CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU910BEightRankINT8CodeMap = {
     {428356648, {{-1, 2560, -1, 2147483647, -1, 2147483647}}},
     {294147112, {{2560, 6656, -1, 2147483647, -1, 2147483647}}},
     {160973864, {{6656, 8192, -1, 2147483647, -1, 2147483647}}},
@@ -154,7 +147,7 @@ static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BEi
     {26756136, {{9728, 10752, -1, 2147483647, -1, 2147483647}}},
     {160977960, {{10752, 12800, -1, 2147483647, -1, 2147483647}}}};
 
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BFourRankFP16CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU910BFourRankFP16CodeMap = {
     {160441384, {{-1, 2560, -1, 1280, -1, 3584}}},
     {160439336, {{-1, 2560, 1280, 2560, -1, 3584}, {-1, 1536, 7680, 2147483647, 3584, 4608}}},
     {160961584,
@@ -220,7 +213,7 @@ static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BFo
       {2560, 9728, 4608, 9728, 8704, 2147483647},
       {9728, 2147483647, 4608, 2147483647, 8704, 2147483647}}}};
 
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BEightRankFP16CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU910BEightRankFP16CodeMap = {
     {159915048, {{-1, 1536, -1, 2147483647, -1, 2560}, {-1, 1536, -1, 3584, 2560, 4608}}},
     {159913008, {{-1, 1536, 3584, 2147483647, 2560, 4608}, {1536, 2147483647, 3584, 2147483647, -1, 4608}}},
     {160963624, {{1536, 2147483647, -1, 3584, -1, 2560}}},
@@ -232,7 +225,7 @@ static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU910BEi
     {162533424, {{3584, 2147483647, -1, 8704, 6656, 2147483647}}},
     {161484848, {{3584, 2147483647, 8704, 2147483647, 6656, 2147483647}}}};
 
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU91093FourRankINT8CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU91093FourRankINT8CodeMap = {
     {434144304, {{-1, 3584, -1, 1280, -1, 1536}}},
     {428930088, {{-1, 3584, 1280, 3584, -1, 1536}}},
     {428377136, {{-1, 3584, 3584, 6144, -1, 1536}}},
@@ -289,7 +282,7 @@ static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU91093F
     {162538536, {{7680, 2147483647, 1792, 2147483647, 5632, 6656}}},
     {162545704, {{-1, 2147483647, 5632, 2147483647, 6656, 7680}}}};
 
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU91093EightRankINT8CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU91093EightRankINT8CodeMap = {
     {161514536,
      {{-1, 1536, -1, 1280, -1, 1536}, {1536, 2560, -1, 1792, 1536, 2560}, {4608, 8704, 3584, 7680, -1, 2560}}},
     {160465960, {{-1, 1536, 1280, 8704, -1, 1536}, {1536, 2560, 3584, 2147483647, -1, 1536}}},
@@ -336,7 +329,7 @@ static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU91093E
     {161486896, {{-1, 2147483647, 1280, 2147483647, 8704, 9728}}},
     {165736496, {{-1, 2147483647, 1280, 2147483647, 9728, 2147483647}}}};
 
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU91093FourRankFP16CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU91093FourRankFP16CodeMap = {
     {428385320, {{-1, 1536, -1, 4096, -1, 1536}}},
     {428377128, {{-1, 1536, 4096, 2147483647, -1, 1536}, {1536, 2560, 2560, 2147483647, -1, 1536}}},
     {428930088, {{1536, 2560, -1, 2560, -1, 1536}, {-1, 1536, -1, 1792, 1536, 2560}}},
@@ -367,7 +360,7 @@ static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU91093F
     {162535464, {{2560, 2147483647, -1, 768, 6656, 2147483647}}},
     {165695528, {{2560, 2147483647, 768, 2147483647, 4608, 8704}}}};
 
-static std::map<int, std::vector<std::vector<int>>> g_allGatherV2MatmulNPU91093EightRankFP16CodeMap = {
+static MknConditionMap g_allGatherV2MatmulNPU91093EightRankFP16CodeMap = {
     {428377128, {{-1, 2560, -1, 4608, -1, 1536}}},
     {160990248,
      {{-1, 2560, 4608, 6144, -1, 1536}, {2560, 6656, 1792, 8704, -1, 1536}, {2560, 5120, 8704, 9728, -1, 1536}}},
