@@ -26,9 +26,9 @@ extern "C" {
  * @brief First phase of aclnnMixedQuantSparseFlashMla: calculate workspace size.
  * @domain aclnn_ops_train_infer
  *
- * @param q                         [IN]  query tensor, BF16.
- * @param oriKvOptional             [IN]  optional original KV tensor, FLOAT8_E4M3FN.
- * @param cmpKvOptional             [IN]  optional compressed KV tensor, FLOAT8_E4M3FN.
+ * @param q                         [IN]  query tensor. BF16 for mode 1/2; FP16 or BF16 for mode 3.
+ * @param oriKvOptional             [IN]  original KV. FLOAT8_E4M3FN for mode 1/2; same dtype as q for mode 3.
+ * @param cmpKvOptional             [IN]  compressed KV. FLOAT8_E4M3FN for mode 1/2; UINT8 TQ4 for mode 3.
  * @param oriSparseIndicesOptional  [IN]  optional original KV sparse indices, INT32.
  * @param cmpSparseIndicesOptional  [IN]  optional compressed KV sparse indices, INT32.
  * @param oriBlockTableOptional     [IN]  optional original KV block table, INT32.
@@ -44,7 +44,7 @@ extern "C" {
  * @param cmpTopkLengthOptional     [IN]  optional compressed KV top-k lengths, INT32.
  * @param sinksOptional             [IN]  optional attention sink weights, FLOAT32.
  * @param metadataOptional          [IN]  optional pre-computed tiling metadata, INT32.
- * @param quantMode                 [IN]  ATTR. Quantization mode.
+ * @param quantMode                 [IN]  ATTR. 1/2 on arch35, 3 (TurboQuant TQ4) on arch22.
  * @param ropeHeadDim               [IN]  ATTR. RoPE head dimension.
  * @param softmaxScale              [IN]  ATTR. Softmax scaling factor.
  * @param cmpRatio                  [IN]  ATTR. Compressed KV ratio.
@@ -56,7 +56,7 @@ extern "C" {
  * @param layoutKvOptional          [IN]  ATTR. KV layout.
  * @param topkValueMode             [IN]  ATTR. Top-k value mode.
  * @param returnSoftmaxLse          [IN]  ATTR. Whether to output softmax LSE.
- * @param attnOut                   [OUT] Required attention output, BF16.
+ * @param attnOut                   [OUT] Required attention output, same dtype and shape as q.
  * @param softmaxLseOptional  [OUT] Optional output. Softmax log-sum-exp, FLOAT32.
  *                                  Valid when returnSoftmaxLse=True.
  * @param workspaceSize       [OUT] Workspace size in bytes.

@@ -57,6 +57,7 @@ struct MQSmlaCase {
     std::vector<int64_t> metadataShape = {1024};
     ge::DataType qType = ge::DT_BF16;
     ge::DataType kvType = ge::DT_FLOAT8_E4M3FN;
+    ge::DataType cmpKvType = ge::DT_FLOAT8_E4M3FN;
     ge::DataType outType = ge::DT_BF16;
     std::string layoutQ = "TND";
     std::string layoutKv = "PA_BBND";
@@ -67,6 +68,9 @@ struct MQSmlaCase {
     int64_t cmpMaskMode = 0;
     int64_t oriWinLeft = 127;
     int64_t oriWinRight = 0;
+    std::string socVersion = "Ascend950";
+    uint32_t coreNum = 56;
+    uint64_t ubSize = 262144;
 };
 
 gert::StorageShape ToStorageShape(const std::vector<int64_t> &dims)
@@ -102,7 +106,7 @@ void RunMQSmlaTilingCase(const MQSmlaCase &c, ge::graphStatus expect, uint64_t e
                             static_cast<uint32_t>(kNumHeadsKv));
     gert::TilingContextPara tilingContextPara(
         "MixedQuantSparseFlashMla",
-        {Desc(c.qShape, c.qType), Desc(c.oriKvShape, c.kvType), Desc(c.cmpKvShape, c.kvType),
+        {Desc(c.qShape, c.qType), Desc(c.oriKvShape, c.kvType), Desc(c.cmpKvShape, c.cmpKvType),
          Desc(c.oriSparseIndicesShape, ge::DT_INT32), Desc(c.cmpSparseIndicesShape, ge::DT_INT32),
          Desc(c.oriBlockTableShape, ge::DT_INT32), Desc(c.cmpBlockTableShape, ge::DT_INT32),
          gert::TilingContextPara::TensorDescription(ToStorageShape(c.cuSeqLensQShape), ge::DT_INT32, ge::FORMAT_ND,
@@ -132,7 +136,7 @@ void RunMQSmlaTilingCase(const MQSmlaCase &c, ge::graphStatus expect, uint64_t e
          {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>(c.layoutKv)},
          {"topk_value_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
-        &compileInfo, "Ascend950", 56, 262144);
+        &compileInfo, c.socVersion, c.coreNum, c.ubSize);
     ExecuteTestCase(tilingContextPara, expect, expectTilingKey);
 }
 } // namespace
@@ -201,12 +205,91 @@ TEST_F(MixedQuantSparseFlashMlaTiling, test_tiling_swa_bsnd_q_success)
     RunMQSmlaTilingCase(c, ge::GRAPH_SUCCESS);
 }
 
-// quant_mode only supports 1 or 2
-TEST_F(MixedQuantSparseFlashMlaTiling, test_tiling_quant_mode_invalid_failed)
+// arch35 keeps the original quant_mode=1/2 contract and rejects TurboQuant mode 3.
+TEST_F(MixedQuantSparseFlashMlaTiling, test_tiling_arch35_quant_mode3_failed)
 {
     MQSmlaCase c;
     c.quantMode = 3;
     RunMQSmlaTilingCase(c, ge::GRAPH_FAILED);
+}
+
+// arch22 must not enter the original arch35 quant_mode=1/2 path.
+TEST_F(MixedQuantSparseFlashMlaTiling, test_tiling_arch22_quant_mode1_failed)
+{
+    MQSmlaCase c;
+    c.socVersion = "Ascend910B";
+    c.coreNum = 64;
+    RunMQSmlaTilingCase(c, ge::GRAPH_FAILED);
+}
+
+// Empty TND query is allowed only by the TurboQuant contract.
+TEST_F(MixedQuantSparseFlashMlaTiling, test_tiling_arch35_empty_query_failed)
+{
+    MQSmlaCase c;
+    c.qShape = {0, 64, 512};
+    RunMQSmlaTilingCase(c, ge::GRAPH_FAILED);
+}
+
+// arch22 supports the TurboQuant CSA contract through quant_mode=3.
+TEST_F(MixedQuantSparseFlashMlaTiling, test_tiling_arch22_turbo_quant_success)
+{
+    for (ge::DataType dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+        for (int64_t topk : {512, 1024}) {
+            MQSmlaCase c;
+            c.oriKvShape = {65, 128, 1, 512};
+            c.cmpKvShape = {17, 128, 1, 258};
+            c.cmpSparseIndicesShape = {512, 1, topk};
+            c.oriBlockTableShape = {4, 65};
+            c.cmpBlockTableShape = {4, 17};
+            c.qType = dtype;
+            c.kvType = dtype;
+            c.cmpKvType = ge::DT_UINT8;
+            c.outType = dtype;
+            c.quantMode = 3;
+            c.cmpRatio = 4;
+            c.cmpMaskMode = 3;
+            c.socVersion = "Ascend910B";
+            c.coreNum = 64;
+            RunMQSmlaTilingCase(c, ge::GRAPH_SUCCESS);
+        }
+    }
+}
+
+TEST_F(MixedQuantSparseFlashMlaTiling, test_tiling_arch22_turbo_quant_topk_failed)
+{
+    MQSmlaCase c;
+    c.oriKvShape = {65, 128, 1, 512};
+    c.cmpKvShape = {17, 128, 1, 258};
+    c.cmpSparseIndicesShape = {512, 1, 256};
+    c.oriBlockTableShape = {4, 65};
+    c.cmpBlockTableShape = {4, 17};
+    c.kvType = ge::DT_BF16;
+    c.cmpKvType = ge::DT_UINT8;
+    c.quantMode = 3;
+    c.cmpRatio = 4;
+    c.cmpMaskMode = 3;
+    c.socVersion = "Ascend910B";
+    c.coreNum = 64;
+    RunMQSmlaTilingCase(c, ge::GRAPH_FAILED);
+}
+
+TEST_F(MixedQuantSparseFlashMlaTiling, test_tiling_arch22_turbo_quant_empty_query_success)
+{
+    MQSmlaCase c;
+    c.qShape = {0, 64, 512};
+    c.oriKvShape = {65, 128, 1, 512};
+    c.cmpKvShape = {17, 128, 1, 258};
+    c.cmpSparseIndicesShape = {0, 1, 512};
+    c.oriBlockTableShape = {4, 65};
+    c.cmpBlockTableShape = {4, 17};
+    c.kvType = ge::DT_BF16;
+    c.cmpKvType = ge::DT_UINT8;
+    c.quantMode = 3;
+    c.cmpRatio = 4;
+    c.cmpMaskMode = 3;
+    c.socVersion = "Ascend910B";
+    c.coreNum = 64;
+    RunMQSmlaTilingCase(c, ge::GRAPH_SUCCESS);
 }
 
 // rope_head_dim only supports 64

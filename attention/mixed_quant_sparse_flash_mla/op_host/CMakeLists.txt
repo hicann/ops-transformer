@@ -43,5 +43,6 @@ add_tiling_modules()
 add_sparse_mla_common_checker_sources(${OPHOST_NAME}_tiling_obj)
 target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
     ${MIXED_QUANT_SPARSE_MLA_CHECKER_SRC_FILES}
-    mixed_quant_sparse_flash_mla_tiling.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/arch22/mixed_quant_sparse_flash_mla_tiling.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/arch35/mixed_quant_sparse_flash_mla_tiling.cpp
 )

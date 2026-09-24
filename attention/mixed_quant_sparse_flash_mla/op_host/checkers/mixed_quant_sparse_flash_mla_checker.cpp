@@ -22,6 +22,7 @@ CheckContext BuildContext(const MQSMLATilingInfo &info)
     CheckContext context;
     sparse_mla_checker::PopulateCommonContext(context, info);
     context.variant = sparse_mla_checker::OperatorVariant::MIXED_QUANT;
+    context.npuArch = info.npuArch;
     context.qHeadDim = info.qkHeadDim;
     context.quantMode = info.quantMode;
     context.ropeHeadDim = info.ropeHeadDim;

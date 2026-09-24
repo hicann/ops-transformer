@@ -151,6 +151,8 @@ public:
     uint32_t qTSize = 0; // 仅TND时生效
 
     uint32_t maxActualseq = 0;
+    uint32_t actualLenDimsQ = 0;
+    uint32_t actualLenDimsKV = 0;
     bool actualSeqLenFlag = false;
     bool isSameSeqAllKVTensor = true;
 
@@ -282,6 +284,8 @@ public:
     int64_t dSizeKV_ = 0;
     int64_t oriKvStride_ = 0;
     int64_t cmpKvStride_ = 0;
+    uint32_t actualLenDimsQ_ = 0;
+    uint32_t actualLenDimsKV_ = 0;
     std::vector<int64_t> oriKvStridesVec_;
     std::vector<int64_t> cmpKvStridesVec_;
     // Layout

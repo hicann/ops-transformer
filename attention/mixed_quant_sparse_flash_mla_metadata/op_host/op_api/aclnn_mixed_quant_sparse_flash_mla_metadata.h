@@ -28,8 +28,10 @@ __attribute__((visibility("default"))) aclnnStatus aclnnMixedQuantSparseFlashMla
     const char *layoutQOptional, const char *layoutKvOptional, bool hasOriKv, bool hasCmpKv, const aclTensor *metaData,
     uint64_t *workspaceSize, aclOpExecutor **executor);
 
-__attribute__((visibility("default"))) aclnnStatus aclnnMixedQuantSparseFlashMlaMetadata(
-    void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnMixedQuantSparseFlashMlaMetadata(void *workspace,
+                                                                                         uint64_t workspaceSize,
+                                                                                         aclOpExecutor *executor,
+                                                                                         aclrtStream stream);
 
 #ifdef __cplusplus
 }

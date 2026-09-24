@@ -62,6 +62,7 @@ bool MixedQuantSparseFlashMlaMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     GetAttrValueOpt(ctx, "max_seqlen_q", maxSeqlenQ_);
     GetAttrValueOpt(ctx, "max_seqlen_ori_kv", maxSeqlenOriKv_);
     GetAttrValueOpt(ctx, "max_seqlen_cmp_kv", maxSeqlenCmpKv_);
+    GetAttrValueOpt(ctx, "quant_mode", quantMode_);
     GetAttrValueOpt(ctx, "ori_topk", oriTopK_);
     GetAttrValueOpt(ctx, "cmp_topk", cmpTopK_);
     GetAttrValueOpt(ctx, "cmp_ratio", cmpRatio_);
@@ -436,7 +437,7 @@ bool MixedQuantSparseFlashMlaMetadataCpuKernel::ParamsInit()
         s2BaseSize_ = 128U;
     } else {
         mBaseSize_ = groupSize_;
-        s2BaseSize_ = 128U;
+        s2BaseSize_ = quantMode_ == 3 ? 512U : 128U;
     }
     return true;
 }

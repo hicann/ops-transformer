@@ -15,6 +15,7 @@
 #include <vector>
 #include "tiling/tiling_api.h"
 #include "exe_graph/runtime/tiling_context.h"
+#include "platform/platform_info.h"
 
 namespace optiling {
 namespace sparse_mla_checker {
@@ -40,6 +41,7 @@ struct TensorParam {
 struct CheckContext {
     const char *opName = nullptr;
     OperatorVariant variant = OperatorVariant::SPARSE;
+    NpuArch npuArch = NpuArch::DAV_2201;
 
     TensorParam q;
     TensorParam oriKv;

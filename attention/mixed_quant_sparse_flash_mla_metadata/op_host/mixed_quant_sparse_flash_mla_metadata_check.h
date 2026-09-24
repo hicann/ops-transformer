@@ -41,7 +41,7 @@ enum class SparseModeMqsmla : uint8_t {
 };
 
 inline constexpr int64_t MQSMLA_QUANT_MODE_LOWER_BOUND = 1;
-inline constexpr int64_t MQSMLA_QUANT_MODE_UPPER_BOUND = 2;
+inline constexpr int64_t MQSMLA_QUANT_MODE_UPPER_BOUND = 3;
 inline constexpr int64_t MQSMLA_CMP_RATIO_LOWER_BOUND = 1;
 inline constexpr int64_t MQSMLA_CMP_RATIO_UPPER_BOUND = 128;
 inline constexpr int64_t MQSMLA_NUM_HEADS_Q_LOWER_BOUND = 1;

@@ -13,10 +13,18 @@
 
 namespace optiling {
 namespace sparse_mla_checker {
+constexpr int64_t TURBO_QUANT_MODE = 3;
 namespace {
 const char *Op(const CheckContext &context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
+}
+
+bool IsTurboQuantEmptyTndIndex(const CheckContext &context, const TensorParam &param, const char *name)
+{
+    return context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE &&
+           context.qLayout == Layout::TND && std::string(name) == "cmp_sparse_indices" && param.shape != nullptr &&
+           param.shape->GetDimNum() > 0 && param.shape->GetDim(0) == 0;
 }
 } // namespace
 
@@ -29,7 +37,8 @@ ge::graphStatus SparseCompressionChecker::CheckIndex(const CheckContext &context
     const size_t dimNum = context.qLayout == Layout::BSND ? 4U : 3U;
     if (CheckTensorDesc(context, param, name, {ge::DT_INT32}) != ge::GRAPH_SUCCESS ||
         CheckDimNum(context, param, name, {dimNum}) != ge::GRAPH_SUCCESS ||
-        CheckNoEmptyDim(context, param, name) != ge::GRAPH_SUCCESS) {
+        (!IsTurboQuantEmptyTndIndex(context, param, name) &&
+         CheckNoEmptyDim(context, param, name) != ge::GRAPH_SUCCESS)) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -72,6 +81,19 @@ ge::graphStatus SparseCompressionChecker::CheckSinglePara(const CheckContext &co
 
 ge::graphStatus SparseCompressionChecker::CheckParaExistence(const CheckContext &context) const
 {
+    if (context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE) {
+        OP_CHECK_IF(!context.cmpKv.present || !context.cmpSparseIndices.present,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "cmp_kv/cmp_sparse_indices",
+                                                             "TurboQuant requires both inputs"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(context.oriSparseIndices.present || context.cmpResidualKv.present ||
+                        context.oriTopkLength.present || context.cmpTopkLength.present,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        Op(context), "unsupported TurboQuant inputs",
+                        "ori_sparse_indices, cmp_residual_kv and topk length inputs must be absent"),
+                    return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
     if (!context.cmpKv.present) {
         OP_CHECK_IF(context.cmpSparseIndices.present,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "cmp_sparse_indices",

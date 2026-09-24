@@ -55,8 +55,8 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaGetWorkspaceSize(
 {
     OP_LOGD("start aclnnMixedQuantSparseFlashMlaGetWorkspaceSize");
 
-    MixedQuantSparseFlashMlaKvTensorPreProcess(oriKvOptional, "ori_kv");
-    MixedQuantSparseFlashMlaKvTensorPreProcess(cmpKvOptional, "cmp_kv");
+    MixedQuantSparseFlashMlaKvTensorPreProcess(oriKvOptional, "ori_kv", quantMode);
+    MixedQuantSparseFlashMlaKvTensorPreProcess(cmpKvOptional, "cmp_kv", quantMode);
     MixedQuantSparseFlashMlaProcessSinks(sinksOptional);
 
     aclnnStatus ret = CheckTensorContiguous(oriKvOptional, cmpKvOptional);

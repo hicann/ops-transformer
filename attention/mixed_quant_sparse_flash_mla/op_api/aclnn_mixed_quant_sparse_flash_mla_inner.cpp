@@ -20,9 +20,11 @@ extern "C" {
 
 namespace {
 
-void MixedQuantSparseFlashMlaKvTensorPreProcess(const aclTensor *&kvTensor, const char *tensorName)
+constexpr int64_t TURBO_QUANT_MODE = 3;
+
+void MixedQuantSparseFlashMlaKvTensorPreProcess(const aclTensor *&kvTensor, const char *tensorName, int64_t quantMode)
 {
-    if (kvTensor != nullptr && kvTensor->GetDataType() == DataType::DT_UINT8) {
+    if (quantMode != TURBO_QUANT_MODE && kvTensor != nullptr && kvTensor->GetDataType() == DataType::DT_UINT8) {
         auto tensor = const_cast<aclTensor *>(kvTensor);
         tensor->SetDataType(DataType::DT_FLOAT8_E4M3FN);
         OP_LOGD("%s dtype is converted from uint8 to float8_e4m3fn.", tensorName);

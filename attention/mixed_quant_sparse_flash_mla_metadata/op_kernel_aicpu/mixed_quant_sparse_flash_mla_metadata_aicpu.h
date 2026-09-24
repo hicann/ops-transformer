@@ -340,6 +340,7 @@ private:
     int32_t maxSeqlenCmpKv_ = 0;
     int32_t numHeadsKv_ = 1;
     int32_t headDim_ = 0;
+    int32_t quantMode_ = 1;
     int32_t oriTopK_ = 0;
     int32_t cmpTopK_ = 0;
     int32_t cmpRatio_ = 1;

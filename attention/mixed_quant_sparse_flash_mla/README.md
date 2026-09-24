@@ -5,8 +5,8 @@
 | 产品                                                         |  是否支持 |
 | :----------------------------------------------------------  | :------: |
 |<term>Ascend 950PR&950DT系列产品</term>                        |     √    |
-|<term>Atlas A3系列产品</term>        |     ×    |
-|<term>Atlas A2系列产品</term>        |     ×    |
+|<term>Atlas A3系列产品</term>        |     √    |
+|<term>Atlas A2系列产品</term>        |     √    |
 |<term>Atlas 200I/500 A2推理产品</term>                        |     ×    |
 |<term>Atlas推理系列产品</term>                                |     ×    |
 |<term>Atlas训练系列产品</term>                                |     ×    |
@@ -61,21 +61,21 @@
       <td>q</td>
       <td>输入</td>
       <td>表示对应公式中的Q。</td>
-      <td>BFLOAT16</td>
+      <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>ori_kv</td>
       <td>可选输入</td>
       <td>表示对应公式中K和V的一部分，为原始不经压缩的量化KV，Key和Value共享同一份数据。由nope、rope、scale、padding拼接而成，详见quant_mode。</td>
-      <td>详见quant_mode</td>
+      <td>FLOAT8_E4M3FN、FLOAT16、BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>cmp_kv</td>
       <td>可选输入</td>
       <td>表示对应公式中K和V的一部分，为经过压缩的量化KV，Key和Value共享同一份数据。由nope、rope、scale、padding拼接而成，详见quant_mode。</td>
-      <td>详见quant_mode</td>
+      <td>FLOAT8_E4M3FN、UINT8</td>
       <td>ND</td>
     </tr>
     <tr>
@@ -186,7 +186,7 @@
     <tr>
       <td>quant_mode</td>
       <td>属性</td>
-      <td>表示量化模式。量化模式1表示K、V nope为per-token-group量化，K、V依次由rope（64，bfloat16）、nope（448，FLOAT8_E4M3FN）、scale（7，bfloat16）、pad（18B）拼接而成；量化模式2表示K、V nope为per-token-group量化，K、V依次由nope（448，FLOAT8_E4M3FN）、rope（64，bfloat16）、scale（7，FLOAT8_E8M0）、pad（1B）拼接而成。当前仅支持1和2，量化模式2仅支持layout_kv为PA_BBND。各量化模式均支持使用UINT8、FLOAT8_E4M3FN作为单字节存储视图，底层字节内容保持不变。</td>
+      <td>表示量化模式。量化模式1表示K、V nope为per-token-group量化，K、V依次由rope（64，bfloat16）、nope（448，FLOAT8_E4M3FN）、scale（7，bfloat16）、pad（18B）拼接而成；量化模式2表示K、V nope为per-token-group量化，K、V依次由nope（448，FLOAT8_E4M3FN）、rope（64，bfloat16）、scale（7，FLOAT8_E8M0）、pad（1B）拼接而成；量化模式3表示融合TQ4反量化的TurboQuant模式。量化模式1和2均支持使用UINT8、FLOAT8_E4M3FN作为单字节存储视图，底层字节内容保持不变。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
@@ -271,7 +271,7 @@
       <td>attn_out</td>
       <td>输出</td>
       <td>表示对应公式中的输出O。</td>
-      <td>BFLOAT16</td>
+      <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
     </tr>
     <tr>
@@ -285,6 +285,18 @@
 </table>
 
 ## 约束说明
+
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR&950DT系列产品</term>：仅支持`quant_mode=1/2`，q和attn_out仅支持BFLOAT16，ori_kv和cmp_kv仅支持FLOAT8_E4M3FN；quant_mode为1和2时kv_d分别为608和584，quant_mode为2时layout_kv仅支持PA_BBND。
+<!-- end id1 -->
+
+<!-- npu="A3" id2 -->
+- <term>Atlas A3系列产品</term>：仅支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258。
+<!-- end id2 -->
+
+<!-- npu="910b" id3 -->
+- <term>Atlas A2系列产品</term>：仅支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258。
+<!-- end id3 -->
 
 - 该接口支持推理场景下使用。
 - 该接口支持aclgraph模式。

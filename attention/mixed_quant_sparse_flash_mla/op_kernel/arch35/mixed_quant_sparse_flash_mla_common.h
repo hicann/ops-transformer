@@ -24,7 +24,7 @@
 #endif
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
-#include "mixed_quant_sparse_flash_mla_metadata.h"
+#include "../mixed_quant_sparse_flash_mla_metadata.h"
 
 using namespace AscendC;
 

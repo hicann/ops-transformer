@@ -131,7 +131,15 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
             key_dtype=None,
             value_dtype=None,
         ):
-            if q.numel() == 0:
+            turbo_quant_empty_query = (
+                quant_mode == 3
+                and layout_q == "TND"
+                and q.dim() == 3
+                and q.shape[0] == 0
+                and q.shape[1] > 0
+                and q.shape[2] > 0
+            )
+            if q.numel() == 0 and not turbo_quant_empty_query:
                 raise ValueError("The shape size of q should not be 0")
             if ori_kv is not None and ori_kv.numel() == 0:
                 raise ValueError("The shape size of ori_kv should not be 0")

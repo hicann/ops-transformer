@@ -13,6 +13,7 @@
 
 namespace optiling {
 namespace sparse_mla_checker {
+constexpr int64_t TURBO_QUANT_MODE = 3;
 namespace {
 const char *Op(const CheckContext &context)
 {
@@ -50,35 +51,45 @@ ge::graphStatus SeqLenChecker::CheckSinglePara(const CheckContext &context) cons
 
 ge::graphStatus SeqLenChecker::CheckParaExistence(const CheckContext &context) const
 {
+    if (context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE) {
+        OP_CHECK_IF(!context.cuSeqlensQ.present || !context.sequsedOriKv.present,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "cu_seqlens_q/seqused_ori_kv",
+                                                             "TurboQuant requires both inputs"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(context.cuSeqlensOriKv.present || context.cuSeqlensCmpKv.present || context.sequsedQ.present ||
+                        context.sequsedCmpKv.present || context.cmpResidualKv.present,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        Op(context), "sequence inputs", "Unsupported sequence inputs were supplied for TurboQuant"),
+                    return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
     if (context.qLayout == Layout::TND) {
         OP_CHECK_IF(!context.cuSeqlensQ.present,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                        Op(context), "cu_seqlens_q", "Cu_seqlens_q is required when layout_q is TND"),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "cu_seqlens_q",
+                                                             "Cu_seqlens_q is required when layout_q is TND"),
                     return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(context.cuSeqlensQ.present,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                        Op(context), "cu_seqlens_q", "Cu_seqlens_q is only supported when layout_q is TND"),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "cu_seqlens_q",
+                                                             "Cu_seqlens_q is only supported when layout_q is TND"),
                     return ge::GRAPH_FAILED);
     }
 
     if (context.kvLayout == Layout::TND) {
         OP_CHECK_IF(!context.cuSeqlensOriKv.present,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                        Op(context), "cu_seqlens_ori_kv",
-                        "Cu_seqlens_ori_kv is required when layout_kv is TND"),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "cu_seqlens_ori_kv",
+                                                             "Cu_seqlens_ori_kv is required when layout_kv is TND"),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(context.cmpKv.present && !context.cuSeqlensCmpKv.present,
                     OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                        Op(context), "cu_seqlens_cmp_kv",
-                        "Cu_seqlens_cmp_kv is required when TND cmp_kv is present"),
+                        Op(context), "cu_seqlens_cmp_kv", "Cu_seqlens_cmp_kv is required when TND cmp_kv is present"),
                     return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(context.cuSeqlensOriKv.present || context.cuSeqlensCmpKv.present,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                        Op(context), "cu_seqlens_ori_kv and cu_seqlens_cmp_kv",
-                        "KV cu_seqlens inputs are only supported when layout_kv is TND"),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            context.cuSeqlensOriKv.present || context.cuSeqlensCmpKv.present,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "cu_seqlens_ori_kv and cu_seqlens_cmp_kv",
+                                                     "KV cu_seqlens inputs are only supported when layout_kv is TND"),
+            return ge::GRAPH_FAILED);
     }
 
     if (context.kvLayout == Layout::PA_BBND) {
@@ -105,9 +116,8 @@ ge::graphStatus SeqLenChecker::CheckLength(const CheckContext &context, const Te
         return ge::GRAPH_SUCCESS;
     }
     OP_CHECK_IF(GetDim(param, 0) != expected,
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                    Op(context), name, std::to_string(GetDim(param, 0)).c_str(),
-                    ("The length must be " + std::to_string(expected)).c_str()),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(Op(context), name, std::to_string(GetDim(param, 0)).c_str(),
+                                                      ("The length must be " + std::to_string(expected)).c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

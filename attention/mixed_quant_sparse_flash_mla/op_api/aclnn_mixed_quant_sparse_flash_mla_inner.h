@@ -34,7 +34,7 @@ extern aclnnStatus aclnnInnerMixedQuantSparseFlashMlaGetWorkspaceSize(
 extern aclnnStatus aclnnInnerMixedQuantSparseFlashMla(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                                       const aclrtStream stream);
 
-void MixedQuantSparseFlashMlaKvTensorPreProcess(const aclTensor *&kvTensor, const char *tensorName);
+void MixedQuantSparseFlashMlaKvTensorPreProcess(const aclTensor *&kvTensor, const char *tensorName, int64_t quantMode);
 
 void MixedQuantSparseFlashMlaProcessSinks(const aclTensor *&sinksOptional);
 
