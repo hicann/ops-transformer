@@ -32,10 +32,16 @@
    y_{t,:}=\operatorname{Softmax}(I_{t,:})
    $$
 
-   本算子将$y$写出到softmaxOut。目标分布$p$由attnSoftmaxL1Norm输入提供，等价于旧版kernel内部由main attention score经head求和和L1归一化得到的结果。若后续继续计算KL Loss，其形式与旧版保持一致：
+   本算子将$y$写出到softmaxOut。目标分布$p$由attnSoftmaxL1Norm输入提供，由main attention score沿head平均得到，不沿上下文做L1归一化。记$Z_{t}$为$p$沿上下文的求和，$t$为L1归一化后的target分布：
 
    $$
-   L(I){=}\sum_tD_{KL}(p_{t,:}||\operatorname{Softmax}(I_{t,:}))
+   Z_{t}=\sum_{j}p_{t,j},\quad t_{t,:}=\frac{p_{t,:}}{Z_{t}}
+   $$
+
+   若后续继续计算KL Loss，对应的loss function为：
+
+   $$
+   L_{t}=Z_{t}\,D_{KL}(t_{t,:}||y_{t,:})=\sum_{j}p_{t,j}(\log t_{t,j}-\log y_{t,j})
    $$
 
    $$
@@ -45,7 +51,7 @@
    通过求导可得Loss的梯度表达式：
 
    $$
-   dI_{t,:}=\operatorname{Softmax}(I_{t,:})-p_{t,:}
+   dI_{t,:}=y_{t,:}\cdot Z_{t}-p_{t,:}
    $$
 
    利用链式法则可以进行w、q和k矩阵的梯度计算：
