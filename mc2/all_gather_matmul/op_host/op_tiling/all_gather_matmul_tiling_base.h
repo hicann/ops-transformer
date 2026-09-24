@@ -51,6 +51,11 @@ public:
 
 protected:
     const char *group_{nullptr};
+
+private:
+    ge::graphStatus InitAllGatherCommParams(gert::TilingContext *context,
+                                            Mc2Tiling::AllGatherMatmulTilingData *tilingData,
+                                            mc2tiling::TilingArgs &args);
 };
 } // namespace optiling
 

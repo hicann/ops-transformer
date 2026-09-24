@@ -24,11 +24,6 @@ public:
                                  SocVersion inputSocVersion = SocVersion::SOC910_B)
         : AllGatherPlusMM(args, inputRankDim, inputKernelType, inputSocVersion)
     {
-        commPerf_.SetCommShapeLen(clusterInfo_.kValue);
-        commPerf_.SetCommDTypeSize(clusterInfo_.inMatrixADtypeSize);
-        rankTileNum_ = commPerf_.GetRankTileNum();
-        tilingM_.SetMinLenByMax(commPerf_.GetLinearThresholdLen());
-
         if (clusterInfo_.socType == SocVersion::SOC910_B) {
             tilingM_.SetMinLenByMax(matmulPerf_.GetLinearThresholdLen(rankDim_));
         } else {
