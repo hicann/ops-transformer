@@ -108,7 +108,6 @@ CCU 通路没有 `comm_context_*` 文件。
 - `exception_info.*`：统一入口不再读取或解析。
 - `peermem_window_*`、`peermem_segN_typeM_*`：统一入口不读取或解析。
 - 算子 `.o`、`*_host.o`、`.json`：不属于本脚本的 MC2 Tiling/Workspace 解析输入，会被忽略。
-- 已生成的 `mc2_dump_analysis` 目录：递归扫描时会跳过，避免重复解析输出文件。
 
 ## 5. 批量解析的 TXT 输出目录和内容
 
@@ -164,7 +163,7 @@ CCU 通路没有 `comm_context_*` 文件。
 python3 parse_mc2_dump.py <dump_file>
 ```
 
-`<dump_file>` 是实际 Dump 文件路径，文件通常没有 `.bin` 后缀。命令只接收这一个文件，不需要再填写算子名、输出文件、参考文件，也不需要选择后端脚本或指定 `--args`、`--workspace`、`--comm-ctx` 等解析模式。
+`<dump_file>` 是实际 Dump 文件路径，文件通常没有 `.bin` 后缀。
 
 解析内容会继续完整显示在终端，同时生成一份对应的 TXT：
 
@@ -190,7 +189,7 @@ TXT 的解析字段和终端结果保持一致，并在文件开头增加算子�
 脚本根据文件名自动完成两层识别：
 
 | 识别内容 | 判断方式 |
-| --- | --- | --- |
+| --- | --- |
 | 算子 | 从文件名中的 `AllGatherMatmulV2`、`AllGatherMatmulV3`、`AlltoAllMatmul`、`AlltoAllMatmulV2` 或 `MatmulReduceScatterV2` 自动识别；MMRS 文件名中的 `MatmulReduceScatter` 也能识别。 |
 | 文件类型 | 根据 `tiling_data_`、`args_info_`、`workspace_segN_typeM_`、`xn_addr_info_`、`cke_addr_info_` 或 `comm_context_` 前缀自动选择解析方式。 |
 
@@ -265,7 +264,7 @@ python3 parse_matrix.py <bin_file> --dtype <type> --rows <M> --cols <N> [显示�
 | `--col-range START END` | 显示连续列范围 `[START, END)`。 |
 | `--row R [R ...]` | 显示一个或多个离散行号。 |
 | `--col C [C ...]` | 显示一个或多个离散列号。 |
-| `--transpose` | 文件按列优先布局时使用，逻辑坐标按 `c × rows + r` 取数。 |
+| `--transpose` | 文件按列优先布局时使用，逻辑坐标按 `col × rows + row` 取数。 |
 
 `--row` 与 `--row-range` 不要同时使用，`--col` 与 `--col-range` 也不要同时使用。
 
