@@ -23,16 +23,21 @@ using namespace std;
 
 class l2_moe_token_unpermute_grad_test : public testing::Test {
 protected:
-    static void SetUpTestCase()
+    void SetUp() override
     {
         cout << "l2_moe_token_unpermute_grad_test SetUp" << endl;
+        originalSocVersion_ = op::GetCurrentPlatformInfo().GetSocVersion();
         op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
     }
 
-    static void TearDownTestCase()
+    void TearDown() override
     {
         cout << "l2_moe_token_unpermute_grad_test TearDown" << endl;
+        op::SetPlatformSocVersion(originalSocVersion_);
     }
+
+private:
+    op::SocVersion originalSocVersion_ = op::SocVersion::ASCEND910B;
 };
 
 TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_fp16)

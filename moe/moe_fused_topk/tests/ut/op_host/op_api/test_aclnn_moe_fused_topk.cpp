@@ -23,28 +23,38 @@ using namespace std;
 
 class l2_moe_fused_topk_test : public testing::Test {
 protected:
-    static void SetUpTestCase()
+    void SetUp() override
     {
         std::cout << "moe_fused_topk_test Setup" << std::endl;
+        originalSocVersion_ = op::GetCurrentPlatformInfo().GetSocVersion();
         op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
     }
-    static void TearDownTestCase()
+    void TearDown() override
     {
         std::cout << "moe_fused_topk_test TearDown" << std::endl;
+        op::SetPlatformSocVersion(originalSocVersion_);
     }
+
+private:
+    op::SocVersion originalSocVersion_ = op::SocVersion::ASCEND910B;
 };
 
 class l2_moe_fused_topk_ascend950_test : public testing::Test {
 protected:
-    static void SetUpTestCase()
+    void SetUp() override
     {
         std::cout << "moe_fused_topk_ascend950_test Setup" << std::endl;
+        originalSocVersion_ = op::GetCurrentPlatformInfo().GetSocVersion();
         op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
     }
-    static void TearDownTestCase()
+    void TearDown() override
     {
         std::cout << "moe_fused_topk_ascend950_test TearDown" << std::endl;
+        op::SetPlatformSocVersion(originalSocVersion_);
     }
+
+private:
+    op::SocVersion originalSocVersion_ = op::SocVersion::ASCEND910B;
 };
 
 TEST_F(l2_moe_fused_topk_ascend950_test, Ascend950_moe_fused_topk_fp16_with_mapping)
