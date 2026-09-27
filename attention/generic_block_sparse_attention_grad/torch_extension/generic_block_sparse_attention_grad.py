@@ -20,6 +20,7 @@ GSAG_TASK_LIST_OFFSET = 80  # 8 + 2 * 36
 GSAG_TASK_ENTRY_SIZE = 4
 GSAG_METADATA_OP_NAME = "generic_block_sparse_attention_grad_metadata"
 ARC22_GBSAG_TASK_LIST_SIZE = 198  # 6 + 64 * 3
+_OP_PREFIX = "GenericBlockSparseAttentionGrad"
 
 
 class MaskMode(IntEnum):
@@ -39,16 +40,17 @@ def _resolve_mask_mode(mask_mode: Union[str, int, MaskMode, None]) -> int:
         try:
             return int(MaskMode[mask_mode.strip().upper()])
         except KeyError as exc:
-            valid = ", ".join(m.name.lower() for m in MaskMode)
+            valid = ", ".join(f"{m.name}={m.value}" for m in MaskMode)
             raise ValueError(
-                f"mask_mode should be one of [{valid}], but got {mask_mode!r}"
+                f"{_OP_PREFIX}: only support mask_mode in [{valid}], got {mask_mode!r}"
             ) from exc
     try:
         return int(MaskMode(mask_mode))
     except ValueError as exc:
         valid = ", ".join(f"{m.name}={m.value}" for m in MaskMode)
         raise ValueError(
-            f"mask_mode should be one of [{valid}], but got {mask_mode!r}"
+            f"{_OP_PREFIX}: only support mask_mode == {int(MaskMode.CAUSAL)} (CAUSAL), "
+            f"got {mask_mode!r}. Supported: [{valid}]"
         ) from exc
 
 
@@ -65,7 +67,9 @@ def calc_gsag_metadata_size(batch_size: int, num_heads_q: int, num_j: int) -> in
 
 def _max_segment_from_cu_seqlens(cu_seqlens: torch.Tensor) -> int:
     if cu_seqlens.numel() < 2:
-        raise ValueError("cu_seqlens must have at least 2 elements to infer max_seqlen")
+        raise ValueError(
+            f"{_OP_PREFIX}: cu_seqlens must have at least 2 elements to infer max_seqlen"
+        )
     diffs = cu_seqlens[1:] - cu_seqlens[:-1]
     return int(diffs.max().item())
 
@@ -81,7 +85,9 @@ def _resolve_max_seqlen_q(
     if max_seqlen_q is not None:
         value = int(max_seqlen_q)
         if value < 0:
-            raise ValueError(f"max_seqlen_q must be >= 0, but got {value}")
+            raise ValueError(
+                f"{_OP_PREFIX}: max_seqlen_q must be >= 0, but got {value}"
+            )
         return value
     if seqused_q is not None:
         return int(seqused_q.max().item())
@@ -90,7 +96,7 @@ def _resolve_max_seqlen_q(
     if sparse_block_idx.dim() == 4:
         return int(sparse_block_idx.shape[3])
     raise ValueError(
-        "cannot infer max_seqlen_q; pass max_seqlen_q explicitly or provide "
+        f"{_OP_PREFIX}: cannot infer max_seqlen_q; pass max_seqlen_q explicitly or provide "
         "seqused_q / cu_seqlens_q / 4D sparse_block_idx"
     )
 
@@ -107,7 +113,9 @@ def _resolve_max_seqlen_kv(
     if max_seqlen_kv is not None:
         value = int(max_seqlen_kv)
         if value < 0:
-            raise ValueError(f"max_seqlen_kv must be >= 0, but got {value}")
+            raise ValueError(
+                f"{_OP_PREFIX}: max_seqlen_kv must be >= 0, but got {value}"
+            )
         return value
     if seqused_kv is not None:
         return int(seqused_kv.max().item())
@@ -120,7 +128,7 @@ def _resolve_max_seqlen_kv(
             # Satisfies host check: J == ceil(max_seqlen_kv / block_y)
             return num_j * block_y
     raise ValueError(
-        "cannot infer max_seqlen_kv; pass max_seqlen_kv explicitly or provide "
+        f"{_OP_PREFIX}: cannot infer max_seqlen_kv; pass max_seqlen_kv explicitly or provide "
         "seqused_kv / cu_seqlens_kv / 4D sparse_block_idx with block_shape"
     )
 
@@ -193,7 +201,7 @@ class GenericBlockSparseAttentionGradOpBuilder(OpBuilder):
             )
             if len(block_shape) < 2:
                 raise ValueError(
-                    "block_shape is required and must be [block_x, block_y]"
+                    f"{_OP_PREFIX}: block_shape is required and must be [block_x, block_y]"
                 )
             block_y = int(block_shape[1])
             batch = int(sparse_block_idx.shape[0])
@@ -307,7 +315,9 @@ def generic_block_sparse_attention_grad_metadata(
     win_right: int = -1,
 ) -> torch.Tensor:
     if len(block_shape) < 2:
-        raise ValueError("block_shape is required and must be [block_x, block_y]")
+        raise ValueError(
+            f"{_OP_PREFIX}: block_shape is required and must be [block_x, block_y]"
+        )
     max_seqlen_q_i = _resolve_max_seqlen_q(
         max_seqlen_q,
         sparse_block_idx=sparse_block_idx,
@@ -374,7 +384,9 @@ def generic_block_sparse_attention_grad(
     win_right: int = -1,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     if len(block_shape) < 2:
-        raise ValueError("block_shape is required and must be [block_x, block_y]")
+        raise ValueError(
+            f"{_OP_PREFIX}: block_shape is required and must be [block_x, block_y]"
+        )
     mask_mode_i = _resolve_mask_mode(mask_mode)
     op_module = generic_block_sparse_attention_grad_op_builder.load()
     return op_module.generic_block_sparse_attention_grad(

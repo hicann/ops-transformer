@@ -82,7 +82,8 @@ struct RunTimeInfo {
     int32_t cur_q_seq_len{0};
     int32_t cur_kv_seq_len{0};
     int32_t need_compute{0};
-    int32_t need_copy_kv{0};
+    int32_t need_copy_kv{0};  // GM->L1 when physical KV tile changes
+    int32_t need_init_l0c{0}; // reset dk/dv L0C at each S1 restart (AtomicAdd across g)
     int32_t kv_ping_pong_idx{0};
     int32_t is_singlekv_last{0};
     int32_t mask_type{0};
