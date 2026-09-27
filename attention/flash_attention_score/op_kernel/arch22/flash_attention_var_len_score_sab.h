@@ -174,30 +174,43 @@ __aicore__ inline void FlashAttentionVarLenScoreSameAB<
     sinkAddr = sink;
     int64_t actualS1Len;
     int64_t actualS2Len;
-    for (int64_t i = 0; i < this->tilingData->inputParams.bSize; ++i) {
-        GetSeqQlenKvlenByBoidx(i, actualS1Len, actualS2Len);
-        if (actualS2Len <= 0 && actualS1Len != 0) {
-            int64_t accumSize = (i == 0) ? 0 : ((__gm__ int64_t *)actualSeqQlenAddr)[i - 1];
-            if (actualS1Len < 0 && accumSize > 0) {
-                actualS1Len = this->s1Size - accumSize;
-                int64_t frontCoreNum = actualS1Len % this->tilingData->multiCoreParams.coreNum;
-                int64_t splitFactor = frontCoreNum > 0 ? 1 : 0;
-                int64_t s1SizeInner = (actualS1Len / this->tilingData->multiCoreParams.coreNum);
-                int64_t innerOffset1 = (s1SizeInner + splitFactor) *
-                                       (this->vecBlockIdx >= frontCoreNum ? frontCoreNum : this->vecBlockIdx);
-                int64_t innerOffset2 =
-                    s1SizeInner * (this->vecBlockIdx >= frontCoreNum ? this->vecBlockIdx - frontCoreNum : 0);
-                accumSize = accumSize + innerOffset1 + innerOffset2;
-                actualS1Len = s1SizeInner + (this->vecBlockIdx >= frontCoreNum ? 0 : splitFactor);
+    if (this->vecBlockIdx < this->tilingData->multiCoreParams.coreNum) {
+        for (int64_t i = 0; i < this->tilingData->inputParams.bSize; ++i) {
+            GetSeqQlenKvlenByBoidx(i, actualS1Len, actualS2Len);
+            if (actualS2Len <= 0 && actualS1Len != 0) {
+                int64_t accumSize = (i == 0) ? 0 : ((__gm__ int64_t *)actualSeqQlenAddr)[i - 1];
+                if (actualS1Len < 0 && accumSize > 0) {
+                    actualS1Len = this->s1Size - accumSize;
+                }
+                // 第 blockIdx 个核只置零 [accumSize, accumSize + actualS1Len)
+                // 中属于自己的那一段，段间不重叠，防止越界。
+                if (actualS1Len > 0) {
+                    int64_t frontCoreNum = actualS1Len % this->tilingData->multiCoreParams.coreNum;
+                    int64_t splitFactor = frontCoreNum > 0 ? 1 : 0;
+                    int64_t s1SizeInner = (actualS1Len / this->tilingData->multiCoreParams.coreNum);
+                    int64_t innerOffset1 = (s1SizeInner + splitFactor) *
+                                           (this->vecBlockIdx >= frontCoreNum ? frontCoreNum : this->vecBlockIdx);
+                    int64_t innerOffset2 =
+                        s1SizeInner * (this->vecBlockIdx >= frontCoreNum ? this->vecBlockIdx - frontCoreNum : 0);
+                    accumSize = accumSize + innerOffset1 + innerOffset2;
+                    actualS1Len = s1SizeInner + (this->vecBlockIdx >= frontCoreNum ? 0 : splitFactor);
+                    if (actualS1Len > 0) {
+                        AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2],
+                                                     actualS1Len * this->n2GD2, static_cast<INPUT_T>(0.0));
+                        AscendC::InitOutput<float>(this->softmaxMaxGm[accumSize * this->n2G * 8],
+                                                   actualS1Len * this->n2G * 8, static_cast<float>(0.0));
+                        AscendC::InitOutput<float>(this->softmaxSumGm[accumSize * this->n2G * 8],
+                                                   actualS1Len * this->n2G * 8, static_cast<float>(0.0));
+                    }
+                }
             }
-            AscendC::InitOutput<INPUT_T>(this->attentionOutGm[accumSize * this->n2GD2], actualS1Len * this->n2GD2,
-                                         static_cast<INPUT_T>(0.0));
-            AscendC::InitOutput<float>(this->softmaxMaxGm[accumSize * this->n2G * 8], actualS1Len * this->n2G * 8,
-                                       static_cast<float>(0.0));
-            AscendC::InitOutput<float>(this->softmaxSumGm[accumSize * this->n2G * 8], actualS1Len * this->n2G * 8,
-                                       static_cast<float>(0.0));
         }
     }
+    // InitOutput 内部经 MTE3 从 UB 搬出，该缓冲在 InitBuffer() 之后会被 maskTBufPing 复用；
+    // 补一条 MTE3_MTE2 同步，避免掩码搬入的 MTE2 写冲突。
+    event_t eventIdMte3ToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
+    AscendC::SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
+    AscendC::WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
     this->InitBuffer();
     if (this->needL1Carry) {
         this->pipe->InitBuffer(this->queryBufL1, L1_Q_SIZE);

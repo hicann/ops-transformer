@@ -862,7 +862,8 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
             event_t eventIdVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
             AscendC::SetFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
             AscendC::WaitFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
-            NzToNd(nz2NdInfo, this->mm2Res[extraInfo.taskIdMod2], bmm2ResPongUb, bmm2ResPingUb);
+            LocalTensor<T> nzTempUb = this->stage1PongBuf.template Get<T>();
+            NzToNd(nz2NdInfo, this->mm2Res[extraInfo.taskIdMod2], nzTempUb, bmm2ResPingUb);
             divCastCalcSize = divCastCalcSize1;
         }
 
@@ -1561,6 +1562,7 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<FA_S1BN2GS1_FUNCTION_PARAMS_T
         nz2NdInfo.ndFirstAxisBaseSize = extraInfo.vecS1BaseSize;
         nz2NdInfo.ndFirstAxisLoopSize = extraInfo.vecS1TailSize;
         nz2NdInfo.ndLastAxis = extraInfo.s2RealSizeAlign64;
+        nz2NdInfo.ndLastAxisInSlot = extraInfo.s2RealSizeAlign16;
         nz2NdInfo.loopIdx = loopIdx;
         LocalTensor<T> tempUb = this->stage1PongBuf.template Get<T>();
         NzToNd(nz2NdInfo, this->mm1Res[extraInfo.taskIdMod2], tempUb, bmm1ResUb);

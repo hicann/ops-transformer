@@ -137,6 +137,7 @@ struct Nz2NdInfo {
     int64_t ndFirstAxisBaseSize = 0;
     int64_t ndFirstAxisLoopSize = 0;
     int64_t ndLastAxis = 0;
+    int64_t ndLastAxisInSlot = 0;
     int64_t loopIdx = 0;
     int64_t vecCoreOffset = 0;
 };
@@ -236,7 +237,8 @@ __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmRe
     // 1.将bmm1结果由GM搬至UB，每块数据在UB上间隔1个block，防止BANK冲突
     DataCopyParams dataCopyParams;
     int64_t nzFirstAxis = CeilDiv(nz2NdInfo.ndLastAxis, 16L);
-    dataCopyParams.blockCount = nzFirstAxis;
+    int64_t nzCopyLastAxis = nz2NdInfo.ndLastAxisInSlot > 0 ? nz2NdInfo.ndLastAxisInSlot : nz2NdInfo.ndLastAxis;
+    dataCopyParams.blockCount = CeilDiv(nzCopyLastAxis, 16L);
     dataCopyParams.blockLen = nz2NdInfo.ndFirstAxisLoopSize * 2;
     dataCopyParams.srcStride = (nz2NdInfo.ndFirstAxisRealSize - nz2NdInfo.ndFirstAxisLoopSize) * 2;
     dataCopyParams.dstStride = 1;
