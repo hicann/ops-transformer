@@ -54,6 +54,7 @@ public:
                                 const SparseFlashAttentionTilingDataMla *__restrict tiling, __gm__ uint8_t *gmTiling,
                                 TPipe *tPipe);
     __aicore__ inline void Process();
+    __aicore__ inline void FreeEvent();
 
 private:
     __aicore__ inline void ProcessMainLoop();
@@ -483,6 +484,18 @@ __aicore__ inline void SparseFlashAttentionKernelMla<CubeBlockType, VecBlockType
     }
 
     ProcessMainLoop();
+    FreeEvent();
+}
+
+template <typename CubeBlockType, typename VecBlockType>
+__aicore__ inline void SparseFlashAttentionKernelMla<CubeBlockType, VecBlockType>::FreeEvent()
+{
+    if ASCEND_IS_AIC {
+        cubeBlock.UninitLocalBuffer();
+    }
+    if ASCEND_IS_AIV {
+        vecBlock.UninitLocalBuffer();
+    }
 }
 
 template <typename CubeBlockType, typename VecBlockType>

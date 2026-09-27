@@ -73,6 +73,7 @@ public:
 
     // 初始化LocalTensor
     __aicore__ inline void InitLocalBuffer(TPipe *pipe, ConstInfo &constInfo);
+    __aicore__ inline void UninitLocalBuffer();
     // 初始化attentionOutGM
     __aicore__ inline void CleanOutput(__gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxMax,
                                        __gm__ uint8_t *softmaxSum, ConstInfo &constInfo);
@@ -810,6 +811,26 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>:
     initOutputEventId = GetTPipePtr()->AllocEventID<HardEvent::MTE3_V>();
 }
 
+TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>::UninitLocalBuffer()
+{
+    if ASCEND_IS_AIV {
+        WaitFlag<HardEvent::MTE3_V>(mte3ToVAttnOutId);
+        WaitFlag<HardEvent::MTE3_V>(mte3ToVLseOutId);
+        WaitFlag<HardEvent::MTE3_MTE2>(mte3ToMte2[0]);
+        WaitFlag<HardEvent::MTE3_MTE2>(mte3ToMte2[1]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVAttnOutId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(mte3ToVLseOutId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(mte3ToMte2[0]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_MTE2>(mte3ToMte2[1]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3AttnOutId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE3>(vToMte3LseOutId);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_MTE3>(mte2ToMte3[0]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_MTE3>(mte2ToMte3[1]);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(mte2ToV);
+        GetTPipePtr()->ReleaseEventID<HardEvent::MTE3_V>(initOutputEventId);
+    }
+}
+
 TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAVectorService<TEMPLATE_ARGS>::InitCubeVecSharedParams(
     CVSharedParams &sharedParams, int32_t aicIdx, uint8_t subBlockIdx, int64_t dSizeRope)
 {
@@ -915,6 +936,7 @@ public:
                                         __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengths,
                                         int64_t dSizeRope) {};
     __aicore__ inline void InitLocalBuffer(TPipe *pipe, ConstInfo &constInfo) {}
+    __aicore__ inline void UninitLocalBuffer() {}
     __aicore__ inline void ProcessVec1(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> &outputBuf,
                                        Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &bmm1ResBuf,
                                        RunInfo &runInfo, ConstInfo &constInfo)
