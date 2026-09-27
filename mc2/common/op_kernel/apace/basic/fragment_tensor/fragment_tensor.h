@@ -323,15 +323,13 @@ __aicore__ inline void FragmentSliceCopy(CopyHandle copyHandle, TensorType &tens
     for (uint32_t idx = 0; idx < composition.totalFragmentCnt; ++idx) {
         auto info = fragmentTensor.GetFragmentInfo(idx, composition);
 
-        if constexpr (isScatter) {
-            const uint64_t realFragmentSize = fragmentTensor.GetRealFragmentSize();
-            if (info.fragCoord[assembleAxis] >= realFragmentSize) {
-                continue;
-            }
-            uint64_t remain = realFragmentSize - info.fragCoord[assembleAxis];
-            if (info.copyShape[assembleAxis] > remain) {
-                info.copyShape[assembleAxis] = remain;
-            }
+        const uint64_t realFragmentSize = fragmentTensor.GetRealFragmentSize();
+        if (info.fragCoord[assembleAxis] >= realFragmentSize) {
+            continue;
+        }
+        uint64_t remain = realFragmentSize - info.fragCoord[assembleAxis];
+        if (info.copyShape[assembleAxis] > remain) {
+            info.copyShape[assembleAxis] = remain;
         }
 
         auto fragment = fragmentTensor.GetFragment(info.fragmentIdx);
