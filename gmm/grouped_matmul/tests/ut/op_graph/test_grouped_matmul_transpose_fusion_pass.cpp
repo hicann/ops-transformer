@@ -48,6 +48,7 @@ constexpr char kPackType[] = "Pack";
 constexpr char kTestCsvFile[] = "test_grouped_matmul_transpose_fusion_pass.csv";
 constexpr size_t kCaseFieldNum = 26;
 bool gVersionKeyValid = false;
+int32_t gGeCompilerVersion = kGraphFusionSupportVersion;
 #ifndef GROUPED_MATMUL_TRANSPOSE_FUSION_PASS_CSV_PATH
 #define GROUPED_MATMUL_TRANSPOSE_FUSION_PASS_CSV_PATH ""
 #endif
@@ -348,8 +349,7 @@ GNode BuildInt64ScalarConst(Graph *graph, const char *name, int64_t value)
     return constNode;
 }
 
-void AddDynamicSwapReshape(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, TensorWithDesc &input,
-                           bool validSwap)
+void AddDynamicSwapReshape(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, TensorWithDesc &input, bool validSwap)
 {
     auto shapeDesc = MakeTensorDesc({2}, DT_INT64);
     auto shapeNode = ge::es::CompliantNodeBuilder(graph)
@@ -358,8 +358,8 @@ void AddDynamicSwapReshape(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, T
                          .IrDefInputs({{"x", ge::es::CompliantNodeBuilder::kEsIrInputRequired, ""}})
                          .IrDefOutputs({{"y", ge::es::CompliantNodeBuilder::kEsIrOutputRequired, ""}})
                          .Build();
-    ge::es::AddEdgeAndUpdatePeerDesc(
-        *graph, *input.tensor.GetProducer(), input.tensor.GetProducerOutIndex(), shapeNode, 0);
+    ge::es::AddEdgeAndUpdatePeerDesc(*graph, *input.tensor.GetProducer(), input.tensor.GetProducerOutIndex(), shapeNode,
+                                     0);
     shapeNode.UpdateInputDesc(0, input.desc);
     shapeNode.UpdateOutputDesc(0, shapeDesc);
 
@@ -400,8 +400,8 @@ void AddDynamicSwapReshape(Graph *graph, ge::es::EsGraphBuilder &graphBuilder, T
                                          {"shape", ge::es::CompliantNodeBuilder::kEsIrInputRequired, ""}})
                            .IrDefOutputs({{"y", ge::es::CompliantNodeBuilder::kEsIrOutputRequired, ""}})
                            .Build();
-    ge::es::AddEdgeAndUpdatePeerDesc(
-        *graph, *input.tensor.GetProducer(), input.tensor.GetProducerOutIndex(), reshapeNode, 0);
+    ge::es::AddEdgeAndUpdatePeerDesc(*graph, *input.tensor.GetProducer(), input.tensor.GetProducerOutIndex(),
+                                     reshapeNode, 0);
     ge::es::AddEdgeAndUpdatePeerDesc(*graph, packNode, 0, reshapeNode, 1);
     reshapeNode.UpdateInputDesc(0, input.desc);
     reshapeNode.UpdateInputDesc(1, shapeDesc);
@@ -448,13 +448,13 @@ GraphPtr BuildGraph(const GroupedMatmulTransposeFusionPassParam &param)
     }
     for (int32_t i = 0; i < param.weightCount; ++i) {
         const auto name = "dataWeight" + std::to_string(i);
-        auto input = graphBuilder.CreateInput(graphInputIndex++, name.c_str(), param.weightDtype, FORMAT_ND,
-                                              param.weightShape);
+        auto input =
+            graphBuilder.CreateInput(graphInputIndex++, name.c_str(), param.weightDtype, FORMAT_ND, param.weightShape);
         input.GetProducer()->UpdateOutputDesc(0, weightDesc);
         weightInputs.push_back({input, weightDesc});
     }
-    AddTransposeIfNeeded(graph, graphBuilder, xInputs[0], param.transposeX, param.transposeOpType.c_str(),
-                         "transposeX", param.xPerm);
+    AddTransposeIfNeeded(graph, graphBuilder, xInputs[0], param.transposeX, param.transposeOpType.c_str(), "transposeX",
+                         param.xPerm);
     AddTransposeIfNeeded(graph, graphBuilder, weightInputs[0], param.transposeWeight, param.transposeOpType.c_str(),
                          "transposeWeight", param.weightPerm);
 
@@ -478,8 +478,7 @@ GraphPtr BuildGraph(const GroupedMatmulTransposeFusionPassParam &param)
         }
     } else if (param.scenario == "scale_reshape_valid" || param.scenario == "scale_reshape_invalid" ||
                param.scenario == "scale_reshape_unknown" || param.scenario == "scale_reshape_unknown_invalid" ||
-               param.scenario == "scale_reshape_all_unknown" ||
-               param.scenario == "mx_scale_reshape_unknown" ||
+               param.scenario == "scale_reshape_all_unknown" || param.scenario == "mx_scale_reshape_unknown" ||
                param.scenario == "mx_scale_reshape_unknown_invalid" ||
                param.scenario == "mxfp4_scale_reshape_all_unknown" ||
                param.scenario == "mxfp4_scale_reshape_all_unknown_invalid") {
@@ -515,41 +514,37 @@ GraphPtr BuildGraph(const GroupedMatmulTransposeFusionPassParam &param)
             scaleDtype = DT_INT8;
         }
         auto scaleDesc = MakeTensorDesc(inputShape, scaleDtype);
-        auto scaleTensor =
-            graphBuilder.CreateInput(graphInputIndex++, "dataScale", scaleDtype, FORMAT_ND, inputShape);
+        auto scaleTensor = graphBuilder.CreateInput(graphInputIndex++, "dataScale", scaleDtype, FORMAT_ND, inputShape);
         scaleTensor.GetProducer()->UpdateOutputDesc(0, scaleDesc);
         TensorWithDesc scaleInput{scaleTensor, scaleDesc};
         AddUnaryNode(graph, graphBuilder, scaleInput, kReshapeType, "reshapeScale",
                      MakeTensorDesc(outputShape, scaleDtype));
         optionalInputs.emplace_back("scale", scaleInput);
-    } else if (param.scenario == "per_token_dynamic_swap" ||
-               param.scenario == "per_token_dynamic_swap_invalid") {
+    } else if (param.scenario == "per_token_dynamic_swap" || param.scenario == "per_token_dynamic_swap_invalid") {
         const std::vector<int64_t> sourceShape = {1, -1};
         auto perTokenDesc = MakeTensorDesc(sourceShape, DT_FLOAT);
-        auto perTokenTensor = graphBuilder.CreateInput(
-            graphInputIndex++, "dataPerTokenScale", DT_FLOAT, FORMAT_ND, sourceShape);
+        auto perTokenTensor =
+            graphBuilder.CreateInput(graphInputIndex++, "dataPerTokenScale", DT_FLOAT, FORMAT_ND, sourceShape);
         perTokenTensor.GetProducer()->UpdateOutputDesc(0, perTokenDesc);
         TensorWithDesc perTokenInput{perTokenTensor, perTokenDesc};
-        AddDynamicSwapReshape(
-            graph, graphBuilder, perTokenInput, param.scenario == "per_token_dynamic_swap");
+        AddDynamicSwapReshape(graph, graphBuilder, perTokenInput, param.scenario == "per_token_dynamic_swap");
         optionalInputs.emplace_back("per_token_scale", perTokenInput);
     } else if (param.scenario == "mx_per_token") {
         const std::vector<int64_t> scaleShape = {2, 1, 64, 2};
         auto scaleDesc = MakeTensorDesc(scaleShape, DT_FLOAT8_E8M0);
-        auto scaleTensor = graphBuilder.CreateInput(
-            graphInputIndex++, "dataScale", DT_FLOAT8_E8M0, FORMAT_ND, scaleShape);
+        auto scaleTensor =
+            graphBuilder.CreateInput(graphInputIndex++, "dataScale", DT_FLOAT8_E8M0, FORMAT_ND, scaleShape);
         scaleTensor.GetProducer()->UpdateOutputDesc(0, scaleDesc);
         optionalInputs.push_back({"scale", {scaleTensor, scaleDesc}});
 
         const std::vector<int64_t> sourceShape = {64, 2, 1};
         auto perTokenDesc = MakeTensorDesc(sourceShape, DT_FLOAT8_E8M0);
-        auto perTokenTensor = graphBuilder.CreateInput(
-            graphInputIndex++, "dataPerTokenScale", DT_FLOAT8_E8M0, FORMAT_ND, sourceShape);
+        auto perTokenTensor =
+            graphBuilder.CreateInput(graphInputIndex++, "dataPerTokenScale", DT_FLOAT8_E8M0, FORMAT_ND, sourceShape);
         perTokenTensor.GetProducer()->UpdateOutputDesc(0, perTokenDesc);
         TensorWithDesc perTokenInput{perTokenTensor, perTokenDesc};
         AddUnaryNode(graph, graphBuilder, perTokenInput, kReshapeType, "reshapePerToken1", perTokenDesc);
-        AddTransposeIfNeeded(
-            graph, graphBuilder, perTokenInput, true, kTransposeDType, "transposePerToken", {1, 0, 2});
+        AddTransposeIfNeeded(graph, graphBuilder, perTokenInput, true, kTransposeDType, "transposePerToken", {1, 0, 2});
         AddUnaryNode(graph, graphBuilder, perTokenInput, kReshapeType, "reshapePerToken2", perTokenInput.desc);
         optionalInputs.emplace_back("per_token_scale", perTokenInput);
     }
@@ -633,14 +628,26 @@ std::string TestName(const testing::TestParamInfo<GroupedMatmulTransposeFusionPa
 
 extern "C" aclError aclsysGetVersionNum(char *name, int32_t *version)
 {
-    gVersionKeyValid = name != nullptr && std::strcmp(name, "ge_compiler") == 0;
+    gVersionKeyValid = name != nullptr && std::strcmp(name, "ge-compiler") == 0;
     if (version != nullptr) {
-        *version = kGraphFusionSupportVersion;
+        *version = gGeCompilerVersion;
     }
     return ACL_SUCCESS;
 }
 
 class GroupedMatmulTransposeFusionPassTest : public testing::TestWithParam<GroupedMatmulTransposeFusionPassParam> {};
+
+TEST(GroupedMatmulTransposeFusionPassVersionTest, SkipUnsupportedRuntime)
+{
+    GraphPtr graph = nullptr;
+    CustomPassContext passContext;
+    TestGroupedMatmulTransposeFusionPass pass;
+    gGeCompilerVersion = kGraphFusionSupportVersion - 1;
+
+    EXPECT_EQ(pass.RunForTest(graph, passContext), GRAPH_NOT_CHANGED);
+
+    gGeCompilerVersion = kGraphFusionSupportVersion;
+}
 
 TEST_P(GroupedMatmulTransposeFusionPassTest, RunFusionPass)
 {

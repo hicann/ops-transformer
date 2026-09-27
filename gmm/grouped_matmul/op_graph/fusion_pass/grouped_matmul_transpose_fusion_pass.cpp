@@ -100,10 +100,10 @@ struct GmmInputPattern {
     bool isBitcastReshapePattern = false;
 };
 
-bool IsGraphFusionRuntimeSupported()
+bool IsTargetVersion()
 {
     int32_t version = 0;
-    if (aclsysGetVersionNum("ge_compiler", &version) != ACL_SUCCESS) {
+    if (aclsysGetVersionNum("ge-compiler", &version) != ACL_SUCCESS) {
         OP_LOGW(kPassName, "Failed to get ge compiler version.");
         return false;
     }
@@ -1007,10 +1007,6 @@ Status Fusion(GraphPtr &graph, GNode &groupedMatmulNode, CustomPassContext &pass
 Status RunGroupedMatmulTransposeFusion(GraphPtr &graph, CustomPassContext &passContext)
 {
     OP_LOGD(kPassName, "Enter GroupedMatmul transpose fusion pass.");
-    if (!IsGraphFusionRuntimeSupported()) {
-        OP_LOGD(kPassName, "Skip GroupedMatmul transpose fusion pass because graph fusion runtime is unsupported.");
-        return GRAPH_NOT_CHANGED;
-    }
     if (graph == nullptr || !graph->IsValid()) {
         OP_LOGW(kPassName, "Graph is null or invalid.");
         return GRAPH_NOT_CHANGED;
@@ -1026,7 +1022,6 @@ Status RunGroupedMatmulTransposeFusion(GraphPtr &graph, CustomPassContext &passC
         return GRAPH_NOT_CHANGED;
     }
 
-    passContext.SetPassName(kPassName);
     bool changed = false;
     for (auto &groupedMatmulNode : groupedMatmulNodes) {
         auto status = Fusion(graph, groupedMatmulNode, passContext);
@@ -1047,11 +1042,16 @@ Status RunGroupedMatmulTransposeFusion(GraphPtr &graph, CustomPassContext &passC
 
 Status GroupedMatmulTransFusionPass::Run(GraphPtr &graph, CustomPassContext &passContext)
 {
+    if (!IsTargetVersion()) {
+        OP_LOGD(kPassName, "Skip GroupedMatmul transpose fusion pass because graph fusion runtime is unsupported.");
+        return GRAPH_NOT_CHANGED;
+    }
     return RunGroupedMatmulTransposeFusion(graph, passContext);
 }
 
 #if GE_COMPILER_VERSION_NUM >= 90100000
-REG_FUSION_PASS(GroupedMatmulTransFusionPass).Stage(CustomPassStage::kCompatibleInherited);
+REG_FUSION_PASS(GroupedMatmulTransFusionPass)
+    .Stage(IsTargetVersion() ? CustomPassStage::kCompatibleInherited : CustomPassStage::kAfterInferShape);
 #endif
 } // namespace ops
 #endif // CANN_VERSION_NUM >= GROUPED_MATMUL_GRAPH_FUSION_SUPPORT_VERSION
