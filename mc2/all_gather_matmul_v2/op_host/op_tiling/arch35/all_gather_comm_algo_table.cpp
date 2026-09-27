@@ -22,6 +22,8 @@ constexpr uint32_t MIN_DATA_BYTES_ZERO = 0;
 constexpr uint64_t DATA_BYTES_2M = 2ULL * 1024ULL * 1024ULL;
 constexpr uint64_t DATA_BYTES_4M = 4ULL * 1024ULL * 1024ULL;
 constexpr uint64_t DATA_BYTES_8M = 8ULL * 1024ULL * 1024ULL;
+constexpr uint64_t DATA_BYTES_16M = 16ULL * 1024ULL * 1024ULL;
+constexpr uint64_t DATA_BYTES_32M = 32ULL * 1024ULL * 1024ULL;
 constexpr uint64_t MAX_DATA_BYTES_UNLIMITED = ~0ULL;
 constexpr uint32_t RANK_SIZE_2 = 2;
 constexpr uint32_t RANK_SIZE_4 = 4;
@@ -44,7 +46,13 @@ static constexpr Mc2Hcom::CommAlgoEntry ALLGATHER_COMM_ALGO_TABLE[] = {
     // rank4 大数据量 → concur[mesh,nhr]
     {mc2tiling::A5_AICPU_TS_ENGINE, COMM_TOPO_CUSTOM, MIN_LAYERS, MAX_LAYERS_UBX, DATA_BYTES_2M,
      MAX_DATA_BYTES_UNLIMITED, RANK_SIZE_4, RANK_SIZE_4, MEDIUM, "concur[mesh,nhr]"},
-    // rank8~16 全数据量 → sole[nhr]
+    // rank8 中数据量 → parallel[mesh,nhr.multi_channel]
+    {mc2tiling::A5_AICPU_TS_ENGINE, COMM_TOPO_CUSTOM, MIN_LAYERS, MAX_LAYERS_UBX, DATA_BYTES_8M, DATA_BYTES_16M,
+     RANK_SIZE_8, RANK_SIZE_8, MEDIUM, "parallel[mesh,nhr.multi_channel]"},
+    // rank16 中大数据量 → parallel[mesh,nhr.multi_channel]
+    {mc2tiling::A5_AICPU_TS_ENGINE, COMM_TOPO_CUSTOM, MIN_LAYERS, MAX_LAYERS_UBX, DATA_BYTES_16M, DATA_BYTES_32M,
+     RANK_SIZE_16, RANK_SIZE_16, MEDIUM, "parallel[mesh,nhr.multi_channel]"},
+    // rank8~16 其余数据量 → sole[nhr]
     {mc2tiling::A5_AICPU_TS_ENGINE, COMM_TOPO_CUSTOM, MIN_LAYERS, MAX_LAYERS_UBX, MIN_DATA_BYTES_ZERO,
      MAX_DATA_BYTES_UNLIMITED, RANK_SIZE_8, RANK_SIZE_16, MEDIUM, "sole[nhr]"},
     // CCU_SCHED通信算法
