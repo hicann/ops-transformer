@@ -102,16 +102,37 @@ void QuantFlashAttnTilingHif8Impl::InitImplParam()
     const gert::Tensor *actSeqLenKV = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
     uint32_t actSeqLenQDims = (actSeqLenQ != nullptr) ? actSeqLenQ->GetShapeSize() : 0;
     uint32_t actSeqLenKVDims = (actSeqLenKV != nullptr) ? actSeqLenKV->GetShapeSize() : 0;
-    cuSeqLenQFlag_ = !((actSeqLenQDims == 0) || (actSeqLenQ == nullptr) || (actSeqLenQ->GetData<int32_t>() == nullptr));
-    cuSeqLenKVFlag_ =
-        !((actSeqLenKVDims == 0) || (actSeqLenKV == nullptr) || (actSeqLenKV->GetData<int32_t>() == nullptr));
+    const gert::Tensor *actSeqLenQTensor = qfaInfo_->opParamInfo.cuSeqlensQ.tensor;
+    const gert::Tensor *seqUsedQTensor = qfaInfo_->opParamInfo.sequsedQ.tensor;
+    const gert::Tensor *actSeqLenKVTensor = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
+    const gert::Tensor *seqUsedKvTensor = qfaInfo_->opParamInfo.sequsedKv.tensor;
+    bool hasAnyData = (actSeqLenQTensor != nullptr && actSeqLenQTensor->GetData<int32_t>() != nullptr) ||
+                      (actSeqLenKVTensor != nullptr && actSeqLenKVTensor->GetData<int32_t>() != nullptr) ||
+                      (seqUsedQTensor != nullptr && seqUsedQTensor->GetData<int32_t>() != nullptr) ||
+                      (seqUsedKvTensor != nullptr && seqUsedKvTensor->GetData<int32_t>() != nullptr);
+    if (!hasAnyData) {
+        // 静态编译: 无运行时数据, 按 shape 判定
+        cuSeqLenQFlag_ = (actSeqLenQTensor != nullptr) && (actSeqLenQTensor->GetShapeSize() > 0);
+        const gert::Tensor *actSeqLenKVT = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
+        cuSeqLenKVFlag_ = (actSeqLenKVT != nullptr) && (actSeqLenKVT->GetShapeSize() > 0);
+        const gert::Tensor *seqUsedQT = qfaInfo_->opParamInfo.sequsedQ.tensor;
+        seqUsedQFlag_ = (seqUsedQT != nullptr) && (seqUsedQT->GetShapeSize() > 0);
+        const gert::Tensor *seqUsedKvT = qfaInfo_->opParamInfo.sequsedKv.tensor;
+        seqUsedKvFlag_ = (seqUsedKvT != nullptr) && (seqUsedKvT->GetShapeSize() > 0);
+    } else {
+        cuSeqLenQFlag_ =
+            !((actSeqLenQDims == 0) || (actSeqLenQ == nullptr) || (actSeqLenQ->GetData<int32_t>() == nullptr));
+        cuSeqLenKVFlag_ =
+            !((actSeqLenKVDims == 0) || (actSeqLenKV == nullptr) || (actSeqLenKV->GetData<int32_t>() == nullptr));
 
-    const gert::Tensor *seqUsedQ = qfaInfo_->opParamInfo.sequsedQ.tensor;
-    const gert::Tensor *seqUsedKv = qfaInfo_->opParamInfo.sequsedKv.tensor;
-    uint32_t seqUsedQDims = (seqUsedQ != nullptr) ? seqUsedQ->GetShapeSize() : 0;
-    uint32_t seqUsedKvDims = (seqUsedKv != nullptr) ? seqUsedKv->GetShapeSize() : 0;
-    seqUsedQFlag_ = !((seqUsedQDims == 0) || (seqUsedQ == nullptr) || (seqUsedQ->GetData<int32_t>() == nullptr));
-    seqUsedKvFlag_ = !((seqUsedKvDims == 0) || (seqUsedKv == nullptr) || (seqUsedKv->GetData<int32_t>() == nullptr));
+        const gert::Tensor *seqUsedQ = qfaInfo_->opParamInfo.sequsedQ.tensor;
+        const gert::Tensor *seqUsedKv = qfaInfo_->opParamInfo.sequsedKv.tensor;
+        uint32_t seqUsedQDims = (seqUsedQ != nullptr) ? seqUsedQ->GetShapeSize() : 0;
+        uint32_t seqUsedKvDims = (seqUsedKv != nullptr) ? seqUsedKv->GetShapeSize() : 0;
+        seqUsedQFlag_ = !((seqUsedQDims == 0) || (seqUsedQ == nullptr) || (seqUsedQ->GetData<int32_t>() == nullptr));
+        seqUsedKvFlag_ =
+            !((seqUsedKvDims == 0) || (seqUsedKv == nullptr) || (seqUsedKv->GetData<int32_t>() == nullptr));
+    }
 }
 
 void QuantFlashAttnTilingHif8Impl::SplitPolicy()

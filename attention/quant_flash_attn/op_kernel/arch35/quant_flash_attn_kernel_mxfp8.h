@@ -100,8 +100,6 @@ public:
     __gm__ uint8_t *valuePtr_ = nullptr;
 
     ConstInfoX constInfo_;
-
-    const __gm__ QuantFlashAttnTilingData *__restrict tilingData_;
     TPipe *pipe_ = nullptr;
     CubeBlockType cubeBlock_;
     VecFaBlockType vecFaBlock_;
@@ -158,12 +156,11 @@ public:
                                 __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *pScale, __gm__ uint8_t *softmaxLse,
                                 __gm__ uint8_t *attnOut, __gm__ uint8_t *workspace, __gm__ uint8_t *metadata,
                                 __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedKv,
-                                const __gm__ QuantFlashAttnTilingData *__restrict tiling, TPipe *tPipe)
+                                const QuantFlashAttnTilingData &tiling, TPipe *tPipe)
     {
         this->pipe_ = tPipe;
-        this->tilingData_ = tiling;
 
-        InitConstInfo();
+        InitConstInfo(tiling);
         constInfo_.needInitOutput = ((__gm__ uint32_t *)metadata)[QFA_HEAD_NEED_INIT_OUTPUT_INDEX] != 0;
         constInfo_.enableFlashDecode = static_cast<bool>(((__gm__ uint32_t *)metadata)[1]);
 
@@ -257,7 +254,7 @@ public:
         bmm1Buffers_.Init(ubBufferManager_, mm1ResultSize);
     }
 
-    __aicore__ inline void InitConstInfo()
+    __aicore__ inline void InitConstInfo(const QuantFlashAttnTilingData &tiling)
     {
         if ASCEND_IS_AIC {
             constInfo_.aicIdx = GetBlockIdx();
@@ -267,10 +264,10 @@ public:
             constInfo_.subBlockIdx = GetSubBlockIdx();
         }
 
-        const auto &qfaBaseParams = this->tilingData_->baseTiling.quantFlashAttnBaseParams;
-        const auto &qfaAttenMaskParams = this->tilingData_->baseTiling.quantFlashAttnAttenMaskParams;
-        const auto &qfaPageAttentionParams = this->tilingData_->baseTiling.quantFlashAttnPageAttentionParams;
-        const auto &qfaWorkspaceParams = this->tilingData_->baseTiling.quantFlashAttnWorkspaceParams;
+        const auto &qfaBaseParams = tiling.baseTiling.quantFlashAttnBaseParams;
+        const auto &qfaAttenMaskParams = tiling.baseTiling.quantFlashAttnAttenMaskParams;
+        const auto &qfaPageAttentionParams = tiling.baseTiling.quantFlashAttnPageAttentionParams;
+        const auto &qfaWorkspaceParams = tiling.baseTiling.quantFlashAttnWorkspaceParams;
 
         constInfo_.bSize = qfaBaseParams.bSize;
         constInfo_.t1Size = qfaBaseParams.t1Size;
