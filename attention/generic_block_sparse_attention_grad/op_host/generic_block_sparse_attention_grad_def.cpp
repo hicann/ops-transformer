@@ -92,14 +92,16 @@ public:
             .FormatList({ge::FORMAT_ND});
 
         this->Attr("block_shape").AttrType(OPTIONAL).ListInt({1, 128});
-        this->Attr("is_packed_gqa").AttrType(OPTIONAL).Int(1);
         this->Attr("layout_q").AttrType(OPTIONAL).String("TND");
         this->Attr("layout_kv").AttrType(OPTIONAL).String("TND");
+        this->Attr("layout_sparse_pattern").AttrType(OPTIONAL).Int(1);
         this->Attr("scale_value").AttrType(OPTIONAL).Float(1.0);
         this->Attr("mask_type").AttrType(OPTIONAL).Int(1);
         this->Attr("softmax_precision").AttrType(OPTIONAL).Int(0);
         this->Attr("win_left").AttrType(OPTIONAL).Int(-1);
         this->Attr("win_right").AttrType(OPTIONAL).Int(-1);
+        this->Attr("residual_block_mode").AttrType(OPTIONAL).Int(0);
+        this->Attr("is_consistent_topk").AttrType(OPTIONAL).Bool(false);
 
         this->AICore().AddConfig("ascend950");
         this->AICore().AddConfig("ascend910b");

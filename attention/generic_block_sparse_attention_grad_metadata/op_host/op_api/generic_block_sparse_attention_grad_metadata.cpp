@@ -30,28 +30,31 @@ const aclTensor *GenericBlockSparseAttentionGradMetadata(
     const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *cuSeqLengthsQOptional,
     const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
     int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t headDim,
-    int64_t blockShapeX, int64_t blockShapeY, int64_t isPackedGQA, const char *layoutQOptional,
-    const char *layoutKvOptional, int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight,
-    const char *socVersion, int64_t aicCoreNum, int64_t aivCoreNum, const aclTensor *metaData, aclOpExecutor *executor)
+    int64_t blockShapeX, int64_t blockShapeY, const char *layoutQOptional, const char *layoutKvOptional,
+    int64_t layoutSparsePattern, int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight,
+    int64_t residualBlockMode, bool isConsistentTopk, const char *socVersion, int64_t aicCoreNum, int64_t aivCoreNum,
+    const aclTensor *metaData, aclOpExecutor *executor)
 {
     L0_DFX(GenericBlockSparseAttentionGradMetadata, sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional,
            cuSeqLengthsKvOptional, sequsedQOptional, sequsedKvOptional, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads,
-           headDim, blockShapeX, blockShapeY, isPackedGQA, layoutQOptional, layoutKvOptional, maskType,
-           softmaxPrecision, winLeft, winRight, socVersion, aicCoreNum, aivCoreNum, metaData);
+           headDim, blockShapeX, blockShapeY, layoutQOptional, layoutKvOptional, layoutSparsePattern, maskType,
+           softmaxPrecision, winLeft, winRight, residualBlockMode, isConsistentTopk, socVersion, aicCoreNum, aivCoreNum,
+           metaData);
 
     static internal::AicpuTaskSpace space("GenericBlockSparseAttentionGradMetadata");
 
     auto ret = ADD_TO_LAUNCHER_LIST_AICPU(
         GenericBlockSparseAttentionGradMetadata,
         OP_ATTR_NAMES({"max_q_seqlen", "max_kv_seqlen", "num_q_heads", "num_kv_heads", "head_dim", "block_shape_x",
-                       "block_shape_y", "is_packed_gqa", "layout_q", "layout_kv", "mask_type", "softmax_precision",
-                       "win_left", "win_right", "soc_version", "aic_core_num", "aiv_core_num"}),
+                       "block_shape_y", "layout_q", "layout_kv", "layout_sparse_pattern", "mask_type",
+                       "softmax_precision", "win_left", "win_right", "residual_block_mode", "is_consistent_topk",
+                       "soc_version", "aic_core_num", "aiv_core_num"}),
         OP_INPUT(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, sequsedQOptional,
                  sequsedKvOptional),
         OP_OUTPUT(metaData),
-        OP_ATTR(maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, isPackedGQA,
-                layoutQOptional, layoutKvOptional, maskType, softmaxPrecision, winLeft, winRight, socVersion,
-                aicCoreNum, aivCoreNum));
+        OP_ATTR(maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, layoutQOptional,
+                layoutKvOptional, layoutSparsePattern, maskType, softmaxPrecision, winLeft, winRight, residualBlockMode,
+                isConsistentTopk, socVersion, aicCoreNum, aivCoreNum));
     OP_CHECK(
         ret == ACL_SUCCESS,
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "GenericBlockSparseAttentionGradMetadata ADD_TO_LAUNCHER_LIST_AICPU failed."),

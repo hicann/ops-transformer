@@ -66,14 +66,16 @@ enum class InputId : uint32_t {
 // attr 索引与 def.cpp 中 Attr 声明顺序一致（block_shape 为首个 attr）。
 enum class AttrId : uint32_t {
     BlockShape = 0,
-    IsPackedGqa = 1,
-    QInputLayout = 2,
-    KvInputLayout = 3,
+    QInputLayout = 1,
+    KvInputLayout = 2,
+    LayoutSparsePattern = 3,
     ScaleValue = 4,
     MaskType = 5,
     SoftmaxPrecision = 6,
     WinLeft = 7,
     WinRight = 8,
+    ResidualBlockMode = 9,
+    IsConsistentTopk = 10,
 };
 
 constexpr uint32_t ToIndex(InputId id)
@@ -162,7 +164,7 @@ private:
     int64_t blockShapeY_ = 0; // block的y维度
     float scaleValue_ = 0.0f;
     uint32_t maskType_ = 0;
-    uint32_t isPackedGQA_ = 1;
+    uint32_t layoutSparsePattern_ = 1;
     uint32_t softmaxPrecision_ = 0;
     int64_t winLeft_ = -1;
     int64_t winRight_ = -1;
@@ -399,11 +401,18 @@ ge::graphStatus GBSAGTiling::ProcessAttrs(gert::TilingContext *context)
         maskType_ = 0;
     }
 
-    auto packedGqaAttr = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::IsPackedGqa));
-    isPackedGQA_ = (packedGqaAttr == nullptr || *packedGqaAttr == 1) ? 1 : 1;
-    if (packedGqaAttr != nullptr && *packedGqaAttr != 1) {
-        OP_LOGW(context->GetNodeName(), "isPackedGQA=%ld is unsupported; using 1", *packedGqaAttr);
+    const auto *sparseLayout = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::LayoutSparsePattern));
+    const auto *residualMode = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::ResidualBlockMode));
+    const int64_t layoutSparsePattern = sparseLayout != nullptr ? *sparseLayout : 1;
+    const int64_t residualBlockMode = residualMode != nullptr ? *residualMode : 0;
+    if (layoutSparsePattern != 1 || residualBlockMode != 0) {
+        OP_LOGE(context->GetNodeName(),
+                "Only layout_sparse_pattern=1 and residual_block_mode=0 are supported, got %ld and %ld.",
+                layoutSparsePattern, residualBlockMode);
+        return ge::GRAPH_FAILED;
     }
+    layoutSparsePattern_ = static_cast<uint32_t>(layoutSparsePattern);
+    // Both is_consistent_topk values use the existing per-block count path.
 
     auto softmaxPrecisionAttr = context->GetAttrs()->GetAttrPointer<int64_t>(ToIndex(AttrId::SoftmaxPrecision));
     softmaxPrecision_ = (softmaxPrecisionAttr == nullptr || *softmaxPrecisionAttr == 0) ? 0 : 0;
@@ -586,7 +595,7 @@ ge::graphStatus GBSAGTiling::FillTilingData(gert::TilingContext *context)
     tilingData_->set_kvHeads(kvHeads_);
     tilingData_->set_headDim(headDim_);
     tilingData_->set_maskType(maskType_);
-    tilingData_->set_isPackedGQA(isPackedGQA_);
+    tilingData_->set_layoutSparsePattern(layoutSparsePattern_);
     tilingData_->set_softmaxPrecision(softmaxPrecision_);
     tilingData_->set_winLeft(winLeft_);
     tilingData_->set_winRight(winRight_);

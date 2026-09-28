@@ -118,13 +118,6 @@ $$
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
-    <td class="tg-0pky">isPackedGQA</td>
-    <td class="tg-0pky">属性</td>
-    <td class="tg-0pky">同一group内qHead是否共享稀疏pattern，当前仅支持1。</td>
-    <td class="tg-0pky">INT64</td>
-    <td class="tg-0pky">-</td>
-  </tr>
-  <tr>
     <td class="tg-0pky">layoutQ</td>
     <td class="tg-0pky">属性</td>
     <td class="tg-0pky">query侧layout格式，支持TND/BNSD/BSND。</td>
@@ -136,6 +129,13 @@ $$
     <td class="tg-0pky">属性</td>
     <td class="tg-0pky">key/value侧layout格式，须与layoutQ一致。</td>
     <td class="tg-0pky">STRING</td>
+    <td class="tg-0pky">-</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">layoutSparsePattern</td>
+    <td class="tg-0pky">属性</td>
+    <td class="tg-0pky">sparseBlockIdx、sparseBlockCount的数据排布，当前仅支持1（BNKQ）。</td>
+    <td class="tg-0pky">INT64</td>
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
@@ -167,6 +167,20 @@ $$
     <td class="tg-0pky">-</td>
   </tr>
   <tr>
+    <td class="tg-0pky">residualBlockMode</td>
+    <td class="tg-0pky">属性</td>
+    <td class="tg-0pky">KV尾部不完整块处理模式，当前仅支持0，由稀疏索引决定是否参与计算。</td>
+    <td class="tg-0pky">INT64</td>
+    <td class="tg-0pky">-</td>
+  </tr>
+  <tr>
+    <td class="tg-0pky">isConsistentTopk</td>
+    <td class="tg-0pky">属性</td>
+    <td class="tg-0pky">前置稀疏选择时，同一batch同一head内每个Q块选择的KV块最大数量是否一致。支持false/true，两种取值均使用通用计算路径。</td>
+    <td class="tg-0pky">BOOL</td>
+    <td class="tg-0pky">-</td>
+  </tr>
+  <tr>
     <td class="tg-0pky">metadata</td>
     <td class="tg-0pky">输出</td>
     <td class="tg-0pky">分核信息，长度≥80+B×N1×J×4。</td>
@@ -182,7 +196,7 @@ $$
 * layoutQ与layoutKv须相同，取值TND/BNSD/BSND；TND布局下cuSeqLengthsQOptional/cuSeqLengthsKvOptional必选。
 * sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自maxQSeqlen/maxKvSeqlen（须与Q/K的S维一致）。
 * HeadDim固定为128；numQHeads/numKvHeads取值范围[1, 128]，且numQHeads % numKvHeads == 0。
-* blockShape当前仅支持[1, 128]；isPackedGQA当前仅支持1；maskType当前仅支持1。
+* blockShape当前仅支持[1, 128]；layoutSparsePattern当前仅支持1；residualBlockMode当前仅支持0；maskType当前仅支持1。
 * winLeft/winRight不使能时必须为-1。
 * metadata长度须满足shape[0] ≥ 80 + B × numQHeads × J × 4；任务数上界B × numQHeads × J ≤ 1048576。
 

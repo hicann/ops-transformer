@@ -103,13 +103,15 @@ cann_ops_transformer.generic_block_sparse_attention_grad_metadata(
     seqused_kv=None,
     max_seqlen_q=None,
     max_seqlen_kv=None,
-    is_packed_gqa=True,
     layout_q="TND",
     layout_kv="TND",
+    layout_sparse_pattern=1,
     mask_mode=MaskMode.CAUSAL,
     softmax_precision=0,
     win_left=-1,
     win_right=-1,
+    residual_block_mode=ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX,
+    is_consistent_topk=False,
 ) -> Tensor
 ```
 
@@ -131,20 +133,22 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
     cu_seqlens_kv=None,
     seqused_q=None,
     seqused_kv=None,
-    is_packed_gqa=True,
     layout_q="TND",
     layout_kv="TND",
+    layout_sparse_pattern=1,
     softmax_scale=1.0,
     mask_mode=MaskMode.CAUSAL,
     softmax_precision=0,
     win_left=-1,
     win_right=-1,
+    residual_block_mode=ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX,
+    is_consistent_topk=False,
 ) -> (Tensor, Tensor, Tensor)
 ```
 
 ## 枚举说明
 
-`mask_mode` 在 Python 接口中支持传入 `IntEnum` 枚举或对应 int 值，枚举定义于 `cann_ops_transformer.ops.generic_block_sparse_attention_grad`：
+`MaskMode` 和 `ResidualBlockMode` 均为 `IntEnum`，定义于 `cann_ops_transformer.ops.generic_block_sparse_attention_grad`，Python 封装接口支持传入枚举、对应 int 值或枚举名字符串。
 
 ### mask_mode 枚举
 
@@ -154,6 +158,16 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 
 > [!NOTE]
 > 枚举为 `IntEnum`，可直接作为 int 传入底层算子；接口支持传入枚举、对应 int 值或枚举名字符串。当前版本仅支持 `mask_mode = 1`（`CAUSAL`）。
+
+### residual_block_mode 枚举
+
+| 枚举名 | 值 | 含义 |
+| :--- | :-: | :--- |
+| `ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX` | 0 | 尾部不完整 KV 块是否参与计算由 `sparse_block_idx` 决定，当前默认且唯一支持的模式 |
+| `ResidualBlockMode.INCOMPLETE_BLK_KEPT_BUT_NOT_IN_SPARSE_BLK_IDX` | 1 | 尾部不完整 KV 块必定参与计算，但不包含在 `sparse_block_idx` 中；当前不支持 |
+
+主算子与 Metadata 的 Python 封装接口均默认使用 `ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX`，也支持整数 `0` 或枚举名字符串 `"MARKED_BY_SPARSE_BLK_IDX"`。字符串解析与 `mask_mode` 一致：忽略大小写及首尾空格。
+
 
 ## 参数说明
 
@@ -173,13 +187,15 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | seqused_kv         | Tensor       | 可选      | 各batch中kv实际使用的序列长度                                                                       | int32    | ND       | `(B,)`                                                  |
 | max_seqlen_q       | int          | 可选      | 所有batch中q序列长度的最大值；省略时由扩展推断（优先`seqused_q`/`cu_seqlens_q`，否则取`sparse_block_idx`最后一维）；显式传入须≥0 | int32    | -        | -                                                         |
 | max_seqlen_kv      | int          | 可选      | 所有batch中kv序列长度的最大值，用于计算$J$；省略时由扩展推断（优先`seqused_kv`/`cu_seqlens_kv`，否则取`J * block_y`）；显式传入须≥0 | int32    | -        | -                                                         |
-| is_packed_gqa      | bool         | 可选      | 同一group内qHead是否共享稀疏pattern，当前仅支持`True`，默认`True`                               | bool     | -        | -                                                         |
 | layout_q           | string       | 可选      | q布局，支持`"TND"`/`"BNSD"`/`"BSND"`，默认`"TND"`                                           | string   | -        | -                                                         |
 | layout_kv          | string       | 可选      | k/value布局，须与`layout_q`一致，默认`"TND"`                                                    | string   | -        | -                                                         |
+| layout_sparse_pattern | int | 可选 | sparse_block_idx、sparse_block_count的数据排布；当前仅支持1（BNKQ），默认1 | int64 | - | - |
 | mask_mode          | int/MaskMode | 可选      | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前仅支持1（`CAUSAL`），默认1 | int32    | -        | -                                                         |
 | softmax_precision  | int          | 可选      | Softmax精度级别，当前仅支持0，默认0                                                                   | int32    | -        | -                                                         |
 | win_left           | int          | 可选      | 滑窗向前包含token数，不使能时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
 | win_right          | int          | 可选      | 滑窗向后包含token数，不使能时必须为-1，默认-1                                                       | int32    | -        | -                                                         |
+| residual_block_mode | int/ResidualBlockMode/str | 可选 | 尾部不完整KV块的处理模式；默认且仅支持模式0，可传枚举、整数0或枚举名字符串，由稀疏索引决定是否参与 | int64 | - | - |
+| is_consistent_topk | bool | 可选 | 前置稀疏选择中，同一batch同一head内每个Q块选择的KV块最大数量是否一致，默认False；两种值均走通用计算路径 | bool | - | - |
 
 ### generic_block_sparse_attention_grad
 
@@ -200,14 +216,16 @@ cann_ops_transformer.generic_block_sparse_attention_grad(
 | cu_seqlens_kv      | Tensor       | 可选      | kv累积序列长度；`layout_kv="TND"`时必传                                             | int64            | ND       | `(B+1,)`                                                               |
 | seqused_q          | Tensor       | 可选      | 各batch中q实际使用的序列长度                                                          | int32            | ND       | `(B,)`                                                                 |
 | seqused_kv         | Tensor       | 可选      | 各batch中kv实际使用的序列长度                                                         | int32            | ND       | `(B,)`                                                                 |
-| is_packed_gqa      | bool         | 可选      | Packed GQA开关，当前仅支持`True`，默认`True`                                      | bool             | -        | -                                                                        |
 | layout_q           | string       | 可选      | q布局，支持`"TND"`/`"BNSD"`/`"BSND"`，默认`"TND"`                             | string           | -        | -                                                                        |
 | layout_kv          | string       | 可选      | k/value布局，须与`layout_q`一致，默认`"TND"`                                      | string           | -        | -                                                                        |
+| layout_sparse_pattern | int | 可选 | sparse_block_idx、sparse_block_count的数据排布；当前仅支持1（BNKQ），默认1 | int64 | - | - |
 | softmax_scale      | float        | 可选      | 缩放因子，建议值$1/\sqrt{D}$，默认1.0                                               | float32          | -        | -                                                                        |
 | mask_mode          | int/MaskMode | 可选      | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前仅支持1，默认1 | int32            | -        | -                                                                        |
 | softmax_precision  | int          | 可选      | Softmax精度级别，当前仅支持0，默认0                                           | int32            | -        | -                                                                        |
 | win_left           | int          | 可选      | 滑窗向前包含token数，不使能时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
 | win_right          | int          | 可选      | 滑窗向后包含token数，不使能时必须为-1，默认-1                                         | int32            | -        | -                                                                        |
+| residual_block_mode | int/ResidualBlockMode/str | 可选 | 尾部不完整KV块的处理模式；默认且仅支持模式0，可传枚举、整数0或枚举名字符串，由稀疏索引决定是否参与 | int64 | - | - |
+| is_consistent_topk | bool | 可选 | 前置稀疏选择中，同一batch同一head内每个Q块选择的KV块最大数量是否一致，默认False；两种值均走通用计算路径 | bool | - | - |
 
 ## 返回值说明
 
@@ -238,6 +256,10 @@ $$
 
 ## 约束说明
 
+- `layout_sparse_pattern`当前仅支持1（BNKQ）。
+- `residual_block_mode`当前仅支持 `ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX`（0），不支持隐式加入尾部不完整KV块。
+- `is_consistent_topk`支持False和True。
+
 - 确定性计算：`generic_block_sparse_attention_grad`默认为非确定性实现，暂不支持确定性实现，确定性计算配置后不会生效。
 - 参数`cu_seqlens_q`、`cu_seqlens_kv`、`seqused_q`、`seqused_kv`、`sparse_block_idx`、`sparse_block_count`属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - `generic_block_sparse_attention_grad_metadata`和`generic_block_sparse_attention_grad`的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
@@ -261,6 +283,9 @@ $$
 |                |   softmax_scale   | ATTR(OPTIONAL) |    float    |
 |                |      layout_q      | ATTR(OPTIONAL) |    string    |
 |                |     layout_kv     | ATTR(OPTIONAL) |    string    |
+|                | layout_sparse_pattern | ATTR(OPTIONAL) | int |
+|                | residual_block_mode | ATTR(OPTIONAL) | int/ResidualBlockMode/str |
+|                | is_consistent_topk | ATTR(OPTIONAL) | bool |
 |                |         dq         |     OUTPUT     |    Tensor    |
 |                |         dk         |     OUTPUT     |    Tensor    |
 |                |         dv         |     OUTPUT     |    Tensor    |
@@ -279,7 +304,6 @@ $$
 |                |     seqused_q     | INPUT(OPTIONAL) |    Tensor    |
 |                |     seqused_kv     | INPUT(OPTIONAL) |    Tensor    |
 | Softmax参数组 | softmax_precision | ATTR(OPTIONAL) |     int     |
-|                |   is_packed_gqa   | ATTR(OPTIONAL) |     bool     |
 
 ### 基准信息说明
 
@@ -450,7 +474,7 @@ $$
         <td rowspan="3">
             <ul>
                 <li>block_shape：block_x=1；block_y>=128 且为 64 的倍数</li>
-                <li>is_packed_gqa当前仅支持True</li>
+                <li>layout_sparse_pattern当前仅支持1（BNKQ）；residual_block_mode当前仅支持ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX（0）</li>
             </ul>
         </td>
     </tr>
@@ -524,7 +548,6 @@ mask_mode参数解释：
 #### Softmax参数组
 
 - `softmax_precision`当前仅支持0。
-- `is_packed_gqa`当前仅支持`True`。
 
 ## 调用示例
 
@@ -535,7 +558,7 @@ mask_mode参数解释：
   import torch
   import torch_npu
   import cann_ops_transformer
-  from cann_ops_transformer.ops.generic_block_sparse_attention_grad import MaskMode
+  from cann_ops_transformer.ops.generic_block_sparse_attention_grad import MaskMode, ResidualBlockMode
 
   torch_npu.npu.set_device(0)
 
@@ -565,13 +588,15 @@ mask_mode参数解释：
       N2,
       D,
       block_shape,
-      is_packed_gqa=True,
       layout_q="BNSD",
       layout_kv="BNSD",
+      layout_sparse_pattern=1,
       mask_mode=MaskMode.CAUSAL,
       softmax_precision=0,
       win_left=-1,
       win_right=-1,
+      residual_block_mode=ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX,
+      is_consistent_topk=False,
   )
 
   dq, dk, dv = cann_ops_transformer.generic_block_sparse_attention_grad(
@@ -586,14 +611,16 @@ mask_mode参数解释：
       block_shape,
       metadata=metadata,
       attn_mask=None,
-      is_packed_gqa=True,
       layout_q="BNSD",
       layout_kv="BNSD",
+      layout_sparse_pattern=1,
       softmax_scale=scale,
       mask_mode=MaskMode.CAUSAL,
       softmax_precision=0,
       win_left=-1,
       win_right=-1,
+      residual_block_mode=ResidualBlockMode.MARKED_BY_SPARSE_BLK_IDX,
+      is_consistent_topk=False,
   )
   torch_npu.npu.synchronize()
   assert dq.shape == q.shape

@@ -28,13 +28,15 @@ const std::array<const aclTensor *, 3> GenericBlockSparseAttentionGrad(
     const aclTensor *lse, const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
     const aclTensor *metadataOptional, const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional,
     const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-    const aclIntArray *blockShape, int64_t isPackedGQA, char *layoutQ, char *layoutKv, double scaleValue,
-    int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, aclOpExecutor *executor)
+    const aclIntArray *blockShape, char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, double scaleValue,
+    int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
+    bool isConsistentTopk, aclOpExecutor *executor)
 {
     const char *safeKvLayout = (layoutKv != nullptr) ? layoutKv : layoutQ;
     L0_DFX(GenericBlockSparseAttentionGrad, query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount,
-           metadataOptional, attenMaskOptional, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, blockShape, isPackedGQA,
-           layoutQ, safeKvLayout, scaleValue, maskType, softmaxPrecision, winLeft, winRight);
+           metadataOptional, attenMaskOptional, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, blockShape, layoutQ,
+           safeKvLayout, layoutSparsePattern, scaleValue, maskType, softmaxPrecision, winLeft, winRight,
+           residualBlockMode, isConsistentTopk);
 
     const aclTensor *metadataTensor =
         (metadataOptional != nullptr) ? metadataOptional :
@@ -70,9 +72,9 @@ const std::array<const aclTensor *, 3> GenericBlockSparseAttentionGrad(
         OP_INPUT(query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadataTensor, attenMaskTensor,
                  cuSeqTensor, cuSeqKvTensor, sequsedQTensor, sequsedKvTensor),
         OP_OUTPUT(dQuery, dKey, dValue),
-        OP_ATTR(blockShapeAttr, static_cast<int64_t>(isPackedGQA), layoutQ, safeKvLayout,
-                static_cast<float>(scaleValue), static_cast<int64_t>(maskType), static_cast<int64_t>(softmaxPrecision),
-                static_cast<int64_t>(winLeft), static_cast<int64_t>(winRight)));
+        OP_ATTR(blockShapeAttr, layoutQ, safeKvLayout, layoutSparsePattern, static_cast<float>(scaleValue),
+                static_cast<int64_t>(maskType), static_cast<int64_t>(softmaxPrecision), static_cast<int64_t>(winLeft),
+                static_cast<int64_t>(winRight), residualBlockMode, isConsistentTopk));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "GenericBlockSparseAttentionGrad InferShape failed.");
         return {nullptr, nullptr, nullptr};
@@ -83,9 +85,9 @@ const std::array<const aclTensor *, 3> GenericBlockSparseAttentionGrad(
         OP_INPUT(query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadataTensor, attenMaskTensor,
                  cuSeqTensor, cuSeqKvTensor, sequsedQTensor, sequsedKvTensor),
         OP_OUTPUT(dQuery, dKey, dValue),
-        OP_ATTR(blockShapeAttr, static_cast<int64_t>(isPackedGQA), layoutQ, safeKvLayout,
-                static_cast<float>(scaleValue), static_cast<int64_t>(maskType), static_cast<int64_t>(softmaxPrecision),
-                static_cast<int64_t>(winLeft), static_cast<int64_t>(winRight)));
+        OP_ATTR(blockShapeAttr, layoutQ, safeKvLayout, layoutSparsePattern, static_cast<float>(scaleValue),
+                static_cast<int64_t>(maskType), static_cast<int64_t>(softmaxPrecision), static_cast<int64_t>(winLeft),
+                static_cast<int64_t>(winRight), residualBlockMode, isConsistentTopk));
 
     return {dQuery, dKey, dValue};
 }

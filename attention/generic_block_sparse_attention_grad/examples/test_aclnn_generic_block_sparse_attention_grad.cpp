@@ -119,7 +119,9 @@ int main()
     const int64_t blockY = 128;
     const int64_t J = (S2 + blockY - 1) / blockY;
     const int64_t maskType = 1;
-    const int64_t isPackedGQA = 1;
+    const int64_t layoutSparsePattern = 1;
+    const int64_t residualBlockMode = 0;
+    const bool isConsistentTopk = false;
     const int64_t softmaxPrecision = 0;
     const int64_t windowLeft = -1;
     const int64_t windowRight = -1;
@@ -214,8 +216,9 @@ int main()
     aclOpExecutor *metaExecutor = nullptr;
     LOG_PRINT("Calling aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize...\n");
     ret = aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
-        idx, cnt, nullptr, nullptr, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, isPackedGQA, qLayout, kvLayout,
-        maskType, softmaxPrecision, windowLeft, windowRight, metadata, &metaWsSize, &metaExecutor);
+        idx, cnt, nullptr, nullptr, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, qLayout, kvLayout,
+        layoutSparsePattern, maskType, softmaxPrecision, windowLeft, windowRight, residualBlockMode, isConsistentTopk,
+        metadata, &metaWsSize, &metaExecutor);
     CHECK_RET(ret == ACL_SUCCESS,
               LOG_PRINT("aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
@@ -235,8 +238,9 @@ int main()
     LOG_PRINT("Calling aclnnGenericBlockSparseAttentionGradGetWorkspaceSize...\n");
     ret = aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
         q, k, v, dout, out, lse, idx, cnt, metadata, nullptr /*attenMask*/, nullptr /*cuQ*/, nullptr /*cuKv*/,
-        nullptr /*sequsedQ*/, nullptr /*sequsedKv*/, blockShape, isPackedGQA, qLayout, kvLayout, scaleValue, maskType,
-        softmaxPrecision, windowLeft, windowRight, dq, dk, dv, &workspaceSize, &executor);
+        nullptr /*sequsedQ*/, nullptr /*sequsedKv*/, blockShape, qLayout, kvLayout, layoutSparsePattern, scaleValue,
+        maskType, softmaxPrecision, windowLeft, windowRight, residualBlockMode, isConsistentTopk, dq, dk, dv,
+        &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS,
               LOG_PRINT("aclnnGenericBlockSparseAttentionGradGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);

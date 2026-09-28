@@ -280,9 +280,10 @@ aclnnStatus Validate(const aclTensor *query, const aclTensor *key, const aclTens
                      const aclTensor *sparseBlockCount, const aclTensor *metadataOptional,
                      const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional,
                      const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional,
-                     const aclTensor *sequsedKvOptional, const aclIntArray *blockShape, int64_t isPackedGQA,
-                     char *layoutQ, char *layoutKv, int64_t maskType, int64_t softmaxPrecision, int64_t winLeft,
-                     int64_t winRight, const aclTensor *dQuery, const aclTensor *dKey, const aclTensor *dValue)
+                     const aclTensor *sequsedKvOptional, const aclIntArray *blockShape, char *layoutQ, char *layoutKv,
+                     int64_t layoutSparsePattern, int64_t maskType, int64_t softmaxPrecision, int64_t winLeft,
+                     int64_t winRight, int64_t residualBlockMode, bool isConsistentTopk, const aclTensor *dQuery,
+                     const aclTensor *dKey, const aclTensor *dValue)
 {
     const aclTensor *required[] = {
         query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadataOptional, dQuery, dKey, dValue};
@@ -331,11 +332,15 @@ aclnnStatus Validate(const aclTensor *query, const aclTensor *key, const aclTens
             return st;
         }
     }
-    if (isPackedGQA != 1) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "GenericBlockSparseAttentionGrad: only support isPackedGQA == 1, got %ld.",
-                isPackedGQA);
+    if (layoutSparsePattern != 1 || residualBlockMode != 0) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "GenericBlockSparseAttentionGrad: only layoutSparsePattern=1 and residualBlockMode=0 are supported, "
+                "got %ld and %ld.",
+                layoutSparsePattern, residualBlockMode);
         return ACLNN_ERR_PARAM_INVALID;
     }
+    // Both TopK hints use the same per-block sparse-count implementation.
+    (void)isConsistentTopk;
     if (maskType != GSAG_SUPPORTED_MASK_TYPE) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "GenericBlockSparseAttentionGrad: only support maskType == %ld, got %ld.",
                 GSAG_SUPPORTED_MASK_TYPE, maskType);
@@ -358,10 +363,11 @@ aclnnStatus Validate(const aclTensor *query, const aclTensor *key, const aclTens
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (blockShape != nullptr) {
-        if (blockShape->Size() < 2) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "GenericBlockSparseAttentionGrad: blockShape must contain [x, y], got size %zu.",
-                    blockShape->Size());
+        if (blockShape->Size() != 2) {
+            OP_LOGE(
+                ACLNN_ERR_PARAM_INVALID,
+                "GenericBlockSparseAttentionGrad: blockShape must contain exactly two elements [x, y], got size %zu.",
+                blockShape->Size());
             return ACLNN_ERR_PARAM_INVALID;
         }
         if ((*blockShape)[0] != 1) {
@@ -478,25 +484,26 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
     const aclTensor *lse, const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
     const aclTensor *metadataOptional, const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional,
     const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-    const aclIntArray *blockShape, int64_t isPackedGQA, char *layoutQ, char *layoutKv, double scaleValue,
-    int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, aclTensor *dQuery, aclTensor *dKey,
-    aclTensor *dValue, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclIntArray *blockShape, char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, double scaleValue,
+    int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
+    bool isConsistentTopk, aclTensor *dQuery, aclTensor *dKey, aclTensor *dValue, uint64_t *workspaceSize,
+    aclOpExecutor **executor)
 {
     CHECK_RET(workspaceSize != nullptr && executor != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    L2_DFX_PHASE_1(
-        aclnnGenericBlockSparseAttentionGrad,
-        DFX_IN(query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadataOptional, attenMaskOptional,
-               cuSeqLengthsQOptional, cuSeqLengthsKvOptional, sequsedQOptional, sequsedKvOptional, blockShape,
-               isPackedGQA, layoutQ, layoutKv, scaleValue, maskType, softmaxPrecision, winLeft, winRight),
-        DFX_OUT(dQuery, dKey, dValue));
+    L2_DFX_PHASE_1(aclnnGenericBlockSparseAttentionGrad,
+                   DFX_IN(query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadataOptional,
+                          attenMaskOptional, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, sequsedQOptional,
+                          sequsedKvOptional, blockShape, layoutQ, layoutKv, layoutSparsePattern, scaleValue, maskType,
+                          softmaxPrecision, winLeft, winRight, residualBlockMode, isConsistentTopk),
+                   DFX_OUT(dQuery, dKey, dValue));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     auto ret = Validate(query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount, metadataOptional,
                         attenMaskOptional, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, sequsedQOptional,
-                        sequsedKvOptional, blockShape, isPackedGQA, layoutQ, layoutKv, maskType, softmaxPrecision,
-                        winLeft, winRight, dQuery, dKey, dValue);
+                        sequsedKvOptional, blockShape, layoutQ, layoutKv, layoutSparsePattern, maskType,
+                        softmaxPrecision, winLeft, winRight, residualBlockMode, isConsistentTopk, dQuery, dKey, dValue);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     auto queryC = l0op::Contiguous(query, uniqueExecutor.get());
@@ -532,10 +539,10 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradGetWorkspaceSize(
         CHECK_RET(sequsedKvC != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
 
-    auto outs = l0op::GenericBlockSparseAttentionGrad(queryC, keyC, valueC, doutC, outC, lseC, idxC, cntC, metaC,
-                                                      attenC, cuQC, cuKvC, sequsedQC, sequsedKvC, blockShape,
-                                                      isPackedGQA, layoutQ, layoutKv, scaleValue, maskType,
-                                                      softmaxPrecision, winLeft, winRight, uniqueExecutor.get());
+    auto outs = l0op::GenericBlockSparseAttentionGrad(
+        queryC, keyC, valueC, doutC, outC, lseC, idxC, cntC, metaC, attenC, cuQC, cuKvC, sequsedQC, sequsedKvC,
+        blockShape, layoutQ, layoutKv, layoutSparsePattern, scaleValue, maskType, softmaxPrecision, winLeft, winRight,
+        residualBlockMode, isConsistentTopk, uniqueExecutor.get());
     CHECK_RET(outs[0] != nullptr && outs[1] != nullptr && outs[2] != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     auto dqView = l0op::ViewCopy(outs[0], dQuery, uniqueExecutor.get());
