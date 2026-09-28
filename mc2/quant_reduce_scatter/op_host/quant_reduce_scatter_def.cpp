@@ -35,7 +35,7 @@ public:
                        ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E1M2,
                        ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E2M1,   ge::DT_FLOAT4_E1M2,
                        ge::DT_FLOAT4_E1M2,   ge::DT_FLOAT4_E1M2})
-            .FormatList({ge::FORMAT_ND, ge::FORMAT_NCHW, ge::FORMAT_NHWC});
+            .FormatList({ge::FORMAT_ND});
         this->Input("scales")
             .ParamType(REQUIRED)
             .DataType(
@@ -45,7 +45,7 @@ public:
                  ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT,       ge::DT_FLOAT,
                  ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT8_E8M0,
                  ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
-            .FormatList({ge::FORMAT_ND, ge::FORMAT_NCHW, ge::FORMAT_NHWC});
+            .FormatList({ge::FORMAT_ND});
 
         this->Output("out_put")
             .ParamType(REQUIRED)
@@ -54,7 +54,7 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT,
                        ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT,
                        ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_FLOAT})
-            .FormatList({ge::FORMAT_ND, ge::FORMAT_NCHW, ge::FORMAT_NHWC});
+            .FormatList({ge::FORMAT_ND});
 
         this->Attr("hccl_buffer_size").AttrType(REQUIRED).Int();
         this->Attr("reduce_op").AttrType(OPTIONAL).String("sum");

@@ -24,13 +24,11 @@ namespace ge {
  * three inputs, including:
  * @li context: A matrix tensor. The type support int32. The format supports ND.
  * @li x: A matrix tensor. The type support int8, hifloat8, float8_e4m3fn, float8_e5m2, float4_e1m2, float4_e2m1. The
- * format supports ND. In graph mode, the format supports NCHW/NHWC.
+ * format supports ND.
  * @li scales: A matrix tensor. The type support float32, float8_e8m0. The format supports ND.
- * In graph mode, the format supports NCHW/NHWC.
  *
  * @par Outputs:
  * out_put: A matrix tensor. The type support float16, bfloat16, float32. The format supports ND.
- * In graph mode, the format supports NCHW/NHWC.
  *
  * @par Attributes:
  * @li hccl_buffer_size: A required string identifying the ccl buffer size in the op.
