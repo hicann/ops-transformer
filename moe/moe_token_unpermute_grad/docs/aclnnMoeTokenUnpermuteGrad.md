@@ -62,7 +62,7 @@
 
 ```c++
 aclnnStatus aclnnMoeTokenUnpermuteGradGetWorkspaceSize(
-  const aclTensor   *permutedTokensOptional,
+  const aclTensor   *permuteTokensOptional,
   const aclTensor   *unpermutedTokensGrad,
   const aclTensor   *sortedIndices,
   const aclTensor   *probsOptional,
@@ -109,7 +109,7 @@ aclnnStatus aclnnMoeTokenUnpermuteGrad(
     </tr></thead>
   <tbody>
     <tr>
-      <td>permutedTokensOptional（aclTensor）</td>
+      <td>permuteTokensOptional（aclTensor）</td>
       <td>输入</td>
       <td>表示输入token。</td>
       <td>-</td>
@@ -276,7 +276,7 @@ aclnnStatus aclnnMoeTokenUnpermuteGrad(
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
   在调用本接口时，框架内部会转调用[aclnnMoeFinalizeRoutingV2Grad](../../moe_finalize_routing_v2_grad/docs/aclnnMoeFinalizeRoutingV2Grad.md)接口，如果出现参数错误提示，请参考以下参数映射关系：
-  - permutedTokensOptional输入等同于aclnnMoeFinalizeRoutingV2Grad接口的expandedXOptional输入。
+  - permuteTokensOptional输入等同于aclnnMoeFinalizeRoutingV2Grad接口的expandedXOptional输入。
   - unpermutedTokensGrad输入等同于aclnnMoeFinalizeRoutingV2Grad接口的gradY输入。
   - sortedIndices输入等同于aclnnMoeFinalizeRoutingV2Grad接口的expandedRowIdx输入。
   - probsOptional输入等同于aclnnMoeFinalizeRoutingV2Grad接口的scalesOptional输入。
@@ -290,7 +290,7 @@ aclnnStatus aclnnMoeTokenUnpermuteGrad(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"
