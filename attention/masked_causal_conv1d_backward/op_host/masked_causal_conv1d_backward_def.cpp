@@ -19,7 +19,8 @@ namespace ops {
 
 class MaskedCausalConv1dBackward : public OpDef {
 public:
-    explicit MaskedCausalConv1dBackward(const char *name) : OpDef(name)
+    explicit MaskedCausalConv1dBackward(const char *name)
+        : OpDef(name)
     {
         this->Input("grad_y")
             .ParamType(REQUIRED)
@@ -62,6 +63,7 @@ public:
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "masked_causal_conv1d_backward_apt");
         this->AICore().AddConfig("ascend950", config_950);
+        this->AICore().AddConfig("ascend350", config_950);
     }
 };
 

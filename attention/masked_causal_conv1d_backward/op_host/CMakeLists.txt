@@ -22,6 +22,16 @@ if (BUILD_OPEN_PROJECT)
                     -Wno-deprecated-declarations
                     -Werror
         )
+    elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend350")
+        add_ops_compile_options(
+            OP_NAME MaskedCausalConv1dBackward
+            COMPUTE_UNIT Ascend350_355e
+            OPTIONS --cce-auto-sync=off
+                    -mllvm
+                    -cce-aicore-dcci-before-kernel-end=false
+                    -Wno-deprecated-declarations
+                    -Werror
+        )
     else()
         add_ops_compile_options(
             OP_NAME MaskedCausalConv1dBackward
