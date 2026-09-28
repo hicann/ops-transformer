@@ -27,21 +27,21 @@
 
 - **计算公式**：
 
-    阶段一：根据cmp_kv与cmp_sparse_indices是否传入选择计算场景，并对输入ori_kv与cmp_kv进行选择。
+    阶段一：根据不同cmp_ratio场景，对输入ori_kv与cmp_kv进行选择
 
-    * SWA（cmp_kv为空）：
+    * 当cmp_ratio = 1 (SWA)：
 
     $$
     selectedKv\text{ }=\text{ }orikv
     $$
 
-    * SCFA（cmp_kv与cmp_sparse_indices均非空）：
+    * 当cmp_ratio = 4 (SCFA)：
 
     $$
     selectedKv\text{ }=concat(oriKv, \text{ }Gather \left( cmpkv,topkIndices \left[ i \left]  \left)) ,\text{ }0\text{ } < =i < \text{ }selectBlockCount\right. \right. \right. \right.
     $$
 
-    * CFA（cmp_kv非空且cmp_sparse_indices为空）：
+    * else (CFA):
 
     $$
     selectedKv\text{ }=concat(oriKv, \text{ }cmpkv)
@@ -439,7 +439,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>输入</td>
             <td>表示对oriKvOptional的压缩率。</td>
             <td>
-            取值范围：0~128。
+            取值范围：1~128。
             </td>
             <td>INT64</td>
             <td>N/A</td>
