@@ -9,7 +9,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 add_op_to_compiled_list()
- 	 
+
 if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnn PRIVATE
         attention_worker_combine_def.cpp
@@ -22,8 +22,18 @@ if (BUILD_OPEN_PROJECT)
                         -Werror
         )
     else() # custom
+        if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950")
+        add_ops_compile_options(
+                OP_NAME AttentionWorkerCombine
+                OPTIONS --cce-auto-sync=on
+                        -Wno-deprecated-declarations
+                        -Werror
+                        -mllvm
+                        -cce-aicore-dcci-before-kernel-end=false
+            )
+        endif()
         add_modules_sources(OPTYPE attention_worker_combine ACLNNTYPE aclnn)
     endif()
 else() # 回黄host
-    add_modules_sources(OPTYPE attention_worker_combine ACLNNTYPE aclnn)  
+    add_modules_sources(OPTYPE attention_worker_combine ACLNNTYPE aclnn)
 endif()

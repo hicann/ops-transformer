@@ -5,7 +5,7 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT系列产品</term>：不支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3系列产品</term>：支持
@@ -110,11 +110,11 @@ aclnnStatus aclnnAttentionWorkerCombine(
     <tr>
       <td>expertScales</td>
       <td>输入</td>
-      <td>专家权重，表示每个token对应的各专家权重。</td>
-      <td>-</td>
-      <td>FLOAT</td>
+      <td>非量化场景表示每个token对应的专家权重；MXFP反量化场景表示token数据的E8M0缩放因子，每32个hiddenSize方向的元素共享一个缩放因子。</td>
+      <td>tokenDtype为0或1时，数据类型为FLOAT；<term>Ascend 950PR&950DT系列产品</term>上tokenDtype为2、3或4时，数据类型为FLOAT8_E8M0。</td>
+      <td>FLOAT、FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>2维，(BS, K)</td>
+      <td>非量化场景为2维，shape为(BS, K)；MXFP反量化场景为3维，shape为(BS, K+1, S)，其中S为Ceil(hiddenSize/32)向上取整到偶数。</td>
       <td>×</td>
     </tr>
     <tr>
@@ -140,8 +140,8 @@ aclnnStatus aclnnAttentionWorkerCombine(
     <tr>
       <td>tokenDtype</td>
       <td>输入</td>
-      <td>指定scheduleContext中token数据的原始精度类型。0表示FLOAT16；1表示BFLOAT16。</td>
-      <td>取值为0或1。</td>
+      <td>指定scheduleContext中token数据的原始精度类型。0表示FLOAT16；1表示BFLOAT16；<term>Ascend 950PR&950DT系列产品</term>另支持MXFP反量化，2表示MXFP8_E5M2、3表示MXFP8_E4M3FN、4表示MXFP4_E2M1。</td>
+      <td>非量化取值为0或1；MXFP反量化场景取值为2、3或4。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -275,7 +275,7 @@ aclnnStatus aclnnAttentionWorkerCombine(
 
 ## 约束说明
 
-- expertScales的第二维K ≤ 64。
+- K ≤ 64。非量化场景下，expertScales为FLOAT类型，shape为(BS, K)；MXFP反量化场景下，expertScales为FLOAT8_E8M0类型，shape为(BS, K+1, S)，S为Ceil(hiddenSize/32)向上取整到偶数。
 - 确定性计算：
   - aclnnAttentionWorkerCombine默认确定性实现。
 

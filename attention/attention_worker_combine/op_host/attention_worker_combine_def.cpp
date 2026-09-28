@@ -19,7 +19,8 @@
 namespace ops {
 class AttentionWorkerCombine : public OpDef {
 public:
-    explicit AttentionWorkerCombine(const char *name) : OpDef(name)
+    explicit AttentionWorkerCombine(const char *name)
+        : OpDef(name)
     {
         this->Input("schedule_context")
             .ParamType(REQUIRED)
@@ -55,8 +56,40 @@ public:
 
         this->AICore().AddConfig("ascend910_93");
         this->AICore().AddConfig("ascend910b");
+
+        OpAICoreConfig regbaseCfg;
+        regbaseCfg.DynamicCompileStaticFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .ExtendCfgInfo("opFile.value", "attention_worker_combine_apt");
+        regbaseCfg.Input("schedule_context")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_INT8, ge::DT_INT8, ge::DT_INT8})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
+        regbaseCfg.Input("expert_scales")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT8_E8M0})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
+        regbaseCfg.Input("layer_id")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_INT32, ge::DT_INT32, ge::DT_INT32})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
+        regbaseCfg.Output("y")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
+        regbaseCfg.Output("next_layer_id")
+            .ParamType(REQUIRED)
+            .DataType({ge::DT_INT32, ge::DT_INT32, ge::DT_INT32})
+            .Format({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND})
+            .UnknownShapeFormat({ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND});
+        this->AICore().AddConfig("ascend950", regbaseCfg);
     }
 };
 
 OP_ADD(AttentionWorkerCombine);
-}  // namespace ops
+} // namespace ops

@@ -26,7 +26,7 @@ namespace ge {
  * @par Inputs:
  * @li schedule_context: A 1D tensor, represents struct contain token_data. Data type is DT_INT8. Format supports ND.
  * @li expert_scales: A 2D tensor, represents expert scales. Data type is DT_FLOAT32. Shape supports (BS, K). Format
- * supports ND.
+ * supports ND. Ascend950 MXFP uses DT_FLOAT8_E8M0 with shape (R, K+1, align_up(ceil(H/32), 2)).
  * @li layer_id: A 1D tensor, represents layer id. Data type is DT_INT32. Format supports ND. Shape supports (1,).
  *
  * @par Outputs:
@@ -38,12 +38,12 @@ namespace ge {
  * @par Attributes:
  * @li hidden_size: Required Int, represents token_data hidden size.
  * @li token_dtype: Int, represents token data type. Value 0 represents token data type is FLOAT16, and value 1
- * represents BFLOAT16.
+ * represents BFLOAT16. Ascend950 also supports 2: MXFP8_E5M2, 3: MXFP8_E4M3FN and 4: MXFP4_E2M1.
  * @li need_schedule: Int, Value 1 represents op waits until tokens are filled.
  */
 REG_OP(AttentionWorkerCombine)
     .INPUT(schedule_context, TensorType({DT_INT8}))
-    .INPUT(expert_scales, TensorType({DT_FLOAT}))
+    .INPUT(expert_scales, TensorType({DT_FLOAT, DT_FLOAT8_E8M0}))
     .INPUT(layer_id, TensorType({DT_INT32}))
     .OUTPUT(y, TensorType({DT_FLOAT16, DT_BF16}))
     .OUTPUT(next_layer_id, TensorType({DT_INT32}))
