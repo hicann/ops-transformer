@@ -254,15 +254,15 @@ __aicore__ inline uint32_t LightningIndexerKernel<LIT>::GetTotalBaseBlockNum()
 // 多核版本，双闭区间。基本原则：计算每个核最少处理的块数, 剩余的部分前面的核每个核多处理一块
 template <typename LIT>
 __aicore__ void inline LightningIndexerKernel<LIT>::SplitCore(uint32_t curCoreIdx, uint32_t &coreNum,
-                                                              LICommon::SplitCoreInfo &info)
+                                                              LICommon::SplitCoreInfo &liInfo)
 {
     uint32_t liTotalBlockNum = GetTotalBaseBlockNum();
-    uint32_t minBlockPerCore = liTotalBlockNum / coreNum;
-    uint32_t deal1MoreBlockCoreNum = liTotalBlockNum % coreNum;
+    uint32_t liMinBlockPerCore = liTotalBlockNum / coreNum;
+    uint32_t liDeal1MoreBlockCoreNum = liTotalBlockNum % coreNum;
     uint32_t liCoreIdx = 0;
     uint32_t liLastGS1RemainBlockCnt = 0;
-    uint32_t liCoreDealBlockCnt = liCoreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
-    coreNum = minBlockPerCore == 0 ? deal1MoreBlockCoreNum : coreNum;
+    uint32_t liCoreDealBlockCnt = liCoreIdx < liDeal1MoreBlockCoreNum ? liMinBlockPerCore + 1 : liMinBlockPerCore;
+    coreNum = liMinBlockPerCore == 0 ? liDeal1MoreBlockCoreNum : coreNum;
     if (curCoreIdx < coreNum) {
         splitCoreInfo.isCoreEnable = true;
     } else {
@@ -271,66 +271,67 @@ __aicore__ void inline LightningIndexerKernel<LIT>::SplitCore(uint32_t curCoreId
     }
 
     bool liFindLastCoreEnd = true;
-    uint32_t actS1Size, actS2Size, actS2SizeOrig;
-    uint32_t s1GBaseNum, s2BaseNum, s2Loop;
-    for (uint32_t bN2Idx = 0; bN2Idx < constInfo.batchSize * constInfo.kHeadNum; bN2Idx++) {
-        uint32_t bIdx = bN2Idx / constInfo.kHeadNum;
-        if (bN2Idx % constInfo.kHeadNum == 0) {
-            GetS1S2ActualSeqLen(bIdx, actS1Size, actS2Size, actS2SizeOrig);
-            s1GBaseNum = CeilDiv(actS1Size, constInfo.s1BaseSize);
-            s2BaseNum = CeilDiv(actS2Size, constInfo.s2BaseSize);
+    uint32_t liActS1Size, liActS2Size, liActS2SizeOrig;
+    uint32_t liS1GBaseNum, liS2BaseNum, liS2Loop;
+    for (uint32_t liBN2Idx = 0; liBN2Idx < constInfo.batchSize * constInfo.kHeadNum; liBN2Idx++) {
+        uint32_t liBIdx = liBN2Idx / constInfo.kHeadNum;
+        if (liBN2Idx % constInfo.kHeadNum == 0) {
+            GetS1S2ActualSeqLen(liBIdx, liActS1Size, liActS2Size, liActS2SizeOrig);
+            liS1GBaseNum = CeilDiv(liActS1Size, constInfo.s1BaseSize);
+            liS2BaseNum = CeilDiv(liActS2Size, constInfo.s2BaseSize);
         }
         if constexpr (LAYOUT_T == LI_LAYOUT::BSND) {
-            if (liFindLastCoreEnd && (s1GBaseNum == 0U || s2BaseNum == 0U)) {
-                info.bN2Start = bN2Idx;
-                info.gS1Start = 0;
-                info.s2Start = 0;
+            if (liFindLastCoreEnd && (liS1GBaseNum == 0U || liS2BaseNum == 0U)) {
+                liInfo.bN2Start = liBN2Idx;
+                liInfo.gS1Start = 0;
+                liInfo.s2Start = 0;
                 liFindLastCoreEnd = false;
             }
         }
-        for (uint32_t gS1Idx = 0; gS1Idx < s1GBaseNum; gS1Idx++) {
+        for (uint32_t liGS1Idx = 0; liGS1Idx < liS1GBaseNum; liGS1Idx++) {
             if (constInfo.attenMaskFlag) {
-                s2BaseNum = GetS2BaseBlockNumOnMask(gS1Idx, actS1Size, actS2SizeOrig);
+                liS2BaseNum = GetS2BaseBlockNumOnMask(liGS1Idx, liActS1Size, liActS2SizeOrig);
             }
-            if (liFindLastCoreEnd && s2BaseNum == 0U) {
-                info.bN2Start = bN2Idx;
-                info.gS1Start = gS1Idx;
-                info.s2Start = 0;
+            if (liFindLastCoreEnd && liS2BaseNum == 0U) {
+                liInfo.bN2Start = liBN2Idx;
+                liInfo.gS1Start = liGS1Idx;
+                liInfo.s2Start = 0;
                 liFindLastCoreEnd = false;
             }
-            s2Loop = constInfo.isLDOpen ? s2BaseNum : (actS2Size > 0 ? 1 : 0);
-            for (uint32_t s2Idx = 0; s2Idx < s2Loop;) {
+            liS2Loop = constInfo.isLDOpen ? liS2BaseNum : (liActS2Size > 0 ? 1 : 0);
+            for (uint32_t liS2Idx = 0; liS2Idx < liS2Loop;) {
                 if (liFindLastCoreEnd) {
-                    info.bN2Start = bN2Idx;
-                    info.gS1Start = gS1Idx;
-                    info.s2Start = s2Idx;
+                    liInfo.bN2Start = liBN2Idx;
+                    liInfo.gS1Start = liGS1Idx;
+                    liInfo.s2Start = liS2Idx;
                     liFindLastCoreEnd = false;
                 }
-                uint32_t liS2RemainBaseNum = s2Loop - s2Idx;
+                uint32_t liS2RemainBaseNum = liS2Loop - liS2Idx;
                 if (liLastGS1RemainBlockCnt + liS2RemainBaseNum >= liCoreDealBlockCnt) {
-                    info.bN2End = bN2Idx;
-                    info.gS1End = gS1Idx;
-                    info.s2End =
-                        constInfo.isLDOpen ? s2Idx + liCoreDealBlockCnt - liLastGS1RemainBlockCnt - 1 : s2BaseNum - 1;
+                    liInfo.bN2End = liBN2Idx;
+                    liInfo.gS1End = liGS1Idx;
+                    liInfo.s2End = constInfo.isLDOpen ? liS2Idx + liCoreDealBlockCnt - liLastGS1RemainBlockCnt - 1 :
+                                                        liS2BaseNum - 1;
 
                     if (liCoreIdx == curCoreIdx) {
                         // S2被切N核，那么只有第一个核需要处理LD，其他核不用
-                        if (s2Idx == 0 && info.s2End + 1 < s2BaseNum) {
-                            info.isLD = true;
+                        if (liS2Idx == 0 && liInfo.s2End + 1 < liS2BaseNum) {
+                            liInfo.isLD = true;
                         }
                         // 最后一个核处理的不是最后一个Batch，表明后面的Batch为空块(S2=0), 调整终点坐标以便清理输出
-                        if (liCoreIdx == coreNum - 1 && info.bN2End != constInfo.batchSize - 1) {
-                            info.bN2End = constInfo.batchSize - 1;
-                            info.s2End = 0;
-                            info.gS1End = 0;
+                        if (liCoreIdx == coreNum - 1 && liInfo.bN2End != constInfo.batchSize - 1) {
+                            liInfo.bN2End = constInfo.batchSize - 1;
+                            liInfo.s2End = 0;
+                            liInfo.gS1End = 0;
                         }
                         return;
                     }
                     liCoreIdx++;
                     liFindLastCoreEnd = true;
-                    s2Idx = info.s2End + 1;
+                    liS2Idx = liInfo.s2End + 1;
                     liLastGS1RemainBlockCnt = 0;
-                    liCoreDealBlockCnt = liCoreIdx < deal1MoreBlockCoreNum ? minBlockPerCore + 1 : minBlockPerCore;
+                    liCoreDealBlockCnt =
+                        liCoreIdx < liDeal1MoreBlockCoreNum ? liMinBlockPerCore + 1 : liMinBlockPerCore;
                 } else {
                     liLastGS1RemainBlockCnt += liS2RemainBaseNum;
                     break;

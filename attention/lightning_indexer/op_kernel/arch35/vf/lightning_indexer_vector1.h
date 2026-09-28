@@ -29,10 +29,10 @@ using liV2Vector1::InitFloatSortConstCtx;
 using liV2Vector1::WeightedAccum;
 
 template <typename T>
-struct UIntSortTraits;
+struct LiUIntSortTraits;
 
 template <>
-struct UIntSortTraits<float> {
+struct LiUIntSortTraits<float> {
     using UInt = uint32_t;
     static constexpr UInt ZERO = 0x00000000;
     static constexpr UInt SIGN_MASK = 0x80000000;
@@ -41,8 +41,8 @@ struct UIntSortTraits<float> {
 };
 
 template <typename FloatT>
-struct UIntSortConstCtx {
-    using Traits = UIntSortTraits<FloatT>;
+struct LiUIntSortConstCtx {
+    using Traits = LiUIntSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
     AscendC::Reg::RegTensor<UInt> zeros;
     AscendC::Reg::RegTensor<UInt> allOne;
@@ -51,9 +51,9 @@ struct UIntSortConstCtx {
 };
 
 template <typename FloatT>
-__simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
+__simd_callee__ inline void InitLiUIntSortConstCtx(LiUIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
 {
-    using Traits = UIntSortTraits<FloatT>;
+    using Traits = LiUIntSortTraits<FloatT>;
     AscendC::Reg::Duplicate(ctx.zeros, Traits::ZERO, maskAll);
     AscendC::Reg::Duplicate(ctx.allOne, Traits::ALL_ONE, maskAll);
     AscendC::Reg::Duplicate(ctx.nan, Traits::NAN_MASK, maskAll);
@@ -61,39 +61,39 @@ __simd_callee__ inline void InitUIntSortConstCtx(UIntSortConstCtx<FloatT> &ctx, 
 }
 
 template <typename FloatT>
-__simd_callee__ inline void UIntToSortableKey(AscendC::Reg::RegTensor<FloatT> &outKey,
-                                              AscendC::Reg::RegTensor<typename UIntSortConstCtx<FloatT>::UInt> &inVal,
-                                              UIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
+__simd_callee__ inline void LiUIntToSortableKey(
+    AscendC::Reg::RegTensor<FloatT> &outKey, AscendC::Reg::RegTensor<typename LiUIntSortConstCtx<FloatT>::UInt> &inVal,
+    LiUIntSortConstCtx<FloatT> &ctx, AscendC::Reg::MaskReg &maskAll)
 {
-    using Traits = UIntSortTraits<FloatT>;
+    using Traits = LiUIntSortTraits<FloatT>;
     using UInt = typename Traits::UInt;
 
-    AscendC::Reg::RegTensor<UInt> regMask;
-    AscendC::Reg::RegTensor<UInt> regTemp;
-    AscendC::Reg::MaskReg regSelectZero;
-    AscendC::Reg::MaskReg regSelectSign;
+    AscendC::Reg::RegTensor<UInt> liRegTemp;
+    AscendC::Reg::RegTensor<UInt> liRegMask;
+    AscendC::Reg::MaskReg liRegSelectZero;
+    AscendC::Reg::MaskReg liRegSelectSign;
 
-    auto &inBits = inVal;
+    auto &liInBits = inVal;
 
     // 1. 0 check
-    AscendC::Reg::Compare<UInt, CMPMODE::EQ>(regSelectZero, inBits, ctx.zeros, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::EQ>(liRegSelectZero, liInBits, ctx.zeros, maskAll);
 
     // 2. 0 -> -NAN
-    AscendC::Reg::Select((AscendC::Reg::RegTensor<UInt> &)outKey, ctx.nan, inBits, regSelectZero);
+    AscendC::Reg::Select((AscendC::Reg::RegTensor<UInt> &)outKey, ctx.nan, liInBits, liRegSelectZero);
 
     // 3. sign bit
-    AscendC::Reg::And(regTemp, (AscendC::Reg::RegTensor<UInt> &)outKey, ctx.signMask, maskAll);
+    AscendC::Reg::And(liRegTemp, (AscendC::Reg::RegTensor<UInt> &)outKey, ctx.signMask, maskAll);
 
-    AscendC::Reg::Compare<UInt, CMPMODE::GT>(regSelectSign, regTemp, ctx.zeros, maskAll);
+    AscendC::Reg::Compare<UInt, CMPMODE::GT>(liRegSelectSign, liRegTemp, ctx.zeros, maskAll);
 
     // 4. xor mask
-    AscendC::Reg::Select(regMask, ctx.signMask, ctx.allOne, regSelectSign);
-    AscendC::Reg::Xor((AscendC::Reg::RegTensor<UInt> &)outKey, (AscendC::Reg::RegTensor<UInt> &)outKey, regMask,
+    AscendC::Reg::Select(liRegMask, ctx.signMask, ctx.allOne, liRegSelectSign);
+    AscendC::Reg::Xor((AscendC::Reg::RegTensor<UInt> &)outKey, (AscendC::Reg::RegTensor<UInt> &)outKey, liRegMask,
                       maskAll);
 }
 
-__aicore__ inline void UIntToFloatReturnValue(const LocalTensor<bfloat16_t> &out_, const LocalTensor<uint32_t> &in,
-                                              const uint32_t topK)
+__aicore__ inline void LiUIntToFloatReturnValue(const LocalTensor<bfloat16_t> &out_, const LocalTensor<uint32_t> &in,
+                                                const uint32_t topK)
 {
     auto outBuf = (__local_mem__ bfloat16_t *)out_.GetPhyAddr();
     auto inBuf = (__local_mem__ uint32_t *)in.GetPhyAddr();
@@ -115,10 +115,10 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<bfloat16_t> &out
         for (uint16_t i = 0; i < topkLoopNum; ++i) {
             AscendC::Reg::LoadAlign<uint32_t>(regIn[0], inBuf + i * repeatSize32);
             AscendC::Reg::LoadAlign<uint32_t>(regIn[1], inBuf + i * repeatSize32 + 64);
-            UIntSortConstCtx<float> uint32Ctx;
-            InitUIntSortConstCtx(uint32Ctx, maskAllB32);
-            UIntToSortableKey<float>(regOut[0], regIn[0], uint32Ctx, maskAllB32);
-            UIntToSortableKey<float>(regOut[1], regIn[1], uint32Ctx, maskAllB32);
+            LiUIntSortConstCtx<float> uint32Ctx;
+            InitLiUIntSortConstCtx(uint32Ctx, maskAllB32);
+            LiUIntToSortableKey<float>(regOut[0], regIn[0], uint32Ctx, maskAllB32);
+            LiUIntToSortableKey<float>(regOut[1], regIn[1], uint32Ctx, maskAllB32);
 
             AscendC::Reg::Cast<bfloat16_t, float, castTraitFP32ToBF16>(regOutBF16[0], regOut[0], maskAllB32);
             AscendC::Reg::Cast<bfloat16_t, float, castTraitFP32ToBF16>(regOutBF16[1], regOut[1], maskAllB32);
@@ -131,8 +131,8 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<bfloat16_t> &out
     }
 }
 
-__aicore__ inline void UIntToFloatReturnValue(const LocalTensor<half> &out_, const LocalTensor<uint32_t> &in,
-                                              const uint32_t topK)
+__aicore__ inline void LiUIntToFloatReturnValue(const LocalTensor<half> &out_, const LocalTensor<uint32_t> &in,
+                                                const uint32_t topK)
 {
     auto outBuf = (__local_mem__ half *)out_.GetPhyAddr();
     auto inBuf = (__local_mem__ uint32_t *)in.GetPhyAddr();
@@ -154,10 +154,10 @@ __aicore__ inline void UIntToFloatReturnValue(const LocalTensor<half> &out_, con
         for (uint16_t i = 0; i < topkLoopNum; ++i) {
             AscendC::Reg::LoadAlign<uint32_t>(regIn[0], inBuf + i * repeatSize32);
             AscendC::Reg::LoadAlign<uint32_t>(regIn[1], inBuf + i * repeatSize32 + 64);
-            UIntSortConstCtx<float> uint32Ctx;
-            InitUIntSortConstCtx(uint32Ctx, maskAllB32);
-            UIntToSortableKey<float>(regOut[0], regIn[0], uint32Ctx, maskAllB32);
-            UIntToSortableKey<float>(regOut[1], regIn[1], uint32Ctx, maskAllB32);
+            LiUIntSortConstCtx<float> uint32Ctx;
+            InitLiUIntSortConstCtx(uint32Ctx, maskAllB32);
+            LiUIntToSortableKey<float>(regOut[0], regIn[0], uint32Ctx, maskAllB32);
+            LiUIntToSortableKey<float>(regOut[1], regIn[1], uint32Ctx, maskAllB32);
 
             AscendC::Reg::Cast<half, float, castTraitFP32ToFP16>(regOutFP16[0], regOut[0], maskAllB32);
             AscendC::Reg::Cast<half, float, castTraitFP32ToFP16>(regOutFP16[1], regOut[1], maskAllB32);

@@ -544,11 +544,11 @@ __aicore__ inline void LightningIndexerServiceVector<LIT>::ProcessTopK(const LIC
             WaitFlag<HardEvent::V_MTE2>(TOPK_V_MTE2_EVENT);
             // uint16_t -> bfloat16
             if (std::is_same_v<K_T, bfloat16_t>) {
-                vector1::UIntToFloatReturnValue(valueOutLocal_.template ReinterpretCast<bfloat16_t>(), scoreOutLocal_,
-                                                topkCountAlign256_);
+                vector1::LiUIntToFloatReturnValue(valueOutLocal_.template ReinterpretCast<bfloat16_t>(), scoreOutLocal_,
+                                                  topkCountAlign256_);
             } else {
-                vector1::UIntToFloatReturnValue(valueOutLocal_.template ReinterpretCast<half>(), scoreOutLocal_,
-                                                topkCountAlign256_);
+                vector1::LiUIntToFloatReturnValue(valueOutLocal_.template ReinterpretCast<half>(), scoreOutLocal_,
+                                                  topkCountAlign256_);
             }
 
             if (validS2Len < topkCount_) {
