@@ -103,36 +103,26 @@ static const std::string CMP_KV_NAME = "cmp_kv";
 static std::string DataTypeToSerialString(ge::DataType type);
 
 const std::map<std::string, std::vector<ge::DataType>> DTYPE_SUPPORT_MAP = {
-    {X_NAME,                  {ge::DT_HIFLOAT8}},
-    {WKV_NAME,                {ge::DT_HIFLOAT8}},
-    {WGATE_NAME,              {ge::DT_HIFLOAT8}},
-    {STATE_CACHE_NAME,        {ge::DT_FLOAT}},
-    {APE_NAME,                {ge::DT_FLOAT}},
-    {X_DESCALE_NAME,           {ge::DT_FLOAT}},
-    {WKV_DESCALE_NAME,        {ge::DT_FLOAT}},
-    {WGATE_DESCALE_NAME,      {ge::DT_FLOAT}},
-    {STATE_BLOCK_TABLE_NAME,  {ge::DT_INT32}},
-    {CU_SEQLENS_NAME,         {ge::DT_INT32}},
-    {SEQUSED_NAME,            {ge::DT_INT32}},
-    {START_POS_NAME,          {ge::DT_INT32}},
-    {CMP_KV_NAME,             {ge::DT_BF16}}
-};
+    {X_NAME, {ge::DT_HIFLOAT8}},        {WKV_NAME, {ge::DT_HIFLOAT8}},        {WGATE_NAME, {ge::DT_HIFLOAT8}},
+    {STATE_CACHE_NAME, {ge::DT_FLOAT}}, {APE_NAME, {ge::DT_FLOAT}},           {X_DESCALE_NAME, {ge::DT_FLOAT}},
+    {WKV_DESCALE_NAME, {ge::DT_FLOAT}}, {WGATE_DESCALE_NAME, {ge::DT_FLOAT}}, {STATE_BLOCK_TABLE_NAME, {ge::DT_INT32}},
+    {CU_SEQLENS_NAME, {ge::DT_INT32}},  {SEQUSED_NAME, {ge::DT_INT32}},       {START_POS_NAME, {ge::DT_INT32}},
+    {CMP_KV_NAME, {ge::DT_BF16}}};
 
 const std::map<std::string, std::vector<uint32_t>> DIM_NUM_MAP = {
-    {X_NAME,                  {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_3}},
-    {WKV_NAME,                {COMPRESSOR_DIM_NUM_2}},
-    {WGATE_NAME,              {COMPRESSOR_DIM_NUM_2}},
-    {STATE_CACHE_NAME,        {COMPRESSOR_DIM_NUM_3}},
-    {APE_NAME,                {COMPRESSOR_DIM_NUM_2}},
-    {X_DESCALE_NAME,           {COMPRESSOR_DIM_NUM_1}},
-    {WKV_DESCALE_NAME,        {COMPRESSOR_DIM_NUM_1}},
-    {WGATE_DESCALE_NAME,      {COMPRESSOR_DIM_NUM_1}},
-    {STATE_BLOCK_TABLE_NAME,  {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_1}},
-    {CU_SEQLENS_NAME,         {COMPRESSOR_DIM_NUM_1}},
-    {SEQUSED_NAME,            {COMPRESSOR_DIM_NUM_1}},
-    {START_POS_NAME,          {COMPRESSOR_DIM_NUM_1}},
-    {CMP_KV_NAME,             {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_3}}
-};
+    {X_NAME, {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_3}},
+    {WKV_NAME, {COMPRESSOR_DIM_NUM_2}},
+    {WGATE_NAME, {COMPRESSOR_DIM_NUM_2}},
+    {STATE_CACHE_NAME, {COMPRESSOR_DIM_NUM_3}},
+    {APE_NAME, {COMPRESSOR_DIM_NUM_2}},
+    {X_DESCALE_NAME, {COMPRESSOR_DIM_NUM_1}},
+    {WKV_DESCALE_NAME, {COMPRESSOR_DIM_NUM_1}},
+    {WGATE_DESCALE_NAME, {COMPRESSOR_DIM_NUM_1}},
+    {STATE_BLOCK_TABLE_NAME, {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_1}},
+    {CU_SEQLENS_NAME, {COMPRESSOR_DIM_NUM_1}},
+    {SEQUSED_NAME, {COMPRESSOR_DIM_NUM_1}},
+    {START_POS_NAME, {COMPRESSOR_DIM_NUM_1}},
+    {CMP_KV_NAME, {COMPRESSOR_DIM_NUM_2, COMPRESSOR_DIM_NUM_3}}};
 
 static const std::map<std::string, uint32_t> LAYOUT_DIM_MAP = {
     {"BSH", COMPRESSOR_DIM_NUM_3},
@@ -172,9 +162,8 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
     {ge::DT_INT4, "DT_INT4"},                     // dt_variant type
     {ge::DT_UINT1, "DT_UINT1"},                   // dt_variant type
     {ge::DT_INT2, "DT_INT2"},                     // dt_variant type
-    {ge::DT_UINT2, "DT_UINT2"},                    // dt_variant type
-    {ge::DT_HIFLOAT8, "DT_HIFLOAT8"}
-};
+    {ge::DT_UINT2, "DT_UINT2"},                   // dt_variant type
+    {ge::DT_HIFLOAT8, "DT_HIFLOAT8"}};
 
 struct QuantCompressorCompileInfo {
     int64_t core_num;
@@ -196,7 +185,7 @@ enum class LayoutType {
     LAYOUT_TH
 };
 
-enum class TemplateId:uint8_t {
+enum class TemplateId : uint8_t {
     NORMAL = 0,
     EMPTY_X = 1,
     FULL_LOAD = 2
@@ -204,30 +193,30 @@ enum class TemplateId:uint8_t {
 
 CMP_EXTERN_C ge::graphStatus TilingQuantCompressor(gert::TilingContext *context);
 struct QuantCompressorBaseShapeInfo {
-    uint32_t bSize = 0; // B
-    uint32_t sSize = 0; // S
-    uint32_t hSize = 0; // Hidden size
-    uint32_t tSize = 0; // T
-    uint32_t nSize = 0; // N
-    uint32_t dSize = 0; // D
+    uint32_t bSize = 0;    // B
+    uint32_t sSize = 0;    // S
+    uint32_t hSize = 0;    // Hidden size
+    uint32_t tSize = 0;    // T
+    uint32_t nSize = 0;    // N
+    uint32_t dSize = 0;    // D
     uint32_t coffSize = 0; // Coff: 1 or 2
-    uint32_t csSize = 0; // Compress sequence len
-    uint32_t rSize = 0; // Compress ratio
-    uint32_t cgSize = 0; // Compress group size
-    uint32_t drSize = 0; // Dr
+    uint32_t csSize = 0;   // Compress sequence len
+    uint32_t rSize = 0;    // Compress ratio
+    uint32_t cgSize = 0;   // Compress group size
+    uint32_t drSize = 0;   // Dr
 };
 
-const std::vector<int> COFF {1, 2};
-const std::vector<int> CMP_RATIO {2, 4, 8, 16, 32, 64, 128};
-const std::vector<uint32_t> HEAD_DIM {128, 512};
-const std::vector<int> CACHE_MODE {1, 2};
+const std::vector<int> COFF{1, 2};
+const std::vector<int> CMP_RATIO{2, 4, 8, 16, 32, 64, 128};
+const std::vector<uint32_t> HEAD_DIM{128, 512};
+const std::vector<int> CACHE_MODE{1, 2};
 
-enum class CACHE_MODE:uint8_t {
+enum class CACHE_MODE : uint8_t {
     CONTINUOUS = 1,
     CYCLE = 2
 };
 
-enum class QUANT_MODE:uint8_t {
+enum class QUANT_MODE : uint8_t {
     HIFP8 = 1
 };
 
@@ -235,7 +224,7 @@ struct QuantCompressorContext {
     const char *opName;
     const char *opType;
     fe::PlatFormInfos *platformInfo;
-    
+
     RequiredParaInfo x;
     RequiredParaInfo wkv;
     RequiredParaInfo wgate;
@@ -257,9 +246,9 @@ struct QuantCompressorContext {
     const int *quantMode;
     TemplateId templateId;
 
-    ge::DataType dtype = ge::DT_BF16; 
+    ge::DataType dtype = ge::DT_BF16;
     LayoutType layout = LayoutType::LAYOUT_BSH;
-    
+
     size_t *workSpaces;
     uint64_t tilingKey;
     uint32_t blockDim;
@@ -267,11 +256,13 @@ struct QuantCompressorContext {
 
 class QuantCompressorTiling {
 public:
-    explicit QuantCompressorTiling(QuantCompressorContext *context) : context_(context) {}
+    explicit QuantCompressorTiling(QuantCompressorContext *context)
+        : context_(context)
+    {}
     ~QuantCompressorTiling() = default;
 
     static ge::graphStatus ConvertContext(gert::TilingContext &context, QuantCompressorContext &compressorContext);
-    ge::graphStatus RunBigKernelTiling(QuantCompressorTilingData* tilingData);
+    ge::graphStatus RunBigKernelTiling(QuantCompressorTilingData *tilingData);
 
 private:
     static void ConvertRequiredParams(gert::TilingContext &context, QuantCompressorContext &compressorContext);
@@ -338,7 +329,7 @@ private:
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckFeature() const;
     ge::graphStatus CheckShapeConsistency() const;
-    
+
     ge::graphStatus CheckMultiParaConsistency() const;
     ge::graphStatus CheckDimNumConsistency() const;
     ge::graphStatus CheckEmptyTensor() const;
@@ -353,6 +344,7 @@ private:
     uint32_t aicNum_ = 0;
     uint32_t aivNum_ = 0;
     platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
+    NpuArch npuArch_ = NpuArch::DAV_2201;
     size_t libapiSize_ = 0;
     size_t workspaceSize_ = 0;
     uint8_t coff = 1;
@@ -368,6 +360,6 @@ private:
     QuantCompressorWorkspaceParams *workspaceParams_ = nullptr;
 };
 
-} // optiling
+} // namespace optiling
 
 #endif
