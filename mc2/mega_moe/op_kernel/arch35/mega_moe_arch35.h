@@ -28,9 +28,9 @@
 #include "stage/mega_moe_token_quant.h"
 #include "stage/mega_moe_send_mask.h"
 #include "stage/mega_moe_workspace_reset.h"
-#include "stage/mega_moe_token_dispatch.h"
+#include "stage/mega_moe_token_dispatch_dedup.h"
 #include "stage/mega_moe_gmm1_activation.h"
-#include "stage/mega_moe_gmm2_combine.h"
+#include "stage/mega_moe_gmm2_combine_dedup.h"
 #include "stage/mega_moe_unpermute.h"
 #include "../../../common/op_kernel/quantize_functions.h"
 
@@ -182,6 +182,8 @@ protected:
     SharedBlockEpilogue sharedEpilogueOp_;
     TokenDispatchScratch<ActivationType, TopkIndexType> tokenDispatchScratch_;
     WaveCombineScratch waveCombineScratch_;
+    // 非量化 combine 去重的追加 UB 视图与跨行事件武装状态（排空时消费）。
+    WaveCombineDedupScratch waveCombineDedupScratch_;
     TokenUnpermuteScratch tokenUnpermuteScratch_;
     MegaMoeImpl::ExceptionDumpEngine exceptionDump_;
     __gm__ MegaMoeImpl::GmmLoopCount *gmmLoopCount_{nullptr};
@@ -199,7 +201,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::InitInputPrepareConfigs
     } else {
         sharedQuantProcessConfig_ = CreateQuantProcessConfig<typename SharedQuantConfig::QuantStorageType,
                                                              typename SharedQuantConfig::QuantScaleType, false,
-                                                             SharedQuantConfig::A_ELEMS_PER_BYTE>(k_, params_);
+                                                             SharedQuantConfig::A_ELEMS_PER_BYTE, false>(k_, params_);
     }
     // 共享专家启用时仅 AIV1 计算发送 topK 有效下标，其余情况保留全 AIV 分工。
     const uint32_t topkValidIndexCoreIdx = sharedExpertNum_ > 0U ? blockIdx_ : aivCoreIdx_;
@@ -397,6 +399,8 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::DispatchBuffInit()
     uint32_t metaInfoTensorSize = static_cast<uint32_t>(bufferConfig.bufferCount) * INT32_PER_256B * sizeof(int32_t);
     scratch.metaInfoTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, metaInfoTensorAddr, metaInfoTensorSize / sizeof(int32_t));
+    scratch.dedupUbBaseAddr = static_cast<uint32_t>(Ops::Base::CeilAlign(
+        static_cast<uint64_t>(metaInfoTensorAddr + metaInfoTensorSize), static_cast<uint64_t>(ALIGN_512)));
 }
 
 template <TemplateMegaMoeTypeClass>
@@ -731,7 +735,32 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunGmm2CombineForExpert
     }
 
     if constexpr (CombineQuantMode == COMBINE_NO_QUANT) {
-        // AIV1 已在上述 GMM2 调用中消费当前 slice；无需在外部重建 scheduler。
+        if (IsCombineDedupOn(params_.tilingData->dedupMode)) {
+            // combine 去重：跨 WAVE 的专家等最后一个 slice 完成后按专家粒度独立消费（与量化路径
+            // 同构；AIC 被跳过 problem 的情形也会到达本分支，per-expert 标记不漏发）。
+            if (tokenStartIndexInExpert + sliceTokenCount >= expertTokenCount) {
+                NotifyWaveGmm2Ready(waveCombineJob_, params_, state.expertIdx);
+                if (isFinalCombine) {
+                    if constexpr (g_coreType == AIV) {
+                        if (GetSubBlockIdx() == 0U) {
+                            // W4 prologue 完成后，末轮 AIV0 才能通过 MTE2 复用同一 UB 区域。
+                            SyncFuncStatic<HardEvent::MTE3_MTE2, SYNC_EVENT_ID0>();
+                        }
+                    }
+                    combineBufferConfig =
+                        InitWaveCombineBuffersDedup<true>(commonConfig_, waveCombineScratch_, waveCombineDedupScratch_);
+                    RunWaveCombineStageDedup<true>(commonConfig_, waveCombineJob_, combineBufferConfig,
+                                                   waveCombineScratch_, waveCombineDedupScratch_, params_, state,
+                                                   state.expertIdx, combineRowSequence);
+                } else {
+                    RunWaveCombineStageDedup<false>(commonConfig_, waveCombineJob_, combineBufferConfig,
+                                                    waveCombineScratch_, waveCombineDedupScratch_, params_, state,
+                                                    state.expertIdx, combineRowSequence);
+                }
+            }
+            return;
+        }
+        // 基线路径：AIV1 已在上述 GMM2 调用中逐 tile 消费当前 slice；无需在外部重建 scheduler。
         return;
     }
 

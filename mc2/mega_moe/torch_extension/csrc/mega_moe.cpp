@@ -214,7 +214,7 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     c10::optional<int64_t> dispatchQuantOutDtype, c10::optional<int64_t> sharedExpertQuantOutDtype,
     c10::optional<int64_t> weight1Type, c10::optional<int64_t> weight2Type, c10::optional<int64_t> sharedWeight1Type,
     c10::optional<int64_t> sharedWeight2Type, c10::optional<int64_t> topoType, c10::optional<int64_t> rankNumPerServer,
-    int64_t topkWeightsType)
+    int64_t topkWeightsType, int64_t combineCommMode)
 {
     const MegaMoeTensorInputs inputs{context,
                                      x,
@@ -384,7 +384,7 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
               sharedBias1Wrapper, sharedBias2Wrapper, maskBuffer, moeExpertNum, epWorldSize, cclBufferSize,
               maxRecvTokenNum, dispatchQuantMode, dispatchQuantResultType, sharedExpertQuantResultType,
               combineQuantMode, commAlgPtr, numMaxTokensPerRank, activationPtr, activationParams, topoTypeValue,
-              rankNumPerServerValue, topkWeightsType, y, expertTokenNums);
+              rankNumPerServerValue, topkWeightsType, combineCommMode, y, expertTokenNums);
 
     return std::tie(y, expertTokenNums);
 }
@@ -548,7 +548,8 @@ int64_t CalcUrmaCclBufferSizeA5(int64_t epWorldSize, int64_t moeExpertNum, int64
 int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
                                 int64_t hidden, int64_t maxRecvTokenNum, int64_t dispatchQuantMode,
                                 c10::optional<int64_t> dispatchQuantOutDtype, int64_t combineQuantMode,
-                                std::string commAlg, int64_t topkWeightsType, int64_t serverNum)
+                                std::string commAlg, int64_t combineCommMode, int64_t topkWeightsType,
+                                int64_t serverNum)
 {
     TORCH_CHECK(serverNum >= 0, "server_num must be non-negative, but got ", serverNum);
     const char *socName = aclrtGetSocName();
@@ -619,7 +620,11 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
         return CalcUrmaCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden,
                                        combineQuantMode, topkWeightsType, serverNum);
     }
-    return CalcMteCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, topkWeightsType);
+    // 与 arch35 host/kernel 的记录带权重段判定同式：tkw=1 或 combine 去重开
+    // 去重位（"dedup"/"dedup_combine"）时记录尾携带 topk 权重段（tkw=0 的 combine 去重在发送端乘权）。
+    int64_t layoutTopkWeights =
+        (topkWeightsType == 1 || combineCommMode == 1 || commAlg == "dedup" || commAlg == "dedup_combine") ? 1 : 0;
+    return CalcMteCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, layoutTopkWeights);
 }
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
@@ -629,7 +634,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
           py::arg("ep_world_size"), py::arg("moe_expert_num"), py::arg("num_max_tokens_per_rank"), py::arg("num_topk"),
           py::arg("hidden"), py::arg("max_recv_token_num"), py::arg("dispatch_quant_mode"),
           py::arg("dispatch_quant_out_dtype"), py::arg("combine_quant_mode"), py::arg("comm_alg"),
-          py::arg("topk_weights_type"), py::arg("server_num") = 0);
+          py::arg("combine_comm_mode") = 0, py::arg("topk_weights_type"), py::arg("server_num") = 0);
 }
 
 } // namespace op_api

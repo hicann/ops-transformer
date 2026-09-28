@@ -68,6 +68,7 @@ private:
     using MegaMoeBase::tokenDispatchConfig_;
     using MegaMoeBase::tokenDispatchScratch_;
     using MegaMoeBase::waveCombineScratch_;
+    using MegaMoeBase::waveCombineDedupScratch_;
     __aicore__ inline bool IsPositionWithinWave(const ExpertTokenPosition &position, uint32_t waveMGroupCount) const
     {
         return position.expertIdx < commonConfig_.moeExpertPerRank && waveMGroupCount < mGroupsPerWave_;
@@ -219,6 +220,12 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::RunGmm2
     const ExpertTokenRange &waveRange, ExpertLoopState &gmm2State, GMMAddrInfo &gmm2AddrInfo,
     WaveCombineBufferConfig &combineBufferConfig, uint32_t &combineRowSequence, const BlockContext &pipeline)
 {
+    // 去重 combine：进 wave 前预挂事件（与函数尾的 Drain 配对，条件逐字一致）。
+    if constexpr (CombineQuantMode == COMBINE_NO_QUANT) {
+        if (IsCombineDedupOn(params_.tilingData->dedupMode)) {
+            ArmWaveCombineDedupEvents();
+        }
+    }
     uint32_t waveGmm2ExpertEndExclusive = waveRange.end.expertIdx + (waveRange.end.tokenIndexInExpert == 0U ? 0U : 1U);
     for (uint32_t expertIdx = waveRange.begin.expertIdx; expertIdx < waveGmm2ExpertEndExclusive; ++expertIdx) {
         uint32_t sliceTokenStartIndexInExpert =
@@ -243,6 +250,8 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::RunGmm2
     }
     if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
         DrainCombineRowBuffers(combineRowSequence, combineBufferConfig.rowBufferCount);
+    } else if (IsCombineDedupOn(params_.tilingData->dedupMode)) {
+        DrainCombineRowBuffersDedup(combineRowSequence, combineBufferConfig.rowBufferCount);
     }
 }
 
@@ -263,16 +272,31 @@ __aicore__ inline void MegaMoeA8W4Wave<TemplateMegaMoeA8W4WaveTypeFunc>::Process
     exceptionDump_.UpdateStage(MegaMoeImpl::Stage::MOE_GMM1_ACTIVATION);
     DispatchBuffInit();
     PrepareMoeExpertTokenCountTable<true>(commonConfig_, countWorkspace_, params_, tokenDispatchScratch_);
+    if (tokenDispatchConfig_.dedup.dedupMode != 0) {
+        // 去重建表：route 槽到达保证与 count epoch 校验同源；函数尾部含 AIV1 间栅栏。
+        PrepareDedupPrepassAiv0Local(tokenDispatchConfig_.dedup, commonConfig_, params_, tokenDispatchScratch_);
+        BuildDedupRowDescTable<TopkIndexType>(tokenDispatchConfig_.dedup, commonConfig_, gmmExecutionConfig_.blockJob,
+                                              syncWorkspaceLayout_, params_, tokenDispatchScratch_);
+    }
     WaveCombineBufferConfig combineBufferConfig{};
     if constexpr (CombineQuantMode != COMBINE_NO_QUANT) {
         combineBufferConfig = InitWaveCombineBuffers<CombineQuantMode>(commonConfig_, waveCombineScratch_);
+    } else if (IsCombineDedupOn(params_.tilingData->dedupMode)) {
+        // 非量化 combine 去重：专家粒度独立消费（基类 RunGmm2CombineForExpert 内接入）。
+        combineBufferConfig =
+            InitWaveCombineBuffersDedup<false>(commonConfig_, waveCombineScratch_, waveCombineDedupScratch_);
     }
 
     GMMAddrInfo gmm1AddrInfo{};
     GMMAddrInfo gmm2AddrInfo{};
     gmm1AddrInfo.gmm1ActivationSync = &gmm1ActivationSync;
     if constexpr (CombineQuantMode == COMBINE_NO_QUANT) {
-        gmm2AddrInfo.gmm2CombineSync = &gmm2CombineSync;
+        // combine 去重开时不挂握手对象：W4 路径的握手启用位（NotifyCombineTileReady）编译期恒真
+        // （见 gmm2_combine.h 对编译器问题的说明），AIC 是否真握手靠这里挂/不挂 + mmad 处判空决定；
+        // 去重开时 AIV1 不做逐 tile 消费，挂上 AIC 会死等 credit。
+        if (!IsCombineDedupOn(params_.tilingData->dedupMode)) {
+            gmm2AddrInfo.gmm2CombineSync = &gmm2CombineSync;
+        }
     }
 
     ExpertTokenPosition dispatchPosition = DispatchFirstWave();

@@ -115,7 +115,7 @@ class _MegaMoeOpBuilder(OpBuilder):
             "Tensor? mask_buffer=None, "
             "int max_recv_token_num=0, "
             "int dispatch_quant_mode=0, int combine_quant_mode=0, "
-            'str comm_alg="", int num_max_tokens_per_rank=0, str activation="swiglu", '
+            'str comm_alg="", int combine_comm_mode=0, int num_max_tokens_per_rank=0, str activation="swiglu", '
             "float? activation_clamp=None, Dict(str, float)? activation_params=None, "
             "int? dispatch_quant_out_dtype=None, int? shared_expert_quant_out_dtype=None, "
             "int? weight1_type=None, int? weight2_type=None, "
@@ -152,6 +152,7 @@ class _MegaMoeOpBuilder(OpBuilder):
             dispatch_quant_mode=0,
             combine_quant_mode=0,
             comm_alg="",
+            combine_comm_mode=0,
             num_max_tokens_per_rank=0,
             activation="swiglu",
             activation_clamp=None,
@@ -210,6 +211,7 @@ def _npu_mega_moe(
     dispatch_quant_mode=0,
     combine_quant_mode=0,
     comm_alg="",
+    combine_comm_mode=0,
     num_max_tokens_per_rank=0,
     activation="swiglu",
     activation_clamp=None,
@@ -267,6 +269,7 @@ def _npu_mega_moe(
         topo_type,
         rank_num_per_server,
         topk_weights_type,
+        combine_comm_mode,
     )
 
 
@@ -282,23 +285,27 @@ class _MegaMoeCclBufferSizeParams:
     dispatch_quant_out_dtype: Optional[torch.dtype]
     combine_quant_mode: int
     comm_alg: str
+    combine_comm_mode: int
     topk_weights_type: int
 
     def __call__(self, server_num: int = 0) -> int:
         # Context passes a positive server count only after cross-super topology is confirmed.
+        # comm_alg 已在 SymmBuffer 构造时 resolve（非空直通幂等），此处必须关键字传参：
+        # 位置传参曾把 topk_weights_type 错落到新插入的 combine_comm_mode 位（EZ0024 少算 64B/token）。
         return _get_mega_moe_ccl_buffer_size(
-            self.ep_world_size,
-            self.moe_expert_num,
-            self.num_max_tokens_per_rank,
-            self.num_topk,
-            self.hidden,
-            self.max_recv_token_num,
-            self.dispatch_quant_mode,
-            self.dispatch_quant_out_dtype,
-            self.combine_quant_mode,
-            self.comm_alg,
-            self.topk_weights_type,
-            server_num,
+            ep_world_size=self.ep_world_size,
+            moe_expert_num=self.moe_expert_num,
+            num_max_tokens_per_rank=self.num_max_tokens_per_rank,
+            num_topk=self.num_topk,
+            hidden=self.hidden,
+            max_recv_token_num=self.max_recv_token_num,
+            dispatch_quant_mode=self.dispatch_quant_mode,
+            dispatch_quant_out_dtype=self.dispatch_quant_out_dtype,
+            combine_quant_mode=self.combine_quant_mode,
+            comm_alg=self.comm_alg,
+            combine_comm_mode=self.combine_comm_mode,
+            topk_weights_type=self.topk_weights_type,
+            server_num=server_num,
         )
 
 
@@ -323,7 +330,12 @@ class SymmBuffer:
         dispatch_quant_mode: int = 0,
         dispatch_quant_out_dtype: Optional[torch.dtype] = None,
         combine_quant_mode: int = 0,
+        # comm_alg: 通信算法选择（历史平台语义）。Ascend950 的通信去重不读取本参数。
         comm_alg: str = "",
+        # combine_comm_mode: combine 通信去重开关，完全由调用方决定。0=强制关闭；1=强制开启（kernel
+        # 必走 combine 去重路径，不经内部收益裁决）。适用场景见算子资料：topK 大、同卡重复路由多、
+        # 通信主导的形状收益显著；容量不满足（如 hidden > 10240）时 tiling 显式报错而非静默回退。
+        combine_comm_mode: int = 0,
         topk_weights_type: int = 0,
     ):
         # Metadata
@@ -338,6 +350,7 @@ class SymmBuffer:
         self.dispatch_quant_out_dtype = dispatch_quant_out_dtype
         self.combine_quant_mode = combine_quant_mode
         self.comm_alg = comm_alg
+        self.combine_comm_mode = combine_comm_mode
         self.topk_weights_type = topk_weights_type
         self._check_params()
 
@@ -356,7 +369,8 @@ class SymmBuffer:
             dispatch_quant_mode=dispatch_quant_mode,
             dispatch_quant_out_dtype=dispatch_quant_out_dtype,
             combine_quant_mode=combine_quant_mode,
-            comm_alg=comm_alg,
+            comm_alg=self.comm_alg,
+            combine_comm_mode=self.combine_comm_mode,
             topk_weights_type=topk_weights_type,
         )
         # Use the exact MTE size initially; cross-super context replaces it with the URMA size before malloc.
@@ -404,6 +418,12 @@ class SymmBuffer:
                 raise ValueError(
                     "topk_weights_type only supports 0 or 1 on Ascend950, "
                     f"got {self.topk_weights_type!r} (type: {type(self.topk_weights_type).__name__})."
+                )
+            _check_int_type(self.combine_comm_mode, "combine_comm_mode")
+            if self.combine_comm_mode not in (0, 1):
+                raise ValueError(
+                    "combine_comm_mode only supports 0 (off) or 1 (force-enable combine dedup) on Ascend950, "
+                    f"got {self.combine_comm_mode!r} (type: {type(self.combine_comm_mode).__name__})."
                 )
 
     def _create_mask_buffer(self, ep_world_size: int) -> torch.Tensor:
@@ -510,6 +530,7 @@ class SymmBuffer:
             dispatch_quant_out_dtype=self.dispatch_quant_out_dtype,
             combine_quant_mode=self.combine_quant_mode,
             comm_alg=self.comm_alg,
+            combine_comm_mode=self.combine_comm_mode,
             topk_weights_type=self.topk_weights_type,
         )
         required_ccl_buffer_size = ccl_buffer_size_params()
@@ -578,24 +599,26 @@ def _get_mega_moe_ccl_buffer_size(
     dispatch_quant_out_dtype: Optional[torch.dtype] = None,
     combine_quant_mode: int = 0,
     comm_alg: str = "",
+    combine_comm_mode: int = 0,
     topk_weights_type: int = 0,
     server_num: int = 0,
 ) -> int:
     _op_module = _mega_moe_op_builder.load()
     quant_dtype_int = _dtype_to_int(dispatch_quant_out_dtype)  # 将torch.dtype转换为int
     return _op_module.get_mega_moe_ccl_buffer_size(
-        ep_world_size,
-        moe_expert_num,
-        num_max_tokens_per_rank,
-        num_topk,
-        hidden,
-        max_recv_token_num,
-        dispatch_quant_mode,
-        quant_dtype_int,
-        combine_quant_mode,
-        comm_alg,
-        topk_weights_type,
-        server_num,
+        ep_world_size=ep_world_size,
+        moe_expert_num=moe_expert_num,
+        num_max_tokens_per_rank=num_max_tokens_per_rank,
+        num_topk=num_topk,
+        hidden=hidden,
+        max_recv_token_num=max_recv_token_num,
+        dispatch_quant_mode=dispatch_quant_mode,
+        dispatch_quant_out_dtype=quant_dtype_int,
+        combine_quant_mode=combine_quant_mode,
+        comm_alg=comm_alg,
+        combine_comm_mode=combine_comm_mode,
+        topk_weights_type=topk_weights_type,
+        server_num=server_num,
     )
 
 
@@ -612,6 +635,7 @@ def get_symm_buffer_for_mega_moe(
     dispatch_quant_out_dtype: Optional[torch.dtype] = None,
     combine_quant_mode: int = 0,
     comm_alg: str = "",
+    combine_comm_mode: int = 0,
     topk_weights_type: int = 0,
 ) -> SymmBuffer:
     return SymmBuffer(
@@ -626,6 +650,7 @@ def get_symm_buffer_for_mega_moe(
         dispatch_quant_out_dtype,
         combine_quant_mode,
         comm_alg,
+        combine_comm_mode,
         topk_weights_type,
     )
 
@@ -689,6 +714,7 @@ def mega_moe(
         dispatch_quant_mode=sym_buffer.dispatch_quant_mode,
         combine_quant_mode=sym_buffer.combine_quant_mode,
         comm_alg=sym_buffer.comm_alg,
+        combine_comm_mode=sym_buffer.combine_comm_mode,
         num_max_tokens_per_rank=sym_buffer.num_max_tokens_per_rank,
         activation=activation,
         activation_clamp=activation_clamp,

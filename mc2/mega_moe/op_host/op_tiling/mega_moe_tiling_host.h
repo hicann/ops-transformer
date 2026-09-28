@@ -65,6 +65,7 @@ struct MegaMoeConfig {
     uint32_t attrTopoTypeIndex = 16U;
     uint32_t attrRankNumPerServerIndex = 17U;
     uint32_t attrTopkWeightsTypeIndex = 18U;
+    uint32_t attrCombineCommModeIndex = 19U;
     bool isMc2Context = false;
 };
 using namespace Ops::Transformer::OpTiling;

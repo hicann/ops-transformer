@@ -91,15 +91,88 @@ __aicore__ inline void LoadMoeExpertInput(const TokenUnpermuteConfig &context, c
     }
 }
 
+// 读回本 token 的 topK 目标卡号（专家→卡 = expertId / moeExpertPerRank）。
+// 结果放函数栈小数组（topK≤32 有 host 校验；unpermute UB 已满载，UB 化需动整段布局，暂保留栈存储）。
+__aicore__ inline void LoadTokenExpertRanks(const MoeStageCommonConfig &common, const Params &params, int32_t tokenIdx,
+                                            int32_t (&expertRanks)[32])
+{
+    __gm__ int32_t *topkIdsBase =
+        reinterpret_cast<__gm__ int32_t *>(params.expertIdxGmAddr) + static_cast<uint64_t>(tokenIdx) * common.topK;
+    for (int32_t k = 0; k < static_cast<int32_t>(common.topK); ++k) {
+        expertRanks[k] = ReadGmByPassDCache(topkIdsBase + k) / static_cast<int32_t>(common.moeExpertPerRank);
+    }
+}
+
+// canonical 槽判定：该槽是其目标卡在本 token topK 里的首个 k 才会到达（与生产卡 minTopkIdx 约定
+// 一致）。返回 false = 该槽已并入同卡首槽、不会到达；sameRankCount 顺手数同卡命中数，tkw=0 下
+// 决定该槽是否还需本端乘权（==1 是 PLAIN 行、发送端未乘；>=2 是合并行、发送端已按成员权重乘加）。
+__aicore__ inline bool JudgeDedupCanonicalSlot(const int32_t (&expertRanks)[32], int32_t topK, int32_t expertIdx,
+                                               int32_t &sameRankCount)
+{
+    sameRankCount = 1;
+    for (int32_t otherIdx = 0; otherIdx < topK; ++otherIdx) {
+        if (otherIdx != expertIdx && expertRanks[otherIdx] == expertRanks[expertIdx]) {
+            if (otherIdx < expertIdx) {
+                return false;
+            }
+            ++sameRankCount;
+        }
+    }
+    return true;
+}
+
+// 把一个专家槽的输入累加进 dataResFp32Tensor（首槽直拷/乘权，后续槽乘权后加）。
+template <bool TopkWeightsPrefetch>
+__aicore__ inline void AccumulateExpertSlotInput(const MoeStageCommonConfig &common, TokenUnpermuteScratch &scratch,
+                                                 const LocalTensor<float> &dataInFp32, int32_t localIdx,
+                                                 int32_t expertIdx, bool applyScale, bool accumStarted)
+{
+    if (!accumStarted) {
+        if constexpr (TopkWeightsPrefetch) {
+            DataCopy(scratch.dataResFp32Tensor, dataInFp32, common.tokenHiddenDim);
+        } else {
+            if (applyScale) {
+                float expertScale = scratch.topKWeightsTensor.GetValue(localIdx * common.topK + expertIdx);
+                Muls(scratch.dataResFp32Tensor, dataInFp32, expertScale, common.tokenHiddenDim);
+            } else {
+                DataCopy(scratch.dataResFp32Tensor, dataInFp32, common.tokenHiddenDim);
+            }
+        }
+        return;
+    }
+    if constexpr (!TopkWeightsPrefetch) {
+        if (applyScale) {
+            float expertScale = scratch.topKWeightsTensor.GetValue(localIdx * common.topK + expertIdx);
+            Muls(dataInFp32, dataInFp32, expertScale, common.tokenHiddenDim);
+            PipeBarrier<PIPE_V>();
+        }
+    }
+    Add(scratch.dataResFp32Tensor, scratch.dataResFp32Tensor, dataInFp32, common.tokenHiddenDim);
+    PipeBarrier<PIPE_V>();
+}
+
 // 累加一个 token 对应的全部 MoE 专家输入。
+// combine 去重模式：生产卡已按卡合并（同卡多专家的贡献落在该卡首个 topk 槽、其余槽不再到达），
+// 归属卡只累加 canonical 槽。
 template <uint8_t CombineMode, bool TopkWeightsPrefetch>
 __aicore__ inline void AccumulateMoeExpertsForToken(const TokenUnpermuteConfig &context,
-                                                    const MoeStageCommonConfig &common, TokenUnpermuteScratch &scratch,
-                                                    int32_t tokenIdx, int32_t localIdx,
+                                                    const MoeStageCommonConfig &common, const Params &params,
+                                                    TokenUnpermuteScratch &scratch, int32_t tokenIdx, int32_t localIdx,
                                                     const GlobalTensor<bfloat16_t> &expandedX,
                                                     const MegaMoeUnpermuteBufferConfig &bufferConfig)
 {
+    const bool dedupCombineActive = IsCombineDedupOn(params.tilingData->dedupMode);
+    int32_t expertRanks[32];
+    if (dedupCombineActive) {
+        LoadTokenExpertRanks(common, params, tokenIdx, expertRanks);
+    }
+    bool accumStarted = false;
     for (int32_t expertIdx = 0; expertIdx < static_cast<int32_t>(common.topK); ++expertIdx) {
+        int32_t sameRankCount = 1;
+        if (dedupCombineActive &&
+            !JudgeDedupCanonicalSlot(expertRanks, static_cast<int32_t>(common.topK), expertIdx, sameRankCount)) {
+            continue; // 该槽不会到达（已并入同卡首槽）
+        }
         int32_t accumulationItemIdx = localIdx * static_cast<int32_t>(common.topK + common.sharedExpertNum) + expertIdx;
         int32_t inputBufferIdx = accumulationItemIdx % bufferConfig.inputBufferCount;
         TEventID event = static_cast<TEventID>(inputBufferIdx);
@@ -113,22 +186,10 @@ __aicore__ inline void AccumulateMoeExpertsForToken(const TokenUnpermuteConfig &
         SetFlag<HardEvent::S_V>(event);
         WaitFlag<HardEvent::S_V>(event);
         PipeBarrier<PIPE_V>();
-        if (expertIdx == 0) {
-            if constexpr (TopkWeightsPrefetch) {
-                DataCopy(scratch.dataResFp32Tensor, dataInFp32, common.tokenHiddenDim);
-            } else {
-                float expertScale = scratch.topKWeightsTensor.GetValue(localIdx * common.topK + expertIdx);
-                Muls(scratch.dataResFp32Tensor, dataInFp32, expertScale, common.tokenHiddenDim);
-            }
-        } else {
-            if constexpr (!TopkWeightsPrefetch) {
-                float expertScale = scratch.topKWeightsTensor.GetValue(localIdx * common.topK + expertIdx);
-                Muls(dataInFp32, dataInFp32, expertScale, common.tokenHiddenDim);
-                PipeBarrier<PIPE_V>();
-            }
-            Add(scratch.dataResFp32Tensor, scratch.dataResFp32Tensor, dataInFp32, common.tokenHiddenDim);
-            PipeBarrier<PIPE_V>();
-        }
+        const bool applyScale = !dedupCombineActive || sameRankCount == 1;
+        AccumulateExpertSlotInput<TopkWeightsPrefetch>(common, scratch, dataInFp32, localIdx, expertIdx, applyScale,
+                                                       accumStarted);
+        accumStarted = true;
         SetFlag<HardEvent::V_MTE2>(event);
     }
 }
@@ -191,8 +252,8 @@ __aicore__ inline void ProcessTokenUnpermuteBatch(
     }
     for (int32_t localIdx = 0; localIdx < batchTokenCount; ++localIdx) {
         int32_t tokenIdx = jobOffset + batchTokenOffset + localIdx;
-        AccumulateMoeExpertsForToken<CombineMode, TopkWeightsPrefetch>(context, common, scratch, tokenIdx, localIdx,
-                                                                       expandedX, bufferConfig);
+        AccumulateMoeExpertsForToken<CombineMode, TopkWeightsPrefetch>(context, common, params, scratch, tokenIdx,
+                                                                       localIdx, expandedX, bufferConfig);
         for (uint32_t sharedExpertIdx = 0; sharedExpertIdx < common.sharedExpertNum; ++sharedExpertIdx) {
             AccumulateSharedExpertForToken<Gmm1TileM>(common, params, scratch, tokenIdx, localIdx, sharedExpertIdx,
                                                       bufferConfig);
