@@ -24,14 +24,6 @@ constexpr uint32_t MAX_LAYERS = ~0U;
 // 故各引擎必须配一条全区间低优先级兜底表项，避免未覆盖场景误选具体算法；
 // 具体算法表项仅覆盖单层卡数[2,4]与[8,16]，拓扑维度暂用通配（topo枚举取值待与HCCL确认）
 static constexpr Mc2Hcom::CommAlgoEntry ALLTOALL_COMM_ALGO_TABLE[] = {
-    // AICPU + 单层 + 卡数[8,16] → sole[mesh]
-    {mc2tiling::A5_AICPU_TS_ENGINE, WILDCARD_TOPO_TYPE, 1, 1, 0, MAX_DATA_BYTES, 8, 16, 1, "sole[mesh]"},
-    // AICPU + 单层 + 卡数[2,4] → concur[mesh,mesh]
-    {mc2tiling::A5_AICPU_TS_ENGINE, WILDCARD_TOPO_TYPE, 1, 1, 0, MAX_DATA_BYTES, 2, 4, 1, "concur[mesh,mesh]"},
-    // CCU + 单层 + 卡数[2,4] → concur[mesh,mesh]
-    {mc2tiling::A5_CCU_ENGINE, WILDCARD_TOPO_TYPE, 1, 1, 0, MAX_DATA_BYTES, 2, 4, 1, "concur[mesh,mesh]"},
-    // CCU + 单层 + 卡数[8,16] → sole[mesh.multi_channel]
-    {mc2tiling::A5_CCU_ENGINE, WILDCARD_TOPO_TYPE, 1, 1, 0, MAX_DATA_BYTES, 8, 16, 1, "sole[mesh.multi_channel]"},
     // AICPU 兜底：未覆盖卡数/层数场景低优先级回退默认算法
     {mc2tiling::A5_AICPU_TS_ENGINE, WILDCARD_TOPO_TYPE, 1, MAX_LAYERS, 0, MAX_DATA_BYTES, 2, MAX_RANK_SIZE, 0,
      ALLTOALL_DEFAULT_ALGO_NAME},

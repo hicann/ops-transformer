@@ -120,6 +120,11 @@ ge::graphStatus MatmulReduceScatterV2Tiling::SetMc2Hcomm()
     if (commMode_ == TPL_AICPU_COMM_MODE) {
         mc2CcTilingConfig.SetCommEngine(mc2tiling::A5_AICPU_TS_ENGINE);
         OP_LOGD(opName_, "[SetCommEngine] Set CommEngine to AiCPU for matmul_reduce_scatter_v2_tiling.");
+        // 16p跨机场景，根据通信api benchmark，使用InsReduceScatterParallelMesh1DNHR算法速度更快
+        if (args_.rankDim == ALG_CONFIG_RANK_SIZE) {
+            mc2CcTilingConfig.SetAlgConfig("InsReduceScatterParallelMesh1DNHR");
+            OP_LOGD(opName_, "[SetAlgConfig] Set AlgConfig to InsReduceScatterParallelMesh1DNHR.");
+        }
     } else {
         mc2CcTilingConfig.SetCommEngine(mc2tiling::A5_CCU_ENGINE);
         OP_LOGD(opName_, "[SetCommEngine] Set CommEngine to CCU for matmul_reduce_scatter_v2_tiling.");
@@ -139,6 +144,8 @@ ge::graphStatus MatmulReduceScatterV2Tiling::SetMc2Hcomm()
         std::string algoName = Mc2Hcom::Mc2CommAlgoSelector::SelectAlgoName(
             opName_, group, commEngine, commDataBytes, static_cast<uint32_t>(args_.rankDim), algoEntries, algoCount,
             REDUCE_SCATTER_DEFAULT_ALGO_NAME);
+        // 当前版本暂不生效，仍旧使用原算法
+        algoName = rsConfig;
         OP_LOGI(opName_, "[SetMc2Hcomm] selected algoName=%s, group=%s", algoName.c_str(), group);
         mc2CcTilingConfig.SetAlgConfig(algoName);
     }
