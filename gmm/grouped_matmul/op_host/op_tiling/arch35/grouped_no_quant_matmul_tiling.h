@@ -50,6 +50,9 @@ constexpr uint64_t ATTR_IDX_TRANS_W = 2UL;
 constexpr uint64_t ATTR_IDX_TRANS_X = 3UL;
 constexpr uint64_t ATTR_IDX_GROUPTYPE = 4UL;
 constexpr uint64_t ATTR_IDX_GROUP_LIST_TYPE = 5UL;
+constexpr uint64_t ATTR_IDX_ACT_TYPE = 6UL;
+constexpr int64_t ACT_TYPE_NONE = 0L;
+constexpr int64_t ACT_TYPE_GELU_TANH = 2L;
 constexpr int32_t NO_SPLIT = -1;
 constexpr int32_t SPLIT_M = 0;
 constexpr int32_t SPLIT_K = 2;
@@ -76,6 +79,9 @@ public:
 
     // 对应20位，转置场景
     uint8_t gmmTrans = 0;
+
+    // 激活类型：0-none，1-gelu tanh
+    uint8_t act = 0;
 
 public:
     uint64_t GenTilingKey() const;
@@ -135,6 +141,7 @@ private:
     int64_t splitItem_ = 0;
     uint32_t groupNum_ = 0;
     int64_t groupListType_ = 0;
+    int64_t activeType_ = ACT_TYPE_NONE;
     uint32_t groupSize_ = 0;
     uint32_t xKDim_ = 0;
     uint32_t weightNDim_ = 0;
@@ -150,6 +157,7 @@ private:
     uint64_t depthB1_ = DEPTH_DEFAULT;
     uint64_t mTailCnt_ = 1UL;
     uint64_t nTailCnt_ = 1UL;
+    uint32_t splitM_ = 1U;
 
     ge::DataType xDType_ = ge::DT_UNDEFINED;
     ge::DataType weightDtype_ = ge::DT_UNDEFINED;

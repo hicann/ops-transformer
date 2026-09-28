@@ -15,6 +15,9 @@
 
 #pragma once
 
+#include "blaze/epilogue/block/block_epilogue_empty.h"
+#include "blaze/epilogue/block/block_epilogue_gelu_fixpipe.h"
+#include "blaze/gemm/block/block_mmad_matmul_fixpipe_opti.h"
 #include "blaze/gemm/block/block_mmad_matmul_basic.h"
 #include "blaze/gemm/block/block_scheduler_grouped_matmul.h"
 #include "blaze/gemm/kernel/kernel_grouped_matmul.h"
@@ -24,7 +27,7 @@ using GMMNoQuantTilingData = GroupedMatmulTilingData::GMMNoQuantTilingData;
 
 namespace GROUPED_MATMUL {
 
-template <typename LayoutA, typename LayoutB>
+template <typename LayoutA, typename LayoutB, bool EnableGelu = false>
 __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR groupList, GM_ADDR y,
                                            GM_ADDR tiling)
 {
@@ -35,14 +38,23 @@ __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bi
     using BType = DTYPE_X;
     using CType = DTYPE_Y;
     using BiasType = DTYPE_BIAS;
+    using EpilogueInputType = AscendC::Std::conditional_t<EnableGelu, float, CType>;
     using LayoutC = asc::te::nd_ext_layout_ptn;
     using LayoutBias = asc::te::nd_ext_layout_ptn;
     using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
-    using DispatchPolicy = Blaze::Gemm::MatmulMultiBlockBasic<0, 0, Blaze::Gemm::KernelGroupedMmadNoQuant, 0,
-                                                              Blaze::Gemm::MatmulOutputMode::OVERWRITE>;
+    using BasicDispatchPolicy =
+        Blaze::Gemm::MatmulMultiBlockBasic<0, Blaze::Gemm::OP_TYPE_EMPTY, Blaze::Gemm::KernelGroupedMmadNoQuant, 0,
+                                           Blaze::Gemm::MatmulOutputMode::OVERWRITE>;
+    using GeluDispatchPolicy =
+        Blaze::Gemm::MatmulMultiBlockFixpipeOpti<Blaze::Gemm::ND_ALIG_1V2_FIXPIPE, Blaze::Gemm::OP_TYPE_GELU,
+                                                 Blaze::Gemm::KernelGroupedMmadNoQuant>;
+    using DispatchPolicy = AscendC::Std::conditional_t<EnableGelu, GeluDispatchPolicy, BasicDispatchPolicy>;
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AType, LayoutA, BType, LayoutB, CType, LayoutC,
                                                     BiasType, LayoutBias>;
-    using BlockEpilogue = Blaze::Epilogue::Block::BlockEpilogueEmpty;
+    using BlockEpilogue =
+        AscendC::Std::conditional_t<EnableGelu,
+                                    Blaze::Epilogue::Block::BlockEpilogueGeluFixpipe<CType, EpilogueInputType>,
+                                    Blaze::Epilogue::Block::BlockEpilogueEmpty>;
     using BlockScheduler = Blaze::Gemm::Block::BlockSchedulerGmmNoQuant;
     using GroupedMatmulKernel =
         Blaze::Gemm::Kernel::GemmUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;
@@ -81,21 +93,31 @@ __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bi
                                          static_cast<uint32_t>(sizeof(BType)),
                                          static_cast<uint32_t>(gmmBaseParams.groupListType)};
 
-    typename BlockMmad::Params mmParams{x,
-                                        weight,
-                                        y,
-                                        gmmBaseParams.hasBias == 0 ? nullptr : bias,
-                                        groupList,
-                                        nullptr, // workspaceGmAddr
-                                        baseM,
-                                        baseN,
-                                        kL1,
-                                        static_cast<uint32_t>(baseM),
-                                        static_cast<uint32_t>(baseN),
-                                        static_cast<uint32_t>(baseK),
-                                        2U, // l1Stages
-                                        static_cast<uint16_t>(mmTilingData.dbL0C),
-                                        nullptr}; // scaleGmAddr
+    typename BlockMmad::Params mmParams;
+    mmParams.aGmAddr = x;
+    mmParams.bGmAddr = weight;
+    mmParams.cGmAddr = y;
+    mmParams.biasGmAddr = gmmBaseParams.hasBias == 0 ? nullptr : bias;
+    mmParams.groupListGmAddr = groupList;
+    mmParams.workspaceGmAddr = nullptr;
+    mmParams.mL1 = baseM;
+    mmParams.nL1 = baseN;
+    mmParams.kL1 = kL1;
+    mmParams.mL0 = static_cast<uint32_t>(baseM);
+    mmParams.nL0 = static_cast<uint32_t>(baseN);
+    mmParams.kL0 = static_cast<uint32_t>(baseK);
+    mmParams.l1Stages = 2U;
+    mmParams.l0cStages = static_cast<uint16_t>(mmTilingData.dbL0C);
+    if constexpr (EnableGelu) {
+        // Keep the current grouped GELU path on the single-L0C-stage configuration selected by tiling.
+        mmParams.l0cStages = 1U;
+        mmParams.oriK = static_cast<uint64_t>(mmTilingData.Ka);
+        mmParams.splitM = static_cast<uint64_t>(gmmBaseParams.splitM);
+        mmParams.ubDB = BlockEpilogue::UB_BUFFER_DEPTH;
+        mmParams.ubPitchGran = BlockEpilogue::ROW_PITCH_GRANULARITY;
+    } else {
+        mmParams.scaleGmAddr = nullptr;
+    }
 
     ProblemShape problemShape{static_cast<int64_t>(mmTilingData.M), static_cast<int64_t>(mmTilingData.N),
                               static_cast<int64_t>(mmTilingData.Ka), static_cast<int64_t>(1)};

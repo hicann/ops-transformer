@@ -29,6 +29,13 @@ bool GroupedNoQuantMatmulTiling::SetTiling(gert::TilingContext *context)
     OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context->GetNodeName(), "compileInfoPtr is nullptr."), return false);
     usedCoreNum_ = compileInfoPtr->aicNum;
     OP_CHECK_IF(!Init(context), OP_LOGE(context->GetNodeName(), "Init failed"), return false);
+    OP_CHECK_IF(activeType_ == ACT_TYPE_GELU_TANH &&
+                    (compileInfoPtr->aicNum == 0U || compileInfoPtr->aivNum < compileInfoPtr->aicNum),
+                OP_LOGE(context->GetNodeName(), "GMM GELU requires at least one AIV per AIC."), return false);
+    const bool enableSplitM =
+        compileInfoPtr->aicNum != 0U &&
+        static_cast<uint64_t>(compileInfoPtr->aivNum) == static_cast<uint64_t>(compileInfoPtr->aicNum) * NUM_TWO;
+    splitM_ = enableSplitM ? 1U : 0U;
     OP_CHECK_IF(!CalMatMulTiling(context, compileInfoPtr),
                 OP_LOGE(context->GetNodeName(), "Unable to calculate matmul-tiling"), return false);
     SetGMMTiling();
@@ -287,11 +294,20 @@ bool GroupedNoQuantMatmulTiling::GetAttrs(const gert::TilingContext *context)
     const int64_t *groupTypePtr = attr->GetAttrPointer<int64_t>(ATTR_IDX_GROUPTYPE);
     const int64_t *splitItemPtr = attr->GetAttrPointer<int64_t>(ATTR_IDX_SPLIT_ITEM);
     const int64_t *groupListTypePtr = attr->GetAttrPointer<int64_t>(ATTR_IDX_GROUP_LIST_TYPE);
+    const int64_t *activeTypePtr = attr->GetAttrPointer<int64_t>(ATTR_IDX_ACT_TYPE);
     transposeWeight_ = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
     transposeX_ = transposeXPtr != nullptr ? *transposeXPtr : false;
     groupType_ = groupTypePtr != nullptr ? *groupTypePtr : NO_SPLIT;
     splitItem_ = splitItemPtr != nullptr ? *splitItemPtr : 0;
     groupListType_ = groupListTypePtr != nullptr ? *groupListTypePtr : 0;
+    activeType_ = activeTypePtr != nullptr ? *activeTypePtr : ACT_TYPE_NONE;
+    OP_CHECK_IF(activeType_ != ACT_TYPE_NONE && activeType_ != ACT_TYPE_GELU_TANH,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context->GetNodeName(), "actType", Ops::Transformer::Gmm::FormatString("%ld", activeType_).c_str(),
+                    Ops::Transformer::Gmm::FormatString("In %s case, the value of %s must be in %s", "no-quant",
+                                                        "actType", "{0, 2}")
+                        .c_str()),
+                return false);
 
     auto xDesc = context->GetDynamicInputDesc(INDEX_X, 0);
     OP_CHECK_IF(xDesc == nullptr, OP_LOGE(context->GetNodeName(), "xDesc is nullptr."), return false);
@@ -305,6 +321,13 @@ bool GroupedNoQuantMatmulTiling::GetAttrs(const gert::TilingContext *context)
     if (!CheckNoQuantGroupList(context)) {
         return false;
     }
+    OP_CHECK_IF(activeType_ == ACT_TYPE_GELU_TANH && groupType_ == SPLIT_K,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context->GetNodeName(), "groupType", Ops::Transformer::Gmm::FormatString("%ld", groupType_).c_str(),
+                    Ops::Transformer::Gmm::FormatString("In %s case with %s enabled, the value of %s must be in %s",
+                                                        "no-quant", "GELU_TANH", "groupType", "{-1, 0}")
+                        .c_str()),
+                return false);
     return true;
 }
 
@@ -410,6 +433,8 @@ void GroupedNoQuantMatmulTiling::SetGMMTiling()
     tilingData_.gmmNoQuantParam.mTailCnt = static_cast<uint32_t>(mTailCnt_);
     tilingData_.gmmNoQuantParam.nTailCnt = static_cast<uint32_t>(nTailCnt_);
     tilingData_.gmmNoQuantParam.weightNoL2Cache = weightNoL2Cache_;
+    tilingData_.gmmNoQuantParam.activeType = static_cast<uint32_t>(activeType_);
+    tilingData_.gmmNoQuantParam.splitM = static_cast<uint32_t>(splitM_);
 }
 
 void GroupedNoQuantMatmulTiling::SetMatMulTiling()
@@ -460,6 +485,7 @@ bool GroupedNoQuantMatmulTiling::SetCustomParam(gert::TilingContext *context)
 void GroupedNoQuantMatmulTiling::SetTilingKey(gert::TilingContext *context)
 {
     tilingKeyBuilder_.gmmTrans = static_cast<uint8_t>(transposeX_) | (static_cast<uint8_t>(transposeWeight_) << 1);
+    tilingKeyBuilder_.act = activeType_ == ACT_TYPE_GELU_TANH ? 1U : 0U;
     context->SetTilingKey(tilingKeyBuilder_.GenTilingKey());
 }
 
@@ -665,12 +691,14 @@ void GroupedNoQuantMatmulTiling::PrintTilingResult(const gert::TilingContext *co
 {
     OP_LOGI(context->GetNodeName(),
             "GMM Tiling result: groupNum: %u, singleX: %u, singleWeight: %u, singleY: %u,"
-            "groupType: %d, groupListType: %u, hasBias: %u, mTailCnt: %u, nTailCnt: %u, weightNoL2Cache: %u",
+            "groupType: %d, groupListType: %u, hasBias: %u, mTailCnt: %u, nTailCnt: %u, weightNoL2Cache: %u,"
+            "activeType: %u, splitM: %u",
             tilingData_.gmmNoQuantParam.groupNum, tilingData_.gmmNoQuantParam.singleX,
             tilingData_.gmmNoQuantParam.singleWeight, tilingData_.gmmNoQuantParam.singleY,
             tilingData_.gmmNoQuantParam.groupType, tilingData_.gmmNoQuantParam.groupListType,
             tilingData_.gmmNoQuantParam.hasBias, tilingData_.gmmNoQuantParam.mTailCnt,
-            tilingData_.gmmNoQuantParam.nTailCnt, tilingData_.gmmNoQuantParam.weightNoL2Cache);
+            tilingData_.gmmNoQuantParam.nTailCnt, tilingData_.gmmNoQuantParam.weightNoL2Cache,
+            tilingData_.gmmNoQuantParam.activeType, tilingData_.gmmNoQuantParam.splitM);
 
     OP_LOGI(context->GetNodeName(),
             "GMM MatMul Tiling result: usedCoreNum: %d, baseM: %d, baseN: %d, baseK: %d, stepKa: %d,"
@@ -687,6 +715,7 @@ uint64_t TilingKeyBuilder::GenTilingKey() const
                    (transInfo == static_cast<uint64_t>(GmmTrans::ABTrans));
     bool btrans_ = (transInfo == static_cast<uint64_t>(GmmTrans::BTrans)) ||
                    (transInfo == static_cast<uint64_t>(GmmTrans::ABTrans));
-    return GET_TPL_TILING_KEY(static_cast<uint64_t>(btrans_), static_cast<uint64_t>(atrans_));
+    return GET_TPL_TILING_KEY(static_cast<uint64_t>(btrans_), static_cast<uint64_t>(atrans_),
+                              static_cast<uint64_t>(this->act));
 }
 } // namespace optiling
