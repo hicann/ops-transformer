@@ -62,8 +62,6 @@ transformer-1@ops-transformer:
     src:
         release:
             huawei_style:
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fia_tiling_info.h
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fia_tiling_info.cpp
                 - ops/ops-transformer/attention/common/op_host/fia_tiling_base.h
                 - ops/ops-transformer/attention/common/op_host/fia_tiling_shape.cpp
                 - ops/ops-transformer/attention/common/op_host/fia_tiling_templates_registry.h
@@ -120,7 +118,7 @@ transformer-1@ops-transformer:
             - ops/ops-transformer/attention/*/op_kernel/
             - ops/ops-transformer/attention/*/op_api/
             - ops/ops-transformer/attention/*/op_graph/
-            - ops/ops-transformer/attention/fused_infer_attention_score/op_host/fia_tiling_info.h
+            - ops/ops-transformer/attention/fused_infer_attention_score/op_host/*.h
             - ops/ops-transformer/attention/flash_attn/op_host/flash_attn_tiling.h
             - ops/ops-transformer/attention/flash_attn/op_host/flash_attn_tiling_common.h
             - ops/ops-transformer/attention/flash_attn/op_host/fa_tiling_info.h
