@@ -81,7 +81,10 @@ __aicore__ inline void KernelMoeTokenUnpermuteWithRoutingMapPad<T>::Init(
     probsGM.SetGlobalBuffer((__gm__ T *)probs);
     unpermutedTokensGM.SetGlobalBuffer((__gm__ T *)unpermuted_tokens + blockOffset);
 
-    this->pipe.InitBuffer(unpermutedTokensOutQue, BUFFER_NUM, num_tokens_each_loop_current_core * sizeof(T));
+    uint64_t maxLoopTokens = (num_tokens_each_loop_current_core > num_tokens_last_loop_current_core) ?
+                                 num_tokens_each_loop_current_core :
+                                 num_tokens_last_loop_current_core;
+    this->pipe.InitBuffer(unpermutedTokensOutQue, BUFFER_NUM, maxLoopTokens * sizeof(T));
 }
 
 template <typename T>
@@ -118,21 +121,24 @@ __aicore__ inline void KernelMoeTokenUnpermuteWithRoutingMapPad<T>::InitData(
 template <typename T>
 __aicore__ inline void KernelMoeTokenUnpermuteWithRoutingMapPad<T>::Compute(uint64_t index, uint64_t loopN)
 {
-    int posIdx = 0;
     LocalTensor<T> unpermutedTokensLocal = this->unpermutedTokensOutQue.template AllocTensor<T>();
-    for (int offset = 0; offset < loopN; offset++) {
-        posIdx = blockOffset + offset;
+    uint64_t loopOffset = index * this->num_tokens_each_loop_current_core;
+    for (uint64_t offset = 0; offset < loopN; offset++) {
+        uint64_t posIdx = this->blockOffset + loopOffset + offset;
         unpermutedTokensLocal.SetValue(
             offset, probsGM.GetValue(sortedIndicesGM.GetValue(posIdx) * num_experts + posIdx / capacity));
     }
     this->copyParams.blockLen = loopN * sizeof(T);
-    DataCopyPad(unpermutedTokensGM, unpermutedTokensLocal, this->copyParams);
+    DataCopyPad(unpermutedTokensGM[loopOffset], unpermutedTokensLocal, this->copyParams);
     this->unpermutedTokensOutQue.FreeTensor(unpermutedTokensLocal);
 }
 
 template <typename T>
 __aicore__ inline void KernelMoeTokenUnpermuteWithRoutingMapPad<T>::Process()
 {
+    if (this->loop_time_current_core == 0) {
+        return;
+    }
     for (uint64_t n = 0; n < this->loop_time_current_core - 1; n++) {
         Compute(n, this->num_tokens_each_loop_current_core);
     }

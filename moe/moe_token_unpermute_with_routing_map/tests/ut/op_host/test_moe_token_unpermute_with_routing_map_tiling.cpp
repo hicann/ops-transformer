@@ -44,14 +44,16 @@ void InitParsePlatformInfo(fe::PlatFormInfos &platformInfo)
 } // namespace
 
 class MoeTokenUnpermuteWithRoutingMapTiling : public testing::Test {
- protected:
-  static void SetUpTestCase() {
-    std::cout << "MoeTokenUnpermuteWithRoutingMapTiling SetUp" << std::endl;
-  }
+protected:
+    static void SetUpTestCase()
+    {
+        std::cout << "MoeTokenUnpermuteWithRoutingMapTiling SetUp" << std::endl;
+    }
 
-  static void TearDownTestCase() {
-    std::cout << "MoeTokenUnpermuteWithRoutingMapTiling TearDown" << std::endl;
-  }
+    static void TearDownTestCase()
+    {
+        std::cout << "MoeTokenUnpermuteWithRoutingMapTiling TearDown" << std::endl;
+    }
 };
 
 TEST_F(MoeTokenUnpermuteWithRoutingMapTiling, test_tiling_fp32_droppad)
@@ -60,16 +62,16 @@ TEST_F(MoeTokenUnpermuteWithRoutingMapTiling, test_tiling_fp32_droppad)
     gert::TilingContextPara tilingContextPara(
         "MoeTokenUnpermuteWithRoutingMap",
         {
-            {{{40968*8, 7168}, {40968*8, 7168}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{2568*8}, {2568*8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{40968 * 8, 7168}, {40968 * 8, 7168}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2568 * 8}, {2568 * 8}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{4096, 265}, {4096, 256}}, ge::DT_INT8, ge::FORMAT_ND},
             {{{4096, 8}, {4096, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {{{8, 7168}, {8, 7168}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{2568*8}, {2568*8}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{2568*8}, {2568*8}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{2568*8}, {2568*8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2568 * 8}, {2568 * 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{2568 * 8}, {2568 * 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{2568 * 8}, {2568 * 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
         },
         {
             {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom(true)},
@@ -77,8 +79,10 @@ TEST_F(MoeTokenUnpermuteWithRoutingMapTiling, test_tiling_fp32_droppad)
         },
         &compileInfo);
     int64_t expectTilingKey = 1000;
+    // each_loop = min(num_tokens_each_core, maxNPerLoopForUb)：321 小于 maxNPerLoopForUb，
+    // 故 front/tail 的 each_loop 均为 321（修复前 GetAlign 向下对齐为 0，会申请 0 字节 UB 队列）。
     string expectTilingData =
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 64 4096 8 2568 64 1 321 0 321 0 1 321 0 321 ";
+        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 64 4096 8 2568 64 1 321 321 321 0 1 321 321 321 ";
     std::vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -89,16 +93,16 @@ TEST_F(MoeTokenUnpermuteWithRoutingMapTiling, test_tiling_bf16)
     gert::TilingContextPara tilingContextPara(
         "MoeTokenUnpermuteWithRoutingMap",
         {
-            {{{40968*8, 7168}, {40968*8, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{2568*8}, {2568*8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{40968 * 8, 7168}, {40968 * 8, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2568 * 8}, {2568 * 8}}, ge::DT_INT32, ge::FORMAT_ND},
             {{{4096, 265}, {4096, 256}}, ge::DT_BOOL, ge::FORMAT_ND},
             {{{4096, 8}, {4096, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
         },
         {
             {{{8, 7168}, {8, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{2568*8}, {2568*8}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{2568*8}, {2568*8}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{2568*8}, {2568*8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2568 * 8}, {2568 * 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{2568 * 8}, {2568 * 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{2568 * 8}, {2568 * 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
         },
         {
             {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom(false)},
@@ -219,10 +223,7 @@ TEST_F(MoeTokenUnpermuteWithRoutingMapTiling, test_tiling_small_ub_hidden_split)
             {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom(false)},
             {"restore_shape", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({32, 8192})},
         },
-        &compileInfo,
-        "Ascend910B",
-        64,
-        8192);
+        &compileInfo, "Ascend910B", 64, 8192);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 1);
 }
 
