@@ -9,8 +9,8 @@
  */
 
 /*!
- * \file rope_quant_kvcache_proto.cpp
- * \brief
+ * \file rope_quant_kvcache_proto.h
+ * \brief RopeQuantKvcache operator prototype definition
  */
 #ifndef OPS_OP_PROTO_INC_REPO_QUANT_KVCACHE_H_
 #define OPS_OP_PROTO_INC_REPO_QUANT_KVCACHE_H_
