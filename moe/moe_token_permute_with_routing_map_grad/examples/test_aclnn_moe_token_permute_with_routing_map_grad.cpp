@@ -10,15 +10,11 @@
 
 #include "aclnnop/aclnn_moe_token_permute_with_routing_map_grad.h"
 #include <iostream>
+#include <numeric>
 #include <vector>
-#include <sys/stat.h>
-#include <fstream>
-#include <fcntl.h>
-#include <unistd.h>
 #include <cstdio>
 #include <cassert>
 #include <iomanip>
-#include <unistd.h>
 #include "acl/acl.h"
 #include "aclnn/acl_meta.h"
 
@@ -43,49 +39,6 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-template <typename T>
-bool ReadFile(const std::string &filePath, std::vector<int64_t> shape, std::vector<T> &hostData)
-{
-    size_t fileSize = 1;
-    for (int64_t i : shape) {
-        fileSize *= i;
-    }
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file" << std::endl;
-        return 1;
-    }
-    // 获取文件大小
-    file.seekg(0, std::ios::end);
-    file.seekg(0, std::ios::beg);
-    hostData.reserve(fileSize);
-    if (file.read(reinterpret_cast<char *>(hostData.data()), fileSize * sizeof(T))) {
-    } else {
-        std::cerr << "Failed to read file" << std::endl;
-        return 1;
-    }
-    file.close();
-    return true;
-}
-
-template <typename T>
-bool WriteFile(const std::string &filePath, int64_t size, std::vector<T> &hostData)
-{
-    int fd = open(filePath.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWRITE);
-    if (fd < 0) {
-        LOG_PRINT("Open file failed. path = %s", filePath.c_str());
-        return false;
-    }
-
-    size_t writeSize = write(fd, reinterpret_cast<char *>(hostData.data()), size * sizeof(T));
-    (void)close(fd);
-    if (writeSize != size * sizeof(T)) {
-        LOG_PRINT("Write file Failed.");
-        return false;
-    }
-
-    return true;
-}
 void PrintOutResult(std::vector<int64_t> &shape, void **deviceAddr)
 {
     auto size = GetShapeSize(shape);
@@ -167,11 +120,12 @@ int main()
                           &permutedProbsOutputGrad_Addr, aclDataType::ACL_FLOAT, &ppermutedProbsOutputGrad);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    std::vector<int> sortedIndicesData(num_expert * num_capacity, 0);
+    // Keep each (token, expert) scatter destination unique.
+    std::vector<int> sortedIndicesData(num_expert * num_capacity);
+    std::iota(sortedIndicesData.begin(), sortedIndicesData.end(), 0);
     std::vector<int64_t> sortedIndicesShape = {num_expert * num_capacity};
     void *sortedIndicesAddr = nullptr;
     aclTensor *sortedIndices = nullptr;
-    ReadFile("./sortedIndices.bin", sortedIndicesShape, sortedIndicesData);
     ret = CreateAclTensor(sortedIndicesData, sortedIndicesShape, &sortedIndicesAddr, aclDataType::ACL_INT32,
                           &sortedIndices);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
