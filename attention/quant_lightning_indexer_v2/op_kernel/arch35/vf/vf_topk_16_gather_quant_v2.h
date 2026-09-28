@@ -343,7 +343,7 @@ __simd_vf__ void FindRealIndexVFImpl(__ubuf__ uint32_t *outputIdxBuf, __ubuf__ u
 }
 
 /**
- * @brief LiTopKVF 对一个validLen的输入进行topk算法，输出idx_tmp
+ * @brief QLiV2TopKVF 对一个validLen的输入进行topk算法，输出idx_tmp
  * @param tmpIdxLocal Temp阶段输出的TopKIndex;如果s2SeqLen < 16K作为最终输出 validLen * 2B
  * @param outputValueLocal 如果s2SeqLen > 16K并且是首轮输出Value topK * 2B
  * @param inputValueLocal 输入Value validLen * 2B
@@ -355,50 +355,52 @@ __simd_vf__ void FindRealIndexVFImpl(__ubuf__ uint32_t *outputIdxBuf, __ubuf__ u
  * @param validLen 有效元素个数:QLIV2Common::Align(topkCountAlign256_ + validTrunkLen, (uint32_t)256)
  */
 template <bool ISOUTVALUE> // 是否输出VALUE
-__aicore__ inline void LiTopKVF(const LocalTensor<uint16_t> &tmpIdxLocal, const LocalTensor<uint16_t> &outputValueLocal,
-                                const LocalTensor<uint16_t> &inputValueLocal,
-                                const LocalTensor<uint32_t> &histogramsLocal, const LocalTensor<uint32_t> &idxHighLocal,
-                                const LocalTensor<uint32_t> &idxLowLocal, const LocalTensor<uint32_t> &nkValueLocal,
-                                uint32_t topK, uint32_t validLen)
+__aicore__ inline void QLiV2TopKVF(const LocalTensor<uint16_t> &tmpIdxLocal,
+                                   const LocalTensor<uint16_t> &outputValueLocal,
+                                   const LocalTensor<uint16_t> &inputValueLocal,
+                                   const LocalTensor<uint32_t> &histogramsLocal,
+                                   const LocalTensor<uint32_t> &idxHighLocal, const LocalTensor<uint32_t> &idxLowLocal,
+                                   const LocalTensor<uint32_t> &nkValueLocal, uint32_t topK, uint32_t validLen)
 {
-    __ubuf__ uint16_t *tmpIdxBuf = (__ubuf__ uint16_t *)tmpIdxLocal.GetPhyAddr();
-    __ubuf__ uint16_t *outputValueBuf = (__ubuf__ uint16_t *)outputValueLocal.GetPhyAddr();
-    __ubuf__ uint16_t *inputValueBuf = (__ubuf__ uint16_t *)inputValueLocal.GetPhyAddr();
-    __ubuf__ uint32_t *histogramsBuf = (__ubuf__ uint32_t *)histogramsLocal.GetPhyAddr();
-    __ubuf__ uint32_t *idxHighBuf = (__ubuf__ uint32_t *)idxHighLocal.GetPhyAddr();
-    __ubuf__ uint32_t *idxLowBuf = (__ubuf__ uint32_t *)idxLowLocal.GetPhyAddr();
-    __ubuf__ uint32_t *nkValueBuf = (__ubuf__ uint32_t *)nkValueLocal.GetPhyAddr();
+    __ubuf__ uint16_t *qliV2TmpIdxBuf = (__ubuf__ uint16_t *)tmpIdxLocal.GetPhyAddr();
+    __ubuf__ uint16_t *qliV2OutputValueBuf = (__ubuf__ uint16_t *)outputValueLocal.GetPhyAddr();
+    __ubuf__ uint16_t *qliV2InputValueBuf = (__ubuf__ uint16_t *)inputValueLocal.GetPhyAddr();
+    __ubuf__ uint32_t *qliV2HistogramsBuf = (__ubuf__ uint32_t *)histogramsLocal.GetPhyAddr();
+    __ubuf__ uint32_t *qliV2IdxHighBuf = (__ubuf__ uint32_t *)idxHighLocal.GetPhyAddr();
+    __ubuf__ uint32_t *qliV2IdxLowBuf = (__ubuf__ uint32_t *)idxLowLocal.GetPhyAddr();
+    __ubuf__ uint32_t *qliV2NkValueBuf = (__ubuf__ uint32_t *)nkValueLocal.GetPhyAddr();
 
-    uint32_t bottomK = validLen - topK + 1;
-    uint32_t beginIdx = 0;
-    bool flag = true;
+    uint32_t qliV2BottomK = validLen - topK + 1;
+    uint32_t qliV2BeginIdx = 0;
+    bool qliV2Flag = true;
 
-    const uint16_t repeatSize8 = 256;
-    const uint16_t repeatSize16 = 128;
-    const uint16_t repeatSize32 = 64;
+    const uint16_t qliV2RepeatSize8 = 256;
+    const uint16_t qliV2RepeatSize16 = 128;
+    const uint16_t qliV2RepeatSize32 = 64;
 
-    uint16_t histogramsLoopNum = (validLen + repeatSize8 - 1) / repeatSize8;
-    uint16_t inputLoopNum = (validLen + repeatSize16 - 1) / repeatSize16;
-    uint16_t topkLoopNum = (topK + repeatSize32 - 1) / repeatSize32;
-    uint16_t topkLoopNum16 = (topK + repeatSize16 - 1) / repeatSize16;
+    uint16_t qliV2HistogramsLoopNum = (validLen + qliV2RepeatSize8 - 1) / qliV2RepeatSize8;
+    uint16_t qliV2InputLoopNum = (validLen + qliV2RepeatSize16 - 1) / qliV2RepeatSize16;
+    uint16_t qliV2TopkLoopNum = (topK + qliV2RepeatSize32 - 1) / qliV2RepeatSize32;
+    uint16_t qliV2TopkLoopNum16 = (topK + qliV2RepeatSize16 - 1) / qliV2RepeatSize16;
 
     // find kth-value
-    HistogramsHighVFImpl<uint16_t>(histogramsBuf, inputValueBuf, histogramsLoopNum, flag);
-    FindHighTargetBinVFImpl(idxHighBuf, nkValueBuf, histogramsBuf, bottomK);
+    HistogramsHighVFImpl<uint16_t>(qliV2HistogramsBuf, qliV2InputValueBuf, qliV2HistogramsLoopNum, qliV2Flag);
+    FindHighTargetBinVFImpl(qliV2IdxHighBuf, qliV2NkValueBuf, qliV2HistogramsBuf, qliV2BottomK);
 
-    HistogramsLowVFImpl<uint16_t>(histogramsBuf, inputValueBuf, idxHighBuf, histogramsLoopNum, flag);
-    FindKthVFImpl(nkValueBuf, histogramsBuf, idxHighBuf, idxLowBuf);
+    HistogramsLowVFImpl<uint16_t>(qliV2HistogramsBuf, qliV2InputValueBuf, qliV2IdxHighBuf, qliV2HistogramsLoopNum,
+                                  qliV2Flag);
+    FindKthVFImpl(qliV2NkValueBuf, qliV2HistogramsBuf, qliV2IdxHighBuf, qliV2IdxLowBuf);
 
     // filter
     AscendC::Duplicate(tmpIdxLocal, (uint16_t)(0), QLIV2Common::Align(topK, (uint32_t)128));
     // 输出大于k-value的值idx
-    FindIdxGTOutputVFImpl(tmpIdxBuf, inputValueBuf, (uint32_t)(0), nkValueBuf, inputLoopNum);
+    FindIdxGTOutputVFImpl(qliV2TmpIdxBuf, qliV2InputValueBuf, (uint32_t)(0), qliV2NkValueBuf, qliV2InputLoopNum);
     // 输出等于k-value的值idx
-    FindIdxEQOutputVFImpl(tmpIdxBuf, inputValueBuf, (uint32_t)(0), nkValueBuf, inputLoopNum);
+    FindIdxEQOutputVFImpl(qliV2TmpIdxBuf, qliV2InputValueBuf, (uint32_t)(0), qliV2NkValueBuf, qliV2InputLoopNum);
 
     // 是否输出Value
     if constexpr (ISOUTVALUE) {
-        FindValueOutputVFImpl(outputValueBuf, inputValueBuf, tmpIdxBuf, topkLoopNum16);
+        FindValueOutputVFImpl(qliV2OutputValueBuf, qliV2InputValueBuf, qliV2TmpIdxBuf, qliV2TopkLoopNum16);
     }
 }
 
@@ -424,54 +426,55 @@ __simd_vf__ void FindLDRealIndexVFImpl(__ubuf__ uint32_t *outputIdxBuf, __ubuf__
 
 /**
  * @brief 通过idx_tmp gather出实际的TopKIndex，s2SeqLen > 16K才会执行
- * @param outputIdxLocal 输出Idx 有效:topK * 2B
- * @param outputValueLocal 输出Value topK * 2B(以后需要输出实际value使用)
- * @param inputValueLocal 输入Value validLen * 2B
- * @param tmpIdxLocal 本轮tmpIdx输入 validLen * 2B (0 ~ validLen - 1)
- * @param hisIdxLocal 上一轮实际Idx输入 有效:topK * 4B
+ * @param qliV2OutputIdxLocal 输出Idx 有效:topK * 2B
+ * @param qliV2OutputValueLocal 输出Value topK * 2B(以后需要输出实际value使用)
+ * @param qliV2InputValueLocal 输入Value validLen * 2B
+ * @param qliV2TmpIdxLocal 本轮tmpIdx输入 validLen * 2B (0 ~ validLen - 1)
+ * @param qliV2HisIdxLocal 上一轮实际Idx输入 有效:topK * 4B
  * @param topK topK元素个数
  * @param loopBasicIdx 当前循环需要加上得基准Index
  * @param validLen 有效元素个数
  */
-__aicore__ inline void LiTopKGatherVF(const LocalTensor<uint32_t> &outputIdxLocal,
-                                      const LocalTensor<uint16_t> &outputValueLocal,
-                                      const LocalTensor<uint16_t> &inputValueLocal,
-                                      const LocalTensor<uint16_t> &tmpIdxLocal,
-                                      const LocalTensor<uint32_t> &hisIdxLocal, uint32_t topK, uint32_t loopBasicIdx,
-                                      uint32_t validLen)
+__aicore__ inline void QLiV2TopKGatherVF(const LocalTensor<uint32_t> &qliV2OutputIdxLocal,
+                                         const LocalTensor<uint16_t> &qliV2OutputValueLocal,
+                                         const LocalTensor<uint16_t> &qliV2InputValueLocal,
+                                         const LocalTensor<uint16_t> &qliV2TmpIdxLocal,
+                                         const LocalTensor<uint32_t> &qliV2HisIdxLocal, uint32_t topK,
+                                         uint32_t loopBasicIdx, uint32_t validLen)
 {
-    __ubuf__ uint32_t *outputIdxBuf = (__ubuf__ uint32_t *)outputIdxLocal.GetPhyAddr();
-    __ubuf__ uint16_t *outputValueBuf = (__ubuf__ uint16_t *)outputValueLocal.GetPhyAddr();
-    __ubuf__ uint16_t *inputValueBuf = (__ubuf__ uint16_t *)inputValueLocal.GetPhyAddr();
-    __ubuf__ uint16_t *tmpIdxBuf = (__ubuf__ uint16_t *)tmpIdxLocal.GetPhyAddr();
-    __ubuf__ uint32_t *hisIdxBuf = (__ubuf__ uint32_t *)hisIdxLocal.GetPhyAddr();
+    __ubuf__ uint32_t *qliV2OutputIdxBuf = (__ubuf__ uint32_t *)qliV2OutputIdxLocal.GetPhyAddr();
+    __ubuf__ uint16_t *qliV2OutputValueBuf = (__ubuf__ uint16_t *)qliV2OutputValueLocal.GetPhyAddr();
+    __ubuf__ uint16_t *qliV2InputValueBuf = (__ubuf__ uint16_t *)qliV2InputValueLocal.GetPhyAddr();
+    __ubuf__ uint16_t *qliV2TmpIdxBuf = (__ubuf__ uint16_t *)qliV2TmpIdxLocal.GetPhyAddr();
+    __ubuf__ uint32_t *qliV2HisIdxBuf = (__ubuf__ uint32_t *)qliV2HisIdxLocal.GetPhyAddr();
 
-    const uint16_t repeatSize32 = 64;
-    const uint16_t repeatSize16 = 128;
-    uint16_t topkLoopNum16 = (topK + repeatSize16 - 1) / repeatSize16;
-    uint16_t topkLoopNum32 = (topK + repeatSize32 - 1) / repeatSize32;
+    const uint16_t qliV2RepeatSize32 = 64;
+    const uint16_t qliV2RepeatSize16 = 128;
+    uint16_t qliV2TopkLoopNum16 = (topK + qliV2RepeatSize16 - 1) / qliV2RepeatSize16;
+    uint16_t qliV2TopkLoopNum32 = (topK + qliV2RepeatSize32 - 1) / qliV2RepeatSize32;
 
-    FindRealIndexVFImpl(outputIdxBuf, tmpIdxBuf, hisIdxBuf, topK, loopBasicIdx, topkLoopNum32);
+    FindRealIndexVFImpl(qliV2OutputIdxBuf, qliV2TmpIdxBuf, qliV2HisIdxBuf, topK, loopBasicIdx, qliV2TopkLoopNum32);
 }
 
 /**
     LD:gather最终的Idx
 */
-__aicore__ inline void LiTopKLDGatherVF(const LocalTensor<uint32_t> &outputIdxLocal, // 输出Idx topK * 2B
-                                        const LocalTensor<uint16_t> &tmpIdxLocal,    // 本轮tmpIdx输入 validLen * 2B
-                                        const LocalTensor<uint32_t> &hisIdxLocal,    // 上一轮Idx输入 topK * 4B
-                                        uint32_t topK)                               // topK元素个数
+__aicore__ inline void QLiV2TopKLDGatherVF(
+    const LocalTensor<uint32_t> &qliV2OutputIdxLocal, // 输出Idx topK * 2B
+    const LocalTensor<uint16_t> &qliV2TmpIdxLocal,    // 本轮tmpIdx输入 validLen * 2B
+    const LocalTensor<uint32_t> &qliV2HisIdxLocal,    // 上一轮Idx输入 topK * 4B
+    uint32_t topK)                                    // topK元素个数
 {
-    __ubuf__ uint32_t *outputIdxBuf = (__ubuf__ uint32_t *)outputIdxLocal.GetPhyAddr();
-    __ubuf__ uint16_t *tmpIdxBuf = (__ubuf__ uint16_t *)tmpIdxLocal.GetPhyAddr();
-    __ubuf__ uint32_t *hisIdxBuf = (__ubuf__ uint32_t *)hisIdxLocal.GetPhyAddr();
+    __ubuf__ uint32_t *qliV2OutputIdxBuf = (__ubuf__ uint32_t *)qliV2OutputIdxLocal.GetPhyAddr();
+    __ubuf__ uint16_t *qliV2TmpIdxBuf = (__ubuf__ uint16_t *)qliV2TmpIdxLocal.GetPhyAddr();
+    __ubuf__ uint32_t *qliV2HisIdxBuf = (__ubuf__ uint32_t *)qliV2HisIdxLocal.GetPhyAddr();
 
-    const uint16_t repeatSize32 = 64;
-    const uint16_t repeatSize16 = 128;
-    uint16_t topkLoopNum16 = (topK + repeatSize16 - 1) / repeatSize16;
-    uint16_t topkLoopNum32 = (topK + repeatSize32 - 1) / repeatSize32;
+    const uint16_t qliV2RepeatSize32 = 64;
+    const uint16_t qliV2RepeatSize16 = 128;
+    uint16_t qliV2TopkLoopNum16 = (topK + qliV2RepeatSize16 - 1) / qliV2RepeatSize16;
+    uint16_t qliV2TopkLoopNum32 = (topK + qliV2RepeatSize32 - 1) / qliV2RepeatSize32;
 
-    FindLDRealIndexVFImpl(outputIdxBuf, tmpIdxBuf, hisIdxBuf, topkLoopNum32);
+    FindLDRealIndexVFImpl(qliV2OutputIdxBuf, qliV2TmpIdxBuf, qliV2HisIdxBuf, qliV2TopkLoopNum32);
 }
 } // namespace topkb16gather
 #endif // VF_TOPK_16_GATHER_QUANT_V2_H

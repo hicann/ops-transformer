@@ -204,33 +204,33 @@ public:
 
     ge::graphStatus CheckRequiredInOutExistence() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
-    ge::graphStatus CheckRequiredParaExistence() const;
+    ge::graphStatus CheckQliv2RequiredParameters() const;
     ge::graphStatus GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor,
                                         const std::string &actualSeqLenName) const;
     ge::graphStatus GetOpName();
     ge::graphStatus GetNpuInfo();
-    void GetOptionalInputParaInfo();
     void GetInputParaInfo();
     void GetOutputParaInfo();
+    void GetOptionalInputParaInfo();
     ge::graphStatus GetAttrParaInfo();
     ge::graphStatus CheckAttrParaInfo();
     ge::graphStatus GetOpParaInfo();
     ge::graphStatus ValidateInputShapesMatch();
     ge::graphStatus CheckScaleShape();
     ge::graphStatus GetAndCheckInOutDataType();
-    ge::graphStatus GetBatchSize();
     ge::graphStatus GetHeadDim();
+    ge::graphStatus GetBatchSize();
     ge::graphStatus GetS1Size();
     ge::graphStatus GetAndCheckOptionalInput();
     ge::graphStatus CheckShapeDim();
     ge::graphStatus GetAndCheckBlockSize();
-    ge::graphStatus GetS2SizeForPageAttention();
-    ge::graphStatus GetS2SizeForBatchContinuous();
-    ge::graphStatus GetS2Size();
     ge::graphStatus GetQueryKeyAndOutLayout();
     ge::graphStatus GetN1Size();
     ge::graphStatus GetAndCheckN2Size();
     ge::graphStatus GetGSize();
+    ge::graphStatus GetS2SizeForPageAttention();
+    ge::graphStatus GetS2SizeForBatchContinuous();
+    ge::graphStatus GetS2Size();
     ge::graphStatus GetAttenMaskInfo();
     ge::graphStatus GetActualSeqInfo();
     ge::graphStatus CheckKeyContiguous() const;
@@ -241,7 +241,7 @@ public:
     gert::TilingContext *context_ = nullptr;
     const char *opName_;
     fe::PlatFormInfos *platformInfo_;
-    QLIV2ParaInfo opParamInfo_;
+    QLIV2ParaInfo qliV2Params_;
 
     // BaseParams
     int64_t bSize_ = 0;

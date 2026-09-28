@@ -23,36 +23,36 @@ namespace {
 constexpr uint32_t BLOCK_TABLE_RANK = 2U;
 constexpr char OP_NAME[] = "QuantLightningIndexerV2";
 
-ge::graphStatus InitCheckerInfo(gert::TilingContext *context, QLIV2TilingInfo &tilingInfo,
-                                lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo &checkerInfo)
+ge::graphStatus InitCheckerInfo(gert::TilingContext *qliV2Context, QLIV2TilingInfo &qliV2TilingInfo,
+                                lightning_indexer_v2_checker::LightningIndexerV2CheckerInfo &qliV2CheckerInfo)
 {
-    const char *opName = context->GetNodeName();
-    opName = opName == nullptr ? OP_NAME : opName;
-    tilingInfo.platformInfo = context->GetPlatformInfo();
-    if (tilingInfo.platformInfo == nullptr) {
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "platform_info", "Platform information must be provided");
+    const char *qliV2OpName = qliV2Context->GetNodeName();
+    qliV2OpName = qliV2OpName == nullptr ? OP_NAME : qliV2OpName;
+    qliV2TilingInfo.platformInfo = qliV2Context->GetPlatformInfo();
+    if (qliV2TilingInfo.platformInfo == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(qliV2OpName, "platform_info", "Platform information must be provided");
         return ge::GRAPH_FAILED;
     }
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo.platformInfo);
-    if (ascendcPlatform.GetCoreNumAic() == 0 || ascendcPlatform.GetCoreNumAiv() == 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, "core_num", "0",
+    auto qliV2AscendcPlatform = platform_ascendc::PlatformAscendC(qliV2TilingInfo.platformInfo);
+    if (qliV2AscendcPlatform.GetCoreNumAic() == 0 || qliV2AscendcPlatform.GetCoreNumAiv() == 0) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qliV2OpName, "core_num", "0",
                                               "AIC and AIV core counts must be greater than 0");
         return ge::GRAPH_FAILED;
     }
-    if (context->GetWorkspaceSizes(1) == nullptr || context->GetRawTilingData() == nullptr) {
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, "tiling_buffer",
+    if (qliV2Context->GetWorkspaceSizes(1) == nullptr || qliV2Context->GetRawTilingData() == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(qliV2OpName, "tiling_buffer",
                                                  "Workspace sizes and raw tiling data must be provided");
         return ge::GRAPH_FAILED;
     }
-    if (ascendcPlatform.GetCurNpuArch() != NpuArch::DAV_3510) {
-        OP_LOGE_FOR_INVALID_VALUE(opName, "npu_arch", "non-DAV_3510", "DAV_3510");
+    if (qliV2AscendcPlatform.GetCurNpuArch() != NpuArch::DAV_3510) {
+        OP_LOGE_FOR_INVALID_VALUE(qliV2OpName, "npu_arch", "non-DAV_3510", "DAV_3510");
         return ge::GRAPH_FAILED;
     }
-    tilingInfo.opName = opName;
-    tilingInfo.socVersion = ascendcPlatform.GetSocVersion();
-    tilingInfo.npuArch = NpuArch::DAV_3510;
-    checkerInfo.opName = opName;
-    checkerInfo.quantized = true;
+    qliV2TilingInfo.opName = qliV2OpName;
+    qliV2TilingInfo.socVersion = qliV2AscendcPlatform.GetSocVersion();
+    qliV2TilingInfo.npuArch = NpuArch::DAV_3510;
+    qliV2CheckerInfo.opName = qliV2OpName;
+    qliV2CheckerInfo.quantized = true;
     return ge::GRAPH_SUCCESS;
 }
 
