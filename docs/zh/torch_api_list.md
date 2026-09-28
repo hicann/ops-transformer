@@ -77,17 +77,17 @@
 |[moe_init_routing](../../moe/moe_init_routing_v4/docs/torchapi_moe_init_routing.md)|MoE的routing计算，根据moe_gating_top_k_softmax的计算结果做routing处理，支持不量化、静态量化和动态量化模式。|默认确定性实现|默认确定性实现|
 |[moe_init_routing_grad](../../moe/moe_init_routing_v2_grad/docs/torchapi_moe_init_routing_grad.md)|`moe_init_routing`的反向接口，封装aclnnMoeInitRoutingV2Grad。|默认支持确定性计算|默认支持确定性计算|
 |[moe_re_routing](../../moe/moe_re_routing_v2/docs/torchapi_moe_re_routing.md)|MoE网络中，进行AlltoAll操作从其他卡上拿到需要算的token后，将token按照专家顺序重新排列。支持对topkWeight重排。|默认确定性实现|默认确定性实现|
-|[moe_token_permute](../../moe/moe_token_permute/docs/torchapi_moe_token_permute.md)|根据专家索引扩展并排序token。|默认支持确定性计算。|
+|[moe_token_permute](../../moe/moe_token_permute/docs/torchapi_moe_token_permute.md)|根据专家索引扩展并排序token。|-|默认支持确定性计算。|
 |[msa_index_score](../../attention/msa_index_score/docs/torchapi_msa_index_score.md)|计算 MSA Index Branch 的 block score，对每个 query token 与 KV sparse block 做 matmul+maxpool 得到重要性分数。|默认确定性实现|默认确定性实现|
 |[pool_key_indexer](../../attention/pool_key_indexer/docs/pool_key_indexer.md)|将多个连续token打包成一个pool（池），以pool为单位计算注意力相关性分数并选取top-k位置，从而在保持稀疏注意力优势的同时减少索引开销。|默认确定性实现|默认确定性实现|
 |[qkv_rms_norm_rope_cache_with_k_scale](../../posembedding/qkv_rms_norm_rope_cache_with_k_scale/docs/torchapi_qkv_rms_norm_rope_cache_with_k_scale.md)|融合Q/K/V拆分、Q/K RMSNorm、RoPE/M-RoPE、量化和KV Cache更新，支持原地与函数式接口及M-RoPE MX场景。|-|默认支持确定性计算。|
 |[quant_all_reduce](../../mc2/quant_all_reduce/docs/torchapi_quant_all_reduce.md)|实现低比特数据的AllReduce通信，在通信的过程中对数据进行反量化，并输出通信结果。|-|-|
 |[quant_compressor](../../attention/quant_compressor/docs/torchapi_quant_compressor.md)|Compressor的量化版本，将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。|-|默认支持确定性计算|
-|[quant_flash_attn](../../attention/quant_flash_attn/docs/torchapi_quant_flash_attn.md)| 调用`QuantFlashAttn`算子完成MxFP8/HiF8/MxFP4量化场景下的全量化注意力计算，训练推理归一化。|默认支持确定性计算。|
-|[quant_flash_attn_grad](../../attention/quant_flash_attn_grad/docs/torchapi_quant_flash_attn_grad.md)| 调用`QuantFlashAttnGrad`算子完成HiF8量化场景下的全量化注意力计算，训练推理归一化。|默认支持确定性计算。|
-|[quant_lightning_indexer](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)| 基于一系列操作得到每一个token对应的top-k个位置。|默认支持确定性计算。|
+|[quant_flash_attn](../../attention/quant_flash_attn/docs/torchapi_quant_flash_attn.md)| 调用`QuantFlashAttn`算子完成MxFP8/HiF8/MxFP4量化场景下的全量化注意力计算，训练推理归一化。|-|默认支持确定性计算。|
+|[quant_flash_attn_grad](../../attention/quant_flash_attn_grad/docs/torchapi_quant_flash_attn_grad.md)| 调用`QuantFlashAttnGrad`算子完成HiF8量化场景下的全量化注意力计算，训练推理归一化。|-|默认支持确定性计算。|
+|[quant_lightning_indexer](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)| 基于一系列操作得到每一个token对应的top-k个位置。|-|默认支持确定性计算。|
 |[quant_reduce_scatter](../../mc2/quant_reduce_scatter/docs/torchapi_quant_reduce_scatter.md)|实现quant + reduceScatter融合计算。|-|-|
-|[quant_sparse_flash_mla](../../attention/quant_sparse_flash_mla/docs/torchapi_quant_sparse_flash_mla.md)|调用`QuantSparseFlashMla`算子完成共享KV（Key和Value使用同一份输入）的稀疏注意力计算。|默认支持确定性计算。|
+|[quant_sparse_flash_mla](../../attention/quant_sparse_flash_mla/docs/torchapi_quant_sparse_flash_mla.md)|调用`QuantSparseFlashMla`算子完成共享KV（Key和Value使用同一份输入）的稀疏注意力计算。|-|默认支持确定性计算。|
 |[recurrent_kda](../../attention/recurrent_kda/docs/torchapi_recurrent_kda.md)|完成KDA（Kimi Delta Attention）的递归前向计算，面向decode和MTP短序列场景。|默认确定性实现|默认确定性实现|
 |[scatter_pa_kv_cache_with_k_scale](../../attention/scatter_pa_kv_cache_with_k_scale/docs/torchapi_scatter_pa_kv_cache_with_k_scale.md)|训练场景下，更新KvCache中指定位置的key和value，同时更新key的scale值。|-|默认支持确定性计算|
 |[sparse_flash_mla](../../attention/sparse_flash_mla/docs/torchapi_sparse_flash_mla.md)|基于共享KV完成SparseFlashMla稀疏注意力计算。需与`sparse_flash_mla_metadata`配套使用。 |默认确定性实现|默认确定性实现|

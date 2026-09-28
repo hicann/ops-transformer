@@ -5,22 +5,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -285,7 +285,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>activeNum（int64_t）</td>
       <td>输入</td>
       <td>表示总的最大处理row数，具体行为依产品而定</td>
-      <td><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：dropPadMode=0时，activeNum支持大于等于-1的值；-1、0表示不限制处理行数，大于0时最多处理min(activeNum, NUM_ROWS*K)行。<term>Ascend 950PR/Ascend 950DT</term>：该属性不用于限制处理行数，仅接受-1、0或NUM_ROWS*K。</td>
+      <td><term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：dropPadMode=0时，activeNum支持大于等于-1的值；-1、0表示不限制处理行数，大于0时最多处理min(activeNum, NUM_ROWS*K)行。<term>Ascend 950PR&950DT系列产品</term>：该属性不用于限制处理行数，仅接受-1、0或NUM_ROWS*K。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -530,14 +530,14 @@ aclnnStatus aclnnMoeInitRoutingV3(
   - quantMode支持情况差异：
 
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持-1、0、1。quantMode=-1时x仅支持FLOAT16、BFLOAT16、FLOAT32、INT8。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持-1、0、1。quantMode=-1时x仅支持FLOAT16、BFLOAT16、FLOAT32、INT8。
     <!-- end id7 -->
     <!-- npu="950" id8 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持-1、0、1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持-1、0、1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17。
     <!-- end id8 -->
 
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>仅支持如下参数的值：
+  - <term>Ascend 950PR&950DT系列产品</term>仅支持如下参数的值：
     - activeNum参数不使用，支持取值为-1、0或NUM_ROWS*K。
     - expertCapacity在Dropless场景下不使用该参数；在DropPad场景下必须校验且取值范围为(0, NUM_ROWS]。
     - dropPadMode支持取值为0和1，DropPad模式（dropPadMode=1）具有如下额外约束：<ul><li>rowIdxType仅支持取值为0（gather索引）。</li><li>activeExpertRangeOptional必须为[0, expertNum]。</li><li>expertTokensNumType仅支持取值为1（count模式）。</li><li>quantMode在DropPad模式下仅支持-1（非量化），且数据类型仅支持FLOAT16、BFLOAT16、FLOAT32、INT8、HIFLOAT8。</li><li>expandedXOut必须是3D Tensor，shape为[expertNum, expertCapacity, H]。</li></ul>
@@ -545,7 +545,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
     - expertTokensNumFlag仅支持取值为true。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>支持quantMode为13的INT4动态量化场景，需同时满足：
+  - <term>Ascend 950PR&950DT系列产品</term>支持quantMode为13的INT4动态量化场景，需同时满足：
     - x数据类型为FLOAT32或BFLOAT16，expandedXOut数据类型为INT4。
     - H为偶数，用于沿H维每两个INT4值打包为1个字节；NUM_ROWS不要求为偶数。
     - activeNum等于NUM_ROWS*K。
@@ -606,10 +606,10 @@ aclnnStatus aclnnMoeInitRoutingV3(
   - 支持性能模板的产品：
 
     <!-- npu="910b" id11 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>
+    - <term>Atlas A2系列产品</term>
     <!-- end id11 -->
     <!-- npu="A3" id12 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>
+    - <term>Atlas A3系列产品</term>
     <!-- end id12 -->
 
   - 性能模板的准入条件：
@@ -628,14 +628,14 @@ aclnnStatus aclnnMoeInitRoutingV3(
       </tr>
       <tr>
         <td align="center"><br>全载性能模板</td>
-        <td>在算子输入shape较小的场景，操作间的多核同步时间占比较高，成为性能瓶颈。因此，针对这种特化场景，添加性能模板。该模板中，搬入、排序、计算都在同一个kernel内完成。需要满足如下条件：<ul style="list-style-type: circle;"><li>属性要求：dropPadMode=0；Ascend 950PR/Ascend 950DT非量化场景还支持dropPadMode=1，此时quantMode=-1、rowIdxType=0、activeExpertRange=[0, expertNum]</li></ul></td>
+        <td>在算子输入shape较小的场景，操作间的多核同步时间占比较高，成为性能瓶颈。因此，针对这种特化场景，添加性能模板。该模板中，搬入、排序、计算都在同一个kernel内完成。需要满足如下条件：<ul style="list-style-type: circle;"><li>属性要求：dropPadMode=0；Ascend 950PR&950DT系列产品非量化场景还支持dropPadMode=1，此时quantMode=-1、rowIdxType=0、activeExpertRange=[0, expertNum]</li></ul></td>
       </tr>
     </table>
 
 - 空tensor处理：
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：NUM_ROWS=0时进入空Tensor处理路径。
-  - <term>Ascend 950PR/Ascend 950DT</term>：NUM_ROWS=0或K=0时没有路由元素，进入空Tensor处理路径，专家计数为0；输出shape仍需满足相应模式的约束。
-  - <term>Ascend 950PR/Ascend 950DT</term>：NUM_ROWS*K&gt;0且H=0时仍走正常路由流程，生成expandedRowIdxOut和expertTokensCountOrCumsumOut。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：NUM_ROWS=0时进入空Tensor处理路径。
+  - <term>Ascend 950PR&950DT系列产品</term>：NUM_ROWS=0或K=0时没有路由元素，进入空Tensor处理路径，专家计数为0；输出shape仍需满足相应模式的约束。
+  - <term>Ascend 950PR&950DT系列产品</term>：NUM_ROWS*K&gt;0且H=0时仍走正常路由流程，生成expandedRowIdxOut和expertTokensCountOrCumsumOut。
 
 - 不支持输入为inf/-inf/nan。
 

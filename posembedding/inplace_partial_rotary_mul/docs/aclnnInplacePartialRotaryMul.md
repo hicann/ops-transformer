@@ -5,22 +5,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -256,10 +256,10 @@ aclnnStatus aclnnInplacePartialRotaryMul(
   - cos/sin的shape必须与xRef满足[broadcast关系](../../../docs/zh/context/broadcast_relationship.md)，且存在如下约束：
 
     <!-- npu="950" id7 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：cos/sin的shape当前只支持BSND、B1ND、B11D、111D排布。
+    - <term>Ascend 950PR&950DT系列产品</term>：cos/sin的shape当前只支持BSND、B1ND、B11D、111D排布。
     <!-- end id7 -->
     <!-- npu="A3,910b" id8 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：cos/sin的shape当前只支持BS1D、B11D排布，即要求B轴保持相等。
+    - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：cos/sin的shape当前只支持BS1D、B11D排布，即要求B轴保持相等。
     <!-- end id8 -->
 
   - partialSlice约束：sliceStart ≥ 0，sliceEnd ≥ 0，sliceEnd ≤ xRef最后一维（D）大小，sliceLength = sliceEnd - sliceStart >= 0，当sliceEnd和sliceStart相同时，不做旋转位置编码，直接返回。

@@ -5,22 +5,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：支持
+- <term>Atlas推理系列产品</term>：支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -29,7 +29,7 @@
 - 计算公式：
 
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+    - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
 
     <!-- end id7 -->
 
@@ -241,19 +241,19 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   </table>
 
   <!-- npu="310p" id8 -->
-  - <term>Atlas 推理系列产品</term>：不支持BFLOAT16数据类型
+  - <term>Atlas推理系列产品</term>：不支持BFLOAT16数据类型
 
   <!-- end id8 -->
   - 参数mode约束：
 
     <!-- npu="A3,910b" id9 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：0=half，1=interleave。
+    - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：0=half，1=interleave。
     <!-- end id9 -->
     <!-- npu="950" id10 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：0=half，1=interleave，2=quarter，3=interleave-half。
+    - <term>Ascend 950PR&950DT系列产品</term>：0=half，1=interleave，2=quarter，3=interleave-half。
     <!-- end id10 -->
     <!-- npu="310p" id11 -->
-    - <term>Atlas 推理系列产品</term>：0=half。
+    - <term>Atlas推理系列产品</term>：0=half。
 
     <!-- end id11 -->
 
@@ -346,7 +346,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   - aclnnRotaryPositionEmbedding默认确定性实现。
 
 <!-- npu="950" id12 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布。各参数的shape约束可以描述如下：
   - 输入张量x、cos、sin及输出张量y的最后一维大小必须相同，且小于等于1024。对于half、interleave和interleave-half模式，最后一维必须能被2整除，对于quarter模式，最后一维必须能被4整除。
@@ -355,7 +355,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
   - 当x为TND时，cos、sin支持T1D、TND。
 <!-- end id12 -->
 <!-- npu="A3,910b" id13 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布。
   输入张量x、cos、sin及输出张量y的D维度大小必须相同，满足D<896，且必须为2的倍数。
@@ -378,7 +378,7 @@ aclnnStatus aclnnRotaryPositionEmbedding(
 
 <!-- end id13 -->
 <!-- npu="310p" id14 -->
-- <term>Atlas 推理系列产品</term>：
+- <term>Atlas推理系列产品</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布。
   输入张量x、cos、sin及输出张量y的D维度大小必须相同，满足D<=128，且必须为32的倍数。

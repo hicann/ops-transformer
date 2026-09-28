@@ -5,22 +5,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950DT</term>：支持
+- <term>Ascend 950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -321,7 +321,7 @@ aclnnStatus aclnnMoeDistributeDispatchTeardown(
     </table>
 
     <!-- npu="950" id7 -->
-    - <term>Ascend 950DT</term>：
+    - <term>Ascend 950DT系列产品</term>：
         - groupEp字符串长度范围为[1, 128)。
         - epWorldSize取值范围[2, 384]。当前仅支持2、8。
         - epRankId取值范围[0, epWorldSize)。同一个EP通信域中各卡的epRankId不能重复。
@@ -336,7 +336,7 @@ aclnnStatus aclnnMoeDistributeDispatchTeardown(
 
     <!-- end id7 -->
     <!-- npu="A3" id8 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+    - <term>Atlas A3系列产品</term>  ：
         - groupEp字符串长度范围为[1, 128)。
         - epWorldSize取值范围[2, 384]。
         - epRankId取值范围[0, epWorldSize)。同一个EP通信域中各卡的epRankId不能重复。
@@ -442,7 +442,7 @@ aclnnStatus aclnnMoeDistributeDispatchTeardown(
 
 3. 调用接口过程中使用的`groupEp`、`epWorldSize`、`moeExpertNum`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBs`、`commQuantMode`、`commType`、`commAlg`参数取值所有卡需保持一致，`groupEp`、`epWorldSize`、`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`、`globalBs`、`commQuantMode`、`commType`、`commAlg`参数取值在网络中不同层中也需保持一致，且和`aclnnMoeDistributeDispatchTeardown`，`aclnnMoeDistributeCombineSetup`，`aclnnMoeDistributeCombineTeardown`对应参数也保持一致。
 
-4. <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
+4. <term>Atlas A3系列产品</term>  ：该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
 
 5. 参数说明里shape格式说明：
     * A：表示本卡可能接收的最大token数量，取值范围如下：
@@ -465,12 +465,12 @@ aclnnStatus aclnnMoeDistributeDispatchTeardown(
 6. HCCL_BUFFSIZE：
 
     <!-- npu="950" id9 -->
-    - <term>Ascend 950DT</term>：
+    - <term>Ascend 950DT系列产品</term>：
       调用本接口前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求 >= 2且满足>= 4 \* (`localExpertNum` \* `maxBs` \* `epWorldSize` \* Align512(Align32(2 \* H) + 44) + (`K` + `sharedExpertNum`) \* `maxBs` \* Align512(2 \* `H`))，`localExpertNum`代表使用MoE专家卡的本卡专家数，其中Align512(x) = ((x + 512 - 1) / 512) \* 512，Align32(x) = ((x + 32 - 1) / 32) \* 32。
 
     <!-- end id9 -->
     <!-- npu="A3" id10 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+    - <term>Atlas A3系列产品</term>  ：
       调用本接口前需检查`HCCL_BUFFSIZE`环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。要求 >= 2且满足>= 2 \* (`localExpertNum` \* `maxBs` \* `epWorldSize` \* Align512(Align32(2 \* H) + 44) + (`K` + `sharedExpertNum`) \* `maxBs` \* Align512(2 \* `H`))，`localExpertNum`代表使用MoE专家卡的本卡专家数，其中Align512(x) = ((x + 512 - 1) / 512) \* 512，Align32(x) = ((x + 32 - 1) / 32) \* 32。
 
     <!-- end id10 -->
@@ -481,13 +481,13 @@ aclnnStatus aclnnMoeDistributeDispatchTeardown(
 8. 通信方式约束：
 
     <!-- npu="950" id11 -->
-    - <term>Ascend 950DT</term>：仅支持URMA通信。
+    - <term>Ascend 950DT系列产品</term>：仅支持URMA通信。
 
     <!-- end id11 -->
 
 ## 调用示例
 
 <!-- npu="950" id12 -->
-- <term>Ascend 950DT</term>：aclnnMoeDistributeDispatchTeardown必须在aclnnMoeDistributeDispatchSetup调用之后调用，请参考[aclnnMoeDistributeDispatchSetup](../../moe_distribute_dispatch_setup/docs/aclnnMoeDistributeDispatchSetup.md)中的调用示例。
+- <term>Ascend 950DT系列产品</term>：aclnnMoeDistributeDispatchTeardown必须在aclnnMoeDistributeDispatchSetup调用之后调用，请参考[aclnnMoeDistributeDispatchSetup](../../moe_distribute_dispatch_setup/docs/aclnnMoeDistributeDispatchSetup.md)中的调用示例。
 
 <!-- end id12 -->

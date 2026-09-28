@@ -4,12 +4,12 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                 |    √     |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term> |      ×     |
-| <term>Atlas 推理系列产品</term> |      ×     |
-| <term>Atlas 训练系列产品</term> |      ×     |
+| <term>Ascend 950PR&950DT系列产品</term>                 |    √     |
+| <term>Atlas A3系列产品</term> |    √     |
+| <term>Atlas A2系列产品</term> |    √     |
+| <term>Atlas 200I/500 A2推理产品</term> |      ×     |
+| <term>Atlas推理系列产品</term> |      ×     |
+| <term>Atlas训练系列产品</term> |      ×     |
 
 ## 功能说明
 
@@ -59,10 +59,10 @@
 - `seqOffset`可不传；传入时shape为`[batch]`，数据类型与`blockTables`保持一致。
 - `keyRef`与`keyCache`的数据类型保持一致，`valueRef`与`valueCache`的数据类型保持一致；`blockTables`、`seqLens`和`seqOffset`的数据类型保持一致。
 - 单个key或value token的数据量不超过148 KiB。例如FLOAT16或BFLOAT16场景下，`num_heads * head_size`可取`128 * 576`。
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
   - `cacheMode`仅支持`Norm`，`keyCache`和`valueCache`仅支持ND格式。
   - `keyCache`、`valueCache`、`keyRef`和`valueRef`仅支持INT8、FLOAT16、BFLOAT16；`blockTables`、`seqLens`和`seqOffset`仅支持INT32。
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
   - `cacheMode`支持`Norm`和`PA_NZ`；`Norm`模式下`keyCache`和`valueCache`均为ND格式，`PA_NZ`模式下均为FRACTAL_NZ格式。
   - `keyCache`为FLOAT8_E4M3FN时，`valueCache`还允许使用FLOAT16或BFLOAT16；其他场景下key和value的数据类型保持一致。
 

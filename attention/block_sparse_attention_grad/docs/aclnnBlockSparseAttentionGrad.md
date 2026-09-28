@@ -3,28 +3,28 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品</term>：支持
+- <term>Atlas A3训练系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="A3" id3 -->
-- <term>Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3推理系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="910b" id4 -->
-- <term>Atlas A2 训练系列产品</term>：支持
+- <term>Atlas A2训练系列产品</term>：支持
 <!-- end id4 -->
 <!-- npu="910b" id5 -->
-- <term>Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="310b" id6 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id6 -->
 <!-- npu="310p" id7 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id7 -->
 <!-- npu="910" id8 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id8 -->
 
 ## 功能说明
@@ -507,7 +507,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
   - <term>Atlas A2 训练产品</term>、<term>Atlas A3 训练产品</term>：当前只支持MHA，即N1等于N2。
 
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：支持MQA、MHA、GQA场景。
+  - <term>Ascend 950PR&950DT系列产品</term>：支持MQA、MHA、GQA场景。
   <!-- end id9 -->
 
 * actualSeqLengthsOptional与actualSeqLengthsKvOptional相关约束：
@@ -515,7 +515,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
   - <term>Atlas A2 训练产品</term>、<term>Atlas A3 训练产品</term>：当 qInputLayout或kvInputLayout 为 "BNSD" 时，如配置该项，算子会按指定的有效长度处理，忽略 Padding 部分的数据，提升性能；如不配置（传nullptr），算子将默认把 query shape 中的 S 维度作为有效长度进行全量处理。
 
   <!-- npu="950" id10 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：当qInputLayout或kvInputLayout 为非"TND"时，会忽略这两个入参。
+  - <term>Ascend 950PR&950DT系列产品</term>：当qInputLayout或kvInputLayout 为非"TND"时，会忽略这两个入参。
 
   <!-- end id10 -->
 

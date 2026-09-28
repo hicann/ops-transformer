@@ -4,11 +4,11 @@
 
 |产品             |  是否支持  |
 |:-------------------------|:----------:|
-|  <term>Ascend 950PR/Ascend 950DT</term>   |     ×    |
-|  <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>   |     √    |
-|  <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>     |     √    |
-|  <term>Kirin X90 处理器系列产品</term> | √ |
-|  <term>Kirin 9030 处理器系列产品</term> | √ |
+|  <term>Ascend 950PR&950DT系列产品</term>   |     ×    |
+|  <term>Atlas A3系列产品</term>   |     √    |
+|  <term>Atlas A2系列产品</term>     |     √    |
+|  <term>Kirin X90处理器系列产品</term> | √ |
+|  <term>Kirin 9030处理器系列产品</term> | √ |
 
 ## 功能说明
 
@@ -81,7 +81,7 @@
   </tbody>
 </table>
 
-- Kirin X90/Kirin 9030 处理器系列产品: 不支持BFLOAT16。
+- Kirin X90/Kirin 9030处理器系列产品: 不支持BFLOAT16。
 
 ## 约束说明
 

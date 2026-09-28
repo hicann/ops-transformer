@@ -4,12 +4,12 @@
 
 | 产品                                                     | 是否支持 |
 | :------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                   |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                  |    ×    |
-| <term>Atlas 推理系列产品</term>                          |    ×    |
-| <term>Atlas 训练系列产品</term>                          |    ×    |
+| <term>Ascend 950PR&950DT系列产品</term>                   |    √    |
+| <term>Atlas A3系列产品</term> |    √    |
+| <term>Atlas A2系列产品</term> |    √    |
+| <term>Atlas 200I/500 A2推理产品</term>                  |    ×    |
+| <term>Atlas推理系列产品</term>                          |    ×    |
+| <term>Atlas训练系列产品</term>                          |    ×    |
 
 ## 功能说明
 
@@ -211,13 +211,13 @@
 - 参数query中的Q_D和key、value的KV_D值相等为512，参数query_rope中的Dr和key_rope的Dr值相等为64。
 - 参数query、key、value的数据类型必须保持一致。
 - 当前只支持query_rope和key_rope传入，不支持rope为空。
-- sinks仅支持Ascend 950PR/Ascend 950DT。
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- sinks仅支持Ascend 950PR&950DT系列产品。
+- <term>Ascend 950PR&950DT系列产品</term>：
   - Q_N支持1~128。
   - sparse_block_size仅支持1。
   - 仅在layout_key为PA_BSND时，key、value和key_rope支持0轴非连续。
   - return_softmax_lse为True时，支持layout_kv为PA_BSND。
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - Q_N支持1/2/4/8/16/32/64/128。
   - 参数sparse_block_size支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparse_block_size整除block_size。
   - 不支持sinks。

@@ -3,12 +3,12 @@
 ## 产品支持情况
 | 产品                                                         | 是否支持 |
 | ------------------------------------------------------------ | :------: |
-|<term>Ascend 950PR/Ascend 950DT</term>                        | ×  |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>        | √  |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>        | ×  |
+|<term>Ascend 950PR&950DT系列产品</term>                        | ×  |
+|<term>Atlas A3系列产品</term>        | √  |
+|<term>Atlas A2系列产品</term>        | ×  |
 |<term>Atlas 200I/500 A2 推理系列产品</term>                    | ×  |
-|<term>Atlas 推理系列产品</term>                                | ×  |
-|<term>Atlas 训练系列产品</term>                                | ×  |
+|<term>Atlas推理系列产品</term>                                | ×  |
+|<term>Atlas训练系列产品</term>                                | ×  |
 
 ## 功能说明
 - API功能：`SparseAttnSharedKV`算子旨在完成以下公式描述的Attention计算，支持Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention。
@@ -82,7 +82,7 @@
 - `q`、`ori_kv`、`cmp_kv`数据排布格式支持从多种维度解读，B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Hidden-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
 - Q\_S和S1表示q shape中的S，S2表示ori_kv shape中的S，S3表示cmp_kv shape中的S；Q\_N和N1表示num\_q\_heads，KV\_N和N2表示num\_ori_kv\_heads和num\_cmp_kv\_heads；Q\_T和T1表示q shape中的输入样本序列长度的累加和。
 
-## Atlas A3 推理系列产品 调用说明
+## Atlas A3推理系列产品 调用说明
 
 - 单算子模式调用
 

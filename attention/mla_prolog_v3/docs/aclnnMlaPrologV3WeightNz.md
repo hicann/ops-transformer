@@ -5,13 +5,13 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 
 ## 功能说明
@@ -766,7 +766,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
   </table>
 
 <!-- npu="A3,910b" id4 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - tokenX、weightDq、weightUqQr、weightDkvKr、kvCacheRef、queryOut、queryNormOutOptional不支持FLOAT8_E4M3FN、HIFLOAT8数据类型。
   - dequantScaleXOptional、dequantScaleWDqOptional、dequantScaleWUqQrOptional、dequantScaleWDkvKrOptional、dequantScaleQNormOutOptional不支持FLOAT8_E8M0数据类型。
 
@@ -1011,8 +1011,8 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
   <details>
   <summary><a id="SupportScenes"></a>aclnnMlaPrologV3WeightNz接口支持场景</summary>
   <ul>
-    <li><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：当前不支持fp8/hif8/mxfp8全量化场景</li>
-    <li><term>Ascend 950PR/Ascend 950DT</term>：当前支持所有量化场景</li>
+    <li><term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：当前不支持fp8/hif8/mxfp8全量化场景</li>
+    <li><term>Ascend 950PR&950DT系列产品</term>：当前支持所有量化场景</li>
   </ul>
   <table style="table-layout: auto;" border="1">
     <tr>
@@ -1635,7 +1635,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
 
 ## 调用示例
 
-<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
+<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
   ```Cpp
   #include <iostream>
@@ -2029,7 +2029,7 @@ aclnnStatus aclnnMlaPrologV3WeightNz(
   }
   ```
 
-<term>Ascend 950PR/Ascend 950DT</term>示例代码如下，仅供参考。
+<term>Ascend 950PR&950DT系列产品</term>示例代码如下，仅供参考。
 
   ```Cpp
 #include <iostream>

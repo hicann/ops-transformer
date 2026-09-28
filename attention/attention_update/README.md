@@ -1,15 +1,15 @@
-# AttentionUpdate 
+# AttentionUpdate
 
 ## 产品支持情况
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -75,8 +75,8 @@ $$
 
 ## 约束说明
 
-* <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持FLOAT32、FLOAT16、BFLOAT16的O<sub>i</sub>和O。
-* <term>Ascend 950PR/Ascend 950DT</term>：支持FLOAT32、FLOAT16、BFLOAT16的O<sub>i</sub>和O，且O<sub>i</sub>和O数据类型相同。
+* <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持FLOAT32、FLOAT16、BFLOAT16的O<sub>i</sub>和O。
+* <term>Ascend 950PR&950DT系列产品</term>：支持FLOAT32、FLOAT16、BFLOAT16的O<sub>i</sub>和O，且O<sub>i</sub>和O数据类型相同。
 * 序列并行的并行度sp取值范围[1, 16]。
 * headDim取值范围[8, 512]且是8的倍数。
 * 不支持非连续的Tensor。

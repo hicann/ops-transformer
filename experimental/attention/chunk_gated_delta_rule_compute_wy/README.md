@@ -4,12 +4,12 @@
 
 | 产品 | 是否支持 |
 | :--- | :---: |
-| <term>Ascend 950PR/Ascend 950DT</term> | × |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> | × |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> | × |
-| <term>Atlas 200I/500 A2 推理产品</term> | × |
-| <term>Atlas 推理系列产品</term> | √ |
-| <term>Atlas 训练系列产品</term> | × |
+| <term>Ascend 950PR&950DT系列产品</term> | × |
+| <term>Atlas A3系列产品</term> | × |
+| <term>Atlas A2系列产品</term> | × |
+| <term>Atlas 200I/500 A2推理产品</term> | × |
+| <term>Atlas推理系列产品</term> | √ |
+| <term>Atlas训练系列产品</term> | × |
 
 ## 功能说明
 
@@ -53,7 +53,7 @@
 
 - `chunk_size`仅支持64，且要求`T % 64 == 0`（序列需由调用方补齐）。
 - `Hv % Hk == 0`（GQA分组），`B <= 32`，`Hv <= 64`。
-- `K`、`V`需为16的整数倍且不大于128；上界由<term>Atlas 推理系列产品</term>的192KB UB容量决定。
+- `K`、`V`需为16的整数倍且不大于128；上界由<term>Atlas推理系列产品</term>的192KB UB容量决定。
 - 输入dtype固定：q/k/v/beta为FLOAT16，g为FLOAT32；g为对数衰减，须非正。
 - 所有输入支持非连续Tensor，aclnn接口内部会先做连续化。
 

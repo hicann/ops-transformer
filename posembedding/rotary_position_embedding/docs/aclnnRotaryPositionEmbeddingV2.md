@@ -5,22 +5,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -39,7 +39,7 @@
 - 计算公式：
 
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
 
     - 不传入rotate参数（推荐half模式1D使用）：
 
@@ -228,20 +228,20 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
   - 参数mode约束：
 
     <!-- npu="A3,910b" id8 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：0=half，1=interleave。V2接口不同mode参数约束和V1接口相同，开发者可以根据mode在调用示例的辅助矩阵rotate生成中选择合适的rotate生成方式。
+    - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：0=half，1=interleave。V2接口不同mode参数约束和V1接口相同，开发者可以根据mode在调用示例的辅助矩阵rotate生成中选择合适的rotate生成方式。
     <!-- end id8 -->
     <!-- npu="950" id9 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：0=half，1=interleave，2=quarter，3=interleave-half。
+    - <term>Ascend 950PR&950DT系列产品</term>：0=half，1=interleave，2=quarter，3=interleave-half。
 
     <!-- end id9 -->
 
   - 参数rotate约束：
 
     <!-- npu="A3,910b" id14 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持传入有效Tensor，数据类型与x一致。
+    - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：支持传入有效Tensor，数据类型与x一致。
     <!-- end id14 -->
     <!-- npu="950" id15 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：不支持传入有效Tensor，当前仅支持传入空指针。
+    - <term>Ascend 950PR&950DT系列产品</term>：不支持传入有效Tensor，当前仅支持传入空指针。
     <!-- end id15 -->
 
 - **返回值：**
@@ -337,7 +337,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
 ## 约束说明
 
 <!-- npu="A3,910b" id10 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布。
   输入张量x、cos、sin及输出张量y的D维度大小必须相同，满足D<896，且必须为2的倍数。
@@ -360,7 +360,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
     - 当x为TND时，cos、sin支持T1D
 <!-- end id10 -->
 <!-- npu="950" id11 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
   输入张量x支持BNSD、BSND、SBND、TND排布，rotate参数当前仅支持传入空指针，传入有效Tensor将报错。各参数的shape约束可以描述如下：
   - 输入张量x、cos、sin及输出张量y的最后一维大小必须相同，且小于等于1024。对于half、interleave和interleave-half模式，最后一维必须能被2整除，对于quarter模式，最后一维必须能被4整除。
@@ -375,7 +375,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="A3,910b" id17 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
 
   ```Cpp
   #include "acl/acl.h"
@@ -570,7 +570,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
 <!-- end id17 -->
 
 <!-- npu="950" id18 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
   ```Cpp
   #include "acl/acl.h"
@@ -743,7 +743,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
   ```
 <!-- end id18 -->
 
-- 辅助矩阵rotate生成示例（仅在<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、  <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>上使用）：
+- 辅助矩阵rotate生成示例（仅在<term>Atlas A3系列产品</term>、  <term>Atlas A2系列产品</term>上使用）：
 
   ```python
   import torch

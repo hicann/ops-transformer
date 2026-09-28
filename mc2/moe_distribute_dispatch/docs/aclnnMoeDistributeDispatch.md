@@ -5,22 +5,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950DT</term>：支持
+- <term>Ascend 950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -393,14 +393,14 @@ aclnnStatus aclnnMoeDistributeDispatch(
     </table>
 
     <!-- npu="910b" id7 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+    - <term>Atlas A2系列产品</term>：
         - 不支持共享专家场景，不支持`expertShardType`、`sharedExpertNum`、`sharedExpertRankNum`属性。
         - 仅支持EP域，无TP域，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，`tpRecvCounts`为无效内容。
         - 仅设置环境变量`HCCL_INTRA_PCIE_ENABLE` = 1和`HCCL_INTRA_ROCE_ENABLE` = 0时，`expandScales`内容有效。
 
     <!-- end id7 -->
     <!-- npu="A3" id8 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+    - <term>Atlas A3系列产品</term>  ：
         - 不支持`expandScales`。
         - 不支持`xActiveMask`输入。
         - `sharedExpertNum`当前取值范围[0, 1]，0表示无共享专家，1表示一个共享专家，当前版本仅支持传1。
@@ -408,7 +408,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
 
     <!-- end id8 -->
     <!-- npu="950" id9 -->
-    - <term>Ascend 950DT</term>：
+    - <term>Ascend 950DT系列产品</term>：
         - 不支持`expandScales`。
         - 不支持`xActiveMask`输入。
         - `sharedExpertNum`当前取值范围[0, 1]，0表示无共享专家，1表示一个共享专家，当前版本仅支持传1。
@@ -526,19 +526,19 @@ aclnnStatus aclnnMoeDistributeDispatch(
     - 当前不支持TP域通信。
 
     <!-- npu="A3" id10 -->
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：一个通信域内的节点需在一个超节点内，不支持跨超节点。
+    - <term>Atlas A3系列产品</term>  ：一个通信域内的节点需在一个超节点内，不支持跨超节点。
 
     <!-- end id10 -->
 
 - 通信方式约束：
 
     <!-- npu="950" id11 -->
-    - <term>Ascend 950DT</term>：仅支持UB Memory通信。
+    - <term>Ascend 950DT系列产品</term>：仅支持UB Memory通信。
 
     <!-- end id11 -->
 
 <!-- npu="910b" id12 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
     - 参数说明里shape格式说明：
         - `H`：表示hidden size隐藏层大小，取值范围(0, 7168]，且保证是32的整数倍。
         - `BS`：表示batch sequence size，即本卡最终输出的token数量，取值范围为[1, 256]。
@@ -554,7 +554,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
 
 <!-- end id12 -->
 <!-- npu="A3" id13 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+- <term>Atlas A3系列产品</term>  ：
     - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
     - 参数说明里shape格式说明：
         - `H`：表示hidden size隐藏层大小，取值为7168。
@@ -572,7 +572,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
 
 <!-- end id13 -->
 <!-- npu="950" id14 -->
-- <term>Ascend 950DT</term>：
+- <term>Ascend 950DT系列产品</term>：
     - 参数说明里shape格式说明：
         - `H`：表示hidden size隐藏层大小，取值为7168。
         - `BS`：表示batch sequence size，即本卡最终输出的token数量，取值范围为[1, 512]。
@@ -592,7 +592,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
 ## 调用示例
 
 <!-- npu="910b" id15 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
 
     - 文件准备：
 
@@ -646,7 +646,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
 
 <!-- end id15 -->
 <!-- npu="A3" id16 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+- <term>Atlas A3系列产品</term>  ：
 
     - 环境变量配置：
 
@@ -661,7 +661,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="950,A3,910b" id17 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950DT</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  、<term>Ascend 950DT系列产品</term>：
 
     ```Cpp
     #include <thread>

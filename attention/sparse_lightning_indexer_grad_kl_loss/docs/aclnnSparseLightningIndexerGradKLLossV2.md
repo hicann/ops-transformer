@@ -3,29 +3,29 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
 
 - 接口功能：SparselightningIndexerGradKlLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，存放在SparseIndices中，从而减少长序列场景下Attention的计算量，加速长序列的网络的推理和训练的性能。
 
-- aclnnSparseLightningIndexerGradKLLossV2在aclnnSparseLightningIndexerGradKLLoss的基础上新增了sinks参数，sinks用于修正target distribution（p）归一化因子，仅Ascend 950PR/Ascend 950DT支持。
+- aclnnSparseLightningIndexerGradKLLossV2在aclnnSparseLightningIndexerGradKLLoss的基础上新增了sinks参数，sinks用于修正target distribution（p）归一化因子，仅Ascend 950PR&950DT系列产品支持。
 
 - 计算公式：
    用于取Top-k的value的计算公式可以表示为：
@@ -377,7 +377,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
               <ul>
                 <li>需为1维且长度等于query的N维度。</li>
                 <li>该参数可选，不传入时与aclnnSparseLightningIndexerGradKLLoss接口行为一致。</li>
-                <li>仅Ascend 950PR/Ascend 950DT支持。</li>
+                <li>仅Ascend 950PR&950DT系列产品支持。</li>
               </ul>
         </td>
         <td>FLOAT32</td>
@@ -681,7 +681,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         </tbody>
     </table>
 <!-- npu="950" id8 -->
-    <term>Ascend 950PR/Ascend 950DT</term>：N1额外支持48，Nidx1额外支持24，二者仅允许(48,24)组合，禁止其余数值配对; B、S1、S2均支持泛化。
+    <term>Ascend 950PR&950DT系列产品</term>：N1额外支持48，Nidx1额外支持24，二者仅允许(48,24)组合，禁止其余数值配对; B、S1、S2均支持泛化。
 <!-- end id8 -->
 ## 调用示例
 
@@ -799,7 +799,7 @@ int main() {
   std::vector<int64_t> dWeightShape = {1,32};
   std::vector<int64_t> lossShape = {1};
 
-  // sinks为1维float张量，长度与query的N维度保持一致，仅Ascend 950PR/Ascend 950DT支持
+  // sinks为1维float张量，长度与query的N维度保持一致，仅Ascend 950PR&950DT系列产品支持
   std::vector<int64_t> sinksShape = {64};
 
   void* qDeviceAddr = nullptr;

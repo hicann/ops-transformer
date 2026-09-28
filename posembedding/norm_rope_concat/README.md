@@ -4,12 +4,12 @@
 
 |产品             |  是否支持  |
 |:-------------------------|:----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -91,9 +91,9 @@
     $$
     seqRope <= min(seqQuery+seqEncoderQuery, seqKey+seqEncoderKey)
     $$
-    
+
     6. 当场景为训练时，会输出`queryMean, queryRstd, encoderQueryMean, encoderQueryRstd`供后续反向使用。
-  
+
 ## 参数说明
 
 <table style="undefined;table-layout: fixed; width: 1576px"><colgroup>
@@ -208,7 +208,7 @@
       <td>输入</td>
       <td>表示LayerNorm的仿射变换参数，作用在encoderKey上</td>
       <td>FLOAT16、BFLOAT16、FLOAT</td>
-      <td>ND</td> 
+      <td>ND</td>
     </tr>
     <tr>
       <td>ropeSin</td>

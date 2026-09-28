@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id8 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id8 -->
 <!-- npu="910" id9 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id9 -->
 
 ## 功能说明
@@ -144,7 +144,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 | cmp_ratio | 可选属性 | key压缩比例。 | `int` | 取值范围 `[1, 128]`，默认 `1`。 |
 
 <!-- npu="A3,910b" id5 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：暂不支持`seqused_q`、`seqused_k`参数。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持`seqused_q`、`seqused_k`参数。
 <!-- end id5 -->
 
 ### sparse_lightning_indexer_kl_loss_grad_metadata
@@ -169,10 +169,10 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
 | cmp_ratio | int | 可选 | key压缩比例，当前支持[1, 128]，默认值为1。 | int32 | - |
 
 <!-- npu="950" id6 -->
-- <term>Ascend 950PR/Ascend 950DT</term> ：`topk`仅支持[1, 2048]。
+- <term>Ascend 950PR&950DT系列产品</term> ：`topk`仅支持[1, 2048]。
 <!-- end id6 -->
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：暂不支持`seqused_q`、`seqused_k`、`cmp_residual_k`，`num_heads_q`仅支持8/16/32/64，`topk`仅支持512/1024/2048/4096/8192。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持`seqused_q`、`seqused_k`、`cmp_residual_k`，`num_heads_q`仅支持8/16/32/64，`topk`仅支持512/1024/2048/4096/8192。
 <!-- end id7 -->
 
 ## 返回值说明
@@ -216,7 +216,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
     | mask_mode | 0、3 | - |
 
   <!-- npu="A3,910b" id10 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
     - B：支持1~256。
     - S1、S2：S1支持1~8192，S2支持1~524288。
@@ -225,7 +225,7 @@ cann_ops_transformer.sparse_lightning_indexer_kl_loss_grad(
   <!-- end id10 -->
 
   <!-- npu="950" id11 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
 
     - B：B>0。
     - S1、S2：S1>0，S2>0。

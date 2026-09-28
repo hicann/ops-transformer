@@ -4,12 +4,12 @@
 
 | 产品                                                         |  是否支持   |
 | :----------------------------------------------------------- |:-------:|
-| <term>Ascend 950DT</term>                             |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>       |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    ×    |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×    |
-| <term>Atlas 推理系列产品</term>                               |    ×    |
-| <term>Atlas 训练系列产品</term>                              |    ×    |
+| <term>Ascend 950DT系列产品</term>                             |    √    |
+| <term>Atlas A3系列产品</term>       |    √    |
+| <term>Atlas A2系列产品</term> |    ×    |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×    |
+| <term>Atlas推理系列产品</term>                               |    ×    |
+| <term>Atlas训练系列产品</term>                              |    ×    |
 
 ## 功能说明
 
@@ -36,7 +36,7 @@ $$
 
 其中，$emax$表示该类型最大正规数对应的指数部分的值。
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：该算子必须与`MoeDistributeCombineV3`一起使用。
+- <term>Atlas A3系列产品</term>  ：该算子必须与`MoeDistributeCombineV3`一起使用。
 
 相较于`MoeDistributeDispatchV3`算子，该算子变更如下：
 
@@ -285,7 +285,7 @@ $$
  </tbody>
 </table>
 
-* <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+* <term>Atlas A3系列产品</term>  ：
     * 不支持`expand_scales_out`。
 
 ## 约束说明
@@ -316,9 +316,9 @@ $$
     - 当前不支持TP域通信。
 
 - 通信方式约束：
-    - <term>Ascend 950DT</term>：仅支持UB Memory通信。
+    - <term>Ascend 950DT系列产品</term>：仅支持UB Memory通信。
 
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+- <term>Atlas A3系列产品</term>  ：
     - 该场景下单卡包含双DIE（简称为“晶粒”或“裸片”），因此参数说明里的“本卡”均表示单DIE。
     - 参数约束：
         - `elastic_info_optional`：当前版本不支持，传空指针即可。

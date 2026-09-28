@@ -4,12 +4,12 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-|  <term>Ascend 950PR/Ascend 950DT</term>   |     √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>     |    √     |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √     |
-| <term>Atlas 200I/500 A2 推理产品</term>                      |    ×     |
-| <term>Atlas 推理系列产品</term>                             |    ×     |
-| <term>Atlas 训练系列产品</term>                              |    ×     |
+|  <term>Ascend 950PR&950DT系列产品</term>   |     √    |
+| <term>Atlas A3系列产品</term>     |    √     |
+| <term>Atlas A2系列产品</term> |    √     |
+| <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
+| <term>Atlas推理系列产品</term>                             |    ×     |
+| <term>Atlas训练系列产品</term>                              |    ×     |
 
 ## 功能说明
 
@@ -162,7 +162,7 @@
       <tr>
         <td>activeNum</td>
         <td>属性</td>
-        <td><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：dropPadMode=0时，activeNum支持大于等于-1的值；-1、0表示不限制处理行数，大于0时最多处理min(activeNum, NUM_ROWS*K)行。<term>Ascend 950PR/Ascend 950DT</term>：该属性不用于限制处理行数，仅接受-1、0或NUM_ROWS*K。</td>
+        <td><term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：dropPadMode=0时，activeNum支持大于等于-1的值；-1、0表示不限制处理行数，大于0时最多处理min(activeNum, NUM_ROWS*K)行。<term>Ascend 950PR&950DT系列产品</term>：该属性不用于限制处理行数，仅接受-1、0或NUM_ROWS*K。</td>
         <td>INT</td>
         <td>-</td>
       </tr>
@@ -257,14 +257,14 @@
 ## 约束说明
 
 - 输入值域限制：
-  - activeNum：<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：dropPadMode=0时，activeNum支持大于等于-1的值；-1、0表示不限制处理行数，大于0时最多处理min(activeNum, NUM_ROWS*K)行。<term>Ascend 950PR/Ascend 950DT</term>：该属性不用于限制处理行数，仅接受-1、0或NUM_ROWS*K。
+  - activeNum：<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：dropPadMode=0时，activeNum支持大于等于-1的值；-1、0表示不限制处理行数，大于0时最多处理min(activeNum, NUM_ROWS*K)行。<term>Ascend 950PR&950DT系列产品</term>：该属性不用于限制处理行数，仅接受-1、0或NUM_ROWS*K。
   - expertCapacity在Dropless场景下不使用该参数；在DropPad场景下必须校验且取值范围为(0, NUM_ROWS]。
   - dropPadMode支持取值为0和1，分别代表Dropless场景和DropPad场景。
   - expertTokensNumType当前只支持0、1 和2，分别代表cumsum模式、count模式和key\_value模式。
   - expertTokensNumFlag只支持true，代表输出expertTokensCountOrCumsumOut。
   - quantMode:
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持1、0、-1，分别代表动态量化、静态量化和不量化场景。quantMode=-1时x仅支持FLOAT16、BFLOAT16、FLOAT32、INT8。
-    - <term>Ascend 950PR/Ascend 950DT</term>：
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持1、0、-1，分别代表动态量化、静态量化和不量化场景。quantMode=-1时x仅支持FLOAT16、BFLOAT16、FLOAT32、INT8。
+    - <term>Ascend 950PR&950DT系列产品</term>：
       - 支持-1、0、1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17，分别表示不量化、静态量化到INT8、动态量化到INT8、MXFP8量化到FLOAT8_E5M2、MXFP8量化到FLOAT8_E4M3FN、FP8 PerGroup量化到FLOAT8_E5M2、FP8 PerGroup量化到FLOAT8_E4M3FN、按直转方式量化到HIFLOAT8、按PERTENSOR模式量化到HIFLOAT8、按PERTOKEN模式量化到HIFLOAT8，MXFP4量化到FLOAT4_E2M1，FP8 PerBlock量化到FLOAT8_E5M2，FP8 PerBlock量化到FLOAT8_E4M3FN，INT4动态量化，FP8 PerGroup量化到FLOAT8_E5M2并启用Amax下限，FP8 PerGroup量化到FLOAT8_E4M3FN并启用Amax下限，MXFP8 RoundScale+Amax量化到FLOAT8_E5M2，MXFP8 RoundScale+Amax量化到FLOAT8_E4M3FN。
       - 支持quantMode为13的INT4动态量化场景，需同时满足：
         - x数据类型为FLOAT32或BFLOAT16，expandedXOut数据类型为INT4。
@@ -272,7 +272,7 @@
         - scaleOptional不输入，或输入shape为(1, H)、数据类型为FLOAT32，表示对activeExpertRangeOptional范围内的expert按H维广播smooth scale；offsetOptional不输入。
         - expertTokensNumType为0或1时，expertTokensCountOrCumsumOut的shape为[expertEnd-expertStart]；expertTokensNumType为2时，expertTokensCountOrCumsumOut的shape为[expertNum, 2]。
 
-- <term>Ascend 950PR/Ascend 950DT</term> DropPad模式特殊约束（dropPadMode=1时）：
+- <term>Ascend 950PR&950DT系列产品</term> DropPad模式特殊约束（dropPadMode=1时）：
   - rowIdxType仅支持取值为0（gather索引）。
   - activeExpertRangeOptional必须为[0, expertNum]。
   - expertTokensNumType仅支持取值为1（count模式）。
@@ -281,8 +281,8 @@
 
 - 其他限制：该算子部分产品支持多种性能模板，进入各性能模板需要分别额外满足以下条件，不满足条件则进入通用模板。
   - 支持性能模板的产品：
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品。</term>
-    - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品。</term>
+    - <term>Atlas A2系列产品。</term>
+    - <term>Atlas A3系列产品。</term>
 
   - 进入低时延性能模板需要同时满足以下条件：
     - x、expertIdx、scaleOptional输入Shape要求分别为：(1, 7168)、(1, 8)、(256, 7168)。
@@ -299,7 +299,7 @@
     - expertTokensNumType=1
 
   - 支持计数排序性能模板的产品：
-    - <term>Ascend 950PR/Ascend 950DT</term>。
+    - <term>Ascend 950PR&950DT系列产品</term>。
 
   - 进入计数排序FullLoad性能模板需要同时满足以下条件：
     - x数据类型为BFLOAT16、FLOAT16、FLOAT32、INT8

@@ -5,22 +5,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -29,13 +29,13 @@ GroupedMatmul和MoeFinalizeRouting的融合算子，GroupedMatmul计算后的输
 
 本接口相较于aclnnGroupedMatmulFinalizeRoutingWeightNz，此接口新增：
 
-- 新增入参offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、tuningConfigOptional。<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>的INT4权重场景支持使用offsetOptional传入非对称量化偏移量；antiquantScaleOptional、antiquantOffsetOptional当前为预留参数，暂不生效，传入空指针即可。
+- 新增入参offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、tuningConfigOptional。<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>的INT4权重场景支持使用offsetOptional传入非对称量化偏移量；antiquantScaleOptional、antiquantOffsetOptional当前为预留参数，暂不生效，传入空指针即可。
 
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：新增对INT4类型weight矩阵的支持，支持tuningConfigOptional调优参数，数组中的第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值合理进行tiling切分，性能更优。请根据实际情况选择合适的接口。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：新增对INT4类型weight矩阵的支持，支持tuningConfigOptional调优参数，数组中的第一个值表示各个专家处理的token数的预期值，算子tiling时会按照该预期值合理进行tiling切分，性能更优。请根据实际情况选择合适的接口。
 <!-- end id7 -->
 <!-- npu="950" id8 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：新增Pertoken-perchannel、静态pertensor-perchannel、MxA8W4、MXFP8和MXFP4量化场景；MXFP8和MXFP4场景支持输出BFLOAT16；dtype支持取0和2；不支持取1。相关信息参考[量化介绍](../../../docs/zh/context/quant_mode_introduction.md)。
+- <term>Ascend 950PR&950DT系列产品</term>：新增Pertoken-perchannel、静态pertensor-perchannel、MxA8W4、MXFP8和MXFP4量化场景；MXFP8和MXFP4场景支持输出BFLOAT16；dtype支持取0和2；不支持取1。相关信息参考[量化介绍](../../../docs/zh/context/quant_mode_introduction.md)。
 
 <!-- end id8 -->
 
@@ -147,7 +147,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
       <td>offsetOptional（aclTensor *）</td>
       <td>输入</td>
       <td>非对称量化的偏移量。</td>
-      <td>Atlas A2/A3的INT4权重非对称量化场景支持传入；对称量化场景传入nullptr。Ascend 950PR/Ascend 950DT暂不支持，必须传入nullptr。</td>
+      <td>Atlas A2/A3的INT4权重非对称量化场景支持传入；对称量化场景传入nullptr。Ascend 950PR&950DT系列产品暂不支持，必须传入nullptr。</td>
       <td>FLOAT</td>
       <td>ND</td>
       <td>Atlas A2/A3场景支持三维，维度为(e, 1, n)</td>
@@ -327,7 +327,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
   </table>
 
   <!-- npu="A3,910b" id9 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
     - 上表数据类型列中的角标"1"代表该系列不支持的数据类型。
     - x1仅支持INT8。维度m的取值范围为[1,16\*1024\*8]，k支持2048。
     - x2支持INT8、INT4以及INT32。当输入为INT32时维度为(e, k, n / 8)，输入转为INT4时维度为(e, k, n)，e取值范围[1,256]，k支持2048，n支持7168。只支持转置属性为false。
@@ -337,7 +337,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
     - x1、x2、scale、groupList、logit、rowIndex是必选参数，bias、sharedInput是可选参数。x2为INT4或INT32时，pertokenScaleOptional是必选参数；x2为INT8时，pertokenScaleOptional是可选参数。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     - 上表数据类型列中的角标"2"代表该系列不支持的数据类型。
     - rowIndex在x1以及x2数据类型为INT8时，数据类型支持INT64、INT32；在Pertoken-perchannel、静态pertensor-perchannel和MxA8W4量化模式时，数据类型仅支持INT64；MXFP8/MXFP4场景输出为FLOAT时仅支持INT64，输出为BFLOAT16时仅支持INT32。
     - MXFP8场景仅支持x1和x2均为FLOAT8_E4M3FN，不支持FLOAT8_E5M2；MXFP4场景仅支持x1和x2均为FLOAT4_E2M1。
@@ -434,16 +434,16 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 - 确定性计算：
 
   <!-- npu="A3,910b" id11 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：aclnnGroupedMatmulFinalizeRoutingWeightNzV2默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：aclnnGroupedMatmulFinalizeRoutingWeightNzV2默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
   <!-- end id11 -->
   <!-- npu="950" id12 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：aclnnGroupedMatmulFinalizeRoutingWeightNzV2默认非确定性实现，仅支持在输入x1和x2都是int8类型时，通过aclrtCtxSetSysParamOpt开启确定性。
+  - <term>Ascend 950PR&950DT系列产品</term>：aclnnGroupedMatmulFinalizeRoutingWeightNzV2默认非确定性实现，仅支持在输入x1和x2都是int8类型时，通过aclrtCtxSetSysParamOpt开启确定性。
 
   <!-- end id12 -->
 
 <!-- npu="A3,910b" id13 -->
 <details>
-<summary><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term></summary>
+<summary><term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term></summary>
 
   - 公共约束
     - groupList：当groupListType为0时，groupList必须为非负单调非递减数列；当groupListType为1时，groupList必须为非负数列。
@@ -464,7 +464,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 
 <!-- npu="950" id14 -->
 <details>
-<summary><term>Ascend 950PR/Ascend 950DT</term></summary>
+<summary><term>Ascend 950PR&950DT系列产品</term></summary>
 
   - 公共约束
     - groupList：当groupListType为0时，groupList必须为非负单调非递减数列；当groupListType为1时，groupList必须为非负数列。
@@ -519,7 +519,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 <!-- npu="A3,910b" id15 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
 
     ```Cpp
     #include <iostream>
@@ -836,7 +836,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNzV2(
 
 <!-- end id15 -->
 <!-- npu="950" id16 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
   - Pertoken量化数据流示例：
 

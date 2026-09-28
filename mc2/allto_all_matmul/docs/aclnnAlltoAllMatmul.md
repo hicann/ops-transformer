@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -296,13 +296,13 @@ aclnnStatus aclnnAlltoAllMatmul(
 * NPU卡数（rankSize），根据设备型号有不同限制：
 
   <!-- npu="910b" id7 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持2、4、8卡。
+  - <term>Atlas A2系列产品</term>：支持2、4、8卡。
   <!-- end id7 -->
   <!-- npu="A3" id8 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：支持2、4、8、16卡。
+  - <term>Atlas A3系列产品</term>  ：支持2、4、8、16卡。
   <!-- end id8 -->
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：支持2、4、8、16卡。
+  - <term>Ascend 950PR&950DT系列产品</term>：支持2、4、8、16卡。
   <!-- end id9 -->
 
 * 参数说明中shape使用的变量BS必须能被NPU卡数（rankSize）整除。
@@ -310,38 +310,38 @@ aclnnStatus aclnnAlltoAllMatmul(
 * H*rankSize范围，根据设备型号有不同限制：
 
   <!-- npu="910b" id10 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持[1, 35000]。
+  - <term>Atlas A2系列产品</term>：支持[1, 35000]。
   <!-- end id10 -->
   <!-- npu="950,A3" id11 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950PR/Ascend 950DT</term>：支持[2, 65535]。
+  - <term>Atlas A3系列产品</term>  、<term>Ascend 950PR&950DT系列产品</term>：支持[2, 65535]。
   <!-- end id11 -->
 
 * 空tensor的支持度根据不同设备型号有不同的限制：
 
   <!-- npu="910b" id12 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持任何空tensor。
+  - <term>Atlas A2系列产品</term>：不支持任何空tensor。
   <!-- end id12 -->
   <!-- npu="950,A3" id13 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  、<term>Ascend 950PR/Ascend 950DT</term>：仅支持输入x1的第一维度（BS）为0的空tensor，其它空tensor均不支持。
+  - <term>Atlas A3系列产品</term>  、<term>Ascend 950PR&950DT系列产品</term>：仅支持输入x1的第一维度（BS）为0的空tensor，其它空tensor均不支持。
   <!-- end id13 -->
 
 * 非连续tensor的支持度根据不同设备型号有不同的限制：
 
   <!-- npu="A3,910b" id14 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：不支持任何非连续tensor。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  ：不支持任何非连续tensor。
   <!-- end id14 -->
   <!-- npu="950" id15 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：仅支持x2为非连续tensor，其它非连续tensor均不支持。
+  - <term>Ascend 950PR&950DT系列产品</term>：仅支持x2为非连续tensor，其它非连续tensor均不支持。
   <!-- end id15 -->
 
 * x1、x2计算输入的数据类型要和output、alltoAllOutOptional计算输出的数据类型一致，传入的x1、x2与output均不为空指针。
 * biasOptional的数据类型根据不同设备型号有不同的限制：
 
   <!-- npu="A3,910b" id16 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：x1/x2计算输入的数据类型为FLOAT16时，biasOptional计算输入的数据类型支持FLOAT16；x1/x2计算输入的数据类型为BFLOAT16时，biasOptional计算输入的数据类型支持FLOAT32。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  ：x1/x2计算输入的数据类型为FLOAT16时，biasOptional计算输入的数据类型支持FLOAT16；x1/x2计算输入的数据类型为BFLOAT16时，biasOptional计算输入的数据类型支持FLOAT32。
   <!-- end id16 -->
   <!-- npu="950" id17 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：x1/x2计算输入的数据类型为FLOAT16时，biasOptional计算输入的数据类型支持FLOAT16和FLOAT32；x1/x2计算输入的数据类型为BFLOAT16时，biasOptional计算输入的数据类型支持BFLOAT16和FLOAT32。
+  - <term>Ascend 950PR&950DT系列产品</term>：x1/x2计算输入的数据类型为FLOAT16时，biasOptional计算输入的数据类型支持FLOAT16和FLOAT32；x1/x2计算输入的数据类型为BFLOAT16时，biasOptional计算输入的数据类型支持BFLOAT16和FLOAT32。
   <!-- end id17 -->
 
 * 通算融合算子不支持并发调用，不同的通算融合算子也不支持并发调用。
@@ -349,13 +349,13 @@ aclnnStatus aclnnAlltoAllMatmul(
 * 通信约束：
 
    <!-- npu="910b" id18 -->
-   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持MTE通信，且通信缓冲区大于等于200MB。
+   - <term>Atlas A2系列产品</term>：支持MTE通信，且通信缓冲区大于等于200MB。
    <!-- end id18 -->
    <!-- npu="A3" id19 -->
-   - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：支持AI_CPU通信。
+   - <term>Atlas A3系列产品</term>  ：支持AI_CPU通信。
    <!-- end id19 -->
    <!-- npu="950" id20 -->
-   - <term>Ascend 950PR/Ascend 950DT</term>：支持AI_CPU通信。
+   - <term>Ascend 950PR&950DT系列产品</term>：支持AI_CPU通信。
 
    <!-- end id20 -->
 
@@ -366,7 +366,7 @@ aclnnStatus aclnnAlltoAllMatmul(
 说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="A3,910b" id21 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>  ：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  ：
 
     ```cpp
     #include <thread>
@@ -588,7 +588,7 @@ aclnnStatus aclnnAlltoAllMatmul(
 
 <!-- end id21 -->
 <!-- npu="950" id22 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
     ```cpp
     #include <thread>
@@ -764,7 +764,7 @@ aclnnStatus aclnnAlltoAllMatmul(
 
     int main(int argc, char *argv[])
     {
-        // 本样例基于<term>Ascend 950PR/Ascend 950DT</term>实现，必须在<term>Ascend 950PR/Ascend 950DT</term>上运行
+        // 本样例基于<term>Ascend 950PR&950DT系列产品</term>实现，必须在<term>Ascend 950PR&950DT系列产品</term>上运行
         int ret = aclInit(nullptr);
         int32_t devices[ndev];
         for (int i = 0; i < ndev; i++) {

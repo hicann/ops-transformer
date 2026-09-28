@@ -5,22 +5,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -637,10 +637,10 @@ aclnnStatus aclnnPoolKeyIndexer(
   - 参数query、poolKey的数据类型应保持一致。
   - 非量化场景（quantMode为-1）下，参数weights的数据类型应与query、poolKey保持一致；量化场景（quantMode为0或1）下，参数weights为FLOAT16或BFLOAT16。
   <!-- npu="950" id8 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：支持FLOAT8_E4M3FN（query、poolKey）数据类型，并支持量化场景（quantMode为0时反量化系数为FLOAT，quantMode为1时反量化系数为FLOAT8_E8M0）。
+  - <term>Ascend 950PR&950DT系列产品</term>：支持FLOAT8_E4M3FN（query、poolKey）数据类型，并支持量化场景（quantMode为0时反量化系数为FLOAT，quantMode为1时反量化系数为FLOAT8_E8M0）。
   <!-- end id8 -->
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持FLOAT8_E4M3FN与FLOAT8_E8M0数据类型，不支持量化场景。
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：不支持FLOAT8_E4M3FN与FLOAT8_E8M0数据类型，不支持量化场景。
   <!-- end id7 -->
 - 输入数据布局限制：
   - 参数query、poolKey的数据布局（layoutQueryOptional与layoutKeyOptional）需保持一致，PageAttention场景（layoutKeyOptional为PA_BBND时）除外。

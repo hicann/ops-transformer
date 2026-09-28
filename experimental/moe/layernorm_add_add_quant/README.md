@@ -4,7 +4,7 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| Atlas A2 训练系列产品                                         | 是       |
+| Atlas A2训练系列产品                                         | 是       |
 
 ## 功能说明
 
@@ -55,21 +55,21 @@
       <td>LayerNorm的缩放参数，shape为(gbW,)</td>
       <td>float16</td>
       <td>ND</td>
-    </tr>    
+    </tr>
     <tr>
       <td>beta</td>
       <td>输入</td>
       <td>LayerNorm的平移参数，shape为(gbW,)</td>
       <td>float16</td>
       <td>ND</td>
-    </tr>    
+    </tr>
     <tr>
       <td>scale</td>
       <td>输入</td>
       <td>量化缩放因子，shape为(gbW,)</td>
       <td>float32</td>
       <td>ND</td>
-    </tr>     
+    </tr>
     <tr>
       <td>outLynQuant</td>
       <td>输出</td>
@@ -83,7 +83,7 @@
       <td>相加后的fp16中间结果(inOne + inTwo + inThr)，shape为(gbH, gbW)</td>
       <td>float16</td>
       <td>ND</td>
-    </tr>    
+    </tr>
     <tr>
       <td>gbH</td>
       <td>属性</td>
@@ -104,14 +104,14 @@
       <td>LayerNorm防除零极小值</td>
       <td>float32</td>
       <td>-</td>
-    </tr>   
+    </tr>
     <tr>
       <td>constrait</td>
       <td>属性</td>
       <td>是否在量化前对中间浮点结果进行 [-128, 128] 的截断约束</td>
       <td>bool</td>
       <td>-</td>
-    </tr>      
+    </tr>
   </tbody></table>
 
 ## 约束说明

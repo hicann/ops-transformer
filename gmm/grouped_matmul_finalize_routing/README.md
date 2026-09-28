@@ -4,12 +4,12 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      √     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      √     |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      ×     |
-|<term>Atlas 推理系列产品</term>|      ×     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      √     |
+|<term>Atlas A3系列产品</term>|      √     |
+|<term>Atlas A2系列产品</term>|      √     |
+|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
+|<term>Atlas推理系列产品</term>|      ×     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -17,7 +17,7 @@
 
 ## 参数说明
 
-> 数据类型列中的角标说明：<sup>1</sup> 表示仅 <term>Ascend 950PR/Ascend 950DT</term> 支持的数据类型；<sup>2</sup> 表示仅 <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> 支持的数据类型。无角标表示全系列产品均支持。各产品详细的参数约束请参见对应的 [aclnn 接口文档](#调用说明)。
+> 数据类型列中的角标说明：<sup>1</sup> 表示仅 <term>Ascend 950PR&950DT系列产品</term> 支持的数据类型；<sup>2</sup> 表示仅 <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term> 支持的数据类型。无角标表示全系列产品均支持。各产品详细的参数约束请参见对应的 [aclnn 接口文档](#调用说明)。
 
   <table style="undefined;table-layout: fixed; width: 1494px"><colgroup>
   <col style="width: 146px">
@@ -153,7 +153,7 @@
     <tr>
       <td>transposeW</td>
       <td>属性</td>
-      <td>右矩阵是否转置。<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>仅支持false；<term>Ascend 950PR/Ascend 950DT</term>支持true或false。</td>
+      <td>右矩阵是否转置。<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>仅支持false；<term>Ascend 950PR&950DT系列产品</term>支持true或false。</td>
       <td>BOOL</td>
       <td></td>
     </tr>
@@ -198,7 +198,7 @@
 ## 约束说明
 
 <details>
-<summary><term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term></summary>
+<summary><term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term></summary>
 
 输入和输出支持以下数据类型组合：
 
@@ -214,7 +214,7 @@
 </details>
 
 <details>
-<summary><term>Ascend 950PR/Ascend 950DT</term></summary>
+<summary><term>Ascend 950PR&950DT系列产品</term></summary>
 
 **ND格式（aclnnGroupedMatmulFinalizeRoutingV3）支持的数据类型组合：**
 
@@ -248,7 +248,7 @@
 
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
-| aclnn调用 | [test_aclnn_grouped_matmul_finalize_routing](examples/test_aclnn_grouped_matmul_finalize_routing.cpp) | 通过[aclnnGroupedMatmulFinalizeRoutingV3](docs/aclnnGroupedMatmulFinalizeRoutingV3.md)接口方式调用GroupedMatmulFinalizeRouting算子。 |
+| aclnn调用 | [test_aclnn_grouped_matmul_finalize_routing](examples/test_aclnn_grouped_matmul_finalize_routing_v3.cpp) | 通过[aclnnGroupedMatmulFinalizeRoutingV3](docs/aclnnGroupedMatmulFinalizeRoutingV3.md)接口方式调用GroupedMatmulFinalizeRouting算子。 |
 | aclnn调用 | [test_aclnn_grouped_matmul_finalize_routing_weight_nz](examples/arch35/test_aclnn_grouped_matmul_finalize_routing_weightnz.cpp) | 通过[aclnnGroupedMatmulFinalizeRoutingWeightNzV2](docs/aclnnGroupedMatmulFinalizeRoutingWeightNzV2.md)接口方式调用GroupedMatmulFinalizeRoutingWeightNz算子。 |
-| aclnn调用 | [test_aclnn_grouped_matmul_finalize_routing_mx](examples/arch35/test_aclnn_grouped_matmul_finalize_routing_mx.cpp) | <term>Ascend 950PR/Ascend 950DT</term>下通过[aclnnGroupedMatmulFinalizeRoutingV3](docs/aclnnGroupedMatmulFinalizeRoutingV3.md)接口方式调用GroupedMatmulFinalizeRouting算子（MX量化场景）。 |
-| aclnn调用 | [test_aclnn_grouped_matmul_finalize_routing_weight_nz_v2_mxa8w4](examples/arch35/test_aclnn_grouped_matmul_finalize_routing_weight_nz_v2_mxa8w4.cpp) | <term>Ascend 950PR/Ascend 950DT</term>下通过[aclnnGroupedMatmulFinalizeRoutingWeightNzV2](docs/aclnnGroupedMatmulFinalizeRoutingWeightNzV2.md)接口方式调用GroupedMatmulFinalizeRoutingWeightNz算子（MxA8W4量化场景）。 |
+| aclnn调用 | [test_aclnn_grouped_matmul_finalize_routing_mx](examples/arch35/test_aclnn_grouped_matmul_finalize_routing_v3_mx.cpp) | <term>Ascend 950PR&950DT系列产品</term>下通过[aclnnGroupedMatmulFinalizeRoutingV3](docs/aclnnGroupedMatmulFinalizeRoutingV3.md)接口方式调用GroupedMatmulFinalizeRouting算子（MX量化场景）。 |
+| aclnn调用 | [test_aclnn_grouped_matmul_finalize_routing_weight_nz_v2_mxa8w4](examples/arch35/test_aclnn_grouped_matmul_finalize_routing_weight_nz_v2_mxa8w4.cpp) | <term>Ascend 950PR&950DT系列产品</term>下通过[aclnnGroupedMatmulFinalizeRoutingWeightNzV2](docs/aclnnGroupedMatmulFinalizeRoutingWeightNzV2.md)接口方式调用GroupedMatmulFinalizeRoutingWeightNz算子（MxA8W4量化场景）。 |

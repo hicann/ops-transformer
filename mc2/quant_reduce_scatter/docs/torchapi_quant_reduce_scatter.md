@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950DT</term>：支持
+- <term>Ascend 950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 **说明：** 使用该接口时，请确保驱动固件包和CANN包都为配套的9.2.0版本或者配套的更高版本，否则将会引发报错，比如BUS ERROR等。
@@ -188,7 +188,7 @@ cann_ops_transformer.ops.quant_reduce_scatter(
 - 单算子模式调用：
 
   <!-- npu="950" id7 -->
-  - **Ascend 950DT**：
+  - **Ascend 950DT系列产品**：
 
     ```python
     import torch
@@ -239,7 +239,7 @@ cann_ops_transformer.ops.quant_reduce_scatter(
 - 图模式调用：
 
   <!-- npu="950" id8 -->
-  - **Ascend 950DT**：
+  - **Ascend 950DT系列产品**：
 
     ```python
     import torch

@@ -4,8 +4,8 @@
 
 | 产品 | 是否支持 |
 | ---- | :----: |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>   | x |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> | √ |
+| <term>Atlas A3系列产品</term>   | x |
+| <term>Atlas A2系列产品</term> | √ |
 
 ## 功能说明
 
@@ -200,7 +200,7 @@
 * 属性reduceOp当前版本仅支持输入"sum"。
 * 属性commTurn当前版本仅支持输入0。
 * 支持1、2、4、8卡，并且仅支持hccs链路all mesh组网。
-* <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。类型要一致。
+* <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。类型要一致。
 
 ## 调用说明
 

@@ -13,7 +13,7 @@
   </tr></thead>
 <tbody>
   <tr>
-    <td>Ascend 950PR/Ascend 950DT</td>
+    <td>Ascend 950PR&950DT系列产品</td>
     <td style="text-align: center;">×</td>
   </tr>
   <tr>
@@ -29,7 +29,7 @@
     <td style="text-align: center;">×</td>
   </tr>
   <tr>
-    <td>Atlas 推理系列产品</td>
+    <td>Atlas推理系列产品</td>
     <td style="text-align: center;">×</td>
   </tr>
   <tr>

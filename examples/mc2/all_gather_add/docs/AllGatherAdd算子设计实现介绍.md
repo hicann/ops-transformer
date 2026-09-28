@@ -1,6 +1,6 @@
 # AllGatherAdd算子设计实现详细介绍
 
-**本篇算子设计和实现介绍基于<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>**
+**本篇算子设计和实现介绍基于<term>Atlas A2系列产品</term>**
 
 ## 1.算子分析
 

@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -608,7 +608,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
     </table>
 
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：暂不支持oriTopkLengthOptional、cmpTopkLengthOptional、metadataOptional字段。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持oriTopkLengthOptional、cmpTopkLengthOptional、metadataOptional字段。
 
     <!-- end id7 -->
 
@@ -700,11 +700,11 @@ aclnnStatus aclnnSparseFlashMlaGrad(
 - 确定性计算：
 
     <!-- npu="A3,910b" id8 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：aclnnSparseFlashMlaGrad默认非确定性实现，不支持通过aclrtCtxSetSysParamOpt开启确定性。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：aclnnSparseFlashMlaGrad默认非确定性实现，不支持通过aclrtCtxSetSysParamOpt开启确定性。
 
     <!-- end id8 -->
     <!-- npu="950" id9 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：aclnnSparseFlashMlaGrad默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
+    - <term>Ascend 950PR&950DT系列产品</term>：aclnnSparseFlashMlaGrad默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
     <!-- end id9 -->
 
 - 公共约束
@@ -794,20 +794,20 @@ aclnnStatus aclnnSparseFlashMlaGrad(
   - 参数cmpMaskMode的支持情况:
 
     <!-- npu="A3,910b" id10 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：cmpMaskMode支持3。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：cmpMaskMode支持3。
     <!-- end id10 -->
     <!-- npu="950" id11 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：cmpMaskMode支持0、3。
+    - <term>Ascend 950PR&950DT系列产品</term>：cmpMaskMode支持0、3。
 
     <!-- end id11 -->
 
   - 参数oriMaskMode的支持情况:
 
     <!-- npu="A3,910b" id12 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：oriMaskMode支持4。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：oriMaskMode支持4。
     <!-- end id12 -->
     <!-- npu="950" id13 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：oriMaskMode支持0、3、4。
+    - <term>Ascend 950PR&950DT系列产品</term>：oriMaskMode支持0、3、4。
 
     <!-- end id13 -->
 

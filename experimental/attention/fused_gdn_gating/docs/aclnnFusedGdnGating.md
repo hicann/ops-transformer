@@ -4,13 +4,13 @@
 
 |产品      | 是否支持 |
 |:----------------------------|:-----------:|
-|<term>Ascend 950PR/Ascend 950DT</term>|      ×     |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>|      ×     |
-|<term>Atlas A2 训练系列产品</term>|      √     |
-|<term>Atlas A2 推理系列产品</term>|      ×     |
-|<term>Atlas 200I/500 A2 推理产品</term>|      √     |
-|<term>Atlas 推理系列产品</term>|      √     |
-|<term>Atlas 训练系列产品</term>|      ×     |
+|<term>Ascend 950PR&950DT系列产品</term>|      ×     |
+|<term>Atlas A3系列产品</term>|      ×     |
+|<term>Atlas A2训练系列产品</term>|      √     |
+|<term>Atlas A2推理系列产品</term>|      ×     |
+|<term>Atlas 200I/500 A2推理产品</term>|      √     |
+|<term>Atlas推理系列产品</term>|      √     |
+|<term>Atlas训练系列产品</term>|      ×     |
 
 ## 功能说明
 
@@ -321,7 +321,7 @@ aclnnStatus aclnnFusedGdnGating(
   </tbody>
   </table>
 
-- <term>Atlas 推理系列产品</term>和<term>Atlas 200I/500 A2 推理产品</term>：仅支持全FLOAT16数据类型组合（即aLog、a、b、dtBias均为FLOAT16，g为FLOAT32，betaOutput为FLOAT16）。
+- <term>Atlas推理系列产品</term>和<term>Atlas 200I/500 A2推理产品</term>：仅支持全FLOAT16数据类型组合（即aLog、a、b、dtBias均为FLOAT16，g为FLOAT32，betaOutput为FLOAT16）。
 
 ## 调用示例
 
@@ -337,7 +337,7 @@ import custom_ops  # noqa: F401  注册torch.ops.custom.npu_fused_gdn_gating
 torch_npu.npu.set_device(0)
 
 num_heads, batch = 8, 4
-# 注意：Atlas 推理系列产品（310P）上 aLog/dtBias 须为 FLOAT16，
+# 注意：Atlas推理系列产品（310P）上 aLog/dtBias 须为 FLOAT16，
 # 即所有输入均为全FLOAT16组合（见约束说明）。
 A_log = torch.randn(num_heads, dtype=torch.float16).npu()
 a = torch.randn(batch, num_heads, dtype=torch.float16).npu()

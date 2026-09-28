@@ -4,12 +4,12 @@
 
 | 产品 | 是否支持 |
 |:---|:---:|
-| <term>Ascend 950PR/Ascend 950DT</term> | √ |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> | × |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> | × |
-| <term>Atlas 200I/500 A2 推理产品</term> | × |
-| <term>Atlas 推理系列产品</term> | × |
-| <term>Atlas 训练系列产品</term> | × |
+| <term>Ascend 950PR&950DT系列产品</term> | √ |
+| <term>Atlas A3系列产品</term> | × |
+| <term>Atlas A2系列产品</term> | × |
+| <term>Atlas 200I/500 A2推理产品</term> | × |
+| <term>Atlas推理系列产品</term> | × |
+| <term>Atlas训练系列产品</term> | × |
 
 ## 功能说明
 
@@ -18,7 +18,7 @@
   - M-RoPE：Q/K执行`RMSNorm -> M-RoPE -> rotation`，Q不量化，K做PerTokenPerHead INT8动态量化；
   - M-RoPE MX：Q/K执行`RMSNorm -> M-RoPE -> Dynamic MX Quant`，不执行`rotation`；每个D32 block使用cuBLAS MX FP8的FLOAT8_E8M0二次幂scale量化为FP8 E4M3FN。
   - 三种场景的V分支均不做RMSNorm、位置编码或`rotation`；RoPE使用`v_scale[Nv]`，M-RoPE和M-RoPE MX使用每个head、每个channel的`v_scale[Nv,D]`量化为FP8 E4M3FN。
-- 使用场景：适用于推理场景下的PagedAttention KV Cache更新，当前仅支持<term>Ascend 950PR/Ascend 950DT</term>。
+- 使用场景：适用于推理场景下的PagedAttention KV Cache更新，当前仅支持<term>Ascend 950PR&950DT系列产品</term>。
 - 计算公式：
 
   按`head_nums=[Nq, Nk, Nv]`从融合输入中拆分Q、K、V：
@@ -164,7 +164,7 @@
 
 ## 调用说明
 
-<term>Ascend 950PR/Ascend 950DT</term>
+<term>Ascend 950PR&950DT系列产品</term>
 
 | 调用方式 | 调用样例 | 说明 |
 |---|---|---|

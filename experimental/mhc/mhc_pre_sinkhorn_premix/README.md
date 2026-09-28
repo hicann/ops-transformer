@@ -4,12 +4,12 @@
 
 | 产品                                                     | 是否支持 |
 | :------------------------------------------------------- | :------: |
-| <term>Ascend 950PR/Ascend 950DT</term>                   |    √    |
-| <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term> |    √    |
-| <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term> |    √    |
-| <term>Atlas 200I/500 A2 推理产品</term>                  |    ×    |
-| <term>Atlas 推理系列产品</term>                          |    ×    |
-| <term>Atlas 训练系列产品</term>                          |    ×    |
+| <term>Ascend 950PR&950DT系列产品</term>                   |    √    |
+| <term>Atlas A3系列产品</term> |    √    |
+| <term>Atlas A2系列产品</term> |    √    |
+| <term>Atlas 200I/500 A2推理产品</term>                  |    ×    |
+| <term>Atlas推理系列产品</term>                          |    ×    |
+| <term>Atlas训练系列产品</term>                          |    ×    |
 
 ## 功能说明
 
@@ -209,10 +209,10 @@
 - n目前支持4。
 - numIters目前仅支持20。
 
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
   - 输入x仅支持4维BSND格式，shape为(bs, seq_len, n, c)。
   - 输入x的最后一维c需满足128对齐，且取值范围为[1, 100000]。
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
   - 输入x支持4维BSND格式和3维TND格式，shape分别为(bs, seq_len, n, c)和(t, n, c)。
   - TND格式下，t表示所有Batch序列长度的累加和。
   - 输入x的最后一维c仅支持4096、7168。

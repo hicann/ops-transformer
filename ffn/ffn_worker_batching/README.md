@@ -4,12 +4,12 @@
 
 | 产品 | 是否支持 |
 | :---------------------------- | :-----------: |
-|<term>Ascend 950PR/Ascend 950DT</term>| √ |
-|<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>| √ |
-|<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>| √ |
-|<term>Atlas 200I/500 A2 推理产品</term>| × |
-|<term>Atlas 推理系列产品</term>| × |
-|<term>Atlas 训练系列产品</term>| × |
+|<term>Ascend 950PR&950DT系列产品</term>| √ |
+|<term>Atlas A3系列产品</term>| √ |
+|<term>Atlas A2系列产品</term>| √ |
+|<term>Atlas 200I/500 A2推理产品</term>| × |
+|<term>Atlas推理系列产品</term>| × |
+|<term>Atlas训练系列产品</term>| × |
 
 ## 功能说明
 
@@ -65,7 +65,7 @@
     <tr>
       <td>token_dtype</td>
       <td>属性</td>
-      <td>输入token的数据类型，默认值为0。<term>Ascend 950PR/Ascend 950DT</term>取值范围为 [0, 5]，其它支持的产品取值范围为 [0, 2]。决定每个hidden state元素的存储宽度及输出y的数据类型：<br>0：FP16，每元素2字节；<br>1：BF16，每元素2字节；<br>2：INT8动态量化，每元素1字节，每行一个FP32 scale；<br>3：FLOAT8_E5M2，每元素1字节；<br>4：FLOAT8_E4M3FN（float8_e4m3），每元素1字节；<br>5：FLOAT4_E2M1，每两个元素打包为1字节。</td>
+      <td>输入token的数据类型，默认值为0。<term>Ascend 950PR&950DT系列产品</term>取值范围为 [0, 5]，其它支持的产品取值范围为 [0, 2]。决定每个hidden state元素的存储宽度及输出y的数据类型：<br>0：FP16，每元素2字节；<br>1：BF16，每元素2字节；<br>2：INT8动态量化，每元素1字节，每行一个FP32 scale；<br>3：FLOAT8_E5M2，每元素1字节；<br>4：FLOAT8_E4M3FN（float8_e4m3），每元素1字节；<br>5：FLOAT4_E2M1，每两个元素打包为1字节。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -86,15 +86,15 @@
     <tr>
       <td>sync_flag</td>
       <td>属性</td>
-      <td>默认false，取值false/true。仅<term>Ascend 950PR/Ascend 950DT</term>的need_schedule=1时解释该属性：false等待当前micro batch的全部session就绪；true循环扫描micro batch，首次发现ready session即处理该micro batch。</td>
+      <td>默认false，取值false/true。仅<term>Ascend 950PR&950DT系列产品</term>的need_schedule=1时解释该属性：false等待当前micro batch的全部session就绪；true循环扫描micro batch，首次发现ready session即处理该micro batch。</td>
       <td>BOOL</td>
       <td>-</td>
     </tr>
     <tr>
       <td>y</td>
       <td>输出</td>
-      <td>重排后的token hidden states，按专家ID排序后连续存放。逻辑shape为 [Y, H]。数据类型由token_dtype决定：0为FP16、1为BF16、2为INT8；<term>Ascend 950PR/Ascend 950DT</term>额外支持3为FLOAT8_E5M2、4为FLOAT8_E4M3FN、5为FLOAT4_E2M1。</td>
-      <td>FP16、BF16、INT8；<term>Ascend 950PR/Ascend 950DT</term>另支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
+      <td>重排后的token hidden states，按专家ID排序后连续存放。逻辑shape为 [Y, H]。数据类型由token_dtype决定：0为FP16、1为BF16、2为INT8；<term>Ascend 950PR&950DT系列产品</term>额外支持3为FLOAT8_E5M2、4为FLOAT8_E4M3FN、5为FLOAT4_E2M1。</td>
+      <td>FP16、BF16、INT8；<term>Ascend 950PR&950DT系列产品</term>另支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
       <td>ND</td>
     </tr>
     <tr>
@@ -135,8 +135,8 @@
     <tr>
       <td>dynamic_scale</td>
       <td>输出</td>
-      <td>随token重排的scale值。token_dtype=2时为FP32，shape为 [Y]；<term>Ascend 950PR/Ascend 950DT</term>上token_dtype=3、4、5时为FLOAT8_E8M0，shape为 [Y, ceil(H/32)]。token_dtype=0、1时该输出无有效数据。</td>
-      <td>FP32；<term>Ascend 950PR/Ascend 950DT</term>另支持FLOAT8_E8M0</td>
+      <td>随token重排的scale值。token_dtype=2时为FP32，shape为 [Y]；<term>Ascend 950PR&950DT系列产品</term>上token_dtype=3、4、5时为FLOAT8_E8M0，shape为 [Y, ceil(H/32)]。token_dtype=0、1时该输出无有效数据。</td>
+      <td>FP32；<term>Ascend 950PR&950DT系列产品</term>另支持FLOAT8_E8M0</td>
       <td>ND</td>
     </tr>
     <tr>
@@ -158,9 +158,9 @@
 - 输出token数上限 Y = A × BS × (topK+1)，其中 A、BS、topK+1 分别为 max_out_shape 的第 1、2、3 维；Y 支持泛化，无硬上限（受内存限制）。
 - 精度口径为二进制一致（非计算类算子：整数索引排序 + 原样字节搬运，无浮点运算）。
 - `y`、索引输出及有效的`dynamic_scale`仅保证前`actual_token_num`行有效，剩余容量不参与结果比较。
-- <term>Ascend 950PR/Ascend 950DT</term>上的`token_dtype=3、4、5`均支持`need_schedule=0、1`。每32个逻辑hidden state元素对应一个E8M0 scale，尾部不足32个元素时仍占一个scale；全部scale紧跟整行token数据。
-- <term>Ascend 950PR/Ascend 950DT</term>上令`S=ceil(H/32)`，FP8行的有效数据为`H`字节token加`S`字节scale，FP4行为`H/2`字节token加`S`字节scale。FP4要求H为偶数，每字节低半字节存放前一个元素，高半字节存放后一个元素。`attn_to_ffn_token_size`记录源行的字节步长，可包含行尾padding。
-- <term>Ascend 950PR/Ascend 950DT</term>异步接收（`need_schedule=1、sync_flag=true`）要求`layer_num>0`且整除`expert_num`，按`layer_id * (expert_num / layer_num) + expert_id`生成跨层专家号进行排序、token重排和`group_list`统计。同步接收与NORM仍使用原专家号。
+- <term>Ascend 950PR&950DT系列产品</term>上的`token_dtype=3、4、5`均支持`need_schedule=0、1`。每32个逻辑hidden state元素对应一个E8M0 scale，尾部不足32个元素时仍占一个scale；全部scale紧跟整行token数据。
+- <term>Ascend 950PR&950DT系列产品</term>上令`S=ceil(H/32)`，FP8行的有效数据为`H`字节token加`S`字节scale，FP4行为`H/2`字节token加`S`字节scale。FP4要求H为偶数，每字节低半字节存放前一个元素，高半字节存放后一个元素。`attn_to_ffn_token_size`记录源行的字节步长，可包含行尾padding。
+- <term>Ascend 950PR&950DT系列产品</term>异步接收（`need_schedule=1、sync_flag=true`）要求`layer_num>0`且整除`expert_num`，按`layer_id * (expert_num / layer_num) + expert_id`生成跨层专家号进行排序、token重排和`group_list`统计。同步接收与NORM仍使用原专家号。
 
 ## 调用说明
 

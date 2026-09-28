@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -109,7 +109,7 @@ cann_ops_transformer.moe_finalize_routing_grad(
 - 传入`bias`时，`expert_idx`必须同时传入。
 - 传入`scales`时，`expanded_x`必须同时传入。
 - `drop_pad_mode=1`时，`expert_num`必须大于0（当`bias`传入时必须等于`bias`的第0维大小E），`expert_capacity`必须大于0。
-- `expanded_x`、`bias`的数据类型必须与`grad_y`一致。`scales`的数据类型在<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>上必须与`grad_y`一致；在<term>Ascend 950PR/Ascend 950DT</term>上可以与`grad_y`不一致。
+- `expanded_x`、`bias`的数据类型必须与`grad_y`一致。`scales`的数据类型在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上必须与`grad_y`一致；在<term>Ascend 950PR&950DT系列产品</term>上可以与`grad_y`不一致。
 - 该反向算子仅支持常规专家场景，不支持aclnnMoeFinalizeRoutingV4特有特性（正向的`x`、`alpha1`、`alpha2`、`v`以及有效的`zero_expert_range`、`copy_expert_range`、`constant_expert_range`）。当正向使用了这些特性时，调用自动反向会抛出`NotImplementedError`。
 - 该算子为[moe\_finalize\_routing](../../moe_finalize_routing_v2/docs/torchapi_moe_finalize_routing.md)的反向算子，各参数需与正向调用保持一致。
 - `expanded_row_idx`布局差异：正向`moe_finalize_routing`的`expanded_row_idx`采用`(K, R)`布局（`drop_pad_mode`为0或1时），本反向算子采用`(R, K)`布局。自动反向下框架会自动转置；手动调用时需注意提供正确布局。

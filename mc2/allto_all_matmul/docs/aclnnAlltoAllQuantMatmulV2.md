@@ -5,22 +5,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
@@ -29,7 +29,7 @@
 - 计算公式：假设x1输入shape为(BS, H)，mx量化场景下x1ScaleOptional输入shape为(BS, ceil(H/64), 2)，rankSize为NPU卡数
 
   <!-- npu="910b" id7 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A2系列产品</term>：
 
     - K-C量化场景：
 
@@ -54,7 +54,7 @@
 
   <!-- end id7 -->
   <!-- npu="950" id8 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
 
     - K-C动态量化场景：
 
@@ -82,10 +82,10 @@
 - 新增`commMode`参数，用户根据该参数指定芯片使用的通信引擎。
 
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：`commMode`支持`ai_cpu`和`ccu`。
+  - <term>Ascend 950PR&950DT系列产品</term>：`commMode`支持`ai_cpu`和`ccu`。
   <!-- end id9 -->
   <!-- npu="910b" id10 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：无新增特性，`commMode`仅支持`aiv`。
+  - <term>Atlas A2系列产品</term>：无新增特性，`commMode`仅支持`aiv`。
 
   <!-- end id10 -->
 
@@ -495,10 +495,10 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
 * NPU卡数（rankSize），根据设备型号有不同限制：
 
   <!-- npu="910b" id11 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持2、4、8卡。
+  - <term>Atlas A2系列产品</term>：支持2、4、8卡。
   <!-- end id11 -->
   <!-- npu="950" id12 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：支持2、4、8、16卡。
+  - <term>Ascend 950PR&950DT系列产品</term>：支持2、4、8、16卡。
   <!-- end id12 -->
 
 * 参数说明中shape使用的变量BS必须整除rankSize。
@@ -507,16 +507,16 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
 * 非连续tensor的支持度根据不同设备型号有不同的限制：
 
   <!-- npu="910b" id13 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持任何非连续tensor。
+  - <term>Atlas A2系列产品</term>：不支持任何非连续tensor。
   <!-- end id13 -->
   <!-- npu="950" id14 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：仅支持x2为非连续tensor，其它非连续tensor均不支持。
+  - <term>Ascend 950PR&950DT系列产品</term>：仅支持x2为非连续tensor，其它非连续tensor均不支持。
   <!-- end id14 -->
 
 * 传入的x1、x2、x2Scale和output不为空指针，且
 
   <!-- npu="950" id15 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：在x1QuantMode为pertoken动态量化场景下，不支持传入x1ScaleOptional。
+  - <term>Ascend 950PR&950DT系列产品</term>：在x1QuantMode为pertoken动态量化场景下，不支持传入x1ScaleOptional。
   <!-- end id15 -->
 
 * groupSize相关约束:
@@ -541,7 +541,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
 * 该算子输入输出的数据类型、数据维度和量化模式根据不同设备型号有不同的限制：
 
   <!-- npu="910b" id16 -->
-  - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+  - <term>Atlas A2系列产品</term>：
     * 量化模式：
       * 目前支持左矩阵perToken量化和perToken动态量化，x1QuantMode=3或7；右矩阵perChannel量化，x2QuantMode=2。
     * 类型约束：
@@ -581,7 +581,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
       * A4W4时，H与N必须为偶数；rankSize * H取值范围：[1, 35000]。
   <!-- end id16 -->
   <!-- npu="950" id17 -->
-  - <term>Ascend 950PR/Ascend 950DT</term>：
+  - <term>Ascend 950PR&950DT系列产品</term>：
     * 量化模式：
       * 目前支持：K-C动态量化，左矩阵perToken动态量化，x1QuantMode=7，右矩阵perChannel量化，x2QuantMode=2；mx量化，左矩阵mx量化，x1QuantMode=6，右矩阵mx量化，x2QuantMode=6。
     * 类型约束：
@@ -637,19 +637,19 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
 * 通信引擎参数commMode根据不同设备型号有不同的限制：
 
    <!-- npu="910b" id18 -->
-   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：仅支持输入`aiv`。
+   - <term>Atlas A2系列产品</term>：仅支持输入`aiv`。
    <!-- end id18 -->
    <!-- npu="950" id19 -->
-   - <term>Ascend 950PR/Ascend 950DT</term>：支持输入`ai_cpu`和`ccu`。
+   - <term>Ascend 950PR&950DT系列产品</term>：支持输入`ai_cpu`和`ccu`。
    <!-- end id19 -->
 
 * 通信引擎约束：
 
    <!-- npu="910b" id20 -->
-   - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持MTE通信。
+   - <term>Atlas A2系列产品</term>：支持MTE通信。
    <!-- end id20 -->
    <!-- npu="950" id21 -->
-   - <term>Ascend 950PR/Ascend 950DT</term>：
+   - <term>Ascend 950PR&950DT系列产品</term>：
       - 支持CCU通信和AI_CPU通信。
       - CCU通信仅支持单机UB域内互联，AI_CPU可支持跨机UB域内互联。
       - 通信域约束：同一个通信域内只能使用同一种通信方式。
@@ -663,7 +663,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
 说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="910b" id22 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：
+- <term>Atlas A2系列产品</term>：
 
     ```cpp
     #include <thread>
@@ -905,7 +905,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
 
 <!-- end id22 -->
 <!-- npu="950" id23 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：
+- <term>Ascend 950PR&950DT系列产品</term>：
 
     ```cpp
     #include <thread>
@@ -1101,7 +1101,7 @@ aclnnStatus aclnnAlltoAllQuantMatmulV2(
 
     int main(int argc, char *argv[])
     {
-    // 本样例基于Ascend 950PR/Ascend 950DT实现，必须在Ascend 950PR/Ascend 950DT上运行
+    // 本样例基于Ascend 950PR&950DT系列产品实现，必须在Ascend 950PR&950DT系列产品上运行
     int ret = aclInit(nullptr);
     int32_t devices[ndev];
     for (int i = 0; i < ndev; i++) {

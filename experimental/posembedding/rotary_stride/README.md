@@ -4,7 +4,7 @@
 
 | 产品                                                         | 是否支持 |
 | :----------------------------------------------------------- | :------: |
-| Atlas A2 训练系列产品                                         | 是       |
+| Atlas A2训练系列产品                                         | 是       |
 
 ## 功能说明
 
@@ -87,4 +87,3 @@
 ```
 torch.ops.npu_ops_transformer_ext.rotary_stride(blockDim, in, sin, cos, out, gbD)
 ```
-

@@ -3,29 +3,29 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
 
 - **接口功能**：根据topkIndices对key和value选取大小为selectedBlockSize的数据重排，接着进行训练场景下计算注意力的反向输出。
 - **与 V1 接口的关系**：V2 在 V1（aclnnSparseFlashAttentionGrad，商发兼容、5 输出）基础上，仅新增可选的可学习 OSS Sink 输入 `sinksOptional` 与对应梯度输出 `dSinksOptional`（6 输出），其余参数与 V1 完全一致。V1/V2 共用同一 OpDef 与 inner 实现。
-- **OSS Sink（可选）**：V2 支持可学习 OSS Sink 输入（`sinksOptional`）与对应梯度输出（`dSinksOptional`），传入 `sinksOptional` 时必须同时提供 `dSinksOptional` 输出。`sinksOptional` 仅支持 <term>Ascend 950PR/Ascend 950DT</term>。
+- **OSS Sink（可选）**：V2 支持可学习 OSS Sink 输入（`sinksOptional`）与对应梯度输出（`dSinksOptional`），传入 `sinksOptional` 时必须同时提供 `dSinksOptional` 输出。`sinksOptional` 仅支持 <term>Ascend 950PR&950DT系列产品</term>。
 
 - **计算公式**：根据传入的topkIndice对keyIn和value选取数量为selectedBlockCount个大小为selectedBlockSize的数据重排，公式如下：
 
@@ -126,7 +126,7 @@
 | :--- | :--- | :--- |
 | 接口定位 | 商发兼容接口，位置参数与商发 `npu_sparse_flash_attention_grad` 严格对齐 | 新增接口，支持 OSS Sink |
 | 输出个数 | 5（dQuery、dKey、dValue、dQueryRope、dKeyRope） | 6（在 V1 基础上新增 dSinks） |
-| sinksOptional 输入 | 无 | 新增（可选，仅 <term>Ascend 950PR/Ascend 950DT</term> 支持） |
+| sinksOptional 输入 | 无 | 新增（可选，仅 <term>Ascend 950PR&950DT系列产品</term> 支持） |
 | dSinksOptional 输出 | 无 | 新增（可选，与 sinksOptional 成对出现） |
 | 其余参数 | - | 与 V1 完全一致（参数顺序、类型、含义均不变） |
 | OpDef | SparseFlashAttentionGrad | 与 V1 共用同一 OpDef 与 inner aclnn |
@@ -211,7 +211,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
             <td>ND</td>
             <td>(B,S1,N1,D)、(T1,N1,D)<br>
             B：支持泛化；S1：支持泛化；N1：支持128、64、32、16、8、4、2、1；D：512；T1：B × S1<br>
-            <term>Ascend 950PR/Ascend 950DT</term>的N1额外还支持48、24、12、6、3
+            <term>Ascend 950PR&950DT系列产品</term>的N1额外还支持48、24、12、6、3
             </td>
             <td>√</td>
         </tr>
@@ -309,7 +309,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
             <td>可学习 OSS Sink 输入。</td>
             <td>
             <ul>
-                <li>可选项，默认值为空指针，未提供时不参与计算；仅 <term>Ascend 950PR/Ascend 950DT</term> 支持。</li>
+                <li>可选项，默认值为空指针，未提供时不参与计算；仅 <term>Ascend 950PR&950DT系列产品</term> 支持。</li>
                 <li>传入 sinksOptional 时必须同时提供 dSinksOptional 输出。</li>
                 <li>Sink 参与前向 softmax 的 max/sum 计算，具体公式请参见<a href="#功能说明">功能说明</a>阶段4。</li>
             </ul>
@@ -396,8 +396,8 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
             <td>输入</td>
             <td>选择的块的大小。</td>
             <td>
-            <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>支持1、8、16、32、64<br>
-            <term>Ascend 950PR/Ascend 950DT</term>支持1
+            <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>支持1、8、16、32、64<br>
+            <term>Ascend 950PR&950DT系列产品</term>支持1
             </td>
             <td>INT64</td>
             <td>-</td>
@@ -504,7 +504,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
             <td>输出</td>
             <td>表示value的梯度。</td>
             <td>
-            可选项。普通场景下与输入value的Shape维度保持一致；KV merge场景下需传入空指针，dValue不单独输出，其梯度合入dKey（Ascend 950PR/Ascend 950DT 与 Atlas A2训练/推理系列产品支持，950上 dValueOut 需传空指针）。
+            可选项。普通场景下与输入value的Shape维度保持一致；KV merge场景下需传入空指针，dValue不单独输出，其梯度合入dKey（Ascend 950PR&950DT系列产品 与 Atlas A2训练/推理系列产品支持，950上 dValueOut 需传空指针）。
             </td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
@@ -649,9 +649,9 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
     - 入参为空的场景处理：
         - query为空Tensor：直接返回。
     - 当前只支持value和key完全一致的场景。
-    - KV merge场景下（Ascend 950PR/Ascend 950DT 与 Atlas A2训练/推理系列产品支持），value和dValueOut需传入空指针，dKeyOut返回dK+dV，不再单独返回dValue。
+    - KV merge场景下（Ascend 950PR&950DT系列产品 与 Atlas A2训练/推理系列产品支持），value和dValueOut需传入空指针，dKeyOut返回dK+dV，不再单独返回dValue。
     - OSS Sink：传入 sinksOptional 时未提供 dSinksOptional 会返回 ACLNN_ERR_PARAM_INVALID。
-    - OSS Sink：sinksOptional 仅支持 <term>Ascend 950PR/Ascend 950DT</term>，其它平台传入 sinksOptional 返回 ACLNN_ERR_RUNTIME_ERROR。
+    - OSS Sink：sinksOptional 仅支持 <term>Ascend 950PR&950DT系列产品</term>，其它平台传入 sinksOptional 返回 ACLNN_ERR_RUNTIME_ERROR。
 
 - Mask
     <table style="undefined;table-layout: fixed; width: 942px"><colgroup>
@@ -749,7 +749,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
         <tr>
             <td>N1</td>
             <td>1、2、4、8、16、32、64、128<br>
-            <term>Ascend 950PR/Ascend 950DT</term>额外还支持48、24、12、6、3
+            <term>Ascend 950PR&950DT系列产品</term>额外还支持48、24、12、6、3
             </td>
             <td>SparseFA为MQA。</td>
         </tr>
@@ -783,7 +783,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2(
 
 ## 调用示例
 
-调用示例代码如下（以<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>为例），仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
+调用示例代码如下（以<term>Atlas A2系列产品</term>为例），仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 ```c++
 #include <iostream>

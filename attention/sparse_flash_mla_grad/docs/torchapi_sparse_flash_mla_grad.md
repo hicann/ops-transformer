@@ -3,22 +3,22 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR/Ascend 950DT</term>：支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2 推理产品</term>：不支持
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id8 -->
-- <term>Atlas 推理系列产品</term>：不支持
+- <term>Atlas推理系列产品</term>：不支持
 <!-- end id8 -->
 <!-- npu="910" id9 -->
-- <term>Atlas 训练系列产品</term>：不支持
+- <term>Atlas训练系列产品</term>：不支持
 <!-- end id9 -->
 
 ## 功能说明
@@ -204,7 +204,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 - **layout_kv**（`str`）：可选参数，ori_kv、cmp_kv的数据排布格式。支持 "BSND"、"TND"，当前必须与layout_q保持一致。数据类型支持`str`。
 
 <!-- npu="A3,910b" id5 -->
-- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：暂不支持seqused_q、seqused_ori_kv、seqused_cmp_kv、ori_topk_length、cmp_topk_lengt、metadata参数。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：暂不支持seqused_q、seqused_ori_kv、seqused_cmp_kv、ori_topk_length、cmp_topk_lengt、metadata参数。
 <!-- end id5 -->
 
 ### sparse_flash_mla_grad_metadata
@@ -240,7 +240,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 | has_cmp_kv | bool | 可选 | 表示是否传入cmp_kv，默认值为true。 | bool | - |
 
 <!-- npu="A3,910b" id6 -->
-- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>、<term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持seqused_q、seqused_ori_kv、seqused_cmp_kv、ori_topk_length、cmp_topk_length，ori_mask_mode仅支持4，cmp_mask_mode仅支持3，ori_win_left仅支持127，ori_win_right仅支持0。
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：不支持seqused_q、seqused_ori_kv、seqused_cmp_kv、ori_topk_length、cmp_topk_length，ori_mask_mode仅支持4，cmp_mask_mode仅支持3，ori_win_left仅支持127，ori_win_right仅支持0。
 <!-- end id6 -->
 
 ## 返回值说明
@@ -298,59 +298,59 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
   - `ori_kv`/`cmp_kv`传None的支持情况:
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持。
     <!-- end id7 -->
     <!-- npu="950" id10 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id10 -->
   - `ori_sparse_indices`的支持情况:
     <!-- npu="A3,910b" id11 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持。
     <!-- end id11 -->
     <!-- npu="950" id12 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id12 -->
   - `seqused_q`的支持情况:
     <!-- npu="A3,910b" id13 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持（需传None）。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持（需传None）。
     <!-- end id13 -->
     <!-- npu="950" id14 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id14 -->
   - `ori_topk_length`/`cmp_topk_length`的支持情况:
     <!-- npu="A3,910b" id15 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持（需传None）。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持（需传None）。
     <!-- end id15 -->
     <!-- npu="950" id16 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id16 -->
   - `sinks` 传None的支持情况:
     <!-- npu="A3,910b" id17 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持。
     <!-- end id17 -->
     <!-- npu="950" id18 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持。
     <!-- end id18 -->
   - `metadata`的支持情况:
     <!-- npu="A3,910b" id19 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：仅支持传None。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：仅支持传None。
     <!-- end id19 -->
     <!-- npu="950" id20 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：必须传。
+    - <term>Ascend 950PR&950DT系列产品</term>：必须传。
     <!-- end id20 -->
   - `ori_mask_mode`的支持情况:
     <!-- npu="A3,910b" id21 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：仅支持模式4。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：仅支持模式4。
     <!-- end id21 -->
     <!-- npu="950" id22 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持模式0、3、4。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持模式0、3、4。
     <!-- end id22 -->
   - `cmp_mask_mode`的支持情况:
     <!-- npu="A3,910b" id23 -->
-    - <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>、<term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：仅支持模式3。
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：仅支持模式3。
     <!-- end id23 -->
     <!-- npu="950" id24 -->
-    - <term>Ascend 950PR/Ascend 950DT</term>：支持模式0、3。
+    - <term>Ascend 950PR&950DT系列产品</term>：支持模式0、3。
     <!-- end id24 -->
 
 ## 确定性计算
