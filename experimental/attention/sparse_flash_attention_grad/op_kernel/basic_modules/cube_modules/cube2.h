@@ -1,0 +1,148 @@
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+/*!
+ * \file  cube2.h
+ * \brief Formula: dp = dy * v^T
+ * l0_a： dimG * dimDv * sizof(T1) (6k-10k)
+ * l0_b： selectedBlockSize * dimDv * sizof(T1) (0-16k / 24k-40k)
+ * l0_c： dimG * selectedBlockSize * sizof(T1) (0-4k / 64k-68k)
+ */
+
+template <typename T1>
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2ProcessSparse(
+    const int64_t dyGmOffset, const int64_t valueGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
+    const int32_t blkCntOffset, const int32_t mmPingPongIdx, const int32_t lastBlockSize, const bool isLastBasicBlock)
+{
+    // dp contracts over the value/dy width. The gathered key row may be wider
+    // (e.g. no-RoPE K-split has Dqk=576 and Dv=512); keep dimDqk as its GM stride.
+    uint32_t dLoopTimes = (dimDv + 127) / K_SPLIT_SIZE;
+    uint32_t perLoopDSize = K_SPLIT_SIZE;
+    uint32_t tailLoopDSize = dimDv - (dLoopTimes - 1) * perLoopDSize;
+    uint32_t blockOffset = N_SPLIT_SIZE / selectedBlockSize;
+
+    MMParam mmParam;
+    mmParam.singleM = dimG;
+    mmParam.singleK = perLoopDSize;
+    mmParam.isFixOut = false;
+    mmParam.dstStride = PER_LOOP_BLOCK_SIZE;
+
+    uint32_t totalSel = selectedCntOffset * selectedBlockSize;
+    if (isLastBasicBlock) {
+        totalSel = totalSel - selectedBlockSize + lastBlockSize;
+    }
+    for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx += blockOffset) {
+        LocalTensor<float> l0cTensor = cL0TensorPingPong[ping_pong_flag_l0c_ & 1];
+        int64_t mm2WorkspaceGmOffset = outGmOffset + (nIdx - blkCntOffset) * selectedBlockSize;
+
+        LocalTensor<T1> current_l1_dy_tensor, l1_v_tensor;
+        int64_t currentDyOffset = 0;
+        int64_t currentVOffset;
+        // query node @ key node
+        mmParam.singleN = min(selectedBlockSize * blockOffset, totalSel - (nIdx - blkCntOffset) * selectedBlockSize);
+
+        for (int32_t dIdx = 0; dIdx < dLoopTimes; dIdx++) {
+            mmParam.isOutKFisrt = dIdx == 0;
+            mmParam.isFixOut = dIdx == dLoopTimes - 1;
+            mmParam.singleK = mmParam.isFixOut ? tailLoopDSize : perLoopDSize;
+            WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
+            l1_v_tensor = l1_common_tensors[ping_pong_flag_l1_common_];
+
+            currentDyOffset = dIdx * dimGAlign * K_SPLIT_SIZE;
+            currentVOffset = valueGmOffset + (nIdx - blkCntOffset) * selectedBlockSizeDqk + dIdx * K_SPLIT_SIZE;
+            CopyGmToL1(l1_v_tensor, selectedKWorkspaceGm[currentVOffset], mmParam.singleN, mmParam.singleK, dimDqk);
+            current_l1_dy_tensor = l1_dy_tensor[currentDyOffset];
+
+            MmadInnerWithSync<T1>(l0cTensor, current_l1_dy_tensor, l1_v_tensor, aL0TensorPingPong, bL0TensorPingPong,
+                                  mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true,
+                                  mm2WorkspaceGm[mm2WorkspaceGmOffset]);
+            SetFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
+            UpdatePingPongFlag(ping_pong_flag_l1_common_);
+        }
+        UpdatePingPongFlag(ping_pong_flag_l0c_);
+    }
+}
+
+template <typename T1>
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2ProcessDense(const int32_t blkCntOffset,
+                                                                                    const int32_t mmPingPongIdx,
+                                                                                    const RunInfo &runInfo)
+{
+    const int64_t dyGmOffset = runInfo.dyGmOffset;
+    const int64_t keyGmOffset = runInfo.keyGmOffset;
+    const int64_t indicesGmOffset = runInfo.indicesGmOffset;
+    const int64_t outGmOffset = runInfo.mm12GmOffset;
+
+    // Match sparse v=k semantics: V is the first Dv columns of each key row.
+    // Dqk remains the row stride, including the no-RoPE Dqk=576, Dv=512 case.
+    uint32_t dLoopTimes = (dimDv + 127) / K_SPLIT_SIZE;
+    uint32_t perLoopDSize = K_SPLIT_SIZE;
+    uint32_t tailLoopDSize = dimDv - (dLoopTimes - 1) * perLoopDSize;
+    uint32_t blockOffset = N_SPLIT_SIZE / selectedBlockSize;
+
+    MMParam mmParam;
+    mmParam.singleM = dimG;
+    mmParam.singleK = perLoopDSize;
+    mmParam.isFixOut = false;
+    mmParam.dstStride = PER_LOOP_BLOCK_SIZE;
+
+    uint32_t totalSel = selectedCntOffset * selectedBlockSize;
+    if (runInfo.isLastBasicBlock) {
+        totalSel = totalSel - selectedBlockSize + runInfo.lastBlockSize;
+    }
+    // 切N，也就是切S2
+    for (int32_t nIdx = blkCntOffset; nIdx < blkCntOffset + selectedCntOffset; nIdx += blockOffset) {
+        LocalTensor<float> l0cTensor = cL0TensorPingPong[ping_pong_flag_l0c_ & 1];
+        int64_t mm2WorkspaceGmOffset = outGmOffset + (nIdx - blkCntOffset) * selectedBlockSize;
+
+        LocalTensor<T1> current_l1_dy_tensor, l1_v_tensor;
+        int64_t currentDyOffset = 0;
+        int64_t currentVOffset;
+
+        mmParam.singleN = min(selectedBlockSize * blockOffset, totalSel - (nIdx - blkCntOffset) * selectedBlockSize);
+        // query node @ key node
+        for (int32_t dIdx = 0; dIdx < dLoopTimes; dIdx++) {
+            mmParam.isOutKFisrt = dIdx == 0;
+            mmParam.isFixOut = dIdx == dLoopTimes - 1;
+            mmParam.singleK = mmParam.isFixOut ? tailLoopDSize : perLoopDSize;
+            l1_v_tensor = l1_common_tensors[ping_pong_flag_l1_common_];
+
+            currentDyOffset = dIdx * dimGAlign * K_SPLIT_SIZE;
+            currentVOffset =
+                keyGmOffset + (blkCntOffset * dimN2 + nIdx - blkCntOffset) * selectedBlockSizeDqk + dIdx * K_SPLIT_SIZE;
+
+            WaitFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
+
+            CopyGmToL1(l1_v_tensor, keyGm[currentVOffset], mmParam.singleN, mmParam.singleK, dimDqk);
+
+            current_l1_dy_tensor = l1_dy_tensor[currentDyOffset];
+
+            MmadInnerWithSync<T1>(l0cTensor, current_l1_dy_tensor, l1_v_tensor, aL0TensorPingPong, bL0TensorPingPong,
+                                  mmParam, ping_pong_flag_l0a_, ping_pong_flag_l0b_, ping_pong_flag_l0c_, true,
+                                  mm2WorkspaceGm[mm2WorkspaceGmOffset]);
+            SetFlag<HardEvent::MTE1_MTE2>(MM_L1_COMMON_EVENTS[ping_pong_flag_l1_common_]);
+            UpdatePingPongFlag(ping_pong_flag_l1_common_);
+        }
+        UpdatePingPongFlag(ping_pong_flag_l0c_);
+    }
+}
+
+template <typename T1>
+__aicore__ inline __attribute__((always_inline)) void CubeOp<T1>::cube2Process(
+    const int64_t dyGmOffset, const int64_t valueGmOffset, const int64_t indicesGmOffset, const int64_t outGmOffset,
+    const int32_t blkCntOffset, const int32_t mmPingPongIdx, const RunInfo &runInfo)
+{
+    if (!runInfo.isSmallS2) {
+        cube2ProcessSparse(dyGmOffset, valueGmOffset, indicesGmOffset, outGmOffset, blkCntOffset, mmPingPongIdx,
+                           runInfo.lastBlockSize, runInfo.isLastBasicBlock);
+    } else {
+        cube2ProcessDense(blkCntOffset, mmPingPongIdx, runInfo);
+    }
+}
