@@ -209,16 +209,24 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<CubeBlockType, VecBlockTyp
     if ASCEND_IS_AIV {
         if constexpr (IS_VEC_S2PHYADDR) {
             uint32_t hasLoad = (aicIdx < usedCoreNum) ? 1U : 0U;
-            // 适配分核左闭右开（与 ProcessMainLoop 中 gS1End/bN2End 的转换保持一致）
-            uint32_t bN2EndIdx = constInfo.bN2End + 1;
+            // 空闲核在 InitCalcParamsEach 中提前返回，bN2End/gS1End/bN2Start 未赋值。
+            // 仅参与计算的核读取分核字段；空闲核仍调用 GetKVPhyAddr 以完成 SyncAll。
+            uint32_t bN2StartIdx = 0;
+            uint32_t bN2EndIdx = 0;
+            uint32_t gS1StartIdx = 0;
             uint32_t nextGs1Idx = 0;
-            uint32_t gS1EndBIdx = constInfo.bN2End / constInfo.n2Size;
-            uint32_t gS1max = GetBalanceActualSeqLengths(actualSeqLengthsQGm, gS1EndBIdx);
-            if (constInfo.gS1End + 1 < gS1max) {
-                nextGs1Idx = constInfo.gS1End + 1;
+            if (hasLoad != 0U) {
+                // 适配分核左闭右开（与 ProcessMainLoop 中 gS1End/bN2End 的转换保持一致）
+                bN2StartIdx = constInfo.bN2Start;
+                bN2EndIdx = constInfo.bN2End + 1;
+                gS1StartIdx = constInfo.gS1Start;
+                uint32_t gS1EndBIdx = constInfo.bN2End / constInfo.n2Size;
+                uint32_t gS1max = GetBalanceActualSeqLengths(actualSeqLengthsQGm, gS1EndBIdx);
+                if (constInfo.gS1End + 1 < gS1max) {
+                    nextGs1Idx = constInfo.gS1End + 1;
+                }
             }
-            this->vecBlock.GetKVPhyAddr(hasLoad, constInfo.bN2Start, bN2EndIdx, constInfo.gS1Start, nextGs1Idx,
-                                        workspace, constInfo);
+            this->vecBlock.GetKVPhyAddr(hasLoad, bN2StartIdx, bN2EndIdx, gS1StartIdx, nextGs1Idx, workspace, constInfo);
         }
     }
     /* UB buffer 在 GetKVPhyAddr（含 tPipe->Reset）之后初始化，避免 buffer 池被重置导致重叠 */
