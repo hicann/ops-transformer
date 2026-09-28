@@ -25,7 +25,6 @@ static const std::vector<std::string> inputNames = {"kv",         "gamma",      
                                                     "index",      "k_cache",       "ckv_cache",   "k_rope_scale",
                                                     "c_kv_scale", "k_rope_offset", "c_kv_offset", "v"};
 using namespace Ops::Base;
-
 std::tuple<int64_t, int64_t, int64_t, int64_t> KvRmsNormRopeCacheTilingBase::GetShapeTuple(
     const gert::TilingContext *context, const int64_t index)
 {
@@ -260,34 +259,6 @@ bool KvRmsNormRopeCacheTilingBase::CheckVCacheValid(const gert::TilingContext *c
     return CheckCacheValid(context, batchSize, numHead, cacheLen, headSize, V_CACHE_INDEX, "v_cache");
 }
 
-bool KvRmsNormRopeCacheTilingBase::CheckCacheValidPA(const gert::TilingContext *context, int64_t headSize,
-                                                     size_t cacheIndex, const char *cacheName)
-{
-    // Default PA format cache check
-    // In PageAttention mode, cache dimensions are in [block_num, block_size, N, hDim].
-    auto cacheShapeTuple = GetShapeTuple(context, cacheIndex);
-    int64_t cacheBlkNum = std::get<SHAPE_IDX_BLOCK_NUM>(cacheShapeTuple);
-    int64_t cacheBlkSize = std::get<SHAPE_IDX_BLOCK_SIZE>(cacheShapeTuple);
-    int64_t cacheN = std::get<DIM_TWO>(cacheShapeTuple);
-    int64_t cacheD = std::get<SHAPE_IDX_D>(cacheShapeTuple);
-
-    if (cacheBlkSize < DIM_TWO) {
-        // block size must be larger than 1 under all PageAttention modes.
-        return false;
-    }
-    if (cacheN != this->numHeadKv_) {
-        return false;
-    }
-    if (cacheD != headSize) {
-        // Inconsist cache hDim size with the expected value headSize
-        return false;
-    }
-
-    // Total PA slots must meet block_num * block_size ≥ Bkv × Skv
-    // here let block_num ≥ Ceil(Skv / block_size) ∗ Bkv
-    return (cacheBlkNum >= ((this->seqLenKv_ + cacheBlkSize - 1) / cacheBlkSize) * this->batchKv_);
-}
-
 bool KvRmsNormRopeCacheTilingBase::CheckKCacheValidPA(const gert::TilingContext *context, int64_t numHead,
                                                       int64_t headSize)
 {
@@ -383,24 +354,14 @@ bool KvRmsNormRopeCacheTilingBase::CheckIndexValid(const gert::TilingContext *co
 
 int64_t KvRmsNormRopeCacheTilingBase::GetQuantMode(const gert::TilingContext *context)
 {
-    int64_t qmode = NON_QUANT_MODE;
-
     auto scale1Shape = context->GetOptionalInputShape(K_ROPE_SCALE_IDX);
     auto scale2Shape = context->GetOptionalInputShape(C_KV_SCALE_IDX);
     bool allNullPtr = (scale1Shape == nullptr) && (scale2Shape == nullptr);
-    if (!allNullPtr) {
-        qmode = QUANT_MODE;
+    if (allNullPtr) {
+        return NON_QUANT_MODE;
+    } else {
+        return QUANT_MODE;
     }
-    // Check and warn dissociated quant offsets
-    auto offset1Shape = context->GetOptionalInputShape(K_ROPE_OFFSET_IDX);
-    auto offset2Shape = context->GetOptionalInputShape(C_KV_OFFSET_IDX);
-    if (scale1Shape == nullptr && offset1Shape != nullptr) {
-        OP_LOGW(context_->GetNodeName(), "Orphan quant offset for k_cache without quant scale will be ignored.");
-    }
-    if (scale2Shape == nullptr && offset2Shape != nullptr) {
-        OP_LOGW(context_->GetNodeName(), "Orphan quant offset for ckv_cache without quant scale will be ignored.");
-    }
-    return qmode;
 }
 
 ge::graphStatus KvRmsNormRopeCacheTilingBase::GetPlatformInfo()
@@ -425,49 +386,16 @@ ge::graphStatus KvRmsNormRopeCacheTilingBase::GetPlatformInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-bool KvRmsNormRopeCacheTilingBase::ValidateCacheShapes()
-{
-    auto kCacheShapeTuple = GetShapeTuple(context_, K_CACHE_INDEX);
-    auto vCacheShapeTuple = GetShapeTuple(context_, V_CACHE_INDEX);
-
-    if (std::get<SHAPE_IDX_BLOCK_NUM>(kCacheShapeTuple) != std::get<SHAPE_IDX_BLOCK_NUM>(vCacheShapeTuple)) {
-        // Must have same blocknum or batch size for cache
-        return false;
-    }
-
-    this->cacheLength_ = std::get<SHAPE_IDX_S>(kCacheShapeTuple);
-    this->blockSize_ = std::get<SHAPE_IDX_BLOCK_SIZE>(kCacheShapeTuple);
-
-    if (cacheLength_ != std::get<SHAPE_IDX_S>(vCacheShapeTuple) ||
-        blockSize_ != std::get<SHAPE_IDX_BLOCK_SIZE>(vCacheShapeTuple)) {
-        return false;
-    }
-    return (this->cacheLength_ > 0 && this->blockSize_ > 0);
-}
-
-bool KvRmsNormRopeCacheTilingBase::ValidateSBroadcast()
-{
-    bool isValid = true;
-    if (cosSinNeedBrc_ == 1) {
-        // got cosSeq == 1 && cosSeq != seqLen && seqLen > 1
-        // only CacheMode::Norm and non-quant PA can be broadcasted
-        isValid =
-            (currentCacheMode_ == CacheMode::Norm) || (isPagedAttention_ && !isPABNSD_ && quantMode_ == NON_QUANT_MODE);
-    }
-    return isValid;
-}
-
 ge::graphStatus KvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
 {
-    if (context_ == nullptr) {
-        // CANNOT OP_LOGE on nullptr context_
-        return ge::GRAPH_FAILED;
-    }
+    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
+                return ge::GRAPH_FAILED);
     isRegbase_ = Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_);
-    // GetQuantMode and validate quant terms
+    // GetQuantMode
     quantMode_ = GetQuantMode(context_);
     // Basic info
     auto kvShapeTuple = GetShapeTuple(context_, KV_INDEX);
+    auto kCacheShapeTuple = GetShapeTuple(context_, K_CACHE_INDEX);
     // Dk
     auto cosShapeTuple = GetShapeTuple(context_, COS_INDEX);
     // Dv
@@ -489,15 +417,8 @@ ge::graphStatus KvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
     int64_t batchSize = std::get<SHAPE_IDX_B>(kvShapeTuple);
     int64_t numHead = std::get<SHAPE_IDX_N>(kvShapeTuple);
     int64_t seqLen = std::get<SHAPE_IDX_S>(kvShapeTuple);
-    this->batchKv_ = batchSize;
-    this->seqLenKv_ = seqLen;
-    this->numHeadKv_ = numHead;
-
-    OP_CHECK_IF(!ValidateCacheShapes(),
-                OP_LOGE(context_->GetNodeName(),
-                        "Normal axes between k_cache and v_cache must have same sizes except for the LAST DIM."),
-                return ge::GRAPH_FAILED);
-
+    cacheLength_ = std::get<SHAPE_IDX_S>(kCacheShapeTuple);
+    blockSize_ = std::get<SHAPE_IDX_BLOCK_SIZE>(kCacheShapeTuple);
     isMTP_ = (seqLen > 1);
     auto kvStorageShape = context_->GetInputShape(KV_INDEX)->GetStorageShape();
     std::string kvStorageShapeStr = ToString(kvStorageShape);
@@ -539,21 +460,10 @@ ge::graphStatus KvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
     }
 
     if (methodMode_ == 1) {
-        // Datatype alignment
-        auto vDesc = context_->GetOptionalInputDesc(V_IDX);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, vDesc);
-        vDtype_ = vDesc->GetDataType();
-        OP_CHECK_IF((vDtype_ != kvDtype_),
-                    OP_LOGE(context_->GetNodeName(), "v datatype Must be consist with kv under k-v split mode."),
-                    return ge::GRAPH_FAILED);
-
         auto vShape = GetOptionalShapeTuple(context_, V_IDX);
         vlen_ = std::get<SHAPE_IDX_D>(vShape);
         OP_CHECK_IF(!CheckVValid(context_, batchSize, numHead, seqLen, vlen_),
                     OP_LOGE(context_->GetNodeName(), "v shape is invalid."), return ge::GRAPH_FAILED);
-    } else {
-        // kv components are aligned in merged hdim
-        vDtype_ = kvDtype_;
     }
     OP_CHECK_IF(!CheckKvValid(context_, batchSize, numHead, seqLen, kv_),
                 OP_LOGE(context_->GetNodeName(), "kv shape is invalid."), return ge::GRAPH_FAILED);
@@ -569,36 +479,26 @@ ge::graphStatus KvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
     const char *tmpmode = attrs->GetStr(CACHE_MODE_IDX);
     if (tmpmode != nullptr) {
         std::string cacheMode = tmpmode;
-        const std::unordered_map<std::string, CacheMode> cacheModeMap = {{"PA", CacheMode::PA},
-                                                                         {"PA_BNSD", CacheMode::PA},
-                                                                         {"PA_NZ", CacheMode::PA_NZ},
-                                                                         {"PA_BLK_BNSD", CacheMode::PA_BLK_BNSD},
-                                                                         {"PA_BLK_NZ", CacheMode::PA_BLK_NZ}};
-        auto it = cacheModeMap.find(cacheMode);
-        if (it != cacheModeMap.end()) {
-            currentCacheMode_ = it->second;
-        } else {
-            currentCacheMode_ = CacheMode::Norm;
-            OP_LOGW(context_->GetNodeName(), "Get unknown cachemode %s, redirect to default mode Norm.", tmpmode);
-        }
-        // both (cacheMode == "PA" || cacheMode == "PA_BNSD") are mapped to CacheMode::PA
-        isPagedAttention_ = (currentCacheMode_ == CacheMode::PA);
-        isPABNSD_ = (cacheMode == "PA_BNSD");
+        isPagedAttention_ = (cacheMode == "PA" || cacheMode == "PA_BNSD");
+        std::unordered_map<std::string, CacheMode> cacheModeMap = {{"PA", CacheMode::PA},
+                                                                   {"PA_BNSD", CacheMode::PA},
+                                                                   {"PA_NZ", CacheMode::PA_NZ},
+                                                                   {"PA_BLK_BNSD", CacheMode::PA_BLK_BNSD},
+                                                                   {"PA_BLK_NZ", CacheMode::PA_BLK_NZ}};
+        auto getCacheMode = [&cacheModeMap](const std::string &mode) -> CacheMode {
+            auto it = cacheModeMap.find(mode);
+            return (it != cacheModeMap.end()) ? it->second : CacheMode::Norm;
+        };
+        currentCacheMode_ = getCacheMode(cacheMode);
     } else {
         isPagedAttention_ = false;
         currentCacheMode_ = CacheMode::Norm;
-        OP_LOGW(context_->GetNodeName(), "Get Empty cachemode, set to default mode Norm.");
     }
-
-    // setup output config
     const bool *isOutputKv = attrs->GetBool(IS_OUTPUT_KV_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, isOutputKv);
     isOutputKv_ = *isOutputKv;
-    // validate S-axis broadcast
     OP_CHECK_IF(!CheckCosSinValid(context_, batchSize, numHead, seqLen, dk_),
                 OP_LOGE(context_->GetNodeName(), "cos or sin shape is invalid."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!ValidateSBroadcast(), OP_LOGE(context_->GetNodeName(), "Unsupported RoPE axis broadcast config."),
-                return ge::GRAPH_FAILED);
     OP_CHECK_IF(!CheckGammaValid(context_, dv_), OP_LOGE(context_->GetNodeName(), "gamma shape is invalid."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(!CheckIndexValid(context_, batchSize, seqLen, blockSize_, currentCacheMode_),

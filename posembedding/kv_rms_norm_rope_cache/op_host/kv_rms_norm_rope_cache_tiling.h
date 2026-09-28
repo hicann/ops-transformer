@@ -22,7 +22,7 @@
 
 namespace optiling {
 using namespace Ops::Base;
-// DS (Atlas 2/3)
+// DS
 BEGIN_TILING_DATA_DEF(KvRmsNormRopeCacheTilingData)
 TILING_DATA_FIELD_DEF(int64_t, numBlocks);
 TILING_DATA_FIELD_DEF(int64_t, rowsPerBlock);
@@ -77,7 +77,6 @@ REGISTER_TILING_DATA_CLASS(KvRmsNormRopeCache_4010, KvRmsNormRopeCacheTilingData
 REGISTER_TILING_DATA_CLASS(KvRmsNormRopeCache_4011, KvRmsNormRopeCacheTilingData)
 REGISTER_TILING_DATA_CLASS(KvRmsNormRopeCache_5010, KvRmsNormRopeCacheTilingData)
 REGISTER_TILING_DATA_CLASS(KvRmsNormRopeCache_5011, KvRmsNormRopeCacheTilingData)
-
 // D全载
 BEGIN_TILING_DATA_DEF(KvRmsNormRopeCacheRegbaseFullLoadTilingData)
 TILING_DATA_FIELD_DEF(int64_t, batchSize);
@@ -190,7 +189,7 @@ constexpr int64_t FLOAT16_BYTES = 2;
 constexpr int64_t FP32_BLOCK_ALIGN_NUM = 8;
 constexpr int64_t FP16_BLOCK_ALIGN_NUM = 16;
 constexpr int64_t INT8_BLOCK_ALIGN_NUM = 32;
-
+;
 constexpr int64_t DIM_SIZE = 4;
 constexpr int64_t DIM_ONE = 1;
 constexpr int64_t DIM_TWO = 2;
@@ -217,10 +216,6 @@ public:
     int64_t vlFp16_ = 0;
     bool isRegbase_{false};
 
-    int64_t batchKv_ = 0;
-    int64_t seqLenKv_ = 0;
-    int64_t numHeadKv_ = 0;
-
     int64_t kv_{DIM_NUM_ONE};
     int64_t dv_{DIM_NUM_ONE};
     int64_t dk_{DIM_NUM_ONE};
@@ -233,14 +228,12 @@ public:
     bool isOutputKv_ = true;
     int64_t cosSinNeedBrc_ = 0;
     bool isPagedAttention_ = false;
-    bool isPABNSD_ = false;
     bool isMTP_ = false;
     CacheMode currentCacheMode_ = CacheMode::Norm;
     int64_t quantMode_ = 0;
     int64_t methodMode_ = 0;
 
     ge::DataType kvDtype_{ge::DataType::DT_FLOAT};
-    ge::DataType vDtype_{ge::DataType::DT_FLOAT};
     int64_t kvDtypeSize_{0};
     int64_t cacheRowLimit_ = 0;
 
@@ -290,20 +283,13 @@ protected:
                           int64_t headSize);
     bool CheckVCacheValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead, int64_t cacheLen,
                           int64_t headSize);
-    virtual bool CheckCacheValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead,
-                                 int64_t cacheLen, int64_t headSize, size_t cacheIndex, const char *cacheName);
-    virtual bool CheckCacheValidPA(const gert::TilingContext *context, int64_t headSize, size_t cacheIndex,
-                                   const char *cacheName);
-
+    bool CheckCacheValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead, int64_t cacheLen,
+                         int64_t headSize, size_t cacheIndex, const char *cacheName);
     bool CheckKCacheValidPA(const gert::TilingContext *context, int64_t numHead, int64_t headSize);
     bool CheckVCacheValidPA(const gert::TilingContext *context, int64_t numHead, int64_t headSize);
     bool CheckIndexValid(const gert::TilingContext *context, int64_t batchSize, int64_t seqLen, int64_t pageSize,
                          CacheMode mode);
     int64_t GetQuantMode(const gert::TilingContext *context);
-
-private:
-    bool ValidateCacheShapes();
-    bool ValidateSBroadcast();
 };
 
 class KvRmsNormRopeCacheTilingDs : virtual public KvRmsNormRopeCacheTilingBase {
@@ -320,19 +306,10 @@ protected:
 
 protected:
     void DoOpTilingPaBlkNz();
-    bool CheckQuantTermShape(const gert::TilingContext *context, size_t inputIdx, int64_t headSize, bool &hasShape);
-    bool CheckCacheValid(const gert::TilingContext *context, int64_t batchSize, int64_t numHead, int64_t cacheLen,
-                         int64_t headSize, size_t cacheIndex, const char *cacheName) override;
-    ge::graphStatus ResolveQuantConfig(size_t scaleIdx, size_t offsetIdx, int64_t headSize, const char *cacheName,
-                                       int8_t &quantType);
-    ge::graphStatus ResolveQuantComponents();
-    bool validateQuantCrossTermShapes();
-    bool validateCacheDatatypes();
+    bool CheckScaleValid(const gert::TilingContext *context);
+    bool CheckOffsetValid(const gert::TilingContext *context);
 
 private:
-    int64_t hDimKCache{0};
-    int64_t hDimVCache{0};
-    int64_t staticQuantType{0};
     KvRmsNormRopeCacheTilingData tilingData_;
 };
 
