@@ -35,6 +35,7 @@ struct MoeEpCombineEpilogueInfo {
     uint64_t recvCapacity = 0;
     uint64_t totalUbSize = 0;
     uint64_t metadataRankOffsetsOffset = 0;
+    uint64_t localRecvIndexOffset = 0;
     uint64_t combineStateWinOffset = 0;
     uint64_t combineDataWinOffset = 0;
 };

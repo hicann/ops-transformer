@@ -45,6 +45,7 @@ struct MoeEpDispatchEpilogueInfo {
     // 保留占位即可让新旧 host/kernel 混用时字段偏移不变。
     uint64_t rankExpertHitCountOffsetReserved = 0;
     uint64_t metadataRankOffsetsOffset = 0; // byte offset of the aligned tail in packed metadata
+    uint64_t localRecvIndexOffset = 0;      // byte offset of [num_tokens, top_k] local recv_x reverse index
 };
 
 struct MoeEpDispatchEpilogueTilingData {

@@ -407,12 +407,14 @@ static ge::graphStatus CheckOutputTensors(const gert::TilingContext *context, co
                         return ge::GRAPH_FAILED);
     }
 
-    // Full storage descriptor includes the five-column rows and both padded regions.
+    // Full storage descriptor includes five-column rows, rank offsets, and the local reverse index.
     info.metadataRankOffsetsOffset =
         AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_FIELDS * METADATA_DTYPE_SIZE);
+    info.localRecvIndexOffset = info.metadataRankOffsetsOffset +
+                                AlignMoeEpWin((static_cast<uint64_t>(info.cfg.epWorldSize) + 1U) * METADATA_DTYPE_SIZE);
     const uint64_t packedElements =
-        (info.metadataRankOffsetsOffset +
-         AlignMoeEpWin((static_cast<uint64_t>(info.cfg.epWorldSize) + 1U) * METADATA_DTYPE_SIZE)) /
+        (info.localRecvIndexOffset +
+         AlignMoeEpWin(static_cast<uint64_t>(info.cfg.numTokens) * info.cfg.topK * METADATA_DTYPE_SIZE)) /
         METADATA_DTYPE_SIZE;
     auto recvSrcMetaShape = context->GetOutputShape(OUT_RECV_SRC_METADATA_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvSrcMetaShape);
