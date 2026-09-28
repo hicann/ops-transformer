@@ -31,8 +31,8 @@ namespace {
  * @domain aclnn_ops_infer
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnFusedInferAttentionScoreV3GetMaxWorkspaceSize(
-    const aclTensor *query, const aclTensorList *tensorListKey, const aclTensorList *tensorListValue, const aclTensor *pseShiftOptional,
-    const aclTensor *attenMaskOptional, const aclIntArray *actualSeqLengthsOptional,
+    const aclTensor *query, const aclTensorList *tensorListKey, const aclTensorList *tensorListValue,
+    const aclTensor *pseShiftOptional, const aclTensor *attenMaskOptional, const aclIntArray *actualSeqLengthsOptional,
     const aclIntArray *actualSeqLengthsKvOptional, const aclTensor *deqScale1Optional,
     const aclTensor *quantScale1Optional, const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
     const aclTensor *quantOffset2Optional, const aclTensor *antiquantScaleOptional,
@@ -42,11 +42,11 @@ __attribute__((visibility("default"))) aclnnStatus aclnnFusedInferAttentionScore
     const aclTensor *valueAntiquantScaleOptional, const aclTensor *valueAntiquantOffsetOptional,
     const aclTensor *tensorKeySharedPrefixOptional, const aclTensor *tensorValueSharedPrefixOptional,
     const aclIntArray *actualSharedPrefixLenOptional, const aclTensor *queryRopeOptional,
-    const aclTensor *keyRopeOptional, const aclTensor *keyRopeAntiquantScaleOptional,
-    int64_t numHeads, double scaleValue, int64_t preTokens,
-    int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
-    int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode, int64_t valueAntiquantMode,
-    const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor *keyRopeOptional, const aclTensor *keyRopeAntiquantScaleOptional, int64_t numHeads,
+    double scaleValue, int64_t preTokens, int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads,
+    int64_t sparseMode, int64_t innerPrecise, int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag,
+    int64_t keyAntiquantMode, int64_t valueAntiquantMode, const aclTensor *attentionOut, const aclTensor *softmaxLse,
+    uint64_t *workspaceSize, aclOpExecutor **executor);
 
 struct FiaActualSeqInArrays {
     const aclIntArray *actualSeqLengthsOptional = nullptr;
@@ -85,45 +85,33 @@ aclnnStatus FakeFiaActualSeqArrays(const FiaActualSeqInArrays &inArrays, FiaActu
 
 aclnnStatus aclnnFusedInferAttentionScoreV3GetMaxWorkspaceSize(
     const aclTensor *query, const aclTensorList *tensorListKey, const aclTensorList *tensorListValue,
-    const aclTensor *pseShiftOptional,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *deqScale1Optional,
-    const aclTensor *quantScale1Optional,
-    const aclTensor *deqScale2Optional,
-    const aclTensor *quantScale2Optional,
-    const aclTensor *quantOffset2Optional,
-    const aclTensor *antiquantScaleOptional,
-    const aclTensor *antiquantOffsetOptional,
-    const aclTensor *blockTableOptional,
-    const aclTensor *queryPaddingSizeOptional,
-    const aclTensor *kvPaddingSizeOptional,
-    const aclTensor *keyAntiquantScaleOptional,
-    const aclTensor *keyAntiquantOffsetOptional,
-    const aclTensor *valueAntiquantScaleOptional,
-    const aclTensor *valueAntiquantOffsetOptional,
-    const aclTensor *tensorKeySharedPrefixOptional,
-    const aclTensor *tensorValueSharedPrefixOptional,
-    const aclIntArray *actualSharedPrefixLenOptional,
-    const aclTensor *queryRopeOptional,
-    const aclTensor *keyRopeOptional,
-    const aclTensor *keyRopeAntiquantScaleOptional,
-    int64_t numHeads, double scaleValue, int64_t preTokens,
-    int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads,
-    int64_t sparseMode, int64_t innerPrecise, int64_t blockSize,
-    int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode, int64_t valueAntiquantMode,
-    const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor *pseShiftOptional, const aclTensor *attenMaskOptional, const aclIntArray *actualSeqLengthsOptional,
+    const aclIntArray *actualSeqLengthsKvOptional, const aclTensor *deqScale1Optional,
+    const aclTensor *quantScale1Optional, const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
+    const aclTensor *quantOffset2Optional, const aclTensor *antiquantScaleOptional,
+    const aclTensor *antiquantOffsetOptional, const aclTensor *blockTableOptional,
+    const aclTensor *queryPaddingSizeOptional, const aclTensor *kvPaddingSizeOptional,
+    const aclTensor *keyAntiquantScaleOptional, const aclTensor *keyAntiquantOffsetOptional,
+    const aclTensor *valueAntiquantScaleOptional, const aclTensor *valueAntiquantOffsetOptional,
+    const aclTensor *tensorKeySharedPrefixOptional, const aclTensor *tensorValueSharedPrefixOptional,
+    const aclIntArray *actualSharedPrefixLenOptional, const aclTensor *queryRopeOptional,
+    const aclTensor *keyRopeOptional, const aclTensor *keyRopeAntiquantScaleOptional, int64_t numHeads,
+    double scaleValue, int64_t preTokens, int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads,
+    int64_t sparseMode, int64_t innerPrecise, int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag,
+    int64_t keyAntiquantMode, int64_t valueAntiquantMode, const aclTensor *attentionOut, const aclTensor *softmaxLse,
+    uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnFusedInferAttentionScore versions V1 to V4 are no longer supported on Ascend950.");
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "Interface aclnnFusedInferAttentionScore versions V1 to V4 are no longer supported on Ascend950.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     OP_LOGD("start aclnnFusedInferAttentionScoreV3GetMaxWorkspaceSize");
     TensorPreProcess(tensorListKey, tensorListValue);
     PrefixTensorPreProcess(tensorKeySharedPrefixOptional, tensorValueSharedPrefixOptional);
 
-    FiaActualSeqInArrays actualSeqArrays{actualSeqLengthsOptional, actualSeqLengthsKvOptional, actualSharedPrefixLenOptional};
+    FiaActualSeqInArrays actualSeqArrays{actualSeqLengthsOptional, actualSeqLengthsKvOptional,
+                                         actualSharedPrefixLenOptional};
     FiaActualSeqOutTensors fakeActualSeqTensors{};
     aclnnStatus ret = FakeFiaActualSeqArrays(actualSeqArrays, fakeActualSeqTensors);
     if (ret != ACLNN_SUCCESS) {
@@ -132,16 +120,23 @@ aclnnStatus aclnnFusedInferAttentionScoreV3GetMaxWorkspaceSize(
 
     const aclTensor *placeHolder = nullptr;
     const aclTensor *tempTensor = nullptr;
-    FusedInferAttentionScoreProcessSoftmaxLse(softmaxLseFlag, softmaxLse, tempTensor, placeHolder);
+    ret = FusedInferAttentionScoreProcessSoftmaxLse(softmaxLseFlag, softmaxLse, tempTensor, placeHolder);
+    if (ret != ACLNN_SUCCESS) {
+        aclDestroyTensor(fakeActualSeqTensors.actualSeqLengthsOptional);
+        aclDestroyTensor(fakeActualSeqTensors.actualSeqLengthsKvOptional);
+        aclDestroyTensor(fakeActualSeqTensors.actualSharedPrefixLenOptional);
+        return ret;
+    }
 
     ret = aclnnInnerFusedInferAttentionScoreTensorGetWorkspaceSize(
-        query, tensorListKey, tensorListValue, pseShiftOptional, attenMaskOptional, fakeActualSeqTensors.actualSeqLengthsOptional,
-        fakeActualSeqTensors.actualSeqLengthsKvOptional, deqScale1Optional, quantScale1Optional, deqScale2Optional, quantScale2Optional,
-        quantOffset2Optional, antiquantScaleOptional, antiquantOffsetOptional, blockTableOptional,
-        queryPaddingSizeOptional, kvPaddingSizeOptional, keyAntiquantScaleOptional, keyAntiquantOffsetOptional,
-        valueAntiquantScaleOptional, valueAntiquantOffsetOptional, tensorKeySharedPrefixOptional,
-        tensorValueSharedPrefixOptional, fakeActualSeqTensors.actualSharedPrefixLenOptional, queryRopeOptional,
-        keyRopeOptional, keyRopeAntiquantScaleOptional, nullptr, nullptr, nullptr, nullptr, numHeads, scaleValue, preTokens, nextTokens,
+        query, tensorListKey, tensorListValue, pseShiftOptional, attenMaskOptional,
+        fakeActualSeqTensors.actualSeqLengthsOptional, fakeActualSeqTensors.actualSeqLengthsKvOptional,
+        deqScale1Optional, quantScale1Optional, deqScale2Optional, quantScale2Optional, quantOffset2Optional,
+        antiquantScaleOptional, antiquantOffsetOptional, blockTableOptional, queryPaddingSizeOptional,
+        kvPaddingSizeOptional, keyAntiquantScaleOptional, keyAntiquantOffsetOptional, valueAntiquantScaleOptional,
+        valueAntiquantOffsetOptional, tensorKeySharedPrefixOptional, tensorValueSharedPrefixOptional,
+        fakeActualSeqTensors.actualSharedPrefixLenOptional, queryRopeOptional, keyRopeOptional,
+        keyRopeAntiquantScaleOptional, nullptr, nullptr, nullptr, nullptr, numHeads, scaleValue, preTokens, nextTokens,
         inputLayout, numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag,
         keyAntiquantMode, valueAntiquantMode, 0, 0, 0, attentionOut, placeHolder, workspaceSize, executor);
     if (softmaxLseFlag == false) {
@@ -154,52 +149,39 @@ aclnnStatus aclnnFusedInferAttentionScoreV3GetMaxWorkspaceSize(
 }
 
 aclnnStatus aclnnFusedInferAttentionScoreV3GetWorkspaceSize(
-    const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
-    const aclTensor *pseShiftOptional,
-    const aclTensor *attenMaskOptional,
-    const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional,
-    const aclTensor *deqScale1Optional,
-    const aclTensor *quantScale1Optional,
-    const aclTensor *deqScale2Optional,
-    const aclTensor *quantScale2Optional,
-    const aclTensor *quantOffset2Optional,
-    const aclTensor *antiquantScaleOptional,
-    const aclTensor *antiquantOffsetOptional,
-    const aclTensor *blockTableOptional,
-    const aclTensor *queryPaddingSizeOptional,
-    const aclTensor *kvPaddingSizeOptional,
-    const aclTensor *keyAntiquantScaleOptional,
-    const aclTensor *keyAntiquantOffsetOptional,
-    const aclTensor *valueAntiquantScaleOptional,
-    const aclTensor *valueAntiquantOffsetOptional,
-    const aclTensor *keySharedPrefixOptional,
-    const aclTensor *valueSharedPrefixOptional,
-    const aclIntArray *actualSharedPrefixLenOptional,
-    const aclTensor *queryRopeOptional,
-    const aclTensor *keyRopeOptional,
-    const aclTensor *keyRopeAntiquantScaleOptional,
-    int64_t numHeads, double scaleValue, int64_t preTokens,
-    int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads,
-    int64_t sparseMode, int64_t innerPrecise, int64_t blockSize,
-    int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode, int64_t valueAntiquantMode,
-    const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShiftOptional,
+    const aclTensor *attenMaskOptional, const aclIntArray *actualSeqLengthsOptional,
+    const aclIntArray *actualSeqLengthsKvOptional, const aclTensor *deqScale1Optional,
+    const aclTensor *quantScale1Optional, const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
+    const aclTensor *quantOffset2Optional, const aclTensor *antiquantScaleOptional,
+    const aclTensor *antiquantOffsetOptional, const aclTensor *blockTableOptional,
+    const aclTensor *queryPaddingSizeOptional, const aclTensor *kvPaddingSizeOptional,
+    const aclTensor *keyAntiquantScaleOptional, const aclTensor *keyAntiquantOffsetOptional,
+    const aclTensor *valueAntiquantScaleOptional, const aclTensor *valueAntiquantOffsetOptional,
+    const aclTensor *keySharedPrefixOptional, const aclTensor *valueSharedPrefixOptional,
+    const aclIntArray *actualSharedPrefixLenOptional, const aclTensor *queryRopeOptional,
+    const aclTensor *keyRopeOptional, const aclTensor *keyRopeAntiquantScaleOptional, int64_t numHeads,
+    double scaleValue, int64_t preTokens, int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads,
+    int64_t sparseMode, int64_t innerPrecise, int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag,
+    int64_t keyAntiquantMode, int64_t valueAntiquantMode, const aclTensor *attentionOut, const aclTensor *softmaxLse,
+    uint64_t *workspaceSize, aclOpExecutor **executor)
 {
-    L2_DFX_PHASE_1(aclnnFusedInferAttentionScoreV3,
-                   DFX_IN(query, key, value, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
-                          actualSeqLengthsKvOptional, deqScale1Optional, quantScale1Optional, deqScale2Optional,
-                          quantScale2Optional, quantOffset2Optional, antiquantScaleOptional, antiquantOffsetOptional,
-                          blockTableOptional, queryPaddingSizeOptional, kvPaddingSizeOptional,
-                          keyAntiquantScaleOptional, keyAntiquantOffsetOptional, valueAntiquantScaleOptional,
-                          valueAntiquantOffsetOptional, keySharedPrefixOptional, valueSharedPrefixOptional,
-                          actualSharedPrefixLenOptional, queryRopeOptional, keyRopeOptional,
-                          keyRopeAntiquantScaleOptional, numHeads, scaleValue, preTokens, nextTokens, inputLayout,
-                          numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag,
-                          keyAntiquantMode, valueAntiquantMode),
-                   DFX_OUT(attentionOut, softmaxLse));
+    L2_DFX_PHASE_1(
+        aclnnFusedInferAttentionScoreV3,
+        DFX_IN(query, key, value, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
+               actualSeqLengthsKvOptional, deqScale1Optional, quantScale1Optional, deqScale2Optional,
+               quantScale2Optional, quantOffset2Optional, antiquantScaleOptional, antiquantOffsetOptional,
+               blockTableOptional, queryPaddingSizeOptional, kvPaddingSizeOptional, keyAntiquantScaleOptional,
+               keyAntiquantOffsetOptional, valueAntiquantScaleOptional, valueAntiquantOffsetOptional,
+               keySharedPrefixOptional, valueSharedPrefixOptional, actualSharedPrefixLenOptional, queryRopeOptional,
+               keyRopeOptional, keyRopeAntiquantScaleOptional, numHeads, scaleValue, preTokens, nextTokens, inputLayout,
+               numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag, keyAntiquantMode,
+               valueAntiquantMode),
+        DFX_OUT(attentionOut, softmaxLse));
 
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnFusedInferAttentionScore versions V1 to V4 are no longer supported on Ascend950.");
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "Interface aclnnFusedInferAttentionScore versions V1 to V4 are no longer supported on Ascend950.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;
@@ -219,16 +201,19 @@ aclnnStatus aclnnFusedInferAttentionScoreV3GetWorkspaceSize(
 
     const aclTensor *placeHolder = nullptr;
     const aclTensor *tempTensor = nullptr;
-    FusedInferAttentionScoreProcessSoftmaxLse(softmaxLseFlag, softmaxLse, tempTensor, placeHolder);
+    aclnnStatus ret = FusedInferAttentionScoreProcessSoftmaxLse(softmaxLseFlag, softmaxLse, tempTensor, placeHolder);
+    if (ret != ACLNN_SUCCESS) {
+        return ret;
+    }
 
-    aclnnStatus ret = InnerFusedInferAttentionScoreGetWorkspaceSize(
+    ret = InnerFusedInferAttentionScoreGetWorkspaceSize(
         query, tensorListKey, tensorListValue, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
         actualSeqLengthsKvOptional, deqScale1Optional, quantScale1Optional, deqScale2Optional, quantScale2Optional,
         quantOffset2Optional, antiquantScaleOptional, antiquantOffsetOptional, blockTableOptional,
         queryPaddingSizeOptional, kvPaddingSizeOptional, keyAntiquantScaleOptional, keyAntiquantOffsetOptional,
         valueAntiquantScaleOptional, valueAntiquantOffsetOptional, tensorKeySharedPrefixOptional,
-        tensorValueSharedPrefixOptional, actualSharedPrefixLenOptional, queryRopeOptional,
-        keyRopeOptional, keyRopeAntiquantScaleOptional, nullptr, nullptr, nullptr, nullptr, numHeads, scaleValue, preTokens, nextTokens,
+        tensorValueSharedPrefixOptional, actualSharedPrefixLenOptional, queryRopeOptional, keyRopeOptional,
+        keyRopeAntiquantScaleOptional, nullptr, nullptr, nullptr, nullptr, numHeads, scaleValue, preTokens, nextTokens,
         inputLayout, numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag,
         keyAntiquantMode, valueAntiquantMode, 0, 0, 0, attentionOut, placeHolder, workspaceSize, executor);
     if (softmaxLseFlag == false) {
@@ -241,7 +226,8 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(void *workspace, uint64_t workspaceS
                                             const aclrtStream stream)
 {
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnFusedInferAttentionScore versions V1 to V4 are no longer supported on Ascend950.");
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "Interface aclnnFusedInferAttentionScore versions V1 to V4 are no longer supported on Ascend950.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;
