@@ -181,7 +181,7 @@ public:
     ge::graphStatus CheckTensorShapes() const;
     ge::graphStatus CheckTensorDescriptions() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
-    ge::graphStatus CheckRequiredParaExistence() const;
+    ge::graphStatus CheckQliRequiredParameters() const;
     ge::graphStatus GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor,
                                         const std::string &actualSeqLenName) const;
     ge::graphStatus GetOpName();
@@ -220,7 +220,7 @@ public:
     gert::TilingContext *context_ = nullptr;
     const char *opName_;
     fe::PlatFormInfos *platformInfo_;
-    QLIParaInfo opParamInfo_;
+    QLIParaInfo qliParams_;
 
     // BaseParams
     int64_t bSize_ = 0;
