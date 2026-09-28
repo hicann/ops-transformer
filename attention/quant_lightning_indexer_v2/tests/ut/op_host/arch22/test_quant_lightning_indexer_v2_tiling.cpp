@@ -197,3 +197,207 @@ TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_tiling_data_
     auto &factory = optiling::CTilingDataClassFactory::GetInstance();
     EXPECT_NE(factory.CreateTilingDataInstance("QuantLightningIndexerV2"), nullptr);
 }
+
+namespace {
+// Base of a valid Ascend910B TND/PA_BBND int8 case
+qliv2_ut::CaseParam Make910bTndPaInt8()
+{
+    qliv2_ut::CaseParam p;
+    p.qShape = {78, 64, 128};
+    p.wShape = {78, 64};
+    p.qScaleShape = {78, 64};
+    p.cuSeqQ = {3};
+    p.layoutQ = "TND";
+    p.outShape = {78, 1, 2048};
+    return p;
+}
+} // namespace
+
+// TND/PA_BBND int8 success on Ascend910B: quant_mode=2
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_tnd_pa_success)
+{
+    qliv2_ut::CaseParam p = Make910bTndPaInt8();
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_SUCCESS);
+}
+
+// TND on Ascend910B: cu_seqlens_q is required, missing should fail
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_tnd_cu_seqlens_q_missing_failed)
+{
+    qliv2_ut::CaseParam p = Make910bTndPaInt8();
+    p.cuSeqQ = {};
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// TND on Ascend910B: shape size of cu_seqlens_q should be greater than 1 (B+1), size=1 should fail
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_tnd_cu_seqlens_q_size_one_failed)
+{
+    qliv2_ut::CaseParam p = Make910bTndPaInt8();
+    p.cuSeqQ = {1};
+    p.sequsedK = {0};
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// TND/PA_BBND on Ascend910B: shape size of cu_seqlens_q must equal seqused_k size + 1 (3 vs 2+1 mismatch)
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_tnd_pa_seqused_k_size_mismatch_failed)
+{
+    qliv2_ut::CaseParam p = Make910bTndPaInt8();
+    p.cmpRatio = 4;
+    p.maskMode = 3;
+    p.cmpResidual = {2};
+    p.sequsedK = {3};
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// TND on Ascend910B: dtype of seqused_q only supports int32 when provided (int64 should fail)
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_tnd_seqused_q_dtype_failed)
+{
+    qliv2_ut::CaseParam p = Make910bTndPaInt8();
+    p.sequsedQ = {2};
+    p.sequsedQType = ge::DT_INT64;
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// BSND on Ascend910B: dtype of seqused_q only supports int32 when provided (int64 should fail)
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_bsnd_seqused_q_dtype_failed)
+{
+    qliv2_ut::CaseParam p;
+    p.sequsedQ = {2};
+    p.sequsedQType = ge::DT_INT64;
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// TND on Ascend910B: shape size of cmp_residual_k must equal cu_seqlens_q size - 1 (mismatch should fail)
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_tnd_cmp_residual_size_failed)
+{
+    qliv2_ut::CaseParam p = Make910bTndPaInt8();
+    p.cmpRatio = 4;
+    p.maskMode = 3;
+    p.cmpResidual = {3};
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// TND on Ascend910B: dim 0 of q, w and sparse_indices must be same (w T=40 should fail)
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_tnd_w_t_mismatch_failed)
+{
+    qliv2_ut::CaseParam p = Make910bTndPaInt8();
+    p.wShape = {40, 64};
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// dtype of q and k must be same and int8 on Ascend910B (e5m2 vs int8 should fail and hit unknown-dtype logging)
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_q_dtype_e5m2_failed)
+{
+    qliv2_ut::CaseParam p;
+    p.qType = ge::DT_FLOAT8_E5M2;
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// PA_BBND on Ascend910B: key stride0 must be positive (0 should fail)
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_pa_k_stride0_zero_failed)
+{
+    struct QLIV2CompileInfo {
+    } compileInfo;
+    std::vector<gert::TilingContextPara::TensorDescription> inputs = {
+        qliv2_ut::Desc({2, 39, 64, 128}, ge::DT_INT8), // q              input0
+        qliv2_ut::Desc({2, 16, 1, 128}, ge::DT_INT8),  // k              input1
+        qliv2_ut::Desc({2, 39, 64}, ge::DT_FLOAT16),   // w              input2
+        qliv2_ut::Desc({2, 39, 64}, ge::DT_FLOAT16),   // q_descale      input3
+        qliv2_ut::Desc({2, 16, 1}, ge::DT_FLOAT16),    // k_descale      input4
+        qliv2_ut::Desc({}, ge::DT_INT32),              // cu_seqlens_q   input5
+        qliv2_ut::Desc({}, ge::DT_INT32),              // cu_seqlens_k   input6
+        qliv2_ut::Desc({}, ge::DT_INT32),              // seqused_q      input7
+        qliv2_ut::Desc({2}, ge::DT_INT32),             // seqused_k      input8
+        qliv2_ut::Desc({}, ge::DT_INT32),              // cmp_residual_k input9
+        qliv2_ut::Desc({2, 2}, ge::DT_INT32),          // block_table    input10
+        qliv2_ut::Desc({}, ge::DT_INT32),              // output_idx_offset input11
+        qliv2_ut::Desc({1024}, ge::DT_INT32)           // metadata       input12
+    };
+    inputs[1].stride_ = gert::Stride({0, 128, 128, 1});
+    inputs[1].hasStride_ = true;
+    gert::TilingContextPara para("QuantLightningIndexerV2", inputs,
+                                 {qliv2_ut::Desc({2, 39, 1, 2048}, ge::DT_INT32), qliv2_ut::Desc({0}, ge::DT_BF16)},
+                                 {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+                                  {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                  {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+                                  {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+                                  {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BBND")},
+                                  {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                  {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+                                 &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, qliv2_ut::SKIP_TILING_KEY);
+}
+
+// PA_BBND success on Ascend910B with contiguous k and k_descale strides: covers stride parsing path
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_pa_k_kdescale_stride_success)
+{
+    struct QLIV2CompileInfo {
+    } compileInfo;
+    std::vector<gert::TilingContextPara::TensorDescription> inputs = {
+        qliv2_ut::Desc({2, 39, 64, 128}, ge::DT_INT8), // q              input0
+        qliv2_ut::Desc({2, 16, 1, 128}, ge::DT_INT8),  // k              input1
+        qliv2_ut::Desc({2, 39, 64}, ge::DT_FLOAT16),   // w              input2
+        qliv2_ut::Desc({2, 39, 64}, ge::DT_FLOAT16),   // q_descale      input3
+        qliv2_ut::Desc({2, 16, 1}, ge::DT_FLOAT16),    // k_descale      input4
+        qliv2_ut::Desc({}, ge::DT_INT32),              // cu_seqlens_q   input5
+        qliv2_ut::Desc({}, ge::DT_INT32),              // cu_seqlens_k   input6
+        qliv2_ut::Desc({}, ge::DT_INT32),              // seqused_q      input7
+        qliv2_ut::Desc({2}, ge::DT_INT32),             // seqused_k      input8
+        qliv2_ut::Desc({}, ge::DT_INT32),              // cmp_residual_k input9
+        qliv2_ut::Desc({2, 2}, ge::DT_INT32),          // block_table    input10
+        qliv2_ut::Desc({}, ge::DT_INT32),              // output_idx_offset input11
+        qliv2_ut::Desc({1024}, ge::DT_INT32)           // metadata       input12
+    };
+    inputs[1].stride_ = gert::Stride({2048, 128, 128, 1});
+    inputs[1].hasStride_ = true;
+    inputs[4].stride_ = gert::Stride({16, 1, 1});
+    inputs[4].hasStride_ = true;
+    gert::TilingContextPara para("QuantLightningIndexerV2", inputs,
+                                 {qliv2_ut::Desc({2, 39, 1, 2048}, ge::DT_INT32), qliv2_ut::Desc({0}, ge::DT_BF16)},
+                                 {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+                                  {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                  {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+                                  {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+                                  {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BBND")},
+                                  {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                  {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+                                 &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, qliv2_ut::SKIP_TILING_KEY);
+}
+
+// PA_BBND on Ascend910B: k only supports non-continuous keying on the 0-axis (axis 1 mismatch should fail)
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_pa_k_noncontiguous_stride_failed)
+{
+    struct QLIV2CompileInfo {
+    } compileInfo;
+    std::vector<gert::TilingContextPara::TensorDescription> inputs = {
+        qliv2_ut::Desc({2, 39, 64, 128}, ge::DT_INT8), // q              input0
+        qliv2_ut::Desc({2, 16, 1, 128}, ge::DT_INT8),  // k              input1
+        qliv2_ut::Desc({2, 39, 64}, ge::DT_FLOAT16),   // w              input2
+        qliv2_ut::Desc({2, 39, 64}, ge::DT_FLOAT16),   // q_descale      input3
+        qliv2_ut::Desc({2, 16, 1}, ge::DT_FLOAT16),    // k_descale      input4
+        qliv2_ut::Desc({}, ge::DT_INT32),              // cu_seqlens_q   input5
+        qliv2_ut::Desc({}, ge::DT_INT32),              // cu_seqlens_k   input6
+        qliv2_ut::Desc({}, ge::DT_INT32),              // seqused_q      input7
+        qliv2_ut::Desc({2}, ge::DT_INT32),             // seqused_k      input8
+        qliv2_ut::Desc({}, ge::DT_INT32),              // cmp_residual_k input9
+        qliv2_ut::Desc({2, 2}, ge::DT_INT32),          // block_table    input10
+        qliv2_ut::Desc({}, ge::DT_INT32),              // output_idx_offset input11
+        qliv2_ut::Desc({1024}, ge::DT_INT32)           // metadata       input12
+    };
+    inputs[1].stride_ = gert::Stride({2048, 256, 128, 1});
+    inputs[1].hasStride_ = true;
+    gert::TilingContextPara para("QuantLightningIndexerV2", inputs,
+                                 {qliv2_ut::Desc({2, 39, 1, 2048}, ge::DT_INT32), qliv2_ut::Desc({0}, ge::DT_BF16)},
+                                 {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+                                  {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                  {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+                                  {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+                                  {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BBND")},
+                                  {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                  {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                  {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+                                 &compileInfo, "Ascend910B", 64, 262144, 16384);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, qliv2_ut::SKIP_TILING_KEY);
+}

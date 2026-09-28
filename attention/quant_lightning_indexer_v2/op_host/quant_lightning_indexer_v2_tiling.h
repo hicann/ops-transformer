@@ -204,7 +204,7 @@ public:
 
     ge::graphStatus CheckRequiredInOutExistence() const;
     ge::graphStatus CheckRequiredAttrExistence() const;
-    ge::graphStatus CheckRequiredParaExistence() const;
+    ge::graphStatus CheckQliv2RequiredParameters() const;
     ge::graphStatus GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor,
                                         const std::string &actualSeqLenName) const;
     ge::graphStatus GetOpName();
@@ -241,7 +241,7 @@ public:
     gert::TilingContext *context_ = nullptr;
     const char *opName_;
     fe::PlatFormInfos *platformInfo_;
-    QLIV2ParaInfo opParamInfo_;
+    QLIV2ParaInfo qliV2Params_;
 
     // BaseParams
     int64_t bSize_ = 0;

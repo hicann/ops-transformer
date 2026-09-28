@@ -907,3 +907,1072 @@ INSTANTIATE_TEST_SUITE_P(
         ShapeCase{"TND_cu_seqlens_k_rank2", "TND", CU_SEQLENS_K_INPUT, {TEST_SINGLETON_DIM, TEST_CU_SEQLENS_SIZE}},
         ShapeCase{"BSND_cu_seqlens_k_forbidden", "BSND", CU_SEQLENS_K_INPUT, {TEST_CU_SEQLENS_SIZE}}),
     [](const testing::TestParamInfo<ShapeCase> &info) { return info.param.name; });
+
+// Ascend950 PA_BBND: seqused_k must be provided when layout_k is PA_BBND (missing should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_seqused_k_missing_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 16, 1, 128}, {2, 16, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6 (null)
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BBND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 PA_BBND: block_num (k dim 0) must be greater than 0 (0 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_block_num_zero_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    int64_t sequsedKData[] = {16, 16};
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{0, 16, 1, 128}, {0, 16, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1 (0 blocks)
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, sequsedKData},         // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BBND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 PA_BBND: only axis 0 of k may be non-contiguous (axis 1 stride mismatch should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_k_noncontiguous_stride_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    int64_t sequsedKData[] = {16, 16};
+    std::vector<gert::TilingContextPara::TensorDescription> inputs = {
+        {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+        {{{2, 16, 1, 128}, {2, 16, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+        {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+        {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, sequsedKData},         // seqused_k    input6
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+        {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+        {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+    };
+    inputs[1].stride_ = gert::Stride({2048, 129, 128, 1});
+    inputs[1].hasStride_ = true;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2", inputs,
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BBND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 PA_BBND success with contiguous k stride provided: covers stride propagation into tiling info
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_k_contiguous_stride_success)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    int64_t sequsedKData[] = {16, 16};
+    std::vector<gert::TilingContextPara::TensorDescription> inputs = {
+        {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+        {{{2, 16, 1, 128}, {2, 16, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+        {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+        {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, sequsedKData},         // seqused_k    input6
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+        {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+        {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+    };
+    inputs[1].stride_ = gert::Stride({2048, 128, 128, 1});
+    inputs[1].hasStride_ = true;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2", inputs,
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BBND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, SKIP_TILING_KEY);
+}
+
+// Ascend950 PA_BBND: dim 0 of block_table must equal the query batch size (3 vs 2 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_block_table_batch_mismatch_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    int64_t sequsedKData[] = {16, 16};
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 16, 1, 128}, {2, 16, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, sequsedKData},         // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{3, 4}, {3, 4}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8 (B=3)
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BBND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: mask_mode only supports 0 or 3 (2 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_mask_mode_invalid_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 BSND: q sequence length must fit in uint32_t (negative S1 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_q_seq_negative_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, -1, 64, 128}, {2, -1, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0 (S1=-1)
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 BSND: stride 0 of k must fit in uint32_t (negative stride should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_k_stride0_negative_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    std::vector<gert::TilingContextPara::TensorDescription> inputs = {
+        {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+        {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+        {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+        {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+        {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+    };
+    inputs[1].stride_ = gert::Stride({-1, 128, 128, 1});
+    inputs[1].hasStride_ = true;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2", inputs,
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 BSND: last dim of q and k must be equal (k D=64 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_k_head_dim_mismatch_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 64}, {2, 64, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},     // k            input1 (D=64)
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 BSND: sparse_indices must be [B,S1,N2,topk] (S1=38 vs q S1=39 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_out_seq_mismatch_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 38, 1, 2048}, {2, 38, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices (S1=38)
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 TND: shape size of cu_seqlens_q must be greater than 1 (size=1 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_cu_seqlens_q_size_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    int64_t cuSeqlensQData[] = {0};
+    int64_t cuSeqlensKData[] = {0, 64, 128};
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{78, 64, 128}, {78, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // k            input1
+            {{{78, 64}, {78, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqlensQData}, // cu_seqlens_q input3
+            {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqlensKData}, // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+        },
+        {
+            {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                      // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 TND/TND: cu_seqlens_q and cu_seqlens_k must have the same size (3 vs 2 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_tnd_cu_seqlens_size_mismatch_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    int64_t cuSeqlensQData[] = {0, 39, 78};
+    int64_t cuSeqlensKData[] = {0, 64};
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{78, 64, 128}, {78, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{64, 1, 128}, {64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{78, 64}, {78, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqlensQData}, // cu_seqlens_q input3
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqlensKData}, // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+        },
+        {
+            {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                      // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: dtype of q and k must be float16 or bfloat16 (hifloat8 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_q_dtype_hifloat8_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_HIFLOAT8, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_HIFLOAT8, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},              // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                                // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                         // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: dtype of q and k must be same (fp16 vs bf16 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_q_k_dtype_mismatch_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0 (fp16)
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},      // k            input1 (bf16)
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: required tensor q must be provided (absent should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_required_q_absent_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},                           // q            input0 (absent)
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},           // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                             // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                      // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: sparse_values must be provided when return_value is 1 (absent should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_return_value_without_values_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}                              // sparse_values (absent)
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: required tensor w must be provided (absent should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_required_w_absent_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                               // w            input2 (absent)
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: layout_k only supports BSND, TND or PA_BBND (unknown layout should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_layout_k_invalid_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("XX")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: layout_q and layout_k must be equal outside PagedAttention (BSND vs TND should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_layout_mismatch_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},       // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: topk must be in [1, 8192] (0 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_topk_invalid_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: cmp_ratio must be in [1, 128] (0 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_cmp_ratio_invalid_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: max_seqlen_q must be >= -1 (-2 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_max_seqlen_q_below_min_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-2)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: head count of k must be 1 (N2=2 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_k_heads_invalid_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 2, 128}, {2, 64, 2, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1 (N2=2)
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 BSND: batch dims of q and k must be equal (k B=3 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_bsnd_k_batch_mismatch_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{3, 64, 1, 128}, {3, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1 (B=3)
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 TND: sparse_values must match T1, N2 and topk when return_value is 1 (T1 mismatch should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_values_t_mismatch_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    int64_t cuSeqlensQData[] = {0, 39, 78};
+    int64_t cuSeqlensKData[] = {0, 64, 128};
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{78, 64, 128}, {78, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // k            input1
+            {{{78, 64}, {78, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqlensQData}, // cu_seqlens_q input3
+            {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqlensKData}, // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+        },
+        {
+            {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{2, 1, 2048}, {2, 1, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND}    // sparse_values (T1=2)
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 BSND: output_idx_offset must be [B,S1,N2] (N2=2 should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_idx_offset_shape_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{2, 39, 2}, {2, 39, 2}}, ge::DT_INT32, ge::FORMAT_ND},               // output_idx_offset input9 (N2=2)
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 BSND: block_table must not be provided when layout_k is not PA_BBND (present should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_bsnd_block_table_present_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8 (not PA)
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 TND: cu_seqlens_k must be provided when layout_k is TND (missing should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_tnd_cu_seqlens_k_missing_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    int64_t cuSeqlensQData[] = {0, 39, 78};
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{78, 64, 128}, {78, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // k            input1
+            {{{78, 64}, {78, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{3}, {3}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqlensQData}, // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cu_seqlens_k input4 (null)
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                         // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                  // metadata     input10
+        },
+        {
+            {{{78, 1, 2048}, {78, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                      // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950 PA_BBND: cu_seqlens_k must not be provided when layout_k is PA_BBND (present should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_pa_cu_seqlens_k_present_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    int64_t cuSeqlensKData[] = {0, 16};
+    int64_t sequsedKData[] = {16, 16};
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 16, 1, 128}, {2, 16, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, cuSeqlensKData},       // cu_seqlens_k input4 (present)
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND, true, sequsedKData},         // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND},                       // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BBND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+// Ascend950: layout_q only supports BSND or TND (unknown layout should fail)
+TEST_F(LightningIndexerV2TilingArch35, LightningIndexerV2_950_tiling_layout_q_invalid_failed)
+{
+    struct LIV2CompileInfo {
+    } compileInfo;
+    gert::TilingContextPara tilingContextPara(
+        "LightningIndexerV2",
+        {
+            {{{2, 39, 64, 128}, {2, 39, 64, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // q            input0
+            {{{2, 64, 1, 128}, {2, 64, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},   // k            input1
+            {{{2, 39, 64}, {2, 39, 64}}, ge::DT_FLOAT, ge::FORMAT_ND},             // w            input2
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_q input3
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cu_seqlens_k input4
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_q    input5
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // seqused_k    input6
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // cmp_residual_k input7
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // block_table  input8
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                               // output_idx_offset input9
+            {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND}                        // metadata     input10
+        },
+        {
+            {{{2, 39, 1, 2048}, {2, 39, 1, 2048}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
+            {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND}                            // sparse_values
+        },
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("XX")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo, "Ascend950", 56, 262144, 16384);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}

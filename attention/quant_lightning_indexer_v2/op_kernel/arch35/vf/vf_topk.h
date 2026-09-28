@@ -22,265 +22,267 @@ namespace topkb32 {
 using liV2TopkCommon::StoreHistogramResult;
 
 template <typename T>
-__simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t *qliV2HistogramsBuf, __ubuf__ uint32_t *qliV2InputBuf,
-                                       uint16_t qliV2VfLoop, bool qliV2Init)
+__simd_vf__ void HistogramsFirstVFImpl(__ubuf__ uint32_t *qliV2HistogramOutput, __ubuf__ uint32_t *qliV2HistogramInput,
+                                       uint16_t qliV2LoopCount, bool qliV2Init)
 {
-    Reg::MaskReg qliV2PregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg qliV2PregB16 = Reg::CreateMask<uint16_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg qliV2PregB8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB16 = Reg::CreateMask<uint16_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
 
     // 计算直方图cout0 0-127 cout1 128-255
-    Reg::RegTensor<uint16_t> qliV2Cout0;
-    Reg::RegTensor<uint16_t> qliV2Cout1;
-    Reg::Duplicate(qliV2Cout0, 0);
-    Reg::Duplicate(qliV2Cout1, 0);
+    Reg::RegTensor<uint16_t> qliV2Histogram0;
+    Reg::RegTensor<uint16_t> qliV2Histogram1;
+    Reg::Duplicate(qliV2Histogram0, 0);
+    Reg::Duplicate(qliV2Histogram1, 0);
 
-    Reg::RegTensor<uint8_t> qliV2Vreg0;
-    Reg::RegTensor<uint8_t> qliV2Vreg1;
-    Reg::RegTensor<uint8_t> qliV2Vreg2;
-    Reg::RegTensor<uint8_t> qliV2Vreg3;
+    Reg::RegTensor<uint8_t> qliV2ByteReg0;
+    Reg::RegTensor<uint8_t> qliV2ByteReg1;
+    Reg::RegTensor<uint8_t> qliV2ByteReg2;
+    Reg::RegTensor<uint8_t> qliV2ByteReg3;
 
     // 32bit 高16bit
-    Reg::RegTensor<uint32_t> qliV2Vreg0U16;
+    Reg::RegTensor<uint32_t> qliV2PackedReg0;
     // 32bit 低16bit
-    Reg::RegTensor<uint32_t> qliV2Vreg1U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg2U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg3U16;
+    Reg::RegTensor<uint32_t> qliV2PackedReg1;
+    Reg::RegTensor<uint32_t> qliV2PackedReg2;
+    Reg::RegTensor<uint32_t> qliV2PackedReg3;
 
-    for (uint16_t qliV2I = 0; qliV2I < qliV2VfLoop; ++qliV2I) {
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2Vreg1U16, qliV2Vreg0U16,
-                                                                 qliV2InputBuf + qliV2I * 256);
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2Vreg3U16, qliV2Vreg2U16,
-                                                                 qliV2InputBuf + (qliV2I * 256) + 128);
+    for (uint16_t qliV2LoopIndex = 0; qliV2LoopIndex < qliV2LoopCount; ++qliV2LoopIndex) {
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2PackedReg1, qliV2PackedReg0,
+                                                                 qliV2HistogramInput + qliV2LoopIndex * 256);
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2PackedReg3, qliV2PackedReg2,
+                                                                 qliV2HistogramInput + (qliV2LoopIndex * 256) + 128);
 
-        Reg::DeInterleave(qliV2Vreg1, qliV2Vreg0, (Reg::RegTensor<uint8_t> &)qliV2Vreg0U16,
-                          (Reg::RegTensor<uint8_t> &)qliV2Vreg2U16);
+        Reg::DeInterleave(qliV2ByteReg1, qliV2ByteReg0, (Reg::RegTensor<uint8_t> &)qliV2PackedReg0,
+                          (Reg::RegTensor<uint8_t> &)qliV2PackedReg2);
 
         Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN0, Reg::HistogramsType::ACCUMULATE>(
-            qliV2Cout0, qliV2Vreg0, qliV2PregB8);
+            qliV2Histogram0, qliV2ByteReg0, qliV2MaskB8);
         Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN1, Reg::HistogramsType::ACCUMULATE>(
-            qliV2Cout1, qliV2Vreg0, qliV2PregB8);
+            qliV2Histogram1, qliV2ByteReg0, qliV2MaskB8);
     }
 
-    StoreHistogramResult(qliV2HistogramsBuf, qliV2Cout0, qliV2Cout1, qliV2PregB16, qliV2PregB32);
+    StoreHistogramResult(qliV2HistogramOutput, qliV2Histogram0, qliV2Histogram1, qliV2MaskB16, qliV2MaskB32);
 }
 
-__simd_vf__ void FindFirstTargetBinVFImpl(__ubuf__ uint32_t *qliV2Idx0Buf, __ubuf__ uint32_t *qliV2NkValueBuf,
-                                          __ubuf__ uint32_t *qliV2HistogramsBuf, uint32_t qliV2BottomK)
+__simd_vf__ void FindFirstTargetBinVFImpl(__ubuf__ uint32_t *qliV2Index0Buffer, __ubuf__ uint32_t *qliV2NkValueBuf,
+                                          __ubuf__ uint32_t *qliV2HistogramOutput, uint32_t qliV2BottomK)
 {
-    Reg::MaskReg qliV2PregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
 
-    Reg::RegTensor<uint32_t> qliV2BtmK;
-    Reg::Duplicate(qliV2BtmK, qliV2BottomK);
+    Reg::RegTensor<uint32_t> qliV2BottomKReg;
+    Reg::Duplicate(qliV2BottomKReg, qliV2BottomK);
 
     Reg::ClearSpr<AscendC::SpecialPurposeReg::AR>();
-    liV2TopkCommon::FindTargetBinAndUpdateNextK(qliV2Idx0Buf, qliV2NkValueBuf, qliV2HistogramsBuf, qliV2BtmK,
-                                                qliV2PregB32);
+    liV2TopkCommon::FindTargetBinAndUpdateNextK(qliV2Index0Buffer, qliV2NkValueBuf, qliV2HistogramOutput,
+                                                qliV2BottomKReg, qliV2MaskB32);
 }
 
 template <typename T>
-__simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t *qliV2HistogramsBuf, __ubuf__ uint32_t *qliV2InputBuf,
-                                        __ubuf__ uint32_t *qliV2Idx0Buf, uint16_t qliV2VfLoop, bool qliV2Init)
+__simd_vf__ void HistogramsSecondVFImpl(__ubuf__ uint32_t *qliV2HistogramOutput, __ubuf__ uint32_t *qliV2HistogramInput,
+                                        __ubuf__ uint32_t *qliV2Index0Buffer, uint16_t qliV2LoopCount, bool qliV2Init)
 {
-    Reg::MaskReg qliV2PregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg qliV2PregB16 = Reg::CreateMask<uint16_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg qliV2PregB8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB16 = Reg::CreateMask<uint16_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
 
     // 计算直方图0-127 128-255
-    Reg::RegTensor<uint16_t> qliV2Cout0;
-    Reg::RegTensor<uint16_t> qliV2Cout1;
-    Reg::Duplicate(qliV2Cout0, 0);
-    Reg::Duplicate(qliV2Cout1, 0);
+    Reg::RegTensor<uint16_t> qliV2Histogram0;
+    Reg::RegTensor<uint16_t> qliV2Histogram1;
+    Reg::Duplicate(qliV2Histogram0, 0);
+    Reg::Duplicate(qliV2Histogram1, 0);
 
-    Reg::RegTensor<uint32_t> qliV2Idx0;
+    Reg::RegTensor<uint32_t> qliV2Index0;
     // 0x000000fc -> 0xfcfcfcfc
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Idx0, qliV2Idx0Buf);
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Index0, qliV2Index0Buffer);
 
-    Reg::RegTensor<uint32_t> qliV2Vreg0U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg1U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg2U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg3U16;
+    Reg::RegTensor<uint32_t> qliV2PackedReg0;
+    Reg::RegTensor<uint32_t> qliV2PackedReg1;
+    Reg::RegTensor<uint32_t> qliV2PackedReg2;
+    Reg::RegTensor<uint32_t> qliV2PackedReg3;
 
-    Reg::RegTensor<uint8_t> qliV2Vreg0;
-    Reg::RegTensor<uint8_t> qliV2Vreg1;
-    Reg::RegTensor<uint8_t> qliV2Vreg2;
-    Reg::RegTensor<uint8_t> qliV2Vreg3;
+    Reg::RegTensor<uint8_t> qliV2ByteReg0;
+    Reg::RegTensor<uint8_t> qliV2ByteReg1;
+    Reg::RegTensor<uint8_t> qliV2ByteReg2;
+    Reg::RegTensor<uint8_t> qliV2ByteReg3;
 
-    for (uint16_t qliV2I = 0; qliV2I < qliV2VfLoop; ++qliV2I) {
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2Vreg1U16, qliV2Vreg0U16,
-                                                                 qliV2InputBuf + qliV2I * 256);
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2Vreg3U16, qliV2Vreg2U16,
-                                                                 qliV2InputBuf + (qliV2I * 256) + 128);
+    for (uint16_t qliV2LoopIndex = 0; qliV2LoopIndex < qliV2LoopCount; ++qliV2LoopIndex) {
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2PackedReg1, qliV2PackedReg0,
+                                                                 qliV2HistogramInput + qliV2LoopIndex * 256);
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2PackedReg3, qliV2PackedReg2,
+                                                                 qliV2HistogramInput + (qliV2LoopIndex * 256) + 128);
 
-        Reg::DeInterleave(qliV2Vreg1, qliV2Vreg0, (Reg::RegTensor<uint8_t> &)qliV2Vreg0U16,
-                          (Reg::RegTensor<uint8_t> &)qliV2Vreg2U16);
+        Reg::DeInterleave(qliV2ByteReg1, qliV2ByteReg0, (Reg::RegTensor<uint8_t> &)qliV2PackedReg0,
+                          (Reg::RegTensor<uint8_t> &)qliV2PackedReg2);
 
         Reg::MaskReg pregEQ = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
-        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ, qliV2Vreg0, (Reg::RegTensor<uint8_t> &)qliV2Idx0, qliV2PregB8);
+        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ, qliV2ByteReg0, (Reg::RegTensor<uint8_t> &)qliV2Index0, qliV2MaskB8);
 
         Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN0, Reg::HistogramsType::ACCUMULATE>(
-            qliV2Cout0, qliV2Vreg1, pregEQ);
+            qliV2Histogram0, qliV2ByteReg1, pregEQ);
         Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN1, Reg::HistogramsType::ACCUMULATE>(
-            qliV2Cout1, qliV2Vreg1, pregEQ);
+            qliV2Histogram1, qliV2ByteReg1, pregEQ);
     }
 
-    StoreHistogramResult(qliV2HistogramsBuf, qliV2Cout0, qliV2Cout1, qliV2PregB16, qliV2PregB32);
+    StoreHistogramResult(qliV2HistogramOutput, qliV2Histogram0, qliV2Histogram1, qliV2MaskB16, qliV2MaskB32);
 }
 
 // kValue新的bottomK
-__simd_vf__ void FindSecondTargetBinVFImpl(__ubuf__ uint32_t *qliV2Idx1Buf, __ubuf__ uint32_t *qliV2NkValueBuf,
-                                           __ubuf__ uint32_t *kValue, __ubuf__ uint32_t *qliV2HistogramsBuf)
+__simd_vf__ void FindSecondTargetBinVFImpl(__ubuf__ uint32_t *qliV2Index1Buffer, __ubuf__ uint32_t *qliV2NkValueBuf,
+                                           __ubuf__ uint32_t *kValue, __ubuf__ uint32_t *qliV2HistogramOutput)
 {
-    Reg::MaskReg qliV2PregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
 
     Reg::RegTensor<uint32_t> btmK1;
     Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(btmK1, kValue);
 
     Reg::ClearSpr<AscendC::SpecialPurposeReg::AR>();
-    liV2TopkCommon::FindTargetBinAndUpdateNextK(qliV2Idx1Buf, qliV2NkValueBuf, qliV2HistogramsBuf, btmK1, qliV2PregB32);
+    liV2TopkCommon::FindTargetBinAndUpdateNextK(qliV2Index1Buffer, qliV2NkValueBuf, qliV2HistogramOutput, btmK1,
+                                                qliV2MaskB32);
 }
 
 template <typename T>
-__simd_vf__ void HistogramsThirdVFImpl(__ubuf__ uint32_t *qliV2HistogramsBuf, __ubuf__ uint32_t *qliV2InputBuf,
-                                       __ubuf__ uint32_t *qliV2Idx0Buf, __ubuf__ uint32_t *qliV2Idx1Buf,
-                                       uint16_t qliV2VfLoop, bool qliV2Init)
+__simd_vf__ void HistogramsThirdVFImpl(__ubuf__ uint32_t *qliV2HistogramOutput, __ubuf__ uint32_t *qliV2HistogramInput,
+                                       __ubuf__ uint32_t *qliV2Index0Buffer, __ubuf__ uint32_t *qliV2Index1Buffer,
+                                       uint16_t qliV2LoopCount, bool qliV2Init)
 {
-    Reg::MaskReg qliV2PregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg qliV2PregB16 = Reg::CreateMask<uint16_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg qliV2PregB8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB16 = Reg::CreateMask<uint16_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
 
     // 计算直方图0-127 128-255
-    Reg::RegTensor<uint16_t> qliV2Cout0;
-    Reg::RegTensor<uint16_t> qliV2Cout1;
-    Reg::Duplicate(qliV2Cout0, 0);
-    Reg::Duplicate(qliV2Cout1, 0);
+    Reg::RegTensor<uint16_t> qliV2Histogram0;
+    Reg::RegTensor<uint16_t> qliV2Histogram1;
+    Reg::Duplicate(qliV2Histogram0, 0);
+    Reg::Duplicate(qliV2Histogram1, 0);
 
-    Reg::RegTensor<uint32_t> qliV2Idx0;
-    Reg::RegTensor<uint32_t> qliV2Idx1;
+    Reg::RegTensor<uint32_t> qliV2Index0;
+    Reg::RegTensor<uint32_t> qliV2Index1;
     // 0x000000fc -> 0xfcfcfcfc
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Idx0, qliV2Idx0Buf);
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Idx1, qliV2Idx1Buf);
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Index0, qliV2Index0Buffer);
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Index1, qliV2Index1Buffer);
 
-    Reg::RegTensor<uint8_t> qliV2Vreg0;
-    Reg::RegTensor<uint8_t> qliV2Vreg1;
-    Reg::RegTensor<uint8_t> qliV2Vreg2;
-    Reg::RegTensor<uint8_t> qliV2Vreg3;
+    Reg::RegTensor<uint8_t> qliV2ByteReg0;
+    Reg::RegTensor<uint8_t> qliV2ByteReg1;
+    Reg::RegTensor<uint8_t> qliV2ByteReg2;
+    Reg::RegTensor<uint8_t> qliV2ByteReg3;
 
-    Reg::RegTensor<uint32_t> qliV2Vreg0U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg1U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg2U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg3U16;
+    Reg::RegTensor<uint32_t> qliV2PackedReg0;
+    Reg::RegTensor<uint32_t> qliV2PackedReg1;
+    Reg::RegTensor<uint32_t> qliV2PackedReg2;
+    Reg::RegTensor<uint32_t> qliV2PackedReg3;
 
-    for (uint16_t qliV2I = 0; qliV2I < qliV2VfLoop; ++qliV2I) {
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2Vreg1U16, qliV2Vreg0U16,
-                                                                 qliV2InputBuf + qliV2I * 256);
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2Vreg3U16, qliV2Vreg2U16,
-                                                                 qliV2InputBuf + (qliV2I * 256) + 128);
+    for (uint16_t qliV2LoopIndex = 0; qliV2LoopIndex < qliV2LoopCount; ++qliV2LoopIndex) {
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2PackedReg1, qliV2PackedReg0,
+                                                                 qliV2HistogramInput + qliV2LoopIndex * 256);
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2PackedReg3, qliV2PackedReg2,
+                                                                 qliV2HistogramInput + (qliV2LoopIndex * 256) + 128);
 
-        Reg::DeInterleave(qliV2Vreg1, qliV2Vreg0, (Reg::RegTensor<uint8_t> &)qliV2Vreg0U16,
-                          (Reg::RegTensor<uint8_t> &)qliV2Vreg2U16);
-        Reg::DeInterleave(qliV2Vreg3, qliV2Vreg2, (Reg::RegTensor<uint8_t> &)qliV2Vreg1U16,
-                          (Reg::RegTensor<uint8_t> &)qliV2Vreg3U16);
+        Reg::DeInterleave(qliV2ByteReg1, qliV2ByteReg0, (Reg::RegTensor<uint8_t> &)qliV2PackedReg0,
+                          (Reg::RegTensor<uint8_t> &)qliV2PackedReg2);
+        Reg::DeInterleave(qliV2ByteReg3, qliV2ByteReg2, (Reg::RegTensor<uint8_t> &)qliV2PackedReg1,
+                          (Reg::RegTensor<uint8_t> &)qliV2PackedReg3);
 
         Reg::MaskReg pregEQ0 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
         Reg::MaskReg pregEQ1 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
-        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ0, qliV2Vreg0, (Reg::RegTensor<uint8_t> &)qliV2Idx0, qliV2PregB8);
-        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ1, qliV2Vreg1, (Reg::RegTensor<uint8_t> &)qliV2Idx1, qliV2PregB8);
+        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ0, qliV2ByteReg0, (Reg::RegTensor<uint8_t> &)qliV2Index0, qliV2MaskB8);
+        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ1, qliV2ByteReg1, (Reg::RegTensor<uint8_t> &)qliV2Index1, qliV2MaskB8);
 
         Reg::MaskReg pregEQ = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
-        Reg::And(pregEQ, pregEQ0, pregEQ1, qliV2PregB8);
+        Reg::And(pregEQ, pregEQ0, pregEQ1, qliV2MaskB8);
 
         Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN0, Reg::HistogramsType::ACCUMULATE>(
-            qliV2Cout0, qliV2Vreg2, pregEQ);
+            qliV2Histogram0, qliV2ByteReg2, pregEQ);
         Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN1, Reg::HistogramsType::ACCUMULATE>(
-            qliV2Cout1, qliV2Vreg2, pregEQ);
+            qliV2Histogram1, qliV2ByteReg2, pregEQ);
     }
 
-    StoreHistogramResult(qliV2HistogramsBuf, qliV2Cout0, qliV2Cout1, qliV2PregB16, qliV2PregB32);
+    StoreHistogramResult(qliV2HistogramOutput, qliV2Histogram0, qliV2Histogram1, qliV2MaskB16, qliV2MaskB32);
 }
 
 __simd_vf__ void FindThirdTargetBinVFImpl(__ubuf__ uint32_t *qliV2Idx2Buf, __ubuf__ uint32_t *qliV2NkValueBuf,
-                                          __ubuf__ uint32_t *kValue, __ubuf__ uint32_t *qliV2HistogramsBuf)
+                                          __ubuf__ uint32_t *kValue, __ubuf__ uint32_t *qliV2HistogramOutput)
 {
-    Reg::MaskReg qliV2PregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
 
     Reg::RegTensor<uint32_t> btmK2;
     Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(btmK2, kValue);
 
     Reg::ClearSpr<AscendC::SpecialPurposeReg::AR>();
-    liV2TopkCommon::FindTargetBinAndUpdateNextK(qliV2Idx2Buf, qliV2NkValueBuf, qliV2HistogramsBuf, btmK2, qliV2PregB32);
+    liV2TopkCommon::FindTargetBinAndUpdateNextK(qliV2Idx2Buf, qliV2NkValueBuf, qliV2HistogramOutput, btmK2,
+                                                qliV2MaskB32);
 }
 
 template <typename T>
-__simd_vf__ void HistogramsLastVFImpl(__ubuf__ uint32_t *qliV2HistogramsBuf, __ubuf__ uint32_t *qliV2InputBuf,
-                                      __ubuf__ uint32_t *qliV2Idx0Buf, __ubuf__ uint32_t *qliV2Idx1Buf,
-                                      __ubuf__ uint32_t *qliV2Idx2Buf, uint16_t qliV2VfLoop, bool qliV2Init)
+__simd_vf__ void HistogramsLastVFImpl(__ubuf__ uint32_t *qliV2HistogramOutput, __ubuf__ uint32_t *qliV2HistogramInput,
+                                      __ubuf__ uint32_t *qliV2Index0Buffer, __ubuf__ uint32_t *qliV2Index1Buffer,
+                                      __ubuf__ uint32_t *qliV2Idx2Buf, uint16_t qliV2LoopCount, bool qliV2Init)
 {
-    Reg::MaskReg qliV2PregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg qliV2PregB16 = Reg::CreateMask<uint16_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg qliV2PregB8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB16 = Reg::CreateMask<uint16_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB8 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
 
-    Reg::RegTensor<uint32_t> qliV2Idx0;
-    Reg::RegTensor<uint32_t> qliV2Idx1;
+    Reg::RegTensor<uint32_t> qliV2Index0;
+    Reg::RegTensor<uint32_t> qliV2Index1;
     Reg::RegTensor<uint32_t> idx2;
     // 0x000000fc -> 0xfcfcfcfc
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Idx0, qliV2Idx0Buf);
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Idx1, qliV2Idx1Buf);
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Index0, qliV2Index0Buffer);
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(qliV2Index1, qliV2Index1Buffer);
     Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B8>(idx2, qliV2Idx2Buf);
 
     // 计算直方图0-127 128-255
-    Reg::RegTensor<uint16_t> qliV2Cout0;
-    Reg::RegTensor<uint16_t> qliV2Cout1;
-    Reg::Duplicate(qliV2Cout0, 0);
-    Reg::Duplicate(qliV2Cout1, 0);
+    Reg::RegTensor<uint16_t> qliV2Histogram0;
+    Reg::RegTensor<uint16_t> qliV2Histogram1;
+    Reg::Duplicate(qliV2Histogram0, 0);
+    Reg::Duplicate(qliV2Histogram1, 0);
 
-    Reg::RegTensor<uint32_t> qliV2Vreg0U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg1U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg2U16;
-    Reg::RegTensor<uint32_t> qliV2Vreg3U16;
+    Reg::RegTensor<uint32_t> qliV2PackedReg0;
+    Reg::RegTensor<uint32_t> qliV2PackedReg1;
+    Reg::RegTensor<uint32_t> qliV2PackedReg2;
+    Reg::RegTensor<uint32_t> qliV2PackedReg3;
 
-    Reg::RegTensor<uint8_t> qliV2Vreg0;
-    Reg::RegTensor<uint8_t> qliV2Vreg1;
-    Reg::RegTensor<uint8_t> qliV2Vreg2;
-    Reg::RegTensor<uint8_t> qliV2Vreg3;
+    Reg::RegTensor<uint8_t> qliV2ByteReg0;
+    Reg::RegTensor<uint8_t> qliV2ByteReg1;
+    Reg::RegTensor<uint8_t> qliV2ByteReg2;
+    Reg::RegTensor<uint8_t> qliV2ByteReg3;
 
-    for (uint16_t qliV2I = 0; qliV2I < qliV2VfLoop; ++qliV2I) {
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2Vreg1U16, qliV2Vreg0U16,
-                                                                 qliV2InputBuf + qliV2I * 256);
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2Vreg3U16, qliV2Vreg2U16,
-                                                                 qliV2InputBuf + (qliV2I * 256) + 128);
+    for (uint16_t qliV2LoopIndex = 0; qliV2LoopIndex < qliV2LoopCount; ++qliV2LoopIndex) {
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2PackedReg1, qliV2PackedReg0,
+                                                                 qliV2HistogramInput + qliV2LoopIndex * 256);
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_DINTLV_B16>(qliV2PackedReg3, qliV2PackedReg2,
+                                                                 qliV2HistogramInput + (qliV2LoopIndex * 256) + 128);
 
-        Reg::DeInterleave(qliV2Vreg1, qliV2Vreg0, (Reg::RegTensor<uint8_t> &)qliV2Vreg0U16,
-                          (Reg::RegTensor<uint8_t> &)qliV2Vreg2U16);
-        Reg::DeInterleave(qliV2Vreg3, qliV2Vreg2, (Reg::RegTensor<uint8_t> &)qliV2Vreg1U16,
-                          (Reg::RegTensor<uint8_t> &)qliV2Vreg3U16);
+        Reg::DeInterleave(qliV2ByteReg1, qliV2ByteReg0, (Reg::RegTensor<uint8_t> &)qliV2PackedReg0,
+                          (Reg::RegTensor<uint8_t> &)qliV2PackedReg2);
+        Reg::DeInterleave(qliV2ByteReg3, qliV2ByteReg2, (Reg::RegTensor<uint8_t> &)qliV2PackedReg1,
+                          (Reg::RegTensor<uint8_t> &)qliV2PackedReg3);
 
         Reg::MaskReg pregEQ0 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
         Reg::MaskReg pregEQ1 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
         Reg::MaskReg pregEQ2 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
-        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ0, qliV2Vreg0, (Reg::RegTensor<uint8_t> &)qliV2Idx0, qliV2PregB8);
-        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ1, qliV2Vreg1, (Reg::RegTensor<uint8_t> &)qliV2Idx1, qliV2PregB8);
-        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ2, qliV2Vreg2, (Reg::RegTensor<uint8_t> &)idx2, qliV2PregB8);
+        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ0, qliV2ByteReg0, (Reg::RegTensor<uint8_t> &)qliV2Index0, qliV2MaskB8);
+        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ1, qliV2ByteReg1, (Reg::RegTensor<uint8_t> &)qliV2Index1, qliV2MaskB8);
+        Reg::Compare<uint8_t, CMPMODE::EQ>(pregEQ2, qliV2ByteReg2, (Reg::RegTensor<uint8_t> &)idx2, qliV2MaskB8);
 
         Reg::MaskReg pregEQ0And1 = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
         Reg::MaskReg pregEQAll = Reg::CreateMask<uint8_t, Reg::MaskPattern::ALL>();
-        Reg::And(pregEQ0And1, pregEQ0, pregEQ1, qliV2PregB8);
-        Reg::And(pregEQAll, pregEQ0And1, pregEQ2, qliV2PregB8);
+        Reg::And(pregEQ0And1, pregEQ0, pregEQ1, qliV2MaskB8);
+        Reg::And(pregEQAll, pregEQ0And1, pregEQ2, qliV2MaskB8);
 
         Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN0, Reg::HistogramsType::ACCUMULATE>(
-            qliV2Cout0, qliV2Vreg3, pregEQAll);
+            qliV2Histogram0, qliV2ByteReg3, pregEQAll);
         Reg::Histograms<uint8_t, uint16_t, Reg::HistogramsBinType::BIN1, Reg::HistogramsType::ACCUMULATE>(
-            qliV2Cout1, qliV2Vreg3, pregEQAll);
+            qliV2Histogram1, qliV2ByteReg3, pregEQAll);
     }
 
-    StoreHistogramResult(qliV2HistogramsBuf, qliV2Cout0, qliV2Cout1, qliV2PregB16, qliV2PregB32);
+    StoreHistogramResult(qliV2HistogramOutput, qliV2Histogram0, qliV2Histogram1, qliV2MaskB16, qliV2MaskB32);
 }
 
-__simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t *qliV2KValue, __ubuf__ uint32_t *qliV2HistogramsBuf,
-                               __ubuf__ uint32_t *qliV2Idx0Buf, __ubuf__ uint32_t *qliV2Idx1Buf,
+__simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t *qliV2KValue, __ubuf__ uint32_t *qliV2HistogramOutput,
+                               __ubuf__ uint32_t *qliV2Index0Buffer, __ubuf__ uint32_t *qliV2Index1Buffer,
                                __ubuf__ uint32_t *qliV2Idx2Buf, __ubuf__ uint32_t *qliV2Idx3Buf)
 {
-    Reg::MaskReg qliV2PregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
 
     Reg::ClearSpr<AscendC::SpecialPurposeReg::AR>();
 
@@ -297,8 +299,8 @@ __simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t *qliV2KValue, __ubuf__ uint32_t
         Reg::MaskReg qliV2PregGE = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
 
         Reg::Arange(qliV2IdxC, i * 64);
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(qliV2Cout, qliV2HistogramsBuf + i * 64);
-        Reg::Compare<uint32_t, CMPMODE::GE>(qliV2PregGE, qliV2Cout, qliV2BtmK3, qliV2PregB32);
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(qliV2Cout, qliV2HistogramOutput + i * 64);
+        Reg::Compare<uint32_t, CMPMODE::GE>(qliV2PregGE, qliV2Cout, qliV2BtmK3, qliV2MaskB32);
         Reg::Squeeze<uint32_t, Reg::GatherMaskMode::STORE_REG>(qliV2SqzIdx3, (Reg::RegTensor<uint32_t> &)qliV2IdxC,
                                                                qliV2PregGE);
         Reg::StoreUnAlign<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE>(qliV2Idx3Buf, qliV2SqzIdx3, qliV2AlignIdx3);
@@ -307,31 +309,31 @@ __simd_vf__ void FindKthVFImpl(__ubuf__ uint32_t *qliV2KValue, __ubuf__ uint32_t
 
     Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
 
-    Reg::RegTensor<uint32_t> qliV2Idx0;
-    Reg::RegTensor<uint32_t> qliV2Idx1;
+    Reg::RegTensor<uint32_t> qliV2Index0;
+    Reg::RegTensor<uint32_t> qliV2Index1;
     Reg::RegTensor<uint32_t> qliV2Idx2;
     Reg::RegTensor<uint32_t> qliV2Idx3;
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B32>(qliV2Idx0, qliV2Idx0Buf);
-    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B32>(qliV2Idx1, qliV2Idx1Buf);
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B32>(qliV2Index0, qliV2Index0Buffer);
+    Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B32>(qliV2Index1, qliV2Index1Buffer);
     Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B32>(qliV2Idx2, qliV2Idx2Buf);
     Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_BRC_B32>(qliV2Idx3, qliV2Idx3Buf);
 
-    Reg::ShiftLefts(qliV2Idx0, qliV2Idx0, (int16_t)24, qliV2PregB32);
-    Reg::ShiftLefts(qliV2Idx1, qliV2Idx1, (int16_t)16, qliV2PregB32);
-    Reg::ShiftLefts(qliV2Idx2, qliV2Idx2, (int16_t)8, qliV2PregB32);
+    Reg::ShiftLefts(qliV2Index0, qliV2Index0, (int16_t)24, qliV2MaskB32);
+    Reg::ShiftLefts(qliV2Index1, qliV2Index1, (int16_t)16, qliV2MaskB32);
+    Reg::ShiftLefts(qliV2Idx2, qliV2Idx2, (int16_t)8, qliV2MaskB32);
 
     // ADD
-    Reg::Add(qliV2Idx0, qliV2Idx0, qliV2Idx1, qliV2PregB32);
-    Reg::Add(qliV2Idx0, qliV2Idx0, qliV2Idx2, qliV2PregB32);
-    Reg::Add(qliV2Idx0, qliV2Idx0, qliV2Idx3, qliV2PregB32);
+    Reg::Add(qliV2Index0, qliV2Index0, qliV2Index1, qliV2MaskB32);
+    Reg::Add(qliV2Index0, qliV2Index0, qliV2Idx2, qliV2MaskB32);
+    Reg::Add(qliV2Index0, qliV2Index0, qliV2Idx3, qliV2MaskB32);
 
-    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(qliV2KValue, qliV2Idx0, qliV2PregB32);
+    Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_NORM>(qliV2KValue, qliV2Index0, qliV2MaskB32);
 }
 
-__simd_vf__ void FindIdxGTOutputVFImpl(__ubuf__ uint32_t *qliV2OutputIdxBuf, __ubuf__ uint32_t *qliV2InputBuf,
-                                       uint32_t qliV2BeginIdx, __ubuf__ uint32_t *qliV2KValue, uint16_t qliV2VfLoop)
+__simd_vf__ void FindIdxGTOutputVFImpl(__ubuf__ uint32_t *qliV2OutputIdxBuf, __ubuf__ uint32_t *qliV2HistogramInput,
+                                       uint32_t qliV2BeginIdx, __ubuf__ uint32_t *qliV2KValue, uint16_t qliV2LoopCount)
 {
-    Reg::MaskReg qliV2PregB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg qliV2MaskB32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
 
     Reg::ClearSpr<AscendC::SpecialPurposeReg::AR>();
 
@@ -342,16 +344,16 @@ __simd_vf__ void FindIdxGTOutputVFImpl(__ubuf__ uint32_t *qliV2OutputIdxBuf, __u
 
     Reg::RegTensor<uint32_t> qliV2VregInput;
 
-    for (uint16_t i = 0; i < (uint16_t)(qliV2VfLoop); ++i) {
+    for (uint16_t i = 0; i < (uint16_t)(qliV2LoopCount); ++i) {
         Reg::RegTensor<int32_t> qliV2IdxC;
         Reg::Arange(qliV2IdxC, qliV2BeginIdx + i * 64);
 
-        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(qliV2VregInput, qliV2InputBuf + i * 64);
+        Reg::LoadAlign<uint32_t, Reg::LoadDist::DIST_NORM>(qliV2VregInput, qliV2HistogramInput + i * 64);
 
         Reg::MaskReg qliV2PoutGT = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
 
         Reg::RegTensor<uint32_t> sqzIdxOut;
-        Reg::Compare<uint32_t, CMPMODE::GT>(qliV2PoutGT, qliV2VregInput, qliV2KthValue, qliV2PregB32);
+        Reg::Compare<uint32_t, CMPMODE::GT>(qliV2PoutGT, qliV2VregInput, qliV2KthValue, qliV2MaskB32);
 
         Reg::Squeeze<uint32_t, Reg::GatherMaskMode::STORE_REG>(sqzIdxOut, (Reg::RegTensor<uint32_t> &)qliV2IdxC,
                                                                qliV2PoutGT);
