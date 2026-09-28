@@ -89,8 +89,7 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::GetShapeAttrsIn
         fBaseParams.layoutType = INPUT_FORMAT_BN2GS2D;
         fBaseParams.b = queryShape->GetStorageShape().GetDim(INPUT_DIM_0);
         fBaseParams.n2 = keyShape->GetStorageShape().GetDim(INPUT_DIM_1);
-        fBaseParams.g =
-            queryShape->GetStorageShape().GetDim(INPUT_DIM_1) / keyShape->GetStorageShape().GetDim(INPUT_DIM_1);
+        fBaseParams.g = 1;
         fBaseParams.s1 = queryShape->GetStorageShape().GetDim(INPUT_DIM_2);
         fBaseParams.d = queryShape->GetStorageShape().GetDim(INPUT_DIM_3);
         fBaseParams.d1 = valueShape->GetStorageShape().GetDim(INPUT_DIM_3);
@@ -104,15 +103,14 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::GetShapeAttrsIn
         fBaseParams.layoutType = INPUT_FORMAT_BS2N2GD;
         fBaseParams.b = queryShape->GetStorageShape().GetDim(INPUT_DIM_0);
         fBaseParams.n2 = keyShape->GetStorageShape().GetDim(INPUT_DIM_2);
-        fBaseParams.g =
-            queryShape->GetStorageShape().GetDim(INPUT_DIM_2) / keyShape->GetStorageShape().GetDim(INPUT_DIM_2);
+        fBaseParams.g = 1;
         fBaseParams.s1 = queryShape->GetStorageShape().GetDim(INPUT_DIM_1);
         fBaseParams.d = queryShape->GetStorageShape().GetDim(INPUT_DIM_3);
         fBaseParams.d1 = valueShape->GetStorageShape().GetDim(INPUT_DIM_3);
         fBaseParams.s2 = keyShape->GetStorageShape().GetDim(INPUT_DIM_1);
     }
 
-    fBaseParams.n1 = fBaseParams.n2 * fBaseParams.g;
+    fBaseParams.n1 = headNum;
     fBaseParams.isS1S2Same = (fBaseParams.s1 == fBaseParams.s2);
 
     auto ret = ProcessOptionalInput(context_, fBaseParams);

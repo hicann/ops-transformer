@@ -74,7 +74,6 @@ constexpr uint32_t HEAD_ATTR_IDX = 4;
 constexpr uint32_t LAYOUT_ATTR_IDX = 5;
 constexpr uint32_t SEED_ATTR_IDX = 9;
 constexpr uint32_t OFFSET_ATTR_IDX = 10;
-constexpr uint32_t OUTDTYPE_ATTR_IDX = 11;
 constexpr uint32_t TND_SOFTMAX_IN_ATTR_IDX = 12;
 
 constexpr uint32_t GM_ALIGN = 512;
@@ -324,7 +323,6 @@ struct FuzzyBaseInfoParamsRegbase { // 频繁使用的基础参数
     float pScaleLog = 1;
     uint32_t bandIdx;
     int64_t offset;
-    DtypeEnum outDtype;
 
     uint32_t calTypeSize;
     int64_t s1Token;
@@ -455,8 +453,8 @@ ge::graphStatus CheckShapeValid(gert::TilingContext *context, int64_t b, int64_t
 
 ge::graphStatus CheckAttenMaskShape(FuzzyBaseInfoParamsRegbase &fBaseParams);
 ge::graphStatus QuantShapeValidCheck(gert::TilingContext *context_, const FuzzyBaseInfoParamsRegbase &fBaseParams);
-ge::graphStatus QuantScaleShapeValidCheck(gert::TilingContext *context_, const FuzzyBaseInfoParamsRegbase &fBaseParams);
-ge::graphStatus QuantScaleDtypeValidCheck(gert::TilingContext *context_, const FuzzyBaseInfoParamsRegbase &fBaseParams);
+ge::graphStatus QuantScaleShapeValidCheck(gert::TilingContext *context_);
+ge::graphStatus QuantScaleDtypeValidCheck(gert::TilingContext *context_);
 void JudgeIsNeedDeter(FuzzyBaseInfoParamsRegbase &fBaseParams, std::array<int64_t, CORE_LIST_NUM> &dqOffset,
                       std::array<int64_t, CORE_LIST_NUM> &dkDvOffset, std::array<int64_t, CORE_LIST_NUM> &dqOffsetpre,
                       std::array<int64_t, CORE_LIST_NUM> &dkDvOffsetpre, int64_t calcNum, bool &noNeedDeter,

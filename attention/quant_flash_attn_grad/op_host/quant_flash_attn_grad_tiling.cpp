@@ -53,40 +53,21 @@ constexpr int64_t WIN_RIGHT = 4;
 constexpr int64_t MAX_SEQLEN_Q = 5;
 constexpr int64_t MAX_SEQLEN_KV = 6;
 constexpr int64_t WINDOW = 4;
+constexpr int64_t LAYOUT_Q = 7;
+constexpr int64_t LAYOUT_KV = 8;
+constexpr int64_t MAIN_INPUT_COUNT = 5;
+constexpr int64_t SUPPORTED_HEAD_DIM = 128;
 
 static bool IsTnd(gert::TilingContext *context)
 {
-    auto layout = context->GetAttrs()->GetAttrPointer<char>(7);
+    auto layout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_Q);
     return layout != nullptr && std::string(layout) == "TND";
 }
 
 static ge::graphStatus ValidateTnd(gert::TilingContext *context, const string &opName)
 {
-    auto outDesc = context->GetInputDesc(ATTN_OUT_IDX);
-    OP_CHECK_IF(outDesc == nullptr || outDesc->GetDataType() != ge::DT_BF16,
-                OP_LOGE(opName, "TND attention output must be BF16."), return ge::GRAPH_FAILED);
-    int64_t dims[3][3];
-    for (int64_t idx = 0; idx < 3; ++idx) {
-        auto shape = context->GetInputShape(idx);
-        OP_CHECK_IF(shape == nullptr || shape->GetStorageShape().GetDimNum() != 3,
-                    OP_LOGE(opName, "TND Q/K/V must have rank 3."), return ge::GRAPH_FAILED);
-        for (int64_t d = 0; d < 3; ++d) {
-            dims[idx][d] = shape->GetStorageShape().GetDim(d);
-        }
-        OP_CHECK_IF(dims[idx][0] <= 0 || dims[idx][1] <= 0 || dims[idx][2] != 128,
-                    OP_LOGE(opName, "TND requires positive T/N and D=128."), return ge::GRAPH_FAILED);
-    }
-    OP_CHECK_IF(dims[0][1] != dims[1][1] || dims[1][1] != dims[2][1] || dims[1][0] != dims[2][0],
-                OP_LOGE(opName, "TND requires equal head counts and matching K/V."), return ge::GRAPH_FAILED);
-    for (int64_t idx = 3; idx <= 4; ++idx) {
-        auto shape = context->GetInputShape(idx);
-        OP_CHECK_IF(shape == nullptr || shape->GetStorageShape().GetDimNum() != 3,
-                    OP_LOGE(opName, "TND dout/out must match Q."), return ge::GRAPH_FAILED);
-        for (int64_t d = 0; d < 3; ++d) {
-            OP_CHECK_IF(shape->GetStorageShape().GetDim(d) != dims[0][d], OP_LOGE(opName, "TND dout/out must match Q."),
-                        return ge::GRAPH_FAILED);
-        }
-    }
+    const auto &queryShape = context->GetInputShape(QUERY_IDX)->GetStorageShape();
+    const auto &keyShape = context->GetInputShape(KEY_IDX)->GetStorageShape();
     int64_t prefixSize = 0;
     for (int64_t idx = 12; idx <= 13; ++idx) {
         auto desc = context->GetOptionalInputDesc(idx);
@@ -99,16 +80,13 @@ static ge::graphStatus ValidateTnd(gert::TilingContext *context, const string &o
                     return ge::GRAPH_FAILED);
         prefixSize = count;
     }
-    OP_CHECK_IF(prefixSize - 1 > dims[0][0] || prefixSize - 1 > dims[1][0],
+    OP_CHECK_IF(prefixSize - 1 > queryShape.GetDim(0) || prefixSize - 1 > keyShape.GetDim(0),
                 OP_LOGE(opName, "Positive TND lengths require Tq/Tkv >= B."), return ge::GRAPH_FAILED);
     auto lse = context->GetInputShape(SOFTMAX_LSE);
     OP_CHECK_IF(lse == nullptr || lse->GetStorageShape().GetDimNum() != 2 ||
-                    lse->GetStorageShape().GetDim(0) != dims[0][1] || lse->GetStorageShape().GetDim(1) != dims[0][0],
+                    lse->GetStorageShape().GetDim(0) != queryShape.GetDim(1) ||
+                    lse->GetStorageShape().GetDim(1) != queryShape.GetDim(0),
                 OP_LOGE(opName, "TND LSE must have shape [N,Tq]."), return ge::GRAPH_FAILED);
-    auto mode = context->GetAttrs()->GetAttrPointer<int64_t>(MASK_MODE);
-    auto quant = context->GetAttrs()->GetAttrPointer<int64_t>(QUANT_MODE_IDX);
-    OP_CHECK_IF((mode != nullptr && *mode != 0 && *mode != 3 && *mode != 4) || (quant != nullptr && *quant != 0),
-                OP_LOGE(opName, "TND supports mask_mode=0/3/4 and quant_mode=0 only."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -116,6 +94,10 @@ static ge::graphStatus ParseAttrs(gert::TilingContext *context, const string &op
 {
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    const auto *quantMode = attrs->GetAttrPointer<int64_t>(QUANT_MODE_IDX);
+    OP_CHECK_IF(quantMode == nullptr, OP_LOGE(opName, "quant_mode must be provided."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(*quantMode != 0, OP_LOGE(opName, "quant_mode only supports 0, got %ld.", *quantMode),
+                return ge::GRAPH_FAILED);
     const int64_t *maxSeqlenQ = attrs->GetAttrPointer<int64_t>(MAX_SEQLEN_Q);
     OP_CHECK_IF(maxSeqlenQ != nullptr && (IsTnd(context) ? (*maxSeqlenQ != -1 && *maxSeqlenQ <= 0) : *maxSeqlenQ != -1),
                 OP_LOGE(opName, "maxSeqlenQ not support."), return ge ::GRAPH_FAILED);
@@ -143,6 +125,56 @@ static ge::graphStatus ParseAttrs(gert::TilingContext *context, const string &op
         OP_CHECK_IF(winLeftValue != -1 || winRightValue != -1,
                     OP_LOGE(opName, "winLeft/winRight only support in maskMode 4, now is [%ld, %ld].", winLeftValue,
                             winRightValue),
+                    return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus ValidateMainInputShapes(gert::TilingContext *context, const string &opName)
+{
+    const auto *attrs = context->GetAttrs();
+    const char *layoutQ = attrs->GetAttrPointer<char>(LAYOUT_Q);
+    const char *layoutKV = attrs->GetAttrPointer<char>(LAYOUT_KV);
+    if (layoutQ == nullptr && layoutKV == nullptr) {
+        layoutQ = "BSND";
+    } else {
+        OP_CHECK_IF(layoutQ == nullptr || layoutKV == nullptr || std::string(layoutQ) != layoutKV,
+                    OP_LOGE(opName, "layout_q and layout_kv must be the same."), return ge::GRAPH_FAILED);
+    }
+    const std::string layout(layoutQ);
+    OP_CHECK_IF(layout != "BSND" && layout != "BNSD" && layout != "TND",
+                OP_LOGE(opName, "Unsupported layout %s; expected BSND, BNSD or TND.", layoutQ),
+                return ge::GRAPH_FAILED);
+
+    const size_t expectedRank = layout == "TND" ? 3 : 4;
+    const size_t headAxis = layout == "BSND" ? 2 : 1;
+    const char *inputNames[MAIN_INPUT_COUNT] = {"q", "k", "v", "dout", "attn_out"};
+    const gert::StorageShape *inputShapes[MAIN_INPUT_COUNT] = {};
+    for (int64_t idx = 0; idx < MAIN_INPUT_COUNT; ++idx) {
+        inputShapes[idx] = context->GetInputShape(idx);
+        OP_CHECK_IF(inputShapes[idx] == nullptr, OP_LOGE(opName, "%s requires a shape.", inputNames[idx]),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(inputShapes[idx]->GetStorageShape().GetDimNum() != expectedRank,
+                    OP_LOGE(opName, "%s must have rank %zu for layout %s.", inputNames[idx], expectedRank, layoutQ),
+                    return ge::GRAPH_FAILED);
+    }
+
+    const int64_t n1 = inputShapes[QUERY_IDX]->GetStorageShape().GetDim(headAxis);
+    const int64_t n2 = inputShapes[KEY_IDX]->GetStorageShape().GetDim(headAxis);
+    OP_CHECK_IF(n2 <= 0, OP_LOGE(opName, "N2 (key head count) must be greater than 0, got %ld.", n2),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(n1 != n2, OP_LOGE(opName, "N1 must equal N2, got N1=%ld and N2=%ld.", n1, n2), return ge::GRAPH_FAILED);
+    for (int64_t idx = 0; idx < MAIN_INPUT_COUNT; ++idx) {
+        const auto &shape = inputShapes[idx]->GetStorageShape();
+        for (size_t axis = 0; axis < expectedRank; ++axis) {
+            OP_CHECK_IF(shape.GetDim(axis) <= 0,
+                        OP_LOGE(opName, "%s dimension %zu must be positive, got %ld.", inputNames[idx], axis,
+                                shape.GetDim(axis)),
+                        return ge::GRAPH_FAILED);
+        }
+        OP_CHECK_IF(shape.GetDim(expectedRank - 1) != SUPPORTED_HEAD_DIM,
+                    OP_LOGE(opName, "quant_mode=0 requires %s D=128, got %ld.", inputNames[idx],
+                            shape.GetDim(expectedRank - 1)),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -207,6 +239,21 @@ static ge::graphStatus ValidateRequiredInputs(gert::TilingContext *context, cons
     OP_CHECK_IF(pScaleDesc == nullptr, OP_LOGE(opName, "pScale must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(dsScaleDesc == nullptr, OP_LOGE(opName, "dsScale must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(softmaxLseDesc == nullptr, OP_LOGE(opName, "softmaxLse must be provided."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(queryDesc->GetDataType() != ge::DT_HIFLOAT8, OP_LOGE(opName, "query must have HIFLOAT8 dtype."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(keyDesc->GetDataType() != ge::DT_HIFLOAT8, OP_LOGE(opName, "key must have HIFLOAT8 dtype."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(valueDesc->GetDataType() != ge::DT_HIFLOAT8, OP_LOGE(opName, "value must have HIFLOAT8 dtype."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(doDesc->GetDataType() != ge::DT_HIFLOAT8, OP_LOGE(opName, "dout must have HIFLOAT8 dtype."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(softmaxLseDesc->GetDataType() != ge::DT_FLOAT, OP_LOGE(opName, "softmax_lse must have FLOAT32 dtype."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(attnOutDesc->GetDataType() != ge::DT_BF16, OP_LOGE(opName, "attn_out must have BF16 dtype."),
+                return ge::GRAPH_FAILED);
+    if (ValidateMainInputShapes(context, opName) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     OP_CHECK_IF(!IsTnd(context) && cuSeqlensQDesc != nullptr, OP_LOGE(opName, "cuSeqlensQ not support."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(!IsTnd(context) && cuSeqlensKVDesc != nullptr, OP_LOGE(opName, "cuSeqlensKV not support."),
@@ -258,6 +305,12 @@ static ge::graphStatus ValidateRequiredInputs(gert::TilingContext *context, cons
     OP_CHECK_IF(dkDesc == nullptr, OP_LOGE(opName, "dk must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(dvDesc == nullptr, OP_LOGE(opName, "dv must be provided."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(dsinkDesc == nullptr, OP_LOGE(opName, "dSink must be provided."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dqDesc->GetDataType() != ge::DT_BF16, OP_LOGE(opName, "dq must have BF16 dtype."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dkDesc->GetDataType() != ge::DT_BF16, OP_LOGE(opName, "dk must have BF16 dtype."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dvDesc->GetDataType() != ge::DT_BF16, OP_LOGE(opName, "dv must have BF16 dtype."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
