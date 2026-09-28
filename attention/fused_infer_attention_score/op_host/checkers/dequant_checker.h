@@ -69,6 +69,12 @@ private:
     ge::graphStatus CheckDequantScaleQueryMLAFullquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleShapePertensor(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckDequantScaleContiguousMXFP8(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckDequantScaleDimMXFP8(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckDequantScaleQueryShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
+    void LogDequantScaleQueryShapeWarnMXFP8(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckDequantScaleKVShapePAMXFP8(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckDequantScaleKVShapeNoPAMXFP8(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleBnNBsDShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckDequantScaleNZShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckQuantScale1ShapeMXFP8(const FiaTilingInfo &fiaInfo) const;
@@ -123,6 +129,18 @@ private:
     ge::graphStatus CheckFeatureRopeForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckFeatureD032ForAntiquant(const FiaTilingInfo &fiaInfo) const;
     ge::graphStatus CheckStrideForAntiquant(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckContiguousIfExistsAntiquant(const FiaTilingInfo &fiaInfo, const gert::Tensor *tensor,
+                                                     const char *tensorName, const gert::Stride *strides) const;
+    ge::graphStatus CheckStrideForAntiquantNoPA(const FiaTilingInfo &fiaInfo) const;
+    ge::graphStatus CheckStrideAllowedAntiquantPA(const FiaTilingInfo &fiaInfo, const char *tensorName, uint32_t dimNum,
+                                                  const gert::Shape &shape, const gert::Stride *strides) const;
+    ge::graphStatus CheckScaleStrideAllowedAntiquantPA(const FiaTilingInfo &fiaInfo, const char *tensorName,
+                                                       uint32_t dimNum, const gert::Shape &shape,
+                                                       const gert::Stride *strides, uint32_t antiquantMode) const;
+    ge::graphStatus CheckScaleStrideIfExistsAntiquantPA(const FiaTilingInfo &fiaInfo, const gert::Tensor *tensor,
+                                                        const char *tensorName, const gert::Stride *strides,
+                                                        uint32_t antiquantMode) const;
+    ge::graphStatus CheckStrideForAntiquantPA(const FiaTilingInfo &fiaInfo) const;
 
     // MultiPara
     ge::graphStatus CheckMultiParaForAntiquant(const FiaTilingInfo &fiaInfo);
