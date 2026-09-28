@@ -981,12 +981,18 @@ __aicore__ inline void CSABlockVec<TEMPLATE_ARGS>::InitOutputSingleCore(ConstInf
 
     if (qsmlaCoreNum != 0) {
         uint64_t singleCoreSize = (totalOutputSize + (CV_RATIO * qsmlaCoreNum) - 1) / (CV_RATIO * qsmlaCoreNum);
-        uint64_t tailSize = totalOutputSize - constInfo.aivIdx * singleCoreSize;
-        uint64_t singleInitOutputSize = tailSize < singleCoreSize ? tailSize : singleCoreSize;
+        uint64_t tailSize;
+        uint64_t singleInitOutputSize = 0;
+        if (constInfo.aivIdx * singleCoreSize < totalOutputSize) {
+            tailSize = totalOutputSize - constInfo.aivIdx * singleCoreSize;
+            singleInitOutputSize = tailSize < singleCoreSize ? tailSize : singleCoreSize;
+        }
         if (singleInitOutputSize > 0) {
             WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
-            matmul::InitOutput<OUTPUT_T>(this->attentionOutGm[constInfo.aivIdx * singleCoreSize], singleInitOutputSize,
-                                         0);
+            if (constInfo.aivIdx * singleCoreSize < totalOutputSize) {
+                matmul::InitOutput<OUTPUT_T>(this->attentionOutGm[constInfo.aivIdx * singleCoreSize],
+                                             singleInitOutputSize, 0);
+            }
             SetFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
         }
     }
