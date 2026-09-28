@@ -55,6 +55,7 @@ int32_t gGeCompilerVersion = kGraphFusionSupportVersion;
 
 struct GroupedMatmulTransposeFusionPassParam {
     std::string caseName;
+    std::string socVersion = "Ascend950";
     std::string scenario;
     std::string transposeOpType;
     int32_t xCount;
@@ -215,15 +216,22 @@ std::vector<GroupedMatmulTransposeFusionPassParam> GetParams()
                 ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, fields.empty() ? "" : fields[0], error));
         }
     }
+    const auto ascend950Params = params;
+    params.reserve(ascend950Params.size() * 2U);
+    for (auto param : ascend950Params) {
+        param.caseName = "ascend350_" + param.caseName;
+        param.socVersion = "Ascend350";
+        params.emplace_back(std::move(param));
+    }
     return params;
 }
 
-void SetPlatformSupport()
+void SetPlatformSupport(const std::string &socVersion)
 {
     fe::PlatformInfo platformInfo;
     fe::OptionalInfo optionalInfo;
-    platformInfo.str_info.short_soc_version = "Ascend950";
-    optionalInfo.soc_version = "Ascend950";
+    platformInfo.str_info.short_soc_version = socVersion;
+    optionalInfo.soc_version = socVersion;
     fe::PlatformInfoManager::Instance().platform_info_map_.clear();
     fe::PlatformInfoManager::Instance().platform_info_map_[optionalInfo.soc_version] = platformInfo;
     fe::PlatformInfoManager::Instance().SetOptionalCompilationInfo(optionalInfo);
@@ -657,7 +665,7 @@ TEST_P(GroupedMatmulTransposeFusionPassTest, RunFusionPass)
 
     CustomPassContext passContext;
     TestGroupedMatmulTransposeFusionPass pass;
-    SetPlatformSupport();
+    SetPlatformSupport(param.socVersion);
     gVersionKeyValid = false;
     const auto status = pass.RunForTest(graph, passContext);
     ClearPlatformSupport();

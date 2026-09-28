@@ -428,8 +428,15 @@ namespace GroupedMatmulInfershapeUT {
 const vector<GroupedMatmulInfershapeCase> &GetGroupedMatmulInfershapeCsvCases()
 {
     static const vector<GroupedMatmulInfershapeCase> cases = [] {
-        vector<GroupedMatmulInfershapeCase> merged = LoadCases("Ascend950");
+        vector<GroupedMatmulInfershapeCase> ascend950 = LoadCases("Ascend950");
+        vector<GroupedMatmulInfershapeCase> ascend350 = ascend950;
+        for (auto &testCase : ascend350) {
+            testCase.socVersion = "Ascend350";
+            testCase.prefix = "ascend350_" + testCase.prefix;
+        }
         vector<GroupedMatmulInfershapeCase> ascend910b = LoadCases("Ascend910B");
+        vector<GroupedMatmulInfershapeCase> merged = ascend950;
+        merged.insert(merged.end(), ascend350.begin(), ascend350.end());
         merged.insert(merged.end(), ascend910b.begin(), ascend910b.end());
         return merged;
     }();

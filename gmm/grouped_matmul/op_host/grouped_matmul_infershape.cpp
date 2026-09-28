@@ -25,7 +25,7 @@
 using namespace ge;
 namespace ops {
 
-static std::set<std::string> GmmDavidSupportSoc = {"Ascend950"};
+static const std::set<std::string> GmmDavidSupportSoc = {"Ascend350", "Ascend950"};
 
 enum class PlatformID : std::uint8_t {
     UNKNOWN,
@@ -51,6 +51,22 @@ struct GmmPlatformCache {
     graphStatus ret = GRAPH_FAILED;
     std::string shortSocVersion;
 };
+
+static bool IsGmmDavidSupportSoc(const std::string &shortSocVersion)
+{
+    return GmmDavidSupportSoc.count(shortSocVersion) > 0;
+}
+
+static PlatformID GetGmmPlatformId(const std::string &shortSocVersion)
+{
+    if (shortSocVersion.find("310P") != std::string::npos) {
+        return PlatformID::ASCEND310P;
+    }
+    if (IsGmmDavidSupportSoc(shortSocVersion)) {
+        return PlatformID::ASCEND950;
+    }
+    return PlatformID::ASCEND910B;
+}
 
 static const GmmPlatformCache &GetGmmPlatformCache(const bool initialize = false)
 {
@@ -464,7 +480,7 @@ static bool IsS8S4SpecialWeightFormat(const gert::InferShapeContext *context)
 {
     const auto &platformInfo = GetGmmPlatformCache();
     const auto ret = platformInfo.ret;
-    if (ret != GRAPH_SUCCESS || GmmDavidSupportSoc.count(platformInfo.shortSocVersion) == 0) {
+    if (ret != GRAPH_SUCCESS || !IsGmmDavidSupportSoc(platformInfo.shortSocVersion)) {
         return false;
     }
     if (!IsS8S4PseudoQuant(context)) {
@@ -991,10 +1007,7 @@ static ge::graphStatus CheckFunctionParamsForShape(gert::InferShapeContext *cont
         OP_LOGW(context->GetNodeName(), "Cannot get platform info!");
         return GRAPH_SUCCESS;
     } else {
-        paramsInfo.platform = (platformInfo.shortSocVersion.find("310P") != std::string::npos) ?
-                                  PlatformID::ASCEND310P :
-                              (platformInfo.shortSocVersion.find("950") != std::string::npos) ? PlatformID::ASCEND950 :
-                                                                                                PlatformID::ASCEND910B;
+        paramsInfo.platform = GetGmmPlatformId(platformInfo.shortSocVersion);
     }
     OP_CHECK_IF(CheckQuantParams(context, gmmAttrs, paramsInfo) != GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "input", "CheckQuantParams failed"),
@@ -1196,7 +1209,7 @@ static ge::graphStatus CheckCaseNoSplit(gert::InferShapeContext *context, bool t
         size_t xDimNum = xShape->GetDimNum();
         // check inner axis of x, which should not be larger than 65535
         int64_t xKDimValue = xShape->GetDim(xDimNum - 1); // x always is not transposed
-        if (!(ret == GRAPH_SUCCESS && GmmDavidSupportSoc.count(platformInfo.shortSocVersion) > 0)) {
+        if (!(ret == GRAPH_SUCCESS && IsGmmDavidSupportSoc(platformInfo.shortSocVersion))) {
             OP_CHECK_IF(xKDimValue > GMM_MAX_INNER_AXIS,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                             context->GetNodeName(), "x K", std::to_string(xKDimValue),
@@ -1225,7 +1238,7 @@ static ge::graphStatus CheckCaseNoSplit(gert::InferShapeContext *context, bool t
                         Ops::Transformer::Gmm::FormatString("x[%lu] K should equal weight[%lu] K", i, i).c_str()),
                     return GRAPH_FAILED);
         // if weight is not transposed, check N aisx; otherwise, check K axis, which can be skiped
-        if (!(ret == GRAPH_SUCCESS && GmmDavidSupportSoc.count(platformInfo.shortSocVersion) > 0)) {
+        if (!(ret == GRAPH_SUCCESS && IsGmmDavidSupportSoc(platformInfo.shortSocVersion))) {
             OP_CHECK_IF(!transposeWeight && weightNDimValue > GMM_MAX_INNER_AXIS,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                             context->GetNodeName(), "weight N", std::to_string(weightNDimValue),
@@ -1247,7 +1260,7 @@ static ge::graphStatus CheckInnerAxisOfTensorList(const gert::InferShapeContext 
         auto shape = context->GetDynamicInputShape(nodeId, i);
         OP_CHECK_NULL_WITH_CONTEXT(context, shape);
         int64_t innerAxisValue = shape->GetDim(innerAxisDimId);
-        if (!(ret == GRAPH_SUCCESS && GmmDavidSupportSoc.count(platformInfo.shortSocVersion) > 0)) {
+        if (!(ret == GRAPH_SUCCESS && IsGmmDavidSupportSoc(platformInfo.shortSocVersion))) {
             OP_CHECK_IF(
                 innerAxisValue > GMM_MAX_INNER_AXIS,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -1283,7 +1296,7 @@ static ge::graphStatus CheckShapeSameLengthTensorList(gert::InferShapeContext *c
             auto shape0 = context->GetDynamicInputShape(nodeIdx[0], i);
             OP_CHECK_NULL_WITH_CONTEXT(context, shape0);
             int64_t innerAxisValue = shape0->GetDim(innerAxisDimId);
-            if (!(ret == GRAPH_SUCCESS && GmmDavidSupportSoc.count(platformInfo.shortSocVersion) > 0) &&
+            if (!(ret == GRAPH_SUCCESS && IsGmmDavidSupportSoc(platformInfo.shortSocVersion)) &&
                 innerAxisValue > GMM_MAX_INNER_AXIS) {
                 OP_LOGW(context->GetNodeName(),
                         "Dim %lu value of %s[%lu] should be less than or equal to %ld,"
@@ -1332,7 +1345,7 @@ static ge::graphStatus CheckShapeDiffLengthTensorList(gert::InferShapeContext *c
     // tensorType[2] indicates whether check single tensorList's inner axis(innerAxisDimId)
     if (tensorType[2] == "true" && innerAxisdimId > -1) {
         int64_t dimValue = singleTensor0->GetDim(innerAxisdimId);
-        if (!(ret == GRAPH_SUCCESS && GmmDavidSupportSoc.count(platformInfo.shortSocVersion) > 0)) {
+        if (!(ret == GRAPH_SUCCESS && IsGmmDavidSupportSoc(platformInfo.shortSocVersion))) {
             OP_CHECK_IF(dimValue > GMM_MAX_INNER_AXIS,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                             context->GetNodeName(), tensorType[1].c_str(), std::to_string(dimValue),
@@ -1899,8 +1912,7 @@ static ge::graphStatus TryDavidInferShape(gert::InferShapeContext *context, bool
     isDavidCase = false;
     const auto &platformInfo = GetGmmPlatformCache();
     auto ret = platformInfo.ret;
-    if (ret != GRAPH_SUCCESS || GmmDavidSupportSoc.count(platformInfo.shortSocVersion) == 0 ||
-        IsS8S4PseudoQuant(context)) {
+    if (ret != GRAPH_SUCCESS || !IsGmmDavidSupportSoc(platformInfo.shortSocVersion) || IsS8S4PseudoQuant(context)) {
         return GRAPH_FAILED; // not handled by David path
     }
     if (IsDavidQuantGMMByShape(context) == GRAPH_SUCCESS) {
@@ -2054,7 +2066,7 @@ static graphStatus CheckNonQuantMatmulParams(const GmmPlatformCache &platformInf
                                              const DataType xDtype, const DataType weightDtype)
 {
     DataType biasDtype = xDtype == DataType::DT_BF16 ? DataType::DT_FLOAT : xDtype;
-    if (GmmDavidSupportSoc.count(platformInfo.shortSocVersion) > 0) {
+    if (IsGmmDavidSupportSoc(platformInfo.shortSocVersion)) {
         biasDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_BIAS, 0);
         if (biasDtype != DT_UNDEFINED) {
             OP_CHECK_IF(std::find(BIAS_DTYPE_SUPPORT_LIST.begin(), BIAS_DTYPE_SUPPORT_LIST.end(), biasDtype) ==
@@ -2148,9 +2160,7 @@ static graphStatus CheckFunctionParamsForDtype(gert::InferDataTypeContext *conte
         OP_LOGW(context->GetNodeName(), "Cannot get platform info.");
         return GRAPH_SUCCESS;
     } else {
-        platform = (platformInfo.shortSocVersion.find("310P") != std::string::npos) ? PlatformID::ASCEND310P :
-                   (platformInfo.shortSocVersion.find("950") != std::string::npos)  ? PlatformID::ASCEND950 :
-                                                                                      PlatformID::ASCEND910B;
+        platform = GetGmmPlatformId(platformInfo.shortSocVersion);
     }
     DataType xDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_X, 0);
     DataType weightDtype = context->GetDynamicInputDataType(GMM_INDEX_IN_WEIGHT, 0);
@@ -2291,7 +2301,7 @@ static graphStatus InferDataType4GroupedMatmul(gert::InferDataTypeContext *conte
     OP_CHECK_NULL_WITH_CONTEXT(context, context);
     const auto &platformInfo = GetGmmPlatformCache(true);
     auto ret = platformInfo.ret;
-    if (ret == GRAPH_SUCCESS && GmmDavidSupportSoc.count(platformInfo.shortSocVersion) > 0) {
+    if (ret == GRAPH_SUCCESS && IsGmmDavidSupportSoc(platformInfo.shortSocVersion)) {
         if (IsDavidQuantGMMByShape(context) == GRAPH_SUCCESS) {
             OP_CHECK_IF(InferDtype4DavidQuantGMM(context) != GRAPH_SUCCESS,
                         OP_LOGE(context->GetNodeName(), "InferDtype4DavidQuantGMM failed"), return GRAPH_FAILED);
