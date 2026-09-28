@@ -293,20 +293,31 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
     }
     uint32_t sOuterFactor = 0;
     uint32_t sInnerFactor = 0;
-    optiling::quant_flash_attn::qfa_tiling_util::AdjustSinnerAndSouter(
-        static_cast<uint32_t>(headDim_), static_cast<int64_t>(maxSeqlenQ_), static_cast<int64_t>(maxSeqlenKv_),
-        maskMode_, static_cast<int64_t>(winLeft_), static_cast<int64_t>(winRight_),
-        optiling::quant_flash_attn::qfa_tiling_util::LAYOUT_BSND, static_cast<uint32_t>(quantMode_), sOuterFactor,
-        sInnerFactor);
+    if (socVersion_.find("Ascend960") != std::string::npos) {
+        // 基本块随 decode/prefill 与 vHeadDim 分级，按 vHeadDim 判档
+        optiling::quant_flash_attn::qfa_tiling_util::AdjustSinnerAndSouterArch92(
+            static_cast<uint32_t>(headDimV_), static_cast<int64_t>(maxSeqlenQ_), static_cast<int64_t>(maxSeqlenKv_),
+            maskMode_, static_cast<int64_t>(winLeft_), static_cast<int64_t>(winRight_),
+            optiling::quant_flash_attn::qfa_tiling_util::LAYOUT_BSND, static_cast<uint32_t>(quantMode_), isDecode,
+            sOuterFactor, sInnerFactor);
+    } else {
+        // 保持原有逻辑与入参不变
+        optiling::quant_flash_attn::qfa_tiling_util::AdjustSinnerAndSouter(
+            static_cast<uint32_t>(headDim_), static_cast<int64_t>(maxSeqlenQ_), static_cast<int64_t>(maxSeqlenKv_),
+            maskMode_, static_cast<int64_t>(winLeft_), static_cast<int64_t>(winRight_),
+            optiling::quant_flash_attn::qfa_tiling_util::LAYOUT_BSND, static_cast<uint32_t>(quantMode_), sOuterFactor,
+            sInnerFactor);
+    }
     mBaseSize_ = sOuterFactor;
     s2BaseSize_ = sInnerFactor;
     mBaseSize_ = mBaseSize_ * (aivCoreNum_ / aicCoreNum_);
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
-    if (quantMode_ == 1) {                  // 仅 MXFP8 开启 FlashDecode
-        param.l2Byte = 96U * 1024U * 1024U; // 96: 96MB, 1024: Mb2Kb, 1024:Kb2Mb
-        param.fdTolerance = 10;             // 10: tolerance block
-        param.fdLeastBlock = 3;             // 3: least block
+    if (quantMode_ == 1 &&
+        socVersion_.find("Ascend960") == std::string::npos) { // 仅 MXFP8 在支持 FlashDecode 的平台开启 FD
+        param.l2Byte = 96U * 1024U * 1024U;                   // 96: 96MB, 1024: Mb2Kb, 1024:Kb2Mb
+        param.fdTolerance = 10;                               // 10: tolerance block
+        param.fdLeastBlock = 3;                               // 3: least block
         param.fdOn = true;
     } else {
         param.l2Byte = 0;

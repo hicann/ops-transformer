@@ -18,7 +18,6 @@
 
 #include <cstdint>
 #include <register/op_impl_registry.h>
-#include "../op_kernel/arch35/quant_flash_attn_tiling_data.h"
 #include "quant_flash_attn_tiling_common.h"
 
 namespace optiling {

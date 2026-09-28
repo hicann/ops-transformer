@@ -19,7 +19,6 @@
 #include "op_host/tiling_templates_registry.h"
 #include "quant_flash_attn_tiling.h"
 #include "quant_flash_attn_tiling_common.h"
-#include "../op_kernel/arch35/quant_flash_attn_template_tiling_key.h"
 #include "qfa_tiling_info_parser.h"
 #include "checkers/qfa_checker.h"
 #include "../../common/op_host/fia_tiling_templates_registry.h"
@@ -45,7 +44,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingQuantFlashAttn(gert::TilingContext *conte
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201) {
         if (IsEmptyInput(context)) {
             return ge::GRAPH_SUCCESS;
         }

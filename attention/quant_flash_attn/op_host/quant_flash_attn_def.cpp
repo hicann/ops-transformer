@@ -134,6 +134,7 @@ public:
             .ExtendCfgInfo("opFile.value", "quant_flash_attn");
 
         this->AICore().AddConfig("ascend950", aicore_config_95);
+        this->AICore().AddConfig("ascend960dt", aicore_config_95);
     }
 };
 
