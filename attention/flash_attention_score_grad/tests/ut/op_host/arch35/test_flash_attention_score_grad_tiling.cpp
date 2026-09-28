@@ -5799,6 +5799,17 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_query_rop
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_key_rope_without_query_rope)
+{
+    constexpr size_t queryRopeIndex = 22;
+    auto compileInfo = MakeA5CompileInfo();
+    auto tilingContextPara = MakeMlaRopeTilingContext(&compileInfo, 128, 128);
+    tilingContextPara.inputTensorDesc_.erase(tilingContextPara.inputTensorDesc_.begin() + queryRopeIndex);
+    tilingContextPara.inputInstanceNum_ = {1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
+    tilingContextPara.outputInstanceNum_ = {1, 1, 1, 0, 1, 1};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_eod_nonzero)
 {
     int64_t actual_seq_qlist[3] = {32, 16, 8};
