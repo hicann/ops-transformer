@@ -703,6 +703,14 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::GetInputParam(Ops::Base
 
 ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::InitTilingData()
 {
+    // workspace 槽位先清零: GetWorkspaceSizes 只设置元素个数, 不初始化数据区;
+    // Tiling4ReduceOp 在 dcos=0 / A 模板 / 未命中 reduce pattern 时不会写入基础值,
+    // 残留脏值会导致 SetTilingKeyBlockDim 累加出错误的 workspace 大小
+    auto workspaces = context_->GetWorkspaceSizes(1);
+    OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context_->GetNodeName(), "get workspace ptr failed"),
+                return ge::GRAPH_FAILED);
+    workspaces[0] = 0;
+
     if (tilingData_ == nullptr) {
         tilingData_ = context_->GetTilingData<ApplyRopeGradTilingData>();
         OP_CHECK_IF(tilingData_ == nullptr, OP_LOGE(context_->GetNodeName(), "get tilingdata ptr failed"),
@@ -788,6 +796,8 @@ ge::graphStatus ApplyRotaryPosEmbGradRegbaseTilingClass::SetTilingKeyBlockDim(ui
     OP_LOGD(context_->GetNodeName(), "reduceBlockNum :%ld, usedCoreNum_ = %ld.\n", reduceBlockNum, usedCoreNum_);
     context_->SetTilingKey(tilingKey_);
     auto workspaces = context_->GetWorkspaceSizes(1);
+    OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context_->GetNodeName(), "get workspace ptr failed"),
+                return ge::GRAPH_FAILED);
     auto partialTypeSize = (dCosFlag_ == DCOS_FLAG_ON && IsBroadcastPartialFloatTemplate(dxTilingKey)) ?
                                PARTIAL_TYPE_SIZE :
                                ge::GetSizeByDataType(dtype_);
