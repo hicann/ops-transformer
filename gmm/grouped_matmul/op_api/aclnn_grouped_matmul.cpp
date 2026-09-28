@@ -512,6 +512,11 @@ static aclnnStatus CheckTensorListNotNull(const aclTensorList *tensorList, const
     return ACLNN_SUCCESS;
 }
 
+static aclnnStatus CheckOptionalTensorListNotNull(const aclTensorList *tensorList, const std::string &tensorType)
+{
+    return tensorList == nullptr ? ACLNN_SUCCESS : CheckTensorListNotNull(tensorList, tensorType);
+}
+
 static aclnnStatus CheckNotNull(const aclTensorList *x, const aclTensorList *weight, const aclTensorList *y)
 {
     CHECK_COND(x != nullptr, ACLNN_ERR_PARAM_NULLPTR, "X must not be nullptr.");
@@ -3122,6 +3127,19 @@ static aclnnStatus CheckEmptyTensor(const aclTensorList *x, const aclTensorList 
 static aclnnStatus PrepareGmmParams(gmm::GroupedMatmulParams &gmmParams, const aclTensorList *x, const aclTensorList *y,
                                     int64_t splitItem, const char *opName)
 {
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+        // Check elements before reading scale dtype or normalizing empty optional inputs.
+        CHECK_RET_CODE(CheckOptionalTensorListNotNull(gmmParams.biasOptional, "bias"), "Invalid bias tensor list.");
+        CHECK_RET_CODE(CheckOptionalTensorListNotNull(gmmParams.scaleOptional, "scale"), "Invalid scale tensor list.");
+        CHECK_RET_CODE(CheckOptionalTensorListNotNull(gmmParams.offsetOptional, "offset"),
+                       "Invalid offset tensor list.");
+        CHECK_RET_CODE(CheckOptionalTensorListNotNull(gmmParams.antiquantScaleOptional, "antiquantScale"),
+                       "Invalid antiquantScale tensor list.");
+        CHECK_RET_CODE(CheckOptionalTensorListNotNull(gmmParams.antiquantOffsetOptional, "antiquantOffset"),
+                       "Invalid antiquantOffset tensor list.");
+        CHECK_RET_CODE(CheckOptionalTensorListNotNull(gmmParams.perTokenScaleOptional, "perTokenScale"),
+                       "Invalid perTokenScale tensor list.");
+    }
     if (gmmParams.scaleOptional != nullptr) {
         for (size_t i = 0; i < gmmParams.scaleOptional->Size(); i++) {
             if ((*gmmParams.scaleOptional)[i]->GetDataType() == DataType::DT_INT64) {
@@ -3189,7 +3207,7 @@ static aclnnStatus aclnnGroupedMatmulGetWorkspaceSizeCommon(
                                        activationFeatureOutOptional,
                                        dynQuantScaleOutOptional,
                                        xDtype};
-    CHECK_RET(PrepareGmmParams(gmmParams, x, y, splitItem, opName) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET_CODE(PrepareGmmParams(gmmParams, x, y, splitItem, opName), "PrepareGmmParams failed.");
 
     aclnnStatus ret = GetGMMResultByL0Api(gmmParams, workspaceSize, executor, opName);
 
@@ -3292,6 +3310,7 @@ aclnnStatus aclnnGroupedMatmulWeightNzGetWorkspaceSize(
                    DFX_OUT(out, activationFeatureOutOptional, dynQuantScaleOutOptional));
     UnpackWeightQuantInputs(x, weight);
     if (IsS8S4PseudoQuantWeightNz(x, weight, scaleOptional)) {
+        CHECK_RET_CODE(CheckOptionalTensorListNotNull(offsetOptional, "offset"), "Invalid offset tensor list.");
         bool hasOffset = offsetOptional != nullptr && offsetOptional->Size() == 1 && (*offsetOptional)[0] != nullptr;
         if (hasOffset) {
             const op::Shape &offsetShape = (*offsetOptional)[0]->GetViewShape();

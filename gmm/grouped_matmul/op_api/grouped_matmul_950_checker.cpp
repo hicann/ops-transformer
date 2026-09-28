@@ -455,7 +455,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightStorageShape(const a
 template <typename T>
 aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzSpecialParams() const
 {
-    CHECK_RET(CheckWeightNzMultiTensorElements() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET_CODE(CheckWeightNzMultiTensorElements(), "Invalid WeightNz tensor list elements.");
     GMM_CHECK_REPORT(
         gmmParams_.apiVersion == gmm::GMMApiVersion::WeightNz,
         OP_LOGE_FOR_INVALID_VALUE(GetAclnnOpName(), "apiVersion", GetAclnnOpName(), "aclnnGroupedMatmulWeightNz"));
@@ -513,21 +513,24 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzMultiTensorElement
     }
     const size_t weightTensorNum = GetInputTensorSize(gmmParams_.weight);
     for (size_t i = 0UL; i < weightTensorNum; ++i) {
-        GMM_CHECK_REPORT(
-            GetInputTensor(gmmParams_.weight, i) != nullptr,
+        if (GetInputTensor(gmmParams_.weight, i) == nullptr) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                 GetAclnnOpName(), weightName_.c_str(), ("weight[" + std::to_string(i) + "]=nullptr").c_str(),
-                "in WeightNz single-multi-single mode, expected every weight tensor to be non-null"));
+                "in WeightNz single-multi-single mode, expected every weight tensor to be non-null");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
     }
     if (gmmParams_.scaleOptional == nullptr) {
         return ACLNN_SUCCESS;
     }
     const size_t scaleTensorNum = GetInputTensorSize(gmmParams_.scaleOptional);
     for (size_t i = 0UL; i < scaleTensorNum; ++i) {
-        GMM_CHECK_REPORT(GetInputTensor(gmmParams_.scaleOptional, i) != nullptr,
-                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                             GetAclnnOpName(), scaleName_.c_str(), ("scale[" + std::to_string(i) + "]=nullptr").c_str(),
-                             "in WeightNz single-multi-single mode, expected every scale tensor to be non-null"));
+        if (GetInputTensor(gmmParams_.scaleOptional, i) == nullptr) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                GetAclnnOpName(), scaleName_.c_str(), ("scale[" + std::to_string(i) + "]=nullptr").c_str(),
+                "in WeightNz single-multi-single mode, expected every scale tensor to be non-null");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
     }
     return ACLNN_SUCCESS;
 }
@@ -1767,7 +1770,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckQuantShapeAndFormat() cons
             "list combinations are supported"));
     CHECK_RET(CheckQuantCasesFormat() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     if (GetInputTensor(gmmParams_.weight)->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ) {
-        CHECK_RET(CheckWeightNzSpecialParams() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+        CHECK_RET_CODE(CheckWeightNzSpecialParams(), "Invalid WeightNz parameters.");
     }
     CHECK_RET(CheckGeneralQuantShape() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
@@ -1838,7 +1841,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulDAV3510() con
     DataType weightDtype = GetInputTensor(gmmParams_.weight)->GetDataType();
     DataType yDtype = GetInputTensor(gmmParams_.y)->GetDataType();
     CHECK_RET(CheckBasicQuantParams(yDtype) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
-    CHECK_RET(CheckQuantShapeAndFormat() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET_CODE(CheckQuantShapeAndFormat(), "Invalid quant shape or format.");
 
     if (gmmParams_.apiVersion == gmm::GMMApiVersion::V3) {
         CHECK_RET(CheckInputParamsForV3Version() == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
