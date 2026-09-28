@@ -171,6 +171,7 @@ ge::graphStatus GMMFRWeightQuantTiling::PostTiling()
             sizeof(tilingData_));
 
     context_->SetBlockDim(tilingData_.coreNum);
+    context_->SetScheduleMode(1);
     OP_CHECK_IF(context_->GetRawTilingData() == nullptr, OP_LOGE(context_->GetNodeName(), "RawTilingData is nullptr."),
                 return ge::GRAPH_FAILED);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),

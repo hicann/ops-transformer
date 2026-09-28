@@ -974,6 +974,8 @@ ge::graphStatus GroupedS4S4IntQuantTiling::PostTiling()
             "depthA1=%lu depthB1=%lu",
             p.baseM, p.baseN, p.baseK, p.ubCalSize, p.ubRestBytes, p.quantGroupNum, p.isPerTokenQuant,
             s4s4Tiling_.depthA1, s4s4Tiling_.depthB1);
+    // Int4->Int8 preprocess synchronizes all vector cores, so all participating cores must be resident.
+    context_->SetScheduleMode(1);
     return SaveTilingDataToContext(tilingData_);
 }
 
