@@ -218,6 +218,7 @@ private:
     fe::PlatFormInfos *platformInfo_ = nullptr;
     StemIndexerParaInfo opParamInfo_;
     platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND950;
+    NpuArch npuArch_ = NpuArch::DAV_3510;
     uint32_t bSize_ = 0;
     uint32_t qHeadNum_ = 0;
     uint32_t kvHeadNum_ = 0;

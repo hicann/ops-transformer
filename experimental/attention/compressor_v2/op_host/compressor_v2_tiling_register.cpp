@@ -42,7 +42,7 @@ CMP_EXTERN_C ge::graphStatus TilingCompressorV2(gert::TilingContext *context)
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("CompressorV2", "platformInfo", "is nullptr"),
                 return ge::GRAPH_FAILED);
     auto platform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-    if (platform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND950) {
+    if (platform.GetCurNpuArch() == NpuArch::DAV_3510) {
         return TilingCompressorArch35(context);
     }
     return TilingCompressorV2Arch22(context);

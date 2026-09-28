@@ -20,7 +20,7 @@
 
 using AscendC::LocalTensor;
 using namespace AscendC;
-using namespace MicroAPI;
+using namespace Reg;
 
 namespace fa_base_vector {
 

@@ -16,6 +16,7 @@
 #include "opdev/format_utils.h"
 #include "opdev/op_log.h"
 #include "opdev/data_type_utils.h"
+#include "opdev/platform.h"
 #include "opdev/tensor_view_utils.h"
 #include "../../quant_lightning_indexer/op_kernel/quant_lightning_indexer_metadata.h"
 
@@ -24,9 +25,9 @@ extern "C" {
 #endif
 
 aclnnStatus CheckSingleParamQli(int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK, int64_t numHeadsQ,
-                                int64_t numHeadsK, char* layoutQueryOptional, char* layoutKeyOptional,
+                                int64_t numHeadsK, char *layoutQueryOptional, char *layoutKeyOptional,
                                 int64_t sparseMode, int64_t preTokens, int64_t nextTokens, int64_t cmpRatio,
-                                const char* socVersion)
+                                NpuArch npuArch)
 {
     // batch_size 非负校验
     if (batchSize < 0) {
@@ -93,7 +94,7 @@ aclnnStatus CheckSingleParamQli(int64_t batchSize, int64_t maxSeqlenQ, int64_t m
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cmp_ratio should be [1, 128], but got %d", cmpRatio);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (strstr(socVersion, "Ascend950") != nullptr) {
+    if (npuArch == NpuArch::DAV_3510) {
         if (cmpRatio != 1 && cmpRatio != 4 && cmpRatio != 128) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "For Ascend950, cmp_ratio should be 1/4/128, but got %d", cmpRatio);
             return ACLNN_ERR_PARAM_INVALID;
@@ -101,16 +102,16 @@ aclnnStatus CheckSingleParamQli(int64_t batchSize, int64_t maxSeqlenQ, int64_t m
     } else {
         if ((cmpRatio & (cmpRatio - 1)) != 0) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "For Atlas A3, cmp_ratio should be 1/2/4/8/16/32/64/128, but got %d",
-                cmpRatio);
+                    cmpRatio);
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckExistenceQli(char* layoutQueryOptional, char* layoutKeyOptional,
-                              const aclTensor* actualSeqLengthsQueryOptional,
-                              const aclTensor* actualSeqLengthsKeyOptional, const aclTensor* metadata)
+aclnnStatus CheckExistenceQli(char *layoutQueryOptional, char *layoutKeyOptional,
+                              const aclTensor *actualSeqLengthsQueryOptional,
+                              const aclTensor *actualSeqLengthsKeyOptional, const aclTensor *metadata)
 {
     int64_t *viewDims = nullptr;
     uint64_t viewDimsNum = 0;
@@ -151,7 +152,7 @@ aclnnStatus CheckExistenceQli(char* layoutQueryOptional, char* layoutKeyOptional
     return ACLNN_SUCCESS;
 }
 
-int64_t GetQueryBatchSizeQli(const aclTensor* actualSeqLengthsQueryOptional, int64_t batchSize)
+int64_t GetQueryBatchSizeQli(const aclTensor *actualSeqLengthsQueryOptional, int64_t batchSize)
 {
     int64_t *viewDims = nullptr;
     uint64_t viewDimsNum = 0;
@@ -165,7 +166,7 @@ int64_t GetQueryBatchSizeQli(const aclTensor* actualSeqLengthsQueryOptional, int
     return batchSize;
 }
 
-int64_t GetKvBatchSizeQli(const aclTensor* actualSeqLengthsKeyOptional, int64_t batchSize)
+int64_t GetKvBatchSizeQli(const aclTensor *actualSeqLengthsKeyOptional, int64_t batchSize)
 {
     int64_t *viewDims = nullptr;
     uint64_t viewDimsNum = 0;
@@ -179,10 +180,10 @@ int64_t GetKvBatchSizeQli(const aclTensor* actualSeqLengthsKeyOptional, int64_t 
     return batchSize;
 }
 
-aclnnStatus CheckConsistencyQli(char* layoutQueryOptional, char* layoutKeyOptional,
-                                const aclTensor* actualSeqLengthsQueryOptional,
-                                const aclTensor* actualSeqLengthsKeyOptional, int64_t batchSize,
-                                const aclTensor* metadata)
+aclnnStatus CheckConsistencyQli(char *layoutQueryOptional, char *layoutKeyOptional,
+                                const aclTensor *actualSeqLengthsQueryOptional,
+                                const aclTensor *actualSeqLengthsKeyOptional, int64_t batchSize,
+                                const aclTensor *metadata)
 {
     int64_t *viewDims = nullptr;
     uint64_t viewDimsNum = 0;
@@ -193,7 +194,7 @@ aclnnStatus CheckConsistencyQli(char* layoutQueryOptional, char* layoutKeyOption
         // 校验 actual_seq_lengths_query 维度
         if (viewDimsNum != 1) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dim num of actual_seq_lengths_query must be 1, but got %lu",
-                viewDimsNum);
+                    viewDimsNum);
             delete[] viewDims;
             return ACLNN_ERR_PARAM_INVALID;
         }
@@ -210,7 +211,7 @@ aclnnStatus CheckConsistencyQli(char* layoutQueryOptional, char* layoutKeyOption
         // 校验 actual_seq_lengths_key 维度
         if (viewDimsNum != 1) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dim num of actual_seq_lengths_key must be 1, but got %lu",
-                viewDimsNum);
+                    viewDimsNum);
             delete[] viewDims;
             return ACLNN_ERR_PARAM_INVALID;
         }
@@ -233,7 +234,7 @@ aclnnStatus CheckConsistencyQli(char* layoutQueryOptional, char* layoutKeyOption
         // 校验 metadata 元素数
         if (viewDims[0] != optiling::QLI_META_SIZE) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The element num of metadata must be %u, but got %ld",
-                optiling::QLI_META_SIZE, viewDims[0]);
+                    optiling::QLI_META_SIZE, viewDims[0]);
             delete[] viewDims;
             return ACLNN_ERR_PARAM_INVALID;
         }
@@ -247,31 +248,35 @@ aclnnStatus CheckConsistencyQli(char* layoutQueryOptional, char* layoutKeyOption
     }
     int64_t queryBatchSize = GetQueryBatchSizeQli(actualSeqLengthsQueryOptional, batchSize);
     int64_t kvBatchSize = GetKvBatchSizeQli(actualSeqLengthsKeyOptional, batchSize);
-    if ((strcmp(layoutQueryOptional, "BSND") == 0 || (strcmp(layoutQueryOptional, "TND") == 0 &&
-        strcmp(layoutKeyOptional, "TND") == 0)) && queryBatchSize != kvBatchSize) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "For the layout_query is BSND or both layout_query and layout_key are TND, "
-            "the batch_size obtained from q Tensor should be the same as that obtained from kv tensor, "
-            "but got %ld and %ld", queryBatchSize, kvBatchSize);
+    if ((strcmp(layoutQueryOptional, "BSND") == 0 ||
+         (strcmp(layoutQueryOptional, "TND") == 0 && strcmp(layoutKeyOptional, "TND") == 0)) &&
+        queryBatchSize != kvBatchSize) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "For the layout_query is BSND or both layout_query and layout_key are TND, "
+                "the batch_size obtained from q Tensor should be the same as that obtained from kv tensor, "
+                "but got %ld and %ld",
+                queryBatchSize, kvBatchSize);
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (std::abs(queryBatchSize - kvBatchSize) > 1) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The difference between the dim of actual_seq_lengths_query and the dim of "
-            "actual_seq_lengths_key should not be greater than 1, but got %ld and %ld", queryBatchSize, kvBatchSize);
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "The difference between the dim of actual_seq_lengths_query and the dim of "
+                "actual_seq_lengths_key should not be greater than 1, but got %ld and %ld",
+                queryBatchSize, kvBatchSize);
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParamsCheck(const aclTensor* actualSeqLengthsQueryOptional,
-                               const aclTensor* actualSeqLengthsKeyOptional, int64_t numHeadsQ, int64_t numHeadsK,
+static aclnnStatus ParamsCheck(const aclTensor *actualSeqLengthsQueryOptional,
+                               const aclTensor *actualSeqLengthsKeyOptional, int64_t numHeadsQ, int64_t numHeadsK,
                                int64_t headDim, int64_t queryQuantMode, int64_t keyQuantMode, int64_t batchSize,
-                               int64_t maxSeqlenQ, int64_t maxSeqlenK, char* layoutQueryOptional,
-                               char* layoutKeyOptional, int64_t sparseCount, int64_t sparseMode, int64_t preTokens,
-                               int64_t nextTokens, int64_t cmpRatio, const char* socVersion, const aclTensor* metadata)
+                               int64_t maxSeqlenQ, int64_t maxSeqlenK, char *layoutQueryOptional,
+                               char *layoutKeyOptional, int64_t sparseCount, int64_t sparseMode, int64_t preTokens,
+                               int64_t nextTokens, int64_t cmpRatio, NpuArch npuArch, const aclTensor *metadata)
 {
     if (CheckSingleParamQli(batchSize, maxSeqlenQ, maxSeqlenK, numHeadsQ, numHeadsK, layoutQueryOptional,
-                            layoutKeyOptional, sparseMode, preTokens, nextTokens, cmpRatio,
-                            socVersion) == ACLNN_SUCCESS &&
+                            layoutKeyOptional, sparseMode, preTokens, nextTokens, cmpRatio, npuArch) == ACLNN_SUCCESS &&
         CheckExistenceQli(layoutQueryOptional, layoutKeyOptional, actualSeqLengthsQueryOptional,
                           actualSeqLengthsKeyOptional, metadata) == ACLNN_SUCCESS &&
         CheckConsistencyQli(layoutQueryOptional, layoutKeyOptional, actualSeqLengthsQueryOptional,

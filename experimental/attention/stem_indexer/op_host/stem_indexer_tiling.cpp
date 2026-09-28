@@ -60,8 +60,9 @@ ge::graphStatus StemIndexerInfoParser::GetNpuInfo()
     OP_CHECK_IF(aicNum == 0 || aivNum == 0, OP_LOGE(opName_, "num of core obtained is 0."), return ge::GRAPH_FAILED);
 
     socVersion_ = ascendcPlatform.GetSocVersion();
-    // 当前仅适配 A5（ASCEND950），A2/A3 暂未适配
-    if (socVersion_ != platform_ascendc::SocVersion::ASCEND950) {
+    npuArch_ = ascendcPlatform.GetCurNpuArch();
+    // 当前仅适配 A5（DAV_3510），A2/A3 暂未适配
+    if (npuArch_ != NpuArch::DAV_3510) {
         OP_LOGE(opName_, "SOC Version[%d] is not support, only ASCEND950 is supported.",
                 static_cast<int32_t>(socVersion_));
         return ge::GRAPH_FAILED;

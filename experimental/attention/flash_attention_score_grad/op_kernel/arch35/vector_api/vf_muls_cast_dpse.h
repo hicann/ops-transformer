@@ -18,17 +18,17 @@
 
 namespace AscendC {
 #ifndef __CCE_KT_TEST__
-constexpr static MicroAPI::CastTrait DPSE_CAST_TRAIT_B32_TO_B16 = {
-    MicroAPI::RegLayout::ZERO,
-    MicroAPI::SatMode::NO_SAT,
-    MicroAPI::MaskMergeMode::ZEROING,
+constexpr static Reg::CastTrait DPSE_CAST_TRAIT_B32_TO_B16 = {
+    Reg::RegLayout::ZERO,
+    Reg::SatMode::NO_SAT,
+    Reg::MaskMergeMode::ZEROING,
     RoundMode::CAST_RINT,
 };
 
 template <typename T, uint32_t dataSize>
 __simd_vf__ inline void MulsCastDpseVF(uint64_t dstLocalInt, uint64_t srcLocalInt, float scaleValue)
 {
-    using namespace MicroAPI;
+    using namespace Reg;
     RegTensor<float> srcReg0;
     RegTensor<float> srcReg1;
     RegTensor<float> scaledReg0;

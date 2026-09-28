@@ -31,10 +31,10 @@ inline bool IsArch35Ub(uint64_t ubSize)
     return ubSize >= kUbThresholdBytes;
 }
 
-/** 真正启用 A5 算法字段：仅 950 / 910_95（与 opFile=k2q_csr_apt 对齐） */
-inline bool IsArch35Soc(platform_ascendc::SocVersion soc)
+/** 真正启用 A5 算法字段：仅 DAV_3510（与 opFile=k2q_csr_apt 对齐） */
+inline bool IsArch35Soc(NpuArch npuArch)
 {
-    return soc == platform_ascendc::SocVersion::ASCEND950;
+    return npuArch == NpuArch::DAV_3510;
 }
 
 /** q 维多核划分：G = min(aivNum, T)，每核一段连续 q（MC 路径） */

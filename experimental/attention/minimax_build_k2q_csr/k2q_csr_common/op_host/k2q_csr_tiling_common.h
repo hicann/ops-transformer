@@ -45,12 +45,12 @@ enum class Stage : int32_t {
 };
 
 inline ge::graphStatus GetPlatformInfo(gert::TilingContext *context, uint64_t &ubSize, int64_t &aivNum,
-                                       platform_ascendc::SocVersion &socVersion)
+                                       NpuArch &npuArch)
 {
     fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfoPtr);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-    socVersion = ascendcPlatform.GetSocVersion();
+    npuArch = ascendcPlatform.GetCurNpuArch();
     aivNum = ascendcPlatform.GetCoreNumAiv();
     OP_CHECK_IF(aivNum == 0, OP_LOGE(context, "aivNum is 0"), return ge::GRAPH_FAILED);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
@@ -297,8 +297,8 @@ inline ge::graphStatus FillTiling(gert::TilingContext *context, Stage stage)
 {
     uint64_t ubSize = 0;
     int64_t aivNum = 0;
-    platform_ascendc::SocVersion socVersion = platform_ascendc::SocVersion::ASCEND910B;
-    OP_CHECK_IF(GetPlatformInfo(context, ubSize, aivNum, socVersion) != ge::GRAPH_SUCCESS,
+    NpuArch npuArch = NpuArch::DAV_2201;
+    OP_CHECK_IF(GetPlatformInfo(context, ubSize, aivNum, npuArch) != ge::GRAPH_SUCCESS,
                 OP_LOGE(context, "GetPlatformInfo error"), return ge::GRAPH_FAILED);
 
     int64_t H = 0, T = 0, topk = 0, B = 0, totalRows = 0, maxKv = 0, rowMapElems = 0;
@@ -308,7 +308,7 @@ inline ge::graphStatus FillTiling(gert::TilingContext *context, Stage stage)
                 OP_LOGE(context, "GetShapeAttrsInfo error"), return ge::GRAPH_FAILED);
 
     int64_t N = T * topk;
-    bool isArch35 = k2q_csr_arch35::IsArch35Soc(socVersion);
+    bool isArch35 = k2q_csr_arch35::IsArch35Soc(npuArch);
     int32_t useSimt = ReadUseSimt(context, stage, isArch35);
     int32_t qGlobalOffset = ReadQGlobalOffset(context, stage);
 
