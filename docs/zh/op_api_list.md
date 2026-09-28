@@ -222,7 +222,7 @@
 |[aclnnNsaSelectedAttentionInfer](../../attention/nsa_selected_attention_infer/docs/aclnnNsaSelectedAttentionInfer.md)|Native Sparse Attention推理过程中，Selected Attention的计算。|默认确定性实现| - |
 |[aclnnPoolKeyIndexer](../../attention/pool_key_indexer/docs/aclnnPoolKeyIndexer.md)|将多个连续token打包成一个pool（池），以pool为单位计算注意力相关性分数并选取top-k位置，从而在保持稀疏注意力优势的同时减少索引开销。|默认确定性实现|默认确定性实现|
 |[aclnnPromptFlashAttentionV3](../../attention/prompt_flash_attention/docs/aclnnPromptFlashAttentionV3.md)|全量推理场景的FlashAttention算子。|默认确定性实现| - |
-|[aclnnQkvRmsNormRopeCache](../../posembedding/qkv_rms_norm_rope_cache/docs/aclnnQkvRmsNormRopeCache.md)|输入qkv融合张量，通过SplitVD拆分q、k、v张量，执行RmsNorm、ApplyRotaryPosEmb、Quant、Scatter融合操作，输出qOut、kCache、vCache、qBeforeQuant(可选)、kBeforeQuant(可选)、vBeforeQuant(可选)。|默认确定性实现| - |
+|[aclnnQkvRmsNormRopeCache](../../posembedding/qkv_rms_norm_rope_cache/docs/aclnnQkvRmsNormRopeCache.md)|输入qkv融合张量，通过SplitVD拆分q、k、v张量，执行RmsNorm、ApplyRotaryPosEmb、Quant、Scatter融合操作，输出qOut、kCache、vCache、qBeforeQuant(可选)、kBeforeQuant(可选)、vBeforeQuant(可选)。|默认确定性实现| 默认确定性实现 |
 |[aclnnQkvRmsNormRopeCacheWithKScale](../../posembedding/qkv_rms_norm_rope_cache_with_k_scale/docs/aclnnQkvRmsNormRopeCacheWithKScale.md)|输入Q/K/V融合张量，对Q/K执行RMSNorm、RoPE/M-RoPE及场景对应的量化，并按slotMapping更新KV Cache和K scale Cache，支持M-RoPE MX场景。|-|默认确定性实现|
 |[aclnnQuantCompressor](../../attention/quant_compressor/docs/aclnnQuantCompressor.md)|Compressor的量化版本，将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。|- | 默认确定性实现 |
 |[aclnnQuantGroupedMatmulDequantWeightNZ](../../gmm/quant_grouped_matmul_dequant/docs/aclnnQuantGroupedMatmulDequantWeightNZ.md)|对输入x进行量化，分组矩阵乘以及反量化，输入权重Weight会被强制视为NZ格式。| - | - |
