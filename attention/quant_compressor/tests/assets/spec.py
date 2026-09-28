@@ -13,6 +13,7 @@
 """TestSpec adapter for QuantCompressor assets."""
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -20,11 +21,13 @@ ASSET_IMPL_DIR = Path(__file__).with_name("impl")
 
 
 def load_impl_module(stem):
+    name = f"quant_compressor_assets_impl_{stem}"
+    if name in sys.modules:
+        return sys.modules[name]
     path = ASSET_IMPL_DIR / f"{stem}.py"
-    spec = importlib.util.spec_from_file_location(
-        f"quant_compressor_assets_impl_{stem}_{abs(hash(path))}", path
-    )
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -32,10 +35,12 @@ def load_impl_module(stem):
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
 compare_module = load_impl_module("compare")
+graph_module = load_impl_module("graph")
 
 
 class QuantCompressorSpec:
     golden = golden_module.cpu_quant_compressor
+    torch_graph = graph_module.QuantCompressorGraphNetwork
     customize_inputs = inputs_module.generate_quant_compressor_inputs
     tolerance = {
         "float16": {"standard": "stat_rel_err"},
