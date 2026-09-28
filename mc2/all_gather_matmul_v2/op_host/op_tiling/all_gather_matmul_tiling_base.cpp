@@ -207,6 +207,7 @@ bool AllGatherMatmulTilingBase::CheckGatherOutPara()
 {
     auto attrs = context_->GetAttrs();
     auto isGatherout = attrs->GetAttrPointer<bool>(IS_GATHER_OUT);
+    OP_TILING_CHECK(isGatherout == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "is_gather_out"), return false);
     auto gatherIndex = attrs->GetAttrPointer<int64_t>(GATHER_IDX);
     auto gatherOutShape = context_->GetOutputShape(GATHER_OUT);
     const gert::StorageShape *x1Shape = context_->GetInputShape(INPUT_X1);
@@ -430,9 +431,10 @@ ge::graphStatus AllGatherMatmulTilingBase::CheckHCCLSize()
                                           // 返回1000+该数据类型的bit位数，比如DT_INT4数据类型，返回1004。
         sizeOfSingleM = args_.kValue * ge::GetSizeByDataType(args_.geAType) * args_.rankDim;
     } else {
-        sizeOfSingleM = args_.kValue * args_.rankDim *
-                        static_cast<uint64_t>(ge::GetSizeByDataType(args_.geAType) - GET_SIZE_BY_DATATYPE_THRESHOLD) /
-                        SINGLE_BYTE_BIT_LENGTH;
+        // 子字节类型返回值为1000+bit位数，先按bit累乘再CeilDiv向上取整换算为字节，避免整数除法截断为0
+        uint64_t bitsPerElem = static_cast<uint64_t>(ge::GetSizeByDataType(args_.geAType)) -
+                               static_cast<uint64_t>(GET_SIZE_BY_DATATYPE_THRESHOLD);
+        sizeOfSingleM = Ops::Base::CeilDiv(args_.kValue * args_.rankDim * bitsPerElem, SINGLE_BYTE_BIT_LENGTH);
     }
     OP_TILING_CHECK(sizeOfSingleM > mc2tiling::ALL_GATHER_HCCL_MEM_LIMIT,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
