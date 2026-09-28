@@ -77,8 +77,16 @@ public:
             int64_t slotmappingValue = static_cast<int64_t>(slotmappingGm.GetValue(n));
             blockIndex = slotmappingValue / blockSize;
             blockOffset = slotmappingValue % blockSize;
-            keycacheOutGmOffset = blockIndex * numHead * blockSize * kHeadSize + blockOffset * kHeadSize;
-            valuecacheOutGmOffset = blockIndex * numHead * blockSize * vHeadSize + blockOffset * vHeadSize;
+            if (kCacheBlockStride > 0) {
+                keycacheOutGmOffset = blockIndex * kCacheBlockStride + blockOffset * kHeadSize;
+            } else {
+                keycacheOutGmOffset = blockIndex * numHead * blockSize * kHeadSize + blockOffset * kHeadSize;
+            }
+            if (vCacheBlockStride > 0) {
+                valuecacheOutGmOffset = blockIndex * vCacheBlockStride + blockOffset * vHeadSize;
+            } else {
+                valuecacheOutGmOffset = blockIndex * numHead * blockSize * vHeadSize + blockOffset * vHeadSize;
+            }
             DataCopyOut<T1>(keycacheOutGm[keycacheOutGmOffset], keyIn, static_cast<uint32_t>(kHeadSize), keyCacheStride,
                             static_cast<uint16_t>(numHead));
             DataCopyOut<T1>(valuecacheOutGm[valuecacheOutGmOffset], valueIn, static_cast<uint32_t>(vHeadSize),
@@ -98,6 +106,8 @@ private:
         kHeadSize = tilingData->kHeadSize;
         vHeadSize = tilingData->vHeadSize;
         blockSize = tilingData->blockSize;
+        kCacheBlockStride = tilingData->kCacheBlockStride;
+        vCacheBlockStride = tilingData->vCacheBlockStride;
     }
 
     template <typename U>
@@ -147,6 +157,8 @@ private:
     int64_t kHeadSize = 0;
     int64_t vHeadSize = 0;
     int64_t blockSize = 0;
+    int64_t kCacheBlockStride = 0;
+    int64_t vCacheBlockStride = 0;
     int32_t blockIdx = 0;
     int64_t useCoreNum = 0;
     int64_t keyInOffset = 0;
