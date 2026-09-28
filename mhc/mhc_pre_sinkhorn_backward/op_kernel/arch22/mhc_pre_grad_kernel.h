@@ -1117,6 +1117,7 @@ __aicore__ inline void MhcPreGradKernel<TYPE_X, T, DETERMINISTIC>::ProcessMatmul
     mm1_.SetOrgShape(mm1M, mm1N_, mm1K_);
     mm1_.SetSingleShape(mm1M, mm1N_, mm1K_);
     mm1_.template IterateAll<false>(gradXCubeGlobal_[taskOffset * (n_ * c_)]);
+    mm1_.SetHF32(false);
     mm1_.End();
 }
 
@@ -1138,6 +1139,7 @@ __aicore__ inline void MhcPreGradKernel<TYPE_X, T, DETERMINISTIC>::ProcessMatmul
     } else {
         mm2_.template IterateAll<false>(gradWeightGlobal_, 1);
     }
+    mm2_.SetHF32(false);
     mm2_.End();
 }
 
