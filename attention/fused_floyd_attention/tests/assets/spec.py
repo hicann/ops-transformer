@@ -224,9 +224,9 @@ class FusedFloydAttentionTestSpec:
 
     # 精度标准
     tolerance = {
-        "bfloat16": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "float32": {"standard": "stat_rel_err"},
+        "bfloat16": {"standard": "binary_equal"},
+        "float16": {"standard": "binary_equal"},
+        "float32": {"standard": "binary_equal"},
     }
 
 
@@ -250,9 +250,9 @@ class FusedFloydAttentionE2ESpec:
 
     # 精度标准
     tolerance = {
-        "bfloat16": {"standard": "stat_rel_err"},
-        "float16": {"standard": "stat_rel_err"},
-        "float32": {"standard": "stat_rel_err"},
+        "bfloat16": {"standard": "binary_equal"},
+        "float16": {"standard": "binary_equal"},
+        "float32": {"standard": "binary_equal"},
     }
 
 
