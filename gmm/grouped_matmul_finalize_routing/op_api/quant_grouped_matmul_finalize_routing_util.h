@@ -43,6 +43,7 @@ struct GroupedMatmulParams {
     float shareInputWeight{0.0f};
     int64_t shareInputOffset{0};
     int64_t groupListType{0};
+    int64_t dtype{0};
     // attrs
     bool transposeX1{false};
     bool transposeX2{false};
@@ -118,6 +119,12 @@ public:
         p_.shareInputWeight = shareInputWeight;
         p_.shareInputOffset = shareInputOffset;
         p_.groupListType = groupListType;
+        return *this;
+    }
+
+    GroupedMatmulParamsBuilder &SetDtype(int64_t dtype)
+    {
+        p_.dtype = dtype;
         return *this;
     }
 

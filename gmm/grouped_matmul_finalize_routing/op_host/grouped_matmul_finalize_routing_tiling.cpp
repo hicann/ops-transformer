@@ -45,6 +45,10 @@ static ge::graphStatus GroupedMatmulFinalizeRoutingTilingFunc(gert::TilingContex
                 OPS_REPORT_CUBE_INNER_ERR("GroupedMatmulFinalizeRouting", "CompileInfo is null"),
                 return ge::GRAPH_FAILED);
     if (compileInfoPtr->npuArch == NpuArch::DAV_3510) {
+        auto atomicRet = context->SetNeedAtomic(true);
+        OP_CHECK_IF(atomicRet != ge::GRAPH_SUCCESS,
+                    OPS_REPORT_CUBE_INNER_ERR(context->GetNodeName(), "SetNeedAtomic failed"), return ge::GRAPH_FAILED);
+
         OP_CHECK_NULL_WITH_CONTEXT(context, context);
         auto xDesc = context->GetDynamicInputDesc(X_INDEX, 0);
         OP_CHECK_NULL_WITH_CONTEXT(context, xDesc); // check xDesc is not null

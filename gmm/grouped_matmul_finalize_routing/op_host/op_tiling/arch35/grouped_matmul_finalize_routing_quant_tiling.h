@@ -127,6 +127,7 @@ private:
     bool CheckOptionalInputsForRouting();
     bool CheckScaleAndPerTokenDims(const gert::StorageShape *pertokenScaleStorageShape,
                                    const gert::Shape &scaleShape) const;
+    bool IsBf16MxTensorApiTarget() const;
 
     GMMFinalizeRoutingTilingData tilingData_;
     uint64_t sharedInputLen_ = 0;
@@ -136,6 +137,7 @@ private:
     uint64_t outputBs_ = 0;
     int8_t scaleType_ = 0;
     int8_t rowIndexType_ = 0;
+    int8_t logitType_ = 0;
     uint32_t deterWorkspaceSize_ = 0;
 };
 } // namespace optiling

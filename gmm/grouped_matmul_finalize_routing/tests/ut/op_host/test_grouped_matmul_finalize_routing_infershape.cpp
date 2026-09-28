@@ -122,7 +122,8 @@ vector<GmmFrInfershapeCase> LoadEnabled()
     return out;
 }
 
-ge::graphStatus RunInferDtype(const ge::DataType dtypes[9], bool tpW)
+ge::graphStatus RunInferDtype(const ge::DataType dtypes[9], bool tpW, int64_t dtypeAttr = 0,
+                              ge::DataType *outDtype = nullptr)
 {
     auto reg = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry();
     auto impl = reg->GetOpImpl("GroupedMatmulFinalizeRouting");
@@ -138,7 +139,7 @@ ge::graphStatus RunInferDtype(const ge::DataType dtypes[9], bool tpW)
                              .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
                              .InputDataTypes(iv)
                              .NodeAttrs({
-                                 {"dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                                 {"dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(dtypeAttr)},
                                  {"shared_input_weight", Ops::Transformer::AnyValue::CreateFrom<float>(1.0F)},
                                  {"shared_input_offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                  {"transpose_x", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
@@ -147,7 +148,12 @@ ge::graphStatus RunInferDtype(const ge::DataType dtypes[9], bool tpW)
                                  {"group_list_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
                              })
                              .Build();
-    return impl->infer_datatype(contextHolder.GetContext<gert::InferDataTypeContext>());
+    auto context = contextHolder.GetContext<gert::InferDataTypeContext>();
+    auto ret = impl->infer_datatype(context);
+    if (outDtype != nullptr) {
+        *outDtype = context->GetOutputDataType(0);
+    }
+    return ret;
 }
 
 string MakeParamName(const testing::TestParamInfo<GmmFrInfershapeCase> &info)
@@ -205,6 +211,26 @@ TEST_F(TestInferdtype, MXFP4ValidDtypes)
                         ge::DT_UNDEFINED,   ge::DT_FLOAT8_E8M0, ge::DT_INT64,
                         ge::DT_UNDEFINED,   ge::DT_FLOAT,       ge::DT_INT64};
     EXPECT_EQ(RunInferDtype(d, true), ge::GRAPH_SUCCESS);
+}
+
+TEST_F(TestInferdtype, MXFP8Bf16OutDtype)
+{
+    ge::DataType d[] = {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E8M0,
+                        ge::DT_UNDEFINED,     ge::DT_FLOAT8_E8M0,   ge::DT_INT64,
+                        ge::DT_UNDEFINED,     ge::DT_BF16,          ge::DT_INT32};
+    ge::DataType outDtype = ge::DT_UNDEFINED;
+    EXPECT_EQ(RunInferDtype(d, true, 2, &outDtype), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(outDtype, ge::DT_BF16);
+}
+
+TEST_F(TestInferdtype, MXFP4Bf16OutDtype)
+{
+    ge::DataType d[] = {ge::DT_FLOAT4_E2M1, ge::DT_FLOAT4_E2M1, ge::DT_FLOAT8_E8M0,
+                        ge::DT_UNDEFINED,   ge::DT_FLOAT8_E8M0, ge::DT_INT64,
+                        ge::DT_UNDEFINED,   ge::DT_BF16,        ge::DT_INT32};
+    ge::DataType outDtype = ge::DT_UNDEFINED;
+    EXPECT_EQ(RunInferDtype(d, true, 2, &outDtype), ge::GRAPH_SUCCESS);
+    EXPECT_EQ(outDtype, ge::DT_BF16);
 }
 
 TEST_F(TestInferdtype, W8A8WithSharedInput)
