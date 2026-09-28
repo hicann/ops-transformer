@@ -330,11 +330,11 @@ ge::graphStatus InplacePartialRotaryMulTiling::CheckInput()
         mode != 1,
         OP_LOGE(context_->GetNodeName(), "mode = %ld is not supported, only mode = 1 (interleave) is supported", mode),
         return ge::GRAPH_FAILED);
-    // 获取slice范围：空属性时默认 [0, allHeadDim_]，与A5行为一致
+    // 获取slice范围：空属性时默认 [0, 0]，与A5行为一致
     auto sliceListAttr = attrs->GetAttrPointer<gert::ContinuousVector>(1);
     if (sliceListAttr == nullptr || sliceListAttr->GetSize() == 0) {
         start_ = 0;
-        end_ = allHeadDim_;
+        end_ = 0;
     } else {
         auto sliceData = static_cast<const int64_t *>(sliceListAttr->GetData());
         OP_CHECK_IF(sliceListAttr->GetSize() != 2,
