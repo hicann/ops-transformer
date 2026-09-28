@@ -242,7 +242,7 @@ public:
                         last_seq_total_len * q_head_num_ * BLOCK_FP32 + n1_idx * current_q_seqlen * BLOCK_FP32;
                 }
                 TEventID event_id = sftg_ping_pong_idx ? event_ping_ : event_pong_;
-                ComputeEvenCoreInfo(info, current_q_seqlen, process_s1_size);
+                ComputeEvenCoreInfo(info, current_q_seqlen, process_s1_size, false);
 
                 WAIT_FLAG(MTE3, MTE2, event_id);
                 ComputeSoftmaxGradFront(sftg_workspace[out_gm_offset], dy_gm[in_gm_offset], out_gm[in_gm_offset], info,
@@ -328,45 +328,40 @@ public:
         if (runTimeInfo.mask_type == 0 || half_s1_process_real_ <= 0) {
             return;
         }
-        constexpr float NEG_INF = -1.0e30f;
         const int32_t rowStart = v_sub_core_idx_ * half_s1_process_align_;
         const int32_t s2Start = runTimeInfo.s2Idx;
         const int32_t s2Len = static_cast<int32_t>(runTimeInfo.s2Len);
         const int32_t causalOffset = runTimeInfo.cur_kv_seq_len - runTimeInfo.cur_q_seq_len;
+        constexpr int32_t kMaxHalfS1 = 128;
+        int32_t firstInvalidArr[kMaxHalfS1];
+        const int32_t nRow = half_s1_process_real_ < kMaxHalfS1 ? half_s1_process_real_ : kMaxHalfS1;
 
         LocalTensor<int32_t> idxUb = softmax_res_nz_tensor_.template ReinterpretCast<int32_t>();
         DataCopy(idxUb, sparse_idx_gm_[runTimeInfo.sparseIdxOffset + rowStart], half_s1_process_align_);
         SET_FLAG(MTE2, S, EVENT_ID1);
         WAIT_FLAG(MTE2, S, EVENT_ID1);
 
-        for (int32_t r = 0; r < half_s1_process_real_; ++r) {
+        for (int32_t r = 0; r < nRow; ++r) {
             const int32_t qTok = idxUb.GetValue(r);
             int32_t firstInvalid = qTok + causalOffset - s2Start + 1;
             if (firstInvalid < 0) {
                 firstInvalid = 0;
             }
-            if (firstInvalid >= s2Len) {
+            if (firstInvalid > s2Len) {
+                firstInvalid = s2Len;
+            }
+            firstInvalidArr[r] = firstInvalid;
+        }
+        SET_FLAG(S, V, EVENT_ID1);
+        WAIT_FLAG(S, V, EVENT_ID1);
+
+        __ubuf__ float *sPtr = (__ubuf__ float *)sUb.GetPhyAddr();
+        for (int32_t r = 0; r < nRow; ++r) {
+            if (firstInvalidArr[r] >= s2Len) {
                 continue;
             }
-            const int32_t rowBase = r * s2_process_align_;
-            const int32_t firstAlign = RoundUp(firstInvalid, static_cast<int32_t>(BLOCK_FP32));
-            for (int32_t c = firstInvalid; c < firstAlign && c < s2Len; ++c) {
-                sUb.SetValue(rowBase + c, NEG_INF);
-            }
-            if (firstAlign >= s2Len) {
-                continue;
-            }
-            int32_t nMask = s2Len - firstAlign;
-            int32_t nMaskAlign = RoundUp(nMask, static_cast<int32_t>(BLOCK_FP32));
-            if (firstAlign + nMaskAlign > s2_process_align_) {
-                nMaskAlign = s2_process_align_ - firstAlign;
-            }
-            if (nMaskAlign <= 0) {
-                continue;
-            }
-            SET_FLAG(S, V, EVENT_ID1);
-            WAIT_FLAG(S, V, EVENT_ID1);
-            Duplicate(sUb[rowBase + firstAlign], NEG_INF, nMaskAlign);
+            FillNegInfRange(sPtr + r * s2_process_align_, static_cast<uint32_t>(firstInvalidArr[r]),
+                            static_cast<uint32_t>(s2Len), static_cast<uint32_t>(s2_process_align_));
         }
     }
 
@@ -391,8 +386,6 @@ public:
         }
 
         ApplyCausalAttenMask(src_ub_tensor, runTimeInfo);
-        SET_FLAG(S, V, EVENT_ID1);
-        WAIT_FLAG(S, V, EVENT_ID1);
         PipeBarrier<PIPE_V>();
         SimpleSoftmax((__ubuf__ float *)src_ub_tensor.GetPhyAddr(), (__ubuf__ float *)src_ub_tensor.GetPhyAddr(),
                       (__ubuf__ float *)lse_tensor_.GetPhyAddr(), half_s1_process_real_, s2_process_align_);
@@ -445,6 +438,7 @@ public:
                            (__ubuf__ float *)softmax_ub_tensor.GetPhyAddr(),
                            (__ubuf__ float *)sftg_front_tensor_.GetPhyAddr(), half_s1_process_align_,
                            s2_process_align_);
+        PipeBarrier<PIPE_V>();
 
         CastND2NZ<INPUT_TYPE>(sftg_res_nz_tensor_, src_ub_tensor, half_s1_process_align_, s2_process_align_);
         SET_FLAG(V, MTE3, EVENT_ID0);
@@ -759,6 +753,48 @@ private:
         }
     }
 
+    // Fill rowBuf[colStart, colEnd) with -inf via Reg (Arange + Compare + Select).
+    __simd_vf__ inline void FillNegInfRange(__ubuf__ float *rowBuf, const uint32_t colStart, const uint32_t colEnd,
+                                            const uint32_t colAlign)
+    {
+        if (colStart >= colEnd || colStart >= colAlign) {
+            return;
+        }
+        constexpr float NEG_INF = -1.0e30f;
+        constexpr uint32_t VF_ELEMS = 256U / sizeof(float);
+        const uint32_t fillEnd = colEnd < colAlign ? colEnd : colAlign;
+        const uint32_t blockStart = colStart & ~(VF_ELEMS - 1U);
+
+        AscendC::Reg::MaskReg maskGeStart;
+        AscendC::Reg::MaskReg maskLtEnd;
+        AscendC::Reg::MaskReg maskPad;
+        AscendC::Reg::MaskReg maskValid;
+        AscendC::Reg::RegTensor<int32_t> regIdx;
+        AscendC::Reg::RegTensor<float> regOld;
+        AscendC::Reg::RegTensor<float> regNeg;
+        AscendC::Reg::RegTensor<float> regOut;
+        Duplicate(regNeg, NEG_INF);
+
+        for (uint32_t blockBase = blockStart; blockBase < fillEnd; blockBase += VF_ELEMS) {
+            uint32_t count = colAlign - blockBase;
+            if (count > VF_ELEMS) {
+                count = VF_ELEMS;
+            }
+            if (count == 0) {
+                break;
+            }
+            maskValid = AscendC::Reg::UpdateMask<float>(count);
+            AscendC::Reg::Arange(regIdx, static_cast<int32_t>(blockBase));
+            LoadAlign(regOld, rowBuf + blockBase);
+            AscendC::Reg::Compares<int32_t, CMPMODE::GE>(maskGeStart, regIdx, static_cast<int32_t>(colStart),
+                                                         maskValid);
+            AscendC::Reg::Compares<int32_t, CMPMODE::LT>(maskLtEnd, regIdx, static_cast<int32_t>(fillEnd), maskValid);
+            AscendC::Reg::And(maskPad, maskGeStart, maskLtEnd, maskValid);
+            AscendC::Reg::Select(regOut, regNeg, regOld, maskPad);
+            StoreAlign<float, AscendC::Reg::StoreDist::DIST_NORM_B32>(rowBuf + blockBase, regOut, maskValid);
+        }
+    }
+
     __simd_vf__ inline void SimpleSoftmax(__ubuf__ float *dstTensor, __ubuf__ float *src0Tensor,
                                           __ubuf__ float *src1Tensor, const uint32_t row, const uint32_t col)
     {
@@ -820,9 +856,12 @@ private:
     }
 
     __aicore__ inline void ComputeEvenCoreInfo(EvenCoreInfo &info, const uint32_t data_size,
-                                               const uint32_t max_process_size)
+                                               const uint32_t max_process_size, const bool align_start = true)
     {
         uint32_t per_core_size = CeilDiv<uint32_t>(data_size, v_core_num_);
+        if (align_start) {
+            per_core_size = RoundUp<uint32_t>(per_core_size, C0_SIZE);
+        }
         info.start_idx = v_core_idx_ * per_core_size;
         info.max_process_size = max_process_size;
         info.data_size = data_size;

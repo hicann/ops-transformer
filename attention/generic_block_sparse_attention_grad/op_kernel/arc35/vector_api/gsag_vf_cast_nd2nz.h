@@ -34,7 +34,6 @@ __aicore__ inline void CastND2NZ(const LocalTensor<T1> &dstTensor, const LocalTe
     const uint32_t fullExeSize = srcN;
     uint64_t srcLocalInt = srcTensor.GetPhyAddr();
     uint64_t dstLocalInt = dstTensor.GetPhyAddr();
-    // Softmax CastND2NZ (no inter-column +1 pad); DataCopy srcStride=0.
     uint32_t blockStride = (srcM * blockN) * sizeof(T1) / blockSize;
     uint32_t repeatStride = 1;
     __VEC_SCOPE__
@@ -44,26 +43,23 @@ __aicore__ inline void CastND2NZ(const LocalTensor<T1> &dstTensor, const LocalTe
         RegTensor<T1> vregCastEven;
         RegTensor<T1> vregCastOdd;
         RegTensor<T1> vregCastRes;
+        uint32_t exeSize = fullExeSize;
         MaskReg pregFullExe = CreateMask<T1, MaskPattern::ALL>();
+        MaskReg pregValidN = UpdateMask<T1>(exeSize);
 
-        // [m,n] -> [n1,m1,16,16] -> [n1,m1*16,16] -> [n1,m1*16+1,16]
         for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); m++) {
             DataCopy<float, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
                 vregSrcEven, vregSrcOdd, ((__ubuf__ float *&)srcLocalInt), fullExeSize);
             Cast<T1, float, castTraitFp322Fp16Even>(vregCastEven, vregSrcEven, pregFullExe);
             Cast<T1, float, castTraitFp322Fp16Odd>(vregCastOdd, vregSrcOdd, pregFullExe);
-            // 0101: b16 0001: b32 1111: b8
             Or((RegTensor<uint16_t> &)vregCastRes, (RegTensor<uint16_t> &)vregCastEven,
                (RegTensor<uint16_t> &)vregCastOdd, pregFullExe);
-            // high 16bits represents stride with each 8 blocks（256B) low 16bits represent repeat stride
             DataCopy<T1, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregFullExe);
+                ((__ubuf__ T1 *&)dstLocalInt), vregCastRes, blockStride, repeatStride, pregValidN);
         }
     }
 }
 
-// Reorder an FP16/BF16 ND matrix to NZ without a type conversion.  Q and dO
-// are already INPUT_TYPE after GM -> UB, unlike softmax results which are FP32.
 template <typename T>
 __aicore__ inline void TransdataND2NZ(const LocalTensor<T> &dstTensor, const LocalTensor<T> &srcTensor,
                                       const uint32_t srcM, const uint32_t srcN)
@@ -72,7 +68,6 @@ __aicore__ inline void TransdataND2NZ(const LocalTensor<T> &dstTensor, const Loc
     const uint32_t blockN = BLOCK_SIZE / sizeof(T);
     uint64_t srcLocalInt = srcTensor.GetPhyAddr();
     uint64_t dstLocalInt = dstTensor.GetPhyAddr();
-    // +1 32B pad between C0 columns; UB->L1 DataCopy must skip it via srcStride.
     const uint32_t blockStride = srcM * blockN * sizeof(T) / BLOCK_SIZE + 1;
     const uint32_t repeatStride = 1;
 
@@ -81,9 +76,6 @@ __aicore__ inline void TransdataND2NZ(const LocalTensor<T> &dstTensor, const Loc
         RegTensor<T> vregSrc;
         MaskReg pregFullExe = CreateMask<T, MaskPattern::ALL>();
 
-        // Same-dtype ND [m, n] -> NZ. Load a full ND row, scatter C0 blocks
-        // with DATA_BLOCK_COPY. Do not deinterleave: that path is only for
-        // FP32->FP16 CastND2NZ.
         for (uint16_t m = 0; m < static_cast<uint16_t>(srcM); ++m) {
             LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_NORM>(
                 vregSrc, ((__ubuf__ T *&)srcLocalInt), srcN);

@@ -192,8 +192,8 @@ private:
         info.s2LenAlign = RoundUp(static_cast<int64_t>(n), static_cast<int64_t>(C0_SIZE));
         info.sparseIdxOffset = curIdxBase_ + s1Offset_;
         info.sparseCount = m;
-        // First S1 of an S2 tile: reload this KV slice and init L0C (Fixpipe AtomicAdd across g).
-        info.need_copy_kv = (s1Offset_ == 0) ? 1 : 0;
+        info.need_copy_kv = sameKvTile ? 0 : 1;
+        info.need_init_l0c = (s1Offset_ == 0) ? 1 : 0;
         info.kv_ping_pong_idx = kvPingPong_;
         info.mask_type = static_cast<int32_t>(tilingData_->maskType);
         info.keyGmOffset = GetQKVGmOffset<INPUT_LAYOUT>(curKvPrefix_, curActS2_, constInfo_.kv_head_num,
