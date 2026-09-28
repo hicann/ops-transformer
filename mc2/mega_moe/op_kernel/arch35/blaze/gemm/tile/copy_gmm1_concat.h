@@ -81,7 +81,8 @@ __aicore__ inline void CopyGmm1WeightConcatToUb(const Dst &dst, const Src &src, 
     // Unlike tensor strides, these intrinsics take byte distances between block starts.
     asc_copy_gm2ub_align(reinterpret_cast<__ubuf__ uint8_t *>(dst.data().get()),
                          reinterpret_cast<__gm__ uint8_t *>(src.data().get()), blockCount, blockBytes, 0, 0, false,
-                         src.engine().get_cache_mode(), halfN * columnBytes, blockBytes);
+                         static_cast<asc_load_l2_cache_mode>(src.engine().get_cache_mode()), halfN * columnBytes,
+                         blockBytes);
 }
 
 template <typename Dst, typename Src>
