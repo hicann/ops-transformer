@@ -100,6 +100,7 @@ private:
     static constexpr bool FLASH_DECODE = SMLAT::flashDecode;
     static constexpr SMLA_LAYOUT LAYOUT_T = SMLAT::layout;
     static constexpr SMLA_LAYOUT KV_LAYOUT_T = SMLAT::kvLayout;
+    static constexpr bool IS_DSPARK = SMLAT::isDspark;
 
     static constexpr uint32_t PRELOAD_NUM = 2;
     static constexpr uint32_t N_BUFFER_M_BASIC_SIZE = 256;
@@ -456,19 +457,22 @@ __aicore__ inline int32_t SparseFlashMlaSwa<SMLAT>::GetCmpMaskS2Size(uint32_t bI
 template <typename SMLAT>
 __aicore__ inline uint32_t SparseFlashMlaSwa<SMLAT>::GetOriSparseActualSeqLen()
 {
-    if (!constInfo.hasOriSparseIndices || constInfo.oriSparseIndexWidth == 0 || tempLoopInfo.actOriS2Size <= 0) {
+    if (constInfo.oriSparseIndexWidth == 0 || tempLoopInfo.actOriS2Size <= 0) {
         return 0;
     }
     uint64_t qTokenOffset = tempLoopInfo.actualSeqQPrefixSum + tempLoopInfo.s1StartIdx;
     uint64_t topkLenOffset = qTokenOffset * constInfo.kvHeadNum + tempLoopInfo.n2Idx;
-    if (!constInfo.hasOriTopkLength) {
-        return 0;
+    if constexpr (IS_DSPARK) {
+        if (!constInfo.hasOriTopkLength) {
+            return 0;
+        }
+        int32_t topkLen = oriTopkLengthGm.GetValue(topkLenOffset);
+        if (topkLen <= 0) {
+            return 0;
+        }
+        return Min(static_cast<uint32_t>(topkLen), constInfo.oriSparseIndexWidth);
     }
-    int32_t topkLen = oriTopkLengthGm.GetValue(topkLenOffset);
-    if (topkLen <= 0) {
-        return 0;
-    }
-    return Min(static_cast<uint32_t>(topkLen), constInfo.oriSparseIndexWidth);
+    return 0;
 }
 
 template <typename SMLAT>
@@ -524,9 +528,11 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::Init(
     tilingData = tiling;
 
     InitTilingData();
-    constInfo.hasOriTopkLength = (oriTopkLength != nullptr);
-    if (constInfo.hasOriTopkLength) {
-        oriTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)oriTopkLength);
+    if constexpr (IS_DSPARK) {
+        constInfo.hasOriTopkLength = (oriTopkLength != nullptr);
+        if (constInfo.hasOriTopkLength) {
+            oriTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)oriTopkLength);
+        }
     }
     (void)cmpTopkLength;
     if (KV_LAYOUT_T == SMLA_LAYOUT::TND && LAYOUT_T == SMLA_LAYOUT::TND) {
@@ -570,7 +576,7 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::Init(
 
     if constexpr (PAGE_ATTENTION) {
         oriBlockTableGm.SetGlobalBuffer((__gm__ int32_t *)oriBlockTable);
-        if (constInfo.hasOriSparseIndices) {
+        if constexpr (IS_DSPARK) {
             oriSparseIndicesGm.SetGlobalBuffer((__gm__ int32_t *)oriSparseIndices);
         }
         if constexpr (TEMPLATE_MODE == HCA_TEMPLATE) {
@@ -600,7 +606,7 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::Init(
         (__gm__ T *)(workspace + offset + aiCoreIdx * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(T)));
     offset += GetBlockNum() * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(T);
 
-    if (constInfo.hasOriSparseIndices) {
+    if constexpr (IS_DSPARK) {
         kvMergeGm_.SetGlobalBuffer(
             (__gm__ KV_T *)(workspace + offset + aiCoreIdx * 512 * 512 * MERGE_CACHE_GM_BUF_NUM * sizeof(KV_T)));
         offset += static_cast<uint64_t>(GetBlockNum()) * 512 * 512 * MERGE_CACHE_GM_BUF_NUM * sizeof(KV_T);
@@ -608,11 +614,11 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::Init(
 
     if ASCEND_IS_AIV {
         vectorBlock.InitParams(constInfo, tilingData);
-        if (constInfo.hasOriSparseIndices) {
-            vectorBlock.InitVec0GlobalTensor(kvMergeGm_, oriKvGm, oriBlockTableGm, oriSparseIndicesGm);
+        if constexpr (IS_DSPARK) {
+            vectorBlock.InitVec0GlobalTensor(kvMergeGm_, oriKvGm, oriBlockTableGm, oriSparseIndicesGm, oriTopkLengthGm);
         }
         vectorBlock.InitVec1GlobalTensor(mm1ResGm, vec1ResGm, actualSeqLengthsQGm, actualSeqLengthsKVGm, sinksGm,
-                                         softmaxLseGm, oriSparseIndicesGm, oriTopkLengthGm);
+                                         softmaxLseGm);
         vectorBlock.InitVec2GlobalTensor(accumOutGm, vec2ResGm, mm2ResGm, attentionOutGm);
     }
 
@@ -620,7 +626,10 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::Init(
         cubeBlock.InitParams(constInfo);
         cubeBlock.InitMm1GlobalTensor(queryGm, oriKvGm, cmpKvGm, mm1ResGm);
         cubeBlock.InitMm2GlobalTensor(vec1ResGm, mm2ResGm, attentionOutGm);
-        cubeBlock.InitPageAttentionInfo(oriKvGm, kvMergeGm_, oriBlockTableGm, cmpBlockTableGm);
+        cubeBlock.InitPageAttentionInfo(oriKvGm, oriBlockTableGm, cmpBlockTableGm);
+        if constexpr (IS_DSPARK) {
+            cubeBlock.InitDsparkKvMerge(kvMergeGm_);
+        }
     }
     // 要在InitParams之后执行
     if (pipe != nullptr) {
@@ -698,10 +707,12 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::CalcParams(uint32_t loop, uint3
     info.tensorBOffset = tensorBCoreOffset;
     info.tensorCmpBOffset = tensorCmpBCoreOffset;
     info.attenOutOffset = tensorACoreOffset;
-    if constexpr (LAYOUT_T == SMLA_LAYOUT::TND) {
-        info.qTokenOffset = tempLoopInfo.actualSeqQPrefixSum + info.s1Idx;
-    } else {
-        info.qTokenOffset = info.bIdx * constInfo.qSeqSize + info.s1Idx;
+    if constexpr (IS_DSPARK) {
+        if constexpr (LAYOUT_T == SMLA_LAYOUT::TND) {
+            info.qTokenOffset = tempLoopInfo.actualSeqQPrefixSum + info.s1Idx;
+        } else {
+            info.qTokenOffset = info.bIdx * constInfo.qSeqSize + info.s1Idx;
+        }
     }
 
     if constexpr (TEMPLATE_MODE == SWA_TEMPLATE) {
@@ -717,7 +728,11 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::CalcParams(uint32_t loop, uint3
             info.actualSingleProcessSInnerOriSize = constInfo.s2BaseSize;
         }
         info.actualSingleProcessSInnerSize = info.actualSingleProcessSInnerOriSize;
-        info.s2StartPoint = constInfo.hasOriSparseIndices ? 0 : tempLoopInfo.oriMaskLeft;
+        if constexpr (IS_DSPARK) {
+            info.s2StartPoint = 0;
+        } else {
+            info.s2StartPoint = tempLoopInfo.oriMaskLeft;
+        }
         info.cmpS2IdLimit = 0;
     } else { // HCA_TEMPLATE场景
         if (s2LoopIdx < tempLoopInfo.oriLoopTimes) {
@@ -769,9 +784,11 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::CalcParams(uint32_t loop, uint3
         SMLAAlign(info.actualSingleProcessSInnerOriSize, SMLAVectorBlock<SMLAT>::BYTE_BLOCK);
     info.actualSingleProcessSInnerCmpAlignSize =
         SMLAAlign(info.actualSingleProcessSInnerCmpSize, SMLAVectorBlock<SMLAT>::BYTE_BLOCK);
-    if (constInfo.hasOriSparseIndices && info.isValid) {
-        info.v0S2Start = 0;
-        info.v0S2DealSize = static_cast<int32_t>(info.actualSingleProcessSInnerOriSize);
+    if constexpr (IS_DSPARK) {
+        if (info.isValid) {
+            info.v0S2Start = 0;
+            info.v0S2DealSize = static_cast<int32_t>(info.actualSingleProcessSInnerOriSize);
+        }
     }
 }
 
@@ -855,12 +872,13 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::ProcessBalance()
         // 判断是否存在行无效场景，直接全部刷零（DSpark 走 sparse topk，不做 dense 行无效清零）
         int32_t inValidRowCount = 0;
         int32_t inValidRowS1StartIdx = 0;
-        if (!constInfo.hasOriSparseIndices &&
-            inValidRowS1StartIdx < (tempLoopInfo.actS1Size - tempLoopInfo.actOriS2Size)) {
-            inValidRowCount = tempLoopInfo.actS1Size - tempLoopInfo.actOriS2Size;
-            tempLoopInfo.hasInvalidRow = true;
-            if ASCEND_IS_AIV {
-                InitAllZeroOutput(tempLoopInfo.bIdx, inValidRowS1StartIdx, inValidRowCount, tempLoopInfo.n2Idx);
+        if constexpr (!IS_DSPARK) {
+            if (inValidRowS1StartIdx < (tempLoopInfo.actS1Size - tempLoopInfo.actOriS2Size)) {
+                inValidRowCount = tempLoopInfo.actS1Size - tempLoopInfo.actOriS2Size;
+                tempLoopInfo.hasInvalidRow = true;
+                if ASCEND_IS_AIV {
+                    InitAllZeroOutput(tempLoopInfo.bIdx, inValidRowS1StartIdx, inValidRowCount, tempLoopInfo.n2Idx);
+                }
             }
         }
         bool isS1S2ZeroAndLastBatch =
@@ -886,7 +904,7 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::ProcessBalance()
                 Min((tempLoopInfo.s1StartIdx + constInfo.mBaseSize / constInfo.gSize - 1), tempLoopInfo.actS1Size - 1);
             // 此处均为闭区间
             // oriMaskMode 0 (DSpark): effective ori S2 from sparse topk_length, not band window.
-            if (constInfo.hasOriSparseIndices) {
+            if constexpr (IS_DSPARK) {
                 uint32_t sparseOriS2Size = GetOriSparseActualSeqLen();
                 tempLoopInfo.oriMaskLeft = 0;
                 tempLoopInfo.oriMaskRight = sparseOriS2Size == 0 ? -1 : static_cast<int32_t>(sparseOriS2Size - 1U);
@@ -951,8 +969,10 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::ProcessBalance()
                  s2LoopIdx++) {
                 PreloadPipeline(gloop, cmpLoop, constInfo.s2Start, s2LoopIdx, extraInfo);
                 ++gloop;
-                if (constInfo.hasOriSparseIndices && s2LoopIdx < tempLoopInfo.s2LoopTimes) {
-                    ++cmpLoop;
+                if constexpr (IS_DSPARK) {
+                    if (s2LoopIdx < tempLoopInfo.s2LoopTimes) {
+                        ++cmpLoop;
+                    }
                 }
             }
             globalLoopStart = false;
@@ -974,13 +994,15 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::PreloadPipeline(uint32_t loop, 
 
     CalcParams(loop, cmpLoop, s2Start, s2LoopIdx, extraInfo0);
     if (extraInfo0.isValid) {
-        if (constInfo.hasOriSparseIndices) {
+        if constexpr (IS_DSPARK) {
             if ASCEND_IS_AIV {
                 vectorBlock.ProcessVec0L(extraInfo0);
                 CrossCoreSetFlag<ConstInfo::SMLA_SYNC_MODE2, PIPE_MTE3>(constInfo.syncV0C1);
             }
-        } else if ASCEND_IS_AIC {
-            ComputeMm1(extraInfo0);
+        } else {
+            if ASCEND_IS_AIC {
+                ComputeMm1(extraInfo0);
+            }
         }
     }
     if (extraInfo2.isValid) {
@@ -997,10 +1019,12 @@ __aicore__ inline void SparseFlashMlaSwa<SMLAT>::PreloadPipeline(uint32_t loop, 
         }
         extraInfo1.isValid = false;
     }
-    if (extraInfo0.isValid && constInfo.hasOriSparseIndices) {
-        if ASCEND_IS_AIC {
-            CrossCoreWaitFlag<ConstInfo::SMLA_SYNC_MODE2, PIPE_MTE3>(constInfo.syncV0C1);
-            ComputeMm1(extraInfo0);
+    if constexpr (IS_DSPARK) {
+        if (extraInfo0.isValid) {
+            if ASCEND_IS_AIC {
+                CrossCoreWaitFlag<ConstInfo::SMLA_SYNC_MODE2, PIPE_MTE3>(constInfo.syncV0C1);
+                ComputeMm1(extraInfo0);
+            }
         }
     }
 }
