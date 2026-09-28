@@ -179,5 +179,6 @@
 ```bash
 # 在ops-transformer仓库根目录执行
 bash build.sh --pkg --soc=ascend950 --ops=block_attn_res_prepare
+(cd build_out && ./cann-ops-transformer-*.run)
 bash build.sh --run_example block_attn_res_prepare eager cust --soc=ascend950 --vendor_name=custom
 ```
