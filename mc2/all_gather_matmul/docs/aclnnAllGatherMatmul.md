@@ -204,7 +204,7 @@ aclnnStatus aclnnAllGatherMatmul(
     </tbody></table>
 
     <!-- npu="A3,910b" id7 -->
-    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  ：
+    - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
         - bias：暂不支持输入为非0的场景。
     <!-- end id7 -->
     <!-- npu="950" id8 -->
@@ -298,21 +298,21 @@ aclnnStatus aclnnAllGatherMatmul(
     - m为空，k不为空，n不为空；
     - m不为空，k不为空，n为空；
     - m为空，k不为空，n为空。
-- 输出为2维，其shape为(m*rank_size, n), rank_size为卡数。
+- 输出为2维，其shape为(m*rank_size, n)，rank_size为卡数。
 
 <!-- npu="910b" id9 -->
 - <term>Atlas A2系列产品</term>：支持2、4、8卡，并且仅支持HCCS链路all mesh组网。
 <!-- end id9 -->
 <!-- npu="A3" id10 -->
-- <term>Atlas A3系列产品</term>  ：支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
+- <term>Atlas A3系列产品</term>：支持2、4、8、16、32卡，并且仅支持HCCS链路double ring组网。
 <!-- end id10 -->
 <!-- npu="950" id11 -->
-- <term>Ascend 950PR&950DT系列产品</term>:
+- <term>Ascend 950PR&950DT系列产品</term>：
   - 支持2、4、8、16、32、64卡，并且仅支持HCCS链路all mesh组网。
   - AllGather(x1)集合通信数据总量不能超过63 \* 256MB，集合通信数据总量计算方式为：m \* k \* sizeof(x1_dtype) \* 卡数。由于shape不同，算子内部实现可能存在差异，实际支持的总通信量可能略小于该值。
 <!-- end id11 -->
 <!-- npu="910b" id12 -->
-- <term>Atlas A2系列产品</term>:一个模型中的通算融合MC2算子，仅支持相同通信域。
+- <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
 
 <!-- end id12 -->
 
@@ -320,10 +320,10 @@ aclnnStatus aclnnAllGatherMatmul(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950,A3,910b" id13 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>  、<term>Ascend 950PR&950DT系列产品</term>：
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：
 
     ```Cpp
     #include <thread>
