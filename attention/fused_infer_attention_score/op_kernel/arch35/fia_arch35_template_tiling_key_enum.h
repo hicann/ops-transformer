@@ -19,7 +19,7 @@
 #define ASCENDC_TPL_5_BW 5
 #define ASCENDC_TPL_10_BW 10
 
-#if (__CCE_AICORE__ == 310)
+#if (__CCE_AICORE__ == 310) || (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
 #define PARSE_PARAMS_AntiQuant(inOutLayoutType, config, pseMode, ...) \
     constexpr LayOutTypeEnum inputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][0]); \
     constexpr LayOutTypeEnum outputLayoutType = static_cast<LayOutTypeEnum>(InOutLayoutTypeValue[inOutLayoutType][1]); \
@@ -173,6 +173,10 @@ static constexpr ConfigParams ConfigValue[] = {
      inferDTemplateType::Aligned64}, // 27
     {inferS1TemplateType::Aligned128, inferS2TemplateType::Aligned512, inferDTemplateType::Aligned128,
      inferDTemplateType::Aligned128}, // 28
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned512, inferDTemplateType::Aligned64,
+     inferDTemplateType::Aligned64}, // 29
+    {inferS1TemplateType::Aligned64, inferS2TemplateType::Aligned512, inferDTemplateType::Aligned128,
+     inferDTemplateType::Aligned128}, // 30
 };
 
 #define Config_S1Aligned64_S2Aligned256_DAligned64_DVAligned64 0
@@ -204,6 +208,8 @@ static constexpr ConfigParams ConfigValue[] = {
 #define Config_S1Aligned64_S2Aligned256_DAligned64_DVAligned128 26
 #define Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64 27
 #define Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128 28
+#define Config_S1Aligned64_S2Aligned512_DAligned64_DVAligned64 29
+#define Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128 30
 
 #define PSE_MODE_PSE_OUTER_MUL_ADD_TYPE 0
 #define PSE_MODE_PSE_OUTER_ADD_MUL_TYPE 1

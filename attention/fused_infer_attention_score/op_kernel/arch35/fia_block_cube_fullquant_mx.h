@@ -674,8 +674,8 @@ public:
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param =
             MakeMMParam((uint32_t)runInfo.actMSize, (uint32_t)s2CurSize, (uint32_t)constInfo.dSize, false, true);
-        MatmulFullMX<Q_T, KV_T, T, 128, 256, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
-                     mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+        MatmulFullMX<Q_T, KV_T, T, mBaseSize, 256, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T,
+                     SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
             mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers, mmL0BBuffers, mm1ResL0C.GetTensor<T>(),
             param, mm1A.GetTensor<SCALE_T>(qScaleOffset), mm1B.GetTensor<SCALE_T>(kScaleOffset));
 
@@ -716,7 +716,11 @@ public:
         // 源NZ矩阵中相邻Z排布的起始地址偏移
         fixpipeParams.srcStride = ((runInfo.actMSize + 15) / 16) * 16;
         fixpipeParams.dstStride = s2SplitSize; // mmResUb上两行之间的间隔，单位：element
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        fixpipeParams.dualDstCtl = 0; // 1:1 全部结果写入单 vector 核 (subBlockIdx=0)
+#else
         fixpipeParams.dualDstCtl = 1; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+#endif
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -736,7 +740,11 @@ public:
         // 源NZ矩阵中相邻Z排布的起始地址偏移
         fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16;
         fixpipeParams.dstStride = 64; // mmResUb上两行之间的间隔，单位：element
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        fixpipeParams.dualDstCtl = 0; // 1:1 全部结果写入单 vector 核 (subBlockIdx=0)
+#else
         fixpipeParams.dualDstCtl = 2; // 双目标模式，按M维度拆分， M * N / 2写入每个UB，M必须为2的倍数
+#endif
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -796,8 +804,8 @@ public:
         mm1ResL0C.Wait<HardEvent::FIX_M>();
         MMParam param =
             MakeMMParam((uint32_t)s2CalcSize, (uint32_t)runInfo.actMSize, (uint32_t)constInfo.dSize, false, true);
-        MatmulFullMX<Q_T, KV_T, T, 256, 128, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T, SCALE_T,
-                     mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
+        MatmulFullMX<Q_T, KV_T, T, 256, mBaseSize, dBaseSize, ABLayout::MK, ABLayout::KN, L0AType, L0BType, SCALE_T,
+                     SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
             mm1A.GetTensor<INPUT_T>(), mm1B.GetTensor<INPUT_T>(), mmL0ABuffers, mmL0BBuffers, mm1ResL0C.GetTensor<T>(),
             param, mm1A.GetTensor<SCALE_T>(kScaleOffset), mm1B.GetTensor<SCALE_T>(qScaleOffset));
 
@@ -849,7 +857,7 @@ public:
 
         constexpr uint32_t baseK = s2SplitSize;
         uint64_t l1BaseKOffset = baseK * mBaseSize;
-        uint64_t l1ScaleOffset = baseK / 32 * runInfo.actMSizeAlign32;
+        uint64_t l1ScaleOffset = baseK / 32 * runInfo.actMSizeAlign;
         uint32_t kLoops = (runInfo.actSingleLoopS2Size + baseK - 1) / baseK;
         uint32_t realK = baseK;
         for (uint32_t kIdx = 0; kIdx < kLoops; kIdx++) {
@@ -881,7 +889,7 @@ public:
             if constexpr (!USE_DN) {
                 param.realM = (uint32_t)runInfo.actMSize;
             }
-            MatmulFullMX<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+            MatmulFullMX<INPUT_T, KV_T, T, mBaseSize, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
                          SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
                 mm2A.GetTensor<INPUT_T>()[kIdx * l1BaseKOffset], mm2BTensor, mmL0ABuffers, mmL0BBuffers,
                 mm2ResL0C.GetTensor<T>(), param, mm2AScaleFakeTensor[kIdx * l1ScaleOffset], mm2BScaleTensor);
@@ -920,7 +928,11 @@ public:
         } else {
             fixpipeParams.dstStride = (uint32_t)constInfo.dSizeV;
         }
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        fixpipeParams.dualDstCtl = 0; // 1:1 全部结果写入单 vector 核 (subBlockIdx=0)
+#else
         fixpipeParams.dualDstCtl = 1;
+#endif
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -983,7 +995,7 @@ public:
             if constexpr (!USE_DN) {
                 param.realM = (uint32_t)runInfo.actMSize;
             }
-            MatmulFullMX<INPUT_T, KV_T, T, 128, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
+            MatmulFullMX<INPUT_T, KV_T, T, mBaseSize, dVBaseSize, baseK, ABLayout::MK, ABLayout::KN, L0AType, L0BType,
                          SCALE_T, SCALE_T, mx_fp8_e4m3_t, mx_fp8_e4m3_t>(
                 mm2A.GetTensor<INPUT_T>()[k * l1BaseKOffset], mm2BTensor, mmL0ABuffers, mmL0BBuffers,
                 mm2ResL0C.GetTensor<T>(), param, mm2AScaleFakeTensor[k * l1ScaleOffset], mm2BScaleTensor);

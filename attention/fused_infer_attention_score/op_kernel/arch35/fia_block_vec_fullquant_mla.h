@@ -444,7 +444,7 @@ public:
         float slopes = 0.0f;
         float posShift = 0.0f;
         uint32_t pseStride = 0;
-        uint32_t actVecMSizeAlign16 = runInfo.actMSizeAlign32 >> 1;
+        uint32_t actVecMSizeAlign16 = runInfo.actMSizeAlign >> 1;
 
         if constexpr (HAS_MASK) {
             attenMaskUb = this->attenMaskInQue[0].template AllocTensor<uint8_t>();

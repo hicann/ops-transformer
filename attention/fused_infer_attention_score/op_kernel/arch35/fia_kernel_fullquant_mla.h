@@ -590,7 +590,7 @@ public:
         info.faTmpOutWsPos = constInfo.coreFirstTmpOutWsPos;
         info.isLastS2Loop = (s2Cur + 1 == curS2End);
 
-        info.actMSizeAlign32 = (info.actMSize + 31) >> 5 << 5;
+        info.actMSizeAlign = (info.actMSize + 31) >> 5 << 5;
         info.actVecMSize = (info.actMSize + 1) >> 1;
         info.vecMbaseIdx = 0;
         if (constInfo.subBlockIdx == 1) {

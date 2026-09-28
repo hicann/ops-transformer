@@ -766,7 +766,7 @@ __aicore__ inline void ProcessVec1UpdateGeneralImpl128Mxfp8Fullquant(
     const float sinkValue = 0.0f, const float pScale = 1.0f)
 {
     const uint32_t nPadding = (s2BaseSize + blockBytesU8 - 1) / blockBytesU8 * blockBytesU8;
-    const uint32_t blockStride = s1BaseSize >> 1 | 0x1;
+    const uint32_t blockStride = s1BaseSize / ArchInfo::CV_RATIO | 0x1;
     const uint32_t dupStride = 1;
     const uint32_t oriTailN = originN - floatRepSize;
     const uint32_t tailN = s2BaseSize - floatRepSize;
@@ -779,7 +779,7 @@ __aicore__ inline void ProcessVec1UpdateGeneralImpl128Mxfp8Fullquant(
     __ubuf__ T2 *x_expUb = nullptr;
     __ubuf__ T2 *expUb = (__ubuf__ T2 *)dstTensor_u128um.GetPhyAddr();
     if constexpr (IsSameType<T2, float>::value) {
-        x_expUb = expUb + ((s1BaseSize >> 1) + 1) * (s2BaseSize >> 1);
+        x_expUb = expUb + ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (s2BaseSize >> 1);
     }
     __ubuf__ pseShiftType *pseUb = (__ubuf__ pseShiftType *)pseTensor.GetPhyAddr();
     __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();

@@ -625,8 +625,8 @@ public:
         info.isLastS2Loop = (s2Cur + 1 == curS2End);
 
         if constexpr (USE_DN) {
-            info.actMSizeAlign32 = (info.actMSize + 31) >> 5 << 5;
-            info.actVecMSize = info.actMSize <= 16 ? info.actMSize : (info.actMSizeAlign32 >> 1);
+            info.actMSizeAlign = (info.actMSize + 31) >> 5 << 5;
+            info.actVecMSize = info.actMSize <= 16 ? info.actMSize : (info.actMSizeAlign >> 1);
         } else {
             info.actVecMSize = (info.actMSize + 1) >> 1;
         }

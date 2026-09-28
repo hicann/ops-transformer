@@ -56,7 +56,7 @@ bool FiaTilingFullQuantMxArch35::IsCapable()
 
 void FiaTilingFullQuantMxArch35::CalcMaxWorkspaceSize()
 {
-    constexpr int32_t mSize = 128;
+    int32_t mSize = 128 / platformInfo_.cvRatio;
     constexpr int32_t dVSize = 512;
 
     size_t sysWorkspaceSize = platformInfo_.defaultSysWorkspaceSize;
@@ -267,7 +267,7 @@ void FiaTilingFullQuantMxArch35::CreateSplitInput(split_core_v2::BaseInfo &baseI
     if (fiaInfo_->sysPrefixFlag) {
         baseInfo.actualSeqPrefixSize = fiaInfo_->systemPrefixLen;
     }
-    splitParam.mBaseSize = sOuterFactor_ * CV_RATIO;
+    splitParam.mBaseSize = sOuterFactor_ * platformInfo_.cvRatio;
     splitParam.s2BaseSize = sInnerFactor_;
     splitParam.gS1BaseSizeOfFd = 8;
     splitParam.streamK = decodeS1GMerge_; // decode场景开启FD
@@ -442,6 +442,10 @@ void FiaTilingFullQuantMxArch35::UpdateTilingKeyConfig()
         tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64;
     } else if (sOuter == SOUTER_128 && sInner == SINNER_512 && dSize == DSIZE_128 && dVsize == DSIZE_128) {
         tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128;
+    } else if (sOuter == SOUTER_64 && sInner == SINNER_512 && dSize == DSIZE_64 && dVsize == DSIZE_64) {
+        tilingKeyInfo_.config = Config_S1Aligned64_S2Aligned512_DAligned64_DVAligned64;
+    } else if (sOuter == SOUTER_64 && sInner == SINNER_512 && dSize == DSIZE_128 && dVsize == DSIZE_128) {
+        tilingKeyInfo_.config = Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128;
     } else {
         tilingKeyInfo_.config = Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128;
     }
@@ -775,5 +779,8 @@ void FiaTilingFullQuantMxArch35::PrintAllTilingData()
 // 2. 十位表示gqa、mla、泛化，即: x0x-mla, x1x-gpa, x2x-泛化
 // 3. 个位代表特化模板到泛化模板的优先级排序
 REGISTER_TILING_TEMPLATE_FIA(FusedInferAttentionScore, FiaTilingFullQuantMxArch35,
-                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510)}), 210);
+                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510),
+                                                   static_cast<int32_t>(NpuArch::DAV_9201),
+                                                   static_cast<int32_t>(NpuArch::DAV_9202)}),
+                             210);
 } // namespace optiling

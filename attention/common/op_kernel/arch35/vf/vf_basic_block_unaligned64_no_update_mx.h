@@ -595,7 +595,7 @@ __aicore__ inline void ProcessVec1NoUpdateImpl64Mxfp8Fullquant(
 
     // 写的时候固定用65或者33的stride去写，因为正向目前使能settail之后mm2的s1方向必须算满128或者64行
     // stride, high 16bits: blockStride (m*16*2/32), low 16bits: repeatStride (1)
-    const uint32_t blockStride = s1BaseSize >> 1 | 0x1;
+    const uint32_t blockStride = s1BaseSize / ArchInfo::CV_RATIO | 0x1;
     const uint32_t repeatStride = 1;
     const uint32_t nPadding = (s2BaseSize + blockBytesU8 - 1) / blockBytesU8 * blockBytesU8;
     uint32_t pltOriginalN = originN;

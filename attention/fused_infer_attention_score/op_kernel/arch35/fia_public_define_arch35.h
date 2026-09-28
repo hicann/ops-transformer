@@ -70,13 +70,13 @@ struct RunInfoX {
     uint32_t s1Idx = 0;
     uint32_t s2Idx = 0;
     uint32_t s2LocalIdx = 0; // 每核本地 S2 索引，从0开始累加，用于判断本核内 S2 的第几个 base 块
-    uint32_t realN2Idx = 0;   // GS1合轴时为n2Idx，不合轴时为n1Idx
-    uint64_t actS1Size = 1;   // 当前处理head的S1轴实际大小
-    uint64_t actS2Size = 1;   // 当前处理head的S2轴实际大小
-    uint32_t actMSize = 0;    // GS1方向上的长度
-    uint32_t actMSizeAlign32; // GS1 方向上长度对齐
-    uint32_t actVecMSize;     // VEC 视角, 基本块GS1方向长度
-    uint32_t vecMbaseIdx;     // VEC 对应的M 轴起始位置,V0 为0， V1 为 V0的actVecMSize
+    uint32_t realN2Idx = 0; // GS1合轴时为n2Idx，不合轴时为n1Idx
+    uint64_t actS1Size = 1; // 当前处理head的S1轴实际大小
+    uint64_t actS2Size = 1; // 当前处理head的S2轴实际大小
+    uint32_t actMSize = 0;  // GS1方向上的长度
+    uint32_t actMSizeAlign; // GS1 方向上长度对齐
+    uint32_t actVecMSize;   // VEC 视角, 基本块GS1方向长度
+    uint32_t vecMbaseIdx;   // VEC 对应的M 轴起始位置,V0 为0， V1 为 V0的actVecMSize
 
     uint32_t actSingleLoopS2Size = 0; // S2方向长度
     uint32_t actSingleLoopS2SizeAlign;

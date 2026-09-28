@@ -62,7 +62,11 @@ inline __aicore__ void fia_fullquant_regbase(
 {
     __gm__ uint8_t *user = GetUserWorkspace(workspace);
 
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+#else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+#endif
     constexpr bool isPa = KvLayoutType != 0;
 #if (ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN && ORIG_DTYPE_KEY == DT_FLOAT8_E4M3FN && \
      ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16)

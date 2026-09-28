@@ -2121,6 +2121,9 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::DoOpTiling(gert::TilingConte
 
 // 老模板作为兜底模板注册，优先级最低(值最大)，确保特化模板优先匹配
 REGISTER_TILING_TEMPLATE_FIA(FusedInferAttentionScore, FusedInferAttentionScoreTilingImpl,
-                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510)}), 999);
+                             std::vector<int32_t>({static_cast<int32_t>(NpuArch::DAV_3510),
+                                                   static_cast<int32_t>(NpuArch::DAV_9201),
+                                                   static_cast<int32_t>(NpuArch::DAV_9202)}),
+                             999);
 
 } // namespace optiling

@@ -2548,7 +2548,8 @@ FIA_EXTERN_C ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingCont
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
 
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 || ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201 ||
+        ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9202) {
         return TilingFusedInferAttentionScoreV4(context);
     } else if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_5102) {
         OP_CHECK_IF(

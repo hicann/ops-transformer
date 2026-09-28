@@ -167,8 +167,8 @@ public:
     {
         uint32_t mm1OutDtype = sizeof(T);
 
-        uint32_t mm1ResultSize = mBaseSize / CV_RATIO * s2BaseSize * mm1OutDtype / 2;
-        constexpr uint32_t mm2ResultSize = mBaseSize / CV_RATIO * dVBaseSize * sizeof(T);
+        uint32_t mm1ResultSize = mBaseSize / ArchInfo::CV_RATIO * s2BaseSize * mm1OutDtype / 2;
+        constexpr uint32_t mm2ResultSize = mBaseSize / ArchInfo::CV_RATIO * dVBaseSize * sizeof(T);
         constexpr uint32_t mm2LeftSize = mBaseSize * s2BaseSize * sizeof(INPUT_T) + mBaseSize * s2BaseSize / 32;
         l1BufferManager.Init(pipe, 524288); // 512 * 1024
         // 保存p结果的L1内存必须放在第一个L1 policy上，保证和vec申请的地址相同
@@ -641,16 +641,20 @@ public:
         info.faTmpOutWsPos = constInfo.coreFirstTmpOutWsPos;
         info.isLastS2Loop = (s2Cur + 1 == curS2End);
 
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        info.actMSizeAlign = (info.actMSize + 15) >> 4 << 4; // CV 1:1 对齐16
+        info.actVecMSize = info.actMSize;                    // 1:1 不拆分,处理完整 M
+#else
+        info.actMSizeAlign = (info.actMSize + 31) >> 5 << 5; // CV 1:2 对齐32
         if constexpr (USE_DN) {
-            info.actMSizeAlign32 = (info.actMSize + 31) >> 5 << 5;
-            info.actVecMSize = info.actMSize <= 16 ? info.actMSize : (info.actMSizeAlign32 >> 1);
+            info.actVecMSize = info.actMSize <= 16 ? info.actMSize : (info.actMSizeAlign >> 1);
         } else {
-            info.actMSizeAlign32 = (info.actMSize + 31) >> 5 << 5;
             info.actVecMSize = (info.actMSize + 1) >> 1;
         }
+#endif
         info.vecMbaseIdx = 0;
         if (constInfo.subBlockIdx == 1) {
-            info.vecMbaseIdx = USE_DN ? info.actVecMSize : (info.actMSizeAlign32 >> 1);
+            info.vecMbaseIdx = USE_DN ? info.actVecMSize : (info.actMSizeAlign >> 1);
             info.actVecMSize = info.actMSize - info.actVecMSize;
         }
 

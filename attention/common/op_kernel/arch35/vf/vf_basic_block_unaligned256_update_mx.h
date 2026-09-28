@@ -812,7 +812,7 @@ __aicore__ inline void ProcessVec1UpdateGeneralImpl256Mxfp8Fullquant(
     const uint32_t nPadding = (s2BaseSize + blockBytesU8 - 1) / blockBytesU8 * blockBytesU8;
     // 写的时候固定用65或者33的stride去写，因为正向目前使能settail之后mm2的s1方向必须算满128或者64行
     // stride, high 16bits: blockStride (m*16*2/32), low 16bits: repeatStride (1)
-    const uint32_t blockStride = s1BaseSize >> 1 | 0x1;
+    const uint32_t blockStride = s1BaseSize / ArchInfo::CV_RATIO | 0x1;
     const uint32_t repeatStride = 1;
     const uint32_t oriTailN1 =
         originN_u256um - floatRepSize * 2 < floatRepSize ? originN_u256um - floatRepSize * 2 : floatRepSize;
@@ -828,7 +828,7 @@ __aicore__ inline void ProcessVec1UpdateGeneralImpl256Mxfp8Fullquant(
     uint32_t pltN = s2BaseSize;
 
     __ubuf__ T2 *expUb1 = (__ubuf__ T2 *)dstTensor.GetPhyAddr();
-    __ubuf__ T2 *expUb2 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + ((s1BaseSize >> 1) + 1) * (128);
+    __ubuf__ T2 *expUb2 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + ((s1BaseSize / ArchInfo::CV_RATIO) + 1) * (128);
     __ubuf__ pseShiftType *pseUb = (__ubuf__ pseShiftType *)pseTensor.GetPhyAddr();
     __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
     __ubuf__ T *maxUbStart = (__ubuf__ T *)maxTensor.GetPhyAddr();
