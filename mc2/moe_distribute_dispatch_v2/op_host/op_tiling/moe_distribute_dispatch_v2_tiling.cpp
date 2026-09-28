@@ -894,7 +894,7 @@ static bool CheckCommAlgAttrs(const gert::TilingContext *context, const char *no
 
 static ge::graphStatus CheckGlobalBsAttr(const gert::TilingContext *context, const char *nodeName,
                                          MoeDistributeDispatchV2TilingData &tilingData, int64_t xDim0,
-                                         uint32_t epWorldSize, bool isActiveMask, DispatchV2Config &config)
+                                         uint32_t epWorldSize, DispatchV2Config &config)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return ge::GRAPH_FAILED);
@@ -910,13 +910,6 @@ static ge::graphStatus CheckGlobalBsAttr(const gert::TilingContext *context, con
                             "rank) * epWorldSize, but got globalBS=%ld, bs=%ld, epWorldSize=%u.",
                             *globalBsPtr, xDim0, epWorldSize),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(
-        ((*globalBsPtr > (xDim0 * static_cast<int64_t>(epWorldSize))) && isActiveMask),
-        OP_LOGE(
-            nodeName,
-            "Different bs on different rank cannot work when isActiveMask=true, globalBS=%ld, bs=%ld, epWorldSize=%u.",
-            *globalBsPtr, xDim0, epWorldSize),
-        return ge::GRAPH_FAILED);
     tilingData.moeDistributeDispatchV2Info.globalBs =
         (*globalBsPtr == 0) ? static_cast<uint32_t>(xDim0) * epWorldSize : static_cast<uint32_t>(*globalBsPtr);
     return ge::GRAPH_SUCCESS;
@@ -963,7 +956,7 @@ static ge::graphStatus CheckAttrs(const gert::TilingContext *context, const char
                     return ge::GRAPH_FAILED);
     tilingData.moeDistributeDispatchV2Info.bs = static_cast<uint32_t>(xDim0);
 
-    return CheckGlobalBsAttr(context, nodeName, tilingData, xDim0, epWorldSize, isActiveMask, config);
+    return CheckGlobalBsAttr(context, nodeName, tilingData, xDim0, epWorldSize, config);
 }
 
 static ge::graphStatus CheckTwoDimScalesShape(const gert::TilingContext *context, const char *nodeName,

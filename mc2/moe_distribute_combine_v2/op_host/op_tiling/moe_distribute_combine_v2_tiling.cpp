@@ -1698,7 +1698,7 @@ static bool CheckZeroComputeExpert(const gert::TilingContext *context, MoeDistri
 
 static bool CheckAndSetGlobalBs(const gert::TilingContext *context, MoeDistributeCombineV2TilingData &tilingData,
                                 const char *nodeName, const CombineV2Config &config, int64_t expertIdsDim0,
-                                uint32_t epWorldSize, bool isActiveMask)
+                                uint32_t epWorldSize)
 {
     // 校验globalBS
     auto attrs = context->GetAttrs();
@@ -1712,10 +1712,6 @@ static bool CheckAndSetGlobalBs(const gert::TilingContext *context, MoeDistribut
                                             ((*globalBsPtr) % (static_cast<int64_t>(epWorldSize)) != 0)),
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "globalBS", std::to_string(*globalBsPtr).c_str(),
                                               "should be 0 or configured maxBs per rank * epWorldSize"),
-                    return false);
-    OP_TILING_CHECK(((*globalBsPtr > (expertIdsDim0 * static_cast<int64_t>(epWorldSize))) && isActiveMask),
-                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "globalBS", std::to_string(*globalBsPtr).c_str(),
-                                              "not > bs * epWorldSize when isActiveMask"),
                     return false);
 
     tilingData.moeDistributeCombineV2Info.globalBs = static_cast<uint32_t>(*globalBsPtr);
@@ -1759,7 +1755,7 @@ static bool CheckAttrs(const gert::TilingContext *context, MoeDistributeCombineV
                     return false);
     tilingData.moeDistributeCombineV2Info.bs = static_cast<uint32_t>(expertIdsDim0);
 
-    if (!CheckAndSetGlobalBs(context, tilingData, nodeName, config, expertIdsDim0, epWorldSize, isActiveMask)) {
+    if (!CheckAndSetGlobalBs(context, tilingData, nodeName, config, expertIdsDim0, epWorldSize)) {
         return false;
     }
     OP_TILING_CHECK(!CheckZeroComputeExpert(context, tilingData, nodeName, config),

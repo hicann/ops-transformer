@@ -188,7 +188,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <td>xActiveMaskOptional</td>
     <td>输入</td>
     <td>标识token是否参与通信。</td>
-    <td><ul><li>要求是1D或者2D Tensor。可传有效数据或空指针，默认所有token参与通信。</li><li>各卡BS不一致时所有token需有效。</li></ul></td>
+    <td><ul><li>要求是1D或者2D Tensor。可传有效数据或空指针，默认所有token参与通信。</li></ul></td>
     <td>BOOL</td>
     <td>ND</td>
     <td>当输入为1D时，shape为<code>(BS, )</code>；当输入为2D时，shape为<code>(BS, K)</code></td>

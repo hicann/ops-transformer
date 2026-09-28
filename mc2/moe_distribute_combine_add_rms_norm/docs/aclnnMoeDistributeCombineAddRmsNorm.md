@@ -201,7 +201,7 @@ aclnnStatus aclnnMoeDistributeCombineAddRmsNorm(
     <td>xActiveMaskOptional</td>
     <td>输入</td>
     <td>表示token是否参与通信。</td>
-    <td><ul><li>可传有效数据或空指针，默认所有token参与通信，1D时shape为(BS,)，2D时shape为(BS, K)。</li><li>各卡BS不一致时所有token需有效。</li></ul></td>
+    <td><ul><li>可传有效数据或空指针，默认所有token参与通信，1D时shape为(BS,)，2D时shape为(BS, K)。</li></ul></td>
     <td>BOOL</td>
     <td>ND</td>
     <td>-</td>

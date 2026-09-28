@@ -96,7 +96,7 @@ $$
   <tr>
    <td>x_active_mask_optional</td>
    <td>可选输入</td>
-   <td>表示token是否参与通信，可传有效数据或空指针；1D时true需排在false前（例：{true, false, true}非法），2D时token对应K个值全为false则不参与通信；默认所有token参与通信；各卡BS不一致时所有token需有效。</td>
+   <td>表示token是否参与通信，可传有效数据或空指针；1D时true需排在false前（例：{true, false, true}非法），2D时token对应K个值全为false则不参与通信；默认所有token参与通信。</td>
    <td>BOOL</td>
    <td>ND</td>
   </tr>
