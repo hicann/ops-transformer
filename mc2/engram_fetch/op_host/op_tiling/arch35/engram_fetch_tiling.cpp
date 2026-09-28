@@ -626,13 +626,17 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
 static void SetTilingKey(gert::TilingContext *context, bool isTraining)
 {
     const char *nodeName = context->GetNodeName();
+    bool hasSf = false;
     auto sfTableDesc = context->GetInputDesc(SF_TABLE_INDEX);
     auto sfTableShape = context->GetInputShape(SF_TABLE_INDEX);
     auto fetchedSfDesc = context->GetOutputDesc(FETCHED_SF_INDEX);
     auto fetchedSfShape = context->GetOutputShape(FETCHED_SF_INDEX);
-    bool hasSf = sfTableDesc != nullptr && sfTableShape != nullptr && fetchedSfDesc != nullptr &&
-                 fetchedSfShape != nullptr && fetchedSfShape->GetStorageShape().GetDimNum() == DIM_TWO &&
-                 fetchedSfShape->GetStorageShape().GetDim(1) > 0;
+    // hasSf 训练/推理统一判定: sf_table 与 fetched_sf 成对提供时为真。
+    // 无 SF 时两者均为空占位 (1-D), fetched_sf 非 2D 使 hasSf 恒为假;
+    // 训练的 sf_table 为本卡 SF 表地址 (1元 int64 张量), 推理为全量 SF 表。
+    hasSf = sfTableDesc != nullptr && sfTableShape != nullptr && fetchedSfDesc != nullptr &&
+            fetchedSfShape != nullptr && fetchedSfShape->GetStorageShape().GetDimNum() == DIM_TWO &&
+            fetchedSfShape->GetStorageShape().GetDim(1) > 0;
     const uint64_t tilingKey = isTraining ? GET_TPL_TILING_KEY(ENGRAM_FETCH_TRAIN_MODE, hasSf) :
                                             GET_TPL_TILING_KEY(ENGRAM_FETCH_DEFAULT_MODE, hasSf);
     context->SetTilingKey(tilingKey);
@@ -663,7 +667,21 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const EngramFe
         int64_t wsCounterScratch = aivNum * UB_ALIGN;
         int64_t wsPartialCounts = aivNum * numRanks * static_cast<int64_t>(sizeof(int32_t));
         int64_t wsIndicesReadyFlag = AlignTo(numRanks * static_cast<int64_t>(sizeof(int32_t)), UB_ALIGN);
-        int64_t wsTokenStaging = tilingData.totalRecv * tilingData.hiddenBytes;
+        // 数值安全防护：sf 分量非负、乘法不溢出，numSfPacks=0 为无 sf 合法场景
+        OP_TILING_CHECK(tilingData.numSfPacks < 0 || tilingData.sfElemSize < 0 ||
+                            (tilingData.sfElemSize > 0 && tilingData.numSfPacks > INT64_MAX / tilingData.sfElemSize),
+                        OP_LOGE(nodeName, "invalid sf dims: numSfPacks=%ld, sfElemSize=%ld", tilingData.numSfPacks,
+                                tilingData.sfElemSize),
+                        return ge::GRAPH_FAILED);
+        int64_t sfBytes = static_cast<int64_t>(tilingData.numSfPacks) * static_cast<int64_t>(tilingData.sfElemSize);
+        int64_t rowStride = tilingData.hiddenBytes + sfBytes;
+        OP_TILING_CHECK(tilingData.totalRecv < 0 || rowStride <= 0 || tilingData.totalRecv > INT64_MAX / rowStride,
+                        OP_LOGE(nodeName, "token staging size overflow: totalRecv=%ld, rowStride=%ld",
+                                tilingData.totalRecv, rowStride),
+                        return ge::GRAPH_FAILED);
+        int64_t wsTokenStaging = tilingData.totalRecv * rowStride;
+        OP_LOGD(nodeName, "token staging bytes = %ld, totalRecv=%ld, rowStride=%ld", wsTokenStaging,
+                tilingData.totalRecv, rowStride);
 
         // SortLib 六段 workspace，与 kernel 侧 InitWorkspaceLayout 逐段一致（按 numTokens 规模）；
         // 前段尺寸不保证 32B 对齐，与 kernel 一致在排序区前插入对齐 padding
