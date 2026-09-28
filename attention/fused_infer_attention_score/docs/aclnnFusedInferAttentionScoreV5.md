@@ -2083,11 +2083,11 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
       aclTensor *valueTensor = nullptr;
       aclTensor *attenTensor = nullptr;
       aclTensor *outTensor = nullptr;
-      std::vector<float> queryHostData(batchSize * numHeads * sequenceLengthQ * headDims, 1.0f);
-      std::vector<float> keyHostData(batchSize * keyNumHeads * sequenceLengthKV * headDims, 1.0f);
-      std::vector<float> valueHostData(batchSize * keyNumHeads * sequenceLengthKV * headDims, 1.0f);
+      std::vector<op::fp16_t> queryHostData(batchSize * numHeads * sequenceLengthQ * headDims, 1.0f);
+      std::vector<op::fp16_t> keyHostData(batchSize * keyNumHeads * sequenceLengthKV * headDims, 1.0f);
+      std::vector<op::fp16_t> valueHostData(batchSize * keyNumHeads * sequenceLengthKV * headDims, 1.0f);
       std::vector<int8_t> attenHostData(batchSize * sequenceLengthKV, 0);
-      std::vector<float> outHostData(batchSize * numHeads * sequenceLengthQ * headDims, 1.0f);
+      std::vector<op::fp16_t> outHostData(batchSize * numHeads * sequenceLengthQ * headDims, 1.0f);
 
       // 创建query aclTensor
       ret = CreateAclTensor(queryHostData, queryShape, &queryDeviceAddr, aclDataType::ACL_FLOAT16, &queryTensor);
@@ -2112,13 +2112,10 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
       ret = CreateAclTensor(outHostData, outShape, &outDeviceAddr, aclDataType::ACL_FLOAT16, &outTensor);
       CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-      std::vector<int64_t> actualSeqlenVector = {sequenceLengthKV};
-      auto actualSeqLengths = aclCreateIntArray(actualSeqlenVector.data(), actualSeqlenVector.size());
-
       int64_t numKeyValueHeads = numHeads;
       double scaleValue = 1 / sqrt(headDims); // 1/sqrt(d)
-      int64_t preTokens = 65535;
-      int64_t nextTokens = 65535;
+      int64_t preTokens = 2147483647;
+      int64_t nextTokens = 2147483647;
       string sLayerOut = "BNSD";
       char layerOut[sLayerOut.length()+1];
       strcpy(layerOut, sLayerOut.c_str());
@@ -2135,6 +2132,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
       int64_t pseType = 0;
       aclOpExecutor* executor;
       // 调用第一段接口
+      // actualSeqLengthsOptional和actualSeqLengthsKvOptional传入nullptr，使用shape中的Q_S=1和KV_S=16。
       ret = aclnnFusedInferAttentionScoreV5GetWorkspaceSize(queryTensor, tensorKeyList, tensorValueList, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, numHeads, scaleValue, preTokens, nextTokens, layerOut, numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag, keyAntiquantMode, valueAntiquantMode, queryAntiquantMode, pseType, outTensor, nullptr, &workspaceSize, &executor);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFusedInferAttentionScoreV5GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
       // 根据第一段接口计算出的workspaceSize申请device内存
@@ -2167,7 +2165,6 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
       aclDestroyTensor(valueTensor);
       aclDestroyTensor(attenTensor);
       aclDestroyTensor(outTensor);
-      aclDestroyIntArray(actualSeqLengths);
       aclrtFree(queryDeviceAddr);
       aclrtFree(keyDeviceAddr);
       aclrtFree(valueDeviceAddr);

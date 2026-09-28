@@ -588,7 +588,7 @@ int main() {
   int64_t innerPrecise = 0;
   int64_t sparseMode = 0;
 
-  char layOut[5] = {'S', 'B', 'H', 0};
+  char inputLayout[5] = {'S', 'B', 'H', 0};
 
   // 3. 调用CANN算子库API，需要修改为具体的Api名称
   uint64_t workspaceSize = 0;
@@ -597,7 +597,7 @@ int main() {
   // 调用aclnnFlashAttentionScore第一段接口
   ret = aclnnFlashAttentionScoreGetWorkspaceSize(
             q, k, v, pse, dropMask, padding, attenmask, prefix, scaleValue,
-            keepProb, preTokens, nextTokens, headNum, layOut, innerPrecise,
+            keepProb, preTokens, nextTokens, headNum, inputLayout, innerPrecise,
             sparseMode, softmaxMax, softmaxSum, softmaxOut, attentionOut, &workspaceSize, &executor);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionScoreGetWorkspaceSize failed. ERROR: %d.\n[ERROR msg]%s", ret, aclGetRecentErrMsg()); return ret);
 
