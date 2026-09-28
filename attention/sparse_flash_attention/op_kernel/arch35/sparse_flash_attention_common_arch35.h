@@ -73,13 +73,13 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
 #define TEMPLATE_INTF_ARGS \
     Q_T, KV_T, T, OUTPUT_T, isFd, isPa, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G, HAS_ROPE
 
-#define CUBE_BLOCK_TRAITS_TYPE_FIELDS(X) \
+#define SFA_CUBE_TRAIT_TYPES(X) \
     X(Q_T) \
     X(KV_T) \
     X(T) \
     X(OUTPUT_T)
 
-#define CUBE_BLOCK_TRAITS_CONST_FIELDS(X) \
+#define SFA_CUBE_TRAIT_CONSTANTS(X) \
     X(isFd, bool, false) \
     X(isPa, bool, true) \
     X(LAYOUT_T, SFA_LAYOUT, SFA_LAYOUT::BSND) \
@@ -89,24 +89,20 @@ __aicore__ constexpr uint64_t Align64Func(uint64_t data)
     X(HAS_ROPE, bool, true)
 
 /* 1. 生成带默认值的模版Template */
-#define GEN_TYPE_PARAM(name) typename name,
-#define GEN_CONST_PARAM(name, type, default_val) type name = default_val,
+#define SFA_TEMPLATE_TYPE(name) typename name,
+#define SFA_TEMPLATE_CONSTANT(name, type, default_val) type name = default_val,
 
 #define TEMPLATES_DEF \
-    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TYPE_PARAM) CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_CONST_PARAM) bool end = \
-                  true>
+    template <SFA_CUBE_TRAIT_TYPES(SFA_TEMPLATE_TYPE) SFA_CUBE_TRAIT_CONSTANTS(SFA_TEMPLATE_CONSTANT) bool end = true>
 
 /* 2. 生成不带默认值的模版Template */
-#define GEN_TEMPLATE_TYPE_NODEF(name) typename name,
-#define GEN_TEMPLATE_CONST_NODEF(name, type, default_val) type name,
+#define SFA_REQUIRED_TYPE(name) typename name,
+#define SFA_REQUIRED_CONSTANT(name, type, default_val) type name,
 #define TEMPLATES_DEF_NO_DEFAULT \
-    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TEMPLATE_TYPE_NODEF) \
-                  CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TEMPLATE_CONST_NODEF) bool end>
+    template <SFA_CUBE_TRAIT_TYPES(SFA_REQUIRED_TYPE) SFA_CUBE_TRAIT_CONSTANTS(SFA_REQUIRED_CONSTANT) bool end>
 
 /* 3. 生成有默认值的Args */
-#define GEN_ARG_NAME(name, ...) name,
-#define TEMPLATE_ARGS \
-    CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARG_NAME) \
-    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARG_NAME) end
+#define SFA_TEMPLATE_ARGUMENT(name, ...) name,
+#define TEMPLATE_ARGS SFA_CUBE_TRAIT_TYPES(SFA_TEMPLATE_ARGUMENT) SFA_CUBE_TRAIT_CONSTANTS(SFA_TEMPLATE_ARGUMENT) end
 
 #endif // SPARSE_FLASH_ATTENTION_COMMON_ARCH35_H

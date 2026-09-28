@@ -408,8 +408,8 @@ struct CubeBlockTraits; // 声明
 #define DEFINE_CUBE_BLOCK_TRAITS(CUBE_BLOCK_CLASS) \
     TEMPLATES_DEF_NO_DEFAULT \
     struct CubeBlockTraits<CUBE_BLOCK_CLASS<TEMPLATE_ARGS>> { \
-        CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TRAIT_TYPE) \
-        CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TRAIT_CONST) \
+        SFA_CUBE_TRAIT_TYPES(GEN_TRAIT_TYPE) \
+        SFA_CUBE_TRAIT_CONSTANTS(GEN_TRAIT_CONST) \
     }
 
 DEFINE_CUBE_BLOCK_TRAITS(SFAMatmulService);
@@ -419,7 +419,7 @@ DEFINE_CUBE_BLOCK_TRAITS(SFAMatmulServiceDummy);
 #define GEN_ARGS_TYPE(name, ...) using name = typename CubeBlockTraits<CubeBlockType>::name##_TRAITS;
 #define GEN_ARGS_CONST(name, type, ...) static constexpr type name = CubeBlockTraits<CubeBlockType>::name##Traits;
 #define ARGS_TRAITS \
-    CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARGS_TYPE) \
-    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARGS_CONST)
+    SFA_CUBE_TRAIT_TYPES(GEN_ARGS_TYPE) \
+    SFA_CUBE_TRAIT_CONSTANTS(GEN_ARGS_CONST)
 } // namespace BaseApi
 #endif // SPARSE_FLASH_ATTENTION_SERVICE_CUBE_MLA_ARCH35_H

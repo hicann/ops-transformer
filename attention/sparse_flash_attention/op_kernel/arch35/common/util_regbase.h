@@ -22,13 +22,13 @@ using AscendC::QuePosition;
 using AscendC::TQue;
 
 namespace regbaseutil {
-constexpr int64_t MAX_PRE_NEXT_TOKENS = 0x7FFFFFFF;
+constexpr int64_t SFA_MAX_WINDOW_TOKENS = 0x7FFFFFFF;
 enum class VselrIndexEnum {
     GT_64_AND_LTE_128_INDEX = 0,
     GT_0_AND_LTE_64_INDEX = 1
 };
 
-#define COMMON_RUN_PARAM \
+#define SFA_RUN_PARAM_FIELDS \
     int64_t boIdx; \
     int64_t s1oIdx; \
     int64_t n2oIdx; \
@@ -49,13 +49,13 @@ enum class VselrIndexEnum {
     int32_t actualS2Size        /* KV的actualSeqLength */
 
 struct RunParamStr { // 分核与切块需要使用到参数
-    COMMON_RUN_PARAM;
+    SFA_RUN_PARAM_FIELDS;
     /* 推理新增 */
     int64_t gs1LoopStartIdx;
     int64_t gs1LoopEndIdx;
     // BN循环生产的数据
-    int64_t preTokensPerBatch = MAX_PRE_NEXT_TOKENS;  // 左上顶点的pretoken
-    int64_t nextTokensPerBatch = MAX_PRE_NEXT_TOKENS; // 左上顶点的nexttoken
+    int64_t preTokensPerBatch = SFA_MAX_WINDOW_TOKENS;  // 左上顶点的pretoken
+    int64_t nextTokensPerBatch = SFA_MAX_WINDOW_TOKENS; // 左上顶点的nexttoken
 
     // NBS1循环生产的数据
     int64_t sOuterOffset;     // 单个S内 souter的 souterIdx * halfS1RealSize souter层确定
@@ -70,7 +70,7 @@ struct RunParamStr { // 分核与切块需要使用到参数
     int64_t kvLoopEndIdx;
 };
 
-#define COMMON_RUN_INFO \
+#define SFA_RUN_INFO_FIELDS \
     int64_t s2StartIdx; /* s2的起始位置，sparse场景下可能不是0 */ \
     int64_t s2EndIdx; \
     int64_t s2LoopCount; /* s2循环当前的循环index */ \
@@ -111,7 +111,7 @@ struct RunParamStr { // 分核与切块需要使用到参数
     int64_t mOuterOffset
 
 struct RunInfo {
-    COMMON_RUN_INFO;
+    SFA_RUN_INFO_FIELDS;
     // 推理新增
     // lse 输出offset
     int64_t softmaxLseOffset;
@@ -120,7 +120,7 @@ struct RunInfo {
     int64_t kvLoopEndIdx;
 };
 
-#define COMMON_CONST_INFO \
+#define SFA_CONST_INFO_FIELDS \
     /* 全局的基本块信息 */ \
     uint32_t bSize; \
     uint32_t needInit; \
@@ -202,7 +202,7 @@ struct RunInfo {
     uint32_t gS1Start; \
     uint32_t gS1End
 
-#define INFER_CONST_INFO \
+#define SFA_INFER_CONST_INFO_FIELDS \
     /* 推理 */ \
     bool isActualLenDimsNull;   /* 判断是否有actualseq */ \
     bool isActualLenDimsKVNull; /* 判断是否有actualseq_kv */ \
@@ -219,7 +219,7 @@ struct RunInfo {
     float softmaxScale; \
     uint32_t keyStride0
 
-#define CV_SHARED_PARAMS \
+#define SFA_CV_SHARED_PARAM_FIELDS \
     /* base params */ \
     uint32_t s1BaseSize; \
     uint32_t s2BaseSize; \
@@ -246,13 +246,13 @@ struct RunInfo {
     bool returnSoftmaxLse
 
 struct ConstInfo {
-    COMMON_CONST_INFO;
-    INFER_CONST_INFO;
+    SFA_CONST_INFO_FIELDS;
+    SFA_INFER_CONST_INFO_FIELDS;
 };
 
 /* only support b32 or b64 */
 struct CVSharedParams {
-    CV_SHARED_PARAMS;
+    SFA_CV_SHARED_PARAM_FIELDS;
 };
 } // namespace regbaseutil
 

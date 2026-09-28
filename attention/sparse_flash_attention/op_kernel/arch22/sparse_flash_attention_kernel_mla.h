@@ -127,11 +127,11 @@ private:
     __gm__ uint8_t *keyPtr = nullptr;
     __gm__ uint8_t *valuePtr = nullptr;
 
-    ConstInfo constInfo{};
-    TempLoopInfo tempLoopInfo{};
+    ConstInfo sfaKernelConstInfo{};
+    TempLoopInfo sfaKernelLoopInfo{};
 
     SFAMatmulService<SFAT> matmulService;
-    SFAVectorService<SFAT> vectorService;
+    SFAVectorService<SFAT> sfaKernelVectorService;
 
     GlobalTensor<Q_T> queryGm;
     GlobalTensor<KV_T> keyGm;
@@ -179,10 +179,11 @@ private:
     // ================================Offset Calc=====================================
     __aicore__ inline void GetActualSeqLen(uint32_t bIdx, uint32_t s1Idx = 0);
     __aicore__ inline void GetSparseActualSeqLen(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx);
-    __aicore__ inline void CalcSinnerTopKBegin(RunInfo &info, uint32_t &curTopKIdx, uint64_t &curOffsetInSparseBlock);
+    __aicore__ inline void CalcSinnerTopKBegin(RunInfo &sfaKernelRunInfo, uint32_t &curTopKIdx,
+                                               uint64_t &curOffsetInSparseBlock);
     __aicore__ inline void UpdateInnerLoopCond();
     __aicore__ inline void DealActSeqLenIsZero(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx);
-    __aicore__ inline void CalcParams(uint32_t loop, uint64_t s2Start, uint32_t s2LoopIdx, RunInfo &info);
+    __aicore__ inline void CalcParams(uint32_t loop, uint64_t s2Start, uint32_t s2LoopIdx, RunInfo &sfaKernelRunInfo);
     __aicore__ inline void GetAxisStartIdx(uint32_t bN2EndPrev, uint32_t gS1EndPrev, uint32_t s2EndPrev);
     __aicore__ inline uint64_t GetBalanceActualSeqLengths(GlobalTensor<int32_t> &actualSeqLengths, uint32_t bIdx);
     __aicore__ inline uint32_t GetActualSeqLenKV(uint32_t bIdx);
@@ -190,9 +191,9 @@ private:
     __aicore__ inline void UpdateInner(uint32_t &s2End, uint32_t &curS2End, uint32_t s1Idx, bool isEnd);
     __aicore__ inline void GetPreNextTokensLeftUp();
     // ================================Mm1==============================================
-    __aicore__ inline void ComputeMm1(const RunInfo &info);
+    __aicore__ inline void ComputeMm1(const RunInfo &sfaKernelRunInfo);
     // ================================Mm2==============================================
-    __aicore__ inline void ComputeMm2(const RunInfo &info);
+    __aicore__ inline void ComputeMm2(const RunInfo &sfaKernelRunInfo);
     __aicore__ inline void Bmm2DataCopyOut(uint64_t attenOutOffset, LocalTensor<OUT_T> &attenOutUb, uint32_t startRow,
                                            uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
     __aicore__ inline void InitAllZeroOutput(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx);
@@ -202,46 +203,46 @@ template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitTilingData()
 {
     usedCoreNum = tilingData->singleCoreParams.usedCoreNum;
-    constInfo.splitKVNum = tilingData->splitKVParams.s2;
-    constInfo.mmResUbSize = tilingData->singleCoreTensorSize.mmResUbSize;
-    constInfo.bmm2ResUbSize = tilingData->singleCoreTensorSize.bmm2ResUbSize;
-    constInfo.vec1ResUbSize = constInfo.mmResUbSize * msdIterNum;
+    sfaKernelConstInfo.splitKVNum = tilingData->splitKVParams.s2;
+    sfaKernelConstInfo.mmResUbSize = tilingData->singleCoreTensorSize.mmResUbSize;
+    sfaKernelConstInfo.bmm2ResUbSize = tilingData->singleCoreTensorSize.bmm2ResUbSize;
+    sfaKernelConstInfo.vec1ResUbSize = sfaKernelConstInfo.mmResUbSize * msdIterNum;
 
-    constInfo.batchSize = tilingData->baseParams.batchSize;
-    constInfo.qHeadNum = constInfo.gSize = tilingData->baseParams.nNumOfQInOneGroup;
-    constInfo.kvSeqSize = tilingData->baseParams.seqSize;
-    constInfo.qSeqSize = tilingData->baseParams.qSeqSize;
-    constInfo.maxBlockNumPerBatch = tilingData->baseParams.maxBlockNumPerBatch;
-    constInfo.kvCacheBlockSize = tilingData->baseParams.blockSize;
-    constInfo.outputLayout = static_cast<SFA_LAYOUT>(tilingData->baseParams.outputLayout);
-    constInfo.mBaseSize = tilingData->innerSplitParams.mBaseSize;
-    constInfo.s2BaseSize = tilingData->innerSplitParams.s2BaseSize;
-    constInfo.kvHeadNum = kvHeadNum;
-    constInfo.headDim = headDim;
-    constInfo.headDimRope = headDimRope;
-    constInfo.sparseBlockSize = tilingData->baseParams.sparseBlockSize;
-    constInfo.sparseBlockCount = tilingData->baseParams.sparseBlockCount;
-    constInfo.sparseMode = tilingData->baseParams.sparseMode;
-    constInfo.preTokens = tilingData->baseParams.preTokens;
-    constInfo.nextTokens = tilingData->baseParams.nextTokens;
-    constInfo.attentionMode = tilingData->baseParams.attentionMode;
-    constInfo.returnSoftmaxLse = tilingData->baseParams.returnSoftmaxLse;
+    sfaKernelConstInfo.batchSize = tilingData->baseParams.batchSize;
+    sfaKernelConstInfo.qHeadNum = sfaKernelConstInfo.gSize = tilingData->baseParams.nNumOfQInOneGroup;
+    sfaKernelConstInfo.kvSeqSize = tilingData->baseParams.seqSize;
+    sfaKernelConstInfo.qSeqSize = tilingData->baseParams.qSeqSize;
+    sfaKernelConstInfo.maxBlockNumPerBatch = tilingData->baseParams.maxBlockNumPerBatch;
+    sfaKernelConstInfo.kvCacheBlockSize = tilingData->baseParams.blockSize;
+    sfaKernelConstInfo.outputLayout = static_cast<SFA_LAYOUT>(tilingData->baseParams.outputLayout);
+    sfaKernelConstInfo.mBaseSize = tilingData->innerSplitParams.mBaseSize;
+    sfaKernelConstInfo.s2BaseSize = tilingData->innerSplitParams.s2BaseSize;
+    sfaKernelConstInfo.kvHeadNum = kvHeadNum;
+    sfaKernelConstInfo.headDim = headDim;
+    sfaKernelConstInfo.headDimRope = headDimRope;
+    sfaKernelConstInfo.sparseBlockSize = tilingData->baseParams.sparseBlockSize;
+    sfaKernelConstInfo.sparseBlockCount = tilingData->baseParams.sparseBlockCount;
+    sfaKernelConstInfo.sparseMode = tilingData->baseParams.sparseMode;
+    sfaKernelConstInfo.preTokens = tilingData->baseParams.preTokens;
+    sfaKernelConstInfo.nextTokens = tilingData->baseParams.nextTokens;
+    sfaKernelConstInfo.attentionMode = tilingData->baseParams.attentionMode;
+    sfaKernelConstInfo.returnSoftmaxLse = tilingData->baseParams.returnSoftmaxLse;
 
-    constInfo.preLoadNum = PRELOAD_NUM;
-    constInfo.nBufferMBaseSize = N_BUFFER_M_BASIC_SIZE;
-    constInfo.syncV0C1 = SYNC_V0_C1_FLAG;
-    constInfo.syncC1V1 = SYNC_C1_V1_FLAG;
-    constInfo.syncV1C2 = SYNC_V1_C2_FLAG;
-    constInfo.syncC2V2 = SYNC_C2_V2_FLAG;
-    constInfo.syncC2V1 = SYNC_C2_V1_FLAG;
-    constInfo.syncV1NupdateC2 = SYNC_V1_NUPDATE_C2_FLAG;
+    sfaKernelConstInfo.preLoadNum = PRELOAD_NUM;
+    sfaKernelConstInfo.nBufferMBaseSize = N_BUFFER_M_BASIC_SIZE;
+    sfaKernelConstInfo.syncV0C1 = SYNC_V0_C1_FLAG;
+    sfaKernelConstInfo.syncC1V1 = SYNC_C1_V1_FLAG;
+    sfaKernelConstInfo.syncV1C2 = SYNC_V1_C2_FLAG;
+    sfaKernelConstInfo.syncC2V2 = SYNC_C2_V2_FLAG;
+    sfaKernelConstInfo.syncC2V1 = SYNC_C2_V1_FLAG;
+    sfaKernelConstInfo.syncV1NupdateC2 = SYNC_V1_NUPDATE_C2_FLAG;
 }
 
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitBuffers()
 {
     if ASCEND_IS_AIV {
-        vectorService.InitBuffers(pipe);
+        sfaKernelVectorService.InitBuffers(pipe);
     } else {
         matmulService.InitBuffers(pipe);
     }
@@ -251,45 +252,46 @@ template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ,
                                                                        __gm__ uint8_t *actualSeqLengths)
 {
-    constInfo.actualLenDimsQ = tilingData->baseParams.actualLenDimsQ;
-    constInfo.actualLenDimsKV = tilingData->baseParams.actualLenDimsKV;
-    if (constInfo.actualLenDimsKV != 0) {
-        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengths, constInfo.actualLenDimsKV);
+    sfaKernelConstInfo.actualLenDimsQ = tilingData->baseParams.actualLenDimsQ;
+    sfaKernelConstInfo.actualLenDimsKV = tilingData->baseParams.actualLenDimsKV;
+    if (sfaKernelConstInfo.actualLenDimsKV != 0) {
+        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengths, sfaKernelConstInfo.actualLenDimsKV);
     }
-    if (constInfo.actualLenDimsQ != 0) {
-        actualSeqLengthsQGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsQ, constInfo.actualLenDimsQ);
+    if (sfaKernelConstInfo.actualLenDimsQ != 0) {
+        actualSeqLengthsQGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsQ, sfaKernelConstInfo.actualLenDimsQ);
     }
 }
 
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitAllZeroOutput(uint32_t bIdx, uint32_t s1Idx, uint32_t n2Idx)
 {
-    if (constInfo.outputLayout == SFA_LAYOUT::TND) {
+    if (sfaKernelConstInfo.outputLayout == SFA_LAYOUT::TND) {
         uint32_t tBase = bIdx == 0 ? 0 : actualSeqLengthsQGm.GetValue(bIdx - 1);
-        uint32_t s1Count = tempLoopInfo.actS1Size;
+        uint32_t s1Count = sfaKernelLoopInfo.actS1Size;
 
-        uint64_t attenOutOffset = (tBase + s1Idx) * kvHeadNum * constInfo.gSize * headDim + // T轴、s1轴偏移
-                                  n2Idx * constInfo.gSize * headDim;                        // N2轴偏移
-        matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], constInfo.gSize * headDim, 0);
-        if (constInfo.returnSoftmaxLse) {
+        uint64_t attenOutOffset = (tBase + s1Idx) * kvHeadNum * sfaKernelConstInfo.gSize * headDim + // T轴、s1轴偏移
+                                  n2Idx * sfaKernelConstInfo.gSize * headDim;                        // N2轴偏移
+        matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], sfaKernelConstInfo.gSize * headDim, 0);
+        if (sfaKernelConstInfo.returnSoftmaxLse) {
             uint64_t softmaxSumOffset =
-                n2Idx * actualSeqLengthsQGm.GetValue(constInfo.batchSize - 1) * constInfo.gSize +
-                (tBase + s1Idx) * constInfo.gSize;
+                n2Idx * actualSeqLengthsQGm.GetValue(sfaKernelConstInfo.batchSize - 1) * sfaKernelConstInfo.gSize +
+                (tBase + s1Idx) * sfaKernelConstInfo.gSize;
             uint64_t softmaxMaxOffset = softmaxSumOffset;
-            matmul::InitOutput<T>(softmaxSumGm[softmaxSumOffset], constInfo.gSize, 0);
-            matmul::InitOutput<T>(softmaxMaxGm[softmaxMaxOffset], constInfo.gSize, 0);
+            matmul::InitOutput<T>(softmaxSumGm[softmaxSumOffset], sfaKernelConstInfo.gSize, 0);
+            matmul::InitOutput<T>(softmaxMaxGm[softmaxMaxOffset], sfaKernelConstInfo.gSize, 0);
         }
-    } else if (constInfo.outputLayout == SFA_LAYOUT::BSND) {
-        uint64_t attenOutOffset = bIdx * constInfo.qSeqSize * kvHeadNum * constInfo.gSize * headDim +
-                                  s1Idx * kvHeadNum * constInfo.gSize * headDim + // B轴、S1轴偏移
-                                  n2Idx * constInfo.gSize * headDim;              // N2轴偏移
-        matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], constInfo.gSize * headDim, 0);
-        if (constInfo.returnSoftmaxLse) {
-            uint64_t softmaxSumOffset = bIdx * kvHeadNum * constInfo.qSeqSize * constInfo.gSize +
-                                        n2Idx * constInfo.qSeqSize * constInfo.gSize + s1Idx * constInfo.gSize;
+    } else if (sfaKernelConstInfo.outputLayout == SFA_LAYOUT::BSND) {
+        uint64_t attenOutOffset = bIdx * sfaKernelConstInfo.qSeqSize * kvHeadNum * sfaKernelConstInfo.gSize * headDim +
+                                  s1Idx * kvHeadNum * sfaKernelConstInfo.gSize * headDim + // B轴、S1轴偏移
+                                  n2Idx * sfaKernelConstInfo.gSize * headDim;              // N2轴偏移
+        matmul::InitOutput<OUT_T>(attentionOutGm[attenOutOffset], sfaKernelConstInfo.gSize * headDim, 0);
+        if (sfaKernelConstInfo.returnSoftmaxLse) {
+            uint64_t softmaxSumOffset = bIdx * kvHeadNum * sfaKernelConstInfo.qSeqSize * sfaKernelConstInfo.gSize +
+                                        n2Idx * sfaKernelConstInfo.qSeqSize * sfaKernelConstInfo.gSize +
+                                        s1Idx * sfaKernelConstInfo.gSize;
             uint64_t softmaxMaxOffset = softmaxSumOffset;
-            matmul::InitOutput<T>(softmaxSumGm[softmaxSumOffset], constInfo.gSize, 0);
-            matmul::InitOutput<T>(softmaxMaxGm[softmaxMaxOffset], constInfo.gSize, 0);
+            matmul::InitOutput<T>(softmaxSumGm[softmaxSumOffset], sfaKernelConstInfo.gSize, 0);
+            matmul::InitOutput<T>(softmaxMaxGm[softmaxMaxOffset], sfaKernelConstInfo.gSize, 0);
         }
     }
 }
@@ -299,16 +301,17 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitOutputSingleCore()
 {
     uint32_t coreNum = GetBlockNum();
     if (coreNum != 0) {
-        uint64_t totalOutputSize = constInfo.batchSize * constInfo.qHeadNum * constInfo.qSeqSize * constInfo.headDim;
+        uint64_t totalOutputSize = sfaKernelConstInfo.batchSize * sfaKernelConstInfo.qHeadNum *
+                                   sfaKernelConstInfo.qSeqSize * sfaKernelConstInfo.headDim;
         uint64_t singleCoreSize = (totalOutputSize + (2 * coreNum) - 1) / (2 * coreNum); // 2 means c:v = 1:2
         uint64_t tailSize = totalOutputSize - tmpBlockIdx * singleCoreSize;
         uint64_t singleInitOutputSize = tailSize < singleCoreSize ? tailSize : singleCoreSize;
         if (tmpBlockIdx * singleCoreSize < totalOutputSize && singleInitOutputSize > 0) {
             matmul::InitOutput<OUT_T>(attentionOutGm[tmpBlockIdx * singleCoreSize], singleInitOutputSize, 0);
         }
-        if (constInfo.returnSoftmaxLse) {
-            uint64_t totalReturnSoftmaxSize =
-                constInfo.batchSize * constInfo.kvHeadNum * constInfo.qSeqSize * constInfo.gSize;
+        if (sfaKernelConstInfo.returnSoftmaxLse) {
+            uint64_t totalReturnSoftmaxSize = sfaKernelConstInfo.batchSize * sfaKernelConstInfo.kvHeadNum *
+                                              sfaKernelConstInfo.qSeqSize * sfaKernelConstInfo.gSize;
             uint64_t singleCoreReturnSoftmaxSize = (totalReturnSoftmaxSize + (2 * coreNum) - 1) / (2 * coreNum);
             uint64_t tailReturnSoftmaxSize = totalReturnSoftmaxSize - tmpBlockIdx * singleCoreReturnSoftmaxSize;
             uint64_t singleInitReturnSoftmaxSize = tailReturnSoftmaxSize < singleCoreReturnSoftmaxSize ?
@@ -328,25 +331,26 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitOutputSingleCore()
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::GetActualSeqLen(uint32_t bIdx, uint32_t s1Idx)
 {
-    tempLoopInfo.curActualSeqLenOri = GetActualSeqLenKV(bIdx);
-    tempLoopInfo.actS1Size = GetBalanceActualSeqLengths(actualSeqLengthsQGm, bIdx);
+    sfaKernelLoopInfo.curActualSeqLenOri = GetActualSeqLenKV(bIdx);
+    sfaKernelLoopInfo.actS1Size = GetBalanceActualSeqLengths(actualSeqLengthsQGm, bIdx);
 }
 
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::GetSparseActualSeqLen(uint32_t bIdx, uint32_t s1Idx,
                                                                             uint32_t n2Idx)
 {
-    if (tempLoopInfo.nextTokensPerBatch < 0 && s1Idx < (-tempLoopInfo.nextTokensPerBatch)) { // 存在行无效
-        tempLoopInfo.curActualSeqLen = 0;
+    if (sfaKernelLoopInfo.nextTokensPerBatch < 0 && s1Idx < (-sfaKernelLoopInfo.nextTokensPerBatch)) { // 存在行无效
+        sfaKernelLoopInfo.curActualSeqLen = 0;
         return;
     }
-    int64_t threshold = tempLoopInfo.curActualSeqLenOri;
-    if (constInfo.sparseMode == 3) {
-        threshold = static_cast<int64_t>(tempLoopInfo.nextTokensPerBatch) + s1Idx + 1;
+    int64_t threshold = sfaKernelLoopInfo.curActualSeqLenOri;
+    if (sfaKernelConstInfo.sparseMode == 3) {
+        threshold = static_cast<int64_t>(sfaKernelLoopInfo.nextTokensPerBatch) + s1Idx + 1;
     }
-    tempLoopInfo.curActualSeqLen = (constInfo.sparseBlockCount * constInfo.sparseBlockSize > threshold) ?
-                                       threshold :
-                                       (constInfo.sparseBlockCount * constInfo.sparseBlockSize);
+    sfaKernelLoopInfo.curActualSeqLen =
+        (sfaKernelConstInfo.sparseBlockCount * sfaKernelConstInfo.sparseBlockSize > threshold) ?
+            threshold :
+            (sfaKernelConstInfo.sparseBlockCount * sfaKernelConstInfo.sparseBlockSize);
 }
 
 template <typename SFAT>
@@ -361,9 +365,9 @@ __aicore__ inline uint32_t SparseFlashAttentionMla<SFAT>::GetActualSeqLenKV(uint
             return 0;
         }
     } else {
-        if (constInfo.actualLenDimsKV == 0) {
-            return constInfo.kvSeqSize;
-        } else if (constInfo.actualLenDimsKV == 1) {
+        if (sfaKernelConstInfo.actualLenDimsKV == 0) {
+            return sfaKernelConstInfo.kvSeqSize;
+        } else if (sfaKernelConstInfo.actualLenDimsKV == 1) {
             return actualSeqLengthsKVGm.GetValue(0);
         } else {
             return actualSeqLengthsKVGm.GetValue(bIdx);
@@ -382,24 +386,25 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::DealActSeqLenIsZero(uint32
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::GetPreNextTokensLeftUp()
 {
-    if (constInfo.sparseMode == 3) {
-        tempLoopInfo.nextTokensPerBatch =
-            static_cast<int32_t>(tempLoopInfo.curActualSeqLenOri) - static_cast<int32_t>(tempLoopInfo.actS1Size);
+    if (sfaKernelConstInfo.sparseMode == 3) {
+        sfaKernelLoopInfo.nextTokensPerBatch = static_cast<int32_t>(sfaKernelLoopInfo.curActualSeqLenOri) -
+                                               static_cast<int32_t>(sfaKernelLoopInfo.actS1Size);
     }
 }
 
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::UpdateInnerLoopCond()
 {
-    if ((tempLoopInfo.curActualSeqLen == 0) || (tempLoopInfo.actS1Size == 0)) {
-        tempLoopInfo.curActSeqLenIsZero = true;
+    if ((sfaKernelLoopInfo.curActualSeqLen == 0) || (sfaKernelLoopInfo.actS1Size == 0)) {
+        sfaKernelLoopInfo.curActSeqLenIsZero = true;
         return;
     }
-    tempLoopInfo.curActSeqLenIsZero = false;
-    tempLoopInfo.mBasicSizeTail = (tempLoopInfo.actS1Size * constInfo.gSize) % constInfo.mBaseSize;
-    tempLoopInfo.mBasicSizeTail =
-        (tempLoopInfo.mBasicSizeTail == 0) ? constInfo.mBaseSize : tempLoopInfo.mBasicSizeTail;
-    tempLoopInfo.s2LoopTimes = 0;
+    sfaKernelLoopInfo.curActSeqLenIsZero = false;
+    sfaKernelLoopInfo.mBasicSizeTail =
+        (sfaKernelLoopInfo.actS1Size * sfaKernelConstInfo.gSize) % sfaKernelConstInfo.mBaseSize;
+    sfaKernelLoopInfo.mBasicSizeTail =
+        (sfaKernelLoopInfo.mBasicSizeTail == 0) ? sfaKernelConstInfo.mBaseSize : sfaKernelLoopInfo.mBasicSizeTail;
+    sfaKernelLoopInfo.s2LoopTimes = 0;
 }
 
 template <typename SFAT>
@@ -408,10 +413,11 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::UpdateInner(uint32_t &s2En
 {
     uint32_t s1BaseSize = 1;
     int64_t s1Offset = s1BaseSize * s1Idx;
-    int64_t s2LastToken = Min(s1Offset + tempLoopInfo.nextTokensPerBatch + s1BaseSize, tempLoopInfo.curActualSeqLenOri);
-    s2LastToken = Min(constInfo.sparseBlockSize * constInfo.sparseBlockCount, s2LastToken);
-    curS2End = (s2LastToken + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
-    tempLoopInfo.s2LoopTimes = isEnd ? constInfo.s2End + 1 : curS2End;
+    int64_t s2LastToken =
+        Min(s1Offset + sfaKernelLoopInfo.nextTokensPerBatch + s1BaseSize, sfaKernelLoopInfo.curActualSeqLenOri);
+    s2LastToken = Min(sfaKernelConstInfo.sparseBlockSize * sfaKernelConstInfo.sparseBlockCount, s2LastToken);
+    curS2End = (s2LastToken + sfaKernelConstInfo.s2BaseSize - 1) / sfaKernelConstInfo.s2BaseSize;
+    sfaKernelLoopInfo.s2LoopTimes = isEnd ? sfaKernelConstInfo.s2End + 1 : curS2End;
 }
 
 template <typename SFAT>
@@ -455,7 +461,7 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
     softmaxMaxGm.SetGlobalBuffer((__gm__ T *)softmaxMax);
     softmaxSumGm.SetGlobalBuffer((__gm__ T *)softmaxSum);
     if ASCEND_IS_AIV {
-        if (constInfo.needInit && LAYOUT_T != SFA_LAYOUT::TND) {
+        if (sfaKernelConstInfo.needInit && LAYOUT_T != SFA_LAYOUT::TND) {
             InitOutputSingleCore();
         }
     }
@@ -471,17 +477,18 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
     uint64_t offset = 0;
     mm1ResGm.SetGlobalBuffer(
         (__gm__ MM1_OUT_T *)(workspace + offset +
-                             aiCoreIdx * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(MM1_OUT_T)));
-    offset += GetBlockNum() * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(MM1_OUT_T);
+                             aiCoreIdx * dbWorkspaceRatio * sfaKernelConstInfo.mmResUbSize * sizeof(MM1_OUT_T)));
+    offset += GetBlockNum() * dbWorkspaceRatio * sfaKernelConstInfo.mmResUbSize * sizeof(MM1_OUT_T);
 
     vec1ResGm.SetGlobalBuffer(
-        (__gm__ KV_T *)(workspace + offset + aiCoreIdx * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(KV_T)));
-    offset += GetBlockNum() * dbWorkspaceRatio * constInfo.mmResUbSize * sizeof(KV_T);
+        (__gm__ KV_T *)(workspace + offset +
+                        aiCoreIdx * dbWorkspaceRatio * sfaKernelConstInfo.mmResUbSize * sizeof(KV_T)));
+    offset += GetBlockNum() * dbWorkspaceRatio * sfaKernelConstInfo.mmResUbSize * sizeof(KV_T);
 
     mm2ResGm.SetGlobalBuffer(
         (__gm__ MM2_OUT_T *)(workspace + offset +
-                             aiCoreIdx * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(MM2_OUT_T)));
-    offset += GetBlockNum() * dbWorkspaceRatio * constInfo.bmm2ResUbSize * sizeof(MM2_OUT_T);
+                             aiCoreIdx * dbWorkspaceRatio * sfaKernelConstInfo.bmm2ResUbSize * sizeof(MM2_OUT_T)));
+    offset += GetBlockNum() * dbWorkspaceRatio * sfaKernelConstInfo.bmm2ResUbSize * sizeof(MM2_OUT_T);
     mm2ResInt32Gm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(mm2ResGm.GetPhyAddr(0)));
 
     if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
@@ -502,22 +509,22 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Init(
     }
 
     if ASCEND_IS_AIV {
-        vectorService.InitParams(constInfo, tilingData);
-        vectorService.InitMm2ResInt32GmGlobalTensor(mm2ResInt32Gm);
+        sfaKernelVectorService.InitParams(sfaKernelConstInfo, tilingData);
+        sfaKernelVectorService.InitMm2ResInt32GmGlobalTensor(mm2ResInt32Gm);
         if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
-            vectorService.InitVec0GlobalTensor(kvValidSizeGm_, kvMergeGm_, kRopeGm, keyGm, blockTableGm);
+            sfaKernelVectorService.InitVec0GlobalTensor(kvValidSizeGm_, kvMergeGm_, kRopeGm, keyGm, blockTableGm);
         }
-        vectorService.InitVec1GlobalTensor(mm1ResGm, vec1ResGm, actualSeqLengthsQGm, actualSeqLengthsKVGm, lseMaxFdGm,
-                                           lseSumFdGm, topKGm, softmaxMaxGm, softmaxSumGm);
-        vectorService.InitVec2GlobalTensor(accumOutGm, vec2ResGm, mm2ResGm, attentionOutGm);
+        sfaKernelVectorService.InitVec1GlobalTensor(mm1ResGm, vec1ResGm, actualSeqLengthsQGm, actualSeqLengthsKVGm,
+                                                    lseMaxFdGm, lseSumFdGm, topKGm, softmaxMaxGm, softmaxSumGm);
+        sfaKernelVectorService.InitVec2GlobalTensor(accumOutGm, vec2ResGm, mm2ResGm, attentionOutGm);
     }
 
     if ASCEND_IS_AIC {
-        matmulService.InitParams(constInfo);
+        matmulService.InitParams(sfaKernelConstInfo);
         matmulService.InitMm1GlobalTensor(queryGm, qRopeGm, keyGm, kRopeGm, mm1ResGm);
         matmulService.InitMm2GlobalTensor(vec1ResGm, valueGm, mm2ResGm, attentionOutGm);
-        matmulService.InitPageAttentionInfo(kvMergeGm_, blockTableGm, topKGm, constInfo.kvCacheBlockSize,
-                                            constInfo.maxBlockNumPerBatch);
+        matmulService.InitPageAttentionInfo(kvMergeGm_, blockTableGm, topKGm, sfaKernelConstInfo.kvCacheBlockSize,
+                                            sfaKernelConstInfo.maxBlockNumPerBatch);
     }
     // 要在InitParams之后执行
     if (pipe != nullptr) {
@@ -531,14 +538,14 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitCalcParamsEach()
     // 计算总的基本块
     uint32_t actBatchS2 = 1;
     uint32_t totalBaseNum = 0;
-    uint32_t s1GBaseSize = constInfo.gSize;
+    uint32_t s1GBaseSize = sfaKernelConstInfo.gSize;
     uint32_t coreNum = GetBlockNum();
     uint32_t currCoreIdx = aiCoreIdx;
     uint32_t actBatchS1 = 1;
-    for (uint32_t bIdx = 0; bIdx < constInfo.batchSize; bIdx++) {
+    for (uint32_t bIdx = 0; bIdx < sfaKernelConstInfo.batchSize; bIdx++) {
         uint32_t actBatchS1 = GetBalanceActualSeqLengths(actualSeqLengthsQGm, bIdx);
-        if (actBatchS1 < constInfo.qSeqSize) {
-            constInfo.needInit = true;
+        if (actBatchS1 < sfaKernelConstInfo.qSeqSize) {
+            sfaKernelConstInfo.needInit = true;
         }
         totalBaseNum += actBatchS1 * actBatchS2;
     }
@@ -559,24 +566,24 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitCalcParamsEach()
     bool setStart = false;
     targetBaseNum = (currCoreIdx + 1) * avgBaseNum; // 计算当前的目标权重
     uint32_t targetStartBaseNum = targetBaseNum - avgBaseNum;
-    for (uint32_t bN2Idx = 0; bN2Idx < constInfo.batchSize * constInfo.kvHeadNum; bN2Idx++) {
-        uint32_t bIdx = bN2Idx / constInfo.kvHeadNum;
+    for (uint32_t bN2Idx = 0; bN2Idx < sfaKernelConstInfo.batchSize * sfaKernelConstInfo.kvHeadNum; bN2Idx++) {
+        uint32_t bIdx = bN2Idx / sfaKernelConstInfo.kvHeadNum;
         actBatchS1 = GetBalanceActualSeqLengths(actualSeqLengthsQGm, bIdx);
         for (uint32_t s1GIdx = 0; s1GIdx < actBatchS1; s1GIdx++) {
             accumBaseNum += 1;
             if (!setStart && accumBaseNum >= targetStartBaseNum) {
-                constInfo.bN2Start = bN2Idx;
-                constInfo.gS1Start = s1GIdx;
+                sfaKernelConstInfo.bN2Start = bN2Idx;
+                sfaKernelConstInfo.gS1Start = s1GIdx;
                 setStart = true;
             }
             if (accumBaseNum >= targetBaseNum) {
                 // 更新当前核的End分核信息
-                constInfo.bN2End = bN2Idx;
-                constInfo.gS1End = s1GIdx;
-                constInfo.s2End = 0;
-                constInfo.coreStartKVSplitPos = 0;
+                sfaKernelConstInfo.bN2End = bN2Idx;
+                sfaKernelConstInfo.gS1End = s1GIdx;
+                sfaKernelConstInfo.s2End = 0;
+                sfaKernelConstInfo.coreStartKVSplitPos = 0;
                 if (aiCoreIdx != 0) {
-                    GetAxisStartIdx(constInfo.bN2Start, constInfo.gS1Start, 0);
+                    GetAxisStartIdx(sfaKernelConstInfo.bN2Start, sfaKernelConstInfo.gS1Start, 0);
                 }
                 return;
             }
@@ -587,17 +594,17 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::InitCalcParamsEach()
         }
     }
     if (!setStart) {
-        constInfo.bN2Start = lastValidBIdx;
-        constInfo.gS1Start = lastValidactBatchS1 - 1;
+        sfaKernelConstInfo.bN2Start = lastValidBIdx;
+        sfaKernelConstInfo.gS1Start = lastValidactBatchS1 - 1;
     }
     if (accumBaseNum < targetBaseNum) {
         // 更新最后一个核的End分核信息
-        constInfo.coreStartKVSplitPos = 0;
-        constInfo.bN2End = lastValidBIdx;
-        constInfo.gS1End = lastValidactBatchS1 - 1;
-        constInfo.s2End = 0;
+        sfaKernelConstInfo.coreStartKVSplitPos = 0;
+        sfaKernelConstInfo.bN2End = lastValidBIdx;
+        sfaKernelConstInfo.gS1End = lastValidactBatchS1 - 1;
+        sfaKernelConstInfo.s2End = 0;
         if (aiCoreIdx != 0) {
-            GetAxisStartIdx(constInfo.bN2Start, constInfo.gS1Start, 0);
+            GetAxisStartIdx(sfaKernelConstInfo.bN2Start, sfaKernelConstInfo.gS1Start, 0);
         }
         return;
     }
@@ -620,148 +627,163 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Bmm2DataCopyOut(uint64_t a
 
 template <typename SFAT>
 __aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcParams(uint32_t loop, uint64_t s2Start, uint32_t s2LoopIdx,
-                                                                 RunInfo &info)
+                                                                 RunInfo &sfaKernelRunInfo)
 {
-    info.bIdx = tempLoopInfo.bIdx;
-    info.gS1Idx = tempLoopInfo.gS1Idx;
-    info.loop = loop;
-    info.s2Idx = s2LoopIdx;
-    info.curSInnerLoopTimes = tempLoopInfo.s2LoopTimes;
+    sfaKernelRunInfo.bIdx = sfaKernelLoopInfo.bIdx;
+    sfaKernelRunInfo.gS1Idx = sfaKernelLoopInfo.gS1Idx;
+    sfaKernelRunInfo.loop = loop;
+    sfaKernelRunInfo.s2Idx = s2LoopIdx;
+    sfaKernelRunInfo.curSInnerLoopTimes = sfaKernelLoopInfo.s2LoopTimes;
 
-    info.tndIsS2SplitCore = tempLoopInfo.tndIsS2SplitCore;
-    info.tndCoreStartKVSplitPos = tempLoopInfo.tndCoreStartKVSplitPos;
-    info.isBmm2Output = false;
+    sfaKernelRunInfo.tndIsS2SplitCore = sfaKernelLoopInfo.tndIsS2SplitCore;
+    sfaKernelRunInfo.tndCoreStartKVSplitPos = sfaKernelLoopInfo.tndCoreStartKVSplitPos;
+    sfaKernelRunInfo.isBmm2Output = false;
 
-    info.actS1Size = tempLoopInfo.actS1Size;
+    sfaKernelRunInfo.actS1Size = sfaKernelLoopInfo.actS1Size;
 
-    info.actMBaseSize = constInfo.mBaseSize;
-    uint32_t remainedGS1Size = tempLoopInfo.actS1Size * constInfo.gSize - tempLoopInfo.gS1Idx;
-    if (remainedGS1Size <= constInfo.mBaseSize && remainedGS1Size > 0) {
-        info.actMBaseSize = tempLoopInfo.mBasicSizeTail;
+    sfaKernelRunInfo.actMBaseSize = sfaKernelConstInfo.mBaseSize;
+    uint32_t remainedGS1Size = sfaKernelLoopInfo.actS1Size * sfaKernelConstInfo.gSize - sfaKernelLoopInfo.gS1Idx;
+    if (remainedGS1Size <= sfaKernelConstInfo.mBaseSize && remainedGS1Size > 0) {
+        sfaKernelRunInfo.actMBaseSize = sfaKernelLoopInfo.mBasicSizeTail;
     }
 
-    info.isValid = s2LoopIdx < tempLoopInfo.s2LoopTimes;
+    sfaKernelRunInfo.isValid = s2LoopIdx < sfaKernelLoopInfo.s2LoopTimes;
 
     if ASCEND_IS_AIV {
-        info.mSize = info.actMBaseSize;
-        info.mSizeV = (info.mSize <= 16) ? info.mSize : (((info.mSize + 15) / 16 + 1) / 2 * 16);
-        info.mSizeVStart = 0;
+        sfaKernelRunInfo.mSize = sfaKernelRunInfo.actMBaseSize;
+        sfaKernelRunInfo.mSizeV = (sfaKernelRunInfo.mSize <= 16) ? sfaKernelRunInfo.mSize :
+                                                                   (((sfaKernelRunInfo.mSize + 15) / 16 + 1) / 2 * 16);
+        sfaKernelRunInfo.mSizeVStart = 0;
         if (tmpBlockIdx % 2 == 1) {
-            info.mSizeVStart = info.mSizeV;
-            info.mSizeV = info.mSize - info.mSizeV;
+            sfaKernelRunInfo.mSizeVStart = sfaKernelRunInfo.mSizeV;
+            sfaKernelRunInfo.mSizeV = sfaKernelRunInfo.mSize - sfaKernelRunInfo.mSizeV;
         }
     }
 
-    info.isChangeBatch = false;
+    sfaKernelRunInfo.isChangeBatch = false;
 
-    info.isFirstSInnerLoop = s2LoopIdx == s2Start;
-    if (info.isFirstSInnerLoop) {
-        tempLoopInfo.bn2IdxInCurCore++;
+    sfaKernelRunInfo.isFirstSInnerLoop = s2LoopIdx == s2Start;
+    if (sfaKernelRunInfo.isFirstSInnerLoop) {
+        sfaKernelLoopInfo.bn2IdxInCurCore++;
     }
-    info.isLastS2Loop = s2LoopIdx == tempLoopInfo.s2LoopTimes - 1;
-    info.bn2IdxInCurCore = tempLoopInfo.bn2IdxInCurCore - 1;
+    sfaKernelRunInfo.isLastS2Loop = s2LoopIdx == sfaKernelLoopInfo.s2LoopTimes - 1;
+    sfaKernelRunInfo.bn2IdxInCurCore = sfaKernelLoopInfo.bn2IdxInCurCore - 1;
     uint64_t actualSeqQPrefixSum;
     if constexpr (LAYOUT_T == SFA_LAYOUT::TND) {
-        actualSeqQPrefixSum = (info.bIdx <= 0) ? 0 : actualSeqLengthsQGm.GetValue(info.bIdx - 1);
+        actualSeqQPrefixSum =
+            (sfaKernelRunInfo.bIdx <= 0) ? 0 : actualSeqLengthsQGm.GetValue(sfaKernelRunInfo.bIdx - 1);
     } else {
-        actualSeqQPrefixSum = (info.bIdx <= 0) ? 0 : info.bIdx * constInfo.qSeqSize;
+        actualSeqQPrefixSum = (sfaKernelRunInfo.bIdx <= 0) ? 0 : sfaKernelRunInfo.bIdx * sfaKernelConstInfo.qSeqSize;
     }
-    info.tndBIdxOffsetForQ = actualSeqQPrefixSum * constInfo.qHeadNum * headDim;
+    sfaKernelRunInfo.tndBIdxOffsetForQ = actualSeqQPrefixSum * sfaKernelConstInfo.qHeadNum * headDim;
 
     uint64_t actualSeqKVPrefixSum;
     if constexpr (KV_LAYOUT_T == SFA_LAYOUT::TND) {
-        actualSeqKVPrefixSum = (info.bIdx <= 0) ? 0 : actualSeqLengthsKVGm.GetValue(info.bIdx - 1);
+        actualSeqKVPrefixSum =
+            (sfaKernelRunInfo.bIdx <= 0) ? 0 : actualSeqLengthsKVGm.GetValue(sfaKernelRunInfo.bIdx - 1);
     } else {
-        actualSeqKVPrefixSum = (info.bIdx <= 0) ? 0 : info.bIdx * constInfo.kvSeqSize;
+        actualSeqKVPrefixSum = (sfaKernelRunInfo.bIdx <= 0) ? 0 : sfaKernelRunInfo.bIdx * sfaKernelConstInfo.kvSeqSize;
     }
-    info.tndBIdxOffsetForKV = actualSeqKVPrefixSum * constInfo.kvHeadNum * headDim;
+    sfaKernelRunInfo.tndBIdxOffsetForKV = actualSeqKVPrefixSum * sfaKernelConstInfo.kvHeadNum * headDim;
 
-    if (info.isFirstSInnerLoop) {
-        uint64_t tndBIdxRopeOffsetForQ = actualSeqQPrefixSum * constInfo.qHeadNum * headDimRope;
-        tensorACoreOffset = info.tndBIdxOffsetForQ + info.gS1Idx * headDim;
-        tensorARopeCoreOffset = tndBIdxRopeOffsetForQ + info.gS1Idx * headDimRope;
+    if (sfaKernelRunInfo.isFirstSInnerLoop) {
+        uint64_t tndBIdxRopeOffsetForQ = actualSeqQPrefixSum * sfaKernelConstInfo.qHeadNum * headDimRope;
+        tensorACoreOffset = sfaKernelRunInfo.tndBIdxOffsetForQ + sfaKernelRunInfo.gS1Idx * headDim;
+        tensorARopeCoreOffset = tndBIdxRopeOffsetForQ + sfaKernelRunInfo.gS1Idx * headDimRope;
 
-        uint64_t tndBIdxRopeOffsetForK = actualSeqKVPrefixSum * constInfo.kvHeadNum * headDimRope;
-        tensorBCoreOffset = info.tndBIdxOffsetForKV + info.n2Idx * headDim;
-        tensorBRopeCoreOffset = tndBIdxRopeOffsetForK + info.n2Idx * headDimRope;
-        if (constInfo.sparseMode == 3) {
-            threshold = static_cast<int64_t>(tempLoopInfo.nextTokensPerBatch) + info.gS1Idx / constInfo.gSize + 1;
+        uint64_t tndBIdxRopeOffsetForK = actualSeqKVPrefixSum * sfaKernelConstInfo.kvHeadNum * headDimRope;
+        tensorBCoreOffset = sfaKernelRunInfo.tndBIdxOffsetForKV + sfaKernelRunInfo.n2Idx * headDim;
+        tensorBRopeCoreOffset = tndBIdxRopeOffsetForK + sfaKernelRunInfo.n2Idx * headDimRope;
+        if (sfaKernelConstInfo.sparseMode == 3) {
+            threshold = static_cast<int64_t>(sfaKernelLoopInfo.nextTokensPerBatch) +
+                        sfaKernelRunInfo.gS1Idx / sfaKernelConstInfo.gSize + 1;
         } else {
-            threshold = tempLoopInfo.curActualSeqLenOri;
+            threshold = sfaKernelLoopInfo.curActualSeqLenOri;
         }
         if constexpr (LAYOUT_T == SFA_LAYOUT::BSND) { // B,S1,N2 K
-            topKBaseOffset = info.bIdx * constInfo.qSeqSize * constInfo.kvHeadNum * constInfo.sparseBlockCount +
-                             info.gS1Idx / constInfo.gSize * constInfo.kvHeadNum * constInfo.sparseBlockCount +
-                             info.n2Idx * constInfo.sparseBlockCount;
+            topKBaseOffset = sfaKernelRunInfo.bIdx * sfaKernelConstInfo.qSeqSize * sfaKernelConstInfo.kvHeadNum *
+                                 sfaKernelConstInfo.sparseBlockCount +
+                             sfaKernelRunInfo.gS1Idx / sfaKernelConstInfo.gSize * sfaKernelConstInfo.kvHeadNum *
+                                 sfaKernelConstInfo.sparseBlockCount +
+                             sfaKernelRunInfo.n2Idx * sfaKernelConstInfo.sparseBlockCount;
         } else if (LAYOUT_T == SFA_LAYOUT::TND) { // T N2 K
-            topKBaseOffset = info.tndBIdxOffsetForQ / constInfo.gSize / constInfo.headDim * constInfo.kvHeadNum *
-                                 constInfo.sparseBlockCount +
-                             info.n2Idx * constInfo.sparseBlockCount +
-                             info.gS1Idx / constInfo.gSize * constInfo.kvHeadNum * constInfo.sparseBlockCount;
+            topKBaseOffset = sfaKernelRunInfo.tndBIdxOffsetForQ / sfaKernelConstInfo.gSize /
+                                 sfaKernelConstInfo.headDim * sfaKernelConstInfo.kvHeadNum *
+                                 sfaKernelConstInfo.sparseBlockCount +
+                             sfaKernelRunInfo.n2Idx * sfaKernelConstInfo.sparseBlockCount +
+                             sfaKernelRunInfo.gS1Idx / sfaKernelConstInfo.gSize * sfaKernelConstInfo.kvHeadNum *
+                                 sfaKernelConstInfo.sparseBlockCount;
         } else { // B N2 S1 K
-            topKBaseOffset = info.bIdx * constInfo.kvHeadNum * constInfo.qSeqSize * constInfo.sparseBlockCount +
-                             info.n2Idx * constInfo.qSeqSize * constInfo.sparseBlockCount +
-                             info.gS1Idx / constInfo.gSize * constInfo.sparseBlockCount;
+            topKBaseOffset =
+                sfaKernelRunInfo.bIdx * sfaKernelConstInfo.kvHeadNum * sfaKernelConstInfo.qSeqSize *
+                    sfaKernelConstInfo.sparseBlockCount +
+                sfaKernelRunInfo.n2Idx * sfaKernelConstInfo.qSeqSize * sfaKernelConstInfo.sparseBlockCount +
+                sfaKernelRunInfo.gS1Idx / sfaKernelConstInfo.gSize * sfaKernelConstInfo.sparseBlockCount;
         }
     }
-    info.threshold = threshold;
-    info.topKBaseOffset = topKBaseOffset;
-    info.tensorAOffset = tensorACoreOffset;
-    info.tensorARopeOffset = tensorARopeCoreOffset;
-    info.attenOutOffset = tensorACoreOffset;
-    info.tensorBOffset = tensorBCoreOffset;
-    info.tensorBRopeOffset = tensorBRopeCoreOffset;
+    sfaKernelRunInfo.threshold = threshold;
+    sfaKernelRunInfo.topKBaseOffset = topKBaseOffset;
+    sfaKernelRunInfo.tensorAOffset = tensorACoreOffset;
+    sfaKernelRunInfo.tensorARopeOffset = tensorARopeCoreOffset;
+    sfaKernelRunInfo.attenOutOffset = tensorACoreOffset;
+    sfaKernelRunInfo.tensorBOffset = tensorBCoreOffset;
+    sfaKernelRunInfo.tensorBRopeOffset = tensorBRopeCoreOffset;
 
-    uint64_t sInnerOffsetDataSize = info.s2Idx * constInfo.s2BaseSize;
-    info.s2BatchOffset = s2BatchBaseOffset + sInnerOffsetDataSize;
+    uint64_t sInnerOffsetDataSize = sfaKernelRunInfo.s2Idx * sfaKernelConstInfo.s2BaseSize;
+    sfaKernelRunInfo.s2BatchOffset = s2BatchBaseOffset + sInnerOffsetDataSize;
 
-    info.curActualSeqLenOri = tempLoopInfo.curActualSeqLenOri;
+    sfaKernelRunInfo.curActualSeqLenOri = sfaKernelLoopInfo.curActualSeqLenOri;
     // 计算实际基本块size
     if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
-        if (tempLoopInfo.curActualSeqLen > sInnerOffsetDataSize) {
-            info.actualSingleProcessSInnerSize = tempLoopInfo.curActualSeqLen - sInnerOffsetDataSize;
-            info.actualSingleProcessSInnerSize = info.actualSingleProcessSInnerSize > constInfo.s2BaseSize ?
-                                                     constInfo.s2BaseSize :
-                                                     info.actualSingleProcessSInnerSize;
+        if (sfaKernelLoopInfo.curActualSeqLen > sInnerOffsetDataSize) {
+            sfaKernelRunInfo.actualSingleProcessSInnerSize = sfaKernelLoopInfo.curActualSeqLen - sInnerOffsetDataSize;
+            sfaKernelRunInfo.actualSingleProcessSInnerSize =
+                sfaKernelRunInfo.actualSingleProcessSInnerSize > sfaKernelConstInfo.s2BaseSize ?
+                    sfaKernelConstInfo.s2BaseSize :
+                    sfaKernelRunInfo.actualSingleProcessSInnerSize;
         } else {
-            info.actualSingleProcessSInnerSize = 0;
+            sfaKernelRunInfo.actualSingleProcessSInnerSize = 0;
         }
-        info.actualSingleProcessSInnerSizeAlign =
-            SFAAlign((uint32_t)info.actualSingleProcessSInnerSize, (uint32_t)SFAVectorService<SFAT>::BYTE_BLOCK);
+        sfaKernelRunInfo.actualSingleProcessSInnerSizeAlign = SFAAlign(
+            (uint32_t)sfaKernelRunInfo.actualSingleProcessSInnerSize, (uint32_t)SFAVectorService<SFAT>::BYTE_BLOCK);
     }
 }
 
 template <typename SFAT>
-__aicore__ inline void SparseFlashAttentionMla<SFAT>::ComputeMm1(const RunInfo &info)
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::ComputeMm1(const RunInfo &sfaKernelRunInfo)
 {
-    uint32_t nBufferLoopTimes = (info.actMBaseSize + constInfo.nBufferMBaseSize - 1) / constInfo.nBufferMBaseSize;
-    uint32_t nBufferTail = info.actMBaseSize - (nBufferLoopTimes - 1) * constInfo.nBufferMBaseSize;
+    uint32_t nBufferLoopTimes =
+        (sfaKernelRunInfo.actMBaseSize + sfaKernelConstInfo.nBufferMBaseSize - 1) / sfaKernelConstInfo.nBufferMBaseSize;
+    uint32_t nBufferTail = sfaKernelRunInfo.actMBaseSize - (nBufferLoopTimes - 1) * sfaKernelConstInfo.nBufferMBaseSize;
     for (uint32_t i = 0; i < nBufferLoopTimes; i++) {
-        MSplitInfo mSplitInfo;
-        mSplitInfo.nBufferStartM = i * constInfo.nBufferMBaseSize;
-        mSplitInfo.nBufferDealM = (i + 1 != nBufferLoopTimes) ? constInfo.nBufferMBaseSize : nBufferTail;
+        MSplitInfo sfaKernelSplitInfo;
+        sfaKernelSplitInfo.nBufferStartM = i * sfaKernelConstInfo.nBufferMBaseSize;
+        sfaKernelSplitInfo.nBufferDealM =
+            (i + 1 != nBufferLoopTimes) ? sfaKernelConstInfo.nBufferMBaseSize : nBufferTail;
         if constexpr (SFAT::hasRope) {
-            matmulService.ComputeMm1(info, mSplitInfo);
+            matmulService.ComputeMm1(sfaKernelRunInfo, sfaKernelSplitInfo);
         } else {
-            matmulService.ComputeMm1NoRope(info, mSplitInfo);
+            matmulService.ComputeMm1NoRope(sfaKernelRunInfo, sfaKernelSplitInfo);
         }
-        CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_FIX>(constInfo.syncC1V1);
+        CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_FIX>(sfaKernelConstInfo.syncC1V1);
     }
 }
 
 template <typename SFAT>
-__aicore__ inline void SparseFlashAttentionMla<SFAT>::ComputeMm2(const RunInfo &info)
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::ComputeMm2(const RunInfo &sfaKernelRunInfo)
 {
-    uint32_t nBufferLoopTimes = (info.actMBaseSize + constInfo.nBufferMBaseSize - 1) / constInfo.nBufferMBaseSize;
-    uint32_t nBufferTail = info.actMBaseSize - (nBufferLoopTimes - 1) * constInfo.nBufferMBaseSize;
+    uint32_t nBufferLoopTimes =
+        (sfaKernelRunInfo.actMBaseSize + sfaKernelConstInfo.nBufferMBaseSize - 1) / sfaKernelConstInfo.nBufferMBaseSize;
+    uint32_t nBufferTail = sfaKernelRunInfo.actMBaseSize - (nBufferLoopTimes - 1) * sfaKernelConstInfo.nBufferMBaseSize;
     for (uint32_t i = 0; i < nBufferLoopTimes; i++) {
-        MSplitInfo mSplitInfo;
-        mSplitInfo.nBufferStartM = i * constInfo.nBufferMBaseSize;
-        mSplitInfo.nBufferDealM = (i + 1 != nBufferLoopTimes) ? constInfo.nBufferMBaseSize : nBufferTail;
-        CrossCoreWaitFlag(constInfo.syncV1C2);
-        matmulService.ComputeMm2(info, mSplitInfo);
-        CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_FIX>(constInfo.syncC2V2);
-        CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_FIX>(constInfo.syncC2V1);
+        MSplitInfo sfaKernelSplitInfo;
+        sfaKernelSplitInfo.nBufferStartM = i * sfaKernelConstInfo.nBufferMBaseSize;
+        sfaKernelSplitInfo.nBufferDealM =
+            (i + 1 != nBufferLoopTimes) ? sfaKernelConstInfo.nBufferMBaseSize : nBufferTail;
+        CrossCoreWaitFlag(sfaKernelConstInfo.syncV1C2);
+        matmulService.ComputeMm2(sfaKernelRunInfo, sfaKernelSplitInfo);
+        CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_FIX>(sfaKernelConstInfo.syncC2V2);
+        CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_FIX>(sfaKernelConstInfo.syncC2V1);
     }
 }
 
@@ -770,15 +792,15 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::Process()
 {
     if (aiCoreIdx < usedCoreNum) {
         if ASCEND_IS_AIV {
-            vectorService.AllocEventID();
-            vectorService.InitSoftmaxDefaultBuffer();
+            sfaKernelVectorService.AllocEventID();
+            sfaKernelVectorService.InitSoftmaxDefaultBuffer();
         } else {
             matmulService.AllocEventID();
         }
         ProcessBalance();
 
         if ASCEND_IS_AIV {
-            vectorService.FreeEventID();
+            sfaKernelVectorService.FreeEventID();
         } else {
             matmulService.FreeEventID();
         }
@@ -800,7 +822,7 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::ProcessBalance()
     int gS1LoopEnd;
     bool globalLoopStart = true;
     if ASCEND_IS_AIC {
-        CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_FIX>(constInfo.syncC2V1);
+        CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_FIX>(sfaKernelConstInfo.syncC2V1);
         if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
             CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_MTE2>(3);
             CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_MTE2>(3);
@@ -808,49 +830,52 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::ProcessBalance()
             CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_MTE2>(3);
         }
     }
-    for (uint32_t bN2LoopIdx = constInfo.bN2Start; bN2LoopIdx <= constInfo.bN2End; bN2LoopIdx++) {
-        GetBN2Idx(bN2LoopIdx, tempLoopInfo.bIdx, tempLoopInfo.n2Idx);
-        GetActualSeqLen(tempLoopInfo.bIdx); // 获取actualSeqLength及ActualSeqLengthKV
+    for (uint32_t bN2LoopIdx = sfaKernelConstInfo.bN2Start; bN2LoopIdx <= sfaKernelConstInfo.bN2End; bN2LoopIdx++) {
+        GetBN2Idx(bN2LoopIdx, sfaKernelLoopInfo.bIdx, sfaKernelLoopInfo.n2Idx);
+        GetActualSeqLen(sfaKernelLoopInfo.bIdx); // 获取actualSeqLength及ActualSeqLengthKV
         GetPreNextTokensLeftUp();
-        if (tempLoopInfo.actS1Size == 0) {
+        if (sfaKernelLoopInfo.actS1Size == 0) {
             continue;
         }
-        int gS1SplitNum = (tempLoopInfo.actS1Size * constInfo.gSize + constInfo.mBaseSize - 1) / constInfo.mBaseSize;
-        gS1LoopEnd = (bN2LoopIdx == constInfo.bN2End) ? constInfo.gS1End : gS1SplitNum - 1;
-        for (uint32_t gS1LoopIdx = constInfo.gS1Start; gS1LoopIdx <= gS1LoopEnd; gS1LoopIdx++) {
-            tempLoopInfo.gS1Idx = gS1LoopIdx * constInfo.mBaseSize;
-            GetSparseActualSeqLen(tempLoopInfo.bIdx, gS1LoopIdx,
-                                  tempLoopInfo.n2Idx); // TopK值sparse完后的ActualSeqLengthKV
+        int gS1SplitNum = (sfaKernelLoopInfo.actS1Size * sfaKernelConstInfo.gSize + sfaKernelConstInfo.mBaseSize - 1) /
+                          sfaKernelConstInfo.mBaseSize;
+        gS1LoopEnd = (bN2LoopIdx == sfaKernelConstInfo.bN2End) ? sfaKernelConstInfo.gS1End : gS1SplitNum - 1;
+        for (uint32_t gS1LoopIdx = sfaKernelConstInfo.gS1Start; gS1LoopIdx <= gS1LoopEnd; gS1LoopIdx++) {
+            sfaKernelLoopInfo.gS1Idx = gS1LoopIdx * sfaKernelConstInfo.mBaseSize;
+            GetSparseActualSeqLen(sfaKernelLoopInfo.bIdx, gS1LoopIdx,
+                                  sfaKernelLoopInfo.n2Idx); // TopK值sparse完后的ActualSeqLengthKV
             UpdateInnerLoopCond();
 
-            if (tempLoopInfo.curActSeqLenIsZero) {
-                DealActSeqLenIsZero(tempLoopInfo.bIdx, gS1LoopIdx, tempLoopInfo.n2Idx);
+            if (sfaKernelLoopInfo.curActSeqLenIsZero) {
+                DealActSeqLenIsZero(sfaKernelLoopInfo.bIdx, gS1LoopIdx, sfaKernelLoopInfo.n2Idx);
             }
-            int s2SplitNum =
-                (tempLoopInfo.curActualSeqLen + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize; // S2切分份数
-            bool isEnd = (bN2LoopIdx == constInfo.bN2End) && (gS1LoopIdx == constInfo.gS1End);
-            tempLoopInfo.s2LoopTimes = s2SplitNum;
+            int s2SplitNum = (sfaKernelLoopInfo.curActualSeqLen + sfaKernelConstInfo.s2BaseSize - 1) /
+                             sfaKernelConstInfo.s2BaseSize; // S2切分份数
+            bool isEnd = (bN2LoopIdx == sfaKernelConstInfo.bN2End) && (gS1LoopIdx == sfaKernelConstInfo.gS1End);
+            sfaKernelLoopInfo.s2LoopTimes = s2SplitNum;
             // 分核修改后需要打开
             // 当前s2是否被切，决定了输出是否要写到attenOut上
-            tempLoopInfo.tndIsS2SplitCore =
-                ((constInfo.s2Start == 0) && (tempLoopInfo.s2LoopTimes == s2SplitNum)) ? false : true;
-            tempLoopInfo.tndCoreStartKVSplitPos = globalLoopStart ? constInfo.coreStartKVSplitPos : 0;
+            sfaKernelLoopInfo.tndIsS2SplitCore =
+                ((sfaKernelConstInfo.s2Start == 0) && (sfaKernelLoopInfo.s2LoopTimes == s2SplitNum)) ? false : true;
+            sfaKernelLoopInfo.tndCoreStartKVSplitPos = globalLoopStart ? sfaKernelConstInfo.coreStartKVSplitPos : 0;
             uint32_t extraLoop = isEnd ? 2 : 0;
 
             uint32_t curTopKIdx = 0;
             uint64_t curOffsetInSparseBlock = 0;
-            for (int s2LoopIdx = constInfo.s2Start; s2LoopIdx < (tempLoopInfo.s2LoopTimes + extraLoop); s2LoopIdx++) {
+            for (int s2LoopIdx = sfaKernelConstInfo.s2Start; s2LoopIdx < (sfaKernelLoopInfo.s2LoopTimes + extraLoop);
+                 s2LoopIdx++) {
                 // PreloadPipeline loop初始值要求为 PRELOAD_NUM
-                PreloadPipeline(gloop, constInfo.s2Start, s2LoopIdx, extraInfo, curTopKIdx, curOffsetInSparseBlock);
+                PreloadPipeline(gloop, sfaKernelConstInfo.s2Start, s2LoopIdx, extraInfo, curTopKIdx,
+                                curOffsetInSparseBlock);
                 ++gloop;
             }
             globalLoopStart = false;
-            constInfo.s2Start = 0;
+            sfaKernelConstInfo.s2Start = 0;
         }
-        constInfo.gS1Start = 0;
+        sfaKernelConstInfo.gS1Start = 0;
     }
     if ASCEND_IS_AIV {
-        CrossCoreWaitFlag(constInfo.syncC2V1);
+        CrossCoreWaitFlag(sfaKernelConstInfo.syncC2V1);
         if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
             CrossCoreWaitFlag(3);
             CrossCoreWaitFlag(3);
@@ -877,20 +902,20 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::PreloadPipeline(uint32_t l
     if (extraInfo0.isValid) {
         if ASCEND_IS_AIC {
             if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
-                CrossCoreWaitFlag(constInfo.syncV0C1);
+                CrossCoreWaitFlag(sfaKernelConstInfo.syncV0C1);
             }
             ComputeMm1(extraInfo0);
         } else {
             if constexpr (TEMPLATE_MODE == V_TEMPLATE) {
                 CrossCoreWaitFlag(3);
-                vectorService.MergeKv(extraInfo0);
-                CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_MTE3>(constInfo.syncV0C1);
+                sfaKernelVectorService.MergeKv(extraInfo0);
+                CrossCoreSetFlag<ConstInfo::SFA_SYNC_MODE2, PIPE_MTE3>(sfaKernelConstInfo.syncV0C1);
             }
         }
     }
     if (extraInfo2.isValid) {
         if ASCEND_IS_AIV {
-            vectorService.ProcessVec1L(extraInfo2);
+            sfaKernelVectorService.ProcessVec1L(extraInfo2);
         }
         if ASCEND_IS_AIC {
             ComputeMm2(extraInfo2);
@@ -901,7 +926,7 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::PreloadPipeline(uint32_t l
     }
     if (extraInfo1.isValid) {
         if ASCEND_IS_AIV {
-            vectorService.ProcessVec2L(extraInfo1);
+            sfaKernelVectorService.ProcessVec2L(extraInfo1);
         }
         extraInfo1.isValid = false;
     }
@@ -920,9 +945,9 @@ __aicore__ inline uint64_t SparseFlashAttentionMla<SFAT>::GetBalanceActualSeqLen
             return 0;
         }
     } else {
-        if (constInfo.actualLenDimsQ == 0) {
-            return constInfo.qSeqSize;
-        } else if (constInfo.actualLenDimsQ == 1) {
+        if (sfaKernelConstInfo.actualLenDimsQ == 0) {
+            return sfaKernelConstInfo.qSeqSize;
+        } else if (sfaKernelConstInfo.actualLenDimsQ == 1) {
             return actualSeqLengths.GetValue(0);
         } else {
             return actualSeqLengths.GetValue(bIdx);
@@ -936,21 +961,23 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::GetAxisStartIdx(uint32_t b
 {
     uint32_t bEndPrev = bN2EndPrev / kvHeadNum;
     uint32_t actualSeqQPrev = GetBalanceActualSeqLengths(actualSeqLengthsQGm, bEndPrev);
-    uint32_t s1GPrevBaseNum = (actualSeqQPrev * constInfo.gSize + constInfo.mBaseSize - 1) / constInfo.mBaseSize;
-    constInfo.bN2Start = bN2EndPrev;
-    constInfo.gS1Start = s1GEndPrev;
+    uint32_t s1GPrevBaseNum =
+        (actualSeqQPrev * sfaKernelConstInfo.gSize + sfaKernelConstInfo.mBaseSize - 1) / sfaKernelConstInfo.mBaseSize;
+    sfaKernelConstInfo.bN2Start = bN2EndPrev;
+    sfaKernelConstInfo.gS1Start = s1GEndPrev;
 
-    constInfo.s2Start = 0;
+    sfaKernelConstInfo.s2Start = 0;
     if (s1GEndPrev >= s1GPrevBaseNum - 1) { // 上个核把S1G处理完了
-        constInfo.gS1Start = 0;
-        constInfo.bN2Start++;
+        sfaKernelConstInfo.gS1Start = 0;
+        sfaKernelConstInfo.bN2Start++;
     } else {
-        constInfo.gS1Start++;
+        sfaKernelConstInfo.gS1Start++;
     }
 }
 
 template <typename SFAT>
-__aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcSinnerTopKBegin(RunInfo &info, uint32_t &curTopKIdx,
+__aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcSinnerTopKBegin(RunInfo &sfaKernelRunInfo,
+                                                                          uint32_t &curTopKIdx,
                                                                           uint64_t &curOffsetInSparseBlock)
 
 {
@@ -958,64 +985,67 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcSinnerTopKBegin(RunInf
         return;
     }
 
-    uint64_t thresholdSparseCount = (info.threshold + constInfo.sparseBlockSize - 1) / constInfo.sparseBlockSize;
-    uint64_t validCount =
-        (constInfo.sparseBlockCount > thresholdSparseCount) ? thresholdSparseCount : constInfo.sparseBlockCount;
+    uint64_t thresholdSparseCount =
+        (sfaKernelRunInfo.threshold + sfaKernelConstInfo.sparseBlockSize - 1) / sfaKernelConstInfo.sparseBlockSize;
+    uint64_t validCount = (sfaKernelConstInfo.sparseBlockCount > thresholdSparseCount) ?
+                              thresholdSparseCount :
+                              sfaKernelConstInfo.sparseBlockCount;
 
-    int32_t sparseIndices = topKGm.GetValue(info.topKBaseOffset + curTopKIdx);
+    int32_t sparseIndices = topKGm.GetValue(sfaKernelRunInfo.topKBaseOffset + curTopKIdx);
     if (sparseIndices == -1 || curTopKIdx == validCount) {
-        info.actualSingleProcessSInnerSize = 0;
-        info.actualSingleProcessSInnerSizeAlign = 0;
-        tempLoopInfo.s2BasicSizeTail = 0;
+        sfaKernelRunInfo.actualSingleProcessSInnerSize = 0;
+        sfaKernelRunInfo.actualSingleProcessSInnerSizeAlign = 0;
+        sfaKernelLoopInfo.s2BasicSizeTail = 0;
         if (curTopKIdx == 0) {
-            DealActSeqLenIsZero(info.bIdx, info.gS1Idx / constInfo.gSize, tempLoopInfo.n2Idx);
+            DealActSeqLenIsZero(sfaKernelRunInfo.bIdx, sfaKernelRunInfo.gS1Idx / sfaKernelConstInfo.gSize,
+                                sfaKernelLoopInfo.n2Idx);
         }
         return;
     }
 
     uint32_t sparseLen = 0;
-    uint64_t blockBegin = sparseIndices * constInfo.sparseBlockSize;
-    uint64_t blockEnd = (blockBegin + constInfo.sparseBlockSize > info.threshold) ?
-                            info.threshold :
-                            blockBegin + constInfo.sparseBlockSize;
+    uint64_t blockBegin = sparseIndices * sfaKernelConstInfo.sparseBlockSize;
+    uint64_t blockEnd = (blockBegin + sfaKernelConstInfo.sparseBlockSize > sfaKernelRunInfo.threshold) ?
+                            sfaKernelRunInfo.threshold :
+                            blockBegin + sfaKernelConstInfo.sparseBlockSize;
     int32_t blockLen = blockEnd - blockBegin;
     sparseLen += (blockLen > static_cast<int32_t>(curOffsetInSparseBlock)) ? blockLen - curOffsetInSparseBlock : 0;
 
     bool firstVaildFlag = false;
     if (curTopKIdx > 0) {
-        info.curTopKIdx = curTopKIdx;
-        info.curOffsetInSparseBlock = curOffsetInSparseBlock;
+        sfaKernelRunInfo.curTopKIdx = curTopKIdx;
+        sfaKernelRunInfo.curOffsetInSparseBlock = curOffsetInSparseBlock;
     } else if (curTopKIdx == 0 && sparseLen > 0) {
-        info.curTopKIdx = curTopKIdx;
-        info.curOffsetInSparseBlock = 0;
+        sfaKernelRunInfo.curTopKIdx = curTopKIdx;
+        sfaKernelRunInfo.curOffsetInSparseBlock = 0;
         firstVaildFlag = true;
     }
 
     for (uint64_t topkIdx = curTopKIdx + 1; topkIdx < validCount; topkIdx++) {
-        int32_t sparseIndices = topKGm.GetValue(info.topKBaseOffset + topkIdx);
+        int32_t sparseIndices = topKGm.GetValue(sfaKernelRunInfo.topKBaseOffset + topkIdx);
         if (sparseIndices == -1) {
             curTopKIdx = topkIdx;
             curOffsetInSparseBlock = 0;
             break;
         }
-        uint64_t blockBegin = sparseIndices * constInfo.sparseBlockSize;
-        if (blockBegin >= info.threshold) {
+        uint64_t blockBegin = sparseIndices * sfaKernelConstInfo.sparseBlockSize;
+        if (blockBegin >= sfaKernelRunInfo.threshold) {
             continue;
         }
         if (firstVaildFlag == false && curTopKIdx == 0) {
-            info.curTopKIdx = topkIdx;
-            info.curOffsetInSparseBlock = 0;
+            sfaKernelRunInfo.curTopKIdx = topkIdx;
+            sfaKernelRunInfo.curOffsetInSparseBlock = 0;
             firstVaildFlag = true;
         }
-        uint64_t blockEnd = (blockBegin + constInfo.sparseBlockSize > info.threshold) ?
-                                info.threshold :
-                                blockBegin + constInfo.sparseBlockSize;
+        uint64_t blockEnd = (blockBegin + sfaKernelConstInfo.sparseBlockSize > sfaKernelRunInfo.threshold) ?
+                                sfaKernelRunInfo.threshold :
+                                blockBegin + sfaKernelConstInfo.sparseBlockSize;
         uint64_t blockLen = blockEnd - blockBegin;
         sparseLen += blockLen;
-        if (sparseLen >= constInfo.s2BaseSize) {
+        if (sparseLen >= sfaKernelConstInfo.s2BaseSize) {
             curTopKIdx = topkIdx;
-            curOffsetInSparseBlock = blockLen - (sparseLen - constInfo.s2BaseSize);
-            sparseLen = constInfo.s2BaseSize;
+            curOffsetInSparseBlock = blockLen - (sparseLen - sfaKernelConstInfo.s2BaseSize);
+            sparseLen = sfaKernelConstInfo.s2BaseSize;
             break;
         }
 
@@ -1025,12 +1055,13 @@ __aicore__ inline void SparseFlashAttentionMla<SFAT>::CalcSinnerTopKBegin(RunInf
         }
     }
 
-    info.actualSingleProcessSInnerSize = sparseLen;
-    info.actualSingleProcessSInnerSizeAlign =
-        SFAAlign((uint32_t)info.actualSingleProcessSInnerSize, (uint32_t)SFAVectorService<SFAT>::BYTE_BLOCK);
-    tempLoopInfo.s2BasicSizeTail = (sparseLen == constInfo.s2BaseSize) ? 0 : sparseLen;
+    sfaKernelRunInfo.actualSingleProcessSInnerSize = sparseLen;
+    sfaKernelRunInfo.actualSingleProcessSInnerSizeAlign = SFAAlign(
+        (uint32_t)sfaKernelRunInfo.actualSingleProcessSInnerSize, (uint32_t)SFAVectorService<SFAT>::BYTE_BLOCK);
+    sfaKernelLoopInfo.s2BasicSizeTail = (sparseLen == sfaKernelConstInfo.s2BaseSize) ? 0 : sparseLen;
     if (curTopKIdx == 0 && sparseLen == 0) {
-        DealActSeqLenIsZero(info.bIdx, info.gS1Idx / constInfo.gSize, tempLoopInfo.n2Idx);
+        DealActSeqLenIsZero(sfaKernelRunInfo.bIdx, sfaKernelRunInfo.gS1Idx / sfaKernelConstInfo.gSize,
+                            sfaKernelLoopInfo.n2Idx);
     }
 }
 
