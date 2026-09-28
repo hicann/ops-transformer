@@ -62,7 +62,8 @@ MhcPreSinkhornPremix(const at::Tensor &x, const at::Tensor &phi, const at::Tenso
             sumOut = at::empty({2 * skIterCount, t, n}, phi.options());
             normOut = at::empty({2 * skIterCount, t, n, n}, phi.options());
         } else {
-            hPre = at::empty({0}, phi.options());
+            // needGrad=false 但传入 premix 时也要输出 hPre
+            hPre = premix.has_value() ? at::empty({t, n}, phi.options()) : at::empty({0}, phi.options());
             hcBeforeNorm = at::empty({0}, phi.options());
             invRms = at::empty({0}, phi.options());
             sumOut = at::empty({0}, phi.options());
@@ -82,7 +83,8 @@ MhcPreSinkhornPremix(const at::Tensor &x, const at::Tensor &phi, const at::Tenso
             sumOut = at::empty({2 * skIterCount, b, s, n}, phi.options());
             normOut = at::empty({2 * skIterCount, b, s, n, n}, phi.options());
         } else {
-            hPre = at::empty({0}, phi.options());
+            // needGrad=false 但传入 premix 时也要输出 hPre
+            hPre = premix.has_value() ? at::empty({b, s, n}, phi.options()) : at::empty({0}, phi.options());
             hcBeforeNorm = at::empty({0}, phi.options());
             invRms = at::empty({0}, phi.options());
             sumOut = at::empty({0}, phi.options());

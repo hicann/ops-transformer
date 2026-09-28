@@ -207,9 +207,9 @@ public:
     __aicore__ inline MhcPreSinkhornPremixMembaseKSplitCorePart2() {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR hcScale, GM_ADDR hcBase, GM_ADDR y, GM_ADDR post, GM_ADDR combFrag,
-                                GM_ADDR hPre, GM_ADDR hcBeforeNorm, GM_ADDR invRms, GM_ADDR sumOut, GM_ADDR normOut,
-                                GM_ADDR workspace, const MhcPreSinkhornPremixTilingData *tilingDataPtr, TPipe *pipePtr,
-                                int64_t bsOffset, bool isTailBsLoop = false)
+                                GM_ADDR premix, GM_ADDR hPre, GM_ADDR hcBeforeNorm, GM_ADDR invRms, GM_ADDR sumOut,
+                                GM_ADDR normOut, GM_ADDR workspace, const MhcPreSinkhornPremixTilingData *tilingDataPtr,
+                                TPipe *pipePtr, int64_t bsOffset, bool isTailBsLoop = false)
     {
         pipe = pipePtr;
         tilingData = tilingDataPtr;
@@ -222,10 +222,14 @@ public:
         yGm.SetGlobalBuffer((__gm__ T *)y + (bsOffset * tilingData->d));
         postGm.SetGlobalBuffer((__gm__ float *)post + (bsOffset * tilingData->hcMult));
         combFragGm.SetGlobalBuffer((__gm__ float *)combFrag + (bsOffset * tilingData->hcMult * tilingData->hcMult));
+        premixGm.SetGlobalBuffer((__gm__ float *)premix + (bsOffset * tilingData->hcMult));
         workspaceGm.SetGlobalBuffer((__gm__ float *)workspace);
 
-        if (needGrad_) {
+        // needGrad=false 但传入 premix 时也要输出 hPre（供下一轮 premix 或梯度计算使用）
+        if (needGrad_ || tilingData->hasPremix != 0) {
             hPreGm.SetGlobalBuffer((__gm__ float *)hPre + (bsOffset * tilingData->hcMult));
+        }
+        if (needGrad_) {
             hcBeforeNormGm.SetGlobalBuffer((__gm__ float *)hcBeforeNorm +
                                            (bsOffset * tilingData->hcMult * (tilingData->hcMult + 2)));
             invRmsGm.SetGlobalBuffer((__gm__ float *)invRms + bsOffset);
@@ -266,6 +270,7 @@ public:
         pipe->InitBuffer(reduceBuf, tilingData->stage2RowFactor * tilingData->hcMultAlign * sizeof(float));
         pipe->InitBuffer(mxies01ReduceBuf,
                          tilingData->stage2RowFactor * tilingData->hcMultAlign * NUM_TWO * sizeof(float));
+        pipe->InitBuffer(premixBuf, tilingData->stage2RowFactor * tilingData->hcMultAlign * sizeof(float));
         pipe->InitBuffer(mxies02ReduceBuf,
                          tilingData->stage2RowFactor * tilingData->hcMultAlign * tilingData->hcMult * sizeof(float));
         pipe->InitBuffer(squareReduceBuf, tilingData->stage2RowFactor * tilingData->hcMultAlign * sizeof(float));
@@ -282,6 +287,7 @@ public:
         reduceLocal = reduceBuf.Get<float>();
         squareReduceLocal = squareReduceBuf.Get<float>();
         mxies01ReduceLocal = mxies01ReduceBuf.Get<float>();
+        premixLocal = premixBuf.Get<float>();
         mxies02ReduceLocal = mxies02ReduceBuf.Get<float>();
         xCastLocal = xCastBuf.Get<float>();
         yCastLocal = yCastBuf.Get<float>();
@@ -410,7 +416,16 @@ public:
                 ProcessPre(mxies01ReduceLocal, mxies01ReduceLocal, hcBase0Local, rsqrtLocal, rowBrcbLocal0,
                            hcBrcbLocal1, hcScaleGm.GetValue(0), tilingData->hcEps, curRowFactor, tilingData->hcMult);
 
-                if (needGrad_) {
+                if (tilingData->hasPremix != 0) {
+                    CopyIn(premixGm[stage2BlockIdx * curRowOfFormerBlock * tilingData->hcMult +
+                                    rowOuterIdx * curStage2RowFactor * tilingData->hcMult],
+                           premixLocal, 1, curRowFactor * tilingData->hcMult);
+                    event_t eventIdPremix = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
+                    SetFlag<HardEvent::MTE2_V>(eventIdPremix);
+                    WaitFlag<HardEvent::MTE2_V>(eventIdPremix);
+                }
+
+                if (needGrad_ || tilingData->hasPremix != 0) {
                     int64_t hPreBaseOffset = stage2BlockIdx * curRowOfFormerBlock * tilingData->hcMult +
                                              rowOuterIdx * curStage2RowFactor * tilingData->hcMult;
                     VToMTE3Sync();
@@ -427,8 +442,8 @@ public:
                     xLocal = xQue.template DeQue<T>();
                     yLocal = yQue.template AllocTensor<T>();
 
-                    ProcessY(yLocal, xLocal, mxies01ReduceLocal, hcBrcbLocal1, xCastLocal, yCastLocal, curRowFactor,
-                             tilingData->hcMult, curDFactor);
+                    ProcessY(yLocal, xLocal, tilingData->hasPremix != 0 ? premixLocal : mxies01ReduceLocal,
+                             hcBrcbLocal1, xCastLocal, yCastLocal, curRowFactor, tilingData->hcMult, curDFactor);
                     xQue.template FreeTensor(xLocal);
                     yQue.template EnQue(yLocal);
                     yLocal = yQue.template DeQue<T>();
@@ -621,6 +636,7 @@ private:
     GlobalTensor<T> yGm;
     GlobalTensor<float> postGm;
     GlobalTensor<float> combFragGm;
+    GlobalTensor<float> premixGm;
 
     GlobalTensor<float> hPreGm;
     GlobalTensor<float> hcBeforeNormGm;
@@ -651,6 +667,7 @@ private:
     TBuf<QuePosition::VECCALC> rsqrtBuf;
     TBuf<QuePosition::VECCALC> squareReduceBuf;
     TBuf<QuePosition::VECCALC> mxies01ReduceBuf;
+    TBuf<QuePosition::VECCALC> premixBuf;
     TBuf<QuePosition::VECCALC> mxies02ReduceBuf;
 
     TBuf<QuePosition::VECCALC> xCastBuf;
@@ -672,6 +689,7 @@ private:
     LocalTensor<float> reduceLocal;
     LocalTensor<float> squareReduceLocal;
     LocalTensor<float> mxies01ReduceLocal;
+    LocalTensor<float> premixLocal;
     LocalTensor<float> mxies02ReduceLocal;
     LocalTensor<float> xCastLocal;
     LocalTensor<float> yCastLocal;

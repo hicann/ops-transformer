@@ -83,6 +83,9 @@ static ge::graphStatus InferShapeForMhcPreSinkhornPremix(gert::InferShapeContext
     const bool *needBackwardAttr = attrs->GetAttrPointer<bool>(ATTR_NEED_BACKWARD);
     const int64_t numIters = numItersAttr == nullptr ? DEFAULT_NUM_ITERS : *numItersAttr;
     const bool needBackward = needBackwardAttr == nullptr ? true : *needBackwardAttr;
+    // needGrad=false 但传入 premix 时也要输出 hPre
+    const bool hasPremix = context->GetOptionalInputShape(INDEX_PREMIX) != nullptr;
+    const bool needHPre = needBackward || hasPremix;
     const int64_t hcMix = hcMult * hcMult + 2 * hcMult;
 
     // premix 为可选输入，传入时 shape 应为 x.shape[:-1]，即 (t, n) 或 (b, s, n)
@@ -128,7 +131,11 @@ static ge::graphStatus InferShapeForMhcPreSinkhornPremix(gert::InferShapeContext
             SetShape(sumOutShape, {numIters * 2, seqLen, hcMult});
             SetShape(normOutShape, {numIters * 2, seqLen, hcMult, hcMult});
         } else {
-            SetShape(hPreShape, {EMPTY_DIM});
+            if (needHPre) {
+                SetShape(hPreShape, {seqLen, hcMult});
+            } else {
+                SetShape(hPreShape, {EMPTY_DIM});
+            }
             SetShape(hcBeforeNormShape, {EMPTY_DIM});
             SetShape(invRmsShape, {EMPTY_DIM});
             SetShape(sumOutShape, {EMPTY_DIM});
@@ -145,7 +152,11 @@ static ge::graphStatus InferShapeForMhcPreSinkhornPremix(gert::InferShapeContext
             SetShape(sumOutShape, {numIters * 2, batch, seqLen, hcMult});
             SetShape(normOutShape, {numIters * 2, batch, seqLen, hcMult, hcMult});
         } else {
-            SetShape(hPreShape, {EMPTY_DIM});
+            if (needHPre) {
+                SetShape(hPreShape, {batch, seqLen, hcMult});
+            } else {
+                SetShape(hPreShape, {EMPTY_DIM});
+            }
             SetShape(hcBeforeNormShape, {EMPTY_DIM});
             SetShape(invRmsShape, {EMPTY_DIM});
             SetShape(sumOutShape, {EMPTY_DIM});

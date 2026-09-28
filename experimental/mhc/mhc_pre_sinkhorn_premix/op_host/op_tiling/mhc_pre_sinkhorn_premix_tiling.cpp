@@ -142,13 +142,6 @@ ge::graphStatus MhcPreSinkhornPremixTiling::GetShapeAttrsInfoInner()
                 OP_LOGE(context_->GetNodeName(), "bias size should be equal with mixhc, but is %ld", baseFirstDim),
                 return ge::GRAPH_FAILED);
 
-    // premix 可选输入仅在 Ascend950 (regbase) 路径支持，membase 平台不支持
-    auto shapePremix = context_->GetOptionalInputShape(4);
-    OP_CHECK_IF(shapePremix != nullptr,
-                OP_LOGE(context_->GetNodeName(),
-                        "premix input is only supported on Ascend950, current platform does not support it."),
-                return ge::GRAPH_FAILED);
-
     OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "get attr failed."),
                 return ge::GRAPH_FAILED);
     // hcMult only support 4
@@ -278,6 +271,8 @@ ge::graphStatus MhcPreSinkhornPremixTiling::CalcMKSplitCoreMembasePart2Tiling()
     tilingData_.set_hcEps(hcEps_);
     tilingData_.set_normEps(normEps_);
     tilingData_.set_needGrad(needGrad_ ? 1 : 0);
+    // 可选输入 premix: [bs, hcMult] fp32，premix 存在时 hin 加权源由内部 hPre 切换为 premix
+    tilingData_.set_hasPremix(context_->GetOptionalInputShape(4) != nullptr ? 1 : 0);
     return ge::GRAPH_SUCCESS;
 }
 

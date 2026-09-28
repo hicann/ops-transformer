@@ -31,7 +31,6 @@ namespace l0op {
  * @param [in] bias: Bias vector, shape is [hcMix], dtype is FP32
  * @param [in] premix: Optional pre-mix weights, shape is [T, n] or [B, S, n], dtype is FP32.
  *                     When provided, hin is computed with premix instead of the internally computed hPre.
- *                     Only supported on Ascend950.
  * @param [in] hcMult: Number of heads (n)
  * @param [in] numIters: Number of Sinkhorn iterations
  * @param [in] hcEps: Epsilon value for Sinkhorn iteration

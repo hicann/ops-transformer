@@ -100,6 +100,7 @@ TILING_DATA_FIELD_DEF(int64_t, bufferPool1Size); // 缓冲池1大小
 TILING_DATA_FIELD_DEF(int64_t, mUbSize);         // M维度UB缓冲大小
 
 TILING_DATA_FIELD_DEF(int64_t, needGrad);         // 是否需要梯度
+TILING_DATA_FIELD_DEF(int64_t, hasPremix);        // 可选输入 premix 是否存在
 TILING_DATA_FIELD_DEF(int64_t, bsSplitThreshold); // BS切分阈值
 TILING_DATA_FIELD_DEF(int64_t, bsLoop);           // BS循环次数
 TILING_DATA_FIELD_DEF(int64_t, tailBs);           // 尾批次BS数

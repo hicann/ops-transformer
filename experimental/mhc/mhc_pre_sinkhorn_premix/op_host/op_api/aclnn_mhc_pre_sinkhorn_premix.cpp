@@ -143,12 +143,8 @@ static bool CheckShape(const aclTensor *x, const aclTensor *phi, const aclTensor
         return false;
     }
 
-    // premix 为可选输入，shape 应为 x.shape[:-1]，即 (t, n) 或 (b, s, n)，仅 Ascend950 支持
+    // premix 为可选输入，shape 应为 x.shape[:-1]，即 (t, n) 或 (b, s, n)，A2/A3/A5 均支持
     if (premix != nullptr) {
-        if (!IsAscend950()) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "premix input is only supported on Ascend950.");
-            return false;
-        }
         auto premixShape = premix->GetViewShape();
         size_t expectedPremixDim = isTnd ? 2 : 3;
         if (premixShape.GetDimNum() != expectedPremixDim) {

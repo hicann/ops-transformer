@@ -29,8 +29,6 @@ extern "C" __global__ __aicore__ void mhc_pre_sinkhorn_premix(GM_ADDR x, GM_ADDR
                                                               GM_ADDR sumOut, GM_ADDR normOut, GM_ADDR workspace,
                                                               GM_ADDR tiling)
 {
-    // premix 仅 Ascend950 (regbase) 支持，membase tiling 已在检测到 premix 时拦截
-    (void)premix;
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     if (workspace == nullptr) {
         return;
@@ -56,8 +54,8 @@ extern "C" __global__ __aicore__ void mhc_pre_sinkhorn_premix(GM_ADDR x, GM_ADDR
 
         TPipe pipeStage2;
         MhcPreSinkhornPremix::MhcPreSinkhornPremixStage2<DTYPE_X> op2;
-        op2.Init(x, alpha, bias, hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs, tilingData,
-                 &pipeStage2);
+        op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
+                 tilingData, &pipeStage2);
         op2.Process(false);
         pipeStage2.Destroy();
     } else if (TILING_KEY_IS(1)) {
@@ -74,8 +72,8 @@ extern "C" __global__ __aicore__ void mhc_pre_sinkhorn_premix(GM_ADDR x, GM_ADDR
 
             TPipe pipeStage2;
             MhcPreSinkhornPremix::MhcPreSinkhornPremixMembaseKSplitCorePart2<DTYPE_X> op2;
-            op2.Init(x, alpha, bias, hin, hPost, hRes, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs, tilingData,
-                     &pipeStage2, curBsOffset, isTailBsLoop);
+            op2.Init(x, alpha, bias, hin, hPost, hRes, premix, hPre, hcBeforeNorm, invRms, sumOut, normOut, userWs,
+                     tilingData, &pipeStage2, curBsOffset, isTailBsLoop);
             op2.Process(curBsOffset, curBs, isTailBsLoop);
             pipeStage2.Destroy();
             SyncAll<false>(); // cv全部同步
