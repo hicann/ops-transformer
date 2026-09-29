@@ -27,8 +27,8 @@
 #include "tiling/tiling_api.h"
 #include "exe_graph/runtime/tiling_context.h"
 #include "register/op_def_registry.h"
-#include "../../op_kernel/arch35/quant_compressor_template_tiling_key.h"
-#include "../../op_kernel/arch35/quant_compressor_tiling_data.h"
+#include "../../op_kernel/arch92/quant_compressor_template_tiling_key.h"
+#include "../../op_kernel/arch92/quant_compressor_tiling_data.h"
 #include "platform/platform_info.h"
 
 #ifdef ASCENDC_OP_TEST
@@ -83,10 +83,6 @@ constexpr uint32_t MIN_BLOCK_SIZE = 1;
 constexpr uint32_t MAX_BLOCK_SIZE = 1024;
 constexpr uint32_t MAX_CMPRATIO_SIZE = 128;
 constexpr uint32_t MIN_CMPRATIO_SIZE = 2;
-constexpr uint32_t DB_WORKSPACE_RATIO = 2;
-constexpr uint32_t COFF_VALUE_2 = 2;
-constexpr uint32_t FULL_LOAD_MAX_SEQ_SIZE = 4;
-constexpr uint32_t FULL_LOAD_MAX_TOKEN_SIZE = 256;
 
 constexpr uint32_t BATCH_MODE_SCHEDULE = 1;
 
@@ -268,23 +264,24 @@ public:
     {}
     ~QuantCompressorTiling() = default;
 
-    static ge::graphStatus ConvertContext(gert::TilingContext &context, QuantCompressorContext &quantCompressorContext);
+    static ge::graphStatus ConvertContext(gert::TilingContext &context, QuantCompressorContext &compressorContext);
     ge::graphStatus RunBigKernelTiling(QuantCompressorTilingData *tilingData);
 
 private:
     static ge::graphStatus ConvertRequiredParams(gert::TilingContext &context,
-                                                 QuantCompressorContext &quantCompressorContext);
+                                                 QuantCompressorContext &compressorContext);
 
-    static void ConvertOptionalParams(gert::TilingContext &context, QuantCompressorContext &quantCompressorContext);
+    static void ConvertOptionalParams(gert::TilingContext &context, QuantCompressorContext &compressorContext);
+    NpuArch GetCurNpuArch() const;
     ge::graphStatus GetNpuInfo();
     ge::graphStatus SetBaseInfo();
-    ge::graphStatus SetPageAttentionInfo() const;
-    ge::graphStatus SetWorkSpaceInfo() const;
+    ge::graphStatus SetPageAttentionInfo();
+    ge::graphStatus SetWorkSpaceInfo();
     ge::graphStatus SetScenarioInfo() const;
-    ge::graphStatus SetTemplateId() const;
-    ge::graphStatus SetInnerSplitInfo() const;
-    ge::graphStatus SetFullLoadSplitInfo() const;
-    ge::graphStatus SetNormalSplitInfo() const;
+    ge::graphStatus SetTemplateId();
+    ge::graphStatus SetInnerSplitInfo();
+    ge::graphStatus SetFullLoadSplitInfo();
+    ge::graphStatus SetNormalSplitInfo();
     ge::graphStatus CalcWorkSpace();
     ge::graphStatus GenTilingKey() const;
     // ================================通用检查辅助函数==================================
@@ -353,7 +350,6 @@ private:
     uint32_t aicNum_ = 0;
     uint32_t aivNum_ = 0;
     platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
-    NpuArch npuArch_ = NpuArch::DAV_2201;
     size_t libapiSize_ = 0;
     size_t workspaceSize_ = 0;
     uint8_t coff = 1;
@@ -371,7 +367,7 @@ private:
 
 } // namespace
 
-CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch35(gert::TilingContext *context);
+CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch92(gert::TilingContext *context);
 } // namespace optiling
 
 #endif

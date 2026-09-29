@@ -9,8 +9,8 @@
  */
 
 /*!
- * \file compressor_tiling_register.cpp
- * \brief Compressor 算子 tiling 入口注册与 arch 分发
+ * \file quant_compressor_tiling_register.cpp
+ * \brief QuantCompressor 算子 tiling 入口注册与 arch 分发
  */
 
 #include "register/op_def_registry.h"
@@ -26,38 +26,38 @@ namespace optiling {
 #define CMP_EXTERN_C
 #endif
 
-CMP_EXTERN_C ge::graphStatus TilingCompressorArch22(gert::TilingContext *context);
-CMP_EXTERN_C ge::graphStatus TilingCompressorArch35(gert::TilingContext *context);
-CMP_EXTERN_C ge::graphStatus TilingCompressorArch92(gert::TilingContext *context);
+CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch35(gert::TilingContext *context);
+CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch92(gert::TilingContext *context);
 
-struct CompressorCompileInfo {
+struct QuantCompressorCompileInfo {
     int64_t core_num;
 };
 
-CMP_EXTERN_C ge::graphStatus TilingCompressor(gert::TilingContext *context)
+CMP_EXTERN_C ge::graphStatus TilingQuantCompressor(gert::TilingContext *context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("Compressor", "context", "is nullptr"),
+    OP_CHECK_IF(context == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("QuantCompressor", "context", "is nullptr"),
                 return ge::GRAPH_FAILED);
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("Compressor", "platformInfo", "is nullptr"),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("QuantCompressor", "platformInfo", "is nullptr"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
-        return TilingCompressorArch35(context);
+        return TilingQuantCompressorArch35(context);
     } else if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201) {
-        return TilingCompressorArch92(context);
-    } else {
-        return TilingCompressorArch22(context);
+        return TilingQuantCompressorArch92(context);
     }
 }
 
-ge::graphStatus TilingPrepareForCompressor(gert::TilingParseContext *const context)
+ge::graphStatus TilingPrepareForQuantCompressor(gert::TilingParseContext *context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-IMPL_OP_OPTILING(Compressor).Tiling(TilingCompressor).TilingParse<CompressorCompileInfo>(TilingPrepareForCompressor);
+IMPL_OP_OPTILING(QuantCompressor)
+    .Tiling(TilingQuantCompressor)
+    .TilingParse<QuantCompressorCompileInfo>(TilingPrepareForQuantCompressor);
 
 } // namespace optiling

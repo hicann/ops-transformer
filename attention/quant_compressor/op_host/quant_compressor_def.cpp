@@ -97,6 +97,8 @@ public:
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn"); // set value of aclnn support
         this->AICore().AddConfig("ascend950", aicore_config);
+        this->AICore().AddConfig("ascend950", aicore_config);
+        this->AICore().AddConfig("ascend960dt", aicore_config);
     }
 };
 OP_ADD(QuantCompressor, optiling::QuantCompressorCompileInfo);

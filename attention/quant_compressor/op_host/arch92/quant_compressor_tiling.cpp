@@ -120,6 +120,13 @@ ge::graphStatus QuantCompressorTiling::ConvertContext(gert::TilingContext &conte
     return ge::GRAPH_SUCCESS;
 }
 
+NpuArch QuantCompressorTiling::GetCurNpuArch() const
+{
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->platformInfo);
+    NpuArch npuArch = ascendcPlatform.GetCurNpuArch();
+    return npuArch;
+}
+
 ge::graphStatus QuantCompressorTiling::GetNpuInfo()
 {
     OP_CHECK_IF(context_->platformInfo == nullptr,
@@ -128,7 +135,6 @@ ge::graphStatus QuantCompressorTiling::GetNpuInfo()
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->platformInfo);
     socVersion_ = ascendcPlatform.GetSocVersion();
-    npuArch_ = ascendcPlatform.GetCurNpuArch();
 
     libapiSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
 
@@ -174,7 +180,7 @@ ge::graphStatus QuantCompressorTiling::SetBaseInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetPageAttentionInfo() const
+ge::graphStatus QuantCompressorTiling::SetPageAttentionInfo()
 {
     pageAttentionParams_->blockNum = context_->stateCache.shape->GetStorageShape().GetDim(COMPRESSOR_DIM_INDEX_0);
     pageAttentionParams_->blockSize = context_->stateCache.shape->GetStorageShape().GetDim(COMPRESSOR_DIM_INDEX_1);
@@ -186,12 +192,12 @@ ge::graphStatus QuantCompressorTiling::SetPageAttentionInfo() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetWorkSpaceInfo() const
+ge::graphStatus QuantCompressorTiling::SetWorkSpaceInfo()
 {
-    workspaceParams_->dbWorkspaceRatio = DB_WORKSPACE_RATIO;
+    workspaceParams_->dbWorkspaceRatio = 2; // 2: dbWorkspaceRatio
     workspaceParams_->mm1KvResSize = innerSplitParams_->mBaseSize * baseParams_->headDim * coff;
     workspaceParams_->mm1ScoreResSize = innerSplitParams_->mBaseSize * baseParams_->headDim * coff;
-    if (coff == COFF_VALUE_2) {
+    if (coff == 2) { // 2: overlap
         workspaceParams_->vec1TailCacheSize = baseParams_->cmpRatio * baseParams_->headDim;
     }
 
@@ -203,16 +209,15 @@ ge::graphStatus QuantCompressorTiling::SetScenarioInfo() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetTemplateId() const
+ge::graphStatus QuantCompressorTiling::SetTemplateId()
 {
     if (context_->templateId == TemplateId::EMPTY_X) {
         return ge::GRAPH_SUCCESS;
     }
-    if (npuArch_ == NpuArch::DAV_3510) {
+    if (GetCurNpuArch() == NpuArch::DAV_9201) {
         // 设置高性能模板
         // 4: max S; 256: max tokensize
-        if (context_->layout == LayoutType::LAYOUT_BSH && baseParams_->seqSize <= FULL_LOAD_MAX_SEQ_SIZE &&
-            baseParams_->tokenSize <= FULL_LOAD_MAX_TOKEN_SIZE) {
+        if (context_->layout == LayoutType::LAYOUT_BSH && baseParams_->seqSize <= 4 && baseParams_->tokenSize <= 256) {
             context_->templateId = TemplateId::FULL_LOAD;
         }
         return ge::GRAPH_SUCCESS;
@@ -220,7 +225,7 @@ ge::graphStatus QuantCompressorTiling::SetTemplateId() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetFullLoadSplitInfo() const
+ge::graphStatus QuantCompressorTiling::SetFullLoadSplitInfo()
 {
     innerSplitParams_->mBaseSize = 256;              // 256:核间切分，M轴基本块大小
     innerSplitParams_->dBaseSize = 256 / (coff * 2); // nBase = dBase * coff * 2
@@ -266,14 +271,14 @@ ge::graphStatus QuantCompressorTiling::SetFullLoadSplitInfo() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetNormalSplitInfo() const
+ge::graphStatus QuantCompressorTiling::SetNormalSplitInfo()
 {
     innerSplitParams_->mBaseSize = 256;        // 256:核间切分，M轴基本块大小
     innerSplitParams_->dBaseSize = 128 / coff; // 128：核间切分，D轴基本块大小
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantCompressorTiling::SetInnerSplitInfo() const
+ge::graphStatus QuantCompressorTiling::SetInnerSplitInfo()
 {
     if (context_->templateId == TemplateId::FULL_LOAD) {
         return SetFullLoadSplitInfo();
@@ -464,7 +469,7 @@ ge::graphStatus QuantCompressorTiling::CheckAttrValueSupport(const T *attrValue,
 template <typename T>
 std::string to_string(const T &value)
 {
-    if constexpr (std::is_same_v<T, bool>) {
+    if (std::is_same_v<T, bool>) {
         return value ? "true" : "false";
     } else {
         return std::to_string(value);
@@ -478,11 +483,9 @@ void QuantCompressorTiling::LogErrorNumberSupport(const std::vector<T> &expectNu
     std::ostringstream oss;
     for (size_t i = 0; i < expectNumberList.size(); ++i) {
         oss << to_string(expectNumberList[i]);
-        const size_t nextOffset = i + 1;
-        const size_t secondOffset = nextOffset + 1;
-        if (secondOffset < expectNumberList.size()) {
+        if (i + 2 < expectNumberList.size()) {
             oss << ", ";
-        } else if (nextOffset < expectNumberList.size()) {
+        } else if (i + 1 < expectNumberList.size()) {
             oss << " or ";
         }
     }
@@ -767,7 +770,7 @@ ge::graphStatus QuantCompressorTiling::CheckSingleParaCmpRatio() const
 
 ge::graphStatus QuantCompressorTiling::CheckSingleParaCoff() const
 {
-    if (ge::GRAPH_SUCCESS != CheckAttrValueSupport(context_->coff, COFF, COFF_NAME)) {
+    if (CheckAttrValueSupport(context_->coff, COFF, COFF_NAME)) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -1030,7 +1033,7 @@ ge::graphStatus QuantCompressorTiling::CheckMultiParaConsistency() const
 
 } // namespace
 
-CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch35(gert::TilingContext *context)
+CMP_EXTERN_C ge::graphStatus TilingQuantCompressorArch92(gert::TilingContext *context)
 {
     OP_CHECK_IF(context == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("QuantCompressor", "context", "is nullptr"),

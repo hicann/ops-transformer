@@ -25,16 +25,12 @@ add_ops_compile_options(
 )
 
 if (NOT BUILD_OPS_RTY_KERNEL)
-    set(SUPPORTED_ARCHS arch35)
     add_modules_sources(OPTYPE quant_compressor ACLNNTYPE aclnn)
     add_tiling_modules()
 
-    foreach(ARCH ${ARCH_DIRECTORY})
-        if(ARCH IN_LIST SUPPORTED_ARCHS)
-            target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/${ARCH}/quant_compressor_tiling.cpp
-            )
-        endif()
-    endforeach()
-
+    target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/quant_compressor_tiling_register.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/arch35/quant_compressor_tiling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/arch92/quant_compressor_tiling.cpp
+    )
 endif()

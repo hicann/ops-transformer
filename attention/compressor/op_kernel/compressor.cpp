@@ -17,6 +17,8 @@
 #include "arch22/compressor_kernel.h"
 #include "arch22/compressor_kernel_perf.h"
 #include "arch22/compressor_kernel_full_load.h"
+#elif (__NPU_ARCH__ == 9201)
+#include "arch92/compressor_kernel.h"
 #else
 #include "arch35/compressor_kernel.h"
 #endif
@@ -49,7 +51,11 @@ __global__ __aicore__ void compressor(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __
                                       __gm__ uint8_t *tiling)
 {
     REGISTER_TILING_DEFAULT(optiling::CompressorTilingData);
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+#else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+#endif
     GET_TILING_DATA_WITH_STRUCT(optiling::CompressorTilingData, tilingDataIn, tiling);
     if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::EMPTY_X) {
         return;

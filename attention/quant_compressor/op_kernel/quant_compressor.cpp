@@ -13,8 +13,11 @@
  * \brief
  */
 
+#if (__NPU_ARCH__ == 9201)
+#include "arch92/quant_compressor_kernel.h"
+#else
 #include "arch35/quant_compressor_kernel.h"
-
+#endif
 using namespace QuantCompressor;
 
 #define INVOKE_QUANT_COMPRESSOR_GENERAL_OP_IMPL(templateClass, isFullLoad, ...) \
@@ -35,7 +38,11 @@ __global__ __aicore__ void quant_compressor(__gm__ uint8_t *x, __gm__ uint8_t *w
                                             __gm__ uint8_t *tiling)
 {
     REGISTER_TILING_DEFAULT(optiling::QuantCompressorTilingData);
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201))
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+#else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+#endif
     GET_TILING_DATA_WITH_STRUCT(optiling::QuantCompressorTilingData, tilingDataIn, tiling);
     if constexpr (static_cast<TEMPLATE_ID>(TemplateId) == TEMPLATE_ID::EMPTY_X) {
         return;
