@@ -534,6 +534,10 @@ if (NOT generate_aclnn_srcs AND NOT generate_aclnn_inner_srcs AND NOT generate_e
     if (_cann_skipped_ops)
         list(REMOVE_DUPLICATES _cann_skipped_ops)
         get_cann_package_version(_cann_cur_ver)
+        get_property(_cann_cur_ver_full GLOBAL PROPERTY CANN_PACKAGE_VERSION_FULL)
+        if(NOT "${_cann_cur_ver_full}" STREQUAL "")
+            set(_cann_cur_ver "${_cann_cur_ver_full}")
+        endif()
         message(STATUS "当前 CANN 版本为 ${_cann_cur_ver}（soc=${ASCEND_COMPUTE_UNIT}），以下算子要求的最低版本不满足，不符合编译要求，已跳过编译：")
         foreach(_cann_skipped_op IN LISTS _cann_skipped_ops)
             message(STATUS "  - ${_cann_skipped_op}")
@@ -653,6 +657,15 @@ if (BUILD_OPEN_PROJECT)
         set(generate_proto_srcs ${generate_proto_srcs_filtered})
     endif()
 
+    # 零算子（所有请求算子均被 CANN 版本检查跳过）时 proto 源为空，补空 stub 保证 generate 不失败
+    if(NOT generate_proto_srcs)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cust_proto_stub.cpp
+                COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/cust_proto_stub.cpp
+        )
+        target_sources(cust_proto PRIVATE
+                ${CMAKE_CURRENT_BINARY_DIR}/cust_proto_stub.cpp
+        )
+    endif()
     set_source_files_properties(${generate_proto_srcs}
             PROPERTIES GENERATED TRUE
     )

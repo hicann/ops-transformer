@@ -73,6 +73,7 @@ endfunction()
 # get_cann_package_version(<OUTPUT_VAR>)
 #   从安装的 CANN 包读取版本号。查找顺序：version.info -> opp/version.info -> compiler/version.info。
 #   结果缓存到全局属性 CANN_PACKAGE_VERSION，避免重复读取。
+#   完整版本串（保留 beta/rc 等后缀，如 9.2.0-beta.2）缓存到全局属性 CANN_PACKAGE_VERSION_FULL。
 # ------------------------------------------------------------------------------------------------------------
 function(get_cann_package_version OUTPUT_VAR)
     get_property(_cann_pkg_ver GLOBAL PROPERTY CANN_PACKAGE_VERSION)
@@ -110,13 +111,22 @@ function(get_cann_package_version OUTPUT_VAR)
         endif()
     endif()
 
+    # 完整版本串（保留 -beta.2 / .beta2 等后缀）：CMake 的 VERSION_* 比较会把非数字后缀当 0，
+    # "9.2.0-beta.2" 与 "9.2.0" 会判等，无法区分预发布版本，因此单独记录完整串。
+    set(_cann_ver_full "${_cann_ver}")
+    string(REGEX MATCH "Version=([0-9]+\\.[0-9]+\\.[0-9]+[^ \t\r\n]*)" _ver_full_match "${_cann_ver_content}")
+    if(_ver_full_match)
+        set(_cann_ver_full "${CMAKE_MATCH_1}")
+    endif()
+
     if(_cann_ver)
-        message(STATUS "CANN package version: ${_cann_ver} (from ${_cann_ver_file})")
+        message(STATUS "CANN package version: ${_cann_ver_full} (from ${_cann_ver_file})")
     else()
         message(WARNING "Cannot parse version from ${_cann_ver_file}")
     endif()
 
     set_property(GLOBAL PROPERTY CANN_PACKAGE_VERSION "${_cann_ver}")
+    set_property(GLOBAL PROPERTY CANN_PACKAGE_VERSION_FULL "${_cann_ver_full}")
     set(${OUTPUT_VAR} "${_cann_ver}" PARENT_SCOPE)
 endfunction()
 
@@ -126,6 +136,10 @@ endfunction()
 #   跳过整个算子的 host/kernel 编译（依赖编译阶段除外）。
 #   - SOC        : 版本检查适用的 soc 列表（空格分隔），缺省=全部 soc 生效
 #   - MIN_VERSION: 三段式最低 CANN 版本，缺省=不检查（打 WARNING）
+#   预发布版本（完整串带 beta/rc 等字母后缀，如 9.2.0-beta.2）视为低于同名正式版本 9.2.0。
+#   MIN_VERSION 自带后缀（如 9.2.0-beta.2）时：同名正式版（9.2.0）及更高版本放行；
+#   已安装同为预发布版本时仅完整串精确匹配（忽略大小写）放行，其余不同后缀
+#   （如 9.2.0-beta.1，含更新的 beta/rc）一律保守视为不满足。
 #   注意：必须是 macro（return 从调用者 CMakeLists 返回），与 require_pypto_pro 同理。
 # ------------------------------------------------------------------------------------------------------------
 macro(require_cann_version)
@@ -163,8 +177,26 @@ macro(require_cann_version)
 
     if(_rcv_need_check)
         get_cann_package_version(_rcv_cann_ver)
-        if(_rcv_cann_ver AND "${_rcv_cann_ver}" VERSION_LESS "${OP_VER_MIN_VERSION}")
-            message(STATUS "算子${_rcv_op_name}不支持在soc=${ASCEND_COMPUTE_UNIT},cann version=${_rcv_cann_ver}场景下编译（要求>=${OP_VER_MIN_VERSION}）")
+        get_property(_rcv_cann_ver_full GLOBAL PROPERTY CANN_PACKAGE_VERSION_FULL)
+        set(_rcv_version_lower FALSE)
+        if(_rcv_cann_ver)
+            if("${_rcv_cann_ver}" VERSION_LESS "${OP_VER_MIN_VERSION}")
+                set(_rcv_version_lower TRUE)
+            elseif("${_rcv_cann_ver}" VERSION_EQUAL "${OP_VER_MIN_VERSION}")
+                # CMake 版本比较把非数字后缀当 0（"9.2.0-beta.2" 与 "9.2.0" 判等）；
+                # 数字版本相等但完整串不同且带字母后缀（beta/rc/alpha 等）时，视为低于同名正式版本。
+                string(TOLOWER "${_rcv_cann_ver_full}" _rcv_full_lower)
+                string(TOLOWER "${OP_VER_MIN_VERSION}" _rcv_min_lower)
+                if(NOT "${_rcv_full_lower}" STREQUAL "${_rcv_min_lower}")
+                    string(REGEX MATCH "[a-z]" _rcv_alpha_suffix "${_rcv_full_lower}")
+                    if(_rcv_alpha_suffix)
+                        set(_rcv_version_lower TRUE)
+                    endif()
+                endif()
+            endif()
+        endif()
+        if(_rcv_version_lower)
+            message(STATUS "算子${_rcv_op_name}不支持在soc=${ASCEND_COMPUTE_UNIT},cann version=${_rcv_cann_ver_full}场景下编译（要求>=${OP_VER_MIN_VERSION}）")
             set_property(GLOBAL PROPERTY ${_rcv_op_name}_CANN_VERSION_SKIPPED TRUE)
             set_property(GLOBAL APPEND PROPERTY CANN_VERSION_SKIPPED_OPS "${_rcv_op_name}（要求>=${OP_VER_MIN_VERSION}）")
             return()
