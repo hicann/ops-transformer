@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_metadata_op():
-    """惰性解析 metadata 算子入口, 优先 python 包路径, 回退 torch.ops."""
     try:
         from cann_ops_transformer.ops import quant_flash_attn_metadata
 
@@ -30,7 +29,6 @@ def _resolve_metadata_op():
 
 
 def _resolve_main_op():
-    """惰性解析主算子入口, 优先 python 包路径, 回退 torch.ops."""
     try:
         from cann_ops_transformer.ops import quant_flash_attn
 
@@ -47,12 +45,7 @@ def _none_if_empty(t):
     return t if t.numel() > 0 else None
 
 
-def _int_or_none(v):
-    return None if v is None else int(v)
-
-
 def _head_index(shape, layout, kv):
-    """从 q/k shape 推导 head 维下标."""
     if kv and layout == "PA_BBND":
         return 2
     if not kv and layout == "BSND":
@@ -61,7 +54,7 @@ def _head_index(shape, layout, kv):
 
 
 class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
-    """aclgraph 编译目标: __init__ 构建 metadata, forward 只调主算子."""
+    """aclgraph 编译目标: forward 只调 quant_flash_attn 主算子."""
 
     def __init__(
         self,
@@ -95,7 +88,7 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
         **kwargs,
     ):
         super().__init__()
-        import torch_npu  # noqa: F401
+        import torch_npu
 
         torch_npu.npu.set_device(int(kwargs.get("device_id", 0)))
 
@@ -121,7 +114,14 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
 
         torch.npu.synchronize()
 
-        logger.info("[GRAPH] build metadata (quant_flash_attn_metadata)")
+        logger.info("[GRAPH] 构建 metadata (quant_flash_attn_metadata)")
+        is_varlen_q = layout_q in ("TND", "NTD")
+        if is_varlen_q:
+            batch_size_arg = None
+        else:
+            batch_size_arg = (
+                int(batch_size) if batch_size is not None else int(q_shape[0])
+            )
         self.metadata = _resolve_metadata_op()(
             num_heads_q=num_heads_q,
             num_heads_kv=num_heads_kv,
@@ -131,7 +131,7 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
             cu_seqlens_kv=cu_seqlens_kv_t,
             seqused_q=seqused_q_t,
             seqused_kv=seqused_kv_t,
-            batch_size=_int_or_none(batch_size),
+            batch_size=batch_size_arg,
             max_seqlen_q=int(max_seqlen_q),
             max_seqlen_kv=int(max_seqlen_kv),
             head_dim_v=head_dim_v,
@@ -214,7 +214,8 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
         )
 
         if not self.return_softmax_lse:
-            lse_out = None
+            if isinstance(lse_out, torch.Tensor):
+                lse_out = lse_out.reshape(0)
         elif isinstance(lse_out, torch.Tensor) and lse_out.ndim == 2:
             lse_out = lse_out.transpose(0, 1).contiguous()
         return atten_out, lse_out

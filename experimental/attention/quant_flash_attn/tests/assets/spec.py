@@ -20,7 +20,6 @@ _impl_cache = {}
 
 
 def load_impl_module(stem):
-    """Lazy-load impl modules to avoid import-time failures."""
     if stem not in _impl_cache:
         path = ASSET_IMPL_DIR / f"{stem}.py"
         spec = importlib.util.spec_from_file_location(
@@ -41,7 +40,7 @@ def _inputs_dispatch(*args, **kwargs):
 
 
 class QuantFlashAttnMxfp4Spec:
-    """TestSpec for the QuantFlashAttn (MXFP4) operator."""
+    """quant_flash_attn (MXFP4, quant_mode=5) 测试规范."""
 
     golden = staticmethod(_golden_dispatch)
     customize_inputs = staticmethod(_inputs_dispatch)
@@ -73,10 +72,7 @@ class QuantFlashAttnMxfp4Spec:
 
 
 class QuantFlashAttnMxfp4MetadataSpec:
-    """TestSpec for the QuantFlashAttn metadata generator.
-
-    Only customized inputs are provided; there is no standalone test suite.
-    """
+    """quant_flash_attn_metadata 生成器的 TestSpec."""
 
     customize_inputs = load_impl_module(
         "metadata_inputs"

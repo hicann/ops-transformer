@@ -28,6 +28,19 @@ _DTYPE_MAP = {
 }
 
 
+def hw_truncate_fp32(value: float) -> float:
+    """deqScalar 硬件通路: 标量以低位截断的 fp32 参与 (低 13 位 mantissa 清零, & -8192).
+
+    与 flash_attention_npu_golden 的 hw_scale 复刻同一截断, 否则边界元素
+    档位翻转 (0183/0076 case)."""
+    return float(
+        torch.tensor(value, dtype=torch.float32)
+        .view(torch.int32)
+        .__and__(-8192)
+        .view(torch.float32)
+    )
+
+
 def _resolve_s_dtype(dtype_str: str) -> torch.dtype:
     """把 s_dtype 字符串解析为 torch dtype, 非法值 raise ValueError."""
     if dtype_str not in _DTYPE_MAP:
@@ -220,11 +233,7 @@ def _blockwise_snap_local_quantize_p_eff(
     #   NPU: Max(curr_group_max, src) → Muls(curr_group_max, dScale)
     scale_s = np.float16(softmax_scale)
     m_block_raw = S_reshape.max(dim=-1).values  # max of UNSCALED S
-    m_block_raw_safe = torch.where(
-        torch.isinf(m_block_raw) & (m_block_raw < 0),
-        torch.zeros_like(m_block_raw),
-        m_block_raw,
-    )
+    m_block_raw_safe = m_block_raw
     # NPU: Muls(curr_group_max, dScale) — 对 max 施加 scale
     m_block_scaled = m_block_raw_safe * scale_s
     # snap: floor(m_scaled / ln 2) × ln 2, 落到全局 log2 网格上
@@ -589,25 +598,25 @@ def _flash_attn_single_batch_kernel(
 
                     P_fp32 = P_ij.float()
 
-                m_i_safe_fp32 = torch.where(
-                    torch.isinf(m_i) & (m_i < 0),
-                    torch.zeros_like(m_i),
-                    m_i,
-                )
-                m_new_safe_fp32 = torch.where(
-                    torch.isinf(m_new) & (m_new < 0),
-                    torch.zeros_like(m_new),
-                    m_new,
-                )
                 if quantize_p and quantize_p_mode == "blockwise_snap_local":
-                    K_diff = m_i_safe_fp32 - m_new_safe_fp32
                     first_tile = torch.isinf(m_i) & (m_i < 0)  # m_i 还是 -inf 未 clamp
+                    K_diff = m_i - m_new
                     alpha = torch.where(
                         first_tile,
                         torch.zeros_like(K_diff),
                         torch.exp2(K_diff),
                     )
                 else:
+                    m_i_safe_fp32 = torch.where(
+                        torch.isinf(m_i) & (m_i < 0),
+                        torch.zeros_like(m_i),
+                        m_i,
+                    )
+                    m_new_safe_fp32 = torch.where(
+                        torch.isinf(m_new) & (m_new < 0),
+                        torch.zeros_like(m_new),
+                        m_new,
+                    )
                     alpha = torch.exp(m_i_safe_fp32 - m_new_safe_fp32)  # FP32
 
                 mm2ReduceSum = P_fp32.sum(dim=seqk_dim)
@@ -626,7 +635,7 @@ def _flash_attn_single_batch_kernel(
                 m_i = m_new
 
             l_safe = torch.where(l_i > 0, l_i, torch.ones_like(l_i))
-            O_i = O_i / l_safe.unsqueeze(-1)
+            O_i = O_i / torch.where(torch.isnan(l_i), l_i, l_safe).unsqueeze(-1)
             out[h, q_lo:q_hi] = O_i
 
     return out
@@ -669,6 +678,7 @@ def attention_cpu_golden_varlen(
 
     if softmax_scale is None:
         softmax_scale = 1.0 / math.sqrt(head_dim)
+    softmax_scale = hw_truncate_fp32(softmax_scale)
 
     batch_size = (
         cu_seqlens_q.numel() - 1
@@ -837,6 +847,7 @@ def flash_attention_cpu_golden_varlen(
 
     if softmax_scale is None:
         softmax_scale = 1.0 / math.sqrt(head_dim)
+    softmax_scale = hw_truncate_fp32(softmax_scale)
 
     batch_size = (
         cu_seqlens_q.numel() - 1

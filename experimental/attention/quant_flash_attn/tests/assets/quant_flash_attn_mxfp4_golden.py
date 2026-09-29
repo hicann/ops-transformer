@@ -37,7 +37,6 @@ logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
-# 配置区: _apply_golden_globals 注入 case 参数覆盖默认值
 # ==============================================================================
 import os as _os
 
@@ -109,7 +108,6 @@ CU_SEQLENS_Q_DTYPE = None
 CU_SEQLENS_KV_DTYPE = None
 SOFTMAX_LSE_DTYPE = None
 
-# metadata 伪 tensor 入参: 默认 4096 (对应 quant_flash_attn_metadata 输出)
 METADATA_SHAPE = [4096]
 METADATA_DTYPE = None
 METADATA_DATARANGE = None
@@ -150,9 +148,8 @@ SEED_Q = 54
 SEED_K = 3
 SEED_V = 4
 
-# 物理 S override: inputs 从 CSV 分配的 q/k/v tensor shape 推导物理 S 后注入,
-# generate_data 优先用这两个值作为物理 S (生成 query/key/value 的 S 维),
-# 而不是 max(ACT_SEQ_LENS) / MAX_SEQLEN (后者只决定有效长度).
+# 物理 S override: generate_data 优先用这两个值作为物理 S (生成 query/key/value
+# 的 S 维), 而不是 max(ACT_SEQ_LENS) / MAX_SEQLEN (后者只决定有效长度).
 _PHYSICAL_S_Q_OVERRIDE = None
 _PHYSICAL_S_KV_OVERRIDE = None
 
@@ -171,7 +168,6 @@ def _infer_physical_s_from_tensor(tensor, layout):
         return None
     layout_upper = (layout or "").upper()
     try:
-        # tensor 可能是 torch.Tensor 或 numpy.ndarray
         nd = len(tensor.shape)
         if layout_upper in ("BSND", "BSH"):
             if nd < 2:
@@ -289,7 +285,7 @@ def _get_npu_fa_kwargs():
 
 
 # ==============================================================================
-# 配置注入: wrapper 把 case attrs 转成模块全局变量
+# 配置注入
 # ==============================================================================
 _GOLDEN_GLOBALS_MAP = {
     "B": "B",
@@ -351,7 +347,6 @@ _GOLDEN_GLOBALS_MAP = {
     "softmax_lse_dtype": "SOFTMAX_LSE_DTYPE",
     "metadata_shape": "METADATA_SHAPE",
     "metadata_dtype": "METADATA_DTYPE",
-    # 表格全量透传列 (kwargs 经 _apply_kwargs_globals 注入)
     "custom_info": "CUSTOM_INFO",
     "attn_out_shape": "ATTN_OUT_SHAPE",
     "attn_out_datarange": "ATTN_OUT_DATARANGE",
@@ -388,7 +383,7 @@ def _apply_kwargs_globals(kwargs):
 
 
 # ==============================================================================
-# Layout 工具: 复用 mxfp4 quant_flash_attn_golden.py 中同名函数
+# Layout 工具
 # ==============================================================================
 def get_query_layout(input_layout):
     if input_layout in ("BSH", "BSH_BNSD", "BSH_NBSD"):
@@ -577,7 +572,7 @@ def _parse_datarange(val):
     if isinstance(val, (int, float)):
         f = float(val)
         return (-f, f)
-    s = str(val).strip()
+    s = str(val).strip().strip("[]()")
     parts = [p.strip() for p in s.split(",") if p.strip() != ""]
     if len(parts) == 1:
         f = float(parts[0])
@@ -626,8 +621,6 @@ def generate_data():
     n2 = N_kv
     g = G
     num_heads = n2 * g
-    # 有效长度: act 传入时用 act, 否则用 max_seqlen. 物理 S 优先用 override,
-    # 否则等于有效长度. 校验: 物理 S >= 有效长度.
     s1, s1_effective, act_seq_q_eff = _resolve_s_with_effective(
         ACT_SEQ_LENS_Q, MAX_SEQLEN_Q, _PHYSICAL_S_Q_OVERRIDE, B, "Q"
     )
@@ -655,8 +648,6 @@ def generate_data():
     key = _gen_range_tensor((B, n2, s2, qk_d), k_lo, k_hi, SEED_K)
     value = _gen_range_tensor((B, n2, s2, v_d), v_lo, v_hi, SEED_V)
 
-    # 原始 FP32 BNSD Q/K/V 随返回 dict 传给 CPU golden (golden 接收 FP32,
-    # 内部 _apply_input_quant 做量化反量化)
     fp32_bnsd = (query, key, value)
 
     # Q/K padding 区域 (act_seq 之外) FP32 置 0: 量化后 packed=0/scale=127,
@@ -670,14 +661,10 @@ def generate_data():
         if sk < s2:
             key[b_idx, :, sk:, :] = 0
 
-    # Q/K: 沿 D 维量化, V: 沿 S 维量化. 产出「未打包」FP4 编码 (uint8 0-15),
-    # 由 inputs.py view 成 float4_e2m1 喂给 TTK.
     query_codes, q_descale = mxfp4_quantize_last(query, quant_axis=-1, mode="baseline")
     key_codes, k_descale = mxfp4_quantize_last(key, quant_axis=-1, mode="baseline")
 
     # V 按 act_seq_lens_kv 分批量化: padding 区域编码填 0, descale 只覆盖有效区域.
-    # v_descale 的 S 维须与 kernel 对齐 (maxSeqlenKv = max_seqlen_kv 或物理 S(s2),
-    # 而非 max(seqused_kv)), 否则 padding 时 v_descale 偏短导致 kernel 读越界.
     v_scale_s = MAX_SEQLEN_KV if MAX_SEQLEN_KV >= 0 else s2
     n_blocks_effective = (v_scale_s + 31) // 32
     value_codes_list = []
@@ -738,7 +725,6 @@ def generate_data():
     aligned_seq_lens_kv_v = [(x + 63) // 64 for x in act_seq_kv_eff]
     v_descale = rearrange_by_layout(v_descale, kv_layout, B, aligned_seq_lens_kv_v)
 
-    # V descale 最后再 view 出 (*shape, V_D, 2) 末尾两维 (显式 V_D: s2=0 时 -1 推断歧义)
     v_descale = v_descale.view(*v_descale.shape[:-1], V_D, 2)
 
     # cu_seqlens (TND only): 表格传了就用表格的, 否则用有效长度自动推导
@@ -762,7 +748,6 @@ def generate_data():
     block_table_t = _gen_opt_tensor(
         BLOCK_TABLE_SHAPE, BLOCK_TABLE_DTYPE or "int32", BLOCK_TABLE_DATARANGE, seed=100
     )
-    # p_scale: 表格传了标量值 (P_SCALE_VALUE) 则用之, 否则按 P_SCALE_SHAPE 随机生成
     if P_SCALE_VALUE is not None:
         p_scale_dt = get_dtype(P_SCALE_DTYPE) or torch.float32
         p_scale_t = torch.tensor([float(P_SCALE_VALUE)], dtype=p_scale_dt).reshape(
@@ -815,8 +800,6 @@ def generate_data():
 
 
 # ==============================================================================
-# CPU Golden: 复用 flash_attention_cpu_golden_varlen
-# 输入: generate_data() 输出的 dict (FP32 BNSD Q/K/V 通过 dict["fp32_bnsd"] 传入)
 # 输出: attn_out 在 attn_out_layout 下, 已转好 layout
 # ==============================================================================
 def cpu_mxfp4_golden(data_dict):
@@ -851,7 +834,6 @@ def cpu_mxfp4_golden(data_dict):
     cu_seqlens_q = [i * s1 for i in range(b + 1)]
     cu_seqlens_kv = [i * s2 for i in range(b + 1)]
 
-    # 取原始 FP32 BNSD Q/K/V (golden 接收 FP32, 内部做量化反量化)
     fp32_bnsd = data_dict.get("fp32_bnsd")
     if fp32_bnsd is None:
         raise RuntimeError(
@@ -859,7 +841,6 @@ def cpu_mxfp4_golden(data_dict):
         )
     query_fp32, key_fp32, value_fp32 = fp32_bnsd
 
-    # BNSD -> BSND -> flatten(B,N) -> [T, N, D]
     query_bsnd = (
         bnsd_to_bsnd(query_fp32).to(torch.float32).flatten(start_dim=0, end_dim=1)
     )
@@ -870,31 +851,50 @@ def cpu_mxfp4_golden(data_dict):
 
     block_q = 128
     block_kv = 4096
-    attn_out = flash_attention_cpu_golden_varlen(
-        query_bsnd,
-        key_bsnd,
-        value_bsnd,
-        cu_seqlens_q,
-        cu_seqlens_kv,
-        act_seq_q_eff,
-        act_seq_kv_eff,
-        softmax_scale=softmax_scale,
-        quantize=True,
-        quantize_p=True,
-        block_q=block_q,
-        block_kv=block_kv,
-        s_layout="DN",
-        quantize_p_mode="blockwise_snap_local",
-        s_dtype="fp16",
-        v_quant_axis="seq_k",
-    )
+    if _os.environ.get("QFA_GOLDEN_BACKEND", "").lower() == "npu":
+        import flash_attention_npu_golden as _npu_golden_mod
 
-    # 输出 reshape 回 BNSD 再转 attn_out_layout
+        logger.info("[GOLDEN] QFA_GOLDEN_BACKEND=npu, 用 npu_quant_matmul 拼接 golden")
+        attn_out = _npu_golden_mod.flash_attention_npu_golden_varlen(
+            query_bsnd,
+            key_bsnd,
+            value_bsnd,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            act_seq_q_eff,
+            act_seq_kv_eff,
+            softmax_scale=softmax_scale,
+            block_q=block_q,
+            block_kv=256,  # 对齐 kernel s2BaseSize=256 的 online softmax 分块
+            mx_block_size=32,
+            mx_mode="baseline",
+            s_dtype="fp16",
+        )
+    else:
+        attn_out = flash_attention_cpu_golden_varlen(
+            query_bsnd,
+            key_bsnd,
+            value_bsnd,
+            cu_seqlens_q,
+            cu_seqlens_kv,
+            act_seq_q_eff,
+            act_seq_kv_eff,
+            softmax_scale=softmax_scale,
+            quantize=True,
+            quantize_p=True,
+            block_q=block_q,
+            block_kv=block_kv,
+            s_layout="DN",
+            quantize_p_mode="blockwise_snap_local",
+            s_dtype="fp16",
+            v_quant_axis="seq_k",
+        )
+
     # s1 是物理 S, attn_out padding 区域为 0 (flash_attention_cpu_golden_varlen 只算有效区域)
     attn_out = attn_out.reshape(b, s1, n1, qk_d).permute(0, 2, 1, 3)  # -> BNSD
     attn_out = rearrange_by_layout(attn_out, attn_out_layout, b, act_seq_q_eff)
 
-    return attn_out.to(get_dtype(OUT_DTYPE)), None
+    return attn_out.to(get_dtype(OUT_DTYPE)), torch.empty(0, dtype=torch.float32)
 
 
 # ==============================================================================
@@ -1379,7 +1379,6 @@ def call_npu_main(data_dict):
     torch.npu.synchronize()
 
     if METADATA_SHAPE is None:
-        # 表格显式未提供 (PASS_THROUGH 下 wrapper 注入 None) -> metadata 传 None
         metadata = None
         logger.info("[NPU_MAIN] 表格未提供 metadata_shape, metadata 传 None")
     else:
@@ -1426,5 +1425,4 @@ def call_npu_main(data_dict):
     return npu_attn_out, npu_lse
 
 
-# 自引用, 用于 _apply_golden_globals (避免循环 import)
 golden_mod_self = sys.modules[__name__]

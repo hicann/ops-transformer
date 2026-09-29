@@ -17,7 +17,6 @@
 
 #ifndef VF_MM1_RES_PRE_PADDING_ALIGN_KVS32_MULTI_H
 #define VF_MM1_RES_PRE_PADDING_ALIGN_KVS32_MULTI_H
-// #include "kernel_tensor.h"
 
 #include "vf_common_def.h"
 
@@ -27,7 +26,7 @@ using namespace AscendC;
 using namespace Reg;
 
 template <typename T, uint16_t S1Base = 128>
-__simd_vf__ inline void mm1_res_pre_padding_align_kvs32_nulti_vf(__ubuf__ T *s, uint16_t actSingleLoopS2Size,
+__simd_vf__ inline void mm1_res_pre_padding_align_kvs32_nulti_vf(__ubuf__ T* s, uint16_t actSingleLoopS2Size,
                                                                  uint16_t actSingleLoopS2SizeAlign32)
 {
     // ====================== 寄存器定义 ======================
@@ -38,7 +37,6 @@ __simd_vf__ inline void mm1_res_pre_padding_align_kvs32_nulti_vf(__ubuf__ T *s, 
         mask_reg = CreateMask<uint16_t, MaskPattern::VL128>();
     }
     uint16_t s2Idx = 0;
-    // uint16_t idx2 = 0;
     RegTensor<T> padding_tensor1;
     Duplicate(padding_tensor1, MIN_VALUE, mask_reg);
     Muls(padding_tensor1, padding_tensor1, TWO_VALE, mask_reg);
@@ -53,11 +51,11 @@ __simd_vf__ inline void mm1_res_pre_padding_align_kvs32_nulti_vf(__ubuf__ T *s, 
 }
 
 template <typename T>
-__aicore__ inline void Mm1ResPrePaddingAlignKvs32MultiCallVF(const LocalTensor<T> &srcTensor,
+__aicore__ inline void Mm1ResPrePaddingAlignKvs32MultiCallVF(const LocalTensor<T>& srcTensor,
                                                              uint16_t actSingleLoopS2Size,
                                                              uint16_t actSingleLoopS2SizeAlign32)
 {
-    __ubuf__ T *input_x_local_UB = (__ubuf__ T *)srcTensor.GetPhyAddr();
+    __ubuf__ T* input_x_local_UB = (__ubuf__ T*)srcTensor.GetPhyAddr();
 
     mm1_res_pre_padding_align_kvs32_nulti_vf<T>(input_x_local_UB, actSingleLoopS2Size, actSingleLoopS2SizeAlign32);
 }

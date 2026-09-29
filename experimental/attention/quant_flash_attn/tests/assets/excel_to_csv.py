@@ -11,8 +11,6 @@
 # -----------------------------------------------------------------------------------------------------------
 """把 mxFp4 Excel sheet 转成符合 ttk e2e 标准的 csv。
 
-主算子直接由 ttk 调用 torch.ops.cann_ops_transformer.quant_flash_attn,
-metadata 由 spec 的 npu_preprocess 在主算子调用前生成并回填 metadata slot。
 输出单份 csv: qfa_mxfp4.csv (api_name=torch.ops.cann_ops_transformer.quant_flash_attn)。
 
 tensor 顺序 (共 15 个, 对齐算子 schema 位置参数顺序):
@@ -21,9 +19,6 @@ tensor 顺序 (共 15 个, 对齐算子 schema 位置参数顺序):
   6  block_table    7  p_scale
   8  cu_seqlens_q   9  cu_seqlens_kv  10 seqused_q  11 seqused_kv
   12 sinks          13 attn_mask      14 metadata
-
-cu_seqlens/seqused 的真实值以 `*_values` 属性保留在 attributes, 不与算子 schema
-的同名 Tensor 参数撞名 (inputs/npu_preprocess 用 `*_values` 覆盖随机占位 tensor)。
 """
 
 import argparse
@@ -117,7 +112,7 @@ METADATA_STRIDE = 16
 
 
 # -----------------------------------------------------------------------------------------------------------
-# metadata slot shape 推导 (与 torch_extension/quant_flash_attn.py 一致)
+# metadata slot shape 推导
 # -----------------------------------------------------------------------------------------------------------
 _CORE_NUMS = None
 
@@ -138,11 +133,11 @@ def _get_core_nums():
     return _CORE_NUMS
 
 
-def _calculate_max_schedule_size(batch_size, num_heads_kv, aic_num, aiv_num):
+def _calculate_max_schedule_size(batch_size, num_heads_q, aic_num, aiv_num):
     align_size = 4096
     batch_size = batch_size if batch_size and batch_size > 0 else 1
-    fa_size = aic_num * METADATA_STRIDE * batch_size * num_heads_kv
-    fd_size = aiv_num * METADATA_STRIDE * batch_size * num_heads_kv
+    fa_size = aic_num * METADATA_STRIDE * batch_size * num_heads_q
+    fd_size = aiv_num * METADATA_STRIDE * batch_size * num_heads_q
     schedule_size = METADATA_STRIDE + fa_size + fd_size
     return ((schedule_size + align_size - 1) // align_size) * align_size
 
@@ -155,11 +150,11 @@ def _metadata_batch_size(B, sq, skv, cu_sq, cu_skv, layout_q):
     return int(B) if B else 0
 
 
-def _metadata_slot_shape(B, N_kv, sq, cu_sq, layout_q):
-    num_heads_kv = int(N_kv) if N_kv else 1
+def _metadata_slot_shape(B, N_q, N_kv, sq, cu_sq, layout_q):
+    num_heads_q = int(N_q) if N_q else int(N_kv) if N_kv else 1
     batch_size = _metadata_batch_size(B, sq, [], cu_sq, [], layout_q)
     aic_num, aiv_num = _get_core_nums()
-    return (2, _calculate_max_schedule_size(batch_size, num_heads_kv, aic_num, aiv_num))
+    return (2, _calculate_max_schedule_size(batch_size, num_heads_q, aic_num, aiv_num))
 
 
 def _parse_int_list(s):
@@ -236,6 +231,13 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
         s = str(v).strip()
         return s if s != "" else None
 
+    def _parse_bool(v):
+        if v is None:
+            return False
+        if isinstance(v, bool):
+            return v
+        return str(v).strip().upper() in ("TRUE", "1", "YES")
+
     name = str(g("name")).strip() + testcase_suffix
     B = int(g("batch_size"))
     N_q = int(g("num_heads_q"))
@@ -267,15 +269,14 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
         2147483647 if (win_right is None or int(win_right) == -1) else int(win_right)
     )
 
-    q_shape = _half_last_dim(_parse_shape(g("q_shape")))
-    k_shape = _half_last_dim(_parse_shape(g("k_shape")))
-    v_shape = _half_last_dim(_parse_shape(g("v_shape")))
+    q_shape = _parse_shape(g("q_shape"))
+    k_shape = _parse_shape(g("k_shape"))
+    v_shape = _parse_shape(g("v_shape"))
     q_descale_shape = _parse_shape(g("q_descale_shape"))
     k_descale_shape = _parse_shape(g("k_descale_shape"))
     v_descale_shape = _parse_shape(g("v_descale_shape"))
 
     def _slot_shape(key):
-        # 可选 tensor：Excel 空 → None（主算子收到 None 而非空 (0,) 张量，避免 segv）
         sh = _parse_shape(g(key))
         return sh if sh else None
 
@@ -289,7 +290,7 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
     attn_mask_shape = _slot_shape("attn_mask_shape")
 
     layout_q = str(g("layout_q")).strip()
-    metadata_shape = _metadata_slot_shape(B, N_kv, sq, cu_sq, layout_q)
+    metadata_shape = _metadata_slot_shape(B, N_q, N_kv, sq, cu_sq, layout_q)
 
     shapes = [
         q_shape,
@@ -310,25 +311,39 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
     ]
     tensor_view_shapes = repr(tuple(shapes))
 
-    def _dt(key, default):
-        return _norm_dtype(g(key)) or default
+    def _csv_dtype(key, default):
+        raw = g(key)
+        dt = (
+            str(raw).strip().lower()
+            if raw is not None and str(raw).strip() != ""
+            else ""
+        )
+        dt = {
+            "fp4_e2m1": "float4_e2m1",
+            "f4_e2m1": "float4_e2m1",
+            "fp4e2m1": "float4_e2m1",
+            "float4_e2m1fn": "float4_e2m1",
+            "fp8_e8m0": "float8_e8m0",
+            "f8_e8m0": "float8_e8m0",
+        }.get(dt, dt)
+        return repr(dt) if dt else repr(default)
 
     dtypes = [
-        "'uint8'",
-        "'uint8'",
-        "'uint8'",  # q/k/v packed
-        "'uint8'",
-        "'uint8'",
-        "'uint8'",  # descale e8m0
-        "'int32'",  # block_table
-        "'float32'",  # p_scale
-        "'int32'",
-        "'int32'",
-        "'int32'",
-        "'int32'",  # cu_seqlens/seqused
-        "'float32'",  # sinks
-        "'int8'",  # attn_mask
-        "'int32'",  # metadata
+        _csv_dtype("q_dtype", "float4_e2m1"),
+        _csv_dtype("k_dtype", "float4_e2m1"),
+        _csv_dtype("v_dtype", "float4_e2m1"),
+        _csv_dtype("q_descale_dtype", "float8_e8m0"),
+        _csv_dtype("k_descale_dtype", "float8_e8m0"),
+        _csv_dtype("v_descale_dtype", "float8_e8m0"),
+        _csv_dtype("block_table_dtype", "int32"),
+        _csv_dtype("p_scale_dtype", "float32"),
+        _csv_dtype("cu_seqlens_q_dtype", "int32"),
+        _csv_dtype("cu_seqlens_kv_dtype", "int32"),
+        _csv_dtype("seqused_q_dtype", "int32"),
+        _csv_dtype("seqused_kv_dtype", "int32"),
+        _csv_dtype("learnable_sink_dtype", "float32"),
+        _csv_dtype("attn_mask_dtype", "int8"),
+        _csv_dtype("metadata_dtype", "int32"),
     ]
     tensor_dtypes = "(" + ",".join(dtypes) + ")"
 
@@ -367,9 +382,7 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
         "mask_mode": mask_mode,
         "win_left": win_left_val,
         "win_right": win_right_val,
-        "return_softmax_lse": bool(g("return_softmax_lse"))
-        if g("return_softmax_lse") is not None
-        else False,
+        "return_softmax_lse": _parse_bool(g("return_softmax_lse")),
         "softmax_scale": softmax_scale,
         "inner_precise": 0,
         "device_id": 0,
@@ -377,19 +390,19 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
         "data_range_q": str(g("q_datarange")) if g("q_datarange") is not None else 1.0,
         "data_range_k": str(g("k_datarange")) if g("k_datarange") is not None else 1.0,
         "data_range_v": str(g("v_datarange")) if g("v_datarange") is not None else 1.0,
-        "block_table_shape": list(block_table_shape),
+        "block_table_shape": list(block_table_shape) if block_table_shape else [],
         "block_table_dtype": _norm_dtype(g("block_table_dtype")),
         "p_scale_value": (
             float(g("p_scale_value"))
             if g("p_scale_value") is not None and str(g("p_scale_value")).strip() != ""
             else None
         ),
-        "p_scale_shape": list(p_scale_shape),
+        "p_scale_shape": list(p_scale_shape) if p_scale_shape else [],
         "p_scale_dtype": _norm_dtype(g("p_scale_dtype")),
         "p_scale_datarange": _raw_str(g("p_scale_datarange")),
-        "sinks_shape": list(sinks_shape),
+        "sinks_shape": list(sinks_shape) if sinks_shape else [],
         "sinks_dtype": _norm_dtype(g("learnable_sink_dtype")),
-        "attn_mask_shape": list(attn_mask_shape),
+        "attn_mask_shape": list(attn_mask_shape) if attn_mask_shape else [],
         "attn_mask_dtype": _norm_dtype(g("attn_mask_dtype")),
         "q_descale_dtype": _norm_dtype(g("q_descale_dtype")),
         "k_descale_dtype": _norm_dtype(g("k_descale_dtype")),
@@ -427,7 +440,7 @@ def excel_row_to_csv_row(ws, row_idx, col_map, api_name, testcase_suffix):
 
 def main():
     parser = argparse.ArgumentParser(description="Excel mxfp4 sheet -> TTK e2e CSV")
-    parser.add_argument("--excel", default="B008QFA_红线用例.xlsx", help="Excel 路径")
+    parser.add_argument("--excel", default="redline.xlsx", help="Excel 路径")
     parser.add_argument("--sheet", default="mxfp4", help="sheet 名 (默认 mxfp4)")
     args = parser.parse_args()
 

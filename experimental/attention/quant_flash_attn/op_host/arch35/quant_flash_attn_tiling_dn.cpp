@@ -155,8 +155,9 @@ void QuantFlashAttnTilingDn::FillTiling()
     tilingData_.baseTiling.flashAttnBaseParams.bSize = tilingInfo_->bSize;
     tilingData_.baseTiling.flashAttnBaseParams.t1Size = tilingInfo_->queryTSize;
     tilingData_.baseTiling.flashAttnBaseParams.t2Size = tilingInfo_->keyTSize;
-    tilingData_.baseTiling.flashAttnBaseParams.n2Size = tilingInfo_->n2Size;
-    tilingData_.baseTiling.flashAttnBaseParams.gSize = tilingInfo_->gSize;
+    tilingData_.baseTiling.flashAttnBaseParams.n2Size = tilingInfo_->n1Size;
+    tilingData_.baseTiling.flashAttnBaseParams.gSize = 1;
+    tilingData_.baseTiling.flashAttnBaseParams.gRealSize = tilingInfo_->gSize;
     tilingData_.baseTiling.flashAttnBaseParams.s1Size = tilingInfo_->s1Size;
     tilingData_.baseTiling.flashAttnBaseParams.s2Size = tilingInfo_->s2Size;
     tilingData_.baseTiling.flashAttnBaseParams.dSize = tilingInfo_->qkHeadDim;

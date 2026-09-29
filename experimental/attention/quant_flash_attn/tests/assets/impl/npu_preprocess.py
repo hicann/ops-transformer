@@ -11,10 +11,10 @@
 # -----------------------------------------------------------------------------------------------------------
 """Populate the QuantFlashAttn (MXFP4) metadata slot before the main API call.
 
-This module is intentionally independent from TTK.  The framework passes the
-main API arguments after H2D; this hook invokes the companion torch operator
-``quant_flash_attn_metadata`` and updates ``metadata`` in place.  The hook
-always returns ``None``.
+本模块独立于 TTK 框架。框架在主 API 调用前 (H2D 之后) 把主算子入参传给本 hook;
+hook 调用伴随算子 ``quant_flash_attn_metadata`` 并把结果 ``copy_`` 回填到 metadata
+槽位, 随后主算子 ``torch.ops.cann_ops_transformer.quant_flash_attn`` 由 ttk 直调。
+hook 始终返回 ``None``。
 """
 
 import logging
@@ -51,7 +51,7 @@ def _move_to_device(value, target):
 
 
 def build_metadata_arguments(q, k, v, quant_mode, kwargs):
-    """Derive ``quant_flash_attn_metadata`` arguments from the main op inputs."""
+    """从主算子入参派生 ``quant_flash_attn_metadata`` 的入参 (与 golden 侧一致)。"""
     layout_q = str(get_attribute(kwargs, "layout_q", "BSND"))
     layout_q_descale = str(get_attribute(kwargs, "layout_q_descale", layout_q))
     layout_kv = str(get_attribute(kwargs, "layout_kv", "BSND"))
@@ -108,7 +108,7 @@ def _resolve_metadata_op():
 
         return quant_flash_attn_metadata
     except ImportError:
-        import torch_npu  # noqa: F401
+        import torch_npu  # noqa: F401  (ensure op registration)
 
         return torch.ops.cann_ops_transformer.quant_flash_attn_metadata
 
@@ -178,10 +178,6 @@ def run(
     return_softmax_lse=False,
     **kwargs,
 ):
-    """Build and backfill the QuantFlashAttn (MXFP4) metadata slot.
-
-    Signature mirrors ``torch.ops.cann_ops_transformer.quant_flash_attn``.
-    """
     if metadata is None:
         raise ValueError("QuantFlashAttn (MXFP4) npu_preprocess requires metadata")
 

@@ -60,10 +60,6 @@ def cpu_qfa_mxfp4(
     return_softmax_lse: bool = False,
     **kwargs,
 ):
-    """CPU golden: 与 inputs 同源 generate_data, 再跑 cpu_mxfp4_golden。
-
-    Signature 镜像 torch.ops.cann_ops_transformer.quant_flash_attn。
-    """
     attrs = dict(kwargs)
     attrs.setdefault("quant_mode", quant_mode)
     attrs.setdefault("softmax_scale", softmax_scale)
@@ -88,4 +84,4 @@ def cpu_qfa_mxfp4(
     cpu_out, cpu_lse = golden_mod.cpu_mxfp4_golden(data_dict)
     if return_softmax_lse and cpu_lse is not None:
         return [cpu_out, cpu_lse]
-    return [cpu_out, None]
+    return [cpu_out, torch.empty(0, dtype=torch.float32)]

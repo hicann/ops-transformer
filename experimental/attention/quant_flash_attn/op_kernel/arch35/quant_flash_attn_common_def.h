@@ -62,6 +62,7 @@ struct CommonConstInfo {
     uint32_t dBasicBlock = 0;
     uint32_t gSize = 0; /* g轴的大小 */
     uint32_t n2Size = 0;
+    uint32_t gRealSize = 1;
     uint64_t s1Size = 0;          /* s1总大小 */
     uint64_t s2Size = 0;          /* s2总大小 */
     uint32_t qCuSeqLensSize = 0;  /* 用户输入的cu_seqlens_q的长度 */
@@ -115,46 +116,55 @@ struct SinkConstInfo {
 
 struct ConstInfo : CommonConstInfo, PAConstInfo, LseConstInfo, SinkConstInfo {};
 
-struct RunInfo {
+struct CubeRunInfo {
     uint32_t loop = 0;
-    uint32_t mloop = 0;
     bool isValid = false;
     bool isFirstS2Loop = false;
     bool isLastS2Loop = false;
     bool isUpdatePScale = false;
-    bool isC2Sync = false;            // s2上16个softmax是一个tile，这是每一个tile的第一个softmax 任务
-    uint32_t s2FirstStartVecCore = 0; // s2上第一个softmax分给哪个vec core
-    uint32_t tileBuffIdx = 0;         // 当前tile分给哪个buff
+    bool isC2Sync = false;
     uint32_t tileMaxIdx = 0;
     uint32_t pscaleNum = 0;
-    bool isS2FirstTilePerCore = false; // 16个softmax均分在两个core, 当前任务是否是分在当前core上的第一个，
+
+    uint32_t bIdx = 0;
+    uint32_t n2Idx = 0;
+    uint32_t kvHeadIdx = 0;
+    uint32_t gS1Idx = 0;
+    uint32_t s2Idx = 0;
+    uint32_t actMSize = 0;
+    uint32_t actMSizeAlign128 = 0;
+
+    uint32_t actSingleLoopS2Size = 0;
+    uint32_t actSingleLoopS2SizeAlign = 0;
+    uint32_t actSingleLoopS2SizeAlign16 = 0;
+    uint32_t actSingleLoopS2SizeAlign64 = 0;
+
+    uint32_t pairKVCopyS2Size = 0;
+    bool prefetched = false;
+};
+
+struct VecRunInfo {
+    uint32_t loop = 0;
+    bool isValid = false;
+    bool isFirstS2Loop = false;
+    bool isLastS2Loop = false;
+    bool isUpdatePScale = false;
+    bool isC2Sync = false;
+    uint32_t s2FirstStartVecCore = 0;
+    uint32_t tileMaxIdx = 0;
+    uint32_t pscaleNum = 0;
+    bool isS2FirstTilePerCore = false;
 
     uint32_t bIdx = 0;
     uint32_t n2Idx = 0;
     uint32_t gS1Idx = 0;
-    uint32_t gIdx = 0;
-    uint32_t s1Idx = 0;
-    uint32_t s2Idx = 0;
-    uint32_t curS2LoopIdx = 0;     // 在当前核处理的S2的循环下标
-    uint64_t actS1Size = 1;        // 当前处理head的S1轴实际大小
-    uint64_t actS2Size = 1;        // 当前处理head的S2轴实际大小
-    uint32_t actMSize = 0;         // GS1方向上的长度,当前切块M轴长度
-    uint32_t actMSizeAlign32 = 0;  // GS1 方向上长度对齐
-    uint32_t actMSizeAlign128 = 0; // GS1 方向上长度对齐对齐128
-    uint32_t actVecMSize = 0;      // VEC 视角, 基本块GS1方向长度，每个核的M长度
-    uint32_t vecMbaseIdx = 0;      // VEC 对应的M 轴起始位置,V0 为0， V1 为 V0的actVecMSize
+    uint32_t curS2LoopIdx = 0;
+    uint32_t actMSize = 0;
     uint32_t updateScaleNum = 0;
 
-    uint32_t actSingleLoopS2Size = 0;        // 单个softmaxS2方向长度
-    uint32_t actSingleLoopS2SizeAlign = 0;   // 对齐到32
-    uint32_t actSingleLoopS2SizeAlign16 = 0; // 对齐到16
-    uint32_t actSingleLoopS2SizeAlign64 = 0; // 对齐到64
-    uint32_t curS2LoopTimes = 0;
-    bool isS2SplitCore = false;
-    uint32_t faTmpOutWsPos = 0; // FA阶段，S2外切，需要写到workspace时，写出到第几块M*D的GM块
-
-    int64_t preTokensLeftUp = 0;
-    int64_t nextTokensLeftUp = 0;
+    uint32_t actSingleLoopS2Size = 0;
+    uint32_t actSingleLoopS2SizeAlign = 0;
+    uint32_t actSingleLoopS2SizeAlign64 = 0;
 };
 
 // kernel stream related struct
@@ -174,7 +184,7 @@ public:
     ActualSeqLensParser<ActualSeqLensMode::ACCUM, SEQLEN_T, true> cuSeqLensParser;
     ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, SEQLEN_T, false> seqUsedParser;
 
-    __aicore__ inline void Init(__gm__ uint8_t *cuSeqLensGmAddr, uint32_t cuSeqLensDims, __gm__ uint8_t *seqUsedGmAddr,
+    __aicore__ inline void Init(__gm__ uint8_t* cuSeqLensGmAddr, uint32_t cuSeqLensDims, __gm__ uint8_t* seqUsedGmAddr,
                                 uint32_t seqUsedDims, uint64_t defaultSeqUsedVal)
     {
         cuSeqLensParser.Init(cuSeqLensGmAddr, cuSeqLensDims, seqUsedGmAddr, seqUsedDims);

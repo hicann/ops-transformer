@@ -125,10 +125,6 @@ def generate_qfa_mxfp4_inputs(
     return_softmax_lse: bool = False,
     **kwargs,
 ):
-    """原位生成 quant_flash_attn (MXFP4) 全部 15 个 tensor slot 的真实数据。
-
-    Signature 镜像 torch.ops.cann_ops_transformer.quant_flash_attn。
-    """
     attrs = dict(kwargs)
     attrs.setdefault("quant_mode", quant_mode)
     attrs.setdefault("softmax_scale", softmax_scale)

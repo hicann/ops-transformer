@@ -206,7 +206,7 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInitDefault()
     baseInfo.batchSize = batchSize_;
     baseInfo.queryHeadNum = numHeadsQ_;
     baseInfo.querySeqSize = maxSeqlenQ_;
-    baseInfo.kvHeadNum = numHeadsKv_;
+    baseInfo.kvHeadNum = numHeadsQ_;
     baseInfo.kvSeqSize = maxSeqlenKv_;
     baseInfo.headDimQk = headDim_;
     baseInfo.headDimV = (headDimV_ > 0) ? headDimV_ : headDim_;
