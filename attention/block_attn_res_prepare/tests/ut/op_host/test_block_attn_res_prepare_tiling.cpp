@@ -174,7 +174,7 @@ struct BlockAttnResPrepareTilingCase {
         ExpectValueIfSpecified(tilingData->mm1NAlign, expectMm1NAlign, "mm1NAlign", caseName);
         if (checkWorkspaceFormula) {
             const uint64_t expectedWorkspaceElems = static_cast<uint64_t>(tilingData->baseS) * tilingData->mm1NAlign +
-                                                    std::min<uint64_t>(totalT, MAX_RUNTIME_BASE_T) *
+                                                    std::min<uint64_t>(tilingData->totalT, MAX_RUNTIME_BASE_T) *
                                                         static_cast<uint64_t>(tilingData->sAlign) * tilingData->nAlign;
             EXPECT_EQ(tilingData->workspacePerCoreElems, expectedWorkspaceElems) << "case=" << caseName;
         }
