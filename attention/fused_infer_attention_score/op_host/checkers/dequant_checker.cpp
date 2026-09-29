@@ -2313,20 +2313,24 @@ ge::graphStatus DequantChecker::CheckContiguousIfExistsAntiquant(const FiaTiling
 // 非PA场景 stride校验
 ge::graphStatus DequantChecker::CheckStrideForAntiquantNoPA(const FiaTilingInfo &fiaInfo) const
 {
-    const gert::Shape keyShape = fiaInfo.opParamInfo.key.shape->GetStorageShape();
-    const uint32_t keyDimNum = keyShape.GetDimNum();
-    const gert::Shape valueShape = fiaInfo.opParamInfo.value.shape->GetStorageShape();
-    const uint32_t valueDimNum = valueShape.GetDimNum();
-    int32_t dimIndex = 0;
+    // tensor list 场景 key/value 连续性由 parser 及 paged_attention_checker 校验, 此处跳过
+    if (fiaInfo.kvStorageMode != KvStorageMode::TENSOR_LIST) {
+        const gert::Shape keyShape = fiaInfo.opParamInfo.key.shape->GetStorageShape();
+        const uint32_t keyDimNum = keyShape.GetDimNum();
+        const gert::Shape valueShape = fiaInfo.opParamInfo.value.shape->GetStorageShape();
+        const uint32_t valueDimNum = valueShape.GetDimNum();
+        int32_t dimIndex = 0;
 
-    OP_CHECK_IF(CheckTensorContiguous(keyDimNum, keyShape, fiaInfo.keyStrides, dimIndex) != ge::GRAPH_SUCCESS,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    fiaInfo.opName, "key", "In non-PA antiquant scenarios, non-contiguous key is not supported"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckTensorContiguous(valueDimNum, valueShape, fiaInfo.valueStrides, dimIndex) != ge::GRAPH_SUCCESS,
-                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                    fiaInfo.opName, "value", "In non-PA antiquant scenarios, non-contiguous value is not supported"),
-                return ge::GRAPH_FAILED);
+        OP_CHECK_IF(CheckTensorContiguous(keyDimNum, keyShape, fiaInfo.keyStrides, dimIndex) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        fiaInfo.opName, "key", "In non-PA antiquant scenarios, non-contiguous key is not supported"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            CheckTensorContiguous(valueDimNum, valueShape, fiaInfo.valueStrides, dimIndex) != ge::GRAPH_SUCCESS,
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                fiaInfo.opName, "value", "In non-PA antiquant scenarios, non-contiguous value is not supported"),
+            return ge::GRAPH_FAILED);
+    }
     if (ge::GRAPH_SUCCESS != CheckContiguousIfExistsAntiquant(fiaInfo, fiaInfo.opParamInfo.keyAntiquantScale.tensor,
                                                               "key_antiquant_scale", fiaInfo.kScaleStrides)) {
         return ge::GRAPH_FAILED;
