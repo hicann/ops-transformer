@@ -14,30 +14,71 @@
   - torch_npu (matching your PyTorch version)
 - Toolkit: Ascend CANN Toolkit
 
-### Installation Steps
+### 构建 Wheel 包
 
-1. Install Dependencies:
+```sh
+# 构建整包（包含所有非 experimental 算子）
+bash build.sh --torch_extension
 
-    ```sh
-    python3 -m pip install -r requirements.txt
-    ```
+# 构建单算子包（仅包含指定算子）
+bash build.sh --torch_extension --ops=flash_attn --vendor_name=custom
 
-2. Build the Wheel:
+# 构建多算子包
+bash build.sh --torch_extension --ops=flash_attn,apply_rotary_pos_emb --vendor_name=custom
 
-    ```sh
-    cd <repo_root>
-    # 整包编译（含所有算子）
-    bash build.sh --torch_extension
-    ```
+# 构建实验性算子包（仅包含 experimental 目录下的算子）
+bash build.sh --torch_extension --experimental
+```
 
-    编译产物位于 `build_out/` 目录下：
-    - 整包：`cann_ops_transformer-1.0.0-*.whl`
+构建完成后，wheel 包会自动复制到 `build_out/` 目录。
 
-3. Install Package:
+**参数说明：**
 
-    ```sh
-    python3 -m pip install build_out/*.whl --force-reinstall --no-deps
-    ```
+| 参数 | 必选 | 说明 |
+| --- | --- | --- |
+| `--torch_extension` | 是 | 仅构建 torch_extension wheel 包，不执行 cmake 编译 |
+| `--ops=op1,op2,...` | 否 | 指定编译的算子名（逗号分隔），不指定则编译所有常规算子 |
+| `--vendor_name=name` | 否 | 指定子包名后缀，用于子包命名和隔离。不指定 `--ops` 时此参数无效，默认为 `custom` |
+| `--experimental` | 否 | 仅编译 experimental 目录下的算子（与常规算子互斥），不指定则跳过 experimental 目录 |
+
+**包命名规则：**
+
+| 场景 | 条件 | 包名 | 安装目录 |
+| --- | --- | --- | --- |
+| 整包 | 不指定 `--ops` | `cann_ops_transformer` | `cann_ops_transformer/` |
+| 单算子/多算子包 | 指定 `--ops`，`--vendor_name` 可选 | `cann_ops_transformer_<vendor>` | `cann_ops_transformer_<vendor>/` |
+
+> **命名逻辑：** 不指定 `--ops` 时构建整包，包名固定为 `cann_ops_transformer`；指定 `--ops` 时构建子包，包名为 `cann_ops_transformer_` 拼接 `--vendor_name` 的值（未指定则默认 `custom`）。整包与子包安装目录物理隔离，可共存。
+
+### 安装
+
+```sh
+# 安装整包
+python3 -m pip install build_out/cann_ops_transformer-*.whl --force-reinstall --no-deps
+
+# 安装单算子包
+python3 -m pip install build_out/cann_ops_transformer_custom-*.whl --force-reinstall --no-deps
+```
+
+### 整包与子包共存机制
+
+整包和单算子包可以同时安装，互不冲突：
+
+- **整包**安装到 `cann_ops_transformer/` 目录，包含所有常规算子。
+- **单算子包**安装到 `cann_ops_transformer_<vendor>/` 目录，与整包物理隔离。
+- 单算子包通过 **entry point** 机制注册算子，优先级高于整包。用户调用 `cann_ops_transformer.<op>` 时，若子包已安装则使用子包的算子实现。
+- 卸载单算子包后，整包的同名算子自动接管。
+
+```sh
+# 安装整包
+pip install cann_ops_transformer-*.whl
+
+# 安装单算子包（覆盖整包中的同名算子）
+pip install cann_ops_transformer_custom-*.whl
+
+# 卸载单算子包（整包算子自动恢复）
+pip uninstall cann_ops_transformer_custom
+```
 
 ## Quick Start
 
