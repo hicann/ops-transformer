@@ -226,11 +226,6 @@ ge::graphStatus FfnWorkerBatchingTiling::RunFfnWorkerBatchingTiling()
 
 static ge::graphStatus Tiling4FfnWorkerBatching(gert::TilingContext *context)
 {
-    // ascend950(arch35 / DAV_3510) → 走模板注册表（1000 档 Regbase tiling，见 _tiling_arch35.cpp）；
-    // A2/A3 走原 monolithic 路径，逐字不动，零回归。
-    if (Ops::Transformer::OpTiling::IsRegbaseSocVersion(context)) {
-        return Ops::Transformer::OpTiling::TilingRegistry::GetInstance().DoTilingImpl(context);
-    }
     FfnWorkerBatchingTiling tilingObject(context);
     return tilingObject.RunFfnWorkerBatchingTiling();
 }

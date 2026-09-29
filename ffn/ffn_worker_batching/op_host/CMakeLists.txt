@@ -20,19 +20,8 @@ if (BUILD_OPEN_PROJECT)
                         -Werror
         )
     else() # custom
-        # ascend950(arch35) 专属编译选项（dcci）；A2/A3 不进此分支，零回归。
-        if(ASCEND_COMPUTE_UNIT STREQUAL "ascend950")
-            add_ops_compile_options(
-                    OP_NAME FfnWorkerBatching
-                    OPTIONS --cce-auto-sync=on
-                            -Wno-deprecated-declarations
-                            -Werror
-                            -mllvm
-                            -cce-aicore-dcci-before-kernel-end=false
-            )
-        endif()
         add_modules_sources(OPTYPE ffn_worker_batching ACLNNTYPE aclnn)
     endif()
 else() # 回黄host
-    add_modules_sources(OPTYPE ffn_worker_batching ACLNNTYPE aclnn)  
+    add_modules_sources(OPTYPE ffn_worker_batching ACLNNTYPE aclnn)
 endif()
