@@ -224,3 +224,95 @@ TEST_F(InplacePartialRotaryMulGradTilingTest, B_BROADCAST_BSN_fp32)
     vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
     ExecuteTestCase(tilingPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
 }
+
+// Issue #4531: out-of-range empty slice must be rejected even though it hits the no-op path
+TEST_F(InplacePartialRotaryMulGradTilingTest, rejects_out_of_range_empty_partial_slice)
+{
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMulGrad",
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 8}, {1, 1, 1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 8}, {1, 1, 1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"partial_slice", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({9, 9})},
+        },
+        &compileInfo_, kSocVersion, k950CoreNum, k950UbSize);
+
+    ExecuteTestCase(tilingPara, ge::GRAPH_FAILED);
+}
+
+// Issue #4531: negative start must be rejected even when a tensor is empty (no-op path)
+TEST_F(InplacePartialRotaryMulGradTilingTest, rejects_negative_start_partial_slice_with_empty_tensor)
+{
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMulGrad",
+        {
+            {{{0, 2, 2, 8}, {0, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 1}, {1, 1, 1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 1}, {1, 1, 1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{0, 2, 2, 8}, {0, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"partial_slice", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({-1, 0})},
+        },
+        &compileInfo_, kSocVersion, k950CoreNum, k950UbSize);
+
+    ExecuteTestCase(tilingPara, ge::GRAPH_FAILED);
+}
+
+// Issue #4531: legal empty slice [0, 0) keeps the no-op behavior
+TEST_F(InplacePartialRotaryMulGradTilingTest, legal_empty_partial_slice_noop)
+{
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMulGrad",
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 8}, {1, 1, 1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 8}, {1, 1, 1, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 2, 8}, {2, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"partial_slice", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({0, 0})},
+        },
+        &compileInfo_, kSocVersion, k950CoreNum, k950UbSize);
+
+    uint64_t expectTilingKey = 403; // TILING_KEY_EMPTY
+    vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    ExecuteTestCase(tilingPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
+}
+
+// Issue #4531: legal empty tensor keeps the no-op behavior
+TEST_F(InplacePartialRotaryMulGradTilingTest, legal_empty_tensor_noop)
+{
+    gert::TilingContextPara tilingPara(
+        "InplacePartialRotaryMulGrad",
+        {
+            {{{0, 2, 2, 8}, {0, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 1}, {1, 1, 1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{1, 1, 1, 1}, {1, 1, 1, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{0, 2, 2, 8}, {0, 2, 2, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"rotary_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"partial_slice", Ops::Transformer::AnyValue::CreateFrom<vector<int64_t>>({0, 0})},
+        },
+        &compileInfo_, kSocVersion, k950CoreNum, k950UbSize);
+
+    uint64_t expectTilingKey = 403; // TILING_KEY_EMPTY
+    vector<size_t> expectWorkspaces = {16 * 1024 * 1024};
+    ExecuteTestCase(tilingPara, ge::GRAPH_SUCCESS, expectTilingKey, "", expectWorkspaces);
+}
