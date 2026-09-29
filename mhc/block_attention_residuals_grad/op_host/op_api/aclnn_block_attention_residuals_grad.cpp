@@ -30,20 +30,21 @@
 using namespace op;
 
 namespace {
-constexpr const char *API_NAME = "aclnnBlockAttentionResidualsGradGetWorkspaceSize";
+constexpr const char* API_NAME = "aclnnBlockAttentionResidualsGradGetWorkspaceSize";
 constexpr size_t DIM_NUM_1D = 1;
 constexpr size_t DIM_NUM_2D = 2;
 constexpr size_t DIM_NUM_3D = 3;
 constexpr size_t DIM_INDEX_0 = 0;
 constexpr size_t DIM_INDEX_1 = 1;
 constexpr size_t DIM_INDEX_2 = 2;
-constexpr int64_t MIN_TOKEN_NUM = 0;
+constexpr int64_t MIN_TOKEN_NUM = 64;
 constexpr int64_t MIN_BLOCK_NUM = 0;
 constexpr int64_t MAX_BLOCK_NUM = 128;
-constexpr int64_t MIN_HIDDEN_SIZE = 0;
+constexpr int64_t MIN_HIDDEN_SIZE = 2048;
+constexpr int64_t MAX_HIDDEN_SIZE = 500000;
 constexpr int64_t PROJ_WEIGHT_ROW_NUM = 1;
 
-aclnnStatus CheckRequiredParameter(const void *parameter, const char *parameterName)
+aclnnStatus CheckRequiredParameter(const void* parameter, const char* parameterName)
 {
     if (parameter == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, parameterName, "nullptr",
@@ -53,11 +54,11 @@ aclnnStatus CheckRequiredParameter(const void *parameter, const char *parameterN
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckNotNull(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
-                         const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
-                         const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
-                         const aclTensor *gradProjWeight, const aclTensor *gradNormWeight, uint64_t *workspaceSize,
-                         aclOpExecutor **executor)
+aclnnStatus CheckNotNull(const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight,
+                         const aclTensor* normWeight, const aclTensor* gradHiddenStates, const aclTensor* invNorm,
+                         const aclTensor* probs, const aclTensor* gradPartialBlock, const aclTensor* gradBlockRes,
+                         const aclTensor* gradProjWeight, const aclTensor* gradNormWeight, uint64_t* workspaceSize,
+                         aclOpExecutor** executor)
 {
     if (CheckRequiredParameter(partialBlock, "partialBlock") != ACLNN_SUCCESS ||
         CheckRequiredParameter(blockRes, "blockRes") != ACLNN_SUCCESS ||
@@ -77,7 +78,7 @@ aclnnStatus CheckNotNull(const aclTensor *partialBlock, const aclTensor *blockRe
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckSupportedMainDtype(const aclTensor *tensor, const char *tensorName)
+aclnnStatus CheckSupportedMainDtype(const aclTensor* tensor, const char* tensorName)
 {
     const DataType actualDtype = tensor->GetDataType();
     if (actualDtype != DataType::DT_FLOAT16 && actualDtype != DataType::DT_BF16 && actualDtype != DataType::DT_FLOAT) {
@@ -88,7 +89,7 @@ aclnnStatus CheckSupportedMainDtype(const aclTensor *tensor, const char *tensorN
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckDtypeMatches(const aclTensor *tensor, const char *tensorName, DataType expectedDtype)
+aclnnStatus CheckDtypeMatches(const aclTensor* tensor, const char* tensorName, DataType expectedDtype)
 {
     const DataType actualDtype = tensor->GetDataType();
     if (actualDtype != expectedDtype) {
@@ -99,10 +100,10 @@ aclnnStatus CheckDtypeMatches(const aclTensor *tensor, const char *tensorName, D
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckDtype(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
-                       const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
-                       const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
-                       const aclTensor *gradProjWeight, const aclTensor *gradNormWeight)
+aclnnStatus CheckDtype(const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight,
+                       const aclTensor* normWeight, const aclTensor* gradHiddenStates, const aclTensor* invNorm,
+                       const aclTensor* probs, const aclTensor* gradPartialBlock, const aclTensor* gradBlockRes,
+                       const aclTensor* gradProjWeight, const aclTensor* gradNormWeight)
 {
     if (CheckSupportedMainDtype(partialBlock, "partialBlock") != ACLNN_SUCCESS ||
         CheckSupportedMainDtype(blockRes, "blockRes") != ACLNN_SUCCESS ||
@@ -127,7 +128,7 @@ aclnnStatus CheckDtype(const aclTensor *partialBlock, const aclTensor *blockRes,
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckTensorDimension(const aclTensor *tensor, const char *tensorName, size_t expectedDimension)
+aclnnStatus CheckTensorDimension(const aclTensor* tensor, const char* tensorName, size_t expectedDimension)
 {
     const size_t actualDimension = tensor->GetViewShape().GetDimNum();
     if (actualDimension != expectedDimension) {
@@ -138,10 +139,10 @@ aclnnStatus CheckTensorDimension(const aclTensor *tensor, const char *tensorName
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckDimensions(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
-                            const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
-                            const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
-                            const aclTensor *gradProjWeight, const aclTensor *gradNormWeight)
+aclnnStatus CheckDimensions(const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight,
+                            const aclTensor* normWeight, const aclTensor* gradHiddenStates, const aclTensor* invNorm,
+                            const aclTensor* probs, const aclTensor* gradPartialBlock, const aclTensor* gradBlockRes,
+                            const aclTensor* gradProjWeight, const aclTensor* gradNormWeight)
 {
     if (CheckTensorDimension(partialBlock, "partialBlock", DIM_NUM_2D) != ACLNN_SUCCESS ||
         CheckTensorDimension(blockRes, "blockRes", DIM_NUM_3D) != ACLNN_SUCCESS ||
@@ -159,33 +160,38 @@ aclnnStatus CheckDimensions(const aclTensor *partialBlock, const aclTensor *bloc
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckInputShapes(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
-                             const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
-                             const aclTensor *probs)
+aclnnStatus CheckInputShapes(const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight,
+                             const aclTensor* normWeight, const aclTensor* gradHiddenStates, const aclTensor* invNorm,
+                             const aclTensor* probs)
 {
-    const auto &partialBlockShape = partialBlock->GetViewShape();
-    const auto &blockResShape = blockRes->GetViewShape();
-    const auto &projWeightShape = projWeight->GetViewShape();
-    const auto &normWeightShape = normWeight->GetViewShape();
-    const auto &gradHiddenStatesShape = gradHiddenStates->GetViewShape();
-    const auto &invNormShape = invNorm->GetViewShape();
-    const auto &probsShape = probs->GetViewShape();
+    const auto& partialBlockShape = partialBlock->GetViewShape();
+    const auto& blockResShape = blockRes->GetViewShape();
+    const auto& projWeightShape = projWeight->GetViewShape();
+    const auto& normWeightShape = normWeight->GetViewShape();
+    const auto& gradHiddenStatesShape = gradHiddenStates->GetViewShape();
+    const auto& invNormShape = invNorm->GetViewShape();
+    const auto& probsShape = probs->GetViewShape();
     const int64_t tokenNum = partialBlockShape.GetDim(DIM_INDEX_0);
     const int64_t hiddenSize = partialBlockShape.GetDim(DIM_INDEX_1);
     const int64_t blockNum = blockResShape.GetDim(DIM_INDEX_1);
     if (tokenNum < MIN_TOKEN_NUM) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "partialBlock.shape[0]", std::to_string(tokenNum).c_str(),
-                                              "partialBlock.shape[0] must be greater than or equal to 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            API_NAME, "partialBlock.shape[0]", std::to_string(tokenNum).c_str(),
+            "token count T must be greater than or equal to 64. T is shared by partialBlock.shape[0], "
+            "blockRes.shape[0], gradHiddenStates.shape[0], invNorm.shape[0] and probs.shape[0].");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (blockNum < MIN_BLOCK_NUM || blockNum > MAX_BLOCK_NUM) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "blockRes.shape[1]", std::to_string(blockNum).c_str(),
-                                              "blockRes.shape[1] must be in [0, 128]");
+                                              "block count N must be in [0, 128]. N is blockRes.shape[1]; "
+                                              "invNorm.shape[1] and probs.shape[1] must both equal N + 1.");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (hiddenSize < MIN_HIDDEN_SIZE) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "partialBlock.shape[1]", std::to_string(hiddenSize).c_str(),
-                                              "partialBlock.shape[1] must be greater than or equal to 0");
+    if (hiddenSize < MIN_HIDDEN_SIZE || hiddenSize > MAX_HIDDEN_SIZE) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            API_NAME, "partialBlock.shape[1]", std::to_string(hiddenSize).c_str(),
+            "hidden size H must be in [2048, 500000]. H is shared by partialBlock.shape[1], blockRes.shape[2], "
+            "projWeight.shape[1], normWeight.shape[0] and gradHiddenStates.shape[1].");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (blockResShape.GetDim(DIM_INDEX_0) != tokenNum || blockResShape.GetDim(DIM_INDEX_2) != hiddenSize) {
@@ -225,10 +231,10 @@ aclnnStatus CheckInputShapes(const aclTensor *partialBlock, const aclTensor *blo
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckOutputShapes(const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
-                              const aclTensor *gradProjWeight, const aclTensor *gradNormWeight,
-                              const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
-                              const aclTensor *normWeight)
+aclnnStatus CheckOutputShapes(const aclTensor* gradPartialBlock, const aclTensor* gradBlockRes,
+                              const aclTensor* gradProjWeight, const aclTensor* gradNormWeight,
+                              const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight,
+                              const aclTensor* normWeight)
 {
     if (gradPartialBlock->GetViewShape() != partialBlock->GetViewShape()) {
         OP_LOGE_FOR_INVALID_SHAPE(API_NAME, "gradPartialBlock",
@@ -254,7 +260,7 @@ aclnnStatus CheckOutputShapes(const aclTensor *gradPartialBlock, const aclTensor
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckValidBlockNum(const aclTensor *blockRes, int64_t validBlockNum)
+aclnnStatus CheckValidBlockNum(const aclTensor* blockRes, int64_t validBlockNum)
 {
     const int64_t blockNum = blockRes->GetViewShape().GetDim(DIM_INDEX_1);
     if (validBlockNum != -1 && validBlockNum != blockNum) {
@@ -265,10 +271,10 @@ aclnnStatus CheckValidBlockNum(const aclTensor *blockRes, int64_t validBlockNum)
     return ACLNN_SUCCESS;
 }
 
-const aclTensor *CreateZeroLikeOutput(const aclTensor *grad, const aclTensor *reshapeRef,
-                                      UniqueExecutor &uniqueExecutor)
+const aclTensor* CreateZeroLikeOutput(const aclTensor* grad, const aclTensor* reshapeRef,
+                                      UniqueExecutor& uniqueExecutor)
 {
-    const auto *zero = l0op::ZerosLike(grad, uniqueExecutor.get());
+    const auto* zero = l0op::ZerosLike(grad, uniqueExecutor.get());
     if (zero == nullptr) {
         return nullptr;
     }
@@ -276,25 +282,25 @@ const aclTensor *CreateZeroLikeOutput(const aclTensor *grad, const aclTensor *re
         return zero;
     }
 
-    const auto &shape = reshapeRef->GetViewShape();
+    const auto& shape = reshapeRef->GetViewShape();
     const size_t dimNum = shape.GetDimNum();
     std::vector<int64_t> dims(dimNum);
     for (size_t i = 0; i < dimNum; ++i) {
         dims[i] = shape.GetDim(i);
     }
-    auto *shapeArray = uniqueExecutor->AllocIntArray(dims.data(), dimNum);
+    auto* shapeArray = uniqueExecutor->AllocIntArray(dims.data(), dimNum);
     if (shapeArray == nullptr) {
         return nullptr;
     }
     return l0op::Reshape(zero, shapeArray, uniqueExecutor.get());
 }
 
-aclnnStatus HandleEmptyTensor(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
-                              const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
-                              const aclTensor *probs, const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes,
-                              const aclTensor *gradProjWeight, const aclTensor *gradNormWeight,
-                              UniqueExecutor &uniqueExecutor, uint64_t *workspaceSize, aclOpExecutor **executor,
-                              bool &handled)
+aclnnStatus HandleEmptyTensor(const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight,
+                              const aclTensor* normWeight, const aclTensor* gradHiddenStates, const aclTensor* invNorm,
+                              const aclTensor* probs, const aclTensor* gradPartialBlock, const aclTensor* gradBlockRes,
+                              const aclTensor* gradProjWeight, const aclTensor* gradNormWeight,
+                              UniqueExecutor& uniqueExecutor, uint64_t* workspaceSize, aclOpExecutor** executor,
+                              bool& handled)
 {
     handled = false;
     const bool hasEmptyInput = partialBlock->IsEmpty() || blockRes->IsEmpty() || projWeight->IsEmpty() ||
@@ -309,17 +315,17 @@ aclnnStatus HandleEmptyTensor(const aclTensor *partialBlock, const aclTensor *bl
         return ACLNN_SUCCESS;
     }
     // T=0 or H=0: skip empty outputs and zero any nonempty gradients.
-    for (const aclTensor *grad : {gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight}) {
+    for (const aclTensor* grad : {gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight}) {
         if (grad->IsEmpty()) {
             continue;
         }
 
         // ZerosLike may drop the leading singleton dimension of [1, H].
         // Restore gradProjWeight's view shape before copying the zero result.
-        const aclTensor *zero =
+        const aclTensor* zero =
             CreateZeroLikeOutput(grad, grad == gradProjWeight ? gradProjWeight : nullptr, uniqueExecutor);
         CHECK_RET(zero != nullptr, ACLNN_ERR_INNER_NULLPTR);
-        const auto *output = l0op::ViewCopy(zero, grad, uniqueExecutor.get());
+        const auto* output = l0op::ViewCopy(zero, grad, uniqueExecutor.get());
         CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
@@ -328,11 +334,11 @@ aclnnStatus HandleEmptyTensor(const aclTensor *partialBlock, const aclTensor *bl
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckParams(const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight,
-                        const aclTensor *normWeight, const aclTensor *gradHiddenStates, const aclTensor *invNorm,
-                        const aclTensor *probs, int64_t validBlockNum, const aclTensor *gradPartialBlock,
-                        const aclTensor *gradBlockRes, const aclTensor *gradProjWeight, const aclTensor *gradNormWeight,
-                        uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus CheckParams(const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight,
+                        const aclTensor* normWeight, const aclTensor* gradHiddenStates, const aclTensor* invNorm,
+                        const aclTensor* probs, int64_t validBlockNum, const aclTensor* gradPartialBlock,
+                        const aclTensor* gradBlockRes, const aclTensor* gradProjWeight, const aclTensor* gradNormWeight,
+                        uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (CheckNotNull(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs, gradPartialBlock,
                      gradBlockRes, gradProjWeight, gradNormWeight, workspaceSize, executor) != ACLNN_SUCCESS) {
@@ -363,10 +369,10 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnBlockAttentionResidualsGradGetWorkspaceSize(
-    const aclTensor *partialBlock, const aclTensor *blockRes, const aclTensor *projWeight, const aclTensor *normWeight,
-    const aclTensor *gradHiddenStates, const aclTensor *invNorm, const aclTensor *probs, int64_t validBlockNum,
-    const aclTensor *gradPartialBlock, const aclTensor *gradBlockRes, const aclTensor *gradProjWeight,
-    const aclTensor *gradNormWeight, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* partialBlock, const aclTensor* blockRes, const aclTensor* projWeight, const aclTensor* normWeight,
+    const aclTensor* gradHiddenStates, const aclTensor* invNorm, const aclTensor* probs, int64_t validBlockNum,
+    const aclTensor* gradPartialBlock, const aclTensor* gradBlockRes, const aclTensor* gradProjWeight,
+    const aclTensor* gradNormWeight, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(
         aclnnBlockAttentionResidualsGrad,
@@ -407,8 +413,8 @@ aclnnStatus aclnnBlockAttentionResidualsGradGetWorkspaceSize(
 
     auto output = l0op::BlockAttentionResidualsGrad(
         partialBlock_, blockRes_, projWeight_, normWeight_, gradHiddenState_, invNorm_, probs_, validBlockNum,
-        const_cast<aclTensor *>(gradPartialBlock), const_cast<aclTensor *>(gradBlockRes),
-        const_cast<aclTensor *>(gradProjWeight), const_cast<aclTensor *>(gradNormWeight), uniqueExecutor.get());
+        const_cast<aclTensor*>(gradPartialBlock), const_cast<aclTensor*>(gradBlockRes),
+        const_cast<aclTensor*>(gradProjWeight), const_cast<aclTensor*>(gradNormWeight), uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
@@ -417,7 +423,7 @@ aclnnStatus aclnnBlockAttentionResidualsGradGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnBlockAttentionResidualsGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnBlockAttentionResidualsGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                              aclrtStream stream)
 {
     auto ret = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);

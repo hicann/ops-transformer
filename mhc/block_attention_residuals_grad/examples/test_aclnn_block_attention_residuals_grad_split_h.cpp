@@ -27,7 +27,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -36,7 +36,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -48,8 +48,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -76,7 +76,7 @@ int main()
 
     // SPLIT_H 用例：Ascend 910B 上 FP16、K=3 时，H=8192 超过 FULL_H 的 UB 容量。
     // Kernel 日志应输出：hMode=1, kernel=SPLIT_H。
-    const int64_t B = 2;
+    const int64_t B = 64;
     const int64_t N = 2;
     const int64_t H = 8192;
     const int64_t N1 = N + 1;
@@ -154,7 +154,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
 
     ret = aclnnBlockAttentionResidualsGradGetWorkspaceSize(
         partial_block, block_res, proj_weight, norm_weight, grad_hidden_states, inv_norm, probs, validBlockNum,
@@ -164,7 +164,7 @@ int main()
               return ret);
     LOG_PRINT("Run SPLIT_H example: B=%ld, N=%ld, H=%ld, workspaceSize=%lu bytes\n", B, N, H, workspaceSize);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > static_cast<uint64_t>(0)) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

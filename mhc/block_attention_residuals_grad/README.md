@@ -194,7 +194,7 @@ $$
 
 ## 约束说明
 
-- $T \ge 1$，$0 \le N \le 128$，$H \ge 1$；各张量中的 $T$、$H$ 以及 `invNorm/probs` 的第 2 维 $N+1$ 需保持一致。
+- $T \ge 64$，$0 \le N \le 128$，$2048 \le H \le 500000$；各张量中的 $T$、$H$ 以及 `invNorm/probs` 的第 2 维 $N+1$ 需保持一致。
 - 主输入 `partialBlock/blockRes/projWeight/normWeight/gradHiddenStates` 支持 FLOAT16、BFLOAT16、FLOAT32，dtype 需一致；`invNorm/probs` 仅支持 FLOAT32。
 - 输入支持非连续 Tensor，接口内部会先转为 Contiguous 再计算。
 - 输出 dtype 与对应主输入保持一致。
