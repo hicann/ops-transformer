@@ -37,10 +37,11 @@ constexpr size_t DIM_NUM_3D = 3;
 constexpr size_t DIM_INDEX_0 = 0;
 constexpr size_t DIM_INDEX_1 = 1;
 constexpr size_t DIM_INDEX_2 = 2;
-constexpr int64_t MIN_TOKEN_NUM = 0;
+constexpr int64_t MIN_TOKEN_NUM = 64;
 constexpr int64_t MIN_BLOCK_NUM = 0;
 constexpr int64_t MAX_BLOCK_NUM = 128;
-constexpr int64_t MIN_HIDDEN_SIZE = 0;
+constexpr int64_t MIN_HIDDEN_SIZE = 2048;
+constexpr int64_t MAX_HIDDEN_SIZE = 500000;
 constexpr int64_t PROJ_WEIGHT_ROW_NUM = 1;
 
 aclnnStatus CheckRequiredParameter(const void *parameter, const char *parameterName)
@@ -174,18 +175,23 @@ aclnnStatus CheckInputShapes(const aclTensor *partialBlock, const aclTensor *blo
     const int64_t hiddenSize = partialBlockShape.GetDim(DIM_INDEX_1);
     const int64_t blockNum = blockResShape.GetDim(DIM_INDEX_1);
     if (tokenNum < MIN_TOKEN_NUM) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "partialBlock.shape[0]", std::to_string(tokenNum).c_str(),
-                                              "partialBlock.shape[0] must be greater than or equal to 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            API_NAME, "partialBlock.shape[0]", std::to_string(tokenNum).c_str(),
+            "token count T must be greater than or equal to 64. T is shared by partialBlock.shape[0], "
+            "blockRes.shape[0], gradHiddenStates.shape[0], invNorm.shape[0] and probs.shape[0].");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (blockNum < MIN_BLOCK_NUM || blockNum > MAX_BLOCK_NUM) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "blockRes.shape[1]", std::to_string(blockNum).c_str(),
-                                              "blockRes.shape[1] must be in [0, 128]");
+                                              "block count N must be in [0, 128]. N is blockRes.shape[1]; "
+                                              "invNorm.shape[1] and probs.shape[1] must both equal N + 1.");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (hiddenSize < MIN_HIDDEN_SIZE) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(API_NAME, "partialBlock.shape[1]", std::to_string(hiddenSize).c_str(),
-                                              "partialBlock.shape[1] must be greater than or equal to 0");
+    if (hiddenSize < MIN_HIDDEN_SIZE || hiddenSize > MAX_HIDDEN_SIZE) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            API_NAME, "partialBlock.shape[1]", std::to_string(hiddenSize).c_str(),
+            "hidden size H must be in [2048, 500000]. H is shared by partialBlock.shape[1], blockRes.shape[2], "
+            "projWeight.shape[1], normWeight.shape[0] and gradHiddenStates.shape[1].");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (blockResShape.GetDim(DIM_INDEX_0) != tokenNum || blockResShape.GetDim(DIM_INDEX_2) != hiddenSize) {

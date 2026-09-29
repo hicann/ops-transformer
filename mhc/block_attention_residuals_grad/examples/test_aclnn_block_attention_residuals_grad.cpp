@@ -73,10 +73,10 @@ int main()
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-    // Test shapes: B = 2, N = 4, H = 64, N1 = N + 1 = 5
-    const int64_t B = 2;
+    // Test shapes: B = 64, N = 4, H = 2048, N1 = N + 1 = 5
+    const int64_t B = 64;
     const int64_t N = 4;
-    const int64_t H = 64;
+    const int64_t H = 2048;
     const int64_t N1 = N + 1;
     const int64_t validBlockNum = N; // Use all N blocks; -1 is also supported.
 

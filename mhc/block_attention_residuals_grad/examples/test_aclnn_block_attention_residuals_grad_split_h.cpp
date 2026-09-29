@@ -76,7 +76,7 @@ int main()
 
     // SPLIT_H 用例：Ascend 910B 上 FP16、K=3 时，H=8192 超过 FULL_H 的 UB 容量。
     // Kernel 日志应输出：hMode=1, kernel=SPLIT_H。
-    const int64_t B = 2;
+    const int64_t B = 64;
     const int64_t N = 2;
     const int64_t H = 8192;
     const int64_t N1 = N + 1;

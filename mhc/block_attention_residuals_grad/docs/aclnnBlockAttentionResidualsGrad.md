@@ -353,11 +353,11 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(
 - partialBlock、blockRes、projWeight、normWeight、gradHiddenStates及其对应输出的数据类型保持一致，支持FLOAT16、BFLOAT16、FLOAT32。
 - validBlockNum为INT64预留属性，默认值为-1，当前不参与计算；仅支持传入-1，其他值返回参数错误。
 - partialBlock、blockRes、projWeight、normWeight、gradHiddenStates、invNorm和probs均只支持ND格式。
-- shape需满足：partialBlock为(T,H)，blockRes为(T,N,H)，projWeight为(1,H)，normWeight为(H)，gradHiddenStates为(T,H)，invNorm为(T,N+1)，probs为(T,N+1)，其中T、H为非负整数，N在[0,128]内，且各张量中的T、H以及invNorm和probs的N+1保持一致。
+- shape需满足：partialBlock为(T,H)，blockRes为(T,N,H)，projWeight为(1,H)，normWeight为(H)，gradHiddenStates为(T,H)，invNorm为(T,N+1)，probs为(T,N+1)，其中T必须大于等于64，H必须在[2048,500000]内，N在[0,128]内，且各张量中的T、H以及invNorm和probs的N+1保持一致。
 - 输入张量支持非连续Tensor，接口内部统一转为Contiguous后计算。
 - probs应为前向softmax输出，invNorm应为前向逐行归一化系数，且invNorm和probs仅支持FLOAT32。当前实现完全以保存的probs和invNorm为准。
 - validBlockNum为预留属性，不参与实际计算；仅支持传入-1。
-- T=0或H=0时，aclnn层跳过主算子；非空的权重梯度输出清零，空输出保持对应输入shape。H=0时所有输出均为空，不安排清零任务；T=0且H>0的清零任务仍需调用第二阶段接口执行。
+- T<64、H<2048或H>500000时，第一阶段接口返回ACLNN_ERR_PARAM_INVALID，不执行kernel。
 - 仅N=0且T、H非零时不提前返回，仍计算partialBlock及权重梯度。
 
 ## 调用示例
@@ -432,9 +432,9 @@ int main()
     auto ret = Init(deviceId, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-    const int64_t T  = 2;
+    const int64_t T  = 64;
     const int64_t N  = 4;
-    const int64_t H  = 64;
+    const int64_t H  = 2048;
     const int64_t N1 = N + 1;
 
     std::vector<int64_t> partialBlockShape      = {T, H};

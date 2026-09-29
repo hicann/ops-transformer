@@ -42,6 +42,9 @@ constexpr uint64_t A35_H_INPUT_ALIGN_ELEMS = 16UL;
 constexpr int64_t FP32_ELEM_PER_32B = 8;
 constexpr int64_t FP16_ELEM_PER_32B = 16;
 constexpr int64_t MAX_NUM_BLOCKS = 128;
+constexpr int64_t MIN_BATCH_SIZE = 64;
+constexpr int64_t MIN_HIDDEN_SIZE = 2048;
+constexpr int64_t MAX_HIDDEN_SIZE = 500000;
 constexpr size_t PARTIAL_BLOCK_RANK = 2;
 constexpr size_t BLOCK_RES_RANK = 3;
 // Input tensor positions, keep in sync with the op def registration order.
@@ -300,21 +303,24 @@ static ge::graphStatus CheckShapeBlockAttentionResidualsGrad(gert::TilingContext
                                               "valid_block_num must be -1 or block_res.shape[1]");
         return ge::GRAPH_FAILED;
     }
-    if (B <= 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "partialBlock.shape[0]",
-                                              std::to_string(B).c_str(),
-                                              "partialBlock.shape[0] must be greater than 0");
+    if (B < MIN_BATCH_SIZE) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "partialBlock.shape[0]", std::to_string(B).c_str(),
+            "token count T must be greater than or equal to 64. T is shared by partialBlock.shape[0], "
+            "blockRes.shape[0], gradHiddenStates.shape[0], invNorm.shape[0] and probs.shape[0].");
         return ge::GRAPH_FAILED;
     }
-    if (H <= 0) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "partialBlock.shape[1]",
-                                              std::to_string(H).c_str(),
-                                              "partialBlock.shape[1] must be greater than 0");
+    if (H < MIN_HIDDEN_SIZE || H > MAX_HIDDEN_SIZE) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "partialBlock.shape[1]", std::to_string(H).c_str(),
+            "hidden size H must be in [2048, 500000]. H is shared by partialBlock.shape[1], blockRes.shape[2], "
+            "projWeight.shape[1], normWeight.shape[0] and gradHiddenStates.shape[1].");
         return ge::GRAPH_FAILED;
     }
     if (N < 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "blockRes.shape[1]", std::to_string(N).c_str(),
-                                              "blockRes.shape[1] must be greater than or equal to 0");
+                                              "block count N must be in [0, 128]. N is blockRes.shape[1]; "
+                                              "invNorm.shape[1] and probs.shape[1] must both equal N + 1.");
         return ge::GRAPH_FAILED;
     }
     if (B != blockResBatch) {
@@ -332,7 +338,8 @@ static ge::graphStatus CheckShapeBlockAttentionResidualsGrad(gert::TilingContext
     // K 轴 meta Buffer 按 totalBlocks = N + 1 驻留 UB，N > MAX_NUM_BLOCKS 时超出设计上限。
     if (N > MAX_NUM_BLOCKS) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "blockRes.shape[1]", std::to_string(N).c_str(),
-                                              "blockRes.shape[1] must be less than or equal to 128");
+                                              "block count N must be in [0, 128]. N is blockRes.shape[1]; "
+                                              "invNorm.shape[1] and probs.shape[1] must both equal N + 1.");
         return ge::GRAPH_FAILED;
     }
 
