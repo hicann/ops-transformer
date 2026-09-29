@@ -32,12 +32,12 @@
 extern "C" {
 #endif
 
-static aclnnStatus ParamsCheck(const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional,
-                               const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional, int64_t batchSize,
+static aclnnStatus ParamsCheck(const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional,
+                               const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional, int64_t batchSize,
                                int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv,
                                int64_t headDim, int64_t headDimV, int64_t quantMode, int64_t maskMode, int64_t winLeft,
-                               int64_t winRight, const char *layoutQ, const char *layoutQDescale, const char *layoutKv,
-                               const char *layoutOut, bool isGradEnabled, const aclTensor *metaData)
+                               int64_t winRight, const char* layoutQ, const char* layoutQDescale, const char* layoutKv,
+                               const char* layoutOut, bool isGradEnabled, const aclTensor* metaData)
 {
     (void)isGradEnabled;
     (void)headDimV;
@@ -156,11 +156,11 @@ static aclnnStatus ParamsCheck(const aclTensor *cuSeqlensQOptional, const aclTen
 }
 
 aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t quantMode, int64_t maskMode, int64_t winLeft,
-    int64_t winRight, const char *layoutQ, const char *layoutQDescale, const char *layoutKv, const char *layoutOut,
-    bool isGradEnabled, const aclTensor *metaData, uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t winRight, const char* layoutQ, const char* layoutQDescale, const char* layoutKv, const char* layoutOut,
+    bool isGradEnabled, const aclTensor* metaData, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnQuantFlashAttnMetadata,
                    DFX_IN(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize,
@@ -176,16 +176,29 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
                            winLeft, winRight, layoutQ, layoutQDescale, layoutKv, layoutOut, isGradEnabled, metaData);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
-    const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
     uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
-    const char *socVersion = npuInfo.GetSocLongVersion().c_str();
+    const char* socVersion = npuInfo.GetSocLongVersion().c_str();
 
-    auto output = l0op::QuantFlashAttnMetadata(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional,
-                                               sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ,
-                                               numHeadsKv, headDim, headDimV, quantMode, maskMode, winLeft, winRight,
-                                               layoutQ, layoutQDescale, layoutKv, layoutOut, isGradEnabled, socVersion,
-                                               aicCoreNum, aivCoreNum, metaData, uniqueExecutor.get());
+    // 输出 tensor 几何信息经 attr 下发至 AICPU（宿主侧读取可靠；AICPU 侧 shape 可能未填充）
+    constexpr int64_t DIM_ONE = 1;
+    constexpr int64_t DIM_TWO = 2;
+    constexpr int64_t DIM_IDX_0 = 0;
+    constexpr int64_t DIM_IDX_1 = 1;
+    int64_t metadataDimNum = metaData->GetViewShape().GetDimNum();
+    int64_t metadataRowSize = 0;
+    if (metadataDimNum >= DIM_TWO) {
+        metadataRowSize = metaData->GetViewShape().GetDim(DIM_IDX_1);
+    } else if (metadataDimNum == DIM_ONE) {
+        metadataRowSize = metaData->GetViewShape().GetDim(DIM_IDX_0);
+    }
+
+    auto output = l0op::QuantFlashAttnMetadata(
+        cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ,
+        maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, quantMode, maskMode, winLeft, winRight, layoutQ,
+        layoutQDescale, layoutKv, layoutOut, isGradEnabled, socVersion, aicCoreNum, aivCoreNum, metadataDimNum,
+        metadataRowSize, metaData, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
@@ -193,8 +206,8 @@ aclnnStatus aclnnQuantFlashAttnMetadataGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-__attribute__((visibility("default"))) aclnnStatus aclnnQuantFlashAttnMetadata(void *workspace, uint64_t workspaceSize,
-                                                                               aclOpExecutor *executor,
+__attribute__((visibility("default"))) aclnnStatus aclnnQuantFlashAttnMetadata(void* workspace, uint64_t workspaceSize,
+                                                                               aclOpExecutor* executor,
                                                                                aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnQuantFlashAttnMetadata);

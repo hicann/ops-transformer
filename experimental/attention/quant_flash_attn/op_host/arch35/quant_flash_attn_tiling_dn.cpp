@@ -27,9 +27,9 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 
-void QuantFlashAttnTilingDn::InitTilingInfo(TilingInfo *tilingInfo)
+void QuantFlashAttnTilingDn::InitTilingInfo(TilingInfo* tilingInfo)
 {
-    tilingInfo_ = static_cast<QuantFlashAttnTilingInfo *>(tilingInfo);
+    tilingInfo_ = static_cast<QuantFlashAttnTilingInfo*>(tilingInfo);
 }
 
 bool QuantFlashAttnTilingDn::IsCapable()
@@ -93,9 +93,7 @@ ge::graphStatus QuantFlashAttnTilingDn::SetPlatMemoryInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-void QuantFlashAttnTilingDn::InitImplParam()
-{
-}
+void QuantFlashAttnTilingDn::InitImplParam() {}
 
 void QuantFlashAttnTilingDn::SplitPolicy()
 {
@@ -133,7 +131,7 @@ void QuantFlashAttnTilingDn::GenTilingKey()
 
     bool hasMask = tilingInfo_->attnMaskFlag;
 
-    tilingKey_ = GET_TPL_TILING_KEY(queryOutLayout, kvStorageMode, hasMask);
+    tilingKey_ = GET_TPL_TILING_KEY(queryOutLayout, Config_DN_FIXED, QFA_MXFP4_DN, hasMask, kvStorageMode, 0);
 }
 
 void QuantFlashAttnTilingDn::CalcNumBlocks(uint32_t aicNum)
@@ -198,9 +196,9 @@ void QuantFlashAttnTilingDn::FillTiling()
     tilingData_.baseTiling.flashAttnEmptyTensorParams.needInit = false;
 }
 
-ge::graphStatus QuantFlashAttnTilingDn::SetTilingData(QuantFlashAttnTilingData &tilingData)
+ge::graphStatus QuantFlashAttnTilingDn::SetTilingData(QuantFlashAttnTilingData& tilingData)
 {
-    QuantFlashAttnTilingData *tiling = context_->GetTilingData<QuantFlashAttnTilingData>();
+    QuantFlashAttnTilingData* tiling = context_->GetTilingData<QuantFlashAttnTilingData>();
     OP_CHECK_IF(tiling == nullptr, OP_LOGE(tilingInfo_->opName, "The tiling data is nullptr"), return ge::GRAPH_FAILED);
     *tiling = tilingData;
     return ge::GRAPH_SUCCESS;

@@ -10,8 +10,9 @@
 
 /*!
  * \file quant_flash_attn_def.cpp
- * \brief QuantFlashAttn算子定义（训练推理归一，仅非量化）
- *        输入数据类型仅支持FLOAT16和BFLOAT16。
+ * \brief QuantFlashAttn算子定义（量化注意力推理）
+ *        quant_mode=5（A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16）输入q/k/v为FLOAT4_E2M1；
+ *        quant_mode=3（A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16）输入q/k/v为FLOAT8_E4M3FN。
  *        支持BSND/BNSD/TND三种layout，支持分页KV缓存（PA_ND/PA_Nz）。
  */
 
@@ -25,37 +26,37 @@ public:
     {
         this->Input("q")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT4_E2M1})
+            .DataType({ge::DT_FLOAT4_E2M1, ge::DT_FLOAT8_E4M3FN})
             .FormatList({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("k")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT4_E2M1})
+            .DataType({ge::DT_FLOAT4_E2M1, ge::DT_FLOAT8_E4M3FN})
             .FormatList({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("v")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT4_E2M1})
+            .DataType({ge::DT_FLOAT4_E2M1, ge::DT_FLOAT8_E4M3FN})
             .FormatList({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("q_descale")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E8M0})
+            .DataType({ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("k_descale")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E8M0})
+            .DataType({ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("v_descale")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT8_E8M0})
+            .DataType({ge::DT_FLOAT8_E8M0, ge::DT_FLOAT8_E8M0})
             .FormatList({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();
@@ -115,7 +116,7 @@ public:
             .AutoContiguous();
         this->Output("attn_out")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_BF16})
+            .DataType({ge::DT_BF16, ge::DT_BF16})
             .FormatList({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND})
             .AutoContiguous();

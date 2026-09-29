@@ -373,9 +373,10 @@ def quant_flash_attn_metadata(
     'PrivateUse1' is dispatch key for custom NPU backends.
     """
     torch._check(
-        quant_mode in (0, 1, 5, 6),
+        quant_mode in (0, 1, 3, 5, 6),
         lambda: f"The quant_mode of quant_flash_attn_metadata only supports 0 (A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32), "
         f"1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), "
+        f"3 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16), "
         f"5 (A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16) "
         f"or 6 (A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), but got {quant_mode}",
     )
@@ -515,9 +516,10 @@ def quant_flash_attn(
     'PrivateUse1' is the combine key for custom NPU backends.
     """
     torch._check(
-        quant_mode in (0, 1, 5, 6),
+        quant_mode in (0, 1, 3, 5, 6),
         lambda: f"The quant_mode of quant_flash_attn only supports 0 (A8C8_QKV_HIF8_P_PER_TENSOR_SOFTMAX_FP32), "
         f"1 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), "
+        f"3 (A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16), "
         f"5 (A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16) "
         f"or 6 (A8C8_QK_FP8_E4M3_PER_TOKEN_HEAD_V_FP8_E4M3_PER_HEAD_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP32), but got {quant_mode}",
     )

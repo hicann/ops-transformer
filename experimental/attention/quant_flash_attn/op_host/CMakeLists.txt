@@ -51,6 +51,7 @@ else()
     checkers/sinks_checker.cpp
     checkers/softmax_lse_checker.cpp
     checkers/qfa_checker.cpp
+    checkers/qfa_checker_mxfp8_softmax_fp16.cpp
     )
     add_modules_sources_with_soc(
         # 该变量用于判断op_api目录是否从op_host移出

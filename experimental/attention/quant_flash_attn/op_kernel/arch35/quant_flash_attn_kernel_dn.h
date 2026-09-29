@@ -22,6 +22,7 @@
 #else
 #include "kernel_operator.h"
 #endif
+#include "quant_flash_attn_tiling_data.h"
 #include "quant_flash_attn_template_tiling_key.h"
 #include "quant_flash_attn_common_def.h"
 #include "../../common/op_kernel/const_def.h"
@@ -70,7 +71,7 @@ public:
     static constexpr uint32_t SUB_S2_BASE_SIZE = s2BaseSize / 2;
 
     ConstInfo constInfo;
-    const FlashAttnTilingData *__restrict tilingData;
+    const FlashAttnTilingData* __restrict tilingData;
 
     // metadata
     GlobalTensor<uint32_t> faMetaDataGm;
@@ -113,23 +114,23 @@ public:
     __aicore__ inline QuantFlashAttnKernelDn()
         : cubeBlock(constInfo, qSeqLensTool, kvSeqLensTool),
           vectorBlock(constInfo, qSeqLensTool, kvSeqLensTool){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-                                __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *blockTable,
-                                __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensKv, __gm__ uint8_t *seqUsedQ,
-                                __gm__ uint8_t *seqUsedKv, __gm__ uint8_t *attenMask, __gm__ uint8_t *learnableSink,
-                                __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                __gm__ uint8_t *fiaMetaData, const FlashAttnTilingData *__restrict tiling)
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
+                                __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
+                                __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensKv, __gm__ uint8_t* seqUsedQ,
+                                __gm__ uint8_t* seqUsedKv, __gm__ uint8_t* attenMask, __gm__ uint8_t* learnableSink,
+                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+                                __gm__ uint8_t* fiaMetaData, const FlashAttnTilingData* __restrict tiling)
     {
         this->tilingData = tiling;
 
-        sectionNum_ = ((__gm__ uint32_t *)fiaMetaData)[0];
+        sectionNum_ = ((__gm__ uint32_t*)fiaMetaData)[0];
 
-        faMetaDataGm.SetGlobalBuffer((__gm__ uint32_t *)(fiaMetaData + FA_METADATA_HEADER_OFFSET),
+        faMetaDataGm.SetGlobalBuffer((__gm__ uint32_t*)(fiaMetaData + FA_METADATA_HEADER_OFFSET),
                                      FA_AIC_CORE_NUM * 16U * sectionNum_);
         fdMetaDataGm.SetGlobalBuffer(
-            (__gm__ uint32_t *)(fiaMetaData + FA_METADATA_HEADER_OFFSET +
-                                FLASH_ATTN_METADATA_SIZE * FA_AIC_CORE_NUM * sectionNum_ * sizeof(uint32_t)),
+            (__gm__ uint32_t*)(fiaMetaData + FA_METADATA_HEADER_OFFSET +
+                               FLASH_ATTN_METADATA_SIZE * FA_AIC_CORE_NUM * sectionNum_ * sizeof(uint32_t)),
             FA_AIV_CORE_NUM * 16U * sectionNum_);
 
         InitConstInfo();
@@ -344,9 +345,9 @@ public:
 
     __aicore__ inline void ExecuteTask(uint64_t loop, RunInfo taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
     {
-        RunInfo &runInfo0 = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];
-        RunInfo &runInfo3 = taskRunInfo[(loop - DELAY_P_SCALE_N) % PRELOAD_TASK_CACHE_SIZE];
-        RunInfo &runInfo20 = taskRunInfo[(loop - PRELOAD_N) % PRELOAD_TASK_CACHE_SIZE];
+        RunInfo& runInfo0 = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];
+        RunInfo& runInfo3 = taskRunInfo[(loop - DELAY_P_SCALE_N) % PRELOAD_TASK_CACHE_SIZE];
+        RunInfo& runInfo20 = taskRunInfo[(loop - PRELOAD_N) % PRELOAD_TASK_CACHE_SIZE];
 
         if (loop >= PRELOAD_N && runInfo20.isValid) {
             if ASCEND_IS_AIC {
@@ -423,29 +424,50 @@ public:
         }
     }
 
-    __aicore__ inline void ComputeMm1(RunInfo &runInfo) { cubeBlock.ComputeMm1(runInfo); }
+    __aicore__ inline void ComputeMm1(RunInfo& runInfo)
+    {
+        cubeBlock.ComputeMm1(runInfo);
+    }
 
-    __aicore__ inline void ComputeMm2(RunInfo &runInfo) { cubeBlock.ComputeMm2(runInfo); }
+    __aicore__ inline void ComputeMm2(RunInfo& runInfo)
+    {
+        cubeBlock.ComputeMm2(runInfo);
+    }
 
-    __aicore__ inline void ComputeVec1(RunInfo &runInfo) { vectorBlock.ComputeVec1(runInfo); }
+    __aicore__ inline void ComputeVec1(RunInfo& runInfo)
+    {
+        vectorBlock.ComputeVec1(runInfo);
+    }
 
-    __aicore__ inline void CopyGMaxUbToL1(RunInfo &runInfo) { vectorBlock.CopyGMaxUbToL1(runInfo); }
+    __aicore__ inline void CopyGMaxUbToL1(RunInfo& runInfo)
+    {
+        vectorBlock.CopyGMaxUbToL1(runInfo);
+    }
 
-    __aicore__ inline void CopyGMaxL1ToUb(RunInfo &runInfo) { cubeBlock.CopyGMaxL1ToUb(runInfo); }
+    __aicore__ inline void CopyGMaxL1ToUb(RunInfo& runInfo)
+    {
+        cubeBlock.CopyGMaxL1ToUb(runInfo);
+    }
 
-    __aicore__ inline void UpdatePScale(RunInfo &runInfo) { vectorBlock.UpdatePScale(runInfo); }
+    __aicore__ inline void UpdatePScale(RunInfo& runInfo)
+    {
+        vectorBlock.UpdatePScale(runInfo);
+    }
 
-    __aicore__ inline void ComputeVec2(RunInfo &runInfo) { vectorBlock.ComputeVec2(runInfo); }
+    __aicore__ inline void ComputeVec2(RunInfo& runInfo)
+    {
+        vectorBlock.ComputeVec2(runInfo);
+    }
 
     __aicore__ inline void CreateTask(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur,
                                       RunInfo taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
     {
-        RunInfo &runInfo = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE]; // 本轮任务
+        RunInfo& runInfo = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE]; // 本轮任务
         CalcParams(loop, bN2Cur, gS1Cur, s2Cur, runInfo);
         runInfo.isValid = true;
     }
 
-    __aicore__ inline void CalcParams(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur, RunInfo &info)
+    __aicore__ inline void CalcParams(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur, RunInfo& info)
     {
         info.loop = loop;
         info.mloop = mloop;
@@ -533,8 +555,8 @@ public:
         }
     }
 
-    __aicore__ inline void UpdateAxisInfo(TASK_DEAL_MODE taskDealMode, uint32_t &bN2Cur, uint32_t &gS1Cur,
-                                          uint32_t &s2Cur)
+    __aicore__ inline void UpdateAxisInfo(TASK_DEAL_MODE taskDealMode, uint32_t& bN2Cur, uint32_t& gS1Cur,
+                                          uint32_t& s2Cur)
     {
         uint64_t s2LoopTimes = (actSeqLensKv + s2BaseSize - 1) / s2BaseSize;
         uint64_t gS1Size = actSeqLensQ * constInfo.gSize;

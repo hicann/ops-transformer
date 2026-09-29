@@ -79,6 +79,8 @@ REG_OP(QuantFlashAttnMetadata)
     .REQUIRED_ATTR(soc_version, String)
     .REQUIRED_ATTR(aic_core_num, Int)
     .REQUIRED_ATTR(aiv_core_num, Int)
+    .ATTR(metadata_dim_num, Int, 0)
+    .ATTR(metadata_row_size, Int, 0)
     .OP_END_FACTORY_REG(QuantFlashAttnMetadata)
 
 } // namespace ge

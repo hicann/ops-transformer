@@ -1,4 +1,4 @@
-# quant_flash_attn（MxFP4）
+# quant_flash_attn（MxFP4/MxFP8 Softmax FP16）
 
 ## 产品支持情况
 
@@ -25,9 +25,10 @@
 
 - **接口功能**:
 
-  `quant_flash_attn`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantFlashAttn`算子完成 MxFP4 量化场景下的全量化注意力计算，训练推理归一化。当前支持 MxFP4 场景：
+  `quant_flash_attn`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantFlashAttn`算子完成全量化注意力计算，训练推理归一化。当前支持 MxFP4 与 MxFP8 Softmax FP16 场景：
 
   - **MxFP4场景**（`quant_mode=5`）：Q/K/V 均采用 MxFP4，P 采用 MxFP4，Softmax 在 FP16 下计算。
+  - **MxFP8 Softmax FP16场景**（`quant_mode=3`）：Q/K/V 均采用 MxFP8（float8_e4m3fn），P 采用 FP8_E4M3（per-tensor），Softmax 在 FP16 下计算。
 
   `quant_flash_attn_metadata`是`quant_flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AICore/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
 
@@ -71,6 +72,7 @@
 >
 > - Q、K、V数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim，且满足D=H/N、G = Q_N / KV_N 表示GQA分组数。
 > - MxFP4场景（`quant_mode=5`）下，仅支持 Q_N == KV_N（即 G=1，不支持 GQA），仅支持 D=128，仅支持 BNSD 排布。
+> - MxFP8 Softmax FP16场景（`quant_mode=3`）下，仅支持 BNSD 排布，仅支持 D=128，不支持 Paged Attention。
 
 ## 函数原型
 
@@ -155,7 +157,7 @@ cann_ops_transformer.quant_flash_attn(
 
 > [!NOTE]
 >
-> 当前仅实现 `quant_mode=5`（MxFP4）场景。
+> 当前实现 `quant_mode=5`（MxFP4）与 `quant_mode=3`（MxFP8 Softmax FP16）场景。
 
 ### mask_mode 枚举
 
@@ -167,7 +169,7 @@ cann_ops_transformer.quant_flash_attn(
 
 > [!NOTE]
 >
-> MxFP4 场景（`quant_mode=5`）仅支持 mask_mode = 0（`NO_MASK`）。
+> MxFP4 场景（`quant_mode=5`）与 MxFP8 Softmax FP16 场景（`quant_mode=3`）均仅支持 mask_mode = 0（`NO_MASK`）。
 
 ## 基准信息说明
 
@@ -413,6 +415,7 @@ cann_ops_transformer.quant_flash_attn(
 
     <ul>
         <li>quant_mode=5，A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16（MxFP4场景）</li>
+        <li>quant_mode=3，A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16（MxFP8 Softmax FP16场景）</li>
     </ul>
 
     <table style="undefined;table-layout: fixed; width:1625px">
@@ -439,6 +442,7 @@ cann_ops_transformer.quant_flash_attn(
                     <ul>
                         <li>data_type支持int32</li>
                         <li>支持输入值为 A4C4_QKV_MXFP4_P_MXFP4_SOFTMAX_FP16（5）</li>
+                        <li>支持输入值为 A8C8_QKV_MXFP8_P_FP8_E4M3_PER_TENSOR_SOFTMAX_FP16（3）</li>
                     </ul>
                 </td>
                 <td>必选属性</td>
@@ -528,6 +532,14 @@ cann_ops_transformer.quant_flash_attn(
             <td>BNSD</td>
             <td>(B, Q_N, Q_S)</td>
         </tr>
+        <tr>
+            <td>quant_mode=3（MxFP8 Softmax FP16）</td>
+            <td>BNSD</td>
+            <td>BNSD</td>
+            <td>BNSD</td>
+            <td>BNSD</td>
+            <td>(B, Q_N, Q_S)</td>
+        </tr>
     </tbody>
     </table>
 
@@ -549,6 +561,19 @@ cann_ops_transformer.quant_flash_attn(
         <tbody>
             <tr>
                 <td rowspan="3">5</td>
+                <td>q_descale</td>
+                <td>float8_e8m0</td>
+            </tr>
+            <tr>
+                <td>k_descale</td>
+                <td>float8_e8m0</td>
+            </tr>
+            <tr>
+                <td>v_descale</td>
+                <td>float8_e8m0</td>
+            </tr>
+            <tr>
+                <td rowspan="3">3</td>
                 <td>q_descale</td>
                 <td>float8_e8m0</td>
             </tr>
@@ -583,6 +608,22 @@ cann_ops_transformer.quant_flash_attn(
         <tbody>
             <tr>
                 <td rowspan="3">5</td>
+                <td>q_descale</td>
+                <td>BNSD</td>
+                <td>(B, Q_N, Q_S, D/64, 2)</td>
+            </tr>
+            <tr>
+                <td>k_descale</td>
+                <td>BNSD</td>
+                <td>(B, KV_N, KV_S, D/64, 2)</td>
+            </tr>
+            <tr>
+                <td>v_descale</td>
+                <td>BNSD</td>
+                <td>(B, KV_N, ceil(KV_S/64), D, 2)</td>
+            </tr>
+            <tr>
+                <td rowspan="3">3</td>
                 <td>q_descale</td>
                 <td>BNSD</td>
                 <td>(B, Q_N, Q_S, D/64, 2)</td>
@@ -637,6 +678,76 @@ cann_ops_transformer.quant_flash_attn(
                 <td>attn_out</td>
                 <td>BNSD</td>
                 <td>(B, Q_N, Q_S, D)</td>
+            </tr>
+            <tr>
+                <td rowspan="4">3</td>
+                <td>q</td>
+                <td>BNSD</td>
+                <td>(B, Q_N, Q_S, D)</td>
+            </tr>
+            <tr>
+                <td>k/v</td>
+                <td>BNSD</td>
+                <td>(B, KV_N, KV_S, D)</td>
+            </tr>
+            <tr>
+                <td>attn_out</td>
+                <td>BNSD</td>
+                <td>(B, Q_N, Q_S, D)</td>
+            </tr>
+        </tbody>
+    </table>
+
+- MxFP8 Softmax FP16 特殊约束:
+
+    <table style="undefined;table-layout: fixed; width:1625px">
+        <colgroup>
+            <col style="width: 147px">
+            <col style="width: 232px">
+            <col style="width: 293px">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>约束项</th>
+                <th>约束内容</th>
+                <th>说明</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>q/k/v dtype</td>
+                <td>仅支持 float8_e4m3fn</td>
+                <td>PyTorch 原生支持该 dtype，直接构造输入，无需 uint8 伪装，D 维大小即实际 head_dim</td>
+            </tr>
+            <tr>
+                <td>D</td>
+                <td>仅支持 128</td>
+                <td>MxFP8 Softmax FP16 仅支持 head_dim = 128</td>
+            </tr>
+            <tr>
+                <td>排布</td>
+                <td>仅支持 BNSD</td>
+                <td>layout_q/layout_kv/layout_out 仅支持 BNSD，不支持 Paged Attention</td>
+            </tr>
+            <tr>
+                <td>GQA</td>
+                <td>支持</td>
+                <td>支持 G = Q_N / KV_N（GQA）与 MHA（Q_N == KV_N）</td>
+            </tr>
+            <tr>
+                <td>S1/S2</td>
+                <td>任意长度</td>
+                <td>S1/S2 支持任意值</td>
+            </tr>
+            <tr>
+                <td>return_softmax_lse</td>
+                <td>支持</td>
+                <td>正常行输出 lse；padding 行（超过该 batch 有效长度的行）为 0；seqused_kv 为 0 的 batch，其有效行输出 -inf（softmax 空集，对应 log(0)）</td>
+            </tr>
+            <tr>
+                <td>seqused</td>
+                <td>支持 per-batch 变长</td>
+                <td>支持 per-batch 变长（每个 batch 独立有效长度）；支持 seqused_q/seqused_kv 中个别 batch 取值为 0（该 batch 无有效 token）；张量 S 维大小取 max(seqused)</td>
             </tr>
         </tbody>
     </table>
