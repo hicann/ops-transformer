@@ -234,7 +234,6 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void QSFAMatmulService<TEMPLATE_ARGS>
     PrepareLeftMatrixBmm1QSFA(inputLeftBuf, runInfo, constInfo);
 
     // 加载当前轮的右矩阵到L1
-    inputRightBuf.WaitCrossCore(); // 核间同步，这里需要根据V0操作处理同步，确保取tensor时，数据已经准备好
 
     if constexpr (IS_SPLIT_G) {
         SetFlag<HardEvent::MTE1_MTE2>(mte2ToMte1Id[runInfo.taskIdMod3]);
@@ -245,6 +244,8 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void QSFAMatmulService<TEMPLATE_ARGS>
         DataCopy(dst, v0ResGmTensor, Align16Func(runInfo.s2RealSize) * constInfo.dSize);
         SetFlag<HardEvent::MTE2_MTE1>(mte1ToMte2Id[runInfo.taskIdMod3]);
         WaitFlag<HardEvent::MTE2_MTE1>(mte1ToMte2Id[runInfo.taskIdMod3]);
+    } else {
+        inputRightBuf.WaitCrossCore();
     }
 
     inputLeftBuf.Wait<HardEvent::MTE2_MTE1>(); // 等待L1A
@@ -332,7 +333,6 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void QSFAMatmulService<TEMPLATE_ARGS>
         inputRightBuf.GetTensor<Q_T>(),                                 // 右矩阵V nope
         mmL0ABuffers, mmL0BBuffers, mm2ResL0C.GetTensor<T>(), qsfaParam);
 
-    inputRightBuf.SetCrossCore();       // bmm2才释放KV，在这里释放
     mm2ResL0C.Set<HardEvent::M_FIX>();  // 通知
     mm2ResL0C.Wait<HardEvent::M_FIX>(); // 等待
 

@@ -234,7 +234,6 @@ TEMPLATES_DEF_NO_DEFAULT __aicore__ inline void SFAMatmulService<TEMPLATE_ARGS>:
     Buffer<BufferType::L1> inputLeftBuf;
     PrepareLeftMatrixBmm1SFA(inputLeftBuf, runInfo, constInfo);
 
-    inputRightBuf.WaitCrossCore();
     SetFlag<HardEvent::MTE1_MTE2>(mte2ToMte1Id[runInfo.taskIdMod3]);
     WaitFlag<HardEvent::MTE1_MTE2>(mte2ToMte1Id[runInfo.taskIdMod3]);
     LocalTensor<Q_T> dst = inputRightBuf.GetTensor<Q_T>();
@@ -336,8 +335,6 @@ __aicore__ inline void SFAMatmulService<TEMPLATE_ARGS>::IterateBmm2SFA(
         inputRightBuf.GetTensor<Q_T>(s2BaseSize * constInfo.dSizeNope), // 左矩阵P 来自rope位置
         inputRightBuf.GetTensor<Q_T>(),                                 // 右矩阵V nope
         mmL0ABuffers, mmL0BBuffers, mm2ResL0C.GetTensor<T>(), param);
-
-    inputRightBuf.SetCrossCore(); // bmm2才释放KV，在这里释放
 
     mm2ResL0C.Set<HardEvent::M_FIX>();  // 通知
     mm2ResL0C.Wait<HardEvent::M_FIX>(); // 等待
