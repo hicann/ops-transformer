@@ -129,14 +129,14 @@ aclnnStatus aclnnFusedInferAttentionScoreV5GetMaxWorkspaceSize(
 
     const aclTensor *placeHolder = nullptr;
     const aclTensor *tempTensor = nullptr;
-    if (!softmaxLseFlag) {
-        std::vector<int64_t> shape = {0};
-        int64_t addr = 0xff;
-        tempTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_FLOAT, shape.data(), 0, ACL_FORMAT_ND,
-                                     shape.data(), shape.size(), static_cast<void *>(&addr));
-        placeHolder = tempTensor;
-    } else {
-        placeHolder = softmaxLse;
+    ret = FusedInferAttentionScoreProcessSoftmaxLse(softmaxLseFlag, softmaxLse, tempTensor, placeHolder);
+    if (ret != ACLNN_SUCCESS) {
+        aclDestroyTensor(fakeActualSeqLengthsOptional);
+        aclDestroyTensor(fakeActualSeqLengthsKvOptional);
+        aclDestroyTensor(fakeActualSharedPrefixLenOptional);
+        aclDestroyTensor(fakeQStartIdxOptional);
+        aclDestroyTensor(fakeKVStartIdxOptional);
+        return ret;
     }
 
     ret = aclnnInnerFusedInferAttentionScoreTensorGetWorkspaceSize(
@@ -219,14 +219,9 @@ aclnnStatus aclnnFusedInferAttentionScoreV5GetWorkspaceSize(
 
     const aclTensor *placeHolder = nullptr;
     const aclTensor *tempTensor = nullptr;
-    if (softmaxLseFlag == false) {
-        std::vector<int64_t> shape = {0};
-        int64_t addr = 0xff;
-        tempTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_FLOAT, shape.data(), 0, ACL_FORMAT_ND,
-                                     shape.data(), shape.size(), static_cast<void *>(&addr));
-        placeHolder = tempTensor;
-    } else {
-        placeHolder = softmaxLse;
+    ret = FusedInferAttentionScoreProcessSoftmaxLse(softmaxLseFlag, softmaxLse, tempTensor, placeHolder);
+    if (ret != ACLNN_SUCCESS) {
+        return ret;
     }
     ret = aclnnInnerFusedInferAttentionScoreGetWorkspaceSize(
         query, tensorListKey, tensorListValue, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
