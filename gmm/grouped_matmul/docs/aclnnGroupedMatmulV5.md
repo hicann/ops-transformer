@@ -327,7 +327,8 @@ aclnnGroupedMatmulV5默认确定性实现。
   - 第二个元素（下标1）：仅支持0或1，其他值不支持。设为0或不提供该元素时，不开启weight特殊格式，weight按常规`[E,K,N]`逻辑布局解析；设为1时，开启weight特殊格式，仅支持offsetOptional不为空的perchannel场景，weight须按`[E,N,K]`排布后转换为NZ，且weight TensorList长度为1。
   - 例如，传入`[0, 1]`表示不指定预期token数，并开启weight特殊格式。详见[S8S4场景约束](#ascend950-s8s4场景约束)。
 - actType（0~5）：
-  - 非量化/伪量化仅支持 0。
+  - 伪量化仅支持 0。
+  - 非量化在x、weight、out数据类型为BFLOAT16/FLOAT16，不分组/M轴分组场景下支持0/2；其余场景仅支持0。
   - 全量化下x、weight数据类型为INT8且out数据类型为BFLOAT16/FLOAT16，静态T-C或动态K-C、scale数据类型为FLOAT32/BFLOAT16时支持0/1/2/4/5（注意3不支持）；其余场景仅支持0。
 - 输入参数 x、weight，输出参数 out在非量化场景支持最多 1024个Tensor，在伪量化支持最多 128个Tensor，在全量化场景最多支持 1个Tensor。
 
