@@ -67,6 +67,10 @@ ge::graphStatus ValidateStrideLocal(const char *opName, const char *tensorName, 
                 OP_LOGE(opName, "The stride rank of %s is %zu, which is smaller than its input rank %zu.", tensorName,
                         static_cast<size_t>(strides->GetDimNum()), static_cast<size_t>(inputShape.GetDimNum())),
                 return ge::GRAPH_FAILED);
+    // Empty tensors may carry zero strides on non-singleton dimensions.
+    if (inputShape.GetShapeSize() == 0) {
+        return ge::GRAPH_SUCCESS;
+    }
     for (uint32_t dim = 0; dim < inputShape.GetDimNum(); ++dim) {
         OP_CHECK_IF(
             inputShape.GetDim(dim) > 1 && strides->GetStride(dim) <= 0,
