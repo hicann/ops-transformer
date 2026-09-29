@@ -13,6 +13,7 @@
  * \brief 算子tiling UT
  */
 
+#include <cstdlib>
 #include <iostream>
 #include <fstream>
 #include <thread>
@@ -24,6 +25,10 @@
 namespace MoeDistributeDispatchSetupUT {
 
 static const std::string OP_NAME = "MoeDistributeDispatchSetup";
+constexpr int64_t CONTEXT_DIM0 = 2052;
+constexpr int64_t DEFAULT_CCL_BUFFER_SIZE = 12000;
+constexpr uint64_t CORE_NUM = 20;
+constexpr uint64_t UB_SIZE = 192 * 1024;
 
 struct MoeDistributeDispatchSetupTestParam {
     std::string caseName;
@@ -356,10 +361,10 @@ static MoeDistributeDispatchSetupTestParam g_testCases[] = {
      2,
      "",
      "3510",
-     ge::GRAPH_FAILED,
-     0UL,
+     ge::GRAPH_SUCCESS,
+     1000UL,
      "",
-     {16777216},
+     {33554432},
      0},
 
     {"test_moe_distribute_dispatch_setup_invalid_x_dtype_int32",
@@ -1036,10 +1041,10 @@ static MoeDistributeDispatchSetupTestParam g_testCases[] = {
      2,
      "",
      "3510",
-     ge::GRAPH_FAILED,
-     0UL,
+     ge::GRAPH_SUCCESS,
+     1000UL,
      "",
-     {16777216},
+     {33554432},
      0},
 
     {"test_moe_distribute_dispatch_setup_invalid_ep_world_size_1",
@@ -2048,11 +2053,13 @@ class MoeDistributeDispatchSetupArch35TilingTest : public testing::TestWithParam
 protected:
     static void SetUpTestCase()
     {
+        setenv("HCCL_BUFFSIZE", "12000", 1);
         std::cout << "MoeDistributeDispatchSetupArch35TilingTest SetUp." << std::endl;
     }
 
     static void TearDownTestCase()
     {
+        unsetenv("HCCL_BUFFSIZE");
         std::cout << "MoeDistributeDispatchSetupArch35TilingTest TearDown." << std::endl;
     }
 };
@@ -2073,15 +2080,11 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatc
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
 
     std::vector<gert::TilingContextPara::TensorDescription> inputTensorDesc_;
+    inputTensorDesc_.push_back({MakeShape({CONTEXT_DIM0}), ge::DT_INT32, ge::FORMAT_ND});
     inputTensorDesc_.push_back({MakeShape(param.xShape), param.xDtype, param.xFormat});
     inputTensorDesc_.push_back({MakeShape(param.expertIdsShape), param.expertIdsDtype, param.expertIdsFormat});
-    if (param.scalesShape.size() > 0) {
-        inputTensorDesc_.push_back({MakeShape(param.scalesShape), param.scalesDtype, param.scalesFormat});
-    }
-    if (param.xActiveMaskShape.size() > 0) {
-        inputTensorDesc_.push_back(
-            {MakeShape(param.xActiveMaskShape), param.xActiveMaskDtype, param.xActiveMaskFormat});
-    }
+    inputTensorDesc_.push_back({MakeShape(param.scalesShape), param.scalesDtype, param.scalesFormat});
+    inputTensorDesc_.push_back({MakeShape(param.xActiveMaskShape), param.xActiveMaskDtype, param.xActiveMaskFormat});
 
     std::vector<gert::TilingContextPara::TensorDescription> outputTensorDesc_;
     outputTensorDesc_.push_back({MakeShape(param.yOutShape), param.yOutDtype, param.yOutFormat});
@@ -2091,10 +2094,10 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatc
         {MakeShape(param.commCmdInfoOutShape), param.commCmdInfoOutDtype, param.commCmdInfoOutFormat});
 
     std::vector<gert::TilingContextPara::OpAttr> attrs_;
-    attrs_.push_back({"group_ep", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.groupEp)});
     attrs_.push_back({"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.epWorldSize)});
     attrs_.push_back({"ep_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.epRankId)});
     attrs_.push_back({"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.moeExpertNum)});
+    attrs_.push_back({"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(DEFAULT_CCL_BUFFER_SIZE)});
     attrs_.push_back({"expert_shard_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.expertShardType)});
     attrs_.push_back({"shared_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.sharedExpertNum)});
     attrs_.push_back(
@@ -2104,18 +2107,21 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatc
     attrs_.push_back({"comm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.commType)});
     attrs_.push_back({"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.commAlg)});
 
-    return gert::TilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo,
-                                   param.socVersion);
+    return gert::TilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo, param.socVersion,
+                                   CORE_NUM, UB_SIZE);
 }
 
 TEST_P(MoeDistributeDispatchSetupArch35TilingTest, GeneralCases)
 {
     auto param = GetParam();
     auto tilingContextPara = BuildTilingContextPara(param);
-    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", param.epWorldSize},
-                                               {"HCCL_BUFFSIZE", 12000UL * 1024UL * 1024UL}};
+    int64_t mockRankNum = 8;
+    if (param.epWorldSize == 2 || param.epWorldSize == 4 || param.epWorldSize == 8) {
+        mockRankNum = param.epWorldSize;
+    }
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", mockRankNum}, {"HCCL_BUFFSIZE", 12000UL * 1024UL * 1024UL}};
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, param.status, param.expectTilingKey,
-                       param.expectTilingData, param.expectWorkspaces, param.mc2TilingDataReservedLen);
+                       param.expectTilingData, {}, param.mc2TilingDataReservedLen);
 }
 
 INSTANTIATE_TEST_CASE_P(MoeDistributeDispatchSetupTilingUT, MoeDistributeDispatchSetupArch35TilingTest,

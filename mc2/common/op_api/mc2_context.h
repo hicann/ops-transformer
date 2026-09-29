@@ -38,7 +38,8 @@ namespace Mc2Aclnn {
 class Mc2Context {
 public:
     static aclnnStatus GetMc2ContextTensor(const char *groupEp, const char *opName, uint64_t &hcclBuffSize,
-                                           aclTensor *&mc2Context);
+                                           aclTensor *&mc2Context,
+                                           CommProtocol protocol = CommProtocol::COMM_PROTOCOL_UB_MEM);
     static aclnnStatus GetMc2RankSize(const char *groupEp, uint32_t &rankSize);
 
 private:
@@ -55,7 +56,7 @@ private:
                                 const CommProtocol &protocol, std::vector<HcclChannelDesc> &channelDesc);
     aclnnStatus GetHcclCommChannel(const HcclComm &hcclHandle, uint32_t rankDim, uint32_t srcRankId,
                                    const CommProtocol &protocol, const CommEngine &engine,
-                                   std::vector<ChannelHandle> &channels);
+                                   std::vector<ChannelHandle> &channels, Mc2MoeContext *mc2ContextStruct);
     aclnnStatus GetHcclCommResource(const HcclComm &hcclHandle, const CommEngine &engine, const CommProtocol &protocol,
                                     Mc2MoeContext *mc2ContextStruct);
     aclnnStatus CreatMc2Context(const HcclComm &hcclHandle, const std::string &mc2ContextTag, const CommEngine &engine,

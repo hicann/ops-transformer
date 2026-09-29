@@ -16,9 +16,12 @@
 #include "opdev/op_log.h"
 #include "opdev/common_types.h"
 #include "aclnnInner_moe_distribute_dispatch_setup.h"
+#include "log/log.h"
+#include "common/op_api/mc2_context.h"
 #include "mc2_log_compat.h"
 
 using namespace op;
+using namespace Mc2Aclnn;
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,11 +92,19 @@ aclnnStatus aclnnMoeDistributeDispatchSetupGetWorkspaceSize(
     auto ret_param = CheckParams(x, expertIds, groupEp, yOut, expandIdxOut, commCmdInfoOut);
     CHECK_RET(ret_param == ACLNN_SUCCESS, ret_param);
 
-    aclnnStatus ret = aclnnInnerMoeDistributeDispatchSetupGetWorkspaceSize(
-        x, expertIds, scalesOptional, xActiveMaskOptional, const_cast<char *>(groupEp), epWorldSize, epRankId,
-        moeExpertNum, expertShardType, sharedExpertNum, shareExpertRankNum, quantMode, globalBs, commType,
-        const_cast<char *>(commAlg), yOut, expandIdxOut, commCmdInfoOut, workspaceSize, executor);
-    return ret;
+    uint64_t yDtype = static_cast<uint64_t>(op::DataType::DT_UNDEFINED);
+    aclnnStatus retStatus;
+    uint64_t hcclBuffSize = 0;
+    aclTensor *mc2Context = nullptr;
+    const char *opName = "moe_distribute_a2av_setup_teardown";
+    retStatus = Mc2Aclnn::Mc2Context::GetMc2ContextTensor(groupEp, opName, hcclBuffSize, mc2Context,
+                                                          CommProtocol::COMM_PROTOCOL_UBC_CTP);
+    CHECK_RET(retStatus == ACLNN_SUCCESS, retStatus);
+    retStatus = aclnnInnerMoeDistributeDispatchSetupGetWorkspaceSize(
+        mc2Context, x, expertIds, scalesOptional, xActiveMaskOptional, epWorldSize, epRankId, moeExpertNum,
+        hcclBuffSize, expertShardType, sharedExpertNum, shareExpertRankNum, quantMode, globalBs, commType,
+        const_cast<char *>(commAlg), yDtype, yOut, expandIdxOut, commCmdInfoOut, workspaceSize, executor);
+    return retStatus;
 }
 
 static aclnnStatus CheckCalcOutputShape(const aclTensor *x, const aclTensor *expertIds)

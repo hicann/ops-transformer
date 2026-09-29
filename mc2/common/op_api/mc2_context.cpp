@@ -230,7 +230,7 @@ aclnnStatus Mc2Context::InitHcclChannel(const HcclComm &hcclHandle, uint32_t ran
 
 aclnnStatus Mc2Context::GetHcclCommChannel(const HcclComm &hcclHandle, uint32_t rankDim, uint32_t srcRankId,
                                            const CommProtocol &protocol, const CommEngine &engine,
-                                           std::vector<ChannelHandle> &channels)
+                                           std::vector<ChannelHandle> &channels, Mc2MoeContext *mc2ContextStruct)
 {
     OP_LOGD("Start to get HCCL communication channel");
     uint32_t channelNum = rankDim - 1;
@@ -255,10 +255,15 @@ aclnnStatus Mc2Context::GetHcclCommChannel(const HcclComm &hcclHandle, uint32_t 
         return ret;
     }
 
-    auto hcclRet = HcclChannelAcquire(hcclHandle, engine, channelDesc.data(), channelNum, channels.data());
-    if (hcclRet != HCCL_SUCCESS) {
+    // COMM_PROTOCOL_UBC_CTP协议 使用 mc2ContextStruct->hcommHandle_
+    auto useChannel = mc2ContextStruct->hcommHandle_;
+    if (CommProtocol::COMM_PROTOCOL_UBC_CTP != protocol) {
+        useChannel = channels.data();
+    }
+    ret = HcclChannelAcquire(hcclHandle, engine, channelDesc.data(), channelNum, useChannel);
+    if (ret != HCCL_SUCCESS) {
         OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Acquire HCCL channel failed");
-        return ACLNN_ERR_INNER;
+        return ret;
     }
     return ACLNN_SUCCESS;
 }
@@ -270,7 +275,7 @@ aclnnStatus Mc2Context::GetHcclCommResource(const HcclComm &hcclHandle, const Co
     uint32_t rankId = mc2ContextStruct->epRankId;
     std::vector<ChannelHandle> channels;
 
-    auto ret = GetHcclCommChannel(hcclHandle, epRankSize_, rankId, protocol, engine, channels);
+    aclnnStatus ret = GetHcclCommChannel(hcclHandle, epRankSize_, rankId, protocol, engine, channels, mc2ContextStruct);
     if (ret != ACLNN_SUCCESS) {
         return ret;
     }
@@ -287,7 +292,11 @@ aclnnStatus Mc2Context::GetHcclCommResource(const HcclComm &hcclHandle, const Co
             hcclRet = HcclGetHcclBuffer(hcclHandle, &tempBuffer, &hcclBuffSize_);
         } else {
             uint32_t idx = (i < rankId) ? i : (i - 1);
-            hcclRet = HcclChannelGetHcclBuffer(hcclHandle, channels[idx], &tempBuffer, &bufSize);
+            auto channelHandle = channels[idx];
+            if (CommProtocol::COMM_PROTOCOL_UBC_CTP == protocol) {
+                channelHandle = mc2ContextStruct->hcommHandle_[idx];
+            }
+            hcclRet = HcclChannelGetHcclBuffer(hcclHandle, channelHandle, &tempBuffer, &bufSize);
         }
 
         if (hcclRet != HCCL_SUCCESS || tempBuffer == nullptr) {
@@ -502,7 +511,7 @@ aclnnStatus Mc2Context::CheckContextCache(const HcclComm &hcclHandle, const std:
 }
 
 aclnnStatus Mc2Context::GetMc2ContextTensor(const char *groupEp, const char *opName, uint64_t &hcclBuffSize,
-                                            aclTensor *&mc2Context)
+                                            aclTensor *&mc2Context, CommProtocol protocol)
 {
     OP_LOGI("Start to get Mc2MoeContext Tensor");
     Mc2Context instance;
@@ -511,7 +520,6 @@ aclnnStatus Mc2Context::GetMc2ContextTensor(const char *groupEp, const char *opN
     CHECK_RET(aclnnRet == ACLNN_SUCCESS, aclnnRet);
 
     void *ctx = nullptr;
-    CommProtocol protocol;
     std::string mc2ContextTag = std::string(groupEp) + std::string(opName);
     CommEngine engine = CommEngine::COMM_ENGINE_AIV;
     hcclBuffSize = 0; // Default to 0, will be updated in CheckContextCache
@@ -532,8 +540,11 @@ aclnnStatus Mc2Context::GetMc2ContextTensor(const char *groupEp, const char *opN
         return ACLNN_SUCCESS;
     }
 
-    aclnnRet = instance.GetCommProtocol(hcclHandle, protocol);
-    CHECK_RET(aclnnRet == ACLNN_SUCCESS, aclnnRet);
+    // COMM_PROTOCOL_UBC_CTP协议直接从算子op_api中传入，不通过 GetCommProtocol 获取和校验
+    if (CommProtocol::COMM_PROTOCOL_UBC_CTP != protocol) {
+        aclnnRet = instance.GetCommProtocol(hcclHandle, protocol);
+        CHECK_RET(aclnnRet == ACLNN_SUCCESS, aclnnRet);
+    }
 
     Mc2MoeContext mc2ContextStruct;
     aclnnRet =

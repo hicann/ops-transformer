@@ -26,9 +26,12 @@
 using namespace AscendC;
 using namespace Mc2Kernel;
 
-extern "C" __global__ __aicore__ void moe_distribute_dispatch_teardown(
-    GM_ADDR x, GM_ADDR y, GM_ADDR expertIds, GM_ADDR commCmdInfo, GM_ADDR expandXOut, GM_ADDR dynamicScalesOut,
-    GM_ADDR assistInfoForCombineOut, GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, GM_ADDR tilingGM)
+extern "C" __global__ __aicore__ void moe_distribute_dispatch_teardown(GM_ADDR context, GM_ADDR x, GM_ADDR y,
+                                                                       GM_ADDR expertIds, GM_ADDR commCmdInfo,
+                                                                       GM_ADDR expandXOut, GM_ADDR dynamicScalesOut,
+                                                                       GM_ADDR assistInfoForCombineOut,
+                                                                       GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM,
+                                                                       GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(MoeDistributeDispatchTeardownTilingData);
     TPipe pipe;
@@ -37,14 +40,14 @@ extern "C" __global__ __aicore__ void moe_distribute_dispatch_teardown(
     if (TILING_KEY_IS(10000)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, UNQUANT, false, false> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(11000)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, UNQUANT, false, true> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     }
 #elif ((ORIG_DTYPE_EXPAND_X == DT_INT8) || (ORIG_DTYPE_EXPAND_X == DT_FLOAT8_E5M2) || \
@@ -52,68 +55,68 @@ extern "C" __global__ __aicore__ void moe_distribute_dispatch_teardown(
     if (TILING_KEY_IS(10011)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, STATIC_QUANT, true, false> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(10002)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, PERTOKEN_DYNAMIC_QUANT, false, false> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(10012)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, PERTOKEN_DYNAMIC_QUANT, true, false> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(11011)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, STATIC_QUANT, true, true> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(11002)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, PERTOKEN_DYNAMIC_QUANT, false, true> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(11012)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, PERTOKEN_DYNAMIC_QUANT, true, true> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(10003)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, PERGROUP_DYNAMIC_QUANT, false, false> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(10013)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, PERGROUP_DYNAMIC_QUANT, true, false> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(11013)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, PERGROUP_DYNAMIC_QUANT, true, true> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(10004)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, MX_QUANT, false, false> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     } else if (TILING_KEY_IS(11004)) {
         GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchTeardownTilingData, tilingData, tilingGM);
         MoeDistributeDispatchTeardown<DTYPE_X, DTYPE_EXPAND_X, MX_QUANT, false, true> op;
-        op.Init(x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
-                workspaceGM, &pipe, &tilingData);
+        op.Init(context, x, y, expertIds, commCmdInfo, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
+                expertTokenNumsOut, workspaceGM, &pipe, &tilingData);
         op.Process();
     }
 #endif

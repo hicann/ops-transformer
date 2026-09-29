@@ -12,13 +12,12 @@
  * \file test_moe_distribute_dispatch_teardown_tiling.cpp
  * \brief tiling ut
  */
+#include <cstdlib>
 #include <iostream>
 #include <fstream>
-#include <thread>
 #include <vector>
 #include <string>
 #include <gtest/gtest.h>
-#include "csv_case_load_utils.h"
 #include "mc2_tiling_case_executor.h"
 
 namespace {
@@ -28,6 +27,10 @@ using namespace ge;
 using namespace gert;
 
 const std::string OP_NAME = "MoeDistributeDispatchTeardown";
+constexpr int64_t CONTEXT_DIM0 = 2052;
+constexpr int64_t DEFAULT_CCL_BUFFER_SIZE = 12000;
+constexpr uint64_t CORE_NUM = 20;
+constexpr uint64_t UB_SIZE = 192 * 1024;
 
 template <typename T>
 auto build_from(const T &value)
@@ -109,7 +112,7 @@ class TestMoeDistributeTeardownTiling : public testing::TestWithParam<MoeDistrib
 protected:
     static void SetUpTestCase()
     {
-        setenv("HCCL_BUFFSIZE", "6000", 1);
+        setenv("HCCL_BUFFSIZE", "12000", 1);
         std::cout << "TestMoeDistributeTeardownTiling SetUp" << std::endl;
     }
 
@@ -155,7 +158,9 @@ static MoeDistributeDispatchTeardownTilingTestParam test_cases[] = {
      ge::DT_INT32,
      ge::DT_INT64,
      ge::GRAPH_SUCCESS,
-     10000UL},
+     10000UL,
+     nullptr,
+     nullptr},
 
     //===============================================quantMode边界值校验====================================================
     // quantMode = -1 (下边界外，无效值，应返回失败)
@@ -191,7 +196,9 @@ static MoeDistributeDispatchTeardownTilingTestParam test_cases[] = {
      ge::DT_INT32,
      ge::DT_INT64,
      ge::GRAPH_FAILED,
-     0UL},
+     0UL,
+     nullptr,
+     nullptr},
 
     // quantMode = 0 (下边界，UNQUANT模式，应成功)
     {4,
@@ -226,7 +233,9 @@ static MoeDistributeDispatchTeardownTilingTestParam test_cases[] = {
      ge::DT_INT32,
      ge::DT_INT64,
      ge::GRAPH_SUCCESS,
-     10000UL},
+     10000UL,
+     nullptr,
+     nullptr},
 
     // quantMode = 4 (上边界，MX_QUANT模式，应成功)
     {4,
@@ -261,7 +270,9 @@ static MoeDistributeDispatchTeardownTilingTestParam test_cases[] = {
      ge::DT_INT32,
      ge::DT_INT64,
      ge::GRAPH_SUCCESS,
-     10004UL},
+     10004UL,
+     nullptr,
+     nullptr},
 
     // quantMode = 5 (上边界外，无效值，应返回失败)
     {4,
@@ -296,7 +307,9 @@ static MoeDistributeDispatchTeardownTilingTestParam test_cases[] = {
      ge::DT_INT32,
      ge::DT_INT64,
      ge::GRAPH_FAILED,
-     0UL},
+     0UL,
+     nullptr,
+     nullptr},
 
     //================================================================================================
     // 以下为根据 moe_distribute_dispatch_teardown_tiling_cases.csv 追加的 88 条用例（严格只新增）
@@ -1574,7 +1587,7 @@ static MoeDistributeDispatchTeardownTilingTestParam test_cases[] = {
      nullptr,
      nullptr},
 
-    // IC-01: group_ep空字符串
+    // IC-01: group_ep 已从接口移除，空串不再作为非法属性校验
     {4,
      4,
      "invalid_group_ep_empty",
@@ -1606,12 +1619,12 @@ static MoeDistributeDispatchTeardownTilingTestParam test_cases[] = {
      ge::DT_FLOAT,
      ge::DT_INT32,
      ge::DT_INT64,
-     ge::GRAPH_FAILED,
-     0UL,
+     ge::GRAPH_SUCCESS,
+     10000UL,
      "",
      nullptr},
 
-    // IC-02: group_ep长度>=128
+    // IC-02: group_ep 已从接口移除，超长字符串不再作为非法属性校验
     {4,
      4,
      "invalid_group_ep_too_long",
@@ -1643,8 +1656,8 @@ static MoeDistributeDispatchTeardownTilingTestParam test_cases[] = {
      ge::DT_FLOAT,
      ge::DT_INT32,
      ge::DT_INT64,
-     ge::GRAPH_FAILED,
-     0UL,
+     ge::GRAPH_SUCCESS,
+     10000UL,
      "__LONG128__",
      nullptr},
 
@@ -3579,7 +3592,7 @@ struct MoeDistributeDispatchTeardownCompileInfo {
 
 static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatchTeardownTilingTestParam &param)
 {
-    // 存储用例中输入信息
+    // 存储用例中输入信息：context 为必选第 0 输入，其后为 x/y/expert_ids/comm_cmd_info
     std::vector<pair<std::initializer_list<int64_t>, ge::DataType>> inputshapeDtypeList = {
         {param.x, param.x_dtype},
         {param.y, param.y_dtype},
@@ -3587,27 +3600,21 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatc
         {param.comm_cmd_info, param.comm_cmd_info_dtype}};
     // 构造输入信息
     std::vector<gert::TilingContextPara::TensorDescription> inputTensorDesc;
+    inputTensorDesc.push_back({make_shape({CONTEXT_DIM0}), ge::DT_INT32, ge::FORMAT_ND});
     for (int i = 0; i < param.inputTotalNum; i++) {
         inputTensorDesc.push_back(
             {make_shape(inputshapeDtypeList[i].first), inputshapeDtypeList[i].second, ge::FORMAT_ND});
     }
 
     // 构造输入Attr信息
-    // group_ep：默认 "ep_group"；sentinel "__LONG128__" 展开为 128 个 'a'
-    // comm_alg：默认 ""
-    uint32_t groupLen = 128;
-    std::string groupEpStr =
-        (param.groupEpOverride == nullptr) ? std::string("ep_group") : std::string(param.groupEpOverride);
-    if (groupEpStr == "__LONG128__") {
-        groupEpStr = std::string(groupLen, 'a');
-    }
+    // group_ep 已从算子接口移除；comm_alg：默认 ""
     std::string commAlgStr = (param.commAlgOverride == nullptr) ? std::string("") : std::string(param.commAlgOverride);
 
     std::vector<gert::TilingContextPara::OpAttr> attrs({
-        {"group_ep", build_from<std::string>(groupEpStr)},
         {"ep_world_size", build_from<int64_t>(param.epWorldSize)},
         {"ep_rank_id", build_from<int64_t>(param.epRankId)},
         {"moe_expert_num", build_from<int64_t>(param.moeExpertNum)},
+        {"ccl_buffer_size", build_from<int64_t>(DEFAULT_CCL_BUFFER_SIZE)},
         {"expert_shard_type", build_from<int64_t>(param.expertShardType)},
         {"shared_expert_num", build_from<int64_t>(param.sharedExpertNum)},
         {"shared_expert_rank_num", build_from<int64_t>(param.sharedExpertRankNum)},
@@ -3631,51 +3638,17 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatc
             {make_shape(outputshapeDtypeList[i].first), outputshapeDtypeList[i].second, ge::FORMAT_ND});
     }
 
-    return gert::TilingContextPara(OP_NAME, inputTensorDesc, outputTensorDesc, attrs, &compileInfo, param.socVersion);
-}
-
-// 多线程执行用例集
-static void ThreadFunc(const MoeDistributeDispatchTeardownTilingTestParam *testCases, size_t testcase_num,
-                       size_t thread_idx, size_t thread_num)
-{
-    for (size_t idx = thread_idx; idx < testcase_num; idx += thread_num) {
-        auto param = testCases[idx];
-        auto tilingContextPara = BuildTilingContextPara(param);
-        std::cout << "[TEST_CASE] " << param << std::endl;
-        if (param.expectResult == ge::GRAPH_SUCCESS) {
-            // 正常用例分支
-            ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey);
-        } else {
-            // 异常用例分支
-            ExecuteTestCase(tilingContextPara);
-        }
-    }
-}
-
-static void TestMultiThread(const MoeDistributeDispatchTeardownTilingTestParam *testCases, size_t testcase_num,
-                            size_t thread_num)
-{
-    std::thread threads[thread_num];
-    for (size_t idx = 0; idx < thread_num; ++idx) {
-        threads[idx] = std::thread(ThreadFunc, testCases, testcase_num, idx, thread_num);
-    }
-    for (size_t idx = 0; idx < thread_num; ++idx) {
-        threads[idx].join();
-    }
+    return gert::TilingContextPara(OP_NAME, inputTensorDesc, outputTensorDesc, attrs, &compileInfo, param.socVersion,
+                                   CORE_NUM, UB_SIZE);
 }
 
 TEST_P(TestMoeDistributeTeardownTiling, general_cases)
 {
     auto param = GetParam();
     auto tilingContextPara = BuildTilingContextPara(param);
-    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", param.rankNum}};
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", param.epWorldSize},
+                                               {"HCCL_BUFFSIZE", 12000UL * 1024UL * 1024UL}};
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, param.expectResult, param.expectTilingKey);
-}
-
-TEST_F(TestMoeDistributeTeardownTiling, general_cases_multi_thread)
-{
-    size_t thread_num = 3;
-    TestMultiThread(test_cases, sizeof(test_cases) / sizeof(MoeDistributeDispatchTeardownTilingTestParam), thread_num);
 }
 
 INSTANTIATE_TEST_CASE_P(MoeDistributeDispatchTeardownTilingUT, TestMoeDistributeTeardownTiling,

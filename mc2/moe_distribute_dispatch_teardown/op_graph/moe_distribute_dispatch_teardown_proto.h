@@ -24,6 +24,7 @@ namespace ge {
 
 * @par Inputs
 * Four inputs, including:
+* @li context: A tensor. Support dtype: int32, dimension must be 1. Shape supports (2052, ), support format: ND.
 * @li x: A tensor. Support dtype: float16, bfloat16, dimension must be 2. Shape supports (BS, H), support format: ND.
 * @li y: A tensor. Support dtype: float16, bfloat16, dimension must be 2. Shape supports (BS * (K + sharedExpertNum),
 tokenMsgSize), support format: ND.
@@ -33,15 +34,17 @@ supports (BS, K), support format: ND.
 sharedExpertNum) + epWorldSize * localExpertNum) * 16), support format: ND.
 
 * @par Attributes
-* @li group_ep: Required. Input ep comm group name, ep means experts parallelism, dtype: String.
 * @li ep_world_size: Required. Input ep comm world size, value range: [2, 384], dtype: int64.
 * @li ep_rank_id: Required. Input ep comm rank Id, value range: [0, epWorldSize), dtype: int64.
 * @li moe_expert_num: Required. Input number of moe experts, value range: (0, 512] and must satisfy moeExpertNum %
 (epWorldSize - SharedExpertRankNum) = 0, dtype: int64.
-* @li expert_shard_type: The shard type of shared expert rank. Only 0 (the shared expert rank is placed before moe
-expert rank) is supported currently, dtype: int64. Default: 0.
+* @li ccl_buffer_size: Required, Input ccl buffer size, Support Range: [0, MAX_INT32)，MAX_INT32 = 2^31 - 1,
+dtype: Int64.
+* @li expert_shard_type: The shard type of shared expert rank. Only 0 (the shared expert rank is placed
+before moe expert rank) is supported currently, dtype: int64. Default: 0.
 * @li shared_expert_num: Input shared expert num, value range: [0, 4], dtype: int64. Default: 1.
-* @li shared_expert_rank_num: Input shared expert rank num, value range: [0, epWorldSize / 2], dtype: int64. Default: 0.
+* @li shared_expert_rank_num: Input shared expert rank num, value range: [0, epWorldSize / 2], dtype: int64.
+Default: 0.
 * @li quant_mode: Input quant mode. The options are 0 (non-quantization), and 2 (dynamic quantization). dtype: int64.
 Default: 0.
 * @li global_bs: Input global batch size, dtype: int64. Default: 0.
@@ -66,6 +69,7 @@ supports (A, ), support format: ND.
 support format: ND.
 */
 REG_OP(MoeDistributeDispatchTeardown)
+    .INPUT(context, TensorType({DT_INT32}))
     .INPUT(x, TensorType({DT_BF16, DT_FLOAT16}))
     .INPUT(y, TensorType({DT_BF16, DT_FLOAT16}))
     .INPUT(expert_ids, TensorType({DT_INT32}))
@@ -74,10 +78,10 @@ REG_OP(MoeDistributeDispatchTeardown)
     .OUTPUT(dynamic_scales, TensorType({DT_FLOAT}))
     .OUTPUT(assist_info_for_combine, TensorType({DT_INT32}))
     .OUTPUT(expert_token_nums, TensorType({DT_INT64}))
-    .REQUIRED_ATTR(group_ep, String)
     .REQUIRED_ATTR(ep_world_size, Int)
     .REQUIRED_ATTR(ep_rank_id, Int)
     .REQUIRED_ATTR(moe_expert_num, Int)
+    .REQUIRED_ATTR(ccl_buffer_size, Int)
     .ATTR(expert_shard_type, Int, 0)
     .ATTR(shared_expert_num, Int, 1)
     .ATTR(shared_expert_rank_num, Int, 0)

@@ -17,25 +17,30 @@
 #include "moe_distribute_dispatch_setup_tiling_base.h"
 
 namespace {
-constexpr uint32_t X_INDEX = 0U;
-constexpr uint32_t EXPERT_IDS_INDEX = 1U;
-constexpr uint32_t SCALES_INDEX = 2U;
-constexpr uint32_t X_ACTIVE_MASK_INDEX = 3U;
-constexpr uint32_t OUTPUT_Y_INDEX = 0U;
-constexpr uint32_t OUTPUT_EXPAND_IDX_INDEX = 1U;
-constexpr uint32_t OUTPUT_COMM_CMD_INFO_INDEX = 2U;
+// -----------------------------aclnnInner接口参数列表----------------------------- //
+constexpr uint32_t CONTEXT_INDEX = 0;
+constexpr uint32_t X_INDEX = 1;
+constexpr uint32_t EXPERT_IDS_INDEX = 2;
+constexpr uint32_t SCALES_INDEX = 3;
+constexpr uint32_t X_ACTIVE_MASK_INDEX = 4;
 
-constexpr uint32_t ATTR_GROUP_EP_INDEX = 0U;
-constexpr uint32_t ATTR_EP_WORLD_SIZE_INDEX = 1U;
-constexpr uint32_t ATTR_EP_RANK_ID_INDEX = 2U;
-constexpr uint32_t ATTR_MOE_EXPERT_NUM_INDEX = 3U;
-constexpr uint32_t ATTR_EXPERT_SHARD_TYPE_INDEX = 4U;
-constexpr uint32_t ATTR_SHARED_EXPERT_NUM_INDEX = 5U;
-constexpr uint32_t ATTR_SHARED_EXPERT_RANK_NUM_INDEX = 6U;
-constexpr uint32_t ATTR_QUANT_MODE_INDEX = 7U;
-constexpr uint32_t ATTR_GLOBAL_BS_INDEX = 8U;
-constexpr uint32_t ATTR_COMM_TYPE_INDEX = 9U;
-constexpr uint32_t ATTR_COMM_ALG_INDEX = 10U;
+constexpr uint32_t ATTR_EP_WORLD_SIZE_INDEX = 0;
+constexpr uint32_t ATTR_EP_RANK_ID_INDEX = 1;
+constexpr uint32_t ATTR_MOE_EXPERT_NUM_INDEX = 2;
+constexpr uint32_t ATTR_CCL_BUFFER_SIZE_INDEX = 3;
+constexpr uint32_t ATTR_EXPERT_SHARD_TYPE_INDEX = 4;
+constexpr uint32_t ATTR_SHARED_EXPERT_NUM_INDEX = 5;
+constexpr uint32_t ATTR_SHARED_EXPERT_RANK_NUM_INDEX = 6;
+constexpr uint32_t ATTR_QUANT_MODE_INDEX = 7;
+constexpr uint32_t ATTR_GLOBAL_BS_INDEX = 8;
+constexpr uint32_t ATTR_COMM_TYPE_INDEX = 9;
+constexpr uint32_t ATTR_COMM_ALG_INDEX = 10;
+constexpr uint32_t ATTR_Y_DTYPE_INDEX = 11;
+
+constexpr uint32_t OUTPUT_Y_INDEX = 0;
+constexpr uint32_t OUTPUT_EXPAND_IDX_INDEX = 1;
+constexpr uint32_t OUTPUT_COMM_CMD_INFO_INDEX = 2;
+// -----------------------------aclnnInner接口参数列表----------------------------- //
 
 constexpr uint32_t ONE_DIMS = 1U;
 constexpr uint32_t TWO_DIMS = 2U;
@@ -126,18 +131,10 @@ const void MoeDistributeDispatchSetupTilingBase::PrintTilingDataInfo()
 const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckRequiredAttrValue()
 {
     auto attrs = context_->GetAttrs();
-    auto groupEpPtr = attrs->GetAttrPointer<char>(ATTR_GROUP_EP_INDEX);
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX);
     auto epRankIdPtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_RANK_ID_INDEX);
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_MOE_EXPERT_NUM_INDEX);
 
-    OP_TILING_CHECK(((strnlen(groupEpPtr, MAX_GROUP_NAME_LENGTH) == 0) ||
-                     (strnlen(groupEpPtr, MAX_GROUP_NAME_LENGTH) == MAX_GROUP_NAME_LENGTH)),
-                    OP_LOGE_WITH_INVALID_ATTR(
-                        nodeName_, "groupEp",
-                        (std::string("length=") + std::to_string(strnlen(groupEpPtr, MAX_GROUP_NAME_LENGTH))).c_str(),
-                        "valid group name length"),
-                    return ge::GRAPH_FAILED);
     OP_TILING_CHECK(((*epWorldSizePtr < MIN_GROUP_EP_SIZE) || (*epWorldSizePtr > MAX_GROUP_EP_SIZE)),
                     OP_LOGE_WITH_INVALID_ATTR(nodeName_, "epWorldSize", std::to_string(*epWorldSizePtr).c_str(),
                                               (std::string("[") + std::to_string(MIN_GROUP_EP_SIZE) + ", " +
@@ -161,13 +158,11 @@ ge::graphStatus MoeDistributeDispatchSetupTilingBase::GetRequiredAttrAndSetTilin
     auto attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "attrs"), return ge::GRAPH_FAILED);
 
-    auto groupEpPtr = attrs->GetAttrPointer<char>(ATTR_GROUP_EP_INDEX);
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_MOE_EXPERT_NUM_INDEX);
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX);
     auto epRankIdPtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_RANK_ID_INDEX);
 
     // 判空
-    OP_TILING_CHECK(groupEpPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "groupEp"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "epWorldSize"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(epRankIdPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "epRankId"), return ge::GRAPH_FAILED);
@@ -179,7 +174,6 @@ ge::graphStatus MoeDistributeDispatchSetupTilingBase::GetRequiredAttrAndSetTilin
     }
 
     // 设置 tilingdata
-    groupEp_ = string(groupEpPtr);
     tilingData_->moeDistributeDispatchSetupInfo.epWorldSize = static_cast<uint32_t>(*epWorldSizePtr);
     tilingData_->moeDistributeDispatchSetupInfo.epRankId = static_cast<uint32_t>(*epRankIdPtr);
     tilingData_->moeDistributeDispatchSetupInfo.moeExpertNum = static_cast<uint32_t>(*moeExpertNumPtr);
@@ -782,6 +776,27 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckHcclBuffSize()
 
     OP_TILING_CHECK(hcclBuffSize < hcclBuffSizeGolden,
                     OP_LOGE(nodeName_, "HCCL_BUFFSIZE [%lu] < [%lu].", hcclBuffSize, hcclBuffSizeGolden),
+                    return ge::GRAPH_FAILED);
+
+    // arch35: totalWin 按 D/C 各半、区内 /4 乒乓
+    OP_TILING_CHECK(
+        (hcclBuffSize % 4ULL) != 0ULL,
+        OP_LOGE(nodeName_, "totalWinSize [%lu] must be divisible by 4 for D/C data partition.", hcclBuffSize),
+        return ge::GRAPH_FAILED);
+    const uint64_t dataBankSize = hcclBuffSize / 4ULL;
+    const uint64_t dataNeed = static_cast<uint64_t>(epWorldSize) * static_cast<uint64_t>(localExpertNum) *
+                              static_cast<uint64_t>(maxBs) * align;
+    OP_TILING_CHECK(dataNeed > dataBankSize,
+                    OP_LOGE(nodeName_, "dispatch data need [%lu] > active data bank totalWin/4 [%lu] (totalWin=%lu).",
+                            dataNeed, dataBankSize, hcclBuffSize),
+                    return ge::GRAPH_FAILED);
+    const uint64_t recvWinBlockNum = static_cast<uint64_t>(epWorldSize) * static_cast<uint64_t>(localExpertNum);
+    const uint64_t stateOffset = (recvWinBlockNum > 512ULL) ? 256ULL : 512ULL;
+    constexpr uint64_t DISPATCH_STATE_BANK = 256ULL * 1024ULL;
+    const uint64_t statusNeed = recvWinBlockNum * stateOffset;
+    OP_TILING_CHECK(statusNeed > DISPATCH_STATE_BANK,
+                    OP_LOGE(nodeName_, "dispatch status need [%lu] > D status bank [%lu] (blocks=%lu stateOffset=%lu).",
+                            statusNeed, DISPATCH_STATE_BANK, recvWinBlockNum, stateOffset),
                     return ge::GRAPH_FAILED);
 
     tilingData_->moeDistributeDispatchSetupInfo.totalWinSize = hcclBuffSize;

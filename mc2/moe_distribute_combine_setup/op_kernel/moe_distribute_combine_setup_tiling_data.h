@@ -37,6 +37,10 @@ struct MoeDistributeCombineSetupInfo {
     uint32_t aivNum;
     uint64_t totalUbSize;
     uint64_t totalWinSize;
+    bool isMc2Context;
+    bool reserved1;
+    bool reserved2;
+    bool reserved3;
 };
 
 struct MoeDistributeCombineSetupTilingData {

@@ -12,6 +12,7 @@
  * \file test_moe_distribute_combine_teardown_tiling.cpp
  * \brief host侧tiling ut
  */
+#include <cstdlib>
 #include <iostream>
 #include <fstream>
 #include <thread>
@@ -23,6 +24,19 @@
 namespace MoeDistributeCombineTeardownUT {
 
 const std::string OP_NAME = "MoeDistributeCombineTeardown";
+constexpr int64_t CONTEXT_DIM0 = 2052;
+constexpr int64_t DEFAULT_CCL_BUFFER_SIZE = 12000;
+constexpr uint64_t CORE_NUM = 20;
+constexpr uint64_t UB_SIZE = 192 * 1024;
+
+// SetHCCL_BUFFSIZE
+struct HcclBuffSizeSetter {
+    HcclBuffSizeSetter()
+    {
+        setenv("HCCL_BUFFSIZE", "12000", 1);
+    }
+};
+static HcclBuffSizeSetter hcclBuffSizeSetter;
 
 struct MoeDistributeCombineTeardownTestParam {
     std::string caseName;
@@ -2425,7 +2439,7 @@ static MoeDistributeCombineTeardownTestParam g_testCases[] = {
      2,
      "",
      "3510",
-     ge::GRAPH_FAILED,
+     ge::GRAPH_SUCCESS,
      0UL,
      "",
      {33554432},
@@ -2470,7 +2484,7 @@ static MoeDistributeCombineTeardownTestParam g_testCases[] = {
      2,
      "",
      "3510",
-     ge::GRAPH_FAILED,
+     ge::GRAPH_SUCCESS,
      0UL,
      "",
      {33554432},
@@ -2516,7 +2530,7 @@ static MoeDistributeCombineTeardownTestParam g_testCases[] = {
      2,
      "",
      "3510",
-     ge::GRAPH_FAILED,
+     ge::GRAPH_SUCCESS,
      0UL,
      "",
      {33554432},
@@ -4011,11 +4025,13 @@ class MoeDistributeCombineTeardownTilingTest : public testing::TestWithParam<Moe
 protected:
     static void SetUpTestCase()
     {
+        setenv("HCCL_BUFFSIZE", "12000", 1);
         std::cout << "MoeDistributeCombineTeardownTilingTest SetUp." << std::endl;
     }
 
     static void TearDownTestCase()
     {
+        unsetenv("HCCL_BUFFSIZE");
         std::cout << "MoeDistributeCombineTeardownTilingTest TearDown." << std::endl;
     }
 };
@@ -4037,7 +4053,8 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombine
     gert::StorageShape sharedExpertXOptionalShape = {param.sharedExpertXOptionalShape,
                                                      param.sharedExpertXOptionalShape};
     std::vector<gert::TilingContextPara::TensorDescription> inputTensorDesc_(
-        {{expandXShape, param.expandXDtype, param.expandXFormat},
+        {{gert::StorageShape{{CONTEXT_DIM0}, {CONTEXT_DIM0}}, ge::DT_INT32, ge::FORMAT_ND},
+         {expandXShape, param.expandXDtype, param.expandXFormat},
          {quantExpandXShape, param.quantExpandXDtype, param.quantExpandXFormat},
          {expertIdsShape, param.expertIdsDtype, param.expertIdsFormat},
          {expandIdxShape, param.expandIdxDtype, param.expandIdxFormat},
@@ -4046,18 +4063,22 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombine
     if (param.xActiveMaskOptionalShape.size() > 0) {
         inputTensorDesc_.push_back(
             {xActiveMaskOptionalShape, param.xActiveMaskOptionalDtype, param.xActiveMaskOptionalFormat});
+    } else {
+        inputTensorDesc_.push_back({gert::StorageShape{}, ge::DT_BOOL, ge::FORMAT_ND});
     }
     if (param.sharedExpertXOptionalShape.size() > 0) {
         inputTensorDesc_.push_back(
             {sharedExpertXOptionalShape, param.sharedExpertXOptionalDtype, param.sharedExpertXOptionalFormat});
+    } else {
+        inputTensorDesc_.push_back({gert::StorageShape{}, ge::DT_FLOAT16, ge::FORMAT_ND});
     }
     std::vector<gert::TilingContextPara::TensorDescription> outputTensorDesc_(
         {{xOutShape, param.xOutDtype, param.xOutFormat}});
     std::vector<gert::TilingContextPara::OpAttr> attrs_(
-        {{"group_ep", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.groupEpAttr)},
-         {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.epWorldSizeAttr)},
+        {{"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.epWorldSizeAttr)},
          {"ep_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.epRankIdAttr)},
          {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.moeExpertNumAttr)},
+         {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(DEFAULT_CCL_BUFFER_SIZE)},
          {"expert_shard_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.expertShardTypeAttr)},
          {"shared_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.sharedExpertNumAttr)},
          {"shared_expert_rank_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.sharedExpertRankNumAttr)},
@@ -4065,8 +4086,8 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombine
          {"comm_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.commQuantModeAttr)},
          {"comm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.commTypeAttr)},
          {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.commAlgAttr)}});
-    return gert::TilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo,
-                                   param.socVersion);
+    return gert::TilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo, param.socVersion,
+                                   CORE_NUM, UB_SIZE);
 }
 
 static void ThreadFunction(const MoeDistributeCombineTeardownTestParam *testCases, size_t caseNum, size_t threadIdx,
@@ -4075,8 +4096,8 @@ static void ThreadFunction(const MoeDistributeCombineTeardownTestParam *testCase
     for (size_t idx = threadIdx; idx < caseNum; idx += threadNum) {
         auto param = testCases[idx];
         auto tilingContextPara = BuildTilingContextPara(param);
-        ExecuteTestCase(tilingContextPara, param.status, param.expectTilingKey, param.expectTilingData,
-                        param.expectWorkspaces, param.mc2TilingDataReservedLen);
+        ExecuteTestCase(tilingContextPara, param.status, param.expectTilingKey, param.expectTilingData, {},
+                        param.mc2TilingDataReservedLen);
     }
 }
 
@@ -4101,9 +4122,10 @@ TEST_P(MoeDistributeCombineTeardownTilingTest, GeneralCasesTest)
 {
     auto param = GetParam();
     auto tilingContextPara = BuildTilingContextPara(param);
-    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", param.epWorldSizeAttr}};
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", param.epWorldSizeAttr},
+                                               {"HCCL_BUFFSIZE", 12000UL * 1024UL * 1024UL}};
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, param.status, param.expectTilingKey,
-                       param.expectTilingData, param.expectWorkspaces, param.mc2TilingDataReservedLen);
+                       param.expectTilingData, {}, param.mc2TilingDataReservedLen);
 }
 
 INSTANTIATE_TEST_CASE_P(MoeDistributeCombineTeardownTilingUT, MoeDistributeCombineTeardownTilingTest,

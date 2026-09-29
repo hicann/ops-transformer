@@ -22,30 +22,11 @@ public:
     explicit MoeDistributeCombineTeardown(const char *name)
         : OpDef(name)
     {
-        DefineRequiredInputs();
-        DefineOptionalInputs();
-        this->Output("x").ParamType(REQUIRED).DataType({ge::DT_BF16, ge::DT_FLOAT16}).FormatList({ge::FORMAT_ND});
-        DefineAttributes();
-
-        OpAICoreConfig aicore_config;
-        aicore_config.DynamicCompileStaticFlag(true)
-            .DynamicFormatFlag(true)
-            .DynamicRankSupportFlag(true)
-            .DynamicShapeSupportFlag(true)
-            .NeedCheckSupportFlag(false)
-            .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
-            .ExtendCfgInfo("jitCompile.flag", "static_true")
-            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
-
-        this->AICore().AddConfig("ascend950", aicore_config);
-        this->MC2().HcclGroup("group_ep");
-    }
-
-private:
-    void DefineRequiredInputs()
-    {
+        this->Input("context")
+            .ParamType(REQUIRED)
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
         this->Input("expand_x")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_FLOAT16})
@@ -90,14 +71,11 @@ private:
             .DataType({ge::DT_BF16, ge::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
-    }
-
-    void DefineAttributes()
-    {
-        this->Attr("group_ep").AttrType(REQUIRED).String();
+        this->Output("x").ParamType(REQUIRED).DataType({ge::DT_BF16, ge::DT_FLOAT16}).FormatList({ge::FORMAT_ND});
         this->Attr("ep_world_size").AttrType(REQUIRED).Int();
         this->Attr("ep_rank_id").AttrType(REQUIRED).Int();
         this->Attr("moe_expert_num").AttrType(REQUIRED).Int();
+        this->Attr("ccl_buffer_size").AttrType(REQUIRED).Int();
         this->Attr("expert_shard_type").AttrType(OPTIONAL).Int(0);
         this->Attr("shared_expert_num").AttrType(OPTIONAL).Int(1);
         this->Attr("shared_expert_rank_num").AttrType(OPTIONAL).Int(0);
@@ -105,6 +83,20 @@ private:
         this->Attr("comm_quant_mode").AttrType(OPTIONAL).Int(0);
         this->Attr("comm_type").AttrType(OPTIONAL).Int(0);
         this->Attr("comm_alg").AttrType(OPTIONAL).String("");
+
+        OpAICoreConfig aicore_config;
+        aicore_config.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("prebuildPattern.value", "Opaque")
+            .ExtendCfgInfo("jitCompile.flag", "static_true")
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
+
+        this->AICore().AddConfig("ascend950", aicore_config);
     }
 };
 

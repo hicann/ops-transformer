@@ -17,16 +17,16 @@
 #include "moe_distribute_combine_setup_tiling_base.h"
 
 namespace {
-constexpr uint32_t EXPAND_X_INDEX = 0U;
-constexpr uint32_t EXPERT_IDS_INDEX = 1U;
-constexpr uint32_t ASSIST_INFO_INDEX = 2U;
-constexpr uint32_t QUANT_EXPAND_X_OUT_INDEX = 0U;
-constexpr uint32_t COMM_CMD_INFO_OUT_INDEX = 1U;
+// -----------------------------aclnnInner接口参数列表----------------------------- //
+constexpr uint32_t CONTEXT_INDEX = 0;
+constexpr uint32_t EXPAND_X_INDEX = 1;
+constexpr uint32_t EXPERT_IDS_INDEX = 2;
+constexpr uint32_t ASSIST_INFO_INDEX = 3;
 
-constexpr uint32_t ATTR_GROUP_EP_INDEX = 0;
-constexpr uint32_t ATTR_EP_WORLD_SIZE_INDEX = 1;
-constexpr uint32_t ATTR_EP_RANK_ID_INDEX = 2;
-constexpr uint32_t ATTR_MOE_EXPERT_NUM_INDEX = 3;
+constexpr uint32_t ATTR_EP_WORLD_SIZE_INDEX = 0;
+constexpr uint32_t ATTR_EP_RANK_ID_INDEX = 1;
+constexpr uint32_t ATTR_MOE_EXPERT_NUM_INDEX = 2;
+constexpr uint32_t ATTR_CCL_BUFFER_SIZE_INDEX = 3;
 constexpr uint32_t ATTR_EXPERT_SHARD_TYPE_INDEX = 4;
 constexpr uint32_t ATTR_SHARED_EXPERT_NUM_INDEX = 5;
 constexpr uint32_t ATTR_SHARED_EXPERT_RANK_NUM_INDEX = 6;
@@ -34,6 +34,10 @@ constexpr uint32_t ATTR_GLOBAL_BS_INDEX = 7;
 constexpr uint32_t ATTR_COMM_QUANT_MODE_INDEX = 8;
 constexpr uint32_t ATTR_COMM_TYPE_INDEX = 9;
 constexpr uint32_t ATTR_COMM_ALG_INDEX = 10;
+
+constexpr uint32_t QUANT_EXPAND_X_OUT_INDEX = 0;
+constexpr uint32_t COMM_CMD_INFO_OUT_INDEX = 1;
+// -----------------------------aclnnInner接口参数列表----------------------------- //
 
 constexpr uint32_t LOCAL_STREAM_MAX_NUM = 40U;
 constexpr uint32_t USED_AIV_NUMS = 40U;
@@ -109,14 +113,6 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckMoeExpertNum()
 ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckRequiredAttrValue()
 {
     auto attrs = context_->GetAttrs();
-    auto groupEpPtr = attrs->GetAttrPointer<char>(ATTR_GROUP_EP_INDEX);
-    OP_TILING_CHECK(((strnlen(groupEpPtr, MAX_GROUP_NAME_LENGTH) == 0) ||
-                     (strnlen(groupEpPtr, MAX_GROUP_NAME_LENGTH) == MAX_GROUP_NAME_LENGTH)),
-                    OP_LOGE_WITH_INVALID_ATTR(
-                        nodeName_, "groupEp",
-                        (std::string("length=") + std::to_string(strnlen(groupEpPtr, MAX_GROUP_NAME_LENGTH))).c_str(),
-                        "valid group name length"),
-                    return ge::GRAPH_FAILED);
 
     if (CheckEpWorldSize() != ge::GRAPH_SUCCESS || CheckMoeExpertNum() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -138,13 +134,11 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::GetRequiredAttrAndSetTiling
     auto attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "attrs"), return ge::GRAPH_FAILED);
 
-    auto groupEpPtr = attrs->GetAttrPointer<char>(ATTR_GROUP_EP_INDEX);
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX);
     auto epRankIdPtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_RANK_ID_INDEX);
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_MOE_EXPERT_NUM_INDEX);
 
     // 判空
-    OP_TILING_CHECK(groupEpPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "groupEp"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(epWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "epWorldSize"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(epRankIdPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "epRankId"), return ge::GRAPH_FAILED);
@@ -156,7 +150,6 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::GetRequiredAttrAndSetTiling
     }
 
     // 设置 tilingdata
-    groupEp_ = string(groupEpPtr);
     tilingData_->moeDistributeCombineSetupInfo.epWorldSize = static_cast<uint32_t>(*epWorldSizePtr);
     tilingData_->moeDistributeCombineSetupInfo.epRankId = static_cast<uint32_t>(*epRankIdPtr);
     tilingData_->moeDistributeCombineSetupInfo.moeExpertNum = static_cast<uint32_t>(*moeExpertNumPtr);
@@ -382,6 +375,16 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckTensorShapeRelation()
                 .c_str(),
             "Dim0 of expandX must be equal to dim0 of quantExpandXOut"),
         return ge::GRAPH_FAILED);
+
+    auto contextStorageShape = context_->GetInputShape(CONTEXT_INDEX);
+    OP_TILING_CHECK(contextStorageShape == nullptr, OP_LOGE(nodeName_, "contextShape is null."),
+                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
+                    OP_LOGE(nodeName_, "contextShape dims must be 1, but current dim num is %lu.",
+                            contextStorageShape->GetStorageShape().GetDimNum()),
+                    return ge::GRAPH_FAILED);
+    int64_t contextDim0 = contextStorageShape->GetStorageShape().GetDim(0);
+    OP_LOGD(nodeName_, "context dim0 = %ld", contextDim0);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -548,11 +551,12 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckTensorDataTypeAndForma
     auto assistInfoForCombineDesc = context_->GetInputDesc(ASSIST_INFO_INDEX);
     auto quantExpandXOutDesc = context_->GetOutputDesc(QUANT_EXPAND_X_OUT_INDEX);
     auto commCmdInfoOutDesc = context_->GetOutputDesc(COMM_CMD_INFO_OUT_INDEX);
+    auto contextDesc = context_->GetInputDesc(CONTEXT_INDEX);
 
-    OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "expandX"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(expertIdsDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "expertIds"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(assistInfoForCombineDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "assistInfoForCombine"),
+    OP_TILING_CHECK(contextDesc == nullptr, OP_LOGE(nodeName_, "contextDesc is null."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE(nodeName_, "expandX is null."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(expertIdsDesc == nullptr, OP_LOGE(nodeName_, "expertIds is null."), return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(assistInfoForCombineDesc == nullptr, OP_LOGE(nodeName_, "assistInfoForCombine is null."),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(quantExpandXOutDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName_, "quantExpandXOut"),
                     return ge::GRAPH_FAILED);
@@ -572,6 +576,7 @@ bool MoeDistributeCombineSetupTilingBase::CheckTensorDataType()
     auto assistInfoForCombineDesc = context_->GetInputDesc(ASSIST_INFO_INDEX);
     auto quantExpandXOutDesc = context_->GetOutputDesc(QUANT_EXPAND_X_OUT_INDEX);
     auto commCmdInfoOutDesc = context_->GetOutputDesc(COMM_CMD_INFO_OUT_INDEX);
+    auto contextDesc = context_->GetInputDesc(CONTEXT_INDEX);
 
     OP_TILING_CHECK(
         (expandXDesc->GetDataType() != ge::DT_BF16) && (expandXDesc->GetDataType() != ge::DT_FLOAT16),
@@ -595,6 +600,10 @@ bool MoeDistributeCombineSetupTilingBase::CheckTensorDataType()
                     OP_LOGE_FOR_INVALID_DTYPE(nodeName_, "commCmdInfoOut",
                                               Ops::Base::ToString(commCmdInfoOutDesc->GetDataType()).c_str(), "int32"),
                     return false);
+    OP_TILING_CHECK(contextDesc->GetDataType() != ge::DT_INT32,
+                    OP_LOGE(nodeName_, "context dataType is invalid, dataType should be int32, but is %s.",
+                            Ops::Base::ToString(contextDesc->GetDataType()).c_str()),
+                    return false);
     return true;
 }
 
@@ -605,6 +614,7 @@ bool MoeDistributeCombineSetupTilingBase::CheckTensorDataFormat()
     auto assistInfoForCombineDesc = context_->GetInputDesc(ASSIST_INFO_INDEX);
     auto quantExpandXOutDesc = context_->GetOutputDesc(QUANT_EXPAND_X_OUT_INDEX);
     auto commCmdInfoOutDesc = context_->GetOutputDesc(COMM_CMD_INFO_OUT_INDEX);
+    auto contextDesc = context_->GetInputDesc(CONTEXT_INDEX);
 
     ge::Format expandXFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(expandXDesc->GetStorageFormat()));
     OP_TILING_CHECK(
@@ -637,6 +647,10 @@ bool MoeDistributeCombineSetupTilingBase::CheckTensorDataFormat()
     OP_TILING_CHECK((commCmdInfoFormat == ge::FORMAT_FRACTAL_NZ),
                     OP_LOGE_FOR_INVALID_FORMAT(nodeName_, "commCmdInfoOut",
                                                Ops::Base::ToString(commCmdInfoFormat).c_str(), "FRACTAL_NZ"),
+                    return false);
+
+    ge::Format contextFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(contextDesc->GetStorageFormat()));
+    OP_TILING_CHECK((contextFormat == ge::FORMAT_FRACTAL_NZ), OP_LOGE(nodeName_, "context format is invalid."),
                     return false);
 
     return true;
@@ -683,6 +697,31 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::CheckHcclBuffSize()
                     OP_LOGE(nodeName_, "HCCL_BUFFSIZE [%lu] < [%lu].", hcclBuffSize, hcclBuffSizeGolden),
                     return ge::GRAPH_FAILED);
 
+    // arch35: totalWin 按 D/C 各半、区内 /4 乒乓；需 4 对齐，且单活跃 bank 装得下本算子数据/状态
+    OP_TILING_CHECK(
+        (hcclBuffSize % 4ULL) != 0ULL,
+        OP_LOGE(nodeName_, "totalWinSize [%lu] must be divisible by 4 for D/C data partition.", hcclBuffSize),
+        return ge::GRAPH_FAILED);
+    const uint64_t dataBankSize = hcclBuffSize / 4ULL;
+    // combine token 块按 H*2B 估上界（与既有 golden 一致），布局约 W*E*maxBs*tokenBytes
+    const uint64_t tokenBytes =
+        static_cast<uint64_t>(ops::CeilAlign(static_cast<int64_t>(H) * 2, static_cast<int64_t>(ALIGN_32)));
+    const uint64_t dataNeed = static_cast<uint64_t>(epWorldSize) * static_cast<uint64_t>(localExpertNum) *
+                              static_cast<uint64_t>(maxBs) * tokenBytes;
+    OP_TILING_CHECK(dataNeed > dataBankSize,
+                    OP_LOGE(nodeName_, "combine data need [%lu] > active data bank totalWin/4 [%lu] (totalWin=%lu).",
+                            dataNeed, dataBankSize, hcclBuffSize),
+                    return ge::GRAPH_FAILED);
+    const uint64_t moeSendNum = static_cast<uint64_t>(epWorldSize) * static_cast<uint64_t>(localExpertNum);
+    const uint64_t stateOffset = (moeSendNum > 512ULL) ? 256ULL : 512ULL;
+    constexpr uint64_t COMBINE_STATE_BANK = 128ULL * 1024ULL;
+    const uint64_t statusNeed = static_cast<uint64_t>(epWorldSize) * stateOffset;
+    OP_TILING_CHECK(
+        statusNeed > COMBINE_STATE_BANK,
+        OP_LOGE(nodeName_, "combine status need [%lu] > C status bank [%lu] (epWorldSize=%u stateOffset=%lu).",
+                statusNeed, COMBINE_STATE_BANK, epWorldSize, stateOffset),
+        return ge::GRAPH_FAILED);
+
     tilingData_->moeDistributeCombineSetupInfo.totalWinSize = hcclBuffSize;
 
     return ge::GRAPH_SUCCESS;
@@ -711,14 +750,11 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::SetWorkspace()
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
     size_t libApiWorkSpaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
+
     workspace[0] = libApiWorkSpaceSize;
     OP_LOGD(nodeName_, "workspace[0] size is %lu", workspace[0]);
-    return ge::GRAPH_SUCCESS;
-}
 
-void MoeDistributeCombineSetupTilingBase::SetHcommCfg()
-{
-    return;
+    return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus MoeDistributeCombineSetupTilingBase::MoeDistributeCombineSetupTilingFuncImpl()
@@ -752,7 +788,6 @@ ge::graphStatus MoeDistributeCombineSetupTilingBase::MoeDistributeCombineSetupTi
     }
 
     SetTilingKey();
-    SetHcommCfg();
     PrintTilingDataInfo();
     OP_LOGD(nodeName_, "MoeDistributeCombineSetupTilingFunc success");
     return ge::GRAPH_SUCCESS;

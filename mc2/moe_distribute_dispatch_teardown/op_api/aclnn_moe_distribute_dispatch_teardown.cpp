@@ -18,9 +18,12 @@
 #include "opdev/common_types.h"
 #include "op_host/util/op_const_def.h"
 #include "aclnnInner_moe_distribute_dispatch_teardown.h"
+#include "log/log.h"
+#include "common/op_api/mc2_context.h"
 #include "mc2_log_compat.h"
 
 using namespace op;
+using namespace Mc2Aclnn;
 
 #ifdef __cplusplus
 extern "C" {
@@ -98,12 +101,19 @@ aclnnStatus aclnnMoeDistributeDispatchTeardownGetWorkspaceSize(
                                  assistInfoForCombineOut, expertTokenNumsOut);
     CHECK_RET(ret_param == ACLNN_SUCCESS, ret_param);
 
-    aclnnStatus ret = aclnnInnerMoeDistributeDispatchTeardownGetWorkspaceSize(
-        x, y, expertIds, commCmdInfo, const_cast<char *>(groupEp), epWorldSize, epRankId, moeExpertNum, expertShardType,
+    aclnnStatus retStatus;
+    uint64_t hcclBuffSize = 0;
+    aclTensor *mc2Context = nullptr;
+    const char *opName = "moe_distribute_a2av_setup_teardown";
+    retStatus = Mc2Aclnn::Mc2Context::GetMc2ContextTensor(groupEp, opName, hcclBuffSize, mc2Context,
+                                                          CommProtocol::COMM_PROTOCOL_UBC_CTP);
+    CHECK_RET(retStatus == ACLNN_SUCCESS, retStatus);
+    retStatus = aclnnInnerMoeDistributeDispatchTeardownGetWorkspaceSize(
+        mc2Context, x, y, expertIds, commCmdInfo, epWorldSize, epRankId, moeExpertNum, hcclBuffSize, expertShardType,
         sharedExpertNum, sharedExpertRankNum, quantMode, globalBs, expertTokenNumsType, commType,
         const_cast<char *>(commAlg), expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
         workspaceSize, executor);
-    return ret;
+    return retStatus;
 }
 
 aclnnStatus aclnnMoeDistributeDispatchTeardown(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
