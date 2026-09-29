@@ -183,7 +183,9 @@ if(UT_TEST_ALL OR OP_GRAPH_UT)
     )
   function(add_opgraph_ut_modules OP_GRAPH_MODULE_NAME)
     if(NOT TARGET ${OP_GRAPH_MODULE_NAME}_cases_obj)
-      add_library(${OP_GRAPH_MODULE_NAME}_cases_obj OBJECT ${UT_PATH}/op_api/stub/opdev/platform.cpp)
+      # rt_soc_spec_mocker 提供 rtGetSocSpec 的 mock 实现（融合 pass 按 NpuArch 门控时在 UT 内可控）
+      add_library(${OP_GRAPH_MODULE_NAME}_cases_obj OBJECT ${UT_PATH}/op_api/stub/opdev/platform.cpp
+                                                          ${UT_PATH}/common/rt_soc_spec_mocker.cpp)
     endif()
     target_include_directories(
       ${OP_GRAPH_MODULE_NAME}_cases_obj

@@ -44,6 +44,7 @@ if(UT_TEST_ALL OR OP_GRAPH_UT)
       graph_base
       exe_graph
       ge_common
+      ge_compiler
       register
       platform
       gtest
