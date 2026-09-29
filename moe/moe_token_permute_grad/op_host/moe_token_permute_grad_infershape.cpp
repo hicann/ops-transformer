@@ -12,6 +12,8 @@
  * \file moe_token_permute_grad_infershape.cpp
  * \brief
  */
+#include <string>
+
 #include "log/log.h"
 #include "register/op_impl_registry.h"
 #include "util/math_util.h"
@@ -24,6 +26,11 @@ static ge::graphStatus InferShapeForMoeTokenPermuteGrad(gert::InferShapeContext*
     const gert::Shape* permuted_inputs_shape = context->GetInputShape(0);
     const int64_t* top_k = context->GetAttrs()->GetAttrPointer<int64_t>(0);
     int64_t topk = *top_k;
+    if (topk <= 0) {
+        std::string topkStr = std::to_string(topk);
+        OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "num_topk", topkStr.c_str(), "greater than 0");
+        return GRAPH_FAILED;
+    }
     int64_t tokens_num = permuted_inputs_shape->GetDim(0) / topk;
 
     gert::Shape* out_shape = context->GetOutputShape(0);
