@@ -82,7 +82,6 @@ transformer-1@ops-transformer:
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_block_cube_noquant_mla.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_kernel_noquant_mla.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_noquant_block_cube_fused_infer.h
-                - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_noquant_block_vec_base_fused_infer.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_noquant_block_vec_infer.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_noquant_kernel_base_fused_infer.h
                 - ops/ops-transformer/attention/fused_infer_attention_score/op_kernel/arch35/flash_attention_noquant_kernel_infer.h
