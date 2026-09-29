@@ -126,26 +126,16 @@ static const std::map<QSFALayout, size_t> QSFA_LAYOUT_DIM_MAP = {
     {QSFALayout::PA_BSND, DIM_NUM_FOUR},
 };
 
-static std::vector<int64_t> ToVector(const gert::Shape &shape)
-{
-    size_t shapeSize = shape.GetDimNum();
-    std::vector<int64_t> shapeVec(shapeSize, 0);
-
-    for (size_t i = 0; i < shapeSize; i++) {
-        shapeVec[i] = shape.GetDim(i);
-    }
-    return shapeVec;
-}
-
 static std::string ToStringRaw(const gert::Shape &shape)
 {
     std::ostringstream oss;
-    auto v = ToVector(shape);
-    if (v.size() > 0) {
-        for (size_t i = 0; i < v.size() - 1; ++i) {
-            oss << v[i] << ", ";
-        }
-        oss << v[v.size() - 1];
+    const size_t qsfaRank = shape.GetDimNum();
+    if (qsfaRank == 0U) {
+        return oss.str();
+    }
+    oss << shape.GetDim(0);
+    for (size_t qsfaDim = 1; qsfaDim < qsfaRank; ++qsfaDim) {
+        oss << ", " << shape.GetDim(qsfaDim);
     }
     return oss.str();
 }
