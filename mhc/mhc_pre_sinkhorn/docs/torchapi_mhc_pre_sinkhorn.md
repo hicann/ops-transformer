@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  基于一系列计算得到MHC架构中hidden层的$\mathbf{H}'_{\text{res}}$和$\mathbf{H}_{\text{post}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{h}_{\text{in}}$。对$\mathbf{H}'_{\text{res}}$矩阵执行Sinkhorn迭代归一化变换，最终得到双随机矩阵$\mathbf{H}_{\text{res}}$；支持输出中间计算结果，用于反向梯度计算。
+  基于一系列计算得到MHC架构中hidden层的$\mathbf{H}'_{\text{res}}$和$\mathbf{H}_{\text{post}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{h}_{\text{in}}$。对$\mathbf{H}'_{\text{res}}$矩阵执行Sinkhorn迭代归一化变换，最终得到双随机矩阵$\mathbf{H}_{\text{res}}$；支持输出中间计算结果，用于反向梯度计算。其中，该接口在Cube中使用的计算模式为HF32。
 
 - **计算公式**：
 
@@ -118,7 +118,7 @@ cann_ops_transformer.mhc_pre_sinkhorn(x, phi, alpha, bias, hcMult, numIters, hcE
         <td>phi</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>MHC的参数矩阵。对应公式中ψ<sup>pre</sup>、ψ<sup>post</sup>、ψ<sup>res</sup>。使用时对N轴进行拆分，分别是(N, N*C), (N, N*C), (N*N, N*C)。</td>
+        <td>MHC的参数矩阵。对应公式中<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>pre</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>post</sup>、<span style="font-family: 'Cambria Math', 'Times New Roman', serif;">φ</span><sup>res</sup>。使用时对N轴进行拆分，分别是(N, N*C), (N, N*C), (N*N, N*C)。</td>
         <td>float32</td>
         <td>(N*N+2*N, N*C)</td>
     </tr>

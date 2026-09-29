@@ -14,6 +14,9 @@
 ## 功能说明
 
 - **算子功能**：`MhcPreSinkhornBackward`是`MhcPreSinkhorn`的反向算子，用于计算mHC（Manifold-Constrained Hyper-Connections）结构中Sinkhorn变换的反向梯度传播。
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：该接口在Cube中使用的计算模式为HF32。
+  - <term>Ascend 950PR&950DT系列产品</term>：该接口在Cube中使用的计算模式为FP32。
+
 - **主要输出**：`gradX`、`gradPhi`、`gradAlpha`、`gradBias`。
 - **前向缓存依赖**：`hPre`、`hcBeforeNorm`、`invRms`、`sumOut`、`normOut`。
 - **计算公式**：

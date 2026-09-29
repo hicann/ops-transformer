@@ -24,6 +24,12 @@
 ## 功能说明
 
 - **接口功能**：MhcPreSinkhornBackward是MhcPreSinkhorn的反向算子。计算对应的梯度反向传播。
+  <!-- npu="A3,910b" id13 -->
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：该接口在Cube中使用的计算模式为HF32。
+  <!-- end id13 -->
+  <!-- npu="950" id14 -->
+  - <term>Ascend 950PR&950DT系列产品</term>：该接口在Cube中使用的计算模式为FP32。
+  <!-- end id14 -->
 
 - **计算公式**：
 
