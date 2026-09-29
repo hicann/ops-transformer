@@ -15,7 +15,7 @@
 - gcc 9.4.0+
 - python 3.8+
 - torch>=2.6.0
-- 对应版本的[TorchNPU](https://gitcode.com/Ascend/pytorch/releases)
+- 对应版本的[TorchNPU](https://atomgit.com/Ascend/pytorch/releases)
 
 ## 安装步骤 | Installation Steps
 
@@ -88,7 +88,7 @@ print("Verification successful!")
     add_sources("--npu-arch=dav-2201")
     ```
 
-    这里`dav-2201`为ascend910b芯片对应的编译参数，获取方法参考[NpuArch说明和使用指导](https://gitcode.com/cann/ops-math/wiki/NpuArch%E8%AF%B4%E6%98%8E%E5%92%8C%E4%BD%BF%E7%94%A8%E6%8C%87%E5%AF%BC.md)。
+    这里`dav-2201`为ascend910b芯片对应的编译参数，获取方法参考[NpuArch说明和使用指导](https://atomgit.com/cann/ops-math/wiki/NpuArch%E8%AF%B4%E6%98%8E%E5%92%8C%E4%BD%BF%E7%94%A8%E6%8C%87%E5%AF%BC.md)。
 
 3. 在soc目录下新建一个`add.cpp`(建议使用算子名为文件名)。这个文件包含了开发一个AI Core算子所需要的全部模块。
     - 算子Schema注册

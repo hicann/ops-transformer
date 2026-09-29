@@ -74,8 +74,8 @@ elseif(EXISTS "${CANN_3RD_LIB_PATH}/ops-tensor")
   get_filename_component(TENSOR_API
                          ${OPTENSOR_SOURCE_PATH}/include/tensor_api REALPATH)
 else()
-  set(OPTENSOR_GIT_URL "git@gitcode.com:cann/ops-tensor.git")
-  set(OPTENSOR_FALLBACK_GIT_URL "https://gitcode.com/cann/ops-tensor.git")
+  set(OPTENSOR_GIT_URL "git@atomgit.com:cann/ops-tensor.git")
+  set(OPTENSOR_FALLBACK_GIT_URL "https://atomgit.com/cann/ops-tensor.git")
 
   execute_process(
     COMMAND git ls-remote ${OPTENSOR_GIT_URL} HEAD

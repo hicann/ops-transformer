@@ -1,6 +1,6 @@
 # aclnnChunkGatedDeltaRule
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/chunk_gated_delta_rule)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/chunk_gated_delta_rule)
 
 ## 产品支持情况
 

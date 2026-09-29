@@ -57,11 +57,11 @@ vLLM在 `vllm.model_executor.layers.mamba.ops` 下实现了完整的Mamba v2算�
 
 ## Nemotron-H网络中的MambaV2整层计算流
 
-<img src="https://raw.gitcode.com/user-images/assets/7673863/5163260c-fe1e-4a06-90c6-5355ba23ea90/image.png" height="900">
+<img src="https://raw.atomgit.com/user-images/assets/7673863/5163260c-fe1e-4a06-90c6-5355ba23ea90/image.png" height="900">
 
 ## MambaV2 chunk scan combined计算流和融合算子设计
 
-![image.png](https://raw.gitcode.com/user-images/assets/7673863/b98b23ee-bb4b-42b5-8270-92828d17c2d2/image.png 'image.png')
+![image.png](https://raw.atomgit.com/user-images/assets/7673863/b98b23ee-bb4b-42b5-8270-92828d17c2d2/image.png 'image.png')
 
 ## 目录结构
 
@@ -125,4 +125,4 @@ python3 test_causal_conv1d.py
 
 （每个算子 tests 下测试脚本在910B3的profile结果）
 
-<img src="https://raw.gitcode.com/user-images/assets/7673863/4d4b226f-cce2-4c93-bb01-fdaade6fff7e/image.png" height="200">
+<img src="https://raw.atomgit.com/user-images/assets/7673863/4d4b226f-cce2-4c93-bb01-fdaade6fff7e/image.png" height="200">

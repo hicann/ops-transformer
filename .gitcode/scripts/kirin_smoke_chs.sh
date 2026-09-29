@@ -14,7 +14,7 @@ set -e
 echo "#########################打印SN号#########################"
 hdc list targets
 echo "#########################下载kirin_cann_test代码仓#########################"
-git clone https://gitcode.com/funna2000/kirin_cann_test.git
+git clone https://atomgit.com/funna2000/kirin_cann_test.git
 cd kirin_cann_test/harmony-infer-chs
 cp ../entry-default-signed.hap ./
 bash rdv_kirin9030_gitcode.sh $(hdc list targets) transformer.json Kirin9030 ${repo_name} ${MERGE_ID} ${obs_path}

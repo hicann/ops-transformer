@@ -1,7 +1,7 @@
 
 # aclnnFusedInferAttentionScoreV4
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/fused_infer_attention_score)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/fused_infer_attention_score)
 
 ## 产品支持情况
 

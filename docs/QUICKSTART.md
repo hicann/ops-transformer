@@ -30,10 +30,10 @@
 
 - 非CANNLab云开发环境：
 
-  从[release仓库](https://gitcode.com/cann/release-management)各文件夹下的release-notes文件获取源码与CANN版本配套关系（CANN ops组合包内可独立升级子包配套关系），执行如下命令下载源码，\$\{tag\_version\}替换为目标分支标签，例如9.0.0。
+  从[release仓库](https://atomgit.com/cann/release-management)各文件夹下的release-notes文件获取源码与CANN版本配套关系（CANN ops组合包内可独立升级子包配套关系），执行如下命令下载源码，\$\{tag\_version\}替换为目标分支标签，例如9.0.0。
 
   ```bash
-  git clone -b ${tag_version} https://gitcode.com/cann/ops-transformer.git && cd ops-transformer
+  git clone -b ${tag_version} https://atomgit.com/cann/ops-transformer.git && cd ops-transformer
   ```
 
 > 说明：如需切换源码分支版本，请参考如下指导。

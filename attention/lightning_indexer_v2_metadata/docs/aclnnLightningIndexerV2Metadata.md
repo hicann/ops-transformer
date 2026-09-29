@@ -1,6 +1,6 @@
 # aclnnLightningIndexerV2Metadata
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/lightning_indexer_v2_metadata)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/lightning_indexer_v2_metadata)
 
 ## 产品支持情况
 

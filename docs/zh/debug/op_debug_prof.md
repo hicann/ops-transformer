@@ -66,7 +66,7 @@
 
 * **msDebug单步调试**
 
-  对于复杂场景的问题定位，比如算子卡死、GM/UB访问越界等场景，可以采取[msDebug](https://gitcode.com/Ascend/msdebug/blob/master/docs/zh/user_guide/msdebug_user_guide.md)单步调试的方式，具体操作步骤如下：
+  对于复杂场景的问题定位，比如算子卡死、GM/UB访问越界等场景，可以采取[msDebug](https://atomgit.com/Ascend/msdebug/blob/master/docs/zh/user_guide/msdebug_user_guide.md)单步调试的方式，具体操作步骤如下：
 
   1. **编译O0 -g的Kernel**
 
@@ -101,7 +101,7 @@
      msdebug ./test_aclnn_add_example
      ```
 
-     更多msDebug使用方法请参见[msDebug](https://gitcode.com/Ascend/msdebug/blob/master/docs/zh/user_guide/msdebug_user_guide.md)算子调试工具文档。
+     更多msDebug使用方法请参见[msDebug](https://atomgit.com/Ascend/msdebug/blob/master/docs/zh/user_guide/msdebug_user_guide.md)算子调试工具文档。
 
 ### 3. Kernel检测
 

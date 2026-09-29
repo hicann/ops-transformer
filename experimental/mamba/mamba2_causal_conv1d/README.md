@@ -4,9 +4,9 @@
 
 基于状态空间模型（SSM）的因果卷积，实现MambaV2 Prefill阶段的因果卷积计算。计算流程包含kernel_size=4的depthwise conv1d和SiLU激活。本算子采用纯Vector实现conv1d，并融合bias和SiLU运算以提升性能。
 
-**计算流**  
+**计算流**
 
-<img src="https://raw.gitcode.com/user-images/assets/7673863/a7e74e1a-1080-4a62-bf45-e172eb790545/image.png" height="300">
+<img src="https://raw.atomgit.com/user-images/assets/7673863/a7e74e1a-1080-4a62-bf45-e172eb790545/image.png" height="300">
 
 ### 自定义Kernel输入输出（I/O）
 
@@ -24,11 +24,11 @@
 |-----|-----|-----|
 | out   | BDS   | FP32   |
 
-**参数说明：**  
+**参数说明：**
 
-B: batch size  
-D: dimension  
-S: sequence len  
+B: batch size
+D: dimension
+S: sequence len
 该算子支持任意长度S
 
 **调用方式**

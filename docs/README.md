@@ -62,7 +62,7 @@ Docs目录结构说明如下：
 
 ### 样例实践
 
-如需学习算子领域高性能实战案例，可参考[cann-samples Performance目录](https://gitcode.com/cann/cann-samples/blob/master/Samples/2_Performance/README.md)。
+如需学习算子领域高性能实战案例，可参考[cann-samples Performance目录](https://atomgit.com/cann/cann-samples/blob/master/Samples/2_Performance/README.md)。
 
 |  算子分类       |  样例算子       | 说明                  |
 | ----------------------- | ---------------------- | ---------------------- |
@@ -72,7 +72,7 @@ Docs目录结构说明如下：
 
 ### 更多文档
 
-欢迎前往[wiki中心](https://gitcode.com/cann/ops-transformer/wiki/Home.md)了解更多项目信息，包括项目定位、算子开发补充知识介绍、性能优化方法和实践样例、常见问题（FAQ）及问题定位方法等。
+欢迎前往[wiki中心](https://atomgit.com/cann/ops-transformer/wiki/Home.md)了解更多项目信息，包括项目定位、算子开发补充知识介绍、性能优化方法和实践样例、常见问题（FAQ）及问题定位方法等。
 
 ## 附录
 

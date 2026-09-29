@@ -1,6 +1,6 @@
 # aclnnGroupedMatmulWeightNz
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/gmm/grouped_matmul)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/gmm/grouped_matmul)
 
 ## 产品支持情况
 

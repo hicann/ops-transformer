@@ -1,6 +1,6 @@
 # aclnnGroupedMatmulActivationQuantWeightNz
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/gmm/grouped_matmul_activation_quant)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/gmm/grouped_matmul_activation_quant)
 
 ## 产品支持情况
 

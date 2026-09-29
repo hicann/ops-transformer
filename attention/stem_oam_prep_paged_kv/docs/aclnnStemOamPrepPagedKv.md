@@ -1,6 +1,6 @@
 # aclnnStemOamPrepPagedKv
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/stem_oam_prep_paged_kv)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/stem_oam_prep_paged_kv)
 
 ## 产品支持情况
 <!-- npu="950" id1 -->

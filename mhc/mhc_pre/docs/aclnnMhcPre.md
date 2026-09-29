@@ -1,6 +1,6 @@
 # aclnnMhcPre
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/mhc/mhc_pre)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mhc/mhc_pre)
 
 ## 产品支持情况
 

@@ -22,10 +22,10 @@ For example: x = [1, 24, 28800, 128], y = [128, 128], cos/sin = [1, 1, 28800, 12
 ### Design
 
 As the fig shows, we design a Mathematical Equivalence algorithm "Rope-Matrix(ROME)" to accelerate rope.
-The key is to replace tensor rearrage operator by matrix.            
-![image.png](https://raw.gitcode.com/user-images/assets/7673863/75dd5e40-a660-4956-b052-95079eae8f8d/image.png 'image.png')
+The key is to replace tensor rearrage operator by matrix.
+![image.png](https://raw.atomgit.com/user-images/assets/7673863/75dd5e40-a660-4956-b052-95079eae8f8d/image.png 'image.png')
 Besides, for 3D-ROPE situation, origin rope-fused need call three times, we just need to call once.
-![image.png](https://raw.gitcode.com/user-images/assets/7673863/9a6d1aa0-9e73-4908-a0c7-c3cebfeda407/image.png 'image.png')
+![image.png](https://raw.atomgit.com/user-images/assets/7673863/9a6d1aa0-9e73-4908-a0c7-c3cebfeda407/image.png 'image.png')
 
 Designing detail：
 By profiling, we find memory bound for both C and V on 910B. Thus, no need CV pipeline, we just simplify run V after C.
@@ -37,7 +37,7 @@ Using ```AscendC::CrossCoreSetFlag``` and ```AscendC::CrossCoreWaitFlag``` to co
   ${op_class}                                          # class
   ├── ${op_name}                                       # name
   │   ├── inc                                          # define aRopeMatrixTiling like TCubeTiling, which can be call by both op_device and op_host
-  │   │   └── ${op_name}_extern.h                      
+  │   │   └── ${op_name}_extern.h
   │   ├── op_host                                      # Tiling、InferShape(If needed, custom operator may not need)...
   │   │   └── ${op_name}_tiling.h                      # Tiling
   │   ├── op_kernel                                    # kernel
@@ -46,7 +46,7 @@ Using ```AscendC::CrossCoreSetFlag``` and ```AscendC::CrossCoreWaitFlag``` to co
   │   ├── tests                                        # tests
   │   │   └── test_rope.py                             # test file: contain how to gen the [d, d] rope-matrix,
   │   ├── CMakeLists.txt                               # makefile
-  │   ├── torch_interface.cpp                          # for torch calling                         
+  │   ├── torch_interface.cpp                          # for torch calling
   │   └── README.md                                    # readme
 ```
 
@@ -54,7 +54,7 @@ Using ```AscendC::CrossCoreSetFlag``` and ```AscendC::CrossCoreWaitFlag``` to co
 
 ```bash
 from example: https://gitee.com/ascend/samples/blob/master/operator/ascendc/0_introduction/22_baremix_kernellaunch/BareMixInvocation/baremix_custom.cpp
-from example: https://gitcode.com/cann/ops-transformer/blob/master/posembedding/rotary_position_embedding/rotate_half_bf16.h
+from example: https://atomgit.com/cann/ops-transformer/blob/master/posembedding/rotary_position_embedding/rotate_half_bf16.h
 ```
 
 we simplify the code from origin rope-fused operator to fit our cases.
@@ -87,8 +87,8 @@ Then cube process 720*2, vector process 720, last vector process 719, last cube 
 
 ```bash
 A. design 'torch_interface.cpp':
-1) design interface: 
-Add "m.def("rope_matrix(Tensor x, Tensor y, Tensor sin, Tensor cos) -> Tensor");" 
+1) design interface:
+Add "m.def("rope_matrix(Tensor x, Tensor y, Tensor sin, Tensor cos) -> Tensor");"
 into "TORCH_LIBRARY" function in "npu_ops_transformer_ext/npu_ops_def.cpp"
 
 Then use TORCH_LIBRARY_IMPL to register your function, fuc must have same inputs and output,
@@ -146,7 +146,7 @@ or use default ```test_rope.py``` or full test code as follows:
 
 ```bash
 import os
-import numpy as np 
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -162,7 +162,7 @@ from torch.cuda.amp import autocast
 
 from einops import rearrange, repeat
 
-os.environ["COMBINED_ENABLE"] = "1"  # 
+os.environ["COMBINED_ENABLE"] = "1"  #
 os.environ["INF_NAN_MODE_ENABLE"] = "1"
 os.environ["PYTORCH_NPU_ALLOC_CONF"] = "expandable_segments:True"
 torch.manual_seed(0)
@@ -171,7 +171,7 @@ torch.set_printoptions(precision=16)
 torch_npu.npu.set_compile_mode(jit_compile=False)
 torch_npu.npu.config.allow_internal_format = False
 torch.npu.conv.allow_hf32 = False
-torch.npu.matmul.allow_hf32 = False 
+torch.npu.matmul.allow_hf32 = False
 
 print("import torch_npu success, training in ascend")
 
@@ -203,12 +203,12 @@ def compose_3matrix(matrix_a, matrix_b, matrix_c):
     b_col_start = matrix_a.size(1)
     result[b_row_start:b_row_start + matrix_b.size(0),
            b_col_start:b_col_start + matrix_b.size(1)] = matrix_b
-    
+
     c_row_start = matrix_a.size(0) + matrix_b.size(0)
     c_col_start = matrix_a.size(1) + matrix_b.size(1)
     result[c_row_start:c_row_start + matrix_c.size(0),
            c_col_start:c_col_start + matrix_c.size(1)] = matrix_c
-    
+
     return result.to('npu')
 
 
@@ -235,7 +235,7 @@ def apply_rotary_pos_emb(tensor: torch.Tensor, sin: torch.Tensor, cos: torch.Ten
         return (tensor * cos) + (rotate_half(tensor) * sin)
     else:
         raise NotImplementedError("mode error, only support half or interleave")
-    
+
 
 def apply_3drotary_pos_v1(q, k, freqs_cis, mode):
     '''
@@ -269,7 +269,7 @@ def apply_3drotary_pos_v2(q, k, freqs_cis, mat1, mat2, mat3):
     rope_matrix, matrix不合一的实现
     '''
     sincos_h, sincos_w, sincos_t = freqs_cis
-    
+
     sin_h, cos_h = sincos_h
     sin_w, cos_w = sincos_w
     sin_t, cos_t = sincos_t
@@ -303,7 +303,7 @@ def apply_3drotary_pos_v3(q, k, freqs_cis, mat, debug=None, high_precision=None)
 
     sin = torch.cat((sin_h, sin_w, sin_t), dim=-1)
     cos = torch.cat((cos_h, cos_w, cos_t), dim=-1)
-    
+
     if high_precision:
         q = q.float() * cos.float() + (q @ mat).float() * sin.float()
         k = k.float() * cos.float() + (k @ mat).float() * sin.float()
@@ -311,7 +311,7 @@ def apply_3drotary_pos_v3(q, k, freqs_cis, mat, debug=None, high_precision=None)
     else:
         q = q * cos + (q @ mat) * sin
         k = k * cos + (k @ mat) * sin
-    
+
     return q, k
 
 
@@ -324,7 +324,7 @@ def apply_3drotary_pos_v4(q, k, freqs_cis, mode):
     sin_h, cos_h = sincos_h
     sin_w, cos_w = sincos_w
     sin_t, cos_t = sincos_t
-    
+
     if mode == 'interleave':
         sin = torch.cat((sin_h, sin_w, sin_t), dim=-1)
         cos = torch.cat((cos_h, cos_w, cos_t), dim=-1)
@@ -386,7 +386,7 @@ class ROPE3D(nn.Module):
 
     def forward(self, q, k, freqs_cis, mat):
         return apply_3drotary_pos_v3(q, k, freqs_cis, mat)
-    
+
 
 def main():
     # init
@@ -422,7 +422,7 @@ def main():
     half_mat_44_44_40 = compose_3matrix(half_mat_44, half_mat_44, half_mat_40)
 
     mode = 'half' # or 'interleave or None
-    
+
     experimental_config = torch_npu.profiler._ExperimentalConfig(
         aic_metrics=torch_npu.profiler.AiCMetrics.PipeUtilization,
         profiler_level=torch_npu.profiler.ProfilerLevel.Level1,
@@ -454,7 +454,7 @@ def main():
             with_flops=False,
             with_modules=False,
             experimental_config=experimental_config) as prof:
-        
+
         if mode == 'interleave':
             with torch.no_grad():
                 for i in range(10):
@@ -473,7 +473,7 @@ def main():
                     with record_function("3d rope v3 op"):
                         outq3, outk3 = op(q, k, freqs_cis_3d, half_mat_44_44_40)
                         torch.cuda.synchronize()
-                    
+
                     XXX = torch.randn(3, 3).npu()
                     XXX = torch.pow(XXX, 2)
                     with record_function("3d rope v5"):
@@ -486,11 +486,11 @@ def main():
     with record_function("3d rope v5"):
         outq5, outk5 = apply_3drotary_pos_v5(q, k, freqs_cis_3d, half_mat_44_44_40)
         torch.cuda.synchronize()
-    
+
     with record_function("3d rope v3"):
         outq3, outk3 = apply_3drotary_pos_v3(q, k, freqs_cis_3d, half_mat_44_44_40, debug=None, high_precision=True)
         torch.cuda.synchronize()
-    
+
     # 精度验证
     print(f"q={q[0][0][0][:10]}")
     print(f"outq3={outq3[0][0][0][:10]}")
@@ -504,7 +504,7 @@ def main():
     error = abs_error / (denominator + 1e-8)
     print(torch.minimum(abs_error, error).max())
     print((torch.minimum(abs_error, error) > 0).sum())
-    
+
 if __name__ == '__main__':
     main()
 ```

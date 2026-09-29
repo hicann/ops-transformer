@@ -39,7 +39,7 @@
 
 ### 前置要求
 
-1. TorchNPU安装包下载路径（需及时更换为最新版本）：[TorchNPU安装教程](https://gitcode.com/Ascend/pytorch)
+1. TorchNPU安装包下载路径（需及时更换为最新版本）：[TorchNPU安装教程](https://atomgit.com/Ascend/pytorch)
 2. 完成环境安装和环境变量配置，具体操作请参考：[ops-transformer](../../../../../README.md)
 
 ### 编译安装torch_ops_extension

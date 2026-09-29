@@ -1,6 +1,6 @@
 # aclnnRotaryPositionEmbeddingV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/posembedding/rotary_position_embedding)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/posembedding/rotary_position_embedding)
 
 ## 产品支持情况
 

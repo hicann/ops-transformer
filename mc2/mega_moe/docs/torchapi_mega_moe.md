@@ -266,7 +266,7 @@
 
     - **Expert Compute**
 
-        在MoE层中，每个专家本质上是一个独立的前馈网络（FFN），采用由 `activation` 指定的门控激活结构以提升表达能力。在A8W4-INT场景下，两个线性层都采用MSD（Mixed-precision Split-activation Decomposition，混合精度激活拆分分解）方案进行矩阵乘，通过将int8 值拆为高4位和低4位两个有符号int4，使得int8×int4 的矩阵乘可分解为两个int4×int4 的矩阵乘，从而利用硬件的int4 矩阵乘加速。该方案的数学原理和实现逻辑可参阅[GroupedMatmul W4A8量化与MSD方案](https://gitcode.com/cann/ops-transformer/wiki/GMM--GroupedMatmul%E9%87%8F%E5%8C%96%E6%9E%81%E8%87%B4%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-%E6%8E%A8%E7%90%86%E6%8F%90%E5%8D%87%E7%99%BE%E5%88%86%E4%B9%8B%E4%B8%89%E5%8D%81)。
+        在MoE层中，每个专家本质上是一个独立的前馈网络（FFN），采用由 `activation` 指定的门控激活结构以提升表达能力。在A8W4-INT场景下，两个线性层都采用MSD（Mixed-precision Split-activation Decomposition，混合精度激活拆分分解）方案进行矩阵乘，通过将int8 值拆为高4位和低4位两个有符号int4，使得int8×int4 的矩阵乘可分解为两个int4×int4 的矩阵乘，从而利用硬件的int4 矩阵乘加速。该方案的数学原理和实现逻辑可参阅[GroupedMatmul W4A8量化与MSD方案](https://atomgit.com/cann/ops-transformer/wiki/GMM--GroupedMatmul%E9%87%8F%E5%8C%96%E6%9E%81%E8%87%B4%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-%E6%8E%A8%E7%90%86%E6%8F%90%E5%8D%87%E7%99%BE%E5%88%86%E4%B9%8B%E4%B8%89%E5%8D%81)。
 
         **1. 生成精度补偿的偏置矩阵（离线生成，在算子外完成，并作为算子输入）**
 

@@ -69,7 +69,7 @@ find_package(ASC REQUIRED)
 
 project(apace_st LANGUAGES CXX ASC)
 
-# ---- blaze / tensor_api（从 gitcode.com/cann/ops-tensor 拉取）----
+# ---- blaze / tensor_api（从 atomgit.com/cann/ops-tensor 拉取）----
 # main.cpp 及 apace kernel 头文件依赖：
 #   "blaze/gemm/..."           -> ops-tensor/include/
 #   "tensor_api/tensor.h"      -> ops-tensor/include/tensor_api/include/

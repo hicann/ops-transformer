@@ -60,7 +60,7 @@
 
 开发者进行项目文档写作前，请务必先阅读如下规范，如有问题欢迎您随时提出建议！
 
-- 前提条件：请先学习CANN组织提供的统一写作规范，具体参见[CANN文档写作规范](https://gitcode.com/cann/community/blob/master/contributor/docs/document_writing_specs.md)。
+- 前提条件：请先学习CANN组织提供的统一写作规范，具体参见[CANN文档写作规范](https://atomgit.com/cann/community/blob/master/contributor/docs/document_writing_specs.md)。
 
   - 文档内容要求：介绍项目里必选和可选文档交付件。
   - 目录结构规范：介绍目录划分的原则，例如中、英文管理等。
@@ -98,5 +98,5 @@
 
 算子交付件中涉及的关键文档主要包括如下，具体写作格式、内容要求请参考模板。
 
-- [算子README文档模板](https://gitcode.com/cann/ops-transformer/wiki/%E7%AE%97%E5%AD%90README%E6%96%87%E6%A1%A3%E6%A8%A1%E6%9D%BF)
-- [aclnn API文档模板](https://gitcode.com/cann/ops-transformer/wiki/aclnn%20API%E6%96%87%E6%A1%A3%E6%A8%A1%E6%9D%BF)
+- [算子README文档模板](https://atomgit.com/cann/ops-transformer/wiki/%E7%AE%97%E5%AD%90README%E6%96%87%E6%A1%A3%E6%A8%A1%E6%9D%BF)
+- [aclnn API文档模板](https://atomgit.com/cann/ops-transformer/wiki/aclnn%20API%E6%96%87%E6%A1%A3%E6%A8%A1%E6%9D%BF)

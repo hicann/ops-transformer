@@ -1,6 +1,6 @@
 # aclnnMoeDistributeDispatchV4
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/mc2/moe_distribute_dispatch_v2)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/moe_distribute_dispatch_v2)
 
 ## 产品支持情况
 

@@ -25,7 +25,7 @@ else()
 
   FetchContent_Declare(
     catlass
-    GIT_REPOSITORY https://gitcode.com/cann/catlass.git
+    GIT_REPOSITORY https://atomgit.com/cann/catlass.git
     GIT_TAG ${CATLASS_TAG_ID}
     GIT_PROGRESS TRUE
     GIT_SUBMODULES ""

@@ -1,6 +1,6 @@
 # aclnnMoeGatingTopKV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/moe/moe_gating_top_k)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/moe/moe_gating_top_k)
 
 ## 产品支持情况
 

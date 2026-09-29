@@ -6,7 +6,7 @@ mamba2_chunk_state用于在MambaV2 Prefill阶段进行chunk内的离散时间状
 
 **计算流**
 
-<img src="https://raw.gitcode.com/user-images/assets/7673863/88ab3b4c-4940-4b88-9aca-e6a44fd4fc04/image.png" height="300">
+<img src="https://raw.atomgit.com/user-images/assets/7673863/88ab3b4c-4940-4b88-9aca-e6a44fd4fc04/image.png" height="300">
 
 ### Kernel输入输出（I/O）
 
@@ -25,15 +25,15 @@ mamba2_chunk_state用于在MambaV2 Prefill阶段进行chunk内的离散时间状
 |-----|-----|-----|
 | states   | BCHNP   | FP32   |
 
-**参数说明：**  
+**参数说明：**
 
-B: batch size  
-C: number of chunks  
-L: chunk size  
-H: number of head  
-G: ngroups   
-N: state size  
-P: head dim  
+B: batch size
+C: number of chunks
+L: chunk size
+H: number of head
+G: ngroups
+N: state size
+P: head dim
 其中C*L为padding后的序列长度
 
 **调用方式**

@@ -1,6 +1,6 @@
 # aclnnKdaInputProj
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/kda_input_proj)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/kda_input_proj)
 
 ## 产品支持情况
 

@@ -18,7 +18,7 @@
     pip install torch-${torch_version}+cpu-${python_version}-linux_${arch}.whl
     ```
 
-   根据实际环境，安装对应TorchNPU包：`torch_npu-${torch_version}-${python_version}-linux_${arch}.whl`下载链接为：[官网地址](https://gitcode.com/Ascend/pytorch/releases)
+   根据实际环境，安装对应TorchNPU包：`torch_npu-${torch_version}-${python_version}-linux_${arch}.whl`下载链接为：[官网地址](https://atomgit.com/Ascend/pytorch/releases)
 
    安装命令如下：
 
@@ -60,7 +60,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Core</td>
-    <td>将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>kv_quant_sparse_attn_sharedkv</td>
@@ -71,7 +71,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Core</td>
-    <td>支持量化模式的Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention计算。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>支持量化模式的Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention计算。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>kv_quant_sparse_attn_sharedkv_metadata</td>
@@ -82,7 +82,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Cpu</td>
-    <td>该算子为kv_quant_sparse_attn_sharedkv算子提供分核结果。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>该算子为kv_quant_sparse_attn_sharedkv算子提供分核结果。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>quant_lightning_indexer</td>
@@ -93,7 +93,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Core</td>
-    <td>该算子是推理场景下，稀疏Attention前处理的计算，选出关键的稀疏token，并对输入query和key进行量化实现存8算8，获取最大收益。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>该算子是推理场景下，稀疏Attention前处理的计算，选出关键的稀疏token，并对输入query和key进行量化实现存8算8，获取最大收益。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>quant_lightning_indexer_metadata</td>
@@ -104,7 +104,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Cpu</td>
-    <td>该算子为quant_lightning_indexer算子提供分核结果。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>该算子为quant_lightning_indexer算子提供分核结果。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>sparse_attn_sharedkv</td>
@@ -115,7 +115,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Core</td>
-    <td>该算子支持非量化的Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention计算。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>该算子支持非量化的Sliding Window Attention、Compressed Attention以及Sparse Compressed Attention计算。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>sparse_attn_sharedkv_metadata</td>
@@ -126,7 +126,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Cpu</td>
-    <td>该算子为sparse_attn_sharedkv算子提供分核结果。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>该算子为sparse_attn_sharedkv算子提供分核结果。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>blitz_sparse_attention</td>
@@ -137,7 +137,7 @@
     <td>/</td>
     <td>/</td>
     <td>/</td>
-    <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/master/experimental/attention/blitz_sparse_attention/README.md">README文档</a>。</td>
+    <td>算子具体使用方法见<a href="https://atomgit.com/cann/ops-transformer/blob/master/experimental/attention/blitz_sparse_attention/README.md">README文档</a>。</td>
   </tr>
   <tr>
     <td>fused_infer_attention_score</td>
@@ -148,7 +148,7 @@
     <td>/</td>
     <td>/</td>
     <td>/</td>
-    <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/master/experimental/attention/fused_infer_attention_score/README.md">README文档</a>。</td>
+    <td>算子具体使用方法见<a href="https://atomgit.com/cann/ops-transformer/blob/master/experimental/attention/fused_infer_attention_score/README.md">README文档</a>。</td>
   </tr>
   <tr>
     <td>typhoon_mla</td>
@@ -159,7 +159,7 @@
     <td>/</td>
     <td>/</td>
     <td>/</td>
-    <td>算子具体使用方法见<a href="https://gitcode.com/cann/ops-transformer/blob/master/experimental/attention/typhoon_mla/README.md">README文档</a>。</td>
+    <td>算子具体使用方法见<a href="https://atomgit.com/cann/ops-transformer/blob/master/experimental/attention/typhoon_mla/README.md">README文档</a>。</td>
   </tr>
   <tr>
     <td>chunk_gated_delta_rule_compute_wy</td>
@@ -181,7 +181,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Core</td>
-    <td>该算子融合GDN单token解码中的QKV拆分、Q/K归一化、门控计算、循环状态更新和输出投影。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>该算子融合GDN单token解码中的QKV拆分、Q/K归一化、门控计算、循环状态更新和输出投影。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>stem_indexer</td>
@@ -192,7 +192,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Core</td>
-    <td>该算子是推理场景下，稀疏Attention前处理的计算，选出关键的稀疏block块，获取最大收益。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>该算子是推理场景下，稀疏Attention前处理的计算，选出关键的稀疏block块，获取最大收益。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>stem_indexer_metadata</td>
@@ -203,7 +203,7 @@
     <td>×</td>
     <td>√</td>
     <td>AI Cpu</td>
-    <td>该算子为stem_indexer算子提供分核结果。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
+    <td>该算子为stem_indexer算子提供分核结果。<br/>算子torch接口调用依赖torch_ops_extension，具体安装方法见<a href="https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85">安装指导</a>。</td>
   </tr>
   <tr>
     <td>minimax_build_k2q_csr</td>
@@ -261,7 +261,7 @@
 
 根据[算子列表](#算子列表)章节介绍，如需使用`torch`接口进行算子调用，则需前置安装torch_ops_extension包。
 
-torch_ops_extension包为自定义算子提供了torch.ops的拓展接口，具体编译安装方法请见[torch_ops_extension安装方法](https://gitcode.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85)。
+torch_ops_extension包为自定义算子提供了torch.ops的拓展接口，具体编译安装方法请见[torch_ops_extension安装方法](https://atomgit.com/cann/cann-recipes-infer/tree/master/ops/ascendc#torch_ops_extension%E7%AE%97%E5%AD%90%E5%8C%85%E7%BC%96%E8%AF%91%E4%B8%8E%E5%AE%89%E8%A3%85)。
 
 ## 自定义算子执行
 项目中各算子通过pytest验证各算子的功能是否正常，各算子的pytest调用方法如下表。

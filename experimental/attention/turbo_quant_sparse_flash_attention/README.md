@@ -75,6 +75,6 @@
 
 ## 精度说明
 -   本算子为 4bit 量化算子，其输出与全精度 Attention 之间存在量化本身引入的固有偏差，不属于算子实现缺陷。因此精度对标的标杆取**与算子采用相同量化方案的高精度 CPU 实现**（量化与反量化过程按 float64 计算），以剥离量化误差、只考察算子实现误差。
--   判定沿用 [experimental 精度标准](https://gitcode.com/cann/opbase/blob/master/docs/zh/ops_precision_standard/experimental_standard.md) 的双条件：
+-   判定沿用 [experimental 精度标准](https://atomgit.com/cann/opbase/blob/master/docs/zh/ops_precision_standard/mixed_tolerance_standard.md) 的双条件：
     -   匹配率：满足 $|actual - golden| \le atol + rtol \times |golden|$ 的元素占比 $\ge 0.99$；
     -   最大绝对误差不超过对应数据类型的硬上限。

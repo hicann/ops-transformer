@@ -61,7 +61,7 @@
 
 根据当前环境，安装对应的CANN开发套件包（toolkit包+ops包）。
 
-1. TorchNPU安装包下载路径：[TorchNPU安装教程](https://gitcode.com/Ascend/pytorch)
+1. TorchNPU安装包下载路径：[TorchNPU安装教程](https://atomgit.com/Ascend/pytorch)
 2. CANN包可从[昇腾社区](https://www.hiascend.com/developer/download/community/result?module=cann)获取，具体下载安装见昇腾社区[文档](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/softwareinst/instg/instg_0000.html?Mode=PmIns&InstallType=netconda&OS=Ubuntu)。
 
 按需选择合适的命令使环境变量生效。

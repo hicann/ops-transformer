@@ -1,6 +1,6 @@
 # aclnnMoeTokenPermuteGrad
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/moe/moe_token_permute_grad)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/moe/moe_token_permute_grad)
 
 ## 产品支持情况
 

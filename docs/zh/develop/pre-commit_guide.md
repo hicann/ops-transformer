@@ -141,5 +141,5 @@ sudo apt install clang-format
 
 - [pre-commit官方文档](https://pre-commit.com/)
 - [clang-format配置](https://clang.llvm.org/docs/ClangFormatStyleOptions.html)
-- [OAT工具](https://gitcode.com/openharmony-sig/tools_oat)
-- [代码仓集成pre-commit指导](https://gitcode.com/cann/infrastructure/blob/main/docs/SC/pre-commit/pre-commit%E9%85%8D%E7%BD%AE%E6%8C%87%E5%AF%BC%E4%B9%A6.md)
+- [OAT工具](https://atomgit.com/openharmony-sig/tools_oat)
+- [代码仓集成pre-commit指导](https://atomgit.com/cann/infrastructure/blob/main/docs/SC/pre-commit/pre-commit%E9%85%8D%E7%BD%AE%E6%8C%87%E5%AF%BC%E4%B9%A6.md)

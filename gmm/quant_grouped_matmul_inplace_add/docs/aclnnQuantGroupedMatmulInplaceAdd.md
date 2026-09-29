@@ -1,6 +1,6 @@
 # aclnnQuantGroupedMatmulInplaceAdd
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/gmm/quant_grouped_matmul_inplace_add)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/gmm/quant_grouped_matmul_inplace_add)
 
 ## 产品支持情况
 

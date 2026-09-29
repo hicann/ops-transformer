@@ -1,6 +1,6 @@
 # aclnnBlockAttnResUpdate
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/block_attn_res_update)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/block_attn_res_update)
 
 ## 产品支持情况
 

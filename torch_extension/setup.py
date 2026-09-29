@@ -321,7 +321,7 @@ setup(
     description=DESCRIPTION,
     author="CANN",
     license="CANN Open Software License Agreement Version 2.0",
-    url="https://gitcode.com/cann/ops-transformer/tree/master/torch_extension",
+    url="https://atomgit.com/cann/ops-transformer/tree/master/torch_extension",
     install_requires=["torch>=2.6.0", "torch_npu"],
     packages=_all_packages,
     package_data={PACKAGE_NAME: _non_python_files(_src_path)},

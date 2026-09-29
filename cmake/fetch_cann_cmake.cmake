@@ -24,7 +24,7 @@ if(NOT PROJECT_SOURCE_DIR)
         else()
             FetchContent_Declare(
                 cann-cmake
-                GIT_REPOSITORY https://gitcode.com/cann/cmake.git
+                GIT_REPOSITORY https://atomgit.com/cann/cmake.git
                 GIT_TAG        ${CANN_CMAKE_TAG}
                 GIT_SHALLOW    TRUE
             )

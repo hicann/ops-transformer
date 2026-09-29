@@ -35,7 +35,7 @@
 
 #### 前置要求
 
-1. TorchNPU安装包下载路径（需及时更换为最新版本）：[TorchNPU安装教程](https://gitcode.com/Ascend/pytorch)
+1. TorchNPU安装包下载路径（需及时更换为最新版本）：[TorchNPU安装教程](https://atomgit.com/Ascend/pytorch)
 2. 完成环境安装和环境变量配置，具体操作请参考：[ops-transformer](../../../../README.md)
 
 #### custom包调用
@@ -150,7 +150,7 @@ bash test_run.sh mss 10
 - 未自带时源码编译安装：
 
 ``` bash
-git clone https://gitcode.com/Ascend/mssanitizer.git
+git clone https://atomgit.com/Ascend/mssanitizer.git
 cd mssanitizer
 python3 build.py
 # 编译完成后安装 run 包

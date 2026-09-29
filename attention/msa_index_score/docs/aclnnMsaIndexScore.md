@@ -1,6 +1,6 @@
 # aclnnMsaIndexScore
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/msa_index_score)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/msa_index_score)
 
 ## 产品支持情况
 
@@ -51,7 +51,7 @@
 
 ## 函数原型
 
-每个算子分为[两段式接口](https://gitcode.com/cann/ops-transformer/blob/master/docs/zh/context/two_phase_api.md)，必须先调用 `aclnnMsaIndexScoreGetWorkspaceSize` 接口获取入参并计算所需 workspace 大小，再调用 `aclnnMsaIndexScore` 接口执行计算。
+每个算子分为[两段式接口](https://atomgit.com/cann/ops-transformer/blob/master/docs/zh/context/two_phase_api.md)，必须先调用 `aclnnMsaIndexScoreGetWorkspaceSize` 接口获取入参并计算所需 workspace 大小，再调用 `aclnnMsaIndexScore` 接口执行计算。
 
 ```cpp
 aclnnStatus aclnnMsaIndexScoreGetWorkspaceSize(

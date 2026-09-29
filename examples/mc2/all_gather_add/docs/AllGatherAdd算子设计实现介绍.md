@@ -419,7 +419,7 @@ extern "C" __global__ __aicore__ void all_gather_add(GM_ADDR aGM, GM_ADDR bGM, G
 ## 编译和运行
 
 编译部署算子请参考开源仓算子README：
-https://gitcode.com/cann/ops-transformer/blob/master/examples/mc2/all_gather_add/README.md
+https://atomgit.com/cann/ops-transformer/blob/master/examples/mc2/all_gather_add/README.md
 
 ## 算子执行样例
 

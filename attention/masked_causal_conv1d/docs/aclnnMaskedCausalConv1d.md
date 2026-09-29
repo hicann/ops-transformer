@@ -1,6 +1,6 @@
 # aclnnMaskedCausalConv1d
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/masked_causal_conv1d)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/masked_causal_conv1d)
 
 ## 产品支持情况
 

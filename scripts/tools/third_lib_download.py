@@ -49,22 +49,22 @@ def down_files_native(url_list):
 
 if __name__ == "__main__":
     my_urls = [
-        "https://gitcode.com/cann-src-third-party/googletest/releases/download/v1.14.0/googletest-1.14.0.tar.gz",
-        "https://gitcode.com/cann-src-third-party/json/releases/download/v3.11.3/include.zip",
+        "https://atomgit.com/cann-src-third-party/googletest/releases/download/v1.14.0/googletest-1.14.0.tar.gz",
+        "https://atomgit.com/cann-src-third-party/json/releases/download/v3.11.3/include.zip",
         (
-            "https://gitcode.com/cann-src-third-party/makeself/releases/download/"
+            "https://atomgit.com/cann-src-third-party/makeself/releases/download/"
             "release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz"
         ),
-        "https://gitcode.com/cann-src-third-party/pybind11/releases/download/v2.13.6/pybind11-2.13.6.tar.gz",
-        "https://gitcode.com/cann-src-third-party/eigen/releases/download/5.0.0-h0.trunk/eigen-5.0.0.tar.gz",
-        "https://gitcode.com/cann-src-third-party/protobuf/releases/download/v25.1/protobuf-25.1.tar.gz",
+        "https://atomgit.com/cann-src-third-party/pybind11/releases/download/v2.13.6/pybind11-2.13.6.tar.gz",
+        "https://atomgit.com/cann-src-third-party/eigen/releases/download/5.0.0-h0.trunk/eigen-5.0.0.tar.gz",
+        "https://atomgit.com/cann-src-third-party/protobuf/releases/download/v25.1/protobuf-25.1.tar.gz",
         (
-            "https://gitcode.com/cann-src-third-party/abseil-cpp/releases/download/"
+            "https://atomgit.com/cann-src-third-party/abseil-cpp/releases/download/"
             "20230802.1/abseil-cpp-20230802.1.tar.gz"
         ),
-        "https://gitcode.com/cann/opbase.git",  # Git 仓库
+        "https://atomgit.com/cann/opbase.git",  # Git 仓库
         "https://cann-3rd.obs.cn-north-4.myhuaweicloud.com/cmake/cmake-master-046.tar.gz",
-        "https://gitcode.com/cann/ops-tensor.git",
+        "https://atomgit.com/cann/ops-tensor.git",
     ]
 
     down_files_native(my_urls)

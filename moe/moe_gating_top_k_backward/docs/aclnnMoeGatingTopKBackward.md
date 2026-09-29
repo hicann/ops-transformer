@@ -1,6 +1,6 @@
 # aclnnMoeGatingTopKBackward
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/moe/moe_gating_top_k_backward)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/moe/moe_gating_top_k_backward)
 
 ## 产品支持情况
 

@@ -53,7 +53,7 @@ apace/
 
 | 子目录 | 说明 |
 |:---|:---|
-| `mmad` | 基于 [ops-tensor](https://gitcode.com/cann/ops-tensor) Blaze 库的量化 MMAD fragment，对接 FragmentTensor。 |
+| `mmad` | 基于 [ops-tensor](https://atomgit.com/cann/ops-tensor) Blaze 库的量化 MMAD fragment，对接 FragmentTensor。 |
 | `epilogue` | Matmul 后处理 block。 |
 | `scheduler` | 多核/多 block 调度 block。 |
 

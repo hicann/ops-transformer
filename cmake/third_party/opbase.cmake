@@ -29,7 +29,7 @@ else()
 
   FetchContent_Declare(
     opbase
-    GIT_REPOSITORY https://gitcode.com/cann/opbase.git
+    GIT_REPOSITORY https://atomgit.com/cann/opbase.git
     GIT_TAG ${OPBASE_TAG_ID}
     GIT_PROGRESS TRUE
     SOURCE_DIR ${CANN_3RD_LIB_PATH}/opbase)

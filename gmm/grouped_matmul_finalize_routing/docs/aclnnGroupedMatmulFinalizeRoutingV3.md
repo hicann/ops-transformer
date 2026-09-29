@@ -1,6 +1,6 @@
 # aclnnGroupedMatmulFinalizeRoutingV3
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/gmm/grouped_matmul_finalize_routing)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/gmm/grouped_matmul_finalize_routing)
 
 ## 产品支持情况
 

@@ -1,6 +1,6 @@
 # aclnnScatterPaKvCacheWithKScale
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/scatter_pa_kv_cache_with_k_scale)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/scatter_pa_kv_cache_with_k_scale)
 
 ## 产品支持情况
 

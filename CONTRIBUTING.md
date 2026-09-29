@@ -1,6 +1,6 @@
 # 贡献指南
 
-本项目欢迎广大开发者体验并参与贡献。在参与社区贡献之前，请参见 [cann-community](https://gitcode.com/cann/community) 了解行为准则，完成 CLA 协议签署，并熟悉源码仓的贡献流程。
+本项目欢迎广大开发者体验并参与贡献。在参与社区贡献之前，请参见 [cann-community](https://atomgit.com/cann/community) 了解行为准则，完成 CLA 协议签署，并熟悉源码仓的贡献流程。
 
 ## 准备工作
 
@@ -37,7 +37,7 @@
 - **价值/作用**
 - **设计方案**
 
-具体操作步骤请参阅：[Issue 操作指南](https://gitcode.com/cann/community/blob/master/contributor/issue-operation.md)。
+具体操作步骤请参阅：[Issue 操作指南](https://atomgit.com/cann/community/blob/master/contributor/issue-operation.md)。
 
 ### 2. 需求评审
 
@@ -51,11 +51,11 @@
 若需求紧急，可申请临时 SIG 会议：
 
 1. 填写议题申请：[议题申请](https://etherpad-cann.meeting.osinfra.cn/p/sig-ops-transformer)
-2. 发送邮件给 [maintainer](https://gitcode.com/cann/community/blob/master/CANN/sigs/ops-transformer/README.md)，建议邮件主题注明：申请临时 SIG 议题及议题内容
+2. 发送邮件给 [maintainer](https://atomgit.com/cann/community/blob/master/CANN/sigs/ops-transformer/README.md)，建议邮件主题注明：申请临时 SIG 议题及议题内容
 
 **需求接纳：**
 
-若需求被接纳，[SIG 成员](https://gitcode.com/cann/community/blob/master/CANN/sigs/ops-transformer/README.md)将为您分配合适的算子分类路径（如：`experimental/attention`），请将贡献算子提交至 `experimental` 对应算子分类目录。
+若需求被接纳，[SIG 成员](https://atomgit.com/cann/community/blob/master/CANN/sigs/ops-transformer/README.md)将为您分配合适的算子分类路径（如：`experimental/attention`），请将贡献算子提交至 `experimental` 对应算子分类目录。
 
 ### 3. PR 提交
 
@@ -76,7 +76,7 @@ ${op_class}                    # 算子分类
 **提交前准备：**
 
 - 建议在需求评审通过后，再提交 PR。
-- 提交 PR 前需完成开发环境准备，并仔细了解项目特定的开发规范和版权声明要求（如涉及开源代码片段引用，请参考片段引用指导），确保您的贡献符合项目标准，签署 CLA。具体操作步骤请参阅：[PR 操作指南](https://gitcode.com/cann/community/blob/master/contributor/pull_request_operation.md)。
+- 提交 PR 前需完成开发环境准备，并仔细了解项目特定的开发规范和版权声明要求（如涉及开源代码片段引用，请参考片段引用指导），确保您的贡献符合项目标准，签署 CLA。具体操作步骤请参阅：[PR 操作指南](https://atomgit.com/cann/community/blob/master/contributor/pull_request_operation.md)。
 
 **交付件要求：**
 
@@ -84,11 +84,11 @@ ${op_class}                    # 算子分类
 |------|------|---------|
 | 代码交付件 | 需提供算子 Kernel 实现、算子测试文件 | [fast_kernel_launch_example](examples/fast_kernel_launch_example/README.md) |
 | 文档交付件 | 算子 README 文档为必选，其余文档可视情况提供 | [文档贡献指南](docs/CONTRIBUTING_DOCS.md) |
-| 精度要求 | 新贡献算子需满足精度标准 | [生态算子开源精度标准](https://gitcode.com/cann/opbase/blob/master/docs/zh/ops_precision_standard/experimental_standard.md) |
+| 精度要求 | 新贡献算子需满足精度标准 | [生态算子开源精度标准](https://atomgit.com/cann/opbase/blob/master/docs/zh/ops_precision_standard/mixed_tolerance_standard.md) |
 
 **合规检查：**
 
-- [ ] 代码是否符合《[C++ 编程规范](https://gitcode.com/cann/community/blob/master/contributor/coding-standards/C++%20Coding%20standards.md)》
+- [ ] 代码是否符合《[C++ 编程规范](https://atomgit.com/cann/community/blob/master/contributor/coding-standards/C++%20Coding%20standards.md)》
 - [ ] 代码是否编译通过
 - [ ] Markdown 文档语法是否符合规范
 - [ ] 使用 git 进行代码提交前，可以参考 [pre-commit 工具使用说明](docs/zh/develop/pre-commit_guide.md)来使您的代码提交更合规高效
@@ -125,7 +125,7 @@ Committer 检视通过后，将标注 `/lgtm` 标签。Maintainer 最终审核�
 
 如果您在本项目中发现了某些算子 Bug，希望对其进行修复，欢迎您新建 Issue 进行反馈和跟踪处理。
 
-您可以按照 [提交 Issue/处理 Issue 任务](https://gitcode.com/cann/community#提交Issue处理Issue任务) 指引新建 `Bug-Report|缺陷反馈` 类 Issue 对 Bug 进行描述。
+您可以按照 [提交 Issue/处理 Issue 任务](https://atomgit.com/cann/community#提交Issue处理Issue任务) 指引新建 `Bug-Report|缺陷反馈` 类 Issue 对 Bug 进行描述。
 
 ---
 
@@ -133,7 +133,7 @@ Committer 检视通过后，将标注 `/lgtm` 标签。Maintainer 最终审核�
 
 如果您对本项目中某些算子实现有泛化性增强或性能优化思路，希望着手实现这些优化点，欢迎您对算子进行优化贡献。
 
-您可以按照 [提交 Issue/处理 Issue 任务](https://gitcode.com/cann/community#提交Issue处理Issue任务) 指引新建 `Requirement|需求建议` 类 Issue 对优化点进行说明，并提供您的设计方案。
+您可以按照 [提交 Issue/处理 Issue 任务](https://atomgit.com/cann/community#提交Issue处理Issue任务) 指引新建 `Requirement|需求建议` 类 Issue 对优化点进行说明，并提供您的设计方案。
 
 ---
 
@@ -141,7 +141,7 @@ Committer 检视通过后，将标注 `/lgtm` 标签。Maintainer 最终审核�
 
 如果您在本项目中发现某些算子文档描述错误，欢迎您新建 Issue 进行反馈和修复，文档规范参考 [文档贡献指南](docs/CONTRIBUTING_DOCS.md)。
 
-您可以按照 [提交 Issue/处理 Issue 任务](https://gitcode.com/cann/community#提交Issue处理Issue任务) 指引新建 `Documentation|文档反馈` 类 Issue 指出对应文档的问题。
+您可以按照 [提交 Issue/处理 Issue 任务](https://atomgit.com/cann/community#提交Issue处理Issue任务) 指引新建 `Documentation|文档反馈` 类 Issue 指出对应文档的问题。
 
 ---
 
@@ -192,7 +192,7 @@ ${op_class}                           # 算子分类
 
 **合规检查：**
 
-- [ ] 代码是否符合《[C++ 编程规范](https://gitcode.com/cann/community/blob/master/contributor/coding-standards/C++%20Coding%20standards.md)》
+- [ ] 代码是否符合《[C++ 编程规范](https://atomgit.com/cann/community/blob/master/contributor/coding-standards/C++%20Coding%20standards.md)》
 - [ ] 是否符合标准算子基础编程规范
 - [ ] 代码是否编译通过
 - [ ] Markdown 文档语法是否符合规范

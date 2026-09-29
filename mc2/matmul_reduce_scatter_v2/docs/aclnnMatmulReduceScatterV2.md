@@ -1,6 +1,6 @@
 # aclnnMatmulReduceScatterV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/mc2/matmul_reduce_scatter_v2)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/matmul_reduce_scatter_v2)
 
 ## 产品支持情况
 

@@ -1,6 +1,6 @@
 # aclnnQuantMatmulAlltoAllV2
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/mc2/matmul_allto_all)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/matmul_allto_all)
 
 ## 产品支持情况
 

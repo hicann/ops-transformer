@@ -2,7 +2,7 @@
 
 **须知：该接口后续版本会废弃，请使用aclnnQuantMatmulAllReduceV2和aclnnAddRmsNorm替代本接口。**
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/mc2/inplace_matmul_all_reduce_add_rms_norm)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/mc2/inplace_matmul_all_reduce_add_rms_norm)
 
 ## 产品支持情况
 

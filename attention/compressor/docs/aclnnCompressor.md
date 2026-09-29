@@ -1,6 +1,6 @@
 # aclnnCompressor
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/attention/compressor)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/attention/compressor)
 
 ## 产品支持情况
 

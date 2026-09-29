@@ -1,6 +1,6 @@
 # aclnnMoeFinalizeRoutingV4
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/master/moe/moe_finalize_routing_v2)
+[📄 查看源码](https://atomgit.com/cann/ops-transformer/tree/master/moe/moe_finalize_routing_v2)
 
 ## 产品支持情况
 
