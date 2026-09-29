@@ -54,6 +54,8 @@ constexpr uint32_t BASIC_BLOCK_BASE_M_WITH_BIAS = 240;
 constexpr uint32_t BASIC_BLOCK_BASE_N = 256;
 constexpr uint32_t BASIC_BLOCK_BASE_K = 64;
 constexpr uint32_t BASIC_BLOCK_BASE_N_MIN = 128;
+constexpr uint32_t BASIC_BLOCK_BASE_M_MIN = 128;
+constexpr uint32_t MX_A8W4_GROUP_DISTRIBUTED_N_MIN = 4096;
 constexpr uint32_t STEP_K_4 = 4;
 constexpr uint32_t STEP_K_3 = 3;
 constexpr uint32_t DEPTH_8 = 8;
@@ -354,6 +356,11 @@ protected:
     bool CheckAllParams(const gert::TilingContext *context);
     bool AnalyzeInput(const gert::TilingContext *context);
     bool CalcResplitTiling(const gert::TilingContext *context);
+    bool CalcMxA8W4BandwidthResplit(const gert::TilingContext *context, uint64_t c0Size, uint64_t &selectedNBlockCount,
+                                    uint64_t &selectedNBlockSize) const;
+    double GetHbmBW(fe::PlatFormInfos *platformInfo) const;
+    double GetL2BW(fe::PlatFormInfos *platformInfo) const;
+    double GetCoreFreq(fe::PlatFormInfos *platformInfo) const;
     bool SetBaseTiling();
     void SetMatMulTiling();
     void SetTilingKey(gert::TilingContext *context);
@@ -393,6 +400,7 @@ protected:
     void PrintInputParam(const gert::TilingContext *context) const;
     void PrintTilingResult(const gert::TilingContext *context);
     bool EnableTailResplit() const;
+    bool TraverseForBalanceBaseN();
 
 private:
     int32_t mList_[GroupedMatmul::MAX_TENSOR_CONT] = {0};
