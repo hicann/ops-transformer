@@ -180,7 +180,7 @@ aclnnStatus aclnnSparseFlashMla(
           <li>layoutQ为TND时：(T1, N1, D)</li>
         </ul>
       </td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>oriKvOptional（aclTensor*）</td>
@@ -230,7 +230,7 @@ aclnnStatus aclnnSparseFlashMla(
         </ul>
         其中K为oriKv的TopK稀疏选择数。
       </td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cmpSparseIndicesOptional（aclTensor*）</td>
@@ -246,7 +246,7 @@ aclnnStatus aclnnSparseFlashMla(
         </ul>
         其中K2为cmpKv的TopK稀疏选择数。
       </td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>oriBlockTableOptional（aclTensor*）</td>
@@ -256,7 +256,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(B, ori_max_block_num_per_batch)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cmpBlockTableOptional（aclTensor*）</td>
@@ -266,7 +266,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(B, cmp_max_block_num_per_batch)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cuSeqlensQOptional（aclTensor*）</td>
@@ -276,7 +276,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(B+1,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cuSeqlensOriKvOptional（aclTensor*）</td>
@@ -286,7 +286,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(B+1,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cuSeqlensCmpKvOptional（aclTensor*）</td>
@@ -296,17 +296,17 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(B+1,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>sequsedQOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中q实际参与运算的token数。</td>
-      <td>当前暂不支持指定该参数。</td>
+      <td>layoutQOptional为可选传入，用于指定每个batch的q有效长度。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>sequsedOriKvOptional（aclTensor*）</td>
@@ -316,7 +316,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>sequsedCmpKvOptional（aclTensor*）</td>
@@ -326,7 +326,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cmpResidualKvOptional（aclTensor*）</td>
@@ -336,7 +336,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>oriTopkLengthOptional（aclTensor*）</td>
@@ -346,17 +346,17 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>layoutQ为BSND时：(B, S1, N2)；layoutQ为TND时：(T1, N2)。shape必须与oriSparseIndicesOptional去掉最后一维K后保持一致。</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cmpTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同q token对应的cmpKv关键稀疏token的实际个数。</td>
-      <td>必须传入nullptr或空Tensor；传入非空Tensor会返回参数错误。</td>
+      <td>cmp_kv稀疏且cmp_mask_mode=0时必须传入，其他场景传入nullptr或空Tensor。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>-</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>sinksOptional（aclTensor*）</td>
@@ -366,7 +366,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>FLOAT32</td>
       <td>ND</td>
       <td>(N1,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>metadataOptional（aclTensor*）</td>
@@ -376,7 +376,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(1024,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>softmaxScale（double）</td>
@@ -694,6 +694,7 @@ aclnnStatus aclnnSparseFlashMla(
   - 除`cmpTopkLengthOptional`等预留输入可传入nullptr或空Tensor外，其余已传入Tensor不支持为空。
   - `metadataOptional`参数必须传入，由`aclnnSparseFlashMlaMetadata`算子生成，shape固定为(1024,)。
   - `cmpResidualKvOptional`为主算子和`aclnnSparseFlashMlaMetadata`的可选入参；传入后用于按`cmp_len * cmpRatio + residual`恢复cmp侧mask使用的压缩前长度。主算子仅在cmpMaskMode为3且cmpRatio不等于1时允许传入，cmpMaskMode为0或cmpRatio等于1时不允许传入。
+  - 当layoutKv为PA_BBND时，oriKvOptional和cmpKvOptional支持0轴非连续，非连续Tensor的每一维的stride均不能为0。不支持其他非连续。
 
 - 三种Attention场景输入要求
 

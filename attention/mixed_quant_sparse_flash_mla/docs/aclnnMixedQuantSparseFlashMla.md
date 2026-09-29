@@ -191,7 +191,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
           <li>layoutQOptional为TND时：(qT, qN, qD)</li>
         </ul>
       </td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>oriKvOptional（aclTensor*）</td>
@@ -241,7 +241,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
         </ul>
         其中oriKvK为对oriKvOptional的TopK稀疏选择数，范围支持大于0。
       </td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cmpSparseIndicesOptional（aclTensor*）</td>
@@ -257,7 +257,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
         </ul>
         其中cmpKvK为对cmpKvOptional的TopK稀疏选择数，范围支持大于0。
       </td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>oriBlockTableOptional（aclTensor*）</td>
@@ -267,7 +267,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(b, Ceil(oriKvSMax/oriKvBlockSize))</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cmpBlockTableOptional（aclTensor*）</td>
@@ -277,7 +277,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(b, Ceil(cmpKvSMax/cmpKvBlockSize))</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cuSeqlensQOptional（aclTensor*）</td>
@@ -287,7 +287,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(b+1,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cuSeqlensOriKvOptional（aclTensor*）</td>
@@ -297,7 +297,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(b+1,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cuSeqlensCmpKvOptional（aclTensor*）</td>
@@ -307,27 +307,27 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(b+1,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>sequsedQOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中q实际参与运算的token数。</td>
-      <td>当前暂不支持指定该参数。</td>
+      <td>layoutQOptional为可选传入，用于指定每个batch的q有效长度。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(b,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>sequsedOriKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同Batch中oriKv实际参与运算的token数。</td>
-      <td>layoutKvOptional为PA_BBND时必须传入；layoutKvOptional为BSND时可选传入，用于指定每个batch的oriKv有效长度；layoutKvOptional为TND时使用cuSeqlensOriKvOptional表达序列边界。</td>
+      <td>layoutKvOptional为PA_BBND且未传入oriTopkLengthOptional时必须传入；layoutKvOptional为BSND时可选传入，用于指定每个batch的oriKv有效长度；layoutKvOptional为TND时使用cuSeqlensOriKvOptional表达序列边界。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(b,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>sequsedCmpKvOptional（aclTensor*）</td>
@@ -337,7 +337,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(b,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cmpResidualKvOptional（aclTensor*）</td>
@@ -347,7 +347,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(b,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>oriTopkLengthOptional（aclTensor*）</td>
@@ -362,7 +362,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
           <li>layoutQOptional为TND时：(qT, kvN)</li>
         </ul>
       </td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cmpTopkLengthOptional（aclTensor*）</td>
@@ -377,7 +377,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
           <li>layoutQOptional为TND时：(qT, kvN)</li>
         </ul>
       </td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>sinksOptional（aclTensor*）</td>
@@ -387,7 +387,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>FLOAT32</td>
       <td>ND</td>
       <td>(qN,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>metadataOptional（aclTensor*）</td>
@@ -397,7 +397,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>INT32</td>
       <td>ND</td>
       <td>(1024,)</td>
-      <td>√</td>
+      <td>×</td>
     </tr>
     <tr>
       <td id="quantMode">quantMode（int64_t）</td>
@@ -683,7 +683,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
   - attnOut：tensor类型，公式中的输出，数据类型支持BFLOAT16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
   - returnSoftmaxLse=False时返回shape为[1]的值为0的tensor；returnSoftmaxLse=True时返回FLOAT32的log-sum-exp结果。
   - cuSeqlensQOptional、cuSeqlensOriKvOptional、cuSeqlensCmpKvOptional须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
-  - 当layoutKvOptional为PA_BBND时，oriKvOptional和cmpKvOptional支持0轴非连续。
+  - 当layoutKvOptional为PA_BBND时，oriKvOptional和cmpKvOptional支持0轴非连续，非连续Tensor的每一维的stride均不能为0。不支持其他非连续。
   - 各参数shape中以相同符号表示的维度，其对应轴的实际数值需保持一致。
 
 ### 产品差异化约束
