@@ -23,26 +23,26 @@
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)
 
 /* --- arch92 --- */
-#include "arch92/quant_flash_attn_common_def.h"
-#include "arch92/quant_flash_attn_kernel_mxfp8.h"
-#include "arch92/quant_flash_attn_kernel_mxfp8_nd.h"
-#include "arch92/quant_flash_attn_template_tiling_key.h"
-#include "arch92/quant_flash_attn_tiling_data.h"
+#include "arch92/quant_flash_attn_common_def_arch92.h"
+#include "arch92/quant_flash_attn_kernel_mxfp8_arch92.h"
+#include "arch92/quant_flash_attn_kernel_mxfp8_nd_arch92.h"
+#include "arch92/quant_flash_attn_template_tiling_key_arch92.h"
+#include "arch92/quant_flash_attn_tiling_data_arch92.h"
 
 using namespace AscendC;
 using namespace optiling;
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
           bool isFd>
-__aicore__ inline void quant_flash_attn_mxfp8_dn(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                                 __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-                                                 __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *blockTable,
-                                                 __gm__ uint8_t *pScale, __gm__ uint8_t *cuSeqLensQ,
-                                                 __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ,
-                                                 __gm__ uint8_t *sequsedKv, __gm__ uint8_t *sinks,
-                                                 __gm__ uint8_t *attnMask, __gm__ uint8_t *metadata,
-                                                 __gm__ uint8_t *attnOut, __gm__ uint8_t *softmaxLse,
-                                                 __gm__ uint8_t *workspace, const QuantFlashAttnTilingData &tilingData)
+__aicore__ inline void quant_flash_attn_mxfp8_dn(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                                 __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
+                                                 __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
+                                                 __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ,
+                                                 __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
+                                                 __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks,
+                                                 __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
+                                                 __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse,
+                                                 __gm__ uint8_t* workspace, const QuantFlashAttnTilingData& tilingData)
 {
     using INPUT_T = fp8_e4m3fn_t;
     using OUT_T = bfloat16_t;
@@ -104,15 +104,15 @@ __aicore__ inline void quant_flash_attn_mxfp8_dn(__gm__ uint8_t *query, __gm__ u
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
           bool isFd>
-__aicore__ inline void quant_flash_attn_mxfp8_nd(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                                 __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-                                                 __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *blockTable,
-                                                 __gm__ uint8_t *pScale, __gm__ uint8_t *cuSeqLensQ,
-                                                 __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ,
-                                                 __gm__ uint8_t *sequsedKv, __gm__ uint8_t *sinks,
-                                                 __gm__ uint8_t *attnMask, __gm__ uint8_t *metadata,
-                                                 __gm__ uint8_t *attnOut, __gm__ uint8_t *softmaxLse,
-                                                 __gm__ uint8_t *workspace, const QuantFlashAttnTilingData &tilingData)
+__aicore__ inline void quant_flash_attn_mxfp8_nd(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                                 __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
+                                                 __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
+                                                 __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ,
+                                                 __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
+                                                 __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks,
+                                                 __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
+                                                 __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse,
+                                                 __gm__ uint8_t* workspace, const QuantFlashAttnTilingData& tilingData)
 {
     using INPUT_T = fp8_e4m3fn_t;
     using OUT_T = bfloat16_t;
@@ -173,16 +173,16 @@ __aicore__ inline void quant_flash_attn_mxfp8_nd(__gm__ uint8_t *query, __gm__ u
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
           bool isFd>
 __global__ __aicore__ void quant_flash_attn(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *dequantScaleQuery,
-    __gm__ uint8_t *dequantScaleKey, __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *blockTable,
-    __gm__ uint8_t *pScale, __gm__ uint8_t *cuSeqLensQ, __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ,
-    __gm__ uint8_t *sequsedKv, __gm__ uint8_t *sinks, __gm__ uint8_t *attnMask, __gm__ uint8_t *metadata,
-    __gm__ uint8_t *attnOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* dequantScaleQuery,
+    __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
+    __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ, __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
+    __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
+    __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(QuantFlashAttnTilingData);
     // SK/静态图兼容：tiling 在外层入口统一经宏取一次（动=GM零拷贝/静=栈拷贝），向下传参
     GET_TILING_DATA(tilingData, tiling);
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == QFA_MXFP8_FP32_PREFILL) {
@@ -215,15 +215,15 @@ using namespace optiling;
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
           bool isFd>
-__aicore__ inline void quant_flash_attn_mxfp8(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                              __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-                                              __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *blockTable,
-                                              __gm__ uint8_t *pScale, __gm__ uint8_t *cuSeqLensQ,
-                                              __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ,
-                                              __gm__ uint8_t *sequsedKv, __gm__ uint8_t *sinks,
-                                              __gm__ uint8_t *attnMask, __gm__ uint8_t *metadata,
-                                              __gm__ uint8_t *attnOut, __gm__ uint8_t *softmaxLse,
-                                              __gm__ uint8_t *workspace, const QuantFlashAttnTilingData &tilingData)
+__aicore__ inline void quant_flash_attn_mxfp8(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                              __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
+                                              __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
+                                              __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ,
+                                              __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
+                                              __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks,
+                                              __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
+                                              __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse,
+                                              __gm__ uint8_t* workspace, const QuantFlashAttnTilingData& tilingData)
 {
     using INPUT_T = fp8_e4m3fn_t;
     using OUT_T = bfloat16_t;
@@ -288,11 +288,11 @@ __aicore__ inline void quant_flash_attn_mxfp8(__gm__ uint8_t *query, __gm__ uint
 template <typename INPUT_T, typename OUT_T, uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask,
           uint8_t config>
 inline __aicore__ void quant_flash_attn_gqa_fp8(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *qDescale,
-    __gm__ uint8_t *kDescale, __gm__ uint8_t *vDescale, __gm__ uint8_t *blockTable, __gm__ uint8_t *pScale,
-    __gm__ uint8_t *cuSeqLensQ, __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedKv,
-    __gm__ uint8_t *sinks, __gm__ uint8_t *metadata, __gm__ uint8_t *attnOut, __gm__ uint8_t *softmaxLse,
-    __gm__ uint8_t *workspace, const QuantFlashAttnTilingData &tilingData)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* qDescale,
+    __gm__ uint8_t* kDescale, __gm__ uint8_t* vDescale, __gm__ uint8_t* blockTable, __gm__ uint8_t* pScale,
+    __gm__ uint8_t* cuSeqLensQ, __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedKv,
+    __gm__ uint8_t* sinks, __gm__ uint8_t* metadata, __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse,
+    __gm__ uint8_t* workspace, const QuantFlashAttnTilingData& tilingData)
 {
     fa_base_matmul::ResetIdCounter();
 
@@ -345,15 +345,15 @@ inline __aicore__ void quant_flash_attn_gqa_fp8(
 
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
           bool isFd>
-__aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                             __gm__ uint8_t *dequantScaleQuery, __gm__ uint8_t *dequantScaleKey,
-                                             __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *blockTable,
-                                             __gm__ uint8_t *pScale, __gm__ uint8_t *cuSeqLensQ,
-                                             __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ,
-                                             __gm__ uint8_t *sequsedKv, __gm__ uint8_t *sinks, __gm__ uint8_t *attnMask,
-                                             __gm__ uint8_t *metadata, __gm__ uint8_t *attnOut,
-                                             __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace,
-                                             const QuantFlashAttnTilingData &tilingData)
+__aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                             __gm__ uint8_t* dequantScaleQuery, __gm__ uint8_t* dequantScaleKey,
+                                             __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
+                                             __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ,
+                                             __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
+                                             __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask,
+                                             __gm__ uint8_t* metadata, __gm__ uint8_t* attnOut,
+                                             __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
+                                             const QuantFlashAttnTilingData& tilingData)
 {
     using INPUT_T = hifloat8_t;
     using OUT_T = bfloat16_t;
@@ -412,16 +412,16 @@ __aicore__ inline void quant_flash_attn_hif8(__gm__ uint8_t *query, __gm__ uint8
 template <uint8_t inOutLayoutType, uint16_t config, uint8_t quantMode, bool hasAttenMask, uint8_t KvLayoutType,
           bool isFd>
 __global__ __aicore__ void quant_flash_attn(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *dequantScaleQuery,
-    __gm__ uint8_t *dequantScaleKey, __gm__ uint8_t *dequantScaleValue, __gm__ uint8_t *blockTable,
-    __gm__ uint8_t *pScale, __gm__ uint8_t *cuSeqLensQ, __gm__ uint8_t *cuSeqLensKv, __gm__ uint8_t *sequsedQ,
-    __gm__ uint8_t *sequsedKv, __gm__ uint8_t *sinks, __gm__ uint8_t *attnMask, __gm__ uint8_t *metadata,
-    __gm__ uint8_t *attnOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* dequantScaleQuery,
+    __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
+    __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ, __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
+    __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
+    __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(QuantFlashAttnTilingData);
     // SK/静态图兼容：tiling 在外层入口统一经宏取一次（动=GM零拷贝/静=栈拷贝），向下传参
     GET_TILING_DATA(tilingData, tiling);
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == QFA_MXFP8_FP32_PREFILL || quantMode == QFA_MXFP8_FP32_DECODE) {

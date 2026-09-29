@@ -9,16 +9,16 @@
  */
 
 /*!
- * \file quant_flash_attn_template_tiling_key.h
+ * \file quant_flash_attn_template_tiling_key_arch92.h
  * \brief QuantFlashAttn TilingKey定义（量化，MXFP8_FP32_PREFILL/DECODE）
  */
 
-#ifndef TEMPLATE_TILING_KEY_QUANT_FLASH_ATTN_H_
-#define TEMPLATE_TILING_KEY_QUANT_FLASH_ATTN_H_
+#ifndef QUANT_FLASH_ATTN_TEMPLATE_TILING_KEY_ARCH92_H_
+#define QUANT_FLASH_ATTN_TEMPLATE_TILING_KEY_ARCH92_H_
 
 #include "ascendc/host_api/tiling/template_argument.h"
-#include "quant_flash_attn_common_def.h"
-#include "quant_flash_attn_tiling_data.h"
+#include "quant_flash_attn_common_def_arch92.h"
+#include "quant_flash_attn_tiling_data_arch92.h"
 
 using namespace optiling;
 
@@ -81,4 +81,4 @@ ASCENDC_TPL_SEL(
                              KvLayoutType_PA_BNBD),
         ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)));
 
-#endif // TEMPLATE_TILING_KEY_QUANT_FLASH_ATTN_H_
+#endif // QUANT_FLASH_ATTN_TEMPLATE_TILING_KEY_ARCH92_H_

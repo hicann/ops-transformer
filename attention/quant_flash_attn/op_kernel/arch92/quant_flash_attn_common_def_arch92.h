@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file quant_flash_attn_common_def.h
+ * \file quant_flash_attn_common_def_arch92.h
  * \brief QuantFlashAttn算子tiling和kernel共用的相关定义
  */
 
-#ifndef QUANT_FLASH_ATTN_COMMON_DEF_H_
-#define QUANT_FLASH_ATTN_COMMON_DEF_H_
+#ifndef QUANT_FLASH_ATTN_COMMON_DEF_ARCH92_H_
+#define QUANT_FLASH_ATTN_COMMON_DEF_ARCH92_H_
 
 static constexpr uint32_t FIA_SYNC_MODE2 = 2;
 static constexpr uint32_t BUFFER_SIZE_BYTE_32B = 32;
@@ -273,4 +273,4 @@ struct SinkConstInfo {
 
 struct ConstInfo_t : CommonConstInfo, PAConstInfo, LseConstInfo, SinkConstInfo {};
 
-#endif // QUANT_FLASH_ATTN_COMMON_DEF_H_
+#endif // QUANT_FLASH_ATTN_COMMON_DEF_ARCH92_H_

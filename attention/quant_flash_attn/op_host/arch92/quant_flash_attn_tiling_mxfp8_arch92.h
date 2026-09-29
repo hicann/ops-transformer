@@ -9,31 +9,31 @@
  */
 
 /*!
- * \file quant_flash_attn_tiling_mxfp8.h
+ * \file quant_flash_attn_tiling_mxfp8_arch92.h
  * \brief QuantFlashAttn arch92 tiling implementation
  */
-#ifndef QUANT_FLASH_ATTN_TILING_MXFP8_IMPL_ARCH92_H_
-#define QUANT_FLASH_ATTN_TILING_MXFP8_IMPL_ARCH92_H_
+#ifndef QUANT_FLASH_ATTN_TILING_MXFP8_ARCH92_H_
+#define QUANT_FLASH_ATTN_TILING_MXFP8_ARCH92_H_
 
 #include "register/tilingdata_base.h"
 #include "exe_graph/runtime/tiling_context.h"
 #include "../qfa_tiling_info.h"
 #include "../quant_flash_attn_tiling_common.h"
 #include "tiling/tiling_api.h"
-#include "../../op_kernel/arch92/quant_flash_attn_tiling_data.h"
-#include "../../op_kernel/arch92/quant_flash_attn_template_tiling_key.h"
+#include "../../op_kernel/arch92/quant_flash_attn_tiling_data_arch92.h"
+#include "../../op_kernel/arch92/quant_flash_attn_template_tiling_key_arch92.h"
 
 namespace optiling {
 namespace quant_flash_attn {
 
 class QuantFlashAttnTilingArch92 : public FiaTilingBase {
 public:
-    explicit QuantFlashAttnTilingArch92(gert::TilingContext *context)
+    explicit QuantFlashAttnTilingArch92(gert::TilingContext* context)
         : FiaTilingBase(context)
     {}
     ~QuantFlashAttnTilingArch92() override = default;
 
-    void InitTilingInfo(TilingInfo *tilingInfo) override;
+    void InitTilingInfo(TilingInfo* tilingInfo) override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
 
@@ -54,7 +54,7 @@ private:
     void CalcScheduleMode();
     void CalcNumBlocks(uint32_t aicNum);
     void FillTiling();
-    ge::graphStatus SetTilingData(QuantFlashAttnTilingData &tilingData);
+    ge::graphStatus SetTilingData(QuantFlashAttnTilingData& tilingData);
 
     QuantFlashAttnTilingData tilingData_;
     QfaTilingKeyInfo tilingKeyInfo_;
@@ -72,9 +72,9 @@ private:
     ScheduleMode scheduleMode_ = ScheduleMode::BATCH_MODE;
     uint32_t numBlocks_ = 0;
 
-    QfaTilingInfo *qfaInfo_ = nullptr;
+    QfaTilingInfo* qfaInfo_ = nullptr;
 };
 
 } // namespace quant_flash_attn
 } // namespace optiling
-#endif // QUANT_FLASH_ATTN_TILING_MXFP8_IMPL_ARCH92_H_
+#endif // QUANT_FLASH_ATTN_TILING_MXFP8_ARCH92_H_

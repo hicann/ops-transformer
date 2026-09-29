@@ -9,12 +9,12 @@
  */
 
 /*!
- * \file quant_flash_attn_tiling_data.h
+ * \file quant_flash_attn_tiling_data_arch92.h
  * \brief QuantFlashAttn tiling data structures
  */
 
-#ifndef QUANT_FLASH_ATTN_TILING_DATA_H_
-#define QUANT_FLASH_ATTN_TILING_DATA_H_
+#ifndef QUANT_FLASH_ATTN_TILING_DATA_ARCH92_H_
+#define QUANT_FLASH_ATTN_TILING_DATA_ARCH92_H_
 
 namespace optiling {
 // AICPU metadata format: 16 fields per core (FA and FD both)
