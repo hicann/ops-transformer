@@ -48,11 +48,11 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     if (workspaceSize == nullptr) {
-        OP_LOGE(MQSMLA_ACLNN_OP_NAME, "workspaceSize is nullptr");
+        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "workspaceSize is nullptr");
         return ACLNN_ERR_INNER_NULLPTR;
     }
     if (executor == nullptr) {
-        OP_LOGE(MQSMLA_ACLNN_OP_NAME, "executor is nullptr");
+        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "executor is nullptr");
         return ACLNN_ERR_INNER_NULLPTR;
     }
     L2_DFX_PHASE_1(aclnnMixedQuantSparseFlashMlaMetadata,
@@ -64,8 +64,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
                    DFX_OUT(metaData));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
-    OP_CHECK_IF(uniqueExecutor.get() == nullptr, OP_LOGE(MQSMLA_ACLNN_OP_NAME, "Failed to create executor"),
-                return ACLNN_ERR_INNER_CREATE_EXECUTOR);
+    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     const op::PlatformInfo &npuInfo = op::GetCurrentPlatformInfo();
     uint32_t aicCoreNum = 0;
@@ -82,9 +81,9 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     int64_t deterministicLevel = 0;
     aclError aclRet = aclrtGetSysParamOpt(ACL_OPT_DETERMINISTIC, &deterministicLevel);
     if (aclRet != ACL_SUCCESS) {
-        OP_LOGW(MQSMLA_ACLNN_OP_NAME, "Unable to get system param batch consistency level.");
+        OP_LOGW("Unable to get system param batch consistency level.");
     }
-    OP_LOGD(MQSMLA_ACLNN_OP_NAME, "deterministic_level=%lld", static_cast<long long>(deterministicLevel));
+    OP_LOGD("deterministic_level=%lld", static_cast<long long>(deterministicLevel));
     bool isBatchConsistency = (deterministicLevel == BATCH_CONSISTENCY_LEVEL);
 
     auto ret = ParamsCheck(cuSeqlensQOptional, cuSeqlensOriKvOptional, cuSeqlensCmpKvOptional, sequsedQOptional,
@@ -93,13 +92,13 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
                            maxSeqlenOriKv, maxSeqlenCmpKv, oriTopk, cmpTopk, ropeHeadDim, cmpRatio, oriMaskMode,
                            cmpMaskMode, oriWinLeft, oriWinRight, layoutQOptional, layoutKvOptional, hasOriKv, hasCmpKv,
                            aicCoreNum, aivCoreNum, socVersion, metaData);
-    OP_CHECK_IF(ret != ACLNN_SUCCESS, OP_LOGE(MQSMLA_ACLNN_OP_NAME, "Parameter check failed: %d", ret), return ret);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     const aclTensor *cuSeqlensQOptionalContiguous = nullptr;
     if (cuSeqlensQOptional != nullptr) {
         cuSeqlensQOptionalContiguous = l0op::Contiguous(cuSeqlensQOptional, uniqueExecutor.get());
         if (cuSeqlensQOptionalContiguous == nullptr) {
-            OP_LOGE(MQSMLA_ACLNN_OP_NAME, "cu_seqlens_q contiguous is null");
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "cu_seqlens_q contiguous is null");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -107,7 +106,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     if (cuSeqlensOriKvOptional != nullptr) {
         cuSeqlensOriKvOptionalContiguous = l0op::Contiguous(cuSeqlensOriKvOptional, uniqueExecutor.get());
         if (cuSeqlensOriKvOptionalContiguous == nullptr) {
-            OP_LOGE(MQSMLA_ACLNN_OP_NAME, "cu_seqlens_ori_kv contiguous is null");
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "cu_seqlens_ori_kv contiguous is null");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -115,7 +114,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     if (cuSeqlensCmpKvOptional != nullptr) {
         cuSeqlensCmpKvOptionalContiguous = l0op::Contiguous(cuSeqlensCmpKvOptional, uniqueExecutor.get());
         if (cuSeqlensCmpKvOptionalContiguous == nullptr) {
-            OP_LOGE(MQSMLA_ACLNN_OP_NAME, "cu_seqlens_cmp_kv contiguous is null");
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "cu_seqlens_cmp_kv contiguous is null");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -123,7 +122,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     if (sequsedQOptional != nullptr) {
         sequsedQOptionalContiguous = l0op::Contiguous(sequsedQOptional, uniqueExecutor.get());
         if (sequsedQOptionalContiguous == nullptr) {
-            OP_LOGE(MQSMLA_ACLNN_OP_NAME, "seqused_q contiguous is null");
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "seqused_q contiguous is null");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -131,7 +130,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     if (sequsedOriKvOptional != nullptr) {
         sequsedOriKvOptionalContiguous = l0op::Contiguous(sequsedOriKvOptional, uniqueExecutor.get());
         if (sequsedOriKvOptionalContiguous == nullptr) {
-            OP_LOGE(MQSMLA_ACLNN_OP_NAME, "seqused_ori_kv contiguous is null");
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "seqused_ori_kv contiguous is null");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -139,7 +138,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     if (sequsedCmpKvOptional != nullptr) {
         sequsedCmpKvOptionalContiguous = l0op::Contiguous(sequsedCmpKvOptional, uniqueExecutor.get());
         if (sequsedCmpKvOptionalContiguous == nullptr) {
-            OP_LOGE(MQSMLA_ACLNN_OP_NAME, "seqused_cmp_kv contiguous is null");
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "seqused_cmp_kv contiguous is null");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -147,7 +146,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     if (cmpResidualKvOptional != nullptr) {
         cmpResidualKvOptionalContiguous = l0op::Contiguous(cmpResidualKvOptional, uniqueExecutor.get());
         if (cmpResidualKvOptionalContiguous == nullptr) {
-            OP_LOGE(MQSMLA_ACLNN_OP_NAME, "cmp_residual_kv contiguous is null");
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "cmp_residual_kv contiguous is null");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -155,7 +154,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     if (oriTopkLengthOptional != nullptr) {
         oriTopkLengthOptionalContiguous = l0op::Contiguous(oriTopkLengthOptional, uniqueExecutor.get());
         if (oriTopkLengthOptionalContiguous == nullptr) {
-            OP_LOGE(MQSMLA_ACLNN_OP_NAME, "ori_topk_length contiguous is null");
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "ori_topk_length contiguous is null");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -163,7 +162,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
     if (cmpTopkLengthOptional != nullptr) {
         cmpTopkLengthOptionalContiguous = l0op::Contiguous(cmpTopkLengthOptional, uniqueExecutor.get());
         if (cmpTopkLengthOptionalContiguous == nullptr) {
-            OP_LOGE(MQSMLA_ACLNN_OP_NAME, "cmp_topk_length contiguous is null");
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "cmp_topk_length contiguous is null");
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -175,8 +174,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMlaMetadataGetWorkspaceSize(
         numHeadsKv, headDim, quantMode, batchSize, maxSeqlenQ, maxSeqlenOriKv, maxSeqlenCmpKv, oriTopk, cmpTopk,
         ropeHeadDim, cmpRatio, oriMaskMode, cmpMaskMode, oriWinLeft, oriWinRight, layoutQOptional, layoutKvOptional,
         hasOriKv, hasCmpKv, socVersion, aicCoreNum, aivCoreNum, isBatchConsistency, metaData, uniqueExecutor.get());
-    OP_CHECK_IF(output == nullptr, OP_LOGE(MQSMLA_ACLNN_OP_NAME, "Metadata output is nullptr"),
-                return ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);
