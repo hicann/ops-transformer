@@ -67,14 +67,16 @@ cann_ops_transformer.generic_block_sparse_attention_metadata(
     seqused_kv=None,
     max_seqlen_q=-1,
     max_seqlen_kv=-1,
-    is_packed_gqa=True,
     layout_q="TND",
     layout_kv="PA_BBND",
+    layout_sparse_pattern=4,
     mask_mode=1,
     quant_mode=0,
     softmax_precision=1,
     win_left=-1,
     win_right=-1,
+    residual_block_mode=0,
+    is_consistent_topk=False,
 ) -> Tensor
 ```
 
@@ -98,9 +100,9 @@ cann_ops_transformer.generic_block_sparse_attention(
     seqused_q=None,
     seqused_kv=None,
     block_table=None,
-    is_packed_gqa=True,
     layout_q="TND",
     layout_kv="PA_BBND",
+    layout_sparse_pattern=4,
     softmax_scale=0.0,
     mask_mode=1,
     quant_mode=0,
@@ -109,13 +111,15 @@ cann_ops_transformer.generic_block_sparse_attention(
     win_left=-1,
     win_right=-1,
     return_softmax_lse=False,
+    residual_block_mode=0,
+    is_consistent_topk=False,
     attention_out_dtype=None,
 ) -> (Tensor, Tensor)
 ```
 
 ## 枚举说明
 
-`quant_mode` 与 `mask_mode` 在 Python 接口中支持传入 `IntEnum` 枚举或对应 int 值，枚举定义于 `cann_ops_transformer.ops.generic_block_sparse_attention`：
+`quant_mode` 、 `mask_mode` 与`residual_block_mode`在 Python 接口中支持传入 `IntEnum` 枚举或对应 int 值，枚举定义于 `cann_ops_transformer.ops.generic_block_sparse_attention`：
 
 ### quant_mode 枚举
 
@@ -136,17 +140,40 @@ cann_ops_transformer.generic_block_sparse_attention(
 | `CAUSAL` | 1 | Causal 模式（默认值） |
 | `WINDOW` | 2 | Window 模式 |
 
+### residual_block_mode 枚举
+
+| 枚举名 | 值 | 含义 |
+| :--- | :---: | :--- |
+| `MARKED_BY_SPARSE_BLK_IDX` | 0 | 尾块是否参与计算由sparseBlockIdx确定 |
+| `INCOMPLETE_BLK_KEPT_BUT_NOT_IN_SPARSE_BLK_IDX` | 1 | 不完整的尾块一定参与计算，但不包含在sparseBlockIdx中 |
+
 > [!NOTE]
 >
 > 枚举为 `IntEnum`，可直接作为 int 传入底层算子；接口仅支持传入枚举或对应 int 值。当前仅支持 mask_mode = 1（`CAUSAL`）；quant_mode 当前仅支持 0（`NO_QUANT`）与 5（`FP8_E4M3_STATIC_CAST_P`）。
 
+## layout_sparse_pattern 取值与sparse_block_idx/sparse_block_count的shape对应关系说明
+
+| 值 | sparse_block_idx的shape | sparse_block_count的shape | 含义 |
+| :---: | :--- | :--- | :--- |
+| 0 | [batch, numKeyValueHeads, maxQBlockCount, maxKvBlockCount] | [batch, numKeyValueHeads, maxQBlockCount] | 同一个Group中的qHead共享sparsePattern，表示每个Q块选择了哪些KV块 |
+| 1 | [batch, numKeyValueHeads, maxKvBlockCount, maxQBlockCount] | [batch, numKeyValueHeads, maxKvBlockCount] | 同一个Group中的qHead共享sparsePattern，表示每个KV块选择了哪些Q块 |
+| 2 | [batch, headNum, maxQBlockCount, maxKvBlockCount] | [batch, headNum, maxQBlockCount] | 同一个Group中的qHead有独立的sparsePattern，表示每个Q块选择了哪些KV块 |
+| 3 | [batch, headNum, maxKvBlockCount, maxQBlockCount] | [batch, headNum, maxKvBlockCount] | 同一个Group中的qHead有独立的sparsePattern，表示每个KV块选择了哪些Q块 |
+| 4 | [numKeyValueHeads, totalQBlocks, maxKvBlockCount] | [numKeyValueHeads, totalQBlocks] | 同一个Group中的qHead共享sparsePattern，表示每个Q块选择了哪些KV块（当前默认值） |
+| 5 | [numKeyValueHeads, totalKBlocks, maxQBlockCount] | [numKeyValueHeads, totalKBlocks] | 同一个Group中的qHead共享sparsePattern，表示每个KV块选择了哪些Q块 |
+| 6 | [headNum, totalQBlocks, maxKvBlockCount] | [headNum, totalQBlocks] | 同一个Group中的qHead有独立的sparsePattern，表示每个Q块选择了哪些KV块 |
+| 7 | [headNum, totalKBlocks, maxQBlockCount] | [headNum, totalKBlocks] | 同一个Group中的qHead有独立的sparsePattern，表示每个KV块选择了哪些Q块 |
+
+> [!NOTE]
+>
+> 当前仅支持 layout_sparse_pattern = 4。
 ## 参数说明
 
 ### generic_block_sparse_attention_metadata
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| sparse_block_idx | Tensor | 必选 | 每个Q块选择的KV块索引 | int32 | ND | (KV_N, totalQBlocks, topK) |
+| sparse_block_idx | Tensor | 必选 | 每个Q块选择的KV块索引 | int32 | ND | (KV_N, totalQBlocks, maxKvBlockCount) |
 | sparse_block_count | Tensor | 必选 | 每个Q块实际保留的KV块数量 | int32 | ND | (KV_N, totalQBlocks) |
 | num_heads_q | int | 必选 | Query head数 | int32 | - | - |
 | num_heads_kv | int | 必选 | Key/Value head数 | int32 | - | - |
@@ -158,14 +185,16 @@ cann_ops_transformer.generic_block_sparse_attention(
 | seqused_kv | Tensor | 可选 | 指定每batch中实际使用的kv序列长度，截断冗余运算 | int32 | ND | (B,) |
 | max_seqlen_q | int | 可选 | 指定查询q序列的长度上限 | int32 | - | - |
 | max_seqlen_kv | int | 可选 | 指定键k和值v序列的长度上限 | int32 | - | - |
-| is_packed_gqa | bool | 可选 | 是否启用Packed GQA | bool | - | - |
 | layout_q | string | 可选 | 定义输入query张量的布局格式 | string | - | - |
 | layout_kv | string | 可选 | 定义输入key/value张量的布局格式 | string | - | - |
+| layout_sparse_pattern | int | 可选 | 代表输入的sparseBlockIdx、sparseBlockCount的数据排布格式，取值见「layout_sparse_pattern 取值与sparse_block_idx/sparse_block_count的shape对应关系说明」 | int64 | - | - |
 | mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」 | int32 | - | - |
 | quant_mode | int/QuantMode | 可选 | 量化模式，支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」 | int32 | - | - |
 | softmax_precision | int | 可选 | Softmax精度模式 | int32 | - | - |
 | win_left | int | 可选 | window左界限 | int32 | - | - |
 | win_right | int | 可选 | window右界限 | int32 | - | - |
+| residual_block_mode | int/ResidualBlockMode | 可选 | 表示KV序列以blockShapeY为单位进行稀疏后，末尾块的状态，枚举定义见「residual_block_mode 枚举」 | int64 | - | - |
+| is_consistent_topk | bool | 可选 | 前置算子进行稀疏块选择时，同一batch同一head内每个Q块选择的KV块最大数量是否一致 | bool | - | - |
 
 ### generic_block_sparse_attention
 
@@ -174,7 +203,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | q | Tensor | 必选 | 公式中的q | bfloat16/float16/float8_e4m3fn | ND | (Q_T, Q_N, D) |
 | k | Tensor | 必选 | 公式中的k | bfloat16/float16/float8_e4m3fn | ND | (num_blocks, block_size, KV_N, D) |
 | v | Tensor | 必选 | 公式中的v | bfloat16/float16/float8_e4m3fn | ND | (num_blocks, block_size, KV_N, D) |
-| sparse_block_idx | Tensor | 必选 | 每个Q块选择的KV块索引 | int32 | ND | (KV_N, totalQBlocks, topK) |
+| sparse_block_idx | Tensor | 必选 | 每个Q块选择的KV块索引 | int32 | ND | (KV_N, totalQBlocks, maxKvBlockCount) |
 | sparse_block_count | Tensor | 必选 | 每个Q块实际保留的KV块数量 | int32 | ND | (KV_N, totalQBlocks) |
 | block_shape | list[int] | 必选 | 稀疏块形状 `[block_x, block_y]` | int64 | - | 长度为2 |
 | metadata | Tensor | 可选 | `generic_block_sparse_attention_metadata`生成的任务切分结果，传入后可优化调度 | int32 | ND | (1024,) |
@@ -188,9 +217,9 @@ cann_ops_transformer.generic_block_sparse_attention(
 | seqused_q | Tensor | 可选 | 指定每batch中实际使用的序列长度，截断冗余运算 | int32 | ND | (B,) |
 | seqused_kv | Tensor | 可选 | 指定每batch中实际使用的kv序列长度，截断冗余运算 | int32 | ND | (B,) |
 | block_table | Tensor | 可选 | 用于Paged Attention计算中的块索引映射 | int32 | ND | (B, max_num_blocks_per_seq) |
-| is_packed_gqa | bool | 可选 | 是否启用Packed GQA | bool | - | - |
 | layout_q | string | 可选 | 定义输入query张量的布局格式 | string | - | - |
 | layout_kv | string | 可选 | 定义输入key/value张量的布局格式 | string | - | - |
+| layout_sparse_pattern | int | 可选 | 代表输入的sparseBlockIdx、sparseBlockCount的数据排布格式，取值见「layout_sparse_pattern 取值与sparse_block_idx/sparse_block_count的shape对应关系说明」 | int64 | - | - |
 | softmax_scale | float | 可选 | 可显式设置缩放因子，覆盖默认计算 | float32 | - | - |
 | mask_mode | int/MaskMode | 可选 | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」 | int32 | - | - |
 | quant_mode | int/QuantMode | 可选 | 量化模式，支持传入枚举或对应 int 值，枚举定义见「quant_mode 枚举」 | int32 | - | - |
@@ -199,6 +228,8 @@ cann_ops_transformer.generic_block_sparse_attention(
 | win_left | int | 可选 | window左界限 | int32 | - | - |
 | win_right | int | 可选 | window右界限 | int32 | - | - |
 | return_softmax_lse | bool | 可选 | 是否需要获取softmax的LSE结果 | bool | - | - |
+| residual_block_mode | int/ResidualBlockMode | 可选 | 表示KV序列以blockShapeY为单位进行稀疏后，末尾块的状态，枚举定义见「residual_block_mode 枚举」 | int64 | - | - |
+| is_consistent_topk | bool | 可选 | 前置算子进行稀疏块选择时，同一batch同一head内每个Q块选择的KV块最大数量是否一致 | bool | - | - |
 | attention_out_dtype | dtype | 可选 | 输出dtype；`quant_mode!=0`时必填，`quant_mode=0`且未指定时与q一致 | ScalarType | - | - |
 
 ## 返回值说明
@@ -236,12 +267,14 @@ cann_ops_transformer.generic_block_sparse_attention(
 |                      |  sparse_block_idx  |      INPUT      |   Tensor   |
 |                      | sparse_block_count  |      INPUT      |   Tensor   |
 |                      |     block_shape     |   ATTR(REQUIRED) |  int[]  |
-|                      |    is_packed_gqa    | ATTR(OPTIONAL) |   bool   |
 |                      |       metadata       | INPUT(OPTIONAL) |   Tensor   |
 |                      |    softmax_scale    | ATTR(OPTIONAL) |   float   |
 |                      |  softmax_precision  | ATTR(OPTIONAL) |   int   |
 |                      |      layout_q       | ATTR(OPTIONAL) |   string   |
 |                      |      layout_kv      | ATTR(OPTIONAL) |   string   |
+|                      |  layout_sparse_pattern  | ATTR(OPTIONAL) |   int64   |
+|                      | residual_block_mode | ATTR(OPTIONAL) |   int64   |
+|                      | is_consistent_topk | ATTR(OPTIONAL) |   bool   |
 |                      |   attention_out   |     OUTPUT     |   Tensor   |
 |   metadata参数组   |   max_seqlen_q   | ATTR(OPTIONAL) |   int   |
 |                      |  max_seqlen_kv  | ATTR(OPTIONAL) |   int   |
@@ -282,10 +315,12 @@ cann_ops_transformer.generic_block_sparse_attention(
 |     Q_S     |      各batch的query逻辑序列长度，TND下一般由cu_seqlens_q差分得到      |
 |    KV_S    |  各batch的key/value逻辑序列长度；TND下一般由cu_seqlens_kv差分得到，Paged Attention下为block_table映射对应的逻辑KV长度  |
 |     D     |          输入q/k/v tensor隐藏层最小的单元尺寸headdim         |
-|  topK  | sparse_block_idx最后一维，表示每个Q块最多选择的KV块数 |
-| totalQBlocks | TND下各batch按Q_S分块后的Q块总数；$\sum_i\mathrm{ceil}(Q\_S_i / block\_x)$，为`sparse_block_idx`/`sparse_block_count`第二维 |
+|  maxKvBlockCount  | sparse_block_idx最后一维，表示每个Q块最多选择的KV块数，须不小于sparseBlockCount中所有元素的最大值，当前上限为256 |
+| totalQBlocks | 按blockShapeX分块后的Q块总数；$\sum_i\mathrm{ceil}(Q\_S_i / block\_x)$，为`sparse_block_idx`/`sparse_block_count`第二维 |
+| totalKBlocks | 按blockShapeY分块后的KV块总数，即$\sum_i\mathrm{ceilDiv}(kvStorageLen_i, blockShapeY)$ |
 | num_blocks | Paged KV Cache物理页总数 |
 | block_size | Paged KV Cache单页token数 |
+| blockShapeX / blockShapeY | 稀疏块在Q方向、KV方向的块大小 |
 
 ### 参数组约束
 
@@ -396,7 +431,7 @@ cann_ops_transformer.generic_block_sparse_attention(
     </tbody>
     </table>
 
-- sparse_block_idx、sparse_block_count、block_shape、is_packed_gqa校验:
+- sparse_block_idx、sparse_block_count、block_shape校验:
 
     <table style="undefined;table-layout: fixed; width:1625px"><colgroup>
     <col style="width: 147px">
@@ -420,19 +455,19 @@ cann_ops_transformer.generic_block_sparse_attention(
         <td>
             <ul>
                 <li>tensor_type仅支持int32</li>
-                <li>shape为(KV_N, totalQBlocks, topK)</li>
+                <li>shape为(KV_N, totalQBlocks, maxKvBlockCount)</li>
             </ul>
         </td>
         <td rowspan="3">必须存在</td>
         <td rowspan="3">
             <ul>
                 <li>metadata接口与主算子须传入相同的sparse_block_idx、sparse_block_count、block_shape</li>
-                <li>topK须不小于sparse_block_count中所有元素的最大值</li>
+                <li>maxKvBlockCount须不小于sparse_block_count中所有元素的最大值</li>
             </ul>
         </td>
         <td rowspan="3">
             <ul>
-                <li>当前topK不超过256</li>
+                <li>当前maxKvBlockCount不超过256</li>
                 <li>当前block_shape=[1, 128]</li>
             </ul>
         </td>
@@ -453,18 +488,6 @@ cann_ops_transformer.generic_block_sparse_attention(
                 <li>长度为2的int列表</li>
             </ul>
         </td>
-    </tr>
-    <tr>
-        <td>is_packed_gqa</td>
-        <td>
-            <ul>
-                <li>data_type仅支持BOOL</li>
-                <li>当前仅支持True</li>
-            </ul>
-        </td>
-        <td>可选属性，默认值为True</td>
-        <td>metadata接口与主算子须一致</td>
-        <td>无</td>
     </tr>
     </tbody>
     </table>
@@ -899,12 +922,14 @@ quant_mode参数解释见「quant_mode 枚举」。
         seqused_kv=seqused_kv,
         max_seqlen_q=Q_S,
         max_seqlen_kv=KV_S,
-        is_packed_gqa=True,
         layout_q="TND",
         layout_kv="PA_BBND",
+        layout_sparse_pattern=4,
         mask_mode=1,
         quant_mode=0,
         softmax_precision=1,
+        residual_block_mode=0,
+        is_consistent_topk=False,
     )
 
     attention_out, softmax_lse = cann_ops_transformer.ops.generic_block_sparse_attention(
@@ -918,14 +943,16 @@ quant_mode参数解释见「quant_mode 枚举」。
         cu_seqlens_q=cu_seqlens_q,
         seqused_kv=seqused_kv,
         block_table=block_table,
-        is_packed_gqa=True,
         layout_q="TND",
         layout_kv="PA_BBND",
+        layout_sparse_pattern=4,
         softmax_scale=1.0 / (D ** 0.5),
         mask_mode=1,
         quant_mode=0,
         softmax_precision=1,
         return_softmax_lse=False,
+        residual_block_mode=0,
+        is_consistent_topk=False,
     )
     torch_npu.npu.synchronize()
     assert attention_out.shape == q.shape

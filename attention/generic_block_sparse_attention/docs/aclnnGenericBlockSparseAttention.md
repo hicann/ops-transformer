@@ -448,8 +448,8 @@ aclnnStatus aclnnGenericBlockSparseAttention(
     <tr>
       <td>residualBlockMode</td>
       <td>输入</td>
-      <td>表示KV序列以blockShapeY为单位进行稀疏后，尾部不完整块的状态。</td>
-      <td>当前仅支持取0或1。0代表尾部不完整块是否参与运算由sparseBlockIdx传入的值决定，1表示尾部不完整块必定参与运算，但必定不包含在sparseBlockIdx中。</td>
+      <td>表示KV序列以blockShapeY为单位进行稀疏后，末尾块的状态。</td>
+      <td>当前仅支持取0或1。0代表末尾块是否参与运算由sparseBlockIdx传入的值决定，1表示尾部不完整块必定参与运算，但必定不包含在sparseBlockIdx中。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
