@@ -115,6 +115,7 @@ __aicore__ inline void QuantCompressorBlockVectorNormal<COMP>::CopyInApe(const L
 
     this->DataCopyWithInputQue(this->apeUb, this->apeGm_[gmOffset], copyRowCount, copyColCount, srcSingleRowCount,
                                dstSingleRowCount);
+    PipeBarrier<PIPE_V>();
 
     prevApeDStartIdx_ = dStartIdx;
     prevApeDDealSize_ = dDealSize;
