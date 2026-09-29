@@ -371,7 +371,7 @@ aclnnStatus aclnnFfnWorkerBatching(
 
 ## 调用示例
 
-完整示例：[test_aclnn_ffn_worker_batching.cpp](../examples/test_aclnn_ffn_worker_batching.cpp)。示例代码如下，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
+示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 ```Cpp
 #include <iostream>

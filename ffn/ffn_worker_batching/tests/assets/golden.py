@@ -392,13 +392,29 @@ def _payload_ranges(input_ranges, token_dtype):
 
 
 def _numeric_samples(rng, shape, bounds, dtype, label):
-    """Sample representable finite ranges or one exact constant (including specials).
+    """Generate numeric payloads using the target format's sampling contract.
 
-    Small formats use a filtered encoding table, avoiding out-of-range rounding
-    (especially E8M0, whose finite values are positive powers of two). BF16 is
-    returned as exact FP32 values and converted by the existing packing path.
+    FP8 token bounds describe source values: sample in FP32, then convert to
+    E4M3FN/E5M2 with the dtype's native rounding, including for constants.
+    Device packing and Golden both consume these converted, cached tokens.
+    Other formats retain their representable-value contract, especially E8M0
+    scales, whose finite values are positive powers of two. BF16 is returned
+    as exact FP32 values and converted by the existing packing path.
     """
     low, high = bounds
+    if (
+        label == "token"
+        and dtype != "bfloat16"
+        and np.dtype(dtype).name in ("float8_e4m3fn", "float8_e5m2")
+    ):
+        if low == high or (np.isnan(low) and np.isnan(high)):
+            source = np.full(shape, low, dtype=np.float32)
+        else:
+            source = rng.uniform(float(low), float(high), shape).astype(np.float32)
+        # No exact-value check or clipping after conversion: e.g. 127 becomes
+        # 128. Overflow and special values follow the target dtype's cast rules.
+        with np.errstate(over="ignore", invalid="ignore"):
+            return source.astype(dtype)
     # Equal bounds specify one exact constant, including signed zero and specials.
     if low == high or (np.isnan(low) and np.isnan(high)):
         target = np.float32 if dtype == "bfloat16" else dtype
@@ -671,27 +687,20 @@ def _generate_group_list(sorted_expert_ids, valid_count, expert_num):
     group_list = np.zeros((expert_num, 2), dtype=np.int64)
     if valid_count == 0:
         return group_list
-    offset = 0
-    cur_expert = int(sorted_expert_ids[0])
-    token_count = 0
-    for i in range(valid_count):
-        eid = int(sorted_expert_ids[i])
-        if eid != cur_expert:
-            if offset < expert_num:
-                group_list[offset, 0] = cur_expert
-                group_list[offset, 1] = token_count
-                offset += 1
-            cur_expert = eid
-            token_count = 1
-        else:
-            token_count += 1
-    if offset < expert_num:
-        group_list[offset, 0] = cur_expert
-        group_list[offset, 1] = token_count
-        offset += 1
-    if offset < expert_num:
-        group_list[offset, 0] = 0
-        group_list[offset, 1] = 0
+    # IDs are already sorted. Find run boundaries in bounded chunks rather
+    # than visiting tens of millions of tokens in Python.
+    boundaries = [np.array([0], dtype=np.int64)]
+    for start in range(1, valid_count, 1 << 20):
+        end = min(start + (1 << 20), valid_count)
+        changes = np.flatnonzero(
+            sorted_expert_ids[start:end] != sorted_expert_ids[start - 1 : end - 1]
+        )
+        boundaries.append(changes + start)
+    boundaries.append(np.array([valid_count], dtype=np.int64))
+    boundaries = np.concatenate(boundaries)
+    count = min(len(boundaries) - 1, expert_num)
+    group_list[:count, 0] = sorted_expert_ids[boundaries[:count]]
+    group_list[:count, 1] = np.diff(boundaries)[:count]
     return group_list
 
 
@@ -1024,28 +1033,39 @@ class AclnnFfnWorkerBatchingTestSpec:
         bsk = BS * K
         cur_mb = data.get("cur_micro_batch_id", 0)
 
-        for i in range(valid_count):
-            gidx = int(sorted_order[i])
+        # Bound the gathered payload to about 16 MiB, including wide-H cases,
+        # and cap index temporaries independently for narrow-H cases.
+        row_bytes = H * token_data.dtype.itemsize
+        if token_scales is not None:
+            row_bytes += token_scales.dtype.itemsize * (
+                (H + 31) // 32 if tokenDtype >= 3 else 1
+            )
+        chunk_rows = max(1, min(1 << 18, (16 << 20) // max(1, row_bytes)))
+        for start in range(0, valid_count, chunk_rows):
+            end = min(start + chunk_rows, valid_count)
+            gidx = sorted_order[start:end]
             a_idx = gidx // bsk
             rem = gidx % bsk
             bs_idx = rem // K
             k_idx = rem % K
 
             if needSchedule == 0:
-                s_idx = int(session_ids_buf[a_idx])
-                mb_idx = int(micro_batch_ids_buf[a_idx])
+                s_idx = session_ids_buf[a_idx]
+                mb_idx = micro_batch_ids_buf[a_idx]
             else:
                 s_idx = a_idx
                 mb_idx = cur_mb
 
-            session_ids_out[i] = s_idx
-            micro_batch_ids_out[i] = mb_idx
-            token_ids_out[i] = bs_idx
-            expert_offsets_out[i] = k_idx
-            y_out[i] = token_data[s_idx, mb_idx, bs_idx, k_idx, :]
+            session_ids_out[start:end] = s_idx
+            micro_batch_ids_out[start:end] = mb_idx
+            token_ids_out[start:end] = bs_idx
+            expert_offsets_out[start:end] = k_idx
+            y_out[start:end] = token_data[s_idx, mb_idx, bs_idx, k_idx, :]
 
             if tokenDtype >= 2 and token_scales is not None:
-                dynamic_scale_out[i] = token_scales[s_idx, mb_idx, bs_idx, k_idx]
+                dynamic_scale_out[start:end] = token_scales[
+                    s_idx, mb_idx, bs_idx, k_idx
+                ]
 
         group_list_out = _generate_group_list(sorted_valid_ids, valid_count, expertNum)
         actual_token_num_out = np.array([valid_count], dtype=np.int64)
@@ -1150,11 +1170,68 @@ class AclnnFfnWorkerBatchingTestSpec:
         return results
 
 
-class TorchFfnWorkerBatchingTestSpec:
-    """TTK eager/aclgraph NORM cases with real-device-address context buffers.
+_TORCH_ORIG_WARMUP = None
+_TORCH_GRAPH_REPLAY = {}
+_TORCH_GRAPH_REPLAY_CHECKS = {}
 
-    RECV consumes descriptors and cannot safely use TTK's default repeated runs.
-    Its real-pointer publication/replay tests live in verify_torch_*.py.
+
+def _ttk_assets_compat():
+    """Load sibling adapters without depending on the caller's PYTHONPATH."""
+    import importlib.util
+    import pathlib
+    import sys
+
+    name = "_ffn_worker_batching_ttk_compat"
+    if name not in sys.modules:
+        path = pathlib.Path(__file__).with_name("ttk_compat.py")
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        sys.modules[name] = module
+    return sys.modules[name]
+
+
+def _configure_torch_execution(need_schedule):
+    """Eager consumes once; ACL graph republishes descriptors before each call."""
+    from ttk.utilities.container_utils import get_global_storage
+
+    global _TORCH_ORIG_WARMUP
+    storage = get_global_storage()
+    if need_schedule == 1:
+        ge_enabled = any(
+            getattr(getattr(storage, name, None), "enabled", False)
+            for name in ("cst_switches", "dyn_switches")
+        )
+        if ge_enabled:
+            raise ValueError(
+                "Torch RECV graph testing currently requires --aclgraph; GE is not adapted"
+            )
+        if getattr(storage, "aclgraph_enabled", False):
+            from ttk.core_modules.framework_api import graph_execution
+
+            if not getattr(graph_execution, "SUPPORTS_NPU_GRAPH_BEFORE_RUN", False):
+                _ttk_assets_compat().install_graph()
+            if _TORCH_ORIG_WARMUP is not None:
+                storage.warmup = _TORCH_ORIG_WARMUP
+            _pin_run_time(0)
+            return
+        if getattr(storage, "deterministic_level", 0):
+            raise ValueError(
+                "Torch RECV single-call testing does not support repeated determinism checks"
+            )
+        if _TORCH_ORIG_WARMUP is None:
+            _TORCH_ORIG_WARMUP = storage.warmup
+        storage.warmup = False
+    elif _TORCH_ORIG_WARMUP is not None:
+        storage.warmup = _TORCH_ORIG_WARMUP
+    _pin_run_time(need_schedule)
+
+
+class TorchFfnWorkerBatchingTestSpec:
+    """TTK NORM, single-call eager RECV, and republished ACL graph RECV.
+
+    Eager RECV consumes once. ACL graph restores the original descriptor bytes
+    and context in place before every compiled call, preserving device pointers.
     """
 
     @staticmethod
@@ -1170,9 +1247,16 @@ class TorchFfnWorkerBatchingTestSpec:
         mx_output_uint8=False,
         **kwargs,
     ):
+        import logging
+        import cann_ops_transformer
+
+        logging.info("FFN Torch installed package: %s", cann_ops_transformer.__file__)
         # TTK manual input files contain only the context tensor. A fresh worker
         # must restore an explicit archive before invoking the pointer-bearing
         # operator; accepting the old process's raw addresses risks invalid DMA.
+        # Eager reads run_time/warmup after this hook, including manual replay
+        # where customize_inputs is bypassed.
+        _configure_torch_execution(need_schedule)
         attributes = dict(
             expert_num=expert_num,
             max_out_shape=list(max_out_shape),
@@ -1199,6 +1283,113 @@ class TorchFfnWorkerBatchingTestSpec:
         archive = os.getenv("FFN_WB_SAVE_ARCHIVE")
         if archive:
             save_context_archive(archive, header, attributes)
+        if need_schedule == 1:
+            pointer, size = struct.unpack_from("<QQ", header, _OFF_FFN_TOKEN_INFO_BUF)
+            descriptors = np.empty(size, dtype=np.uint8)
+            lib = _load_acl()
+            ret = lib.aclrtMemcpy(
+                descriptors.ctypes.data, size, pointer, size, _ACL_MEMCPY_DEVICE_TO_HOST
+            )
+            if ret:
+                raise RuntimeError(f"Torch RECV descriptor snapshot failed: {ret}")
+            _TORCH_GRAPH_REPLAY[kwargs.get("testcase_name", "default")] = (
+                schedule_context.data_ptr(),
+                header.copy(),
+                pointer,
+                descriptors.tobytes(),
+            )
+            _TORCH_GRAPH_REPLAY_CHECKS[kwargs.get("testcase_name", "default")] = 0
+            from ttk.utilities.container_utils import get_global_storage
+
+            if getattr(get_global_storage(), "aclgraph_enabled", False):
+                hook_args = {
+                    **attributes,
+                    "testcase_name": kwargs.get("testcase_name", "default"),
+                }
+                _ttk_assets_compat().remember_graph_state(
+                    schedule_context,
+                    lambda: TorchFfnWorkerBatchingTestSpec.npu_graph_before_run(
+                        schedule_context, **hook_args
+                    ),
+                    lambda: TorchFfnWorkerBatchingTestSpec.npu_graph_after_run(
+                        schedule_context, **hook_args
+                    ),
+                )
+
+    @staticmethod
+    def npu_graph_before_run(
+        schedule_context,
+        expert_num,
+        max_out_shape,
+        *,
+        token_dtype=0,
+        need_schedule=0,
+        layer_num=0,
+        sync_flag=False,
+        mx_output_uint8=False,
+        **kwargs,
+    ):
+        if need_schedule != 1:
+            return
+        key = kwargs.get("testcase_name", "default")
+        if key not in _TORCH_GRAPH_REPLAY:
+            raise RuntimeError("Torch RECV graph has no prepared descriptor snapshot")
+        context_ptr, header, pointer, descriptors = _TORCH_GRAPH_REPLAY[key]
+        if schedule_context.data_ptr() != context_ptr:
+            raise RuntimeError(
+                "Torch RECV graph context moved after snapshot preparation"
+            )
+        validate_live_context(header, need_schedule)
+        # TTK synchronizes the preceding invocation before this hook. Restore
+        # descriptors first, then the cursor/header, without reallocating HBM.
+        _hbm_copy(descriptors, pointer)
+        schedule_context.reshape(-1)[:_SCHEDULE_CONTEXT_BYTES].copy_(
+            torch.from_numpy(header)
+        )
+
+    @staticmethod
+    def npu_graph_after_run(
+        schedule_context,
+        expert_num,
+        max_out_shape,
+        *,
+        token_dtype=0,
+        need_schedule=0,
+        layer_num=0,
+        sync_flag=False,
+        mx_output_uint8=False,
+        **kwargs,
+    ):
+        if need_schedule != 1:
+            return
+        key = kwargs.get("testcase_name", "default")
+        _, header, pointer, descriptors = _TORCH_GRAPH_REPLAY[key]
+        current = np.empty(len(descriptors), dtype=np.uint8)
+        ret = _load_acl().aclrtMemcpy(
+            current.ctypes.data,
+            current.size,
+            pointer,
+            current.size,
+            _ACL_MEMCPY_DEVICE_TO_HOST,
+        )
+        if ret:
+            raise RuntimeError(f"Torch RECV consumption check failed: {ret}")
+        A, M, BS, K = struct.unpack_from("<4I", header, 0)
+        original = np.frombuffer(descriptors, dtype=np.int32).reshape(A, M, 2 + BS * K)
+        current = current.view(np.int32).reshape(original.shape)
+        mb = next(m for m in range(M) if (original[:, m, 0] == 1).any())
+        selected = original[:, mb, 0] == 1
+        if np.any(current[selected, mb, 0] != 0):
+            raise RuntimeError(
+                "Torch RECV graph did not consume the republished ready descriptors"
+            )
+        _TORCH_GRAPH_REPLAY_CHECKS[key] += 1
+        import logging
+
+        logging.info(
+            "Torch RECV graph consumption verified: call %d",
+            _TORCH_GRAPH_REPLAY_CHECKS[key],
+        )
 
     @staticmethod
     def customize_inputs(
@@ -1213,10 +1404,7 @@ class TorchFfnWorkerBatchingTestSpec:
         mx_output_uint8=False,
         **kwargs,
     ):
-        if need_schedule != 0:
-            raise ValueError(
-                "TTK Torch cases require need_schedule=0; use verify_torch_*.py for RECV"
-            )
+        _configure_torch_execution(need_schedule)
         # Only the 1024-byte header is part of this tensor; secondary buffers
         # have their own HBM allocations and are archived explicitly for replay.
         if schedule_context.numel() < _SCHEDULE_CONTEXT_BYTES:
@@ -1295,6 +1483,12 @@ class FfnWorkerBatchingKernelTestSpec:
         sync_flag: bool = False,
         **kwargs,
     ):
+        from ttk.utilities.container_utils import get_global_storage
+
+        if getattr(get_global_storage(), "test_mode", None) == "geir":
+            _ttk_assets_compat().install_geir(
+                FfnWorkerBatchingKernelTestSpec.geir_prepare_inputs
+            )
         tensor = torch.from_numpy(schedule_context.copy())
         AclnnFfnWorkerBatchingTestSpec.customize_inputs(
             tensor,
@@ -1456,3 +1650,66 @@ class AclnnFfnWorkerBatchingLegacyTestSpec(AclnnFfnWorkerBatchingTestSpec):
             *args,
             **kwargs,
         )
+
+
+def _run_ttk_with_installed_package():
+    """Run unmodified TTK after importing the active Python environment's wheel.
+
+    TTK normally prioritizes the CANN namespace package. Preloading the actual
+    installed package in the parent and workers avoids that competing copy.
+    No source frontend or hand-written dispatcher schema is registered here.
+    """
+    import importlib
+    import multiprocessing
+    import pathlib
+    import sys
+    import sysconfig
+
+    site = pathlib.Path(sysconfig.get_path("purelib")).resolve()
+    expected = site / "cann_ops_transformer" / "__init__.py"
+    if not expected.is_file():
+        raise RuntimeError(
+            f"Install the full cann_ops_transformer wheel in {sys.prefix} first"
+        )
+    if not (pathlib.Path.cwd() / "ttk" / "__init__.py").is_file():
+        raise RuntimeError(
+            "Run this command from the ops-test-kit repository directory"
+        )
+    sys.path.insert(0, str(pathlib.Path.cwd()))
+    sys.path.insert(0, str(site))
+    assets = str(pathlib.Path(__file__).resolve().parent)
+    sys.path.insert(0, assets)
+    # The server imports only a stdlib bootstrap. Workers import the wheel after
+    # fork, because the complete package initializes NPU state during import.
+    old_paths = os.environ.get("PYTHONPATH", "").split(os.pathsep)
+    os.environ["PYTHONPATH"] = os.pathsep.join(
+        [
+            str(site),
+            assets,
+            *[p for p in old_paths if p and p not in (str(site), assets)],
+        ]
+    )
+    package = importlib.import_module("cann_ops_transformer")
+    actual = pathlib.Path(package.__file__).resolve()
+    if actual != expected.resolve():
+        raise RuntimeError(
+            f"Expected installed package {expected}, but imported {actual}"
+        )
+    if not getattr(
+        getattr(torch.ops.cann_ops_transformer, "ffn_worker_batching", None),
+        "_schemas",
+        None,
+    ):
+        raise RuntimeError(
+            "Installed cann_ops_transformer did not register FFN; check competing entry points"
+        )
+    print(f"FFN TTK Python: {sys.executable}", flush=True)
+    print(f"FFN TTK installed package: {actual}", flush=True)
+    multiprocessing.set_forkserver_preload(["_ffn_ttk_worker_bootstrap"])
+    from ttk.cli import main
+
+    main()
+
+
+if __name__ == "__main__":
+    _run_ttk_with_installed_package()

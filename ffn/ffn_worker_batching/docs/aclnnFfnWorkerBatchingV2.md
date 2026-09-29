@@ -35,17 +35,9 @@
 
   4. 单核扫描排序后的专家ID序列，查找跳变点，生成`groupList`（每个专家处理的token数）。
 
-  其中 $Y = A \times BS \times (K+1)$，$A$ 为Attention worker数量，$BS$ 为micro batch size，$K+1$ 为topK加共享专家数。
-
-- `syncFlag` 为布尔类型，控制接收阶段的就绪条件，行为差异如下：
-
-  | needSchedule | syncFlag | 接收行为 |
-  | --- | --- | --- |
-  | 0（NORM） | false / true | 不轮询session就绪状态，按已有token信息执行batching；syncFlag不影响执行。 |
-  | 1（RECV） | false | 同步接收：等待当前micro batch的全部session就绪后统一处理，保持V1接口的接收语义。 |
-  | 1（RECV） | true | 异步接收：循环扫描micro batch，首次发现非空ready session快照后，仅处理该快照选中的session，不等待其余session；若没有数据就绪，则继续等待。 |
-
-  异步接收允许同一micro batch的已就绪session来自不同层，要求`layerNum > 0`且`expertNum`能被`layerNum`整除，并按`layer_id * (expertNum / layerNum) + expert_id`生成跨层专家号进行排序、重排和`groupList`统计。同步接收与NORM使用原专家号。
+  其中 $Y = A \times BS \times (K+1)$，$A$ 为Attention worker数量，$BS$ 为micro batch size，$K+1$ 为topK加共享专家数。本接口针对接口[aclnnFfnWorkerBatching](../../ffn_worker_batching/docs/aclnnFfnWorkerBatching.md)做出如下功能变更，请根据实际情况选择合适的接口：
+  - 新增布尔类型的参数`syncFlag` ，用于开启异步接收模式，循环扫描micro batch，首次发现ready session快照后，仅处理该快照选中的session，不等待其余session；若没有数据就绪，则继续等待。 |
+  - 异步接收模式允许同一micro batch的已就绪session来自不同层，要求`layerNum > 0`且`expertNum`能被`layerNum`整除，并按`layer_id * (expertNum / layerNum) + expert_id`生成跨层专家号进行排序、重排和`groupList`统计。同步接收与NORM使用原专家号。
 
 ## 函数原型
 
@@ -169,7 +161,7 @@ aclnnStatus aclnnFfnWorkerBatchingV2(
     <tr>
       <td>syncFlag</td>
       <td>输入</td>
-      <td>接收同步方式。false：等待当前micro batch的全部session就绪；true：循环扫描micro batch，处理首次发现的非空ready session快照，无数据时等待。</td>
+      <td>同步/异步接收方式。false：同步接收方式，等待当前micro batch的全部session就绪；true：异步接收方式，循环扫描micro batch，处理首次发现的非空ready session快照，无数据时等待。</td>
       <td>取值为false或true，仅needSchedule=1时解释该属性；needSchedule=0时不影响执行。</td>
       <td>BOOL</td>
       <td>-</td>
@@ -375,7 +367,7 @@ aclnnStatus aclnnFfnWorkerBatchingV2(
 
 ## 调用示例
 
-完整示例：[test_aclnn_ffn_worker_batching_v2.cpp](../examples/test_aclnn_ffn_worker_batching_v2.cpp)。示例代码如下，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
+示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
 ```Cpp
 #include <iostream>

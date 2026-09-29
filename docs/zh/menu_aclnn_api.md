@@ -47,6 +47,7 @@
 - [aclnnFFNV2](../../ffn/ffn/docs/aclnnFFNV2.md)
 - [aclnnFFNV3](../../ffn/ffn/docs/aclnnFFNV3.md)
 - [aclnnFfnWorkerBatching](../../ffn/ffn_worker_batching/docs/aclnnFfnWorkerBatching.md)
+- [aclnnFfnWorkerBatchingV2](../../ffn/ffn_worker_batching/docs/aclnnFfnWorkerBatchingV2.md)
 - [aclnnFlashAttentionScore](../../attention/flash_attention_score/docs/aclnnFlashAttentionScore.md)
 - [aclnnFlashAttentionScoreGrad](../../attention/flash_attention_score_grad/docs/aclnnFlashAttentionScoreGrad.md)
 - [aclnnFlashAttentionScoreGradV2](../../attention/flash_attention_score_grad/docs/aclnnFlashAttentionScoreGradV2.md)

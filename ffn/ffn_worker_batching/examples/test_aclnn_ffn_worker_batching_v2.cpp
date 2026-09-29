@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -36,7 +36,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -55,8 +55,8 @@ void Finalize(int32_t deviceId, aclrtStream stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -73,8 +73,8 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-int CreateAclTensorNoData(const std::vector<int64_t> &shape, void **deviceAddr, aclDataType dataType,
-                          aclTensor **tensor)
+int CreateAclTensorNoData(const std::vector<int64_t>& shape, void** deviceAddr, aclDataType dataType,
+                          aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(int8_t);
     if (dataType == ACL_INT32) {
@@ -203,14 +203,14 @@ int main()
                              static_cast<uint64_t>(scheduleContext.common.micro_batch_num) *
                              static_cast<uint64_t>(scheduleContext.common.session_num);
     scheduleContext.ffn.token_info_buf_size = tokenInfoSize;
-    void *tokenInfoBuf = nullptr;
+    void* tokenInfoBuf = nullptr;
     ret = aclrtMalloc(&tokenInfoBuf, tokenInfoSize, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("malloc token info buf failed. ERROR: %d\n", ret); return ret);
     scheduleContext.ffn.token_info_buf = reinterpret_cast<uint64_t>(tokenInfoBuf);
 
     // 填充token_info_buf：flag=1，layer_id，expert_ids
     std::vector<int32_t> hostTokenInfo(tokenInfoSize / sizeof(int32_t), 0);
-    int32_t *pInt = hostTokenInfo.data();
+    int32_t* pInt = hostTokenInfo.data();
     for (uint32_t s = 0; s < scheduleContext.common.session_num; ++s) {
         for (uint32_t m = 0; m < scheduleContext.common.micro_batch_num; ++m) {
             *pInt++ = 1; // flag
@@ -226,7 +226,7 @@ int main()
     // 初始化Ffn token_data_buf
     uint64_t tokenDataSize = static_cast<uint64_t>(Y) * H * sizeof(int16_t);
     scheduleContext.ffn.token_data_buf_size = tokenDataSize;
-    void *tokenDataBuf = nullptr;
+    void* tokenDataBuf = nullptr;
     ret = aclrtMalloc(&tokenDataBuf, tokenDataSize, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("malloc token data buf failed. ERROR: %d\n", ret); return ret);
     scheduleContext.ffn.token_data_buf = reinterpret_cast<uint64_t>(tokenDataBuf);
@@ -236,8 +236,8 @@ int main()
 
     // 创建scheduleContext aclTensor
     std::vector<int64_t> scheduleContextShape = {1024};
-    void *scheduleContextDeviceAddr = nullptr;
-    aclTensor *scheduleContextRef = nullptr;
+    void* scheduleContextDeviceAddr = nullptr;
+    aclTensor* scheduleContextRef = nullptr;
     // ==== FfnArea 中的扁平 id 缓冲 ====
     // 这四个字段是二级指针:context 里存的是 device 地址,由 kernel 自行解引用。框架看不到内层缓冲,
     // 不填也能通过 tiling 校验,只在 kernel 访存时暴露为 errcode:(95) MTE 访问 DDR 越界。
@@ -246,7 +246,7 @@ int main()
     for (int64_t i = 0; i < Y; ++i) {
         hostExpertIds[i] = static_cast<int32_t>(i % expertNum);
     }
-    void *expertIdsBuf = nullptr;
+    void* expertIdsBuf = nullptr;
     ret = aclrtMalloc(&expertIdsBuf, hostExpertIds.size() * sizeof(int32_t), ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("malloc expert ids buf failed. ERROR: %d\n", ret); return ret);
     ret = aclrtMemcpy(expertIdsBuf, hostExpertIds.size() * sizeof(int32_t), hostExpertIds.data(),
@@ -259,9 +259,9 @@ int main()
     std::vector<int32_t> hostMicroBatchIds(A, 0);
     std::vector<int32_t> hostLayerIds(A, 0);
     const uint64_t idsBufSize = static_cast<uint64_t>(A) * sizeof(int32_t);
-    void *sessionIdsBuf = nullptr;
-    void *microBatchIdsBuf = nullptr;
-    void *layerIdsBuf = nullptr;
+    void* sessionIdsBuf = nullptr;
+    void* microBatchIdsBuf = nullptr;
+    void* layerIdsBuf = nullptr;
     ret = aclrtMalloc(&sessionIdsBuf, idsBufSize, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("malloc session ids buf failed. ERROR: %d\n", ret); return ret);
     ret = aclrtMalloc(&microBatchIdsBuf, idsBufSize, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -289,55 +289,55 @@ int main()
 
     // 创建输出 aclTensor
     std::vector<int64_t> yShape = {Y, H};
-    void *yDeviceAddr = nullptr;
-    aclTensor *yRef = nullptr;
+    void* yDeviceAddr = nullptr;
+    aclTensor* yRef = nullptr;
     ret = CreateAclTensorNoData(yShape, &yDeviceAddr, aclDataType::ACL_FLOAT16, &yRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<int64_t> groupListShape = {expertNum, 2};
-    void *groupListDeviceAddr = nullptr;
-    aclTensor *groupListRef = nullptr;
+    void* groupListDeviceAddr = nullptr;
+    aclTensor* groupListRef = nullptr;
     ret = CreateAclTensorNoData(groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64, &groupListRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<int64_t> oneDimShape = {Y};
-    void *sessionIdsAddr = nullptr;
-    aclTensor *sessionIdsRef = nullptr;
+    void* sessionIdsAddr = nullptr;
+    aclTensor* sessionIdsRef = nullptr;
     ret = CreateAclTensorNoData(oneDimShape, &sessionIdsAddr, aclDataType::ACL_INT32, &sessionIdsRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    void *microBatchIdsAddr = nullptr;
-    aclTensor *microBatchIdsRef = nullptr;
+    void* microBatchIdsAddr = nullptr;
+    aclTensor* microBatchIdsRef = nullptr;
     ret = CreateAclTensorNoData(oneDimShape, &microBatchIdsAddr, aclDataType::ACL_INT32, &microBatchIdsRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    void *tokenIdsAddr = nullptr;
-    aclTensor *tokenIdsRef = nullptr;
+    void* tokenIdsAddr = nullptr;
+    aclTensor* tokenIdsRef = nullptr;
     ret = CreateAclTensorNoData(oneDimShape, &tokenIdsAddr, aclDataType::ACL_INT32, &tokenIdsRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    void *expertOffsetsAddr = nullptr;
-    aclTensor *expertOffsetsRef = nullptr;
+    void* expertOffsetsAddr = nullptr;
+    aclTensor* expertOffsetsRef = nullptr;
     ret = CreateAclTensorNoData(oneDimShape, &expertOffsetsAddr, aclDataType::ACL_INT32, &expertOffsetsRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    void *dynamicScaleAddr = nullptr;
-    aclTensor *dynamicScaleRef = nullptr;
+    void* dynamicScaleAddr = nullptr;
+    aclTensor* dynamicScaleRef = nullptr;
     ret = CreateAclTensorNoData(oneDimShape, &dynamicScaleAddr, aclDataType::ACL_FLOAT, &dynamicScaleRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     std::vector<int64_t> actualTokenNumShape = {1};
-    void *actualTokenNumAddr = nullptr;
-    aclTensor *actualTokenNumRef = nullptr;
+    void* actualTokenNumAddr = nullptr;
+    aclTensor* actualTokenNumRef = nullptr;
     ret = CreateAclTensorNoData(actualTokenNumShape, &actualTokenNumAddr, aclDataType::ACL_INT64, &actualTokenNumRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     // 创建maxOutShape aclIntArray
-    aclIntArray *maxOutShapeArray = aclCreateIntArray(maxOutShapeValue.data(), maxOutShapeValue.size());
+    aclIntArray* maxOutShapeArray = aclCreateIntArray(maxOutShapeValue.data(), maxOutShapeValue.size());
 
     // 3. 调用CANN算子库API
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     ret = aclnnFfnWorkerBatchingV2GetWorkspaceSize(scheduleContextRef, expertNum, maxOutShapeArray, tokenDtype,
                                                    needSchedule, layerNum, false, yRef, groupListRef, sessionIdsRef,
                                                    microBatchIdsRef, tokenIdsRef, expertOffsetsRef, dynamicScaleRef,
@@ -345,7 +345,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFfnWorkerBatchingV2GetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

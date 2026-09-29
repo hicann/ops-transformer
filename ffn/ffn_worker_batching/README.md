@@ -44,14 +44,14 @@
     <tr>
       <td>schedule_context</td>
       <td>输入</td>
-      <td>调度上下文数据结构，内含CommonArea、ControlArea、AttentionArea、FfnArea。算子从FfnArea中读取token_info_buf和token_data_buf获取待重排的token数据与描述信息，并获取layer_id、session_id、micro_batch_id、expert_ids等路由信息。为一维Tensor，shape为 [1024]（固定1024字节结构体），不支持空Tensor。</td>
+      <td>调度上下文数据结构，内含CommonArea、ControlArea、AttentionArea、FfnArea。算子从FfnArea中读取token_info_buf和token_data_buf获取待重排的token数据与描述信息，并获取layer_id、session_id、micro_batch_id、expert_ids等路由信息。为连续一维 INT8 Tensor，shape为 [1024]，不支持空Tensor。</td>
       <td>INT8</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>expert_num</td>
       <td>属性</td>
-      <td>本卡专家总数，等于每层本卡专家数 × layer_num。用于推导group_list输出大小。取值范围为 (0, 8192]。</td>
+      <td>本次调用的本卡专家总数；仅异步混层RECV按“每层本卡专家数 × layer_num”解释。用于推导group_list输出大小。取值范围为 (0, 8192]。</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
