@@ -29,7 +29,7 @@ namespace {
         } \
     } while (false)
 
-const aclTensor *GetInputTensor(const aclTensorList *input, size_t index = 0)
+const aclTensor* GetInputTensor(const aclTensorList* input, size_t index = 0)
 {
     if (input == nullptr || index >= input->Size()) {
         return nullptr;
@@ -37,23 +37,23 @@ const aclTensor *GetInputTensor(const aclTensorList *input, size_t index = 0)
     return (*input)[index];
 }
 
-const aclTensor *GetInputTensor(const aclTensor *input, size_t index = 0)
+const aclTensor* GetInputTensor(const aclTensor* input, size_t index = 0)
 {
     (void)index;
     return input;
 }
 
-size_t GetInputTensorSize(const aclTensorList *input)
+size_t GetInputTensorSize(const aclTensorList* input)
 {
     return input == nullptr ? 0UL : input->Size();
 }
 
-size_t GetInputTensorSize(const aclTensor *input)
+size_t GetInputTensorSize(const aclTensor* input)
 {
     return input == nullptr ? 0UL : 1UL;
 }
 
-std::string ShapeToStringWithoutBracket(const op::Shape *shape)
+std::string ShapeToStringWithoutBracket(const op::Shape* shape)
 {
     if (shape == nullptr) {
         return "nullptr";
@@ -68,12 +68,12 @@ std::string ShapeToStringWithoutBracket(const op::Shape *shape)
     return oss.str();
 }
 
-std::string ViewShapeToString(const aclTensor *tensor)
+std::string ViewShapeToString(const aclTensor* tensor)
 {
     return tensor == nullptr ? "nullptr" : ShapeToStringWithoutBracket(&tensor->GetViewShape());
 }
 
-std::string StorageShapeToString(const aclTensor *tensor)
+std::string StorageShapeToString(const aclTensor* tensor)
 {
     return tensor == nullptr ? "nullptr" : ShapeToStringWithoutBracket(&tensor->GetStorageShape());
 }
@@ -82,7 +82,7 @@ std::string StorageShapeToString(const aclTensor *tensor)
 template <typename T>
 bool AclnnGroupedMatmulDAV3510Checker<T>::IsMxfp4() const
 {
-    const auto *weightTensor = GetInputTensor(gmmParams_.weight);
+    const auto* weightTensor = GetInputTensor(gmmParams_.weight);
     if (weightTensor == nullptr) {
         return false;
     }
@@ -94,14 +94,14 @@ bool AclnnGroupedMatmulDAV3510Checker<T>::IsMxfp4() const
 template <typename T>
 bool AclnnGroupedMatmulDAV3510Checker<T>::IsMultiTensorWeight() const
 {
-    const auto *weightTensor = GetInputTensor(gmmParams_.weight);
+    const auto* weightTensor = GetInputTensor(gmmParams_.weight);
     return weightTensor != nullptr && weightTensor->GetViewShape().GetDimNum() == MIN_FM_DIM;
 }
 
 template <typename T>
 bool AclnnGroupedMatmulDAV3510Checker<T>::IsWeightNzMultiTensorLayout() const
 {
-    const auto *weightTensor = GetInputTensor(gmmParams_.weight);
+    const auto* weightTensor = GetInputTensor(gmmParams_.weight);
     return gmmParams_.groupType == SPLIT_M && GetInputTensorSize(gmmParams_.x) == 1 &&
            GetInputTensorSize(gmmParams_.y) == 1 && IsMultiTensorWeight() && weightTensor != nullptr &&
            weightTensor->GetStorageFormat() == op::Format::FORMAT_FRACTAL_NZ;
@@ -150,15 +150,15 @@ std::string AclnnGroupedMatmulDAV3510Checker<T>::GetAclnnOpName() const
 }
 
 template <typename T>
-void AclnnGroupedMatmulDAV3510Checker<T>::SetAclnnOpName(const std::string &opName)
+void AclnnGroupedMatmulDAV3510Checker<T>::SetAclnnOpName(const std::string& opName)
 {
     this->aclnnOpName_ = opName;
 }
 
 template <typename T>
-void AclnnGroupedMatmulDAV3510Checker<T>::SetInputName(const std::string &xName, const std::string &weightName,
-                                                       const std::string &perTokenScaleName,
-                                                       const std::string &scaleName, const std::string &groupTensorName)
+void AclnnGroupedMatmulDAV3510Checker<T>::SetInputName(const std::string& xName, const std::string& weightName,
+                                                       const std::string& perTokenScaleName,
+                                                       const std::string& scaleName, const std::string& groupTensorName)
 {
     this->xName_ = xName;
     this->weightName_ = weightName;
@@ -170,7 +170,7 @@ void AclnnGroupedMatmulDAV3510Checker<T>::SetInputName(const std::string &xName,
 template <typename T>
 aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckInputTensorsNotNull() const
 {
-    const auto checkTensorContainer = [this](const auto *input, const std::string &name, bool required) -> aclnnStatus {
+    const auto checkTensorContainer = [this](const auto* input, const std::string& name, bool required) -> aclnnStatus {
         if (input == nullptr) {
             if (!required) {
                 return ACLNN_SUCCESS;
@@ -226,7 +226,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckInputTensorsNotNull() cons
 }
 
 template <typename T>
-bool AclnnGroupedMatmulDAV3510Checker<T>::LastTwoDimValueIsOne(const aclTensor *tensor) const
+bool AclnnGroupedMatmulDAV3510Checker<T>::LastTwoDimValueIsOne(const aclTensor* tensor) const
 {
     if (tensor == nullptr) {
         return false;
@@ -246,7 +246,7 @@ bool AclnnGroupedMatmulDAV3510Checker<T>::LastTwoDimValueIsOne(const aclTensor *
 template <typename T>
 bool AclnnGroupedMatmulDAV3510Checker<T>::CheckTensorListSizeForEachInput() const
 {
-    const auto *yTensor = GetInputTensor(gmmParams_.y);
+    const auto* yTensor = GetInputTensor(gmmParams_.y);
     if (yTensor == nullptr) {
         return false;
     }
@@ -276,9 +276,9 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGeneralQuantShape() const
     const auto tensorIndexInfo = GetTensorIndexInfo();
     for (size_t i = 0; i < tensorIndexInfo.loopSize; i++) {
         const auto tensorIndex = GetTensorIndexInfo(i);
-        const auto *xTensor = GetInputTensor(gmmParams_.x, tensorIndex.x);
-        const auto *weightTensor = GetInputTensor(gmmParams_.weight, tensorIndex.weight);
-        const auto *yTensor = GetInputTensor(gmmParams_.y, tensorIndex.y);
+        const auto* xTensor = GetInputTensor(gmmParams_.x, tensorIndex.x);
+        const auto* weightTensor = GetInputTensor(gmmParams_.weight, tensorIndex.weight);
+        const auto* yTensor = GetInputTensor(gmmParams_.y, tensorIndex.y);
         GMM_CHECK_REPORT(xTensor != nullptr && weightTensor != nullptr && yTensor != nullptr,
                          OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnOpName(), "x, weight or y", "nullptr",
                                                                "every tensor used by grouped matmul must be non-null"));
@@ -342,7 +342,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckQuantCasesFormat() const
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzStorageDim(const aclTensor *weightTensor) const
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzStorageDim(const aclTensor* weightTensor) const
 {
     auto weightStorage = weightTensor->GetStorageShape();
     auto weightStorageShapeDim = weightStorage.GetDimNum();
@@ -359,9 +359,9 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzStorageDim(const a
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzC0(const aclTensor *weightTensor,
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzC0(const aclTensor* weightTensor,
                                                                  int64_t weightStorageLastDim,
-                                                                 int64_t &cubeBlockSizeK) const
+                                                                 int64_t& cubeBlockSizeK) const
 {
     const bool isInt4 = (gmmParams_.xDtype == DataType::DT_INT4);
     const bool isMxfp4 =
@@ -381,7 +381,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzC0(const aclTensor
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzOuterDims(const aclTensor *weightTensor,
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzOuterDims(const aclTensor* weightTensor,
                                                                         int64_t kDimValue, int64_t nDimValue,
                                                                         int64_t cubeBlockSizeK,
                                                                         int64_t weightStorageLastFourthDim,
@@ -426,7 +426,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzOuterDims(const ac
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightStorageShape(const aclTensor *weightTensor,
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightStorageShape(const aclTensor* weightTensor,
                                                                          int64_t kDimValue, int64_t nDimValue) const
 {
     auto weightStorage = weightTensor->GetStorageShape();
@@ -549,14 +549,14 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzTensorShapes() con
                     .c_str(),
                 "the number of weight tensors must equal the number of groups"));
     }
-    const auto *firstWeightTensor = GetInputTensor(gmmParams_.weight);
+    const auto* firstWeightTensor = GetInputTensor(gmmParams_.weight);
     GMM_CHECK_REPORT(firstWeightTensor != nullptr,
                      OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnOpName(), weightName_.c_str(), "nullptr",
                                                            "each weight tensor must be non-null"));
     int64_t firstKDimValue = 0L;
     int64_t firstNDimValue = 0L;
     for (size_t i = 0; i < weightTensorNum; ++i) {
-        const auto *weightTensor = GetInputTensor(gmmParams_.weight, i);
+        const auto* weightTensor = GetInputTensor(gmmParams_.weight, i);
         CHECK_RET(CheckWeightNzTensorShape(weightTensor, firstWeightTensor, i, firstKDimValue, firstNDimValue) ==
                       ACLNN_SUCCESS,
                   ACLNN_ERR_PARAM_INVALID);
@@ -565,10 +565,10 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzTensorShapes() con
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzTensorShape(const aclTensor *weightTensor,
-                                                                          const aclTensor *firstWeightTensor,
-                                                                          size_t index, int64_t &firstKDimValue,
-                                                                          int64_t &firstNDimValue) const
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckWeightNzTensorShape(const aclTensor* weightTensor,
+                                                                          const aclTensor* firstWeightTensor,
+                                                                          size_t index, int64_t& firstKDimValue,
+                                                                          int64_t& firstNDimValue) const
 {
     GMM_CHECK_REPORT(weightTensor != nullptr,
                      OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnOpName(), weightName_.c_str(), "nullptr",
@@ -641,7 +641,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckPerGroupWeightDim(size_t w
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckPerGroupScaleDim(const TensorIndexInfo &tensorIndex,
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckPerGroupScaleDim(const TensorIndexInfo& tensorIndex,
                                                                        size_t scaleDimNumber, size_t perTokenDimNumber,
                                                                        size_t xDimNumber, size_t weightDimNumber) const
 {
@@ -698,7 +698,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulPerGroupDim()
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxBiasInputShape(const TensorDimInfo &dimInfo, size_t index) const
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxBiasInputShape(const TensorDimInfo& dimInfo, size_t index) const
 {
     const auto tensorIndex = GetTensorIndexInfo(index);
     auto weightNIndex = GetInputTensor(gmmParams_.weight, tensorIndex.weight)->GetViewShape().GetDimNum() - 1;
@@ -711,7 +711,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxBiasInputShape(const Ten
     }
     auto weightNDimValue = GetInputTensor(gmmParams_.weight, tensorIndex.weight)->GetViewShape().GetDim(weightNIndex);
     if (gmmParams_.biasOptional != nullptr) {
-        const auto *biasTensor = GetInputTensor(gmmParams_.biasOptional, tensorIndex.bias);
+        const auto* biasTensor = GetInputTensor(gmmParams_.biasOptional, tensorIndex.bias);
         auto biasGDimValue = GetInputTensor(gmmParams_.biasOptional, tensorIndex.bias)->GetViewShape().GetDim(0);
         auto biasNDimValue = GetInputTensor(gmmParams_.biasOptional, tensorIndex.bias)->GetViewShape().GetDim(1);
         GMM_CHECK_REPORT(biasGDimValue == groupNum,
@@ -730,7 +730,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxBiasInputShape(const Ten
 
 template <typename T>
 typename AclnnGroupedMatmulDAV3510Checker<T>::MxTypeMDims AclnnGroupedMatmulDAV3510Checker<T>::ExtractMxTypeMDims(
-    const TensorDimInfo &dimInfo, size_t index) const
+    const TensorDimInfo& dimInfo, size_t index) const
 {
     const auto tensorIndex = GetTensorIndexInfo(index);
     auto weightNIndex = GetInputTensor(gmmParams_.weight, tensorIndex.weight)->GetViewShape().GetDimNum() - 1;
@@ -752,8 +752,8 @@ typename AclnnGroupedMatmulDAV3510Checker<T>::MxTypeMDims AclnnGroupedMatmulDAV3
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxTypeMScaleShape(const MxTypeMDims &dims,
-                                                                        const TensorIndexInfo &tensorIndex) const
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxTypeMScaleShape(const MxTypeMDims& dims,
+                                                                        const TensorIndexInfo& tensorIndex) const
 {
     auto weightNIndex = GetInputTensor(gmmParams_.weight, tensorIndex.weight)->GetViewShape().GetDimNum() - 1;
     if (IsWeightNzMultiTensorLayout()) {
@@ -805,7 +805,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxTypeMScaleShape(const Mx
 
 template <typename T>
 aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxTypeMPerTokenAndScaleLastDim(
-    const MxTypeMDims &dims, const TensorIndexInfo &tensorIndex) const
+    const MxTypeMDims& dims, const TensorIndexInfo& tensorIndex) const
 {
     GMM_CHECK_REPORT(dims.pertokenScaleKDimValue == dims.inferedScaleKDimValue,
                      OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
@@ -830,7 +830,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxTypeMPerTokenAndScaleLas
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxTypeMCaseInputShape(const TensorDimInfo &dimInfo,
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxTypeMCaseInputShape(const TensorDimInfo& dimInfo,
                                                                             size_t index) const
 {
     const auto tensorIndex = GetTensorIndexInfo(index);
@@ -849,7 +849,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxTypeMCaseInputShape(cons
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxSplitKDimNum(const TensorDimInfo &dimInfo) const
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxSplitKDimNum(const TensorDimInfo& dimInfo) const
 {
     size_t xDimNum = dimInfo.xDimNum;
     size_t weightDimNum = dimInfo.weightDimNum;
@@ -873,7 +873,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxSplitKDimNum(const Tenso
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxSplitKDimValue(const TensorIndexInfo &tensorIndex,
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxSplitKDimValue(const TensorIndexInfo& tensorIndex,
                                                                        int64_t groupNum) const
 {
     auto xMDimValue = GetInputTensor(gmmParams_.x, tensorIndex.x)->GetViewShape().GetDim(0);
@@ -933,7 +933,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxSplitKDimValue(const Ten
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxFp8TypeKCaseInputShape(const TensorDimInfo &dimInfo,
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckMxFp8TypeKCaseInputShape(const TensorDimInfo& dimInfo,
                                                                                size_t index) const
 {
     const auto tensorIndex = GetTensorIndexInfo(index);
@@ -968,18 +968,20 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulMxShape() con
 }
 
 template <typename T>
-bool AclnnGroupedMatmulDAV3510Checker<T>::IsSpecialMXCase(const T *tensorList) const
+bool AclnnGroupedMatmulDAV3510Checker<T>::IsSpecialMXCase(const T* tensorList) const
 {
     // 已校验mx场景scale的shape大于或等于3维度，不存在越界取值问题
-    // mx特殊场景 (m,k,2) -> shape(1,1,2), stride(2,2,1); (k,m,2) -> shape(1,1,2), stride(2,2,1),
-    // 无法通过stride识别转置
+    // mx场景下，scale/perTokenScale为特殊取值(K = 64)时，无法通过stride识别转置
+    // K = 64时，正常情况下(m, 1, 2) -> shape(m, 1, 2), stride(2, 2, 1)，
+    // (1, m, 2)转置得来的(m, 1, 2) -> shape(m, 1, 2), stride(2, m*2, 1)，
+    // 转置得来的(m, 1, 2)底层仍为连续排布，即使调用contiguous()也不会改变stride
     for (size_t i = 0; i < GetInputTensorSize(tensorList); i++) {
         auto tensorDimNum = GetInputTensor(tensorList, i)->GetViewShape().GetDimNum();
         auto secondLastDimValue =
             GetInputTensor(tensorList, i)->GetViewShape().GetDim(tensorDimNum - LAST_SECOND_DIM_INDEX);
         auto thirdLastDimValue =
             GetInputTensor(tensorList, i)->GetViewShape().GetDim(tensorDimNum - LAST_THIRD_DIM_INDEX);
-        if (secondLastDimValue == 1 && thirdLastDimValue == 1) {
+        if (secondLastDimValue == 1 || thirdLastDimValue == 1) {
             return true;
         }
     }
@@ -992,8 +994,8 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulMxScaleTransp
     const auto tensorIndexInfo = GetTensorIndexInfo();
     for (size_t i = 0; i < tensorIndexInfo.loopSize; ++i) {
         const auto tensorIndex = GetTensorIndexInfo(i);
-        const auto *scaleTensor = GetInputTensor(gmmParams_.scaleOptional, tensorIndex.scale);
-        const auto *weightTensor = GetInputTensor(gmmParams_.weight, tensorIndex.weight);
+        const auto* scaleTensor = GetInputTensor(gmmParams_.scaleOptional, tensorIndex.scale);
+        const auto* weightTensor = GetInputTensor(gmmParams_.weight, tensorIndex.weight);
         GMM_CHECK_REPORT(scaleTensor != nullptr && weightTensor != nullptr,
                          OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnOpName(), "scale or weight", "nullptr",
                                                                "each scale and weight tensor must be non-null"));
@@ -1008,8 +1010,8 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulMxScaleTransp
         }
     }
     const auto tensorIndex = GetTensorIndexInfo();
-    const auto *perTokenScaleTensor = GetInputTensor(gmmParams_.perTokenScaleOptional, tensorIndex.perTokenScale);
-    const auto *xTensor = GetInputTensor(gmmParams_.x, tensorIndex.x);
+    const auto* perTokenScaleTensor = GetInputTensor(gmmParams_.perTokenScaleOptional, tensorIndex.perTokenScale);
+    const auto* xTensor = GetInputTensor(gmmParams_.x, tensorIndex.x);
     GMM_CHECK_REPORT(perTokenScaleTensor != nullptr && xTensor != nullptr,
                      OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnOpName(), "perTokenScale or x", "nullptr",
                                                            "each perTokenScale and x tensor must be non-null"));
@@ -1080,8 +1082,8 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckGroupedMatmulFp4MxDimValue
     const auto tensorIndexInfo = GetTensorIndexInfo();
     for (size_t i = 0; i < tensorIndexInfo.loopSize; i++) {
         const auto tensorIndex = GetTensorIndexInfo(i);
-        const auto *xTensor = GetInputTensor(gmmParams_.x, tensorIndex.x);
-        const auto *weightTensor = GetInputTensor(gmmParams_.weight, tensorIndex.weight);
+        const auto* xTensor = GetInputTensor(gmmParams_.x, tensorIndex.x);
+        const auto* weightTensor = GetInputTensor(gmmParams_.weight, tensorIndex.weight);
         GMM_CHECK_REPORT(xTensor != nullptr && weightTensor != nullptr,
                          OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GetAclnnOpName(), "x or weight", "nullptr",
                                                                "each x and weight tensor must be non-null"));
@@ -1613,7 +1615,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckFp8Hif8QuantParams() const
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckFp8Params(const DataType &scaleDtype) const
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckFp8Params(const DataType& scaleDtype) const
 {
     if (scaleDtype == DataType::DT_FLOAT8_E8M0) {
         return CheckGroupedMatmulMxfp8();
@@ -1629,7 +1631,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckFp8Params(const DataType &
 }
 
 template <typename T>
-aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckFp4Params(const DataType &scaleDtype) const
+aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckFp4Params(const DataType& scaleDtype) const
 {
     GMM_CHECK_REPORT(
         gmmParams_.groupType == SPLIT_M,
@@ -1756,7 +1758,7 @@ aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckQuantShapeAndFormat() cons
     std::string tensorNums = std::string("x=") + std::to_string(xTensorNum) +
                              ", weight=" + std::to_string(weightTensorNum) + ", y=" + std::to_string(yTensorNum);
     const bool isSplitMSeparatedWeight = gmmParams_.groupType == SPLIT_M && IsMultiTensorWeight();
-    const auto *scaleTensor = GetInputTensor(gmmParams_.scaleOptional);
+    const auto* scaleTensor = GetInputTensor(gmmParams_.scaleOptional);
     const bool validTensorLayout =
         xTensorNum == 1 && yTensorNum == 1 &&
         (isSplitMSeparatedWeight ? (IsWeightNzMultiTensorLayout() && scaleTensor != nullptr &&
