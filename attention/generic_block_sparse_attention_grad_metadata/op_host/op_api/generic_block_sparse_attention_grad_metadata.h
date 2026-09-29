@@ -18,9 +18,10 @@ const aclTensor *GenericBlockSparseAttentionGradMetadata(
     const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *cuSeqLengthsQOptional,
     const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
     int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t headDim,
-    int64_t blockShapeX, int64_t blockShapeY, int64_t isPackedGQA, const char *layoutQOptional,
-    const char *layoutKvOptional, int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight,
-    const char *socVersion, int64_t aicCoreNum, int64_t aivCoreNum, const aclTensor *metaData, aclOpExecutor *executor);
+    int64_t blockShapeX, int64_t blockShapeY, const char *layoutQOptional, const char *layoutKvOptional,
+    int64_t layoutSparsePattern, int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight,
+    int64_t residualBlockMode, bool isConsistentTopk, const char *socVersion, int64_t aicCoreNum, int64_t aivCoreNum,
+    const aclTensor *metaData, aclOpExecutor *executor);
 } // namespace l0op
 
 #endif

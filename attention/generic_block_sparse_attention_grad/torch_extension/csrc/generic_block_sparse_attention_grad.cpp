@@ -35,8 +35,9 @@ at::Tensor GenericBlockSparseAttentionGradMetadata(
     const at::Tensor &sparseBlockIdx, const at::Tensor &sparseBlockCount, const c10::optional<at::Tensor> &cuSeqLengths,
     const c10::optional<at::Tensor> &cuSeqLengthsKv, const c10::optional<at::Tensor> &sequsedQ,
     const c10::optional<at::Tensor> &sequsedKv, int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads,
-    int64_t numKvHeads, int64_t headDim, at::IntArrayRef blockShape, int64_t isPackedGQA, const std::string &layoutQ,
-    const std::string &layoutKv, int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight)
+    int64_t numKvHeads, int64_t headDim, at::IntArrayRef blockShape, const std::string &layoutQ,
+    const std::string &layoutKv, int64_t layoutSparsePattern, int64_t maskType, int64_t softmaxPrecision,
+    int64_t winLeft, int64_t winRight, int64_t residualBlockMode, bool isConsistentTopk)
 {
     TORCH_CHECK(sparseBlockIdx.dim() == 4, "sparse_block_idx must be 4D [B, N2, J, maxS1]");
     TORCH_CHECK(numQHeads > 0, "num_heads_q must be > 0");
@@ -57,8 +58,8 @@ at::Tensor GenericBlockSparseAttentionGradMetadata(
 
     ACLNN_CMD(aclnnGenericBlockSparseAttentionGradMetadata, sparseBlockIdx, sparseBlockCount, cuSeqLengthsValue,
               cuSeqLengthsKvValue, sequsedQValue, sequsedKvValue, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads,
-              headDim, blockShape, isPackedGQA, layoutQPtr, layoutKvPtr, maskType, softmaxPrecision, winLeft, winRight,
-              metadata);
+              headDim, blockShape, layoutQPtr, layoutKvPtr, layoutSparsePattern, maskType, softmaxPrecision, winLeft,
+              winRight, residualBlockMode, isConsistentTopk, metadata);
 
     return metadata;
 }
@@ -69,8 +70,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> GenericBlockSparseAttentionGrad(
     const c10::optional<at::Tensor> &metadata, const c10::optional<at::Tensor> &attenMask,
     const c10::optional<at::Tensor> &cuSeqLengths, const c10::optional<at::Tensor> &cuSeqLengthsKv,
     const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &sequsedKv, at::IntArrayRef blockShape,
-    int64_t isPackedGQA, const std::string &layoutQ, const std::string &layoutKv, double scaleValue, int64_t maskType,
-    int64_t softmaxPrecision, int64_t winLeft, int64_t winRight)
+    const std::string &layoutQ, const std::string &layoutKv, int64_t layoutSparsePattern, double scaleValue,
+    int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
+    bool isConsistentTopk)
 {
     const at::Tensor &metadataValue = metadata.value_or(at::Tensor());
     const at::Tensor &attenMaskValue = attenMask.value_or(at::Tensor());
@@ -88,8 +90,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> GenericBlockSparseAttentionGrad(
 
     ACLNN_CMD(aclnnGenericBlockSparseAttentionGrad, query, key, value, dout, out, lse, sparseBlockIdx, sparseBlockCount,
               metadataValue, attenMaskValue, cuSeqLengthsValue, cuSeqLengthsKvValue, sequsedQValue, sequsedKvValue,
-              blockShape, isPackedGQA, layoutQPtr, layoutKvPtr, scaleValue, maskType, softmaxPrecision, winLeft,
-              winRight, dQuery, dKey, dValue);
+              blockShape, layoutQPtr, layoutKvPtr, layoutSparsePattern, scaleValue, maskType, softmaxPrecision, winLeft,
+              winRight, residualBlockMode, isConsistentTopk, dQuery, dKey, dValue);
 
     return std::make_tuple(dQuery, dKey, dValue);
 }

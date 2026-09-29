@@ -50,7 +50,8 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::Prepare(CpuKernelCo
 
     GetAttrValueOpt(ctx, "block_shape_x", blockShapeX_);
     GetAttrValueOpt(ctx, "block_shape_y", blockShapeY_);
-    GetAttrValueOpt(ctx, "is_packed_gqa", isPackedGQA_);
+    GetAttrValueOpt(ctx, "layout_sparse_pattern", layoutSparsePattern_);
+    GetAttrValueOpt(ctx, "residual_block_mode", residualBlockMode_);
     GetAttrValueOpt(ctx, "mask_type", maskType_);
     GetAttrValueOpt(ctx, "softmax_precision", softmaxPrecision_);
     GetAttrValueOpt(ctx, "win_left", winLeft_);
@@ -119,8 +120,9 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ParamsInit()
         return false;
     }
     groupSize_ = static_cast<uint32_t>(numQHeads_ / numKvHeads_);
-    if (isPackedGQA_ != 1) {
-        KERNEL_LOG_ERROR("only is_packed_gqa=1 is supported currently");
+    if (layoutSparsePattern_ != 1 || residualBlockMode_ != 0) {
+        KERNEL_LOG_ERROR("Only layout_sparse_pattern=1 and residual_block_mode=0 are supported, got %ld and %ld.",
+                         layoutSparsePattern_, residualBlockMode_);
         return false;
     }
 

@@ -20,8 +20,9 @@ const std::array<const aclTensor *, 3> GenericBlockSparseAttentionGrad(
     const aclTensor *lse, const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
     const aclTensor *metadataOptional, const aclTensor *attenMaskOptional, const aclTensor *cuSeqLengthsQOptional,
     const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
-    const aclIntArray *blockShape, int64_t isPackedGQA, char *layoutQ, char *layoutKv, double scaleValue,
-    int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, aclOpExecutor *executor);
+    const aclIntArray *blockShape, char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, double scaleValue,
+    int64_t maskType, int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
+    bool isConsistentTopk, aclOpExecutor *executor);
 } // namespace l0op
 
 #endif

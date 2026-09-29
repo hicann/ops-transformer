@@ -136,6 +136,16 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch22::Prepare(CpuKernelCo
         return false;
     }
     // ---- optional attrs ----
+    int64_t layoutSparsePattern = 1;
+    int64_t residualBlockMode = 0;
+    GetAttrValueOpt(ctx, "layout_sparse_pattern", layoutSparsePattern);
+    GetAttrValueOpt(ctx, "residual_block_mode", residualBlockMode);
+    if (layoutSparsePattern != 1 || residualBlockMode != 0) {
+        KERNEL_LOG_ERROR("Only layout_sparse_pattern=1 and residual_block_mode=0 are supported, got %ld and %ld.",
+                         layoutSparsePattern, residualBlockMode);
+        return false;
+    }
+    // is_consistent_topk does not change the generic inverse-pattern schedule.
     GetAttrValueOpt(ctx, "layout_q", layoutQ_);
     GetAttrValueOpt(ctx, "aic_core_num", aicCoreNum_);
 

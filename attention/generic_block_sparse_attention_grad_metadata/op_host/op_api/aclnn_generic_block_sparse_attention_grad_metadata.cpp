@@ -36,9 +36,9 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
     const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, const aclTensor *cuSeqLengthsQOptional,
     const aclTensor *cuSeqLengthsKvOptional, const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
     int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t headDim,
-    const aclIntArray *blockShape, int64_t isPackedGQA, char *layoutQ, char *layoutKv, int64_t maskType,
-    int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, aclTensor *metadata, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclIntArray *blockShape, char *layoutQ, char *layoutKv, int64_t layoutSparsePattern, int64_t maskType,
+    int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode, bool isConsistentTopk,
+    aclTensor *metadata, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     if (workspaceSize == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "workspaceSize is nullptr");
@@ -51,7 +51,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
     L2_DFX_PHASE_1(aclnnGenericBlockSparseAttentionGradMetadata,
                    DFX_IN(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional,
                           sequsedQOptional, sequsedKvOptional, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim,
-                          blockShape, isPackedGQA, layoutQ, layoutKv, maskType, softmaxPrecision, winLeft, winRight),
+                          blockShape, layoutQ, layoutKv, layoutSparsePattern, maskType, softmaxPrecision, winLeft,
+                          winRight, residualBlockMode, isConsistentTopk),
                    DFX_OUT(metadata));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -66,18 +67,19 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
     int64_t blockShapeX = 1;
     int64_t blockShapeY = 128;
     if (blockShape != nullptr) {
-        if (blockShape->Size() >= 1) {
-            blockShapeX = (*blockShape)[0];
+        if (blockShape->Size() != 2) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "blockShape must contain exactly two elements [x, y].");
+            return ACLNN_ERR_PARAM_INVALID;
         }
-        if (blockShape->Size() >= 2) {
-            blockShapeY = (*blockShape)[1];
-        }
+        blockShapeX = (*blockShape)[0];
+        blockShapeY = (*blockShape)[1];
     }
 
-    auto ret = ParamsCheck(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional,
-                           sequsedQOptional, sequsedKvOptional, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim,
-                           blockShapeX, blockShapeY, isPackedGQA, layoutQ, layoutKv, maskType, softmaxPrecision,
-                           winLeft, winRight, aicCoreNum, aivCoreNum, socVersion, metadata);
+    auto ret =
+        ParamsCheck(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, sequsedQOptional,
+                    sequsedKvOptional, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX,
+                    blockShapeY, layoutQ, layoutKv, layoutSparsePattern, maskType, softmaxPrecision, winLeft, winRight,
+                    residualBlockMode, isConsistentTopk, aicCoreNum, aivCoreNum, socVersion, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     const aclTensor *sparseBlockIdxContiguous = l0op::Contiguous(sparseBlockIdx, uniqueExecutor.get());
@@ -109,8 +111,9 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
     auto output = l0op::GenericBlockSparseAttentionGradMetadata(
         sparseBlockIdxContiguous, sparseBlockCountContiguous, cuSeqLengthsQOptionalContiguous,
         cuSeqLengthsKvOptionalContiguous, sequsedQOptionalContiguous, sequsedKvOptionalContiguous, maxQSeqlen,
-        maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, isPackedGQA, layoutQ, layoutKv, maskType,
-        softmaxPrecision, winLeft, winRight, socVersion, aicCoreNum, aivCoreNum, metadata, uniqueExecutor.get());
+        maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, layoutQ, layoutKv, layoutSparsePattern,
+        maskType, softmaxPrecision, winLeft, winRight, residualBlockMode, isConsistentTopk, socVersion, aicCoreNum,
+        aivCoreNum, metadata, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();

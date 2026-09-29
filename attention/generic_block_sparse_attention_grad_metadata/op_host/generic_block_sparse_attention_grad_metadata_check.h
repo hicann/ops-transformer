@@ -49,9 +49,10 @@ static constexpr size_t DIM_J = 2;
 static constexpr size_t DIM_MAX_S1 = 3;
 
 aclnnStatus CheckSingleParam(int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads,
-                             int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, int64_t isPackedGQA,
-                             const char *layoutQ, const char *layoutKv, int64_t maskType, int64_t softmaxPrecision,
-                             int64_t winLeft, int64_t winRight, uint32_t aicCoreNum, uint32_t aivCoreNum)
+                             int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, const char *layoutQ,
+                             const char *layoutKv, int64_t layoutSparsePattern, int64_t maskType,
+                             int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
+                             bool isConsistentTopk, uint32_t aicCoreNum, uint32_t aivCoreNum)
 {
     if (maxQSeqlen < 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GSAG_ACLNN_OP_NAME, "max_q_seqlen", std::to_string(maxQSeqlen),
@@ -100,10 +101,14 @@ aclnnStatus CheckSingleParam(int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t nu
                                               "block_shape[1] must be >= 128 and aligned to 64");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (isPackedGQA != 1) {
-        OP_LOGE_FOR_INVALID_VALUE(GSAG_ACLNN_OP_NAME, "is_packed_gqa", std::to_string(isPackedGQA), "1");
+    if (layoutSparsePattern != 1 || residualBlockMode != 0) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "Only layoutSparsePattern=1 and residualBlockMode=0 are supported, got %ld and %ld.",
+                layoutSparsePattern, residualBlockMode);
         return ACLNN_ERR_PARAM_INVALID;
     }
+    // TopK consistency is a forward-selection hint, not equality of inverse counts.
+    (void)isConsistentTopk;
     if (layoutQ == nullptr || layoutKv == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GSAG_ACLNN_OP_NAME, "layout_q/layout_kv",
                                                  "layout_q and layout_kv cannot be empty");
@@ -173,7 +178,7 @@ aclnnStatus CheckExistence(const aclTensor *sparseBlockIdx, const aclTensor *spa
 
 aclnnStatus CheckConsistency(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, int64_t maxQSeqlen,
                              int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t blockShapeY,
-                             int64_t isPackedGQA, const aclTensor *metadata)
+                             const aclTensor *metadata)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     if (sparseBlockIdx->GetViewShape().GetDimNum() != SPARSE_BLOCK_IDX_DIM_NUM) {
@@ -259,8 +264,6 @@ aclnnStatus CheckConsistency(const aclTensor *sparseBlockIdx, const aclTensor *s
                                               "dtype of metadata must be int32");
         return ACLNN_ERR_PARAM_INVALID;
     }
-
-    (void)isPackedGQA;
     return ACLNN_SUCCESS;
 }
 
@@ -268,18 +271,19 @@ static aclnnStatus ParamsCheck(const aclTensor *sparseBlockIdx, const aclTensor 
                                const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional,
                                const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
                                int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads,
-                               int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, int64_t isPackedGQA,
-                               const char *layoutQ, const char *layoutKv, int64_t maskType, int64_t softmaxPrecision,
-                               int64_t winLeft, int64_t winRight, uint32_t aicCoreNum, uint32_t aivCoreNum,
-                               const char *socVersion, const aclTensor *metadata)
+                               int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, const char *layoutQ,
+                               const char *layoutKv, int64_t layoutSparsePattern, int64_t maskType,
+                               int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
+                               bool isConsistentTopk, uint32_t aicCoreNum, uint32_t aivCoreNum, const char *socVersion,
+                               const aclTensor *metadata)
 {
     (void)sequsedQOptional;
     (void)sequsedKvOptional;
     (void)socVersion;
 
-    if (CheckSingleParam(maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, isPackedGQA,
-                         layoutQ, layoutKv, maskType, softmaxPrecision, winLeft, winRight, aicCoreNum,
-                         aivCoreNum) != ACLNN_SUCCESS) {
+    if (CheckSingleParam(maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, headDim, blockShapeX, blockShapeY, layoutQ,
+                         layoutKv, layoutSparsePattern, maskType, softmaxPrecision, winLeft, winRight,
+                         residualBlockMode, isConsistentTopk, aicCoreNum, aivCoreNum) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (CheckExistence(sparseBlockIdx, sparseBlockCount, cuSeqLengthsQOptional, cuSeqLengthsKvOptional, layoutQ,
@@ -287,7 +291,7 @@ static aclnnStatus ParamsCheck(const aclTensor *sparseBlockIdx, const aclTensor 
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (CheckConsistency(sparseBlockIdx, sparseBlockCount, maxQSeqlen, maxKvSeqlen, numQHeads, numKvHeads, blockShapeY,
-                         isPackedGQA, metadata) != ACLNN_SUCCESS) {
+                         metadata) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;

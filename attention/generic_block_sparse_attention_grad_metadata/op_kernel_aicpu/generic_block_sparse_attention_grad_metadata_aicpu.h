@@ -87,7 +87,8 @@ private:
     int32_t headDim_ = 0;
     int32_t blockShapeX_ = 1;
     int32_t blockShapeY_ = 128;
-    int32_t isPackedGQA_ = 1;
+    int64_t layoutSparsePattern_ = 1;
+    int64_t residualBlockMode_ = 0;
     int32_t maskType_ = 0;
     int32_t softmaxPrecision_ = 0;
     int64_t winLeft_ = -1;

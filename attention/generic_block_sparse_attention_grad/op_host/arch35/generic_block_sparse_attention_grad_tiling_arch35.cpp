@@ -65,10 +65,6 @@ protected:
                     static_cast<int64_t>(blockShapeY_));
             return false;
         }
-        if (isPackedGQA_ != 1) {
-            OP_LOGE(context_->GetNodeName(), "only support is_packed_gqa == 1.");
-            return false;
-        }
         if (qHeadNum_ <= 0 || qHeadNum_ > MAX_HEAD_NUM) {
             OP_LOGE(context_->GetNodeName(), "qHeadNum=%ld must be in [1, %ld].", qHeadNum_, MAX_HEAD_NUM);
             return false;
@@ -108,9 +104,19 @@ protected:
         dataType_ = qInputDesc->GetDataType();
 
         const auto *blockShapeList = attrs->GetListInt(0);
-        isPackedGQA_ = static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>(1));
-        qLayout_ = attrs->GetAttrPointer<char>(2);
-        kvLayout_ = attrs->GetAttrPointer<char>(3);
+        qLayout_ = attrs->GetAttrPointer<char>(1);
+        kvLayout_ = attrs->GetAttrPointer<char>(2);
+        const auto *sparseLayout = attrs->GetAttrPointer<int64_t>(3);
+        const auto *residualMode = attrs->GetAttrPointer<int64_t>(9);
+        layoutSparsePattern_ = sparseLayout != nullptr ? *sparseLayout : 1;
+        residualBlockMode_ = residualMode != nullptr ? *residualMode : 0;
+        if (layoutSparsePattern_ != 1 || residualBlockMode_ != 0) {
+            OP_LOGE(context_->GetNodeName(),
+                    "Only layout_sparse_pattern=1 and residual_block_mode=0 are supported, got %ld and %ld.",
+                    layoutSparsePattern_, residualBlockMode_);
+            return ge::GRAPH_FAILED;
+        }
+        // is_consistent_topk (10) needs no specialization: each block uses its actual count.
         softmaxScale_ = *attrs->GetAttrPointer<float>(4);
         maskType_ = static_cast<uint32_t>(*attrs->GetAttrPointer<int64_t>(5));
         winLeft_ = static_cast<int32_t>(*attrs->GetAttrPointer<int64_t>(7));
@@ -252,7 +258,7 @@ protected:
         tilingData_.set_maxS1(maxS1_);
         tilingData_.set_numJ(numJ_);
         tilingData_.set_maskType(maskType_);
-        tilingData_.set_isPackedGQA(static_cast<uint32_t>(isPackedGQA_));
+        tilingData_.set_layoutSparsePattern(static_cast<uint32_t>(layoutSparsePattern_));
         tilingData_.set_winLeft(winLeft_);
         tilingData_.set_winRight(winRight_);
         return ge::GRAPH_SUCCESS;
@@ -368,7 +374,8 @@ private:
     int64_t numJ_{0};
     int32_t blockShapeX_{1};
     int32_t blockShapeY_{128};
-    int32_t isPackedGQA_{1};
+    int64_t layoutSparsePattern_{1};
+    int64_t residualBlockMode_{0};
     uint32_t maskType_{0};
     float softmaxScale_{1.0f};
     int32_t winLeft_{-1};

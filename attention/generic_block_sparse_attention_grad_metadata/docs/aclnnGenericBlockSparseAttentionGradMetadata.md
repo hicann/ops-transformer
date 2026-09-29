@@ -3,46 +3,34 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT系列产品</term>：支持
+- <term>Ascend 950PR/Ascend 950DT</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3 训练系列产品/Atlas A3 推理系列产品</term>：不支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：不支持
+- <term>Atlas A2 训练系列产品/Atlas A2 推理系列产品</term>：不支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
-- <term>Atlas 200I/500 A2推理产品</term>：不支持
+- <term>Atlas 200I/500 A2 推理产品</term>：不支持
 <!-- end id4 -->
 <!-- npu="310p" id5 -->
-- <term>Atlas推理系列产品</term>：不支持
+- <term>Atlas 推理系列产品</term>：不支持
 <!-- end id5 -->
 <!-- npu="910" id6 -->
-- <term>Atlas训练系列产品</term>：不支持
+- <term>Atlas 训练系列产品</term>：不支持
 <!-- end id6 -->
 
 ## 功能说明
 
-- 接口功能：
+- 接口功能：aclnnGenericBlockSparseAttentionGradMetadata根据sparseBlockIdx、sparseBlockCount、seqlen等信息进行稀疏attention的分核与负载均衡，为aclnnGenericBlockSparseAttentionGrad的前置AICPU算子。按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做`[baseM, baseN] = [128, 128]`基本块粒度的贪心负载均衡，输出metadata供主Grad算子消费。
+- 该算子不建议单独使用，建议与aclnnGenericBlockSparseAttentionGrad配合使用，形成完整工作流。
 
-  aclnnGenericBlockSparseAttentionGradMetadata根据sparseBlockIdx、sparseBlockCount、seqlen等信息进行稀疏attention的分核与负载均衡，为aclnnGenericBlockSparseAttentionGrad的前置AICPU算子。
+$$
+\text{metaSize} = 80 + B \times N1 \times J \times 4
+$$
 
-  <!-- npu="950" id9 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：
-    按B → N2 → J → G顺序展开`(b, n2, j, g)`任务列表，并在AIC核间做`[baseM, baseN] = [128, 128]`基本块粒度的贪心负载均衡，输出metadata供主Grad算子消费。
-  <!-- end id9 -->
-
-  - 该算子不建议单独使用，建议与aclnnGenericBlockSparseAttentionGrad配合使用，形成完整工作流。
-- Metadata size计算公式：
-  <!-- npu="950" id7 -->
-  - <term>Ascend 950PR&950DT系列产品</term>:
-
-    $$
-    \text{metaSize} = 80 + B \times N1 \times J \times 4
-    $$
-
-    其中`J = ceilDiv(maxKvSeqlen, blockShapeY)`。
-  <!-- end id7 -->
+其中`J = ceilDiv(maxKvSeqlen, blockShapeY)`。
 
 ## 函数原型
 
@@ -62,13 +50,15 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
     int64_t numKvHeads,
     int64_t headDim,
     const aclIntArray *blockShape,
-    int64_t isPackedGQA,
     char *layoutQ,
     char *layoutKv,
+    int64_t layoutSparsePattern,
     int64_t maskType,
     int64_t softmaxPrecision,
     int64_t winLeft,
     int64_t winRight,
+    int64_t residualBlockMode,
+    bool isConsistentTopk,
     aclTensor *metadata,
     uint64_t *workspaceSize,
     aclOpExecutor **executor)
@@ -114,7 +104,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>sparseBlockIdx</td>
         <td>输入</td>
         <td>稀疏块索引数组，指定每个KV块选择的Q块/token索引。</td>
-        <td>同group每个KVHead对应的Q稀疏pattern一致（isPackedGQA=1）。不支持空Tensor。</td>
+        <td>详细参考<a href="../../generic_block_sparse_attention_grad/docs/aclnnGenericBlockSparseAttentionGrad.md#layout对应关系说明">layout对应关系说明</a>。不支持空Tensor。</td>
         <td>INT32</td>
         <td>ND</td>
         <td>TND：[B, N2, ceilDiv(maxS2, blockShapeY), maxS1]；BNSD/BSND：[B, N2, ceilDiv(S2, blockShapeY), S1]</td>
@@ -124,7 +114,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>sparseBlockCount</td>
         <td>输入</td>
         <td>指定每个KV块实际选择的Q数量。</td>
-        <td>不支持空Tensor。</td>
+        <td>详细参考<a href="../../generic_block_sparse_attention_grad/docs/aclnnGenericBlockSparseAttentionGrad.md#layout对应关系说明">layout对应关系说明</a>。不支持空Tensor。</td>
         <td>INT32</td>
         <td>ND</td>
         <td>[B, N2, ceilDiv(maxS2, blockShapeY)]或[B, N2, ceilDiv(S2, blockShapeY)]</td>
@@ -231,16 +221,6 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>-</td>
       </tr>
       <tr>
-        <td>isPackedGQA</td>
-        <td>输入</td>
-        <td>同一group内的qHead是否共享同样的稀疏pattern。</td>
-        <td>当前仅支持1。</td>
-        <td>INT64</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
         <td>layoutQ</td>
         <td>输入</td>
         <td>输入query的数据排布格式。</td>
@@ -256,6 +236,16 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>输入key、value的数据排布格式。</td>
         <td>当前支持"TND"、"BNSD"、"BSND"，须与layoutQ一致。</td>
         <td>STRING</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>layoutSparsePattern</td>
+        <td>输入</td>
+        <td>代表输入的sparseBlockIdx、sparseBlockCount的数据排布格式。</td>
+        <td>当前仅支持取"1"，详细参考<a href="../../generic_block_sparse_attention_grad/docs/aclnnGenericBlockSparseAttentionGrad.md#layout对应关系说明">layout对应关系说明</a>。</td>
+        <td>INT64</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -284,7 +274,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>winLeft</td>
         <td>输入</td>
         <td>滑窗向前包含token数。</td>
-        <td>不开启时必须为-1。</td>
+        <td>不使能时必须为-1。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -294,8 +284,28 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>winRight</td>
         <td>输入</td>
         <td>滑窗向后包含token数。</td>
-        <td>不开启时必须为-1。</td>
+        <td>不使能时必须为-1。</td>
         <td>INT64</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>residualBlockMode</td>
+        <td>输入</td>
+        <td>表示KV序列以blockShapeY为单位进行稀疏后，尾部不完整块的状态。</td>
+        <td>当前仅支持取0，表示尾部不完整块是否参与运算由sparseBlockIdx传入的值决定。1表示尾部不完整块必定参与运算，但必定不包含在sparseBlockIdx中，当前不支持。</td>
+        <td>INT64</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>isConsistentTopk</td>
+        <td>输入</td>
+        <td>前置算子进行稀疏块选择时，同一batch同一head内每个Q块选择的KV块最大数量是否一致。</td>
+        <td>仅支持0或1。0代表不一致，1代表一致；当前两种取值均使用按实际稀疏索引和数量计算的通用实现。</td>
+        <td>BOOL</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -304,7 +314,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
         <td>metadata</td>
         <td>输出</td>
         <td>稀疏attention的分核信息。</td>
-        <td>不支持空Tensor。metaSize ≥ max(80 + B×N1×J×4, 198)。</td>
+        <td>不支持空Tensor。metaSize ≥ 80 + B×N1×J×4。</td>
         <td>INT32</td>
         <td>ND</td>
         <td>[metaSize]</td>
@@ -370,7 +380,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
           <td>sparseBlockIdx/sparseBlockCount/metadata为空或shape/dtype非法。</td>
         </tr>
         <tr>
-          <td>layout为TND时未提供cuSeqLengths；headDim、blockShape、isPackedGQA、window参数不在支持范围。</td>
+          <td>layout为TND时未提供cuSeqLengths；headDim、blockShape、layoutSparsePattern、residualBlockMode、isConsistentTopk、window参数不在支持范围。</td>
         </tr>
         <tr>
           <td>sparseBlockIdx的J维与ceilDiv(maxKvSeqlen, blockShapeY)不一致；metadata长度不足；B×N1×J超过任务数上限（1M）。</td>
@@ -419,16 +429,18 @@ aclnnStatus aclnnGenericBlockSparseAttentionGradMetadata(
 
 ## 约束说明
 
+- Grad与GradMetadata调用中的layoutSparsePattern、residualBlockMode、isConsistentTopk须保持一致；当前仅支持layoutSparsePattern=1、residualBlockMode=0。
+
 - 确定性计算：
   - 本算子输出为确定性结果。
 - 须与[aclnnGenericBlockSparseAttentionGrad](../../generic_block_sparse_attention_grad/docs/aclnnGenericBlockSparseAttentionGrad.md)配合使用；主算子调用前必须先成功执行本算子。
 - HeadDim固定为128；numQHeads/numKvHeads须落在[1, 128]，且numQHeads % numKvHeads == 0。
-- blockShape：blockShapeX仅支持1；blockShapeY须≥128且为64的倍数, blockShapeY须≥128且为64的倍数；isPackedGQA当前仅支持1；maskType当前仅支持1。
+- blockShape当前仅支持[1, 128]；layoutSparsePattern当前仅支持1；maskType当前仅支持1。
 - layoutQ与layoutKv须相同，取值"TND"/"BNSD"/"BSND"；TND布局下cuSeqLengthsQOptional/cuSeqLengthsKvOptional必选。
 - sequsedQOptional/sequsedKvOptional仅在TND时生效；BNSD/BSND须传nullptr，实际序列长度取自maxQSeqlen/maxKvSeqlen（须与Q/K的S维一致）。
-- winLeft和winRight不开启时必须为-1。
+- winLeft和winRight不使能时必须为-1。
 - sparseBlockIdx最后一维maxS1须≥maxQSeqlen；J = ceilDiv(maxKvSeqlen, blockShapeY)须与sparseBlockIdx第3维一致。
-- metadata长度须满足shape[0] ≥ max(80 + B × numQHeads × J × 4, 198)；任务数上界B × numQHeads × J ≤ 1048576。
+- metadata长度须满足shape[0] ≥ 80 + B × numQHeads × J × 4；任务数上界B × numQHeads × J ≤ 1048576。
 
 ## 调用示例
 
@@ -539,7 +551,7 @@ int main()
     uint64_t wsSize = 0;
     aclOpExecutor *executor = nullptr;
     ret = aclnnGenericBlockSparseAttentionGradMetadataGetWorkspaceSize(
-        idx, cnt, nullptr, nullptr, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, 1, layout, layout, 1, 0, -1, -1,
+        idx, cnt, nullptr, nullptr, nullptr, nullptr, S1, S2, N1, N2, D, blockShape, layout, layout, 1, 1, 0, -1, -1, 0, 0,
         metadata, &wsSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, Finalize(deviceId, stream); return ret);
 
