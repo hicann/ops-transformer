@@ -14,9 +14,10 @@ import os
 import shutil
 from abc import ABC, abstractmethod
 from typing import List, Union
+
 import torch
-from torch.utils.cpp_extension import load
 from torch.library import Library
+from torch.utils.cpp_extension import load
 
 ASCEND_HOME_PATH = "ASCEND_HOME_PATH"
 _as_library = None
@@ -59,10 +60,9 @@ class OpBuilder(ABC):
         self._ensure_initialized()
 
     def get_cann_path(self):
-        if ASCEND_HOME_PATH in os.environ and os.path.exists(
-            os.environ[ASCEND_HOME_PATH]
-        ):
-            return os.environ[ASCEND_HOME_PATH]
+        cann_path = os.environ.get(ASCEND_HOME_PATH)
+        if cann_path and os.path.exists(cann_path):
+            return cann_path
         return os.path.dirname(os.path.dirname(self._torch_npu_path))
 
     @property
@@ -124,14 +124,18 @@ class OpBuilder(ABC):
             inc = os.path.join(vendor_dir, "op_api", "include")
             if os.path.isdir(inc):
                 paths.append(inc)
+        # CANN 路径必须先于 torch_npu 路径：torch_npu 自带的 third_party/acl 版本较旧，
+        # 且与新版 CANN 头文件共用同名 include guard，若排在前面会因 -I 搜索顺序先命中旧头，
+        # 环境上实际安装的 CANN 头文件（含 ACL_FLOAT8_E5M2 等新枚举）被 guard 抑制导致编译报错。
+        # vendor op_api/include 保持最优先，run 包的增强算子 aclnn 头文件需覆盖 CANN 同名头。
         paths.extend(
             [
+                os.path.join(self._cann_path, "include"),
+                os.path.join(self._cann_path, "include/aclnnop"),
                 os.path.join(self._torch_npu_path, "include"),
                 os.path.join(self._torch_npu_path, "include/third_party/hccl/inc"),
                 os.path.join(self._torch_npu_path, "include/third_party/acl/inc"),
                 os.path.join(self._torch_npu_path, "include/third_party/op-plugin"),
-                os.path.join(self._cann_path, "include"),
-                os.path.join(self._cann_path, "include/aclnnop"),
                 os.path.join(self._package_path, "common"),
             ]
         )
