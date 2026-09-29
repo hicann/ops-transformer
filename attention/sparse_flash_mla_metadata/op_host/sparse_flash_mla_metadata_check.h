@@ -637,6 +637,10 @@ aclnnStatus CheckConsistencySmla(const aclTensor *cuSeqlensQOptional, const aclT
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     int64_t dimNum = -1;
     if (!(socVersion != nullptr && strstr(socVersion, "Ascend950") != nullptr)) {
+        if (oriTopk == 0 &&
+            CheckReservedOptionalTensorSmla(oriTopkLengthOptional, "ori_topk_length") != ACLNN_SUCCESS) {
+            return ACLNN_ERR_PARAM_INVALID;
+        }
         if (CheckReservedOptionalTensorSmla(cmpTopkLengthOptional, "cmp_topk_length") != ACLNN_SUCCESS) {
             return ACLNN_ERR_PARAM_INVALID;
         }
