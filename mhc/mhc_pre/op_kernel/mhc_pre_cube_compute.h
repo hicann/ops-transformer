@@ -96,7 +96,6 @@ __aicore__ inline void MHC_PRE_CUBE_COMPUTE_TEMPLATE_CLASS::ProcessMatmulXPhi(co
     uint64_t xxoffset = blockIdx_ * curBs_ * 2 * mm1K_ + ping4Cub * vecCoreNum_ * curBs_ * mm1K_;
     mm1_.SetTensorA(xGm_[blockIdx_ * curBs_ * 2 * mm1K_ + ping4Cub * vecCoreNum_ * curBs_ * mm1K_]);
     mm1_.SetTensorB(phiGm_, true);
-    // mm1_.SetHF32(true, 1);
     mm1_.SetOrgShape(mm1M, mm1N_, mm1K_);
     mm1_.SetSingleShape(mm1M, mm1N_, mm1K_);
     mm1_.template IterateAll<false>(workspaceGlobalAB_[taskOffset * mm1N_]);

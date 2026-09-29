@@ -545,6 +545,7 @@ __aicore__ inline void MHC_PRE_SINKHORN_CUBE_COMPUTE_TEMPLATE_CLASS::ProcessMatm
     mm1_.SetOrgShape(mm1M, mm1N_, mm1K_);
     mm1_.SetSingleShape(mm1M, mm1N_, mm1K_);
     mm1_.template IterateAll<false>(workspaceGlobalAB_[taskOffset * mm1N_]);
+    mm1_.SetHF32(false);
     mm1_.End();
     ping4Cub = 1 - ping4Cub;
 }
