@@ -45,21 +45,21 @@ constexpr size_t STATE_DIM_NUM = 4;
 
 struct RecurrentGatedDeltaRuleParams {
     // madatory
-    const aclTensor *query{nullptr};
-    const aclTensor *key{nullptr};
-    const aclTensor *value{nullptr};
-    const aclTensor *beta{nullptr};
-    const aclTensor *state{nullptr};
-    const aclTensor *actual_seq_lengths{nullptr};
-    const aclTensor *ssm_state_indices{nullptr};
+    const aclTensor* query{nullptr};
+    const aclTensor* key{nullptr};
+    const aclTensor* value{nullptr};
+    const aclTensor* beta{nullptr};
+    const aclTensor* state{nullptr};
+    const aclTensor* actual_seq_lengths{nullptr};
+    const aclTensor* ssm_state_indices{nullptr};
     // optional
-    const aclTensor *g{nullptr};
-    const aclTensor *gk{nullptr};
-    const aclTensor *num_accepted_tokens{nullptr};
+    const aclTensor* g{nullptr};
+    const aclTensor* gk{nullptr};
+    const aclTensor* num_accepted_tokens{nullptr};
     // attrs
     float scale{1.0f};
     // output
-    const aclTensor *out{nullptr};
+    const aclTensor* out{nullptr};
 };
 
 // support dtype
@@ -73,7 +73,7 @@ static const std::initializer_list<op::DataType> G_TYPE_SUPPORT_LIST = {op::Data
 static const std::initializer_list<op::DataType> ACC_TO_TYPE_SUPPORT_LIST = {op::DataType::DT_INT32};
 static const std::initializer_list<op::DataType> OUT_TYPE_SUPPORT_LIST = {op::DataType::DT_BF16};
 
-static inline bool CheckNotNull(const RecurrentGatedDeltaRuleParams &params)
+static inline bool CheckNotNull(const RecurrentGatedDeltaRuleParams& params)
 {
     // 必选参数
     OP_CHECK_NULL(params.query, return false);
@@ -88,7 +88,7 @@ static inline bool CheckNotNull(const RecurrentGatedDeltaRuleParams &params)
     return true;
 }
 
-static inline bool CheckDtypeVaild(const RecurrentGatedDeltaRuleParams &params)
+static inline bool CheckDtypeVaild(const RecurrentGatedDeltaRuleParams& params)
 {
     // 检查必选参数数据类型
     OP_CHECK_DTYPE_NOT_SUPPORT(params.query, QKV_TYPE_SUPPORT_LIST, return false);
@@ -114,7 +114,7 @@ static inline bool CheckDtypeVaild(const RecurrentGatedDeltaRuleParams &params)
     return true;
 }
 
-static aclnnStatus CheckParams(RecurrentGatedDeltaRuleParams &params)
+static aclnnStatus CheckParams(RecurrentGatedDeltaRuleParams& params)
 {
     // 检查输入参数是否在支持的数据类型范围内
     CHECK_RET(CheckDtypeVaild(params), ACLNN_ERR_PARAM_INVALID);
@@ -124,7 +124,7 @@ static aclnnStatus CheckParams(RecurrentGatedDeltaRuleParams &params)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus PreProcess(RecurrentGatedDeltaRuleParams &params)
+static aclnnStatus PreProcess(RecurrentGatedDeltaRuleParams& params)
 {
     params.query->SetOriginalShape(params.query->GetViewShape());
     params.key->SetOriginalShape(params.key->GetViewShape());
@@ -138,18 +138,18 @@ static aclnnStatus PreProcess(RecurrentGatedDeltaRuleParams &params)
 }
 } // namespace
 
-aclnnStatus aclnnRecurrentGatedDeltaRuleGetWorkspaceSize(const aclTensor *query, const aclTensor *key,
-                                                         const aclTensor *value, const aclTensor *beta,
-                                                         aclTensor *stateRef, const aclTensor *actualSeqLengths,
-                                                         const aclTensor *ssmStateIndices, const aclTensor *g,
-                                                         const aclTensor *gk, const aclTensor *numAcceptedTokens,
-                                                         float scaleValue, aclTensor *out, uint64_t *workspaceSize,
-                                                         aclOpExecutor **executor)
+aclnnStatus aclnnRecurrentGatedDeltaRuleGetWorkspaceSize(const aclTensor* query, const aclTensor* key,
+                                                         const aclTensor* value, const aclTensor* beta,
+                                                         aclTensor* stateRef, const aclTensor* actualSeqLengths,
+                                                         const aclTensor* ssmStateIndices, const aclTensor* g,
+                                                         const aclTensor* gk, const aclTensor* numAcceptedTokens,
+                                                         float scaleValue, aclTensor* out, uint64_t* workspaceSize,
+                                                         aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnRecurrentGatedDeltaRule,
                    DFX_IN(query, key, value, beta, stateRef, actualSeqLengths, ssmStateIndices, g, gk,
                           numAcceptedTokens, scaleValue),
-                   DFX_OUT(stateRef, out));
+                   DFX_OUT(out, stateRef));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -222,7 +222,7 @@ aclnnStatus aclnnRecurrentGatedDeltaRuleGetWorkspaceSize(const aclTensor *query,
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnRecurrentGatedDeltaRule(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnRecurrentGatedDeltaRule(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                          aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnRecurrentGatedDeltaRule);
