@@ -33,7 +33,7 @@ public:
     using MM_OUT_T = T;
 
     __aicore__ inline KvQuantSparseFlashMlaCsaBlockCube(){};
-    __aicore__ inline void InitParams(const ConstInfo &constInfo);
+    __aicore__ inline void InitParams(const ConstInfo &mqCubeConstInfo);
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T> queryGm, GlobalTensor<KV_T> oriKvGm,
                                                GlobalTensor<KV_T> cmpKV, GlobalTensor<MM_OUT_T> mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm, GlobalTensor<MM_OUT_T> mm2ResGm,
@@ -45,8 +45,8 @@ public:
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const RunInfo &info, const MSplitInfo mSplitInfo);
-    __aicore__ inline void ComputeMm2(const RunInfo &info, const MSplitInfo mSplitInfo);
+    __aicore__ inline void ComputeMm1(const RunInfo &mqCubeRunInfo, const MSplitInfo mqCubeSplitInfo);
+    __aicore__ inline void ComputeMm2(const RunInfo &mqCubeRunInfo, const MSplitInfo mqCubeSplitInfo);
 
 private:
     static constexpr bool PAGE_ATTENTION = SAST::pageAttention;
@@ -86,15 +86,15 @@ private:
 
     static constexpr IsResetLoad3dConfig LOAD3DV2_CONFIG = {true, true};                    // isSetFMatrix isSetPadding
     static constexpr uint32_t mte21QPIds[4] = {L1_EVENT0, L1_EVENT1, L1_EVENT2, L1_EVENT3}; // mte12复用
-    static constexpr uint32_t mte21KVIds[3] = {L1_EVENT4, L1_EVENT5, L1_EVENT6};
+    static constexpr uint32_t mqsMte21KvEvents[3] = {L1_EVENT4, L1_EVENT5, L1_EVENT6};
 
-    ConstInfo constInfo{};
+    ConstInfo mqCubeConstInfo{};
 
     // L1分成3块buf, 用于记录
     uint32_t qpL1BufIter = 0;
     uint32_t kvL1BufIter = -1;
     uint32_t abL0BufIter = 0;
-    uint32_t cL0BufIter = 0;
+    uint32_t mqsL0CBufferIndex = 0;
 
     // mm1
     GlobalTensor<Q_T> queryGm;
@@ -140,10 +140,10 @@ private:
 
     __aicore__ inline void CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &info, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &mqCubeRunInfo, uint32_t mSeqIdx,
                                           uint32_t mSizeAct, uint32_t headSize, uint32_t headOffset);
 
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &info, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &mqCubeRunInfo, uint32_t mSeqIdx,
                                           uint32_t subMSizeAct, uint32_t nSize, uint32_t nOffset);
     __aicore__ inline void LoadDataMm1A(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor, uint32_t idx,
                                         uint32_t kSplitSize, uint32_t mSize, uint32_t kSize);
@@ -152,9 +152,9 @@ private:
 };
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::InitParams(const ConstInfo &constInfo)
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::InitParams(const ConstInfo &mqCubeConstInfo)
 {
-    this->constInfo = constInfo;
+    this->mqCubeConstInfo = mqCubeConstInfo;
 }
 
 template <typename SAST>
@@ -245,26 +245,26 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyGmToL1(Local
                                                                            uint32_t srcN, uint32_t srcD,
                                                                            uint32_t srcDstride)
 {
-    Nd2NzParams nd2nzPara;
-    nd2nzPara.ndNum = 1;
-    nd2nzPara.nValue = srcN; // 行数
-    nd2nzPara.dValue = srcD;
-    nd2nzPara.srcDValue = srcDstride;
-    nd2nzPara.dstNzC0Stride = (srcN + 15) / 16 * 16; // 对齐到16 单位block
-    nd2nzPara.dstNzNStride = 1;
-    nd2nzPara.srcNdMatrixStride = 0;
-    nd2nzPara.dstNzMatrixStride = 0;
-    DataCopy(l1Tensor, gmSrcTensor, nd2nzPara);
+    Nd2NzParams mqCubeCopyParams;
+    mqCubeCopyParams.ndNum = 1;
+    mqCubeCopyParams.nValue = srcN;
+    mqCubeCopyParams.dValue = srcD;
+    mqCubeCopyParams.srcDValue = srcDstride;
+    mqCubeCopyParams.dstNzC0Stride = (srcN + 15) / 16 * 16; // 对齐到16 单位block
+    mqCubeCopyParams.dstNzNStride = 1;
+    mqCubeCopyParams.srcNdMatrixStride = 0;
+    mqCubeCopyParams.dstNzMatrixStride = 0;
+    DataCopy(l1Tensor, gmSrcTensor, mqCubeCopyParams);
 }
 
 template <typename SAST>
 __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyInMm1AToL1(LocalTensor<KV_T> &l1Tensor,
-                                                                               const RunInfo &info, uint32_t mSeqIdx,
-                                                                               uint32_t mSizeAct, uint32_t headSize,
-                                                                               uint32_t headOffset)
+                                                                               const RunInfo &mqCubeRunInfo,
+                                                                               uint32_t mSeqIdx, uint32_t mSizeAct,
+                                                                               uint32_t headSize, uint32_t headOffset)
 {
-    auto srcGm = queryGm[info.tensorAOffset + mSeqIdx * constInfo.headDim + headOffset];
-    CopyGmToL1(l1Tensor, srcGm, mSizeAct, headSize, constInfo.headDim);
+    auto srcGm = queryGm[mqCubeRunInfo.tensorAOffset + mSeqIdx * mqCubeConstInfo.headDim + headOffset];
+    CopyGmToL1(l1Tensor, srcGm, mSizeAct, headSize, mqCubeConstInfo.headDim);
 }
 
 template <typename SAST>
@@ -274,32 +274,32 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::LoadDataMm1A(Loc
                                                                              uint32_t kSize)
 {
     LocalTensor<KV_T> srcTensor = aL1Tensor[mSize * kSplitSize * idx];
-    LoadData3DParamsV2<KV_T> loadData3DParams;
+    LoadData3DParamsV2<KV_T> mqMm1LoadParams;
     // SetFmatrixParams
-    loadData3DParams.l1H = mSize / 16; // Hin=M1=8
-    loadData3DParams.l1W = 16;         // Win=M0
-    loadData3DParams.padList[0] = 0;
-    loadData3DParams.padList[1] = 0;
-    loadData3DParams.padList[2] = 0;
-    loadData3DParams.padList[3] = 255; // 尾部数据不影响滑窗的结果
+    mqMm1LoadParams.l1H = mSize / 16; // Hin=M1=8
+    mqMm1LoadParams.l1W = 16;         // Win=M0
+    mqMm1LoadParams.padList[0] = 0;
+    mqMm1LoadParams.padList[1] = 0;
+    mqMm1LoadParams.padList[2] = 0;
+    mqMm1LoadParams.padList[3] = 255; // 尾部数据不影响滑窗的结果
 
     // SetLoadToA0Params
-    loadData3DParams.mExtension = mSize; // M
-    loadData3DParams.kExtension = kSize; // K
-    loadData3DParams.mStartPt = 0;
-    loadData3DParams.kStartPt = 0;
-    loadData3DParams.strideW = 1;
-    loadData3DParams.strideH = 1;
-    loadData3DParams.filterW = 1;
-    loadData3DParams.filterSizeW = (1 >> 8) & 255;
-    loadData3DParams.filterH = 1;
-    loadData3DParams.filterSizeH = (1 >> 8) & 255;
-    loadData3DParams.dilationFilterW = 1;
-    loadData3DParams.dilationFilterH = 1;
-    loadData3DParams.enTranspose = 0;
-    loadData3DParams.fMatrixCtrl = 0;
-    loadData3DParams.channelSize = kSize; // Cin=K
-    LoadData<KV_T, LOAD3DV2_CONFIG>(aL0Tensor, srcTensor, loadData3DParams);
+    mqMm1LoadParams.mExtension = mSize;
+    mqMm1LoadParams.kExtension = kSize;
+    mqMm1LoadParams.mStartPt = 0;
+    mqMm1LoadParams.kStartPt = 0;
+    mqMm1LoadParams.strideW = 1;
+    mqMm1LoadParams.strideH = 1;
+    mqMm1LoadParams.filterW = 1;
+    mqMm1LoadParams.filterSizeW = (1 >> 8) & 255;
+    mqMm1LoadParams.filterH = 1;
+    mqMm1LoadParams.filterSizeH = (1 >> 8) & 255;
+    mqMm1LoadParams.dilationFilterW = 1;
+    mqMm1LoadParams.dilationFilterH = 1;
+    mqMm1LoadParams.enTranspose = 0;
+    mqMm1LoadParams.fMatrixCtrl = 0;
+    mqMm1LoadParams.channelSize = kSize;
+    LoadData<KV_T, LOAD3DV2_CONFIG>(aL0Tensor, srcTensor, mqMm1LoadParams);
 }
 
 template <typename SAST>
@@ -311,36 +311,36 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::LoadDataMm1B(Loc
     // N 方向全载
     LocalTensor<KV_T> srcTensor = l1Tensor[nSize * kSplitSize * idx];
 
-    LoadData2DParams loadData2DParams;
-    loadData2DParams.startIndex = 0;
-    loadData2DParams.repeatTimes = (nSize + 15) / 16 * kSize / (32 / sizeof(KV_T));
-    loadData2DParams.srcStride = 1;
-    loadData2DParams.dstGap = 0;
-    loadData2DParams.ifTranspose = false;
-    LoadData(l0Tensor, srcTensor, loadData2DParams);
+    LoadData2DParams mqMm1LoadBParams;
+    mqMm1LoadBParams.startIndex = 0;
+    mqMm1LoadBParams.repeatTimes = (nSize + 15) / 16 * kSize / (32 / sizeof(KV_T));
+    mqMm1LoadBParams.srcStride = 1;
+    mqMm1LoadBParams.dstGap = 0;
+    mqMm1LoadBParams.ifTranspose = false;
+    LoadData(l0Tensor, srcTensor, mqMm1LoadBParams);
 }
 
 template <typename SAST>
 __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor,
-                                                                               const RunInfo &info, uint32_t mSeqIdx,
-                                                                               uint32_t subMSizeAct, uint32_t nSize,
-                                                                               uint32_t nOffset)
+                                                                               const RunInfo &mqCubeRunInfo,
+                                                                               uint32_t mSeqIdx, uint32_t subMSizeAct,
+                                                                               uint32_t nSize, uint32_t nOffset)
 {
-    auto srcGm = vec1ResGm[(info.loop % constInfo.preLoadNum) * constInfo.mmResUbSize +
-                           mSeqIdx * info.actualSingleProcessSInnerSizeAlign + nOffset];
-    CopyGmToL1(aL1Tensor, srcGm, subMSizeAct, nSize, info.actualSingleProcessSInnerSizeAlign);
+    auto srcGm = vec1ResGm[(mqCubeRunInfo.loop % mqCubeConstInfo.preLoadNum) * mqCubeConstInfo.mmResUbSize +
+                           mSeqIdx * mqCubeRunInfo.actualSingleProcessSInnerSizeAlign + nOffset];
+    CopyGmToL1(aL1Tensor, srcGm, subMSizeAct, nSize, mqCubeRunInfo.actualSingleProcessSInnerSizeAlign);
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const RunInfo &info,
-                                                                           const MSplitInfo mSplitInfo)
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const RunInfo &mqCubeRunInfo,
+                                                                           const MSplitInfo mqCubeSplitInfo)
 {
-    uint32_t mSize = mSplitInfo.nBufferDealM;
+    uint32_t mSize = mqCubeSplitInfo.nBufferDealM;
     uint32_t mL1Size = M_SPLIT_SIZE;
     uint32_t mL1SizeAlign = SASAlign(M_SPLIT_SIZE, 16);
-    uint32_t mL1Loops = CeilDiv(mSize, M_SPLIT_SIZE);
+    uint32_t mqsML1LoopCount = CeilDiv(mSize, M_SPLIT_SIZE);
 
-    uint32_t nSize = info.actualSingleProcessSInnerSize;
+    uint32_t nSize = mqCubeRunInfo.actualSingleProcessSInnerSize;
     uint32_t nL1Size = N_SPLIT_SIZE;
     uint32_t nL1SizeAlign = SASAlign(N_SPLIT_SIZE, 16);
     uint32_t nL1Loops = CeilDiv(nSize, N_SPLIT_SIZE);
@@ -352,7 +352,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
     uint32_t kL0Loops = CeilDiv(kL1Size, kL0Size);
 
     LocalTensor<KV_T> bL1Tensor;
-    uint32_t ka = 0, kb = 0;
+    uint32_t mqsQueryBufferIndex = 0, mqsKvBufferIndex = 0;
 
     // L1 切n切k
     for (uint32_t nL1 = 0; nL1 < nL1Loops; nL1++) {
@@ -364,159 +364,163 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
 
         for (uint32_t kL1 = 0; kL1 < kL1Loops; kL1++) {
             kvL1BufIter++;
-            uint32_t kb = kvL1BufIter % 3;
-            WaitFlag<HardEvent::MTE1_MTE2>(mte21KVIds[kb]);
+            uint32_t mqsKvBufferIndex = kvL1BufIter % 3;
+            WaitFlag<HardEvent::MTE1_MTE2>(mqsMte21KvEvents[mqsKvBufferIndex]);
             // 从k当中取当前的块
-            bL1Tensor = l1KVTensor[kb * L1_BLOCK_OFFSET];
-            uint32_t curSeqIdx = info.s2BatchOffset + nL1 * N_SPLIT_SIZE;
-            if (info.isOriOnly) {
+            bL1Tensor = l1KVTensor[mqsKvBufferIndex * L1_BLOCK_OFFSET];
+            uint32_t curSeqIdx = mqCubeRunInfo.s2BatchOffset + nL1 * N_SPLIT_SIZE;
+            if (mqCubeRunInfo.isOriOnly) {
                 if constexpr (KV_LAYOUT_T == SAS_LAYOUT::PA_BSND || KV_LAYOUT_T == SAS_LAYOUT::PA_BNSD) {
-                    uint32_t curS2Offset = info.s2Idx * constInfo.s2BaseSize + info.s2StartPoint + nL1 * N_SPLIT_SIZE;
+                    uint32_t curS2Offset = mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize +
+                                           mqCubeRunInfo.s2StartPoint + nL1 * N_SPLIT_SIZE;
                     uint32_t copyFinishRowCnt = 0;
                     LocalTensor<KV_T> kTensor;
                     uint32_t copyRowCnt = 0;
 
                     while (copyFinishRowCnt < nL1Size) {
                         // 由于ori_left的存在， 即使第一块搬运也可能并非是pa_block的零点位
-                        copyRowCnt = constInfo.paOriBlockSize - curS2Offset % constInfo.paOriBlockSize;
+                        copyRowCnt = mqCubeConstInfo.paOriBlockSize - curS2Offset % mqCubeConstInfo.paOriBlockSize;
                         if (copyFinishRowCnt + copyRowCnt > nL1Size) {
                             copyRowCnt = nL1Size - copyFinishRowCnt;
                         }
-                        PAShape shape;
-                        shape.blockSize = constInfo.paOriBlockSize;
-                        shape.headNum = constInfo.kvHeadNum;
-                        shape.headDim = constInfo.headDim;
-                        shape.kvStride = constInfo.oriKvStride0;
+                        MqPaShape shape;
+                        shape.blockSize = mqCubeConstInfo.paOriBlockSize;
+                        shape.headNum = mqCubeConstInfo.kvHeadNum;
+                        shape.headDim = mqCubeConstInfo.headDim;
+                        shape.kvStride = mqCubeConstInfo.oriKvStride0;
                         shape.actHeadDim = D_SPLIT_SIZE;
-                        shape.maxblockNumPerBatch = constInfo.oriMaxBlockNumPerBatch;
+                        shape.maxblockNumPerBatch = mqCubeConstInfo.oriMaxBlockNumPerBatch;
                         shape.copyRowNum = copyRowCnt;
                         shape.copyRowNumAlign = nL1SizeAlign;
                         kTensor = bL1Tensor[copyFinishRowCnt * 16];
 
-                        Position startPos;
-                        startPos.bIdx = info.bIdx;
-                        startPos.n2Idx = info.n2Idx;
+                        MqPaPosition startPos;
+                        startPos.bIdx = mqCubeRunInfo.bIdx;
+                        startPos.n2Idx = mqCubeRunInfo.n2Idx;
                         startPos.s2Idx = curS2Offset;
                         startPos.dIdx =
                             kL1 * D_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
-                        DataCopyPA<KV_T, KV_LAYOUT_T>(kTensor, oriKvGm, oriBlockTableGm, shape, startPos);
+                        MqDataCopyPA<KV_T, KV_LAYOUT_T>(kTensor, oriKvGm, oriBlockTableGm, shape, startPos);
 
                         // 更新循环变量
                         copyFinishRowCnt += copyRowCnt;
                         curS2Offset += copyRowCnt;
                     }
                 } else if constexpr (KV_LAYOUT_T == SAS_LAYOUT::BSND) {
-                    Nd2NzParams nd2nzPara;
-                    nd2nzPara.ndNum = 1;
-                    nd2nzPara.nValue = nL1Size;      // 行数
-                    nd2nzPara.dValue = D_SPLIT_SIZE; // 256
-                    nd2nzPara.srcDValue = constInfo.headDim;
-                    nd2nzPara.dstNzC0Stride = nL1SizeAlign;
-                    nd2nzPara.dstNzNStride = 1;
-                    nd2nzPara.srcNdMatrixStride = 0;
-                    nd2nzPara.dstNzMatrixStride = 0;
+                    Nd2NzParams mqCubeCopyParams;
+                    mqCubeCopyParams.ndNum = 1;
+                    mqCubeCopyParams.nValue = nL1Size;
+                    mqCubeCopyParams.dValue = D_SPLIT_SIZE;
+                    mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                    mqCubeCopyParams.dstNzC0Stride = nL1SizeAlign;
+                    mqCubeCopyParams.dstNzNStride = 1;
+                    mqCubeCopyParams.srcNdMatrixStride = 0;
+                    mqCubeCopyParams.dstNzMatrixStride = 0;
 
-                    uint32_t headStride = constInfo.headDim;
-                    uint32_t seqStride = constInfo.kvHeadNum * constInfo.headDim;
-                    uint32_t batchStride = constInfo.kvSeqSize * seqStride;
+                    uint32_t headStride = mqCubeConstInfo.headDim;
+                    uint32_t seqStride = mqCubeConstInfo.kvHeadNum * mqCubeConstInfo.headDim;
+                    uint32_t batchStride = mqCubeConstInfo.kvSeqSize * seqStride;
 
-                    uint32_t curS2 = info.s2Idx * constInfo.s2BaseSize + info.s2StartPoint;
-                    uint64_t offset = (uint64_t)info.bIdx * batchStride + (uint64_t)curS2 * seqStride +
-                                      (uint64_t)info.n2Idx * headStride + kL1 * D_SPLIT_SIZE;
-                    DataCopy(bL1Tensor, oriKvGm[offset], nd2nzPara);
+                    uint32_t curS2 = mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize + mqCubeRunInfo.s2StartPoint;
+                    uint64_t offset = (uint64_t)mqCubeRunInfo.bIdx * batchStride + (uint64_t)curS2 * seqStride +
+                                      (uint64_t)mqCubeRunInfo.n2Idx * headStride + kL1 * D_SPLIT_SIZE;
+                    DataCopy(bL1Tensor, oriKvGm[offset], mqCubeCopyParams);
                 } else if constexpr (KV_LAYOUT_T == SAS_LAYOUT::TND) {
-                    uint32_t curS2Offset = info.s2Idx * constInfo.s2BaseSize + info.s2StartPoint;
+                    uint32_t curS2Offset =
+                        mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize + mqCubeRunInfo.s2StartPoint;
                     if (kL1 == 0) {
-                        Nd2NzParams nd2nzPara;
-                        nd2nzPara.ndNum = 1;
-                        nd2nzPara.nValue = nL1Size;
-                        nd2nzPara.dValue = constInfo.headDim >> 1;
-                        nd2nzPara.srcDValue = constInfo.headDim;
-                        nd2nzPara.dstNzC0Stride = nL1SizeAlign;
-                        nd2nzPara.dstNzNStride = 1;
-                        nd2nzPara.srcNdMatrixStride = 0;
-                        nd2nzPara.dstNzMatrixStride = 0;
+                        Nd2NzParams mqCubeCopyParams;
+                        mqCubeCopyParams.ndNum = 1;
+                        mqCubeCopyParams.nValue = nL1Size;
+                        mqCubeCopyParams.dValue = mqCubeConstInfo.headDim >> 1;
+                        mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                        mqCubeCopyParams.dstNzC0Stride = nL1SizeAlign;
+                        mqCubeCopyParams.dstNzNStride = 1;
+                        mqCubeCopyParams.srcNdMatrixStride = 0;
+                        mqCubeCopyParams.dstNzMatrixStride = 0;
                         DataCopy(bL1Tensor,
-                                 oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
-                                         nL1 * N_SPLIT_SIZE * constInfo.headDim],
-                                 nd2nzPara);
+                                 oriKvGm[mqCubeRunInfo.tensorBOffset + curS2Offset * mqCubeConstInfo.headDim +
+                                         nL1 * N_SPLIT_SIZE * mqCubeConstInfo.headDim],
+                                 mqCubeCopyParams);
                     } else {
-                        Nd2NzParams nd2nzPara;
-                        nd2nzPara.ndNum = 1;
-                        nd2nzPara.nValue = nL1Size;
-                        nd2nzPara.dValue = constInfo.headDim >> 1;
-                        nd2nzPara.srcDValue = constInfo.headDim;
-                        nd2nzPara.dstNzC0Stride = nL1SizeAlign;
-                        nd2nzPara.dstNzNStride = 1;
-                        nd2nzPara.srcNdMatrixStride = 0;
-                        nd2nzPara.dstNzMatrixStride = 0;
+                        Nd2NzParams mqCubeCopyParams;
+                        mqCubeCopyParams.ndNum = 1;
+                        mqCubeCopyParams.nValue = nL1Size;
+                        mqCubeCopyParams.dValue = mqCubeConstInfo.headDim >> 1;
+                        mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                        mqCubeCopyParams.dstNzC0Stride = nL1SizeAlign;
+                        mqCubeCopyParams.dstNzNStride = 1;
+                        mqCubeCopyParams.srcNdMatrixStride = 0;
+                        mqCubeCopyParams.dstNzMatrixStride = 0;
                         DataCopy(bL1Tensor,
-                                 oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
-                                         (constInfo.headDim >> 1) + nL1 * N_SPLIT_SIZE * constInfo.headDim],
-                                 nd2nzPara);
+                                 oriKvGm[mqCubeRunInfo.tensorBOffset + curS2Offset * mqCubeConstInfo.headDim +
+                                         (mqCubeConstInfo.headDim >> 1) + nL1 * N_SPLIT_SIZE * mqCubeConstInfo.headDim],
+                                 mqCubeCopyParams);
                     }
                 }
             } else {
                 if (kL1 == 0) {
-                    Nd2NzParams nd2nzPara;
-                    nd2nzPara.ndNum = 1;
-                    nd2nzPara.nValue = nL1Size;
-                    nd2nzPara.dValue = constInfo.headDim >> 1;
-                    nd2nzPara.srcDValue = constInfo.headDim;
-                    nd2nzPara.dstNzC0Stride = nL1SizeAlign;
-                    nd2nzPara.dstNzNStride = 1;
-                    nd2nzPara.srcNdMatrixStride = 0;
-                    nd2nzPara.dstNzMatrixStride = 0;
+                    Nd2NzParams mqCubeCopyParams;
+                    mqCubeCopyParams.ndNum = 1;
+                    mqCubeCopyParams.nValue = nL1Size;
+                    mqCubeCopyParams.dValue = mqCubeConstInfo.headDim >> 1;
+                    mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                    mqCubeCopyParams.dstNzC0Stride = nL1SizeAlign;
+                    mqCubeCopyParams.dstNzNStride = 1;
+                    mqCubeCopyParams.srcNdMatrixStride = 0;
+                    mqCubeCopyParams.dstNzMatrixStride = 0;
                     DataCopy(bL1Tensor,
-                             kvMergeGm_[info.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * kSize +
-                                        nL1 * N_SPLIT_SIZE * constInfo.headDim],
-                             nd2nzPara);
+                             kvMergeGm_[mqCubeRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * kSize +
+                                        nL1 * N_SPLIT_SIZE * mqCubeConstInfo.headDim],
+                             mqCubeCopyParams);
                 } else {
-                    Nd2NzParams nd2nzPara;
-                    nd2nzPara.ndNum = 1;
-                    nd2nzPara.nValue = nL1Size;
-                    nd2nzPara.dValue = constInfo.headDim >> 1;
-                    nd2nzPara.srcDValue = constInfo.headDim;
-                    nd2nzPara.dstNzC0Stride = nL1SizeAlign;
-                    nd2nzPara.dstNzNStride = 1;
-                    nd2nzPara.srcNdMatrixStride = 0;
-                    nd2nzPara.dstNzMatrixStride = 0;
+                    Nd2NzParams mqCubeCopyParams;
+                    mqCubeCopyParams.ndNum = 1;
+                    mqCubeCopyParams.nValue = nL1Size;
+                    mqCubeCopyParams.dValue = mqCubeConstInfo.headDim >> 1;
+                    mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                    mqCubeCopyParams.dstNzC0Stride = nL1SizeAlign;
+                    mqCubeCopyParams.dstNzNStride = 1;
+                    mqCubeCopyParams.srcNdMatrixStride = 0;
+                    mqCubeCopyParams.dstNzMatrixStride = 0;
                     DataCopy(bL1Tensor,
-                             kvMergeGm_[info.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * kSize +
-                                        (constInfo.headDim >> 1) + nL1 * N_SPLIT_SIZE * constInfo.headDim],
-                             nd2nzPara);
+                             kvMergeGm_[mqCubeRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * kSize +
+                                        (mqCubeConstInfo.headDim >> 1) + nL1 * N_SPLIT_SIZE * mqCubeConstInfo.headDim],
+                             mqCubeCopyParams);
                 }
             }
-            SetFlag<HardEvent::MTE2_MTE1>(mte21KVIds[kb]);
-            WaitFlag<HardEvent::MTE2_MTE1>(mte21KVIds[kb]);
+            SetFlag<HardEvent::MTE2_MTE1>(mqsMte21KvEvents[mqsKvBufferIndex]);
+            WaitFlag<HardEvent::MTE2_MTE1>(mqsMte21KvEvents[mqsKvBufferIndex]);
             mL1Size = M_SPLIT_SIZE;
             mL1SizeAlign = SASAlign(M_SPLIT_SIZE, 16U);
-            for (uint32_t mL1 = 0; mL1 < mL1Loops; mL1++) {
+            for (uint32_t mL1 = 0; mL1 < mqsML1LoopCount; mL1++) {
                 uint32_t aL1PaddingSize = 0; // 用于使左矩阵对齐到尾部, 以保证两块32K内存连续
-                if (mL1 == (mL1Loops - 1)) {
-                    mL1Size = mSize - (mL1Loops - 1) * M_SPLIT_SIZE;
+                if (mL1 == (mqsML1LoopCount - 1)) {
+                    mL1Size = mSize - (mqsML1LoopCount - 1) * M_SPLIT_SIZE;
                     mL1SizeAlign = SASAlign(mL1Size, 16U);
                     aL1PaddingSize = (M_SPLIT_SIZE - mL1SizeAlign) * 256;
                 }
                 uint32_t mIdx = qpL1BufIter + mL1;
-                ka = GetQPL1RealIdx(mIdx, kL1);
-                LocalTensor<Q_T> aL1Tensor = l1QPTensor[ka * L1_BLOCK_OFFSET + (1 - kL1) * aL1PaddingSize];
+                mqsQueryBufferIndex = GetQPL1RealIdx(mIdx, kL1);
+                LocalTensor<Q_T> aL1Tensor =
+                    l1QPTensor[mqsQueryBufferIndex * L1_BLOCK_OFFSET + (1 - kL1) * aL1PaddingSize];
                 if (nL1 == 0) {
                     if (kL1 == 0) {
-                        WaitFlag<HardEvent::MTE1_MTE2>(mte21QPIds[ka]);
-                        WaitFlag<HardEvent::MTE1_MTE2>(mte21QPIds[ka + 1]);
-                        CopyInMm1AToL1(aL1Tensor, info, mSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE, mL1Size, 256, 0);
+                        WaitFlag<HardEvent::MTE1_MTE2>(mte21QPIds[mqsQueryBufferIndex]);
+                        WaitFlag<HardEvent::MTE1_MTE2>(mte21QPIds[mqsQueryBufferIndex + 1]);
+                        CopyInMm1AToL1(aL1Tensor, mqCubeRunInfo, mqCubeSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE,
+                                       mL1Size, 256, 0);
                     } else {
                         LocalTensor<Q_T> qTmpTensor = aL1Tensor;
-                        CopyInMm1AToL1(qTmpTensor, info, mSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE, mL1Size, 256,
-                                       256);
+                        CopyInMm1AToL1(qTmpTensor, mqCubeRunInfo, mqCubeSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE,
+                                       mL1Size, 256, 256);
                     }
-                    SetFlag<HardEvent::MTE2_MTE1>(mte21QPIds[ka]);
-                    WaitFlag<HardEvent::MTE2_MTE1>(mte21QPIds[ka]);
+                    SetFlag<HardEvent::MTE2_MTE1>(mte21QPIds[mqsQueryBufferIndex]);
+                    WaitFlag<HardEvent::MTE2_MTE1>(mte21QPIds[mqsQueryBufferIndex]);
                 }
                 // 使用unitflag同步
                 LocalTensor cL0Tensor =
-                    cL0TensorPingPong[(cL0BufIter % 2) *
+                    cL0TensorPingPong[(mqsL0CBufferIndex % 2) *
                                       (L0C_PP_SIZE / sizeof(MM_OUT_T))]; // 需要保证cL0BufIter和m步调一致
                 for (uint32_t kL0 = 0; kL0 < kL0Loops; kL0++) {
                     WaitFlag<HardEvent::M_MTE1>(Mte1MmABEventId(abL0BufIter % 2));
@@ -527,16 +531,16 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
                     SetFlag<HardEvent::MTE1_M>(Mte1MmABEventId(abL0BufIter % 2));
                     WaitFlag<HardEvent::MTE1_M>(Mte1MmABEventId(abL0BufIter % 2));
 
-                    MmadParams mmadParams;
-                    mmadParams.m = mL1SizeAlign;
-                    mmadParams.n = nL1SizeAlign;
-                    mmadParams.k = kL0Size;
-                    mmadParams.cmatrixInitVal = (kL1 == 0 && kL0 == 0);
-                    mmadParams.cmatrixSource = false;
-                    mmadParams.unitFlag =
+                    MmadParams mqMmadParams;
+                    mqMmadParams.m = mL1SizeAlign;
+                    mqMmadParams.n = nL1SizeAlign;
+                    mqMmadParams.k = kL0Size;
+                    mqMmadParams.cmatrixInitVal = (kL1 == 0 && kL0 == 0);
+                    mqMmadParams.cmatrixSource = false;
+                    mqMmadParams.unitFlag =
                         (kL1 == 1 && kL0 == (kL0Loops - 1)) ? 0b11 : 0b10; // 累加最后一次翻转flag, 表示可以搬出
-                    Mmad(cL0Tensor, aL0Tensor, bL0Tensor, mmadParams);
-                    if ((mmadParams.m / 16) * (mmadParams.n / 16) < 10) {
+                    Mmad(cL0Tensor, aL0Tensor, bL0Tensor, mqMmadParams);
+                    if ((mqMmadParams.m / 16) * (mqMmadParams.n / 16) < 10) {
                         PipeBarrier<PIPE_M>();
                     }
                     SetFlag<HardEvent::M_MTE1>(Mte1MmABEventId(abL0BufIter % 2));
@@ -544,7 +548,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
                 }
 
                 if (nL1 == (nL1Loops - 1)) {
-                    SetFlag<HardEvent::MTE1_MTE2>(mte21QPIds[ka]); // 反向同步, 表示L1中的A已经被mte1消费完
+                    SetFlag<HardEvent::MTE1_MTE2>(
+                        mte21QPIds[mqsQueryBufferIndex]); // 反向同步, 表示L1中的A已经被mte1消费完
                 }
 
                 if (kL1 == 1) { // 最后一轮kL1循环
@@ -553,45 +558,46 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
                     fixParams.mSize = mL1SizeAlign;
                     fixParams.srcStride = mL1SizeAlign;
                     // 改成nSizeAlign
-                    fixParams.dstStride = info.actualSingleProcessSInnerSizeAlign; // mm1ResGm两行之间的间隔
+                    fixParams.dstStride = mqCubeRunInfo.actualSingleProcessSInnerSizeAlign; // mm1ResGm两行之间的间隔
                     fixParams.unitFlag = 0b11;
                     fixParams.ndNum = 1; // 输出ND
 
-                    Fixpipe(mm1ResGm[(info.loop % (constInfo.preLoadNum)) * constInfo.mmResUbSize + nL1 * N_SPLIT_SIZE +
-                                     (mSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE) *
-                                         info.actualSingleProcessSInnerSizeAlign],
+                    Fixpipe(mm1ResGm[(mqCubeRunInfo.loop % (mqCubeConstInfo.preLoadNum)) * mqCubeConstInfo.mmResUbSize +
+                                     nL1 * N_SPLIT_SIZE +
+                                     (mqCubeSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE) *
+                                         mqCubeRunInfo.actualSingleProcessSInnerSizeAlign],
                             cL0Tensor, fixParams);
                 }
-                if (mL1Loops == 2) {
-                    cL0BufIter++;
+                if (mqsML1LoopCount == 2) {
+                    mqsL0CBufferIndex++;
                 }
             }
 
-            SetFlag<HardEvent::MTE1_MTE2>(mte21KVIds[kb]); // 反向同步, 表示L1已经被mte1消费完
+            SetFlag<HardEvent::MTE1_MTE2>(mqsMte21KvEvents[mqsKvBufferIndex]); // 反向同步, 表示L1已经被mte1消费完
         }
-        if (mL1Loops == 1) {
-            cL0BufIter++;
+        if (mqsML1LoopCount == 1) {
+            mqsL0CBufferIndex++;
         }
     }
-    qpL1BufIter += mL1Loops;
+    qpL1BufIter += mqsML1LoopCount;
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const RunInfo &info,
-                                                                           const MSplitInfo mSplitInfo)
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const RunInfo &mqCubeRunInfo,
+                                                                           const MSplitInfo mqCubeSplitInfo)
 {
-    uint32_t mSize = mSplitInfo.nBufferDealM;
+    uint32_t mSize = mqCubeSplitInfo.nBufferDealM;
     uint32_t mSizeAlign = (mSize + 16 - 1) / 16;
-    uint32_t mL1Loops = (mSize + M_SPLIT_SIZE - 1) / M_SPLIT_SIZE;
+    uint32_t mqsML1LoopCount = (mSize + M_SPLIT_SIZE - 1) / M_SPLIT_SIZE;
     uint32_t mL1SizeAlign = M_SPLIT_SIZE; // 16对齐
     uint32_t mL1Size = M_SPLIT_SIZE;      // m的实际大小
 
-    uint32_t nSize = BlockAlign<KV_T>(constInfo.headDim);
+    uint32_t nSize = BlockAlign<KV_T>(mqCubeConstInfo.headDim);
     uint32_t nL1Loops = (nSize + N_SPLIT_SIZE - 1) / N_SPLIT_SIZE;
     uint32_t nL1SizeAlign = N_SPLIT_SIZE; // 16对齐
     uint32_t nL1Size = N_SPLIT_SIZE;      // n的实际大小
 
-    uint32_t kSize = info.actualSingleProcessSInnerSize;
+    uint32_t kSize = mqCubeRunInfo.actualSingleProcessSInnerSize;
     uint32_t kL1Size = 256;
     uint32_t kL1SizeAlign = SASAlign(kL1Size, 16U);
     uint32_t kL1Loops = (kSize + kL1Size - 1) / kL1Size;
@@ -602,7 +608,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
     LocalTensor<KV_T> subvTensor;
 
     // ka表示左矩阵4buf选择哪一块buf, kb表示右矩阵3buf选择哪一块buf
-    uint32_t ka = 0, kb = 0;
+    uint32_t mqsQueryBufferIndex = 0, mqsKvBufferIndex = 0;
     uint32_t mBaseIdx = qpL1BufIter;
     for (uint32_t nL1 = 0; nL1 < nL1Loops; nL1++) { // n切L1 -> D
         if (nL1 == (nL1Loops - 1)) {
@@ -622,9 +628,9 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
                 kL1SizeAlign = SASAlign(kL1Size, 16U);
             }
             kvL1BufIter++;
-            uint32_t kb = kvL1BufIter % 3;
-            WaitFlag<HardEvent::MTE1_MTE2>(mte21KVIds[kb]);
-            bL1Tensor = l1KVTensor[kb * L1_BLOCK_OFFSET];
+            uint32_t mqsKvBufferIndex = kvL1BufIter % 3;
+            WaitFlag<HardEvent::MTE1_MTE2>(mqsMte21KvEvents[mqsKvBufferIndex]);
+            bL1Tensor = l1KVTensor[mqsKvBufferIndex * L1_BLOCK_OFFSET];
             uint32_t kOffset = k1 * kL0Loops;
             kL0Size = 128;
             // 此处必须先初始化kL0Size, 再求kL0Loops, 否则由于循环会改变kL0Size大小, 导致kL0Loops错误
@@ -637,115 +643,117 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
                     kL0SizeAlign = SASAlign(kL0Size, 16U);
                 }
 
-                uint32_t curSeqIdx = info.s2BatchOffset + (kL1 - kOffset) * 128 + k1 * 256;
-                if (info.isOriOnly) {
+                uint32_t curSeqIdx = mqCubeRunInfo.s2BatchOffset + (kL1 - kOffset) * 128 + k1 * 256;
+                if (mqCubeRunInfo.isOriOnly) {
                     if constexpr (KV_LAYOUT_T == SAS_LAYOUT::PA_BSND || KV_LAYOUT_T == SAS_LAYOUT::PA_BNSD) {
                         uint32_t copyFinishRowCnt = 0;
-                        uint32_t curS2Offset = info.s2Idx * constInfo.s2BaseSize + info.s2StartPoint + kL1 * 128;
+                        uint32_t curS2Offset =
+                            mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize + mqCubeRunInfo.s2StartPoint + kL1 * 128;
                         while (copyFinishRowCnt < kL0Size) {
-                            copyRowCnt = constInfo.paOriBlockSize - curS2Offset % constInfo.paOriBlockSize;
+                            copyRowCnt = mqCubeConstInfo.paOriBlockSize - curS2Offset % mqCubeConstInfo.paOriBlockSize;
                             if (copyFinishRowCnt + copyRowCnt > kL0Size) {
                                 copyRowCnt = kL0Size - copyFinishRowCnt;
                             }
-                            Position startPos;
-                            startPos.bIdx = info.bIdx;
-                            startPos.n2Idx = info.n2Idx;
+                            MqPaPosition startPos;
+                            startPos.bIdx = mqCubeRunInfo.bIdx;
+                            startPos.n2Idx = mqCubeRunInfo.n2Idx;
                             startPos.s2Idx = curS2Offset;
                             startPos.dIdx =
                                 nL1 * N_SPLIT_SIZE; // mm1 右矩阵 bn2s2d, d为k轴不切; mm2 右矩阵, s2为k轴, d轴切分
-                            PAShape shape;
-                            shape.blockSize = constInfo.paOriBlockSize;
-                            shape.headNum = constInfo.kvHeadNum;
-                            shape.headDim = constInfo.headDim;
-                            shape.kvStride = constInfo.oriKvStride0;
+                            MqPaShape shape;
+                            shape.blockSize = mqCubeConstInfo.paOriBlockSize;
+                            shape.headNum = mqCubeConstInfo.kvHeadNum;
+                            shape.headDim = mqCubeConstInfo.headDim;
+                            shape.kvStride = mqCubeConstInfo.oriKvStride0;
                             shape.actHeadDim = nL1Size;
-                            shape.maxblockNumPerBatch = constInfo.oriMaxBlockNumPerBatch;
+                            shape.maxblockNumPerBatch = mqCubeConstInfo.oriMaxBlockNumPerBatch;
                             shape.copyRowNum = copyRowCnt;
                             shape.copyRowNumAlign = kL0SizeAlign;
                             subvTensor = bL1Tensor[(kL1 - kOffset) * 128 * N_SPLIT_SIZE + copyFinishRowCnt * 16];
 
-                            DataCopyPA<KV_T, KV_LAYOUT_T>(subvTensor, oriKvGm, oriBlockTableGm, shape, startPos);
+                            MqDataCopyPA<KV_T, KV_LAYOUT_T>(subvTensor, oriKvGm, oriBlockTableGm, shape, startPos);
 
                             // 更新循环变量
                             copyFinishRowCnt += copyRowCnt;
                             curS2Offset += copyRowCnt;
                         }
                     } else if constexpr (KV_LAYOUT_T == SAS_LAYOUT::BSND) {
-                        Nd2NzParams nd2nzPara;
-                        nd2nzPara.ndNum = 1;
-                        nd2nzPara.nValue = kL0Size;      // 行数
-                        nd2nzPara.dValue = N_SPLIT_SIZE; // constInfo.headDim;
-                        nd2nzPara.srcDValue = constInfo.headDim;
-                        nd2nzPara.dstNzC0Stride = kL0SizeAlign;
-                        nd2nzPara.dstNzNStride = 1;
-                        nd2nzPara.srcNdMatrixStride = 0;
-                        nd2nzPara.dstNzMatrixStride = 0;
+                        Nd2NzParams mqCubeCopyParams;
+                        mqCubeCopyParams.ndNum = 1;
+                        mqCubeCopyParams.nValue = kL0Size;
+                        mqCubeCopyParams.dValue = N_SPLIT_SIZE;
+                        mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                        mqCubeCopyParams.dstNzC0Stride = kL0SizeAlign;
+                        mqCubeCopyParams.dstNzNStride = 1;
+                        mqCubeCopyParams.srcNdMatrixStride = 0;
+                        mqCubeCopyParams.dstNzMatrixStride = 0;
 
-                        uint32_t headStride = constInfo.headDim;
-                        uint32_t seqStride = constInfo.kvHeadNum * constInfo.headDim;
-                        uint32_t batchStride = constInfo.kvSeqSize * seqStride;
+                        uint32_t headStride = mqCubeConstInfo.headDim;
+                        uint32_t seqStride = mqCubeConstInfo.kvHeadNum * mqCubeConstInfo.headDim;
+                        uint32_t batchStride = mqCubeConstInfo.kvSeqSize * seqStride;
 
-                        uint32_t curS2 = info.s2Idx * constInfo.s2BaseSize + info.s2StartPoint;
-                        uint64_t offset = (uint64_t)info.bIdx * batchStride + (uint64_t)curS2 * seqStride +
-                                          (uint64_t)info.n2Idx * headStride + nL1 * N_SPLIT_SIZE;
+                        uint32_t curS2 = mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize + mqCubeRunInfo.s2StartPoint;
+                        uint64_t offset = (uint64_t)mqCubeRunInfo.bIdx * batchStride + (uint64_t)curS2 * seqStride +
+                                          (uint64_t)mqCubeRunInfo.n2Idx * headStride + nL1 * N_SPLIT_SIZE;
                         subvTensor = bL1Tensor[(kL1 - kOffset) * 128 * N_SPLIT_SIZE];
-                        DataCopy(subvTensor, oriKvGm[offset], nd2nzPara);
+                        DataCopy(subvTensor, oriKvGm[offset], mqCubeCopyParams);
                     } else if constexpr (KV_LAYOUT_T == SAS_LAYOUT::TND) {
-                        uint32_t curS2Offset = info.s2Idx * constInfo.s2BaseSize + info.s2StartPoint;
-                        Nd2NzParams nd2nzPara;
-                        nd2nzPara.ndNum = 1;
-                        nd2nzPara.nValue = kL0Size;      // 行数
-                        nd2nzPara.dValue = N_SPLIT_SIZE; // constInfo.headDim;
-                        nd2nzPara.srcDValue = constInfo.headDim;
-                        nd2nzPara.dstNzC0Stride = kL0SizeAlign;
-                        nd2nzPara.dstNzNStride = 1;
-                        nd2nzPara.srcNdMatrixStride = 0;
-                        nd2nzPara.dstNzMatrixStride = 0;
+                        uint32_t curS2Offset =
+                            mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize + mqCubeRunInfo.s2StartPoint;
+                        Nd2NzParams mqCubeCopyParams;
+                        mqCubeCopyParams.ndNum = 1;
+                        mqCubeCopyParams.nValue = kL0Size;
+                        mqCubeCopyParams.dValue = N_SPLIT_SIZE;
+                        mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                        mqCubeCopyParams.dstNzC0Stride = kL0SizeAlign;
+                        mqCubeCopyParams.dstNzNStride = 1;
+                        mqCubeCopyParams.srcNdMatrixStride = 0;
+                        mqCubeCopyParams.dstNzMatrixStride = 0;
                         DataCopy(bL1Tensor[(kL1 - kOffset) * 128 * N_SPLIT_SIZE],
-                                 oriKvGm[info.tensorBOffset + curS2Offset * constInfo.headDim +
-                                         kL1 * 128 * constInfo.headDim + nL1 * N_SPLIT_SIZE],
-                                 nd2nzPara);
+                                 oriKvGm[mqCubeRunInfo.tensorBOffset + curS2Offset * mqCubeConstInfo.headDim +
+                                         kL1 * 128 * mqCubeConstInfo.headDim + nL1 * N_SPLIT_SIZE],
+                                 mqCubeCopyParams);
                     }
                 } else {
-                    Nd2NzParams nd2nzPara;
-                    nd2nzPara.ndNum = 1;
-                    nd2nzPara.nValue = kL0Size;      // 行数
-                    nd2nzPara.dValue = N_SPLIT_SIZE; // constInfo.headDim;
-                    nd2nzPara.srcDValue = constInfo.headDim;
-                    nd2nzPara.dstNzC0Stride = kL0SizeAlign;
-                    nd2nzPara.dstNzNStride = 1;
-                    nd2nzPara.srcNdMatrixStride = 0;
-                    nd2nzPara.dstNzMatrixStride = 0;
+                    Nd2NzParams mqCubeCopyParams;
+                    mqCubeCopyParams.ndNum = 1;
+                    mqCubeCopyParams.nValue = kL0Size;
+                    mqCubeCopyParams.dValue = N_SPLIT_SIZE;
+                    mqCubeCopyParams.srcDValue = mqCubeConstInfo.headDim;
+                    mqCubeCopyParams.dstNzC0Stride = kL0SizeAlign;
+                    mqCubeCopyParams.dstNzNStride = 1;
+                    mqCubeCopyParams.srcNdMatrixStride = 0;
+                    mqCubeCopyParams.dstNzMatrixStride = 0;
                     DataCopy(bL1Tensor[(kL1 - kOffset) * 128 * N_SPLIT_SIZE],
-                             kvMergeGm_[info.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * 512 +
-                                        kL1 * 128 * constInfo.headDim + nL1 * N_SPLIT_SIZE],
-                             nd2nzPara);
+                             kvMergeGm_[mqCubeRunInfo.cmpLoop % MERGE_CACHE_GM_BUF_NUM * N_WORKSPACE_SIZE * 512 +
+                                        kL1 * 128 * mqCubeConstInfo.headDim + nL1 * N_SPLIT_SIZE],
+                             mqCubeCopyParams);
                 }
             }
-            SetFlag<HardEvent::MTE2_MTE1>(mte21KVIds[kb]);
-            WaitFlag<HardEvent::MTE2_MTE1>(mte21KVIds[kb]);
+            SetFlag<HardEvent::MTE2_MTE1>(mqsMte21KvEvents[mqsKvBufferIndex]);
+            WaitFlag<HardEvent::MTE2_MTE1>(mqsMte21KvEvents[mqsKvBufferIndex]);
             mL1SizeAlign = M_SPLIT_SIZE;
             mL1Size = M_SPLIT_SIZE; // m的实际大小
-            for (uint32_t mL1 = 0; mL1 < mL1Loops; mL1++) {
-                if (mL1 == (mL1Loops - 1)) {
+            for (uint32_t mL1 = 0; mL1 < mqsML1LoopCount; mL1++) {
+                if (mL1 == (mqsML1LoopCount - 1)) {
                     // 尾块
-                    mL1Size = mSize - (mL1Loops - 1) * M_SPLIT_SIZE;
+                    mL1Size = mSize - (mqsML1LoopCount - 1) * M_SPLIT_SIZE;
                     mL1SizeAlign = SASAlign(mL1Size, 16U);
                 }
 
                 uint32_t mIdx = mBaseIdx + mL1;
-                ka = GetQPL1RealIdx(mIdx, k1);
-                LocalTensor<KV_T> aL1Tensor = l1QPTensor[ka * L1_BLOCK_OFFSET];
+                mqsQueryBufferIndex = GetQPL1RealIdx(mIdx, k1);
+                LocalTensor<KV_T> aL1Tensor = l1QPTensor[mqsQueryBufferIndex * L1_BLOCK_OFFSET];
                 if (nL1 == 0) {
-                    WaitFlag<HardEvent::MTE1_MTE2>(mte21QPIds[ka]);
-                    CopyInMm2AToL1(aL1Tensor, info, mSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE, mL1Size, kL1Size,
-                                   256 * k1);
-                    SetFlag<HardEvent::MTE2_MTE1>(mte21QPIds[ka]);
-                    WaitFlag<HardEvent::MTE2_MTE1>(mte21QPIds[ka]);
+                    WaitFlag<HardEvent::MTE1_MTE2>(mte21QPIds[mqsQueryBufferIndex]);
+                    CopyInMm2AToL1(aL1Tensor, mqCubeRunInfo, mqCubeSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE,
+                                   mL1Size, kL1Size, 256 * k1);
+                    SetFlag<HardEvent::MTE2_MTE1>(mte21QPIds[mqsQueryBufferIndex]);
+                    WaitFlag<HardEvent::MTE2_MTE1>(mte21QPIds[mqsQueryBufferIndex]);
                 }
 
                 LocalTensor cL0Tensor =
-                    cL0TensorPingPong[(cL0BufIter % 2) *
+                    cL0TensorPingPong[(mqsL0CBufferIndex % 2) *
                                       (L0C_PP_SIZE / sizeof(MM_OUT_T))]; // 需要保证cL0BufIter和m步调一致
                 uint32_t baseK = 128;
                 uint32_t baseN = 128;
@@ -758,73 +766,72 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
                     }
                     WaitFlag<HardEvent::M_MTE1>(Mte1MmABEventId(abL0BufIter % 2));
                     LocalTensor<KV_T> bL0Tensor = bL0TensorPingPong[(abL0BufIter % 2) * (L0B_PP_SIZE / sizeof(KV_T))];
-                    LoadData3DParamsV2<KV_T> loadData3DParamsForB;
-                    loadData3DParamsForB.l1H = kL0SizeAlign / 16; // 源操作数height
-                    loadData3DParamsForB.l1W = 16;                // 源操作数weight=16，目的height=l1H*L1W
-                    loadData3DParamsForB.padList[0] = 0;
-                    loadData3DParamsForB.padList[1] = 0;
-                    loadData3DParamsForB.padList[2] = 0;
-                    loadData3DParamsForB.padList[3] = 255; // 尾部数据不影响滑窗的结果
+                    LoadData3DParamsV2<KV_T> mqMm2LoadBParams;
+                    mqMm2LoadBParams.l1H = kL0SizeAlign / 16;
+                    mqMm2LoadBParams.l1W = 16;
+                    mqMm2LoadBParams.padList[0] = 0;
+                    mqMm2LoadBParams.padList[1] = 0;
+                    mqMm2LoadBParams.padList[2] = 0;
+                    mqMm2LoadBParams.padList[3] = 255; // 尾部数据不影响滑窗的结果
 
-                    loadData3DParamsForB.mExtension = kL0SizeAlign; // 在目的操作数height维度的传输长度
-                    loadData3DParamsForB.kExtension = nL1SizeAlign; // 在目的操作数width维度的传输长度
-                    loadData3DParamsForB.mStartPt = 0;              // 卷积核在目的操作数width维度的起点
-                    loadData3DParamsForB.kStartPt = 0;              // 卷积核在目的操作数height维度的起点
-                    loadData3DParamsForB.strideW = 1;
-                    loadData3DParamsForB.strideH = 1;
-                    loadData3DParamsForB.filterW = 1;
-                    loadData3DParamsForB.filterSizeW = false; // 是否在filterW的基础上将卷积核width增加256个元素
-                    loadData3DParamsForB.filterH = 1;
-                    loadData3DParamsForB.filterSizeH = false; // 是否在filterH的基础上将卷积核height增加256个元素
-                    loadData3DParamsForB.dilationFilterW = 1; // 卷积核width膨胀系数
-                    loadData3DParamsForB.dilationFilterH = 1; // 卷积核height膨胀系数
-                    loadData3DParamsForB.enTranspose = 1;     // 是否启用转置功能
-                    loadData3DParamsForB.fMatrixCtrl =
+                    mqMm2LoadBParams.mExtension = kL0SizeAlign; // 在目的操作数height维度的传输长度
+                    mqMm2LoadBParams.kExtension = nL1SizeAlign; // 在目的操作数width维度的传输长度
+                    mqMm2LoadBParams.mStartPt = 0;              // 卷积核在目的操作数width维度的起点
+                    mqMm2LoadBParams.kStartPt = 0;              // 卷积核在目的操作数height维度的起点
+                    mqMm2LoadBParams.strideW = 1;
+                    mqMm2LoadBParams.strideH = 1;
+                    mqMm2LoadBParams.filterW = 1;
+                    mqMm2LoadBParams.filterSizeW = false; // 是否在filterW的基础上将卷积核width增加256个元素
+                    mqMm2LoadBParams.filterH = 1;
+                    mqMm2LoadBParams.filterSizeH = false; // 是否在filterH的基础上将卷积核height增加256个元素
+                    mqMm2LoadBParams.dilationFilterW = 1; // 卷积核width膨胀系数
+                    mqMm2LoadBParams.dilationFilterH = 1; // 卷积核height膨胀系数
+                    mqMm2LoadBParams.enTranspose = 1;     // 是否启用转置功能
+                    mqMm2LoadBParams.fMatrixCtrl =
                         0; // 使用FMATRIX_LEFT还是使用FMATRIX_RIGHT，=0使用FMATRIX_LEFT，=1使用FMATRIX_RIGHT 1
-                    loadData3DParamsForB.channelSize =
+                    mqMm2LoadBParams.channelSize =
                         nL1SizeAlign; // 源操作数的通道数。膨胀系数为1时，目的weight为filterW*filterH*channelSize
-                    LoadData<KV_T, LOAD3DV2_CONFIG>(bL0Tensor, bL1Tensor[kL0 * baseK * baseN], loadData3DParamsForB);
+                    LoadData<KV_T, LOAD3DV2_CONFIG>(bL0Tensor, bL1Tensor[kL0 * baseK * baseN], mqMm2LoadBParams);
 
                     LocalTensor<KV_T> aL0Tensor = aL0TensorPingPong[(abL0BufIter % 2) * (L0A_PP_SIZE / sizeof(KV_T))];
-                    LoadData3DParamsV2<KV_T> loadData3DParamsForA;
-                    loadData3DParamsForA.l1H = mL1SizeAlign / 16; // 源操作数height
-                    loadData3DParamsForA.l1W = 16;                // 源操作数weight
-                    loadData3DParamsForA.padList[0] = 0;
-                    loadData3DParamsForA.padList[1] = 0;
-                    loadData3DParamsForA.padList[2] = 0;
-                    loadData3DParamsForA.padList[3] = 255; // 尾部数据不影响滑窗的结果
+                    LoadData3DParamsV2<KV_T> mqMm2LoadAParams;
+                    mqMm2LoadAParams.l1H = mL1SizeAlign / 16;
+                    mqMm2LoadAParams.l1W = 16;
+                    mqMm2LoadAParams.padList[0] = 0;
+                    mqMm2LoadAParams.padList[1] = 0;
+                    mqMm2LoadAParams.padList[2] = 0;
+                    mqMm2LoadAParams.padList[3] = 255; // 尾部数据不影响滑窗的结果
 
-                    loadData3DParamsForA.mExtension = mL1SizeAlign; // 在目的操作数height维度的传输长度
-                    loadData3DParamsForA.kExtension = kL0SizeAlign; // 在目的操作数width维度的传输长度
-                    loadData3DParamsForA.mStartPt = 0;              // 卷积核在目的操作数width维度的起点
-                    loadData3DParamsForA.kStartPt = 0;              // 卷积核在目的操作数height维度的起点
-                    loadData3DParamsForA.strideW = 1;         // 卷积核在源操作数width维度滑动的步长
-                    loadData3DParamsForA.strideH = 1;         // 卷积核在源操作数height维度滑动的步长
-                    loadData3DParamsForA.filterW = 1;         // 卷积核width
-                    loadData3DParamsForA.filterSizeW = false; // 是否在filterW的基础上将卷积核width增加256个元素
-                    loadData3DParamsForA.filterH = 1;         // 卷积核height
-                    loadData3DParamsForA.filterSizeH = false; // 是否在filterH的基础上将卷积核height增加256个元素
-                    loadData3DParamsForA.dilationFilterW = 1; // 卷积核width膨胀系数
-                    loadData3DParamsForA.dilationFilterH = 1; // 卷积核height膨胀系数
-                    loadData3DParamsForA.enTranspose = 0; // 是否启用转置功能，对整个目标矩阵进行转置
-                    loadData3DParamsForA.fMatrixCtrl = 0;
-                    loadData3DParamsForA.channelSize =
+                    mqMm2LoadAParams.mExtension = mL1SizeAlign; // 在目的操作数height维度的传输长度
+                    mqMm2LoadAParams.kExtension = kL0SizeAlign; // 在目的操作数width维度的传输长度
+                    mqMm2LoadAParams.mStartPt = 0;              // 卷积核在目的操作数width维度的起点
+                    mqMm2LoadAParams.kStartPt = 0;              // 卷积核在目的操作数height维度的起点
+                    mqMm2LoadAParams.strideW = 1;               // 卷积核在源操作数width维度滑动的步长
+                    mqMm2LoadAParams.strideH = 1;               // 卷积核在源操作数height维度滑动的步长
+                    mqMm2LoadAParams.filterW = 1;               // 卷积核width
+                    mqMm2LoadAParams.filterSizeW = false; // 是否在filterW的基础上将卷积核width增加256个元素
+                    mqMm2LoadAParams.filterH = 1;         // 卷积核height
+                    mqMm2LoadAParams.filterSizeH = false; // 是否在filterH的基础上将卷积核height增加256个元素
+                    mqMm2LoadAParams.dilationFilterW = 1; // 卷积核width膨胀系数
+                    mqMm2LoadAParams.dilationFilterH = 1; // 卷积核height膨胀系数
+                    mqMm2LoadAParams.enTranspose = 0; // 是否启用转置功能，对整个目标矩阵进行转置
+                    mqMm2LoadAParams.fMatrixCtrl = 0;
+                    mqMm2LoadAParams.channelSize =
                         kL0SizeAlign; // 源操作数的通道数。膨胀系数为1时，目的weight为filterW*filterH*channelSize
-                    LoadData<KV_T, LOAD3DV2_CONFIG>(aL0Tensor, aL1Tensor[kL0 * baseK * mL1SizeAlign],
-                                                    loadData3DParamsForA);
+                    LoadData<KV_T, LOAD3DV2_CONFIG>(aL0Tensor, aL1Tensor[kL0 * baseK * mL1SizeAlign], mqMm2LoadAParams);
                     SetFlag<HardEvent::MTE1_M>(Mte1MmABEventId(abL0BufIter % 2));
                     WaitFlag<HardEvent::MTE1_M>(Mte1MmABEventId(abL0BufIter % 2));
 
-                    MmadParams mmadParams;
-                    mmadParams.m = mL1SizeAlign;
-                    mmadParams.n = nL1SizeAlign;
-                    mmadParams.k = kL0Size;
-                    mmadParams.cmatrixInitVal = (kL0 == 0 && k1 == 0);
-                    mmadParams.cmatrixSource = false;
-                    mmadParams.unitFlag = ((k1 == (kL1Loops - 1)) && (kL0 == (kL0Loops - 1))) ? 0b11 : 0b10;
+                    MmadParams mqMmadParams;
+                    mqMmadParams.m = mL1SizeAlign;
+                    mqMmadParams.n = nL1SizeAlign;
+                    mqMmadParams.k = kL0Size;
+                    mqMmadParams.cmatrixInitVal = (kL0 == 0 && k1 == 0);
+                    mqMmadParams.cmatrixSource = false;
+                    mqMmadParams.unitFlag = ((k1 == (kL1Loops - 1)) && (kL0 == (kL0Loops - 1))) ? 0b11 : 0b10;
 
-                    Mmad(cL0Tensor, aL0Tensor, bL0Tensor, mmadParams);
-                    if ((mmadParams.m / 16) * (mmadParams.n / 16) < 10) {
+                    Mmad(cL0Tensor, aL0Tensor, bL0Tensor, mqMmadParams);
+                    if ((mqMmadParams.m / 16) * (mqMmadParams.n / 16) < 10) {
                         PipeBarrier<PIPE_M>();
                     }
                     SetFlag<HardEvent::M_MTE1>(Mte1MmABEventId(abL0BufIter % 2));
@@ -832,7 +839,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
                 }
 
                 if (nL1 == (nL1Loops - 1)) { // nL1最后一轮, 需要将B驻留在L1中, 用于下一轮的计算？
-                    SetFlag<HardEvent::MTE1_MTE2>(mte21QPIds[ka]); // 反向同步, 表示L1中的A已经被mte1消费完
+                    SetFlag<HardEvent::MTE1_MTE2>(
+                        mte21QPIds[mqsQueryBufferIndex]); // 反向同步, 表示L1中的A已经被mte1消费完
                 }
 
                 if (k1 == (kL1Loops - 1)) {
@@ -845,23 +853,26 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
                     fixParams.ndNum = 1;         // 输出ND
                     fixParams.unitFlag = 0b11;
 
-                    uint64_t mm2Offset = (mSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE) * nSize + nL1 * N_SPLIT_SIZE;
-                    Fixpipe(mm2ResGm[(info.loop % (constInfo.preLoadNum)) * constInfo.bmm2ResUbSize + mm2Offset],
-                            cL0Tensor, fixParams);
+                    uint64_t mm2Offset =
+                        (mqCubeSplitInfo.nBufferStartM + mL1 * M_SPLIT_SIZE) * nSize + nL1 * N_SPLIT_SIZE;
+                    Fixpipe(
+                        mm2ResGm[(mqCubeRunInfo.loop % (mqCubeConstInfo.preLoadNum)) * mqCubeConstInfo.bmm2ResUbSize +
+                                 mm2Offset],
+                        cL0Tensor, fixParams);
                 }
 
-                if (mL1Loops == 2) {
-                    cL0BufIter++;
+                if (mqsML1LoopCount == 2) {
+                    mqsL0CBufferIndex++;
                 }
             }
-            SetFlag<HardEvent::MTE1_MTE2>(mte21KVIds[kb]); // 反向同步, 表示L1已经被mte1消费完
+            SetFlag<HardEvent::MTE1_MTE2>(mqsMte21KvEvents[mqsKvBufferIndex]); // 反向同步, 表示L1已经被mte1消费完
         }
         // cL0BufIter已经不在使用
-        if (mL1Loops == 1) {
-            cL0BufIter++;
+        if (mqsML1LoopCount == 1) {
+            mqsL0CBufferIndex++;
         }
     }
-    qpL1BufIter += mL1Loops;
+    qpL1BufIter += mqsML1LoopCount;
 }
 } // namespace SASKernel
 #endif // MIXED_QUANT_SPARSE_FLASH_MLA_TQ_CSA_BLOCK_CUBE_H

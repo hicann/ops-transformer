@@ -90,7 +90,7 @@ __aicore__ inline size_t BlockAlign(size_t s)
     return (s + n - 1) / n * n;
 }
 
-struct PAShape {
+struct MqPaShape {
     uint32_t blockSize;
     uint32_t headNum; // 一般为kv的head num，对应n2
     uint32_t headDim; // 512 对应d
@@ -101,7 +101,7 @@ struct PAShape {
     uint32_t copyRowNumAlign;
 };
 
-struct Position {
+struct MqPaPosition {
     uint32_t bIdx;
     uint32_t n2Idx;
     uint32_t s2Idx;
@@ -113,10 +113,9 @@ struct Position {
 // L1按NZ格式存储
 // GM的行、列、列的stride
 template <typename T>
-__aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T> &gmTensor, uint32_t rowAct,
-                                        uint32_t rowAlign,
-                                        uint32_t col,       // D
-                                        uint32_t colStride) // D or N*D
+__aicore__ inline void MqDataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T> &gmTensor, uint32_t rowAct,
+                                          uint32_t rowAlign, uint32_t col,
+                                          uint32_t colStride) // D or N*D
 {
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
@@ -138,11 +137,9 @@ __aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T
     shape.copyRowNumAlign 需要16字节对齐，如拷贝k矩阵，一次拷贝128*512，遇到尾块 10*512 需对齐到16*512
 */
 template <typename T, SAS_LAYOUT SRC_LAYOUT = SAS_LAYOUT::PA_BSND>
-__aicore__ inline void DataCopyPA(LocalTensor<T> &dstTensor,  // l1
-                                  GlobalTensor<T> &srcTensor, // gm
-                                  GlobalTensor<int32_t> &blockTableGm,
-                                  const PAShape &shape,     // blockSize, headNum, headDim
-                                  const Position &startPos) // bacthIdx nIdx curSeqIdx
+__aicore__ inline void MqDataCopyPA(LocalTensor<T> &dstTensor, GlobalTensor<T> &srcTensor,
+                                    GlobalTensor<int32_t> &blockTableGm, const MqPaShape &shape,
+                                    const MqPaPosition &startPos)
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch;
@@ -175,7 +172,7 @@ __aicore__ inline void DataCopyPA(LocalTensor<T> &dstTensor,  // l1
         LocalTensor<T> tmpDstTensor = dstTensor[copyFinishRowCnt * blockElementCnt];
         GlobalTensor<T> tmpSrcTensor = srcTensor[offset];
 
-        DataCopyGmNDToL1<T>(tmpDstTensor, tmpSrcTensor, copyRowCnt, shape.copyRowNumAlign, dValue, srcDValue);
+        MqDataCopyGmNDToL1<T>(tmpDstTensor, tmpSrcTensor, copyRowCnt, shape.copyRowNumAlign, dValue, srcDValue);
         copyFinishRowCnt += copyRowCnt;
         curS2Idx += copyRowCnt;
     }
@@ -248,16 +245,16 @@ struct ConstInfo {
     // CUBE与VEC核间同步的模式
     static constexpr uint32_t SAS_SYNC_MODE2 = 2;
     // BUFFER的字节数
-    static constexpr uint32_t BUFFER_SIZE_BYTE_32B = 32;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_64B = 64;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_256B = 256;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_512B = 512;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_1K = 1024;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_2K = 2048;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_4K = 4096;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_8K = 8192;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_16K = 16384;
-    static constexpr uint32_t BUFFER_SIZE_BYTE_32K = 32768;
+    static constexpr uint32_t MQ_BUFFER_BYTES_32 = 32;
+    static constexpr uint32_t MQ_BUFFER_BYTES_64 = 64;
+    static constexpr uint32_t MQ_BUFFER_BYTES_256 = 256;
+    static constexpr uint32_t MQ_BUFFER_BYTES_512 = 512;
+    static constexpr uint32_t MQ_BUFFER_BYTES_1K = 1024;
+    static constexpr uint32_t MQ_BUFFER_BYTES_2K = 2048;
+    static constexpr uint32_t MQ_BUFFER_BYTES_4K = 4096;
+    static constexpr uint32_t MQ_BUFFER_BYTES_8K = 8192;
+    static constexpr uint32_t MQ_BUFFER_BYTES_16K = 16384;
+    static constexpr uint32_t MQ_BUFFER_BYTES_32K = 32768;
     // FP32的0值和极大值
     static constexpr float FLOAT_ZERO = 0;
     static constexpr float FLOAT_MAX = 3.402823466e+38F;
@@ -299,12 +296,12 @@ struct ConstInfo {
     uint32_t templateMode = 0;
 
     // FlashDecoding
-    uint32_t actualCombineLoopSize = 0U; // FlashDecoding场景, S2在核间切分的最大份数
-    uint64_t combineLseOffset = 0ULL;
-    uint64_t combineAccumOutOffset = 0ULL;
+    uint32_t mqActualCombineLoopSize = 0U; // FlashDecoding场景, S2在核间切分的最大份数
+    uint64_t mqCombineLseOffset = 0ULL;
+    uint64_t mqCombineAccumOutOffset = 0ULL;
 
-    uint32_t actualLenDimsQ = 0U;  // query的actualSeqLength 的维度
-    uint32_t actualLenDimsKV = 0U; // KV 的actualSeqLength 的维度
+    uint32_t mqActualLenDimsQ = 0U;  // query的actualSeqLength 的维度
+    uint32_t mqActualLenDimsKV = 0U; // KV 的actualSeqLength 的维度
 
     // TND
     uint32_t s2Start = 0U; // TND场景下，S2的起始位置

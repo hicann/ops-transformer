@@ -38,10 +38,12 @@ using namespace regbaseutil;
 using AttentionCommon::FdRunInfo;
 
 namespace BaseApi {
-template <typename CubeBlockType, typename VecBlockType>
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
 class MixedQuantSparseFlashMlaCsa {
 public:
-    ARGS_TRAITS;
+    using CubeBlockType = MqsmlaCsaCubeBlockType;
+    using VecBlockType = MqsmlaCsaVecBlockType;
+    MQSMLA_ARGS_TRAITS;
     __aicore__ inline MixedQuantSparseFlashMlaCsa(){};
 
     __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV,
@@ -56,55 +58,59 @@ public:
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void ProcessMainLoop();
-    __aicore__ inline int64_t GetSeqLen(int32_t bIdx, bool hasActualSeq, bool hasCuSeqlens,
-                                        GlobalTensor<int32_t> &actualSeqGm, GlobalTensor<int32_t> &cuSeqlensGm,
-                                        int64_t defaultSize);
-    __aicore__ inline void ParseTilingData(__gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
-                                           __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *sequsedOriKv,
-                                           __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedCmpKv,
-                                           __gm__ uint8_t *cmpResidualKv);
-    __aicore__ inline void InitGlobalBuffer(
+    __aicore__ inline void ProcessMqsmlaMainLoop();
+    __aicore__ inline int64_t GetMqsmlaSeqLen(int32_t batchIndex, bool preferActualLength, bool deriveFromCuSeqlens,
+                                              GlobalTensor<int32_t> &actualLengthGm, GlobalTensor<int32_t> &cuLengthGm,
+                                              int64_t fallbackLength);
+    __aicore__ inline void ParseMqsmlaTilingData(__gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
+                                                 __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *sequsedOriKv,
+                                                 __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedCmpKv,
+                                                 __gm__ uint8_t *cmpResidualKv);
+    __aicore__ inline void InitMqsmlaGlobalBuffer(
         __gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *oriSparseIndices,
         __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
         __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
         __gm__ uint8_t *sequsedQ, __gm__ uint8_t *sequsedOriKv, __gm__ uint8_t *sequsedCmpKv,
         __gm__ uint8_t *cmpResidualKv, __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength,
         __gm__ uint8_t *sinks, __gm__ uint8_t *workspace, const MixedQuantSparseFlashMlaTilingData *__restrict tiling);
-    __aicore__ inline void InitLocalBuffer();
-    __aicore__ inline void InitMMResBuf(__gm__ uint8_t *workspace);
-    __aicore__ inline void ComputeConstexpr();
-    __aicore__ inline void SetRunInfo(RunInfo<HIGH_PERF> &runInfo, RunParamStr<HIGH_PERF> &runParam, int64_t taskId,
-                                      int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
-    __aicore__ inline void ComputeBmm1Tail(RunInfo<HIGH_PERF> &runInfo, RunParamStr<HIGH_PERF> &runParam);
-    __aicore__ inline void InitUniqueConstInfo();
-    __aicore__ inline void FreeEvent();
-    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index,
-                                                    RunParamStr<HIGH_PERF> &runParam);
-    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<HIGH_PERF> &runParam, RunInfo<HIGH_PERF> &runInfo);
-    __aicore__ inline void ParseFdRunInfo(FdRunInfo &fdRunInfo);
-    __aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr<HIGH_PERF> &runParam,
-                                                            const ConstInfo<HIGH_PERF> &constInfo, uint32_t s2BlockIdx);
-    __aicore__ inline bool ApplyS2MetadataRange(RunParamStr<HIGH_PERF> &runParam, ConstInfo<HIGH_PERF> &constInfo,
-                                                int64_t s2StartPoint, int64_t s2EndPoint, bool isFirstS2RangeTask,
-                                                bool isLastS2RangeTask);
+    __aicore__ inline void InitMqsmlaLocalBuffer();
+    __aicore__ inline void InitMqsmlaMMResBuf(__gm__ uint8_t *workspace);
+    __aicore__ inline void ComputeMqsmlaConstexpr();
+    __aicore__ inline void SetMqsmlaRunInfo(RunInfo<HIGH_PERF> &mq35RunInfo, RunParamStr<HIGH_PERF> &mq35RunParam,
+                                            int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit,
+                                            int64_t multiCoreInnerIdx);
+    __aicore__ inline void ComputeMqsmlaBmm1Tail(RunInfo<HIGH_PERF> &mq35RunInfo, RunParamStr<HIGH_PERF> &mq35RunParam);
+    __aicore__ inline void InitMqsmlaUniqueConstInfo();
+    __aicore__ inline void FreeMqsmlaEvent();
+    __aicore__ inline void ComputeMqsmlaAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index,
+                                                          RunParamStr<HIGH_PERF> &mq35RunParam);
+    __aicore__ inline void InitMqsmlaUniqueRunInfo(const RunParamStr<HIGH_PERF> &mq35RunParam,
+                                                   RunInfo<HIGH_PERF> &mq35RunInfo);
+    __aicore__ inline void ParseMqsmlaFdRunInfo(FdRunInfo &fdRunInfo);
+    __aicore__ inline int64_t ConvertMqsmlaS2MetadataBlockToToken(const RunParamStr<HIGH_PERF> &mq35RunParam,
+                                                                  const ConstInfo<HIGH_PERF> &mqsmlaCsaConstInfo,
+                                                                  uint32_t s2BlockIdx);
+    __aicore__ inline bool ApplyMqsmlaS2MetadataRange(RunParamStr<HIGH_PERF> &mq35RunParam,
+                                                      ConstInfo<HIGH_PERF> &mqsmlaCsaConstInfo, int64_t s2StartPoint,
+                                                      int64_t s2EndPoint, bool isFirstS2RangeTask,
+                                                      bool isLastS2RangeTask);
 
-    const MixedQuantSparseFlashMlaTilingData *__restrict tilingData;
+    const MixedQuantSparseFlashMlaTilingData *__restrict mqsmlaCsaTilingData;
     static constexpr uint32_t PRELOAD_NUM = 3;
     /* 核间通道 */
-    BufferManager<BufferType::GM> v0ResGmBufferManager;
+    BufferManager<BufferType::GM> mqsmlaCsaV0ResGmBufferManager;
 
-    StaticBuffer<T> bmm1Buffers[2];
-    StaticBuffer<T> bmm2Buffers;
-    uint32_t bmm1GetFlag = 0;
-    uint32_t vUbBase = 0;
+    StaticBuffer<T> mqsmlaCsaBmm1Buffers[2];
+    StaticBuffer<T> mqsmlaCsaBmm2Buffers;
+    uint32_t mqsmlaCsaBmm1GetFlag = 0;
+    uint32_t mqsmlaCsaVUbBase = 0;
 
     // mm2左矩阵P
-    StaticBuffer<Q_T> l1PBuffers[2];
-    uint32_t l1PGetFlag = 0;
-    uint32_t l1CubeBase = 0;
+    StaticBuffer<Q_T> mqsmlaCsaL1PBuffers[2];
+    uint32_t mqsmlaCsaL1PGetFlag = 0;
+    uint32_t mqsmlaCsaL1CubeBase = 0;
     /* GM信息 */
-    GlobalTensor<uint32_t> metadataGm;
+    GlobalTensor<uint32_t> mqsmlaCsaMetadataGm;
     GlobalTensor<int32_t> cuSeqlensQGm;
     GlobalTensor<int32_t> cuSeqlensOriKvGm;
     GlobalTensor<int32_t> cuSeqlensCmpKvGm;
@@ -127,7 +133,7 @@ private:
     BuffersPolicySingleBuffer<BufferType::GM, SyncType::NO_SYNC> intraCoreCombineBuffer;
     BuffersPolicySingleBuffer<BufferType::GM, SyncType::NO_SYNC> crossCoreCombineBuffer;
     /* 核Index信息 */
-    int32_t aicIdx;
+    int32_t mqsmlaCsaAicIdx;
     uint32_t bN2StartIdx;
     uint32_t gS1StartIdx;
     uint32_t s2StartIdx;
@@ -137,15 +143,15 @@ private:
     uint32_t hasLoad;
 
     /* 初始化后不变的信息 */
-    ConstInfo<HIGH_PERF> constInfo;
+    ConstInfo<HIGH_PERF> mqsmlaCsaConstInfo;
 
     /* 模板库Block */
-    CubeBlockType cubeBlock;
-    VecBlockType vecBlock;
+    MqsmlaCsaCubeBlockType mqsmlaCsaCubeBlock;
+    MqsmlaCsaVecBlockType mqsmlaCsaVecBlock;
 };
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Init(
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::Init(
     __gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *oriSparseIndices,
     __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
     __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
@@ -155,131 +161,135 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     const MixedQuantSparseFlashMlaTilingData *__restrict tiling)
 {
     fa_base_matmul::ResetIdCounter();
-    constInfo.subBlockIdx = GetSubBlockIdx();
+    mqsmlaCsaConstInfo.subBlockIdx = GetSubBlockIdx();
     if ASCEND_IS_AIC {
-        this->aicIdx = GetBlockIdx();
-        constInfo.aivIdx = 0;
-        this->tilingData = tiling;
+        this->mqsmlaCsaAicIdx = GetBlockIdx();
+        mqsmlaCsaConstInfo.aivIdx = 0;
+        this->mqsmlaCsaTilingData = tiling;
     } else {
-        constInfo.aivIdx = GetBlockIdx();
-        this->aicIdx = constInfo.aivIdx >> 1;
-        this->tilingData = tiling;
+        mqsmlaCsaConstInfo.aivIdx = GetBlockIdx();
+        this->mqsmlaCsaAicIdx = mqsmlaCsaConstInfo.aivIdx >> 1;
+        this->mqsmlaCsaTilingData = tiling;
     }
 
     if (metadata == nullptr) {
         return;
     }
-    this->metadataGm.SetGlobalBuffer((__gm__ uint32_t *)metadata);
+    this->mqsmlaCsaMetadataGm.SetGlobalBuffer((__gm__ uint32_t *)metadata);
 
-    bN2StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_BN2_START_INDEX, false));
-    gS1StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_M_START_INDEX, false));
-    s2StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_START_INDEX, false));
-    bN2EndIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_BN2_END_INDEX, false));
-    nextGs1Idx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_M_END_INDEX, false));
-    s2EndIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_END_INDEX, false));
-    hasLoad = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_CORE_ENABLE_INDEX, false));
+    bN2StartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_BN2_START_INDEX, false));
+    gS1StartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_M_START_INDEX, false));
+    s2StartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_S2_START_INDEX, false));
+    bN2EndIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_BN2_END_INDEX, false));
+    nextGs1Idx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_M_END_INDEX, false));
+    s2EndIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_S2_END_INDEX, false));
+    hasLoad = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_CORE_ENABLE_INDEX, false));
     if (nextGs1Idx != 0 || s2EndIdx != 0) {
         bN2EndIdx++;
     }
 
-    constInfo.s1BaseSize = 64;
-    constInfo.s2BaseSize = 128;
+    mqsmlaCsaConstInfo.s1BaseSize = 64;
+    mqsmlaCsaConstInfo.s2BaseSize = 128;
 
-    this->ParseTilingData(cuSeqlensQ, sequsedQ, cuSeqlensOriKv, sequsedOriKv, cuSeqlensCmpKv, sequsedCmpKv,
-                          cmpResidualKv);
-    this->InitGlobalBuffer(query, oriKV, cmpKV, oriSparseIndices, cmpSparseIndices, oriBlockTable, cmpBlockTable,
-                           cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedQ, sequsedOriKv, sequsedCmpKv,
-                           cmpResidualKv, oriTopkLength, cmpTopkLength, sinks, workspace, tiling);
-    vecBlock.InitVecBlock(cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedOriKv, sequsedCmpKv, cmpResidualKv);
-    vecBlock.CleanOutput(attentionOut, softmaxLse, constInfo);
+    this->ParseMqsmlaTilingData(cuSeqlensQ, sequsedQ, cuSeqlensOriKv, sequsedOriKv, cuSeqlensCmpKv, sequsedCmpKv,
+                                cmpResidualKv);
+    this->InitMqsmlaGlobalBuffer(query, oriKV, cmpKV, oriSparseIndices, cmpSparseIndices, oriBlockTable, cmpBlockTable,
+                                 cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedQ, sequsedOriKv, sequsedCmpKv,
+                                 cmpResidualKv, oriTopkLength, cmpTopkLength, sinks, workspace, tiling);
+    mqsmlaCsaVecBlock.InitVecBlock(cuSeqlensQ, cuSeqlensOriKv, cuSeqlensCmpKv, sequsedOriKv, sequsedCmpKv,
+                                   cmpResidualKv);
+    mqsmlaCsaVecBlock.CleanOutput(attentionOut, softmaxLse, mqsmlaCsaConstInfo);
     if ASCEND_IS_AIV {
         if constexpr ((TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
                        TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                        TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
                       IS_VEC_S2PHYADDR) {
-            this->vecBlock.GetKVPhyAddr(hasLoad, bN2StartIdx, bN2EndIdx, gS1StartIdx, nextGs1Idx, hasActualSeqQlen,
-                                        hasCuSeqlensQ, hasActualSeqOriKvlen, hasCuSeqlensOriKv, actualSeqOriKvlenGm,
-                                        cuSeqlensOriKvGm, oriTopkLengthGm, hasActualSeqCmpKvlen, hasCuSeqlensCmpKv,
-                                        actualSeqCmpKvlenGm, cuSeqlensCmpKvGm, cmpTopkLengthGm, cmpResidualKvGm,
-                                        actualSeqQlenGm, cuSeqlensQGm, workspace, constInfo);
+            this->mqsmlaCsaVecBlock.GetKVPhyAddr(
+                hasLoad, bN2StartIdx, bN2EndIdx, gS1StartIdx, nextGs1Idx, hasActualSeqQlen, hasCuSeqlensQ,
+                hasActualSeqOriKvlen, hasCuSeqlensOriKv, actualSeqOriKvlenGm, cuSeqlensOriKvGm, oriTopkLengthGm,
+                hasActualSeqCmpKvlen, hasCuSeqlensCmpKv, actualSeqCmpKvlenGm, cuSeqlensCmpKvGm, cmpTopkLengthGm,
+                cmpResidualKvGm, actualSeqQlenGm, cuSeqlensQGm, workspace, mqsmlaCsaConstInfo);
         }
     }
     /* cube侧不依赖sharedParams的scalar前置 */
-    InitMMResBuf(workspace);
+    InitMqsmlaMMResBuf(workspace);
     if constexpr (IS_BATCH_CONSISTENCY) {
-        vecBlock.InitS2SplitStaging(intraCoreCombineBuffer.Get(), crossCoreCombineBuffer.Get());
+        mqsmlaCsaVecBlock.InitS2SplitStaging(intraCoreCombineBuffer.Get(), crossCoreCombineBuffer.Get());
     } else {
-        vecBlock.InitS2SplitStaging(fdStagingBuffer.Get());
+        mqsmlaCsaVecBlock.InitS2SplitStaging(fdStagingBuffer.Get());
     }
-    this->ComputeConstexpr();
-    this->InitLocalBuffer();
+    this->ComputeMqsmlaConstexpr();
+    this->InitMqsmlaLocalBuffer();
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline int64_t MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::GetSeqLen(
-    int32_t bIdx, bool hasActualSeq, bool hasCuSeqlens, GlobalTensor<int32_t> &actualSeqGm,
-    GlobalTensor<int32_t> &cuSeqlensGm, int64_t defaultSize)
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline int64_t MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::GetMqsmlaSeqLen(
+    int32_t batchIndex, bool preferActualLength, bool deriveFromCuSeqlens, GlobalTensor<int32_t> &actualLengthGm,
+    GlobalTensor<int32_t> &cuLengthGm, int64_t fallbackLength)
 {
-    if (hasActualSeq) {
-        return actualSeqGm.GetValue(bIdx);
-    } else if (hasCuSeqlens) {
-        return cuSeqlensGm.GetValue(bIdx + 1) - cuSeqlensGm.GetValue(bIdx);
+    if (preferActualLength) {
+        return actualLengthGm.GetValue(batchIndex);
+    } else if (deriveFromCuSeqlens) {
+        return cuLengthGm.GetValue(batchIndex + 1) - cuLengthGm.GetValue(batchIndex);
     } else {
-        return defaultSize;
+        return fallbackLength;
     }
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ParseTilingData(
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::ParseMqsmlaTilingData(
     __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *sequsedOriKv,
     __gm__ uint8_t *cuSeqlensCmpKv, __gm__ uint8_t *sequsedCmpKv, __gm__ uint8_t *cmpResidualKv)
 {
-    auto &mixedQuantSparseFlashMlaBaseParams = this->tilingData->baseParams;
-    constInfo.bSize = mixedQuantSparseFlashMlaBaseParams.batchSize;
-    constInfo.n2Size = 1;
-    constInfo.gSize = mixedQuantSparseFlashMlaBaseParams.nNumOfQInOneGroup;
-    constInfo.s1Size = mixedQuantSparseFlashMlaBaseParams.qSeqSize;
-    constInfo.s2Size = mixedQuantSparseFlashMlaBaseParams.kvSeqSize;
-    constInfo.cmpS2Size = mixedQuantSparseFlashMlaBaseParams.cmpKvSeqSize;
-    constInfo.oriSparseBlockCount = mixedQuantSparseFlashMlaBaseParams.oriSparseBlockCount;
-    constInfo.cmpSparseBlockCount = mixedQuantSparseFlashMlaBaseParams.cmpSparseBlockCount;
+    auto &mixedQuantSparseFlashMlaBaseParams = this->mqsmlaCsaTilingData->baseParams;
+    mqsmlaCsaConstInfo.bSize = mixedQuantSparseFlashMlaBaseParams.batchSize;
+    mqsmlaCsaConstInfo.n2Size = 1;
+    mqsmlaCsaConstInfo.gSize = mixedQuantSparseFlashMlaBaseParams.nNumOfQInOneGroup;
+    mqsmlaCsaConstInfo.s1Size = mixedQuantSparseFlashMlaBaseParams.qSeqSize;
+    mqsmlaCsaConstInfo.s2Size = mixedQuantSparseFlashMlaBaseParams.kvSeqSize;
+    mqsmlaCsaConstInfo.cmpS2Size = mixedQuantSparseFlashMlaBaseParams.cmpKvSeqSize;
+    mqsmlaCsaConstInfo.oriSparseBlockCount = mixedQuantSparseFlashMlaBaseParams.oriSparseBlockCount;
+    mqsmlaCsaConstInfo.cmpSparseBlockCount = mixedQuantSparseFlashMlaBaseParams.cmpSparseBlockCount;
     constexpr uint32_t SPARSE_BLOCK_ALIGN_NUM = 128;
-    constInfo.alignedOriSparseBlockCount =
-        (constInfo.oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
-    constInfo.alignedCmpSparseBlockCount =
-        (constInfo.cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM * SPARSE_BLOCK_ALIGN_NUM;
+    mqsmlaCsaConstInfo.alignedOriSparseBlockCount =
+        (mqsmlaCsaConstInfo.oriSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM *
+        SPARSE_BLOCK_ALIGN_NUM;
+    mqsmlaCsaConstInfo.alignedCmpSparseBlockCount =
+        (mqsmlaCsaConstInfo.cmpSparseBlockCount + SPARSE_BLOCK_ALIGN_NUM - 1) / SPARSE_BLOCK_ALIGN_NUM *
+        SPARSE_BLOCK_ALIGN_NUM;
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
-        constInfo.cmpRatio = mixedQuantSparseFlashMlaBaseParams.cmpRatio;
+        mqsmlaCsaConstInfo.cmpRatio = mixedQuantSparseFlashMlaBaseParams.cmpRatio;
     }
-    constInfo.oriMaskMode = mixedQuantSparseFlashMlaBaseParams.oriMaskMode;
-    constInfo.cmpMaskMode = mixedQuantSparseFlashMlaBaseParams.cmpMaskMode;
-    constInfo.oriWinLeft = mixedQuantSparseFlashMlaBaseParams.oriWinLeft;
-    constInfo.oriWinRight = mixedQuantSparseFlashMlaBaseParams.oriWinRight;
-    constInfo.dSizeRope = mixedQuantSparseFlashMlaBaseParams.ropeHeadDim;
-    constInfo.softmaxScale = mixedQuantSparseFlashMlaBaseParams.softmaxScale;
-    constInfo.oriKvStride = mixedQuantSparseFlashMlaBaseParams.oriKvStride;
+    mqsmlaCsaConstInfo.oriMaskMode = mixedQuantSparseFlashMlaBaseParams.oriMaskMode;
+    mqsmlaCsaConstInfo.cmpMaskMode = mixedQuantSparseFlashMlaBaseParams.cmpMaskMode;
+    mqsmlaCsaConstInfo.oriWinLeft = mixedQuantSparseFlashMlaBaseParams.oriWinLeft;
+    mqsmlaCsaConstInfo.oriWinRight = mixedQuantSparseFlashMlaBaseParams.oriWinRight;
+    mqsmlaCsaConstInfo.dSizeRope = mixedQuantSparseFlashMlaBaseParams.ropeHeadDim;
+    mqsmlaCsaConstInfo.softmaxScale = mixedQuantSparseFlashMlaBaseParams.softmaxScale;
+    mqsmlaCsaConstInfo.oriKvStride = mixedQuantSparseFlashMlaBaseParams.oriKvStride;
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
-        constInfo.cmpKvStride = mixedQuantSparseFlashMlaBaseParams.cmpKvStride;
+        mqsmlaCsaConstInfo.cmpKvStride = mixedQuantSparseFlashMlaBaseParams.cmpKvStride;
     }
-    constInfo.dSize = mixedQuantSparseFlashMlaBaseParams.dSize;
-    constInfo.dSizeV = constInfo.dSize;
-    constInfo.dSizeVInput = mixedQuantSparseFlashMlaBaseParams.dSizeVInput;
-    constInfo.dSizeNope = constInfo.dSize - constInfo.dSizeRope;
+    mqsmlaCsaConstInfo.dSize = mixedQuantSparseFlashMlaBaseParams.dSize;
+    mqsmlaCsaConstInfo.dSizeV = mqsmlaCsaConstInfo.dSize;
+    mqsmlaCsaConstInfo.dSizeVInput = mixedQuantSparseFlashMlaBaseParams.dSizeVInput;
+    mqsmlaCsaConstInfo.dSizeNope = mqsmlaCsaConstInfo.dSize - mqsmlaCsaConstInfo.dSizeRope;
     if constexpr (!HIGH_PERF) {
-        constInfo.isSoftmaxLseEnable = mixedQuantSparseFlashMlaBaseParams.returnSoftmaxLse;
+        mqsmlaCsaConstInfo.isSoftmaxLseEnable = mixedQuantSparseFlashMlaBaseParams.returnSoftmaxLse;
     }
-    constInfo.sparseBlockSize = 1;
-    constInfo.actualSeqLenSize = constInfo.bSize + 1;
+    mqsmlaCsaConstInfo.sparseBlockSize = 1;
+    mqsmlaCsaConstInfo.actualSeqLenSize = mqsmlaCsaConstInfo.bSize + 1;
 
     if constexpr (isPa) {
-        constInfo.oriBlockSize = mixedQuantSparseFlashMlaBaseParams.paOriBlockSize;
-        constInfo.oriMaxBlockNumPerBatch = mixedQuantSparseFlashMlaBaseParams.oriMaxBlockNumPerBatch;
+        mqsmlaCsaConstInfo.oriBlockSize = mixedQuantSparseFlashMlaBaseParams.paOriBlockSize;
+        mqsmlaCsaConstInfo.oriMaxBlockNumPerBatch = mixedQuantSparseFlashMlaBaseParams.oriMaxBlockNumPerBatch;
         if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
                       TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
-            constInfo.cmpBlockSize = mixedQuantSparseFlashMlaBaseParams.paCmpBlockSize;
-            constInfo.cmpMaxBlockNumPerBatch = mixedQuantSparseFlashMlaBaseParams.cmpMaxBlockNumPerBatch;
+            mqsmlaCsaConstInfo.cmpBlockSize = mixedQuantSparseFlashMlaBaseParams.paCmpBlockSize;
+            mqsmlaCsaConstInfo.cmpMaxBlockNumPerBatch = mixedQuantSparseFlashMlaBaseParams.cmpMaxBlockNumPerBatch;
         }
     }
 
@@ -317,32 +327,34 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
         }
     }
 
-    constInfo.needInit = 0;
+    mqsmlaCsaConstInfo.needInit = 0;
     if (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
-        TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE && constInfo.oriMaskMode != 0) {
-        for (uint32_t bIdx = 0; bIdx < constInfo.bSize; bIdx++) {
-            int64_t s2Size = GetSeqLen(bIdx, hasActualSeqOriKvlen, hasCuSeqlensOriKv, actualSeqOriKvlenGm,
-                                       cuSeqlensOriKvGm, constInfo.s2Size);
-            int64_t s1Size =
-                GetSeqLen(bIdx, hasActualSeqQlen, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm, constInfo.s1Size);
+        TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE && mqsmlaCsaConstInfo.oriMaskMode != 0) {
+        for (uint32_t mqsmlaBIdx = 0; mqsmlaBIdx < mqsmlaCsaConstInfo.bSize; mqsmlaBIdx++) {
+            int64_t s2Size = GetMqsmlaSeqLen(mqsmlaBIdx, hasActualSeqOriKvlen, hasCuSeqlensOriKv, actualSeqOriKvlenGm,
+                                             cuSeqlensOriKvGm, mqsmlaCsaConstInfo.s2Size);
+            int64_t s1Size = GetMqsmlaSeqLen(mqsmlaBIdx, hasActualSeqQlen, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm,
+                                             mqsmlaCsaConstInfo.s1Size);
             int64_t expectQs;
             if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
-                expectQs = GetSeqLen(bIdx, false, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm, constInfo.s1Size);
+                expectQs = GetMqsmlaSeqLen(mqsmlaBIdx, false, hasCuSeqlensQ, actualSeqQlenGm, cuSeqlensQGm,
+                                           mqsmlaCsaConstInfo.s1Size);
             } else {
-                expectQs = constInfo.s1Size;
+                expectQs = mqsmlaCsaConstInfo.s1Size;
             }
             if (s1Size > s2Size || s1Size < expectQs) {
-                constInfo.needInit = 1;
+                mqsmlaCsaConstInfo.needInit = 1;
                 break;
             }
         }
     } else {
-        constInfo.needInit = 1;
+        mqsmlaCsaConstInfo.needInit = 1;
     }
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitGlobalBuffer(
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::InitMqsmlaGlobalBuffer(
     __gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *oriSparseIndices,
     __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
     __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
@@ -350,84 +362,86 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength, __gm__ uint8_t *sinks, __gm__ uint8_t *workspace,
     const MixedQuantSparseFlashMlaTilingData *__restrict tiling)
 {
-    vecBlock.InitGlobalBuffer(oriKV, cmpKV, oriSparseIndices, cmpSparseIndices, oriBlockTable, cmpBlockTable, sequsedQ,
-                              sinks, sequsedOriKv, sequsedCmpKv, cmpResidualKv);
-    cubeBlock.InitGlobalBuffer(query, cuSeqlensQ, sequsedQ, constInfo);
+    mqsmlaCsaVecBlock.InitGlobalBuffer(oriKV, cmpKV, oriSparseIndices, cmpSparseIndices, oriBlockTable, cmpBlockTable,
+                                       sequsedQ, sinks, sequsedOriKv, sequsedCmpKv, cmpResidualKv);
+    mqsmlaCsaCubeBlock.InitGlobalBuffer(query, cuSeqlensQ, sequsedQ, mqsmlaCsaConstInfo);
     if constexpr (!HIGH_PERF) {
         if (oriTopkLength != nullptr) {
-            constInfo.hasOriTopkLength = true;
+            mqsmlaCsaConstInfo.hasOriTopkLength = true;
             oriTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)oriTopkLength);
         } else {
-            constInfo.hasOriTopkLength = false;
+            mqsmlaCsaConstInfo.hasOriTopkLength = false;
         }
         if (cmpTopkLength != nullptr) {
-            constInfo.hasCmpTopkLength = true;
+            mqsmlaCsaConstInfo.hasCmpTopkLength = true;
             cmpTopkLengthGm.SetGlobalBuffer((__gm__ int32_t *)cmpTopkLength);
         } else {
-            constInfo.hasCmpTopkLength = false;
+            mqsmlaCsaConstInfo.hasCmpTopkLength = false;
         }
     }
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitMMResBuf(__gm__ uint8_t *workspace)
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::InitMqsmlaMMResBuf(
+    __gm__ uint8_t *workspace)
 {
     // L1: [l1P x2][cube L1], l1P 必须放在最前面保证与 vec 申请地址相同
-    uint32_t mm2LeftSize = constInfo.s1BaseSize * constInfo.s2BaseSize;
+    uint32_t mm2LeftSize = mqsmlaCsaConstInfo.s1BaseSize * mqsmlaCsaConstInfo.s2BaseSize;
     uint32_t l1PAddr = 0;
-    l1PBuffers[0] = {LocalTensor<Q_T>(TPosition::A1, l1PAddr, mm2LeftSize), 0};
+    mqsmlaCsaL1PBuffers[0] = {LocalTensor<Q_T>(TPosition::A1, l1PAddr, mm2LeftSize), 0};
     l1PAddr += (mm2LeftSize * sizeof(Q_T));
-    l1PBuffers[1] = {LocalTensor<Q_T>(TPosition::A1, l1PAddr, mm2LeftSize), 1};
+    mqsmlaCsaL1PBuffers[1] = {LocalTensor<Q_T>(TPosition::A1, l1PAddr, mm2LeftSize), 1};
     l1PAddr += (mm2LeftSize * sizeof(Q_T));
-    l1CubeBase = l1PAddr;
+    mqsmlaCsaL1CubeBase = l1PAddr;
 
     // UB: [bmm2][bmm1 x2][vec UB]
-    uint32_t mm1ResultSize = constInfo.s1BaseSize / CV_RATIO * constInfo.s2BaseSize;
-    uint32_t mm2ResultSize = constInfo.s1BaseSize / CV_RATIO * 512;
+    uint32_t mm1ResultSize = mqsmlaCsaConstInfo.s1BaseSize / CV_RATIO * mqsmlaCsaConstInfo.s2BaseSize;
+    uint32_t mm2ResultSize = mqsmlaCsaConstInfo.s1BaseSize / CV_RATIO * 512;
     uint32_t ubAddr = 0;
-    bmm2Buffers = {LocalTensor<T>(TPosition::VECIN, ubAddr, mm2ResultSize), 0};
+    mqsmlaCsaBmm2Buffers = {LocalTensor<T>(TPosition::VECIN, ubAddr, mm2ResultSize), 0};
     ubAddr += (mm2ResultSize * sizeof(T));
-    bmm1Buffers[0] = {LocalTensor<T>(TPosition::VECIN, ubAddr, mm1ResultSize), 0};
+    mqsmlaCsaBmm1Buffers[0] = {LocalTensor<T>(TPosition::VECIN, ubAddr, mm1ResultSize), 0};
     ubAddr += (mm1ResultSize * sizeof(T));
-    bmm1Buffers[1] = {LocalTensor<T>(TPosition::VECIN, ubAddr, mm1ResultSize), 1};
+    mqsmlaCsaBmm1Buffers[1] = {LocalTensor<T>(TPosition::VECIN, ubAddr, mm1ResultSize), 1};
     ubAddr += (mm1ResultSize * sizeof(T));
-    vUbBase = ubAddr;
+    mqsmlaCsaVUbBase = ubAddr;
 
     if ASCEND_IS_AIV {
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CROSSCORE_BMM1(bmm1Buffers[0].idx));
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CROSSCORE_BMM1(bmm1Buffers[1].idx));
+        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CROSSCORE_BMM1(mqsmlaCsaBmm1Buffers[0].idx));
+        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CROSSCORE_BMM1(mqsmlaCsaBmm1Buffers[1].idx));
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CROSSCORE_BMM2);
     }
 
-    uint32_t v0ResSize = constInfo.s2BaseSize * 512U * sizeof(Q_T);
-    uint64_t totalOffset = IS_SPLIT_G ? static_cast<uint64_t>(v0ResSize) * 3 * (aicIdx >> 1U) :
-                                        static_cast<uint64_t>(v0ResSize) * 3 * aicIdx;
-    v0ResGmBufferManager.Init(workspace + totalOffset);
-    v0ResGmBuffers.Init(v0ResGmBufferManager, v0ResSize);
+    uint32_t v0ResSize = mqsmlaCsaConstInfo.s2BaseSize * 512U * sizeof(Q_T);
+    uint64_t totalOffset = IS_SPLIT_G ? static_cast<uint64_t>(v0ResSize) * 3 * (mqsmlaCsaAicIdx >> 1U) :
+                                        static_cast<uint64_t>(v0ResSize) * 3 * mqsmlaCsaAicIdx;
+    mqsmlaCsaV0ResGmBufferManager.Init(workspace + totalOffset);
+    v0ResGmBuffers.Init(mqsmlaCsaV0ResGmBufferManager, v0ResSize);
     v0ResGmBuffers.Get().SetCrossCoreID(INVALID_CROSS_CORE_EVENT_ID, CROSSCORE_V0RES(0));
     v0ResGmBuffers.Get().SetCrossCoreID(INVALID_CROSS_CORE_EVENT_ID, CROSSCORE_V0RES(1));
     v0ResGmBuffers.Get().SetCrossCoreID(INVALID_CROSS_CORE_EVENT_ID, CROSSCORE_V0RES(2));
 
     uint64_t phyAddrRegionSize = 0;
     if constexpr (IS_VEC_S2PHYADDR) {
-        uint64_t totalBS1 = (LAYOUT_T == QSMLA_LAYOUT::TND) ? constInfo.s1Size :
-                                                              static_cast<uint64_t>(constInfo.bSize) * constInfo.s1Size;
+        uint64_t totalBS1 = (LAYOUT_T == QSMLA_LAYOUT::TND) ?
+                                mqsmlaCsaConstInfo.s1Size :
+                                static_cast<uint64_t>(mqsmlaCsaConstInfo.bSize) * mqsmlaCsaConstInfo.s1Size;
         if constexpr (TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                       TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-            phyAddrRegionSize += totalBS1 * constInfo.alignedOriSparseBlockCount * sizeof(int64_t);
+            phyAddrRegionSize += totalBS1 * mqsmlaCsaConstInfo.alignedOriSparseBlockCount * sizeof(int64_t);
         }
         if constexpr (TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
                       TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-            phyAddrRegionSize += totalBS1 * constInfo.alignedCmpSparseBlockCount * sizeof(int64_t);
+            phyAddrRegionSize += totalBS1 * mqsmlaCsaConstInfo.alignedCmpSparseBlockCount * sizeof(int64_t);
         }
     }
     uint64_t v0RegionSize = static_cast<uint64_t>(v0ResSize) * 3 * (IS_SPLIT_G ? (GetBlockNum() >> 1U) : GetBlockNum());
     fdStagingBufferManager.Init(workspace + v0RegionSize + phyAddrRegionSize);
     constexpr uint32_t FD_MAX_SUM_REGION_NUM = 2U;
-    uint32_t gSize = static_cast<uint32_t>(constInfo.gSize);
+    uint32_t gSize = static_cast<uint32_t>(mqsmlaCsaConstInfo.gSize);
     if constexpr (IS_BATCH_CONSISTENCY) {
         uint32_t combineElemSize =
-            gSize * constInfo.dSize +
+            gSize * mqsmlaCsaConstInfo.dSize +
             FD_MAX_SUM_REGION_NUM * gSize * static_cast<uint32_t>(AttentionCommon::FD_BROADCAST_ELEMS_PER_ROW);
         uint32_t intraCoreSlotNum = IS_SPLIT_G ? GetBlockNum() : (GetBlockNum() << 1U);
         uint32_t intraCoreCombineSize = intraCoreSlotNum * combineElemSize * sizeof(float);
@@ -439,89 +453,95 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
         uint32_t fdSlotCount = static_cast<uint32_t>(AttentionCommon::FD_MAX_S2_SPLIT_NUM) *
                                (IS_SPLIT_G ? (GetBlockNum() >> 1U) : GetBlockNum());
         uint32_t fdStagingSize =
-            fdSlotCount * (gSize * constInfo.dSize * sizeof(float) +
+            fdSlotCount * (gSize * mqsmlaCsaConstInfo.dSize * sizeof(float) +
                            FD_MAX_SUM_REGION_NUM * gSize *
                                static_cast<uint32_t>(AttentionCommon::FD_BROADCAST_ELEMS_PER_ROW) * sizeof(float));
         fdStagingBuffer.Init(fdStagingBufferManager, fdStagingSize);
     }
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitLocalBuffer()
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::InitMqsmlaLocalBuffer()
 {
-    vecBlock.InitLocalBuffer(constInfo, vUbBase);
-    cubeBlock.InitLocalBuffer(l1CubeBase);
+    mqsmlaCsaVecBlock.InitLocalBuffer(mqsmlaCsaConstInfo, mqsmlaCsaVUbBase);
+    mqsmlaCsaCubeBlock.InitLocalBuffer(mqsmlaCsaL1CubeBase);
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeConstexpr()
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::ComputeMqsmlaConstexpr()
 {
-    constInfo.s1S2 = constInfo.s1Size * constInfo.s2Size;
-    constInfo.gS1 = constInfo.gSize * constInfo.s1Size;
-    constInfo.n2G = constInfo.n2Size * constInfo.gSize;
+    mqsmlaCsaConstInfo.s1S2 = mqsmlaCsaConstInfo.s1Size * mqsmlaCsaConstInfo.s2Size;
+    mqsmlaCsaConstInfo.gS1 = mqsmlaCsaConstInfo.gSize * mqsmlaCsaConstInfo.s1Size;
+    mqsmlaCsaConstInfo.n2G = mqsmlaCsaConstInfo.n2Size * mqsmlaCsaConstInfo.gSize;
 
-    constInfo.s1Dv = constInfo.s1Size * constInfo.dSizeV;
-    constInfo.s2Dv = constInfo.s2Size * constInfo.dSizeV;
-    constInfo.n2Dv = constInfo.n2Size * constInfo.dSizeV;
-    constInfo.gDv = constInfo.gSize * constInfo.dSizeV;
-    constInfo.gS1Dv = constInfo.gSize * constInfo.s1Dv;
-    constInfo.n2S2Dv = constInfo.n2Size * constInfo.s2Dv;
-    constInfo.n2GDv = constInfo.n2Size * constInfo.gDv;
-    constInfo.s2BaseN2Dv = constInfo.s2BaseSize * constInfo.n2Dv;
-    constInfo.n2GS1Dv = constInfo.n2Size * constInfo.gS1Dv;
+    mqsmlaCsaConstInfo.s1Dv = mqsmlaCsaConstInfo.s1Size * mqsmlaCsaConstInfo.dSizeV;
+    mqsmlaCsaConstInfo.s2Dv = mqsmlaCsaConstInfo.s2Size * mqsmlaCsaConstInfo.dSizeV;
+    mqsmlaCsaConstInfo.n2Dv = mqsmlaCsaConstInfo.n2Size * mqsmlaCsaConstInfo.dSizeV;
+    mqsmlaCsaConstInfo.gDv = mqsmlaCsaConstInfo.gSize * mqsmlaCsaConstInfo.dSizeV;
+    mqsmlaCsaConstInfo.gS1Dv = mqsmlaCsaConstInfo.gSize * mqsmlaCsaConstInfo.s1Dv;
+    mqsmlaCsaConstInfo.n2S2Dv = mqsmlaCsaConstInfo.n2Size * mqsmlaCsaConstInfo.s2Dv;
+    mqsmlaCsaConstInfo.n2GDv = mqsmlaCsaConstInfo.n2Size * mqsmlaCsaConstInfo.gDv;
+    mqsmlaCsaConstInfo.s2BaseN2Dv = mqsmlaCsaConstInfo.s2BaseSize * mqsmlaCsaConstInfo.n2Dv;
+    mqsmlaCsaConstInfo.n2GS1Dv = mqsmlaCsaConstInfo.n2Size * mqsmlaCsaConstInfo.gS1Dv;
 
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
         // (BS)ND
-        constInfo.s1BaseN2GDv = constInfo.s1BaseSize * constInfo.n2GDv;
+        mqsmlaCsaConstInfo.s1BaseN2GDv = mqsmlaCsaConstInfo.s1BaseSize * mqsmlaCsaConstInfo.n2GDv;
 
-        constInfo.mm1Ka = constInfo.n2Size * constInfo.dSize;
+        mqsmlaCsaConstInfo.mm1Ka = mqsmlaCsaConstInfo.n2Size * mqsmlaCsaConstInfo.dSize;
         if ASCEND_IS_AIV {
-            constInfo.attentionOutStride = (constInfo.n2G - constInfo.gSize) * constInfo.dSizeV * sizeof(OUTPUT_T);
+            mqsmlaCsaConstInfo.attentionOutStride =
+                (mqsmlaCsaConstInfo.n2G - mqsmlaCsaConstInfo.gSize) * mqsmlaCsaConstInfo.dSizeV * sizeof(OUTPUT_T);
         }
     } else if constexpr (LAYOUT_T == QSMLA_LAYOUT::BSND) {
         // BSH/BSNGD
-        constInfo.s1BaseN2GDv = constInfo.s1BaseSize * constInfo.n2GDv;
-        constInfo.mm1Ka = constInfo.n2Size * constInfo.dSize;
+        mqsmlaCsaConstInfo.s1BaseN2GDv = mqsmlaCsaConstInfo.s1BaseSize * mqsmlaCsaConstInfo.n2GDv;
+        mqsmlaCsaConstInfo.mm1Ka = mqsmlaCsaConstInfo.n2Size * mqsmlaCsaConstInfo.dSize;
         if ASCEND_IS_AIV {
-            constInfo.attentionOutStride = (constInfo.n2G - constInfo.gSize) * constInfo.dSizeV * sizeof(OUTPUT_T);
+            mqsmlaCsaConstInfo.attentionOutStride =
+                (mqsmlaCsaConstInfo.n2G - mqsmlaCsaConstInfo.gSize) * mqsmlaCsaConstInfo.dSizeV * sizeof(OUTPUT_T);
         }
     }
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Process()
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::Process()
 {
     if constexpr (IS_VEC_S2PHYADDR) {
         SyncAll<false>();
     } else {
-        if (this->constInfo.needInit) {
+        if (this->mqsmlaCsaConstInfo.needInit) {
             SyncAll<false>();
         }
     }
     if ASCEND_IS_AIV {
-        vecBlock.InitSinks(this->constInfo);
+        mqsmlaCsaVecBlock.InitSinks(this->mqsmlaCsaConstInfo);
     }
     FdRunInfo fdRunInfo;
     if ASCEND_IS_AIV {
-        ParseFdRunInfo(fdRunInfo);
+        ParseMqsmlaFdRunInfo(fdRunInfo);
     }
     ICachePreLoad(6);
-    ProcessMainLoop();
+    ProcessMqsmlaMainLoop();
     SyncAll();
     if ASCEND_IS_AIV {
         if (fdRunInfo.coreEnable > 0) {
-            this->vecBlock.ProcessFlashDecode(fdRunInfo, this->constInfo);
+            this->mqsmlaCsaVecBlock.ProcessFlashDecode(fdRunInfo, this->mqsmlaCsaConstInfo);
         }
     }
-    FreeEvent();
+    FreeMqsmlaEvent();
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ProcessMainLoop()
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::ProcessMqsmlaMainLoop()
 {
     int64_t mqsmlaMaxS2LoopCnt = 0;
     if constexpr (IS_SPLIT_G) {
-        mqsmlaMaxS2LoopCnt = static_cast<int64_t>(metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_MAX_NUM, false)));
+        mqsmlaMaxS2LoopCnt =
+            static_cast<int64_t>(mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_S2_MAX_NUM, false)));
     }
     if (hasLoad == 0) {
         if ASCEND_IS_AIC {
@@ -537,33 +557,34 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
 
     // 从meta data解析分核信息
     uint32_t firstFdDataWorkspaceIdx =
-        metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX, false));
+        mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX, false));
     uint32_t s2LoopLimit = 0;
     int64_t taskId = 0;
     bool isFirstLoop = true;
     bool mqsmlaNotLast = true;
     bool mqsmlaNotLastTwoLoop = true;
-    RunInfo<HIGH_PERF> runInfo[4];
-    RunParamStr<HIGH_PERF> runParam;
-    runParam.firstFdDataWorkspaceIdx = firstFdDataWorkspaceIdx;
-    int64_t multiCoreInnerIdx = 1;
+    RunInfo<HIGH_PERF> mq35RunInfo[4];
+    RunParamStr<HIGH_PERF> mq35RunParam;
+    mq35RunParam.firstFdDataWorkspaceIdx = firstFdDataWorkspaceIdx;
+    int64_t mqsmlaMultiCoreInnerIdx = 1;
     int64_t s2SplitIdxCounter = 0;
     for (int64_t bnIdx = bN2StartIdx; bnIdx < bN2EndIdx; bnIdx++) {
         bool lastBN = (bnIdx == bN2EndIdx - 1);
-        runParam.boIdx = bnIdx;
-        runParam.n2oIdx = 0;
-        ComputeParamBatch<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, this->cuSeqlensQGm, this->cuSeqlensOriKvGm,
-                                              this->cuSeqlensCmpKvGm, this->actualSeqQlenGm, this->actualSeqOriKvlenGm,
-                                              this->actualSeqCmpKvlenGm, this->cmpResidualKvGm, this->hasCuSeqlensOriKv,
-                                              this->hasCuSeqlensCmpKv, this->hasActualSeqQlen,
-                                              this->hasActualSeqOriKvlen, this->hasActualSeqCmpKvlen);
-        ComputeS1LoopInfo<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, lastBN, nextGs1Idx, gS1StartIdx, s2EndIdx);
+        mq35RunParam.boIdx = bnIdx;
+        mq35RunParam.n2oIdx = 0;
+        ComputeParamBatch<TEMPLATE_INTF_ARGS>(
+            mq35RunParam, this->mqsmlaCsaConstInfo, this->cuSeqlensQGm, this->cuSeqlensOriKvGm, this->cuSeqlensCmpKvGm,
+            this->actualSeqQlenGm, this->actualSeqOriKvlenGm, this->actualSeqCmpKvlenGm, this->cmpResidualKvGm,
+            this->hasCuSeqlensOriKv, this->hasCuSeqlensCmpKv, this->hasActualSeqQlen, this->hasActualSeqOriKvlen,
+            this->hasActualSeqCmpKvlen);
+        ComputeS1LoopInfo<TEMPLATE_INTF_ARGS>(mq35RunParam, this->mqsmlaCsaConstInfo, lastBN, nextGs1Idx, gS1StartIdx,
+                                              s2EndIdx);
 
-        int64_t mqsmlaGS1LoopEnd = lastBN ? (runParam.gs1LoopEndIdx + PRELOAD_NUM) : runParam.gs1LoopEndIdx;
-        for (int64_t gS1Index = runParam.gs1LoopStartIdx; gS1Index < mqsmlaGS1LoopEnd; gS1Index++) {
+        int64_t mqsmlaGS1LoopEnd = lastBN ? (mq35RunParam.gs1LoopEndIdx + PRELOAD_NUM) : mq35RunParam.gs1LoopEndIdx;
+        for (int64_t gS1Index = mq35RunParam.gs1LoopStartIdx; gS1Index < mqsmlaGS1LoopEnd; gS1Index++) {
             bool mqsmlaNotLastThreeLoop = true;
             if (lastBN) {
-                int32_t mqsmlaExtraGS1 = gS1Index - runParam.gs1LoopEndIdx;
+                int32_t mqsmlaExtraGS1 = gS1Index - mq35RunParam.gs1LoopEndIdx;
                 switch (mqsmlaExtraGS1) {
                     case 0:
                         mqsmlaNotLastThreeLoop = false;
@@ -582,81 +603,91 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                 }
             }
             if (mqsmlaNotLastThreeLoop) {
-                this->ComputeAxisIdxByBnAndGs1(bnIdx, gS1Index, runParam);
-                bool mqsmlaS1NoNeedCalc =
-                    ComputeParamS1<TEMPLATE_INTF_ARGS>(runParam, this->constInfo, gS1Index, this->cuSeqlensQGm);
-                bool mqsmlaS2NoNeedCalc = ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(
-                    bnIdx, gS1Index, this->cuSeqlensQGm, oriTopkLengthGm, cmpTopkLengthGm, runParam, this->constInfo);
+                this->ComputeMqsmlaAxisIdxByBnAndGs1(bnIdx, gS1Index, mq35RunParam);
+                bool mqsmlaS1NoNeedCalc = ComputeParamS1<TEMPLATE_INTF_ARGS>(mq35RunParam, this->mqsmlaCsaConstInfo,
+                                                                             gS1Index, this->cuSeqlensQGm);
+                bool mqsmlaS2NoNeedCalc =
+                    ComputeS2LoopInfo<TEMPLATE_INTF_ARGS>(bnIdx, gS1Index, this->cuSeqlensQGm, oriTopkLengthGm,
+                                                          cmpTopkLengthGm, mq35RunParam, this->mqsmlaCsaConstInfo);
                 if constexpr (IS_BATCH_CONSISTENCY) {
-                    int64_t s2Load = runParam.s2LineOriEndIdx - runParam.s2LineStartIdx + runParam.s2CmpLineEndIdx;
-                    int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
+                    int64_t s2Load =
+                        mq35RunParam.s2LineOriEndIdx - mq35RunParam.s2LineStartIdx + mq35RunParam.s2CmpLineEndIdx;
+                    int64_t s2BaseSize = static_cast<int64_t>(mqsmlaCsaConstInfo.s2BaseSize);
                     int64_t s2PerReduceBlock = ((s2Load + 31LL) / 32LL + s2BaseSize - 1) >> 7 << 7;
                     int64_t baseBlockNum = s2PerReduceBlock >> 7;
-                    runParam.baseBlockNumPerReductionBlock = baseBlockNum > 0 ? baseBlockNum : 1LL;
+                    mq35RunParam.baseBlockNumPerReductionBlock = baseBlockNum > 0 ? baseBlockNum : 1LL;
                 }
                 if (!mqsmlaS2NoNeedCalc) {
-                    bool isFirstS2RangeTask = (bnIdx == bN2StartIdx && gS1Index == runParam.gs1LoopStartIdx);
-                    bool isLastS2RangeTask = (lastBN && gS1Index == runParam.gs1LoopEndIdx - 1);
-                    int64_t s2StartPoint = ConvertS2MetadataBlockToToken(runParam, this->constInfo, s2StartIdx);
-                    int64_t s2EndPoint = (isLastS2RangeTask && s2EndIdx == 0) ?
-                                             0 :
-                                             ConvertS2MetadataBlockToToken(runParam, this->constInfo, s2EndIdx);
-                    mqsmlaS2NoNeedCalc = ApplyS2MetadataRange(runParam, this->constInfo, s2StartPoint, s2EndPoint,
-                                                              isFirstS2RangeTask, isLastS2RangeTask);
+                    bool isFirstS2RangeTask = (bnIdx == bN2StartIdx && gS1Index == mq35RunParam.gs1LoopStartIdx);
+                    bool isLastS2RangeTask = (lastBN && gS1Index == mq35RunParam.gs1LoopEndIdx - 1);
+                    int64_t s2StartPoint =
+                        ConvertMqsmlaS2MetadataBlockToToken(mq35RunParam, this->mqsmlaCsaConstInfo, s2StartIdx);
+                    int64_t s2EndPoint =
+                        (isLastS2RangeTask && s2EndIdx == 0) ?
+                            0 :
+                            ConvertMqsmlaS2MetadataBlockToToken(mq35RunParam, this->mqsmlaCsaConstInfo, s2EndIdx);
+                    mqsmlaS2NoNeedCalc =
+                        ApplyMqsmlaS2MetadataRange(mq35RunParam, this->mqsmlaCsaConstInfo, s2StartPoint, s2EndPoint,
+                                                   isFirstS2RangeTask, isLastS2RangeTask);
                 } else {
-                    runParam.isCrossCoreSplit = false;
+                    mq35RunParam.isCrossCoreSplit = false;
                 }
                 // s1和s2有任意一个不需要算, 则continue, 如果是当前核最后一次循环，则补充计算taskIdx+2的部分
                 if (mqsmlaS1NoNeedCalc || mqsmlaS2NoNeedCalc) {
                     continue;
                 }
                 if constexpr (IS_SPLIT_G) {
-                    mqsmlaMaxS2LoopCnt -= runParam.s2LoopEndIdx;
+                    mqsmlaMaxS2LoopCnt -= mq35RunParam.s2LoopEndIdx;
                 }
-                s2LoopLimit = runParam.s2LoopEndIdx - 1;
+                s2LoopLimit = mq35RunParam.s2LoopEndIdx - 1;
             } else {
                 s2LoopLimit = 0;
             }
             for (int64_t s2LoopCount = 0; s2LoopCount <= s2LoopLimit; ++s2LoopCount) {
-                int64_t safeBaseBlockNum =
-                    runParam.baseBlockNumPerReductionBlock > 0 ? runParam.baseBlockNumPerReductionBlock : 1LL;
-                int64_t reductionLoopCount = s2LoopCount;
+                int64_t mq35ReductionBlockSize =
+                    mq35RunParam.baseBlockNumPerReductionBlock > 0 ? mq35RunParam.baseBlockNumPerReductionBlock : 1LL;
+                int64_t mq35ReductionLoop = s2LoopCount;
                 if constexpr (IS_BATCH_CONSISTENCY) {
-                    if (s2LoopCount >= runParam.oriKvLoopEndIdx) {
-                        reductionLoopCount +=
-                            (safeBaseBlockNum - runParam.oriKvLoopEndIdx % safeBaseBlockNum) % safeBaseBlockNum;
+                    if (s2LoopCount >= mq35RunParam.oriKvLoopEndIdx) {
+                        mq35ReductionLoop +=
+                            (mq35ReductionBlockSize - mq35RunParam.oriKvLoopEndIdx % mq35ReductionBlockSize) %
+                            mq35ReductionBlockSize;
                     }
                 }
-                if (runParam.isCrossCoreSplit && reductionLoopCount % safeBaseBlockNum == 0) {
-                    runParam.s2SplitIdx = s2SplitIdxCounter++;
+                if (mq35RunParam.isCrossCoreSplit && mq35ReductionLoop % mq35ReductionBlockSize == 0) {
+                    mq35RunParam.s2SplitIdx = s2SplitIdxCounter++;
                 }
                 if (mqsmlaNotLastThreeLoop) {
-                    RunInfo<HIGH_PERF> &runInfo1 = runInfo[taskId % 4];
-                    this->SetRunInfo(runInfo1, runParam, taskId, s2LoopCount, s2LoopLimit, multiCoreInnerIdx);
+                    RunInfo<HIGH_PERF> &runInfo1 = mq35RunInfo[taskId % 4];
+                    this->SetMqsmlaRunInfo(runInfo1, mq35RunParam, taskId, s2LoopCount, s2LoopLimit,
+                                           mqsmlaMultiCoreInnerIdx);
                 }
                 if ASCEND_IS_AIV {
                     if (mqsmlaNotLastThreeLoop) {
-                        RunInfo<HIGH_PERF> &runInfo1 = runInfo[taskId % 4];
-                        this->vecBlock.ProcessVec0(v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1, this->constInfo);
+                        RunInfo<HIGH_PERF> &runInfo1 = mq35RunInfo[taskId % 4];
+                        this->mqsmlaCsaVecBlock.ProcessVec0(v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1,
+                                                            this->mqsmlaCsaConstInfo);
                     }
                     if (taskId > 1 && mqsmlaNotLast) {
-                        uint32_t bmm1Slot = bmm1GetFlag;
-                        bmm1GetFlag ^= 1;
-                        uint32_t l1PSlot = l1PGetFlag;
-                        l1PGetFlag ^= 1;
-                        auto &runInfo2 = runInfo[(taskId + 2) % 4];
-                        this->vecBlock.ProcessVec1(this->l1PBuffers[l1PSlot], this->bmm1Buffers[bmm1Slot], runInfo2,
-                                                   this->constInfo);
+                        uint32_t bmm1Slot = mqsmlaCsaBmm1GetFlag;
+                        mqsmlaCsaBmm1GetFlag ^= 1;
+                        uint32_t l1PSlot = mqsmlaCsaL1PGetFlag;
+                        mqsmlaCsaL1PGetFlag ^= 1;
+                        auto &runInfo2 = mq35RunInfo[(taskId + 2) % 4];
+                        this->mqsmlaCsaVecBlock.ProcessVec1(this->mqsmlaCsaL1PBuffers[l1PSlot],
+                                                            this->mqsmlaCsaBmm1Buffers[bmm1Slot], runInfo2,
+                                                            this->mqsmlaCsaConstInfo);
                     }
                     if (taskId > 2) {
-                        RunInfo<HIGH_PERF> &runInfo3 = runInfo[(taskId + 1) % 4];
-                        this->vecBlock.ProcessVec2(this->bmm2Buffers, runInfo3, this->constInfo);
+                        RunInfo<HIGH_PERF> &runInfo3 = mq35RunInfo[(taskId + 1) % 4];
+                        this->mqsmlaCsaVecBlock.ProcessVec2(this->mqsmlaCsaBmm2Buffers, runInfo3,
+                                                            this->mqsmlaCsaConstInfo);
                     }
                 } else {
                     if (taskId > 0 && mqsmlaNotLastTwoLoop) {
-                        RunInfo<HIGH_PERF> &runInfo1 = runInfo[(taskId + 3) % 4];
-                        this->cubeBlock.IterateLoadQK(v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1,
-                                                      this->constInfo, isFirstLoop);
+                        RunInfo<HIGH_PERF> &runInfo1 = mq35RunInfo[(taskId + 3) % 4];
+                        this->mqsmlaCsaCubeBlock.IterateLoadQK(v0ResGmBuffers.Get(runInfo1.taskIdMod3), runInfo1,
+                                                               this->mqsmlaCsaConstInfo, isFirstLoop);
                         isFirstLoop = false;
                     } else {
                         if constexpr (IS_SPLIT_G) {
@@ -668,25 +699,26 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
                         }
                     }
                     if (taskId > 1 && mqsmlaNotLast) {
-                        uint32_t bmm1Slot = bmm1GetFlag;
-                        bmm1GetFlag ^= 1;
-                        RunInfo<HIGH_PERF> &runInfo2 = runInfo[(taskId + 2) % 4];
-                        RunInfo<HIGH_PERF> &runInfoNext = runInfo[(taskId + 3) % 4];
-                        this->cubeBlock.IterateBmm1(this->bmm1Buffers[bmm1Slot],
-                                                    v0ResGmBuffers.Get(runInfo2.taskIdMod3), mqsmlaNotLastTwoLoop,
-                                                    runInfoNext, runInfo2, this->constInfo);
+                        uint32_t bmm1Slot = mqsmlaCsaBmm1GetFlag;
+                        mqsmlaCsaBmm1GetFlag ^= 1;
+                        RunInfo<HIGH_PERF> &runInfo2 = mq35RunInfo[(taskId + 2) % 4];
+                        RunInfo<HIGH_PERF> &runInfoNext = mq35RunInfo[(taskId + 3) % 4];
+                        this->mqsmlaCsaCubeBlock.IterateBmm1(
+                            this->mqsmlaCsaBmm1Buffers[bmm1Slot], v0ResGmBuffers.Get(runInfo2.taskIdMod3),
+                            mqsmlaNotLastTwoLoop, runInfoNext, runInfo2, this->mqsmlaCsaConstInfo);
                     }
                     if (taskId > 2) {
-                        uint32_t l1PSlot = l1PGetFlag;
-                        l1PGetFlag ^= 1;
-                        RunInfo<HIGH_PERF> &runInfo3 = runInfo[(taskId + 1) % 4];
-                        this->cubeBlock.IterateBmm2(this->bmm2Buffers, this->l1PBuffers[l1PSlot], runInfo3,
-                                                    this->constInfo);
+                        uint32_t l1PSlot = mqsmlaCsaL1PGetFlag;
+                        mqsmlaCsaL1PGetFlag ^= 1;
+                        RunInfo<HIGH_PERF> &runInfo3 = mq35RunInfo[(taskId + 1) % 4];
+                        this->mqsmlaCsaCubeBlock.IterateBmm2(this->mqsmlaCsaBmm2Buffers,
+                                                             this->mqsmlaCsaL1PBuffers[l1PSlot], runInfo3,
+                                                             this->mqsmlaCsaConstInfo);
                     }
                 }
                 ++taskId;
             }
-            ++multiCoreInnerIdx;
+            ++mqsmlaMultiCoreInnerIdx;
         }
         gS1StartIdx = 0;
     }
@@ -700,16 +732,17 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     }
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline int64_t MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ConvertS2MetadataBlockToToken(
-    const RunParamStr<HIGH_PERF> &runParam, const ConstInfo<HIGH_PERF> &constInfo, uint32_t s2BlockIdx)
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline int64_t
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::ConvertMqsmlaS2MetadataBlockToToken(
+    const RunParamStr<HIGH_PERF> &mq35RunParam, const ConstInfo<HIGH_PERF> &mqsmlaCsaConstInfo, uint32_t s2BlockIdx)
 {
-    int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
-    int64_t oriLen = runParam.s2LineOriEndIdx - runParam.s2LineStartIdx;
-    int64_t cmpLen = runParam.s2CmpLineEndIdx - runParam.s2CmpLineStartIdx;
-    int64_t safeBaseBlockNum =
-        runParam.baseBlockNumPerReductionBlock > 0 ? runParam.baseBlockNumPerReductionBlock : 1LL;
-    int64_t reductionBlockSize = safeBaseBlockNum * s2BaseSize;
+    int64_t s2BaseSize = static_cast<int64_t>(mqsmlaCsaConstInfo.s2BaseSize);
+    int64_t oriLen = mq35RunParam.s2LineOriEndIdx - mq35RunParam.s2LineStartIdx;
+    int64_t cmpLen = mq35RunParam.s2CmpLineEndIdx - mq35RunParam.s2CmpLineStartIdx;
+    int64_t mq35ReductionBlockSize =
+        mq35RunParam.baseBlockNumPerReductionBlock > 0 ? mq35RunParam.baseBlockNumPerReductionBlock : 1LL;
+    int64_t reductionBlockSize = mq35ReductionBlockSize * s2BaseSize;
     int64_t oriReductionBlockNum = (oriLen + reductionBlockSize - 1) / reductionBlockSize;
     if (s2BlockIdx <= oriReductionBlockNum) {
         int64_t oriToken = static_cast<int64_t>(s2BlockIdx) * reductionBlockSize;
@@ -719,16 +752,17 @@ __aicore__ inline int64_t MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockTyp
     return oriLen + (cmpToken < cmpLen ? cmpToken : cmpLen);
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline bool MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ApplyS2MetadataRange(
-    RunParamStr<HIGH_PERF> &runParam, ConstInfo<HIGH_PERF> &constInfo, int64_t s2StartPoint, int64_t s2EndPoint,
-    bool isFirstS2RangeTask, bool isLastS2RangeTask)
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline bool
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::ApplyMqsmlaS2MetadataRange(
+    RunParamStr<HIGH_PERF> &mq35RunParam, ConstInfo<HIGH_PERF> &mqsmlaCsaConstInfo, int64_t s2StartPoint,
+    int64_t s2EndPoint, bool isFirstS2RangeTask, bool isLastS2RangeTask)
 {
-    int64_t oriStart = runParam.s2LineStartIdx;
-    int64_t oriEnd = runParam.s2LineOriEndIdx;
+    int64_t oriStart = mq35RunParam.s2LineStartIdx;
+    int64_t oriEnd = mq35RunParam.s2LineOriEndIdx;
     int64_t oriLen = oriEnd - oriStart;
-    int64_t cmpStart = runParam.s2CmpLineStartIdx;
-    int64_t cmpEnd = runParam.s2CmpLineEndIdx;
+    int64_t cmpStart = mq35RunParam.s2CmpLineStartIdx;
+    int64_t cmpEnd = mq35RunParam.s2CmpLineEndIdx;
     int64_t cmpLen = cmpEnd - cmpStart;
     int64_t totalLen = oriLen + cmpLen;
 
@@ -740,175 +774,184 @@ __aicore__ inline bool MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     rangeEnd = rangeEnd < 0 ? 0 : rangeEnd;
     rangeEnd = rangeEnd < totalLen ? rangeEnd : totalLen;
     if (rangeEnd <= rangeStart) {
-        runParam.oriKvLoopEndIdx = 0;
-        runParam.cmpKvLoopEndIdx = 0;
-        runParam.s2LoopEndIdx = 0;
-        runParam.isCrossCoreSplit = false;
+        mq35RunParam.oriKvLoopEndIdx = 0;
+        mq35RunParam.cmpKvLoopEndIdx = 0;
+        mq35RunParam.s2LoopEndIdx = 0;
+        mq35RunParam.isCrossCoreSplit = false;
         return true;
     }
 
     bool hasPrevCore = rangeStart > 0;
     bool hasNextCore = rangeEnd < totalLen;
-    runParam.isCrossCoreSplit = hasPrevCore || hasNextCore;
-    runParam.isFirstS2SplitCore = !hasPrevCore;
+    mq35RunParam.isCrossCoreSplit = hasPrevCore || hasNextCore;
+    mq35RunParam.isFirstS2SplitCore = !hasPrevCore;
 
     int64_t oriRangeStart = rangeStart < oriLen ? rangeStart : oriLen;
     int64_t oriRangeEnd = rangeEnd < oriLen ? rangeEnd : oriLen;
-    runParam.s2LineStartIdx = oriStart + oriRangeStart;
-    runParam.s2LineOriEndIdx = oriStart + oriRangeEnd;
+    mq35RunParam.s2LineStartIdx = oriStart + oriRangeStart;
+    mq35RunParam.s2LineOriEndIdx = oriStart + oriRangeEnd;
 
     int64_t cmpRangeStart = rangeStart > oriLen ? rangeStart - oriLen : 0;
     cmpRangeStart = cmpRangeStart < cmpLen ? cmpRangeStart : cmpLen;
     int64_t cmpRangeEnd = rangeEnd > oriLen ? rangeEnd - oriLen : 0;
     cmpRangeEnd = cmpRangeEnd < cmpLen ? cmpRangeEnd : cmpLen;
-    runParam.s2CmpLineStartIdx = cmpStart + cmpRangeStart;
-    runParam.s2CmpLineEndIdx = cmpStart + cmpRangeEnd;
+    mq35RunParam.s2CmpLineStartIdx = cmpStart + cmpRangeStart;
+    mq35RunParam.s2CmpLineEndIdx = cmpStart + cmpRangeEnd;
 
-    int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
-    int64_t oriRangeLen = runParam.s2LineOriEndIdx - runParam.s2LineStartIdx;
-    int64_t cmpRangeLen = runParam.s2CmpLineEndIdx - runParam.s2CmpLineStartIdx;
-    runParam.oriKvLoopEndIdx = (oriRangeLen + s2BaseSize - 1) / s2BaseSize;
-    runParam.cmpKvLoopEndIdx = (cmpRangeLen + s2BaseSize - 1) / s2BaseSize;
-    runParam.s2LoopEndIdx = runParam.oriKvLoopEndIdx + runParam.cmpKvLoopEndIdx;
-    return runParam.s2LoopEndIdx == 0;
+    int64_t s2BaseSize = static_cast<int64_t>(mqsmlaCsaConstInfo.s2BaseSize);
+    int64_t oriRangeLen = mq35RunParam.s2LineOriEndIdx - mq35RunParam.s2LineStartIdx;
+    int64_t cmpRangeLen = mq35RunParam.s2CmpLineEndIdx - mq35RunParam.s2CmpLineStartIdx;
+    mq35RunParam.oriKvLoopEndIdx = (oriRangeLen + s2BaseSize - 1) / s2BaseSize;
+    mq35RunParam.cmpKvLoopEndIdx = (cmpRangeLen + s2BaseSize - 1) / s2BaseSize;
+    mq35RunParam.s2LoopEndIdx = mq35RunParam.oriKvLoopEndIdx + mq35RunParam.cmpKvLoopEndIdx;
+    return mq35RunParam.s2LoopEndIdx == 0;
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ParseFdRunInfo(FdRunInfo &fdRunInfo)
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::ParseMqsmlaFdRunInfo(
+    FdRunInfo &fdRunInfo)
 {
-    uint32_t aivIdx = static_cast<uint32_t>(this->constInfo.aivIdx);
-    fdRunInfo.coreEnable = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_CORE_ENABLE_INDEX, true)) != 0;
+    uint32_t aivIdx = static_cast<uint32_t>(this->mqsmlaCsaConstInfo.aivIdx);
+    fdRunInfo.coreEnable = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_CORE_ENABLE_INDEX, true)) != 0;
     if (!fdRunInfo.coreEnable) {
         return;
     }
 
-    fdRunInfo.bn2Idx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_BN2_IDX_INDEX, true));
-    fdRunInfo.mIdx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_IDX_INDEX, true));
-    fdRunInfo.workspaceIdx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_IDX_INDEX, true));
-    fdRunInfo.workspaceNum = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_NUM_INDEX, true));
-    fdRunInfo.mStartIdx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_START_INDEX, true));
-    fdRunInfo.mNum = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_NUM_INDEX, true));
+    fdRunInfo.bn2Idx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_BN2_IDX_INDEX, true));
+    fdRunInfo.mIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_IDX_INDEX, true));
+    fdRunInfo.workspaceIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_IDX_INDEX, true));
+    fdRunInfo.workspaceNum = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_NUM_INDEX, true));
+    fdRunInfo.mStartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_START_INDEX, true));
+    fdRunInfo.mNum = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_NUM_INDEX, true));
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(
-    int64_t bnIndex, int64_t gS1Index, RunParamStr<HIGH_PERF> &runParam)
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::ComputeMqsmlaAxisIdxByBnAndGs1(
+    int64_t bnIndex, int64_t gS1Index, RunParamStr<HIGH_PERF> &mq35RunParam)
 {
     // GS1合轴, 不切G, 只切S1
-    runParam.s1oIdx = gS1Index * runParam.qSNumInOneBlock;
+    mq35RunParam.s1oIdx = gS1Index * mq35RunParam.qSNumInOneBlock;
     if constexpr (IS_SPLIT_G) {
-        int64_t mqsmlaHalfG = (constInfo.gSize + 1) / 2; // ceil(gSize/2), 第一个AIC多处理一行
-        runParam.goIdx = (aicIdx % 2 == 0) ? 0 : mqsmlaHalfG;
-        runParam.gSplitSize = (aicIdx % 2 == 0) ? mqsmlaHalfG : (constInfo.gSize - mqsmlaHalfG);
+        int64_t mqsmlaHalfG = (mqsmlaCsaConstInfo.gSize + 1) / 2; // ceil(gSize/2), 第一个AIC多处理一行
+        mq35RunParam.goIdx = (mqsmlaCsaAicIdx % 2 == 0) ? 0 : mqsmlaHalfG;
+        mq35RunParam.gSplitSize = (mqsmlaCsaAicIdx % 2 == 0) ? mqsmlaHalfG : (mqsmlaCsaConstInfo.gSize - mqsmlaHalfG);
     } else {
-        runParam.goIdx = 0;
-        runParam.gSplitSize = constInfo.gSize;
+        mq35RunParam.goIdx = 0;
+        mq35RunParam.gSplitSize = mqsmlaCsaConstInfo.gSize;
     }
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::SetRunInfo(
-    RunInfo<HIGH_PERF> &runInfo, RunParamStr<HIGH_PERF> &runParam, int64_t taskId, int64_t s2LoopCount,
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::SetMqsmlaRunInfo(
+    RunInfo<HIGH_PERF> &mq35RunInfo, RunParamStr<HIGH_PERF> &mq35RunParam, int64_t taskId, int64_t s2LoopCount,
     int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
 {
-    if (s2LoopCount < runParam.oriKvLoopEndIdx) {
-        runInfo.s2StartIdx = runParam.s2LineStartIdx;
-        runInfo.s2EndIdx = runParam.s2LineOriEndIdx;
+    if (s2LoopCount < mq35RunParam.oriKvLoopEndIdx) {
+        mq35RunInfo.s2StartIdx = mq35RunParam.s2LineStartIdx;
+        mq35RunInfo.s2EndIdx = mq35RunParam.s2LineOriEndIdx;
     } else {
-        runInfo.s2StartIdx = runParam.s2CmpLineStartIdx;
-        runInfo.s2EndIdx = runParam.s2CmpLineEndIdx;
+        mq35RunInfo.s2StartIdx = mq35RunParam.s2CmpLineStartIdx;
+        mq35RunInfo.s2EndIdx = mq35RunParam.s2CmpLineEndIdx;
     }
-    runInfo.s2LoopCount = s2LoopCount;
-    if (runInfo.multiCoreInnerIdx != multiCoreInnerIdx) {
-        runInfo.s1oIdx = runParam.s1oIdx;
-        runInfo.boIdx = runParam.boIdx;
-        runInfo.n2oIdx = runParam.n2oIdx;
-        runInfo.goIdx = runParam.goIdx;
-        runInfo.multiCoreInnerIdx = multiCoreInnerIdx;
-        runInfo.multiCoreIdxMod2 = multiCoreInnerIdx & 1;
-        runInfo.multiCoreIdxMod3 = multiCoreInnerIdx % 3;
+    mq35RunInfo.s2LoopCount = s2LoopCount;
+    if (mq35RunInfo.multiCoreInnerIdx != multiCoreInnerIdx) {
+        mq35RunInfo.s1oIdx = mq35RunParam.s1oIdx;
+        mq35RunInfo.boIdx = mq35RunParam.boIdx;
+        mq35RunInfo.n2oIdx = mq35RunParam.n2oIdx;
+        mq35RunInfo.goIdx = mq35RunParam.goIdx;
+        mq35RunInfo.multiCoreInnerIdx = multiCoreInnerIdx;
+        mq35RunInfo.multiCoreIdxMod2 = multiCoreInnerIdx & 1;
+        mq35RunInfo.multiCoreIdxMod3 = multiCoreInnerIdx % 3;
     }
 
-    runInfo.taskId = taskId;
-    runInfo.taskIdMod2 = taskId & 1;
-    runInfo.taskIdMod3 = taskId % 3;
-    runInfo.s2LoopLimit = s2LoopLimit;
+    mq35RunInfo.taskId = taskId;
+    mq35RunInfo.taskIdMod2 = taskId & 1;
+    mq35RunInfo.taskIdMod3 = taskId % 3;
+    mq35RunInfo.s2LoopLimit = s2LoopLimit;
 
-    runInfo.actualS1Size = runParam.actualS1Size;
-    runInfo.attentionOutOffset = runParam.attentionOutOffset;
-    runInfo.sOuterOffset = runParam.sOuterOffset;
-    runInfo.firstFdDataWorkspaceIdx = runParam.firstFdDataWorkspaceIdx;
-    runInfo.isCrossCoreSplit = runParam.isCrossCoreSplit;
-    runInfo.s2SplitIdx = runParam.s2SplitIdx;
-    runInfo.isFirstS2SplitCore = runParam.isFirstS2SplitCore;
-    int64_t safeBaseBlockNum =
-        runParam.baseBlockNumPerReductionBlock > 0 ? runParam.baseBlockNumPerReductionBlock : 1LL;
-    int64_t reductionLoopCount = s2LoopCount;
+    mq35RunInfo.actualS1Size = mq35RunParam.actualS1Size;
+    mq35RunInfo.attentionOutOffset = mq35RunParam.attentionOutOffset;
+    mq35RunInfo.sOuterOffset = mq35RunParam.sOuterOffset;
+    mq35RunInfo.firstFdDataWorkspaceIdx = mq35RunParam.firstFdDataWorkspaceIdx;
+    mq35RunInfo.isCrossCoreSplit = mq35RunParam.isCrossCoreSplit;
+    mq35RunInfo.s2SplitIdx = mq35RunParam.s2SplitIdx;
+    mq35RunInfo.isFirstS2SplitCore = mq35RunParam.isFirstS2SplitCore;
+    int64_t mq35ReductionBlockSize =
+        mq35RunParam.baseBlockNumPerReductionBlock > 0 ? mq35RunParam.baseBlockNumPerReductionBlock : 1LL;
+    int64_t mq35ReductionLoop = s2LoopCount;
     if constexpr (IS_BATCH_CONSISTENCY) {
         // 进入 CMP 时补齐规约计数，不增加实际计算。
-        if (s2LoopCount >= runParam.oriKvLoopEndIdx) {
-            reductionLoopCount += (safeBaseBlockNum - runParam.oriKvLoopEndIdx % safeBaseBlockNum) % safeBaseBlockNum;
+        if (s2LoopCount >= mq35RunParam.oriKvLoopEndIdx) {
+            mq35ReductionLoop += (mq35ReductionBlockSize - mq35RunParam.oriKvLoopEndIdx % mq35ReductionBlockSize) %
+                                 mq35ReductionBlockSize;
         }
     }
-    int64_t baseBlockIdInReduceBlock = reductionLoopCount % safeBaseBlockNum;
-    runInfo.reduceBlockId = reductionLoopCount / safeBaseBlockNum;
-    runInfo.isFirstBase = baseBlockIdInReduceBlock == 0;
-    runInfo.isLastBase = ((safeBaseBlockNum - baseBlockIdInReduceBlock) == 1LL) || (s2LoopCount == s2LoopLimit);
+    int64_t baseBlockIdInReduceBlock = mq35ReductionLoop % mq35ReductionBlockSize;
+    mq35RunInfo.reduceBlockId = mq35ReductionLoop / mq35ReductionBlockSize;
+    mq35RunInfo.isFirstBase = baseBlockIdInReduceBlock == 0;
+    mq35RunInfo.isLastBase =
+        ((mq35ReductionBlockSize - baseBlockIdInReduceBlock) == 1LL) || (s2LoopCount == s2LoopLimit);
     if constexpr (IS_BATCH_CONSISTENCY) {
-        runInfo.isLastBase = runInfo.isLastBase || s2LoopCount + 1 == runParam.oriKvLoopEndIdx;
+        mq35RunInfo.isLastBase = mq35RunInfo.isLastBase || s2LoopCount + 1 == mq35RunParam.oriKvLoopEndIdx;
     }
-    runInfo.needReduce = runInfo.reduceBlockId > 0;
-    this->ComputeBmm1Tail(runInfo, runParam);
-    InitUniqueRunInfo(runParam, runInfo);
+    mq35RunInfo.needReduce = mq35RunInfo.reduceBlockId > 0;
+    this->ComputeMqsmlaBmm1Tail(mq35RunInfo, mq35RunParam);
+    InitMqsmlaUniqueRunInfo(mq35RunParam, mq35RunInfo);
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::InitUniqueRunInfo(
-    const RunParamStr<HIGH_PERF> &runParam, RunInfo<HIGH_PERF> &runInfo)
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::InitMqsmlaUniqueRunInfo(
+    const RunParamStr<HIGH_PERF> &mq35RunParam, RunInfo<HIGH_PERF> &mq35RunInfo)
 {
-    InitTaskParamByRun<TEMPLATE_INTF_ARGS>(runParam, runInfo);
+    InitTaskParamByRun<TEMPLATE_INTF_ARGS>(mq35RunParam, mq35RunInfo);
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::FreeEvent()
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::FreeMqsmlaEvent()
 {
     if ASCEND_IS_AIC {
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1(bmm1Buffers[0].idx));
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1(bmm1Buffers[0].idx) + AIV0_AIV1_OFFSET);
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1(bmm1Buffers[1].idx));
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1(bmm1Buffers[1].idx) + AIV0_AIV1_OFFSET);
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1(mqsmlaCsaBmm1Buffers[0].idx));
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1(mqsmlaCsaBmm1Buffers[0].idx) +
+                                                          AIV0_AIV1_OFFSET);
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1(mqsmlaCsaBmm1Buffers[1].idx));
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM1(mqsmlaCsaBmm1Buffers[1].idx) +
+                                                          AIV0_AIV1_OFFSET);
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM2);
         CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM2 + AIV0_AIV1_OFFSET);
-        this->cubeBlock.FreeEvent();
+        this->mqsmlaCsaCubeBlock.ReleaseMqsmlaCubeEvents();
     } else {
-        this->vecBlock.FreeEvent(constInfo);
+        this->mqsmlaCsaVecBlock.FreeEvent(mqsmlaCsaConstInfo);
     }
 }
 
-template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ComputeBmm1Tail(
-    RunInfo<HIGH_PERF> &runInfo, RunParamStr<HIGH_PERF> &runParam)
+template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>
+__aicore__ inline void
+MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::ComputeMqsmlaBmm1Tail(
+    RunInfo<HIGH_PERF> &mq35RunInfo, RunParamStr<HIGH_PERF> &mq35RunParam)
 {
     // ------------------------S1 Base Related---------------------------
-    runInfo.s1RealSize = runParam.s1RealSize;
-    runInfo.halfS1RealSize = runParam.halfS1RealSize;
-    runInfo.firstHalfS1RealSize = runParam.firstHalfS1RealSize;
-    runInfo.mRealSize = runParam.mRealSize;
-    runInfo.halfMRealSize = runParam.halfMRealSize;
-    runInfo.firstHalfMRealSize = runParam.firstHalfMRealSize;
+    mq35RunInfo.s1RealSize = mq35RunParam.s1RealSize;
+    mq35RunInfo.halfS1RealSize = mq35RunParam.halfS1RealSize;
+    mq35RunInfo.firstHalfS1RealSize = mq35RunParam.firstHalfS1RealSize;
+    mq35RunInfo.mRealSize = mq35RunParam.mRealSize;
+    mq35RunInfo.halfMRealSize = mq35RunParam.halfMRealSize;
+    mq35RunInfo.firstHalfMRealSize = mq35RunParam.firstHalfMRealSize;
 
-    runInfo.vec2S1BaseSize = runInfo.halfS1RealSize; // D>128 这里需要适配
-    runInfo.vec2MBaseSize = runInfo.halfMRealSize;
+    mq35RunInfo.vec2S1BaseSize = mq35RunInfo.halfS1RealSize; // D>128 这里需要适配
+    mq35RunInfo.vec2MBaseSize = mq35RunInfo.halfMRealSize;
 
     // ------------------------S2 Base Related----------------------------
-    runInfo.s2RealSize = constInfo.s2BaseSize;
-    runInfo.s2AlignedSize = runInfo.s2RealSize;
-    int64_t mqsmlaCurS2LoopCnt = (runInfo.s2LoopCount >= runParam.oriKvLoopEndIdx) ?
-                                     (runInfo.s2LoopCount - runParam.oriKvLoopEndIdx) :
-                                     runInfo.s2LoopCount;
-    if (runInfo.s2StartIdx + (mqsmlaCurS2LoopCnt + 1) * runInfo.s2RealSize > runInfo.s2EndIdx) {
-        runInfo.s2RealSize = runInfo.s2EndIdx - mqsmlaCurS2LoopCnt * runInfo.s2RealSize - runInfo.s2StartIdx;
-        runInfo.s2AlignedSize = Align(runInfo.s2RealSize);
+    mq35RunInfo.s2RealSize = mqsmlaCsaConstInfo.s2BaseSize;
+    mq35RunInfo.s2AlignedSize = mq35RunInfo.s2RealSize;
+    int64_t mqsmlaCurS2LoopCnt = (mq35RunInfo.s2LoopCount >= mq35RunParam.oriKvLoopEndIdx) ?
+                                     (mq35RunInfo.s2LoopCount - mq35RunParam.oriKvLoopEndIdx) :
+                                     mq35RunInfo.s2LoopCount;
+    if (mq35RunInfo.s2StartIdx + (mqsmlaCurS2LoopCnt + 1) * mq35RunInfo.s2RealSize > mq35RunInfo.s2EndIdx) {
+        mq35RunInfo.s2RealSize =
+            mq35RunInfo.s2EndIdx - mqsmlaCurS2LoopCnt * mq35RunInfo.s2RealSize - mq35RunInfo.s2StartIdx;
+        mq35RunInfo.s2AlignedSize = Align(mq35RunInfo.s2RealSize);
     }
 }
 } // namespace BaseApi

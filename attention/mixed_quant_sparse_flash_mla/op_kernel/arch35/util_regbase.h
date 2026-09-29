@@ -23,13 +23,13 @@ using AscendC::TQue;
 using AscendC::QuePosition;
 
 namespace regbaseutil {
-constexpr int64_t MAX_PRE_NEXT_TOKENS = 0x7FFFFFFF;
+constexpr int64_t MQSMLA_MAX_WINDOW_TOKENS = 0x7FFFFFFF;
 enum class VselrIndexEnum {
     GT_64_AND_LTE_128_INDEX = 0,
     GT_0_AND_LTE_64_INDEX = 1
 };
 
-#define RUN_PARAM_COMMON_FIELDS \
+#define MQSMLA_RUN_PARAM_FIELDS \
     int64_t boIdx; \
     int64_t s1oIdx; \
     int64_t n2oIdx; \
@@ -56,9 +56,9 @@ enum class VselrIndexEnum {
     /* BN循环生产的数据 */ \
     int64_t gs1LoopStartIdx; \
     int64_t gs1LoopEndIdx; \
-    int64_t preTokensPerBatch = MAX_PRE_NEXT_TOKENS;     /* 左上顶点的pretoken */ \
-    int64_t nextTokensPerBatchOri = MAX_PRE_NEXT_TOKENS; /* ori 左上顶点的nexttoken */ \
-    int64_t nextTokensPerBatchCmp = MAX_PRE_NEXT_TOKENS; /* cmp 左上顶点的nexttoken */ \
+    int64_t preTokensPerBatch = MQSMLA_MAX_WINDOW_TOKENS;     /* 左上顶点的pretoken */ \
+    int64_t nextTokensPerBatchOri = MQSMLA_MAX_WINDOW_TOKENS; /* ori 左上顶点的nexttoken */ \
+    int64_t nextTokensPerBatchCmp = MQSMLA_MAX_WINDOW_TOKENS; /* cmp 左上顶点的nexttoken */ \
     /* NBS1循环生产的数据 */ \
     int64_t sOuterOffset;     /* 单个S内 souter的 souterIdx * halfS1RealSize souter层确定 */ \
     int64_t cubeSOuterOffset; /* 单个S内 souter的 souterIdx * halfS1RealSize souter层确定 */ \
@@ -73,22 +73,22 @@ enum class VselrIndexEnum {
     bool isCrossCoreSplit = false; \
     bool isFirstS2SplitCore = true
 
-#define RUN_PARAM_TOPK_LSE_FIELDS \
+#define MQSMLA_RUN_PARAM_TOPK_LSE_FIELDS \
     /* lse/topk len 相关参数, 仅在非HIGH_PERF模式存在 */ \
     int64_t softmaxLseOffset /* lse 输出offset, souter层确定 */
 
 template <bool HIGH_PERF = false>
 struct RunParamStr { // 分核与切块需要使用到参数
-    RUN_PARAM_COMMON_FIELDS;
-    RUN_PARAM_TOPK_LSE_FIELDS;
+    MQSMLA_RUN_PARAM_FIELDS;
+    MQSMLA_RUN_PARAM_TOPK_LSE_FIELDS;
 };
 
 template <>
 struct RunParamStr<true> { // HIGH_PERF: 无topk len且无lse场景, 剔除topk/lse相关字段
-    RUN_PARAM_COMMON_FIELDS;
+    MQSMLA_RUN_PARAM_FIELDS;
 };
 
-#define RUN_INFO_COMMON_FIELDS \
+#define MQSMLA_RUN_INFO_FIELDS \
     uint64_t s2StartIdx; /* s2的起始位置，sparse场景下可能不是0 */ \
     int64_t s2EndIdx; \
     int64_t s2LoopCount; /* s2循环当前的循环index */ \
@@ -142,19 +142,19 @@ struct RunParamStr<true> { // HIGH_PERF: 无topk len且无lse场景, 剔除topk/
     bool isLastBase = true; \
     bool needReduce = false
 
-#define RUN_INFO_TOPK_LSE_FIELDS \
+#define MQSMLA_RUN_INFO_TOPK_LSE_FIELDS \
     /* lse 输出offset, 仅在非HIGH_PERF模式存在 */ \
     int64_t softmaxLseOffset
 
 template <bool HIGH_PERF = false>
 struct RunInfo {
-    RUN_INFO_COMMON_FIELDS;
-    RUN_INFO_TOPK_LSE_FIELDS;
+    MQSMLA_RUN_INFO_FIELDS;
+    MQSMLA_RUN_INFO_TOPK_LSE_FIELDS;
 };
 
 template <>
 struct RunInfo<true> { // HIGH_PERF: 无topk len且无lse场景, 剔除topk/lse相关字段
-    RUN_INFO_COMMON_FIELDS;
+    MQSMLA_RUN_INFO_FIELDS;
 };
 
 template <bool HIGH_PERF = false>

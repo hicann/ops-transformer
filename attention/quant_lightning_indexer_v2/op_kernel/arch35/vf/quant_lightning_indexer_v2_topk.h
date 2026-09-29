@@ -153,8 +153,8 @@ public:
             uint32_t curProcess = liV2TopkCommon::GetGatherLoopOffset(topK, trunkLen, loopIdx);
             // 2:pingpong
             topkb16gather::QLiV2TopKGatherVF(hisIndexLocal[(loopIdx + 1) % 2], hisValueLocal, mrgValueLocal,
-                                             tmpIndexLocal, hisIndexLocal[loopIdx % 2], topK, curProcess,
-                                             s2SeqLen); // 2:pingpong
+                                             tmpIndexLocal, hisIndexLocal[loopIdx % 2], // 2:pingpong
+                                             topK, curProcess, s2SeqLen);
             if (loopIdx == s2LoopNum - 1) {
                 PipeBarrier<PIPE_V>();
                 if ((loopIdx + 1) % 2 == 1) {                                            // 2:pingpong
@@ -179,8 +179,8 @@ public:
             uint32_t curProcess = liV2TopkCommon::GetGatherLoopOffset(topK, trunkLen, loopIdx);
             // 2:pingpong
             topkb16gather::QLiV2TopKGatherVF(hisIndexLocal[(loopIdx + 1) % 2], hisValueLocal, mrgValueLocal,
-                                             tmpIndexLocal, hisIndexLocal[loopIdx % 2], topK, curProcess,
-                                             s2SeqLen); // 2:pingpong
+                                             tmpIndexLocal, hisIndexLocal[loopIdx % 2], // 2:pingpong
+                                             topK, curProcess, s2SeqLen);
             PipeBarrier<PIPE_V>();
             AscendC::DataCopy(indicesOutLocal, hisIndexLocal[(loopIdx + 1) % 2], // 2:pingpong
                               QLIV2Common::Align(topK, (uint32_t)256));          // 256：拷贝长度对齐大小

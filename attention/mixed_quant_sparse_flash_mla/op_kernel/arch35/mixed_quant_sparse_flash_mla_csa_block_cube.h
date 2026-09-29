@@ -41,7 +41,7 @@ __aicore__ inline constexpr GmFormat GetQueryGmFormat()
 }
 
 TEMPLATES_DEF
-class CSABlockCube {
+class MqsmlaCsaBlockCube {
 public:
     /* =================编译期常量的基本块信息================= */
     static constexpr uint32_t s1BaseSize = 64;
@@ -52,7 +52,7 @@ public:
     static constexpr uint32_t rightBufSingleSize = s2BaseSize * dBaseSize;
     static constexpr uint32_t rightBufTotalSize = rightBufSingleSize * rightBufNum;
 
-    __aicore__ inline CSABlockCube(){};
+    __aicore__ inline MqsmlaCsaBlockCube(){};
     __aicore__ inline void InitLocalBuffer(uint32_t l1BaseAddr);
     __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
                                             const ConstInfo<HIGH_PERF> &constInfo);
@@ -63,7 +63,7 @@ public:
                                        Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
                                        bool notLastTwoLoop, RunInfo<HIGH_PERF> &runInfoNext,
                                        RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo);
-    __aicore__ inline void FreeEvent();
+    __aicore__ inline void ReleaseMqsmlaCubeEvents();
 
     __aicore__ inline void IterateBmm2(StaticBuffer<T> &outputBuf, StaticBuffer<Q_T> &l1PBuffer,
                                        RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo);
@@ -86,32 +86,33 @@ private:
     FaGmTensor<Q_T, Q_FORMAT, int32_t, Q_WITH_ZERO_HEAD> queryGm;
 
     /* =====================运行时变量==================== */
-    uint32_t l1QBufId = 0; // 3 buffer, 0-2 (轮转游标)
-    uint32_t l1KLoadBufId = 0;
-    uint32_t l1KMatmul1BufId = 0;
-    uint32_t l1KMatmul2BufId = 0;
+    uint32_t mqsmlaL1QueryCursor = 0; // 3 buffer, 0-2 (轮转游标)
+    uint32_t mqsmlaL1KvLoadCursor = 0;
+    uint32_t mqsmlaL1KvBmm1Cursor = 0;
+    uint32_t mqsmlaL1KvBmm2Cursor = 0;
     /* =====================LocalBuffer变量==================== */
-    StaticBuffer<Q_T> l1QBufs[3];
-    StaticBuffer<Q_T> l1RightBufs[3];
-    StaticBuffer<Q_T> l0ABufs[2];
+    StaticBuffer<Q_T> mqsmlaL1QueryBuffers[3];
+    StaticBuffer<Q_T> mqsmlaL1KvBuffers[3];
+    StaticBuffer<Q_T> mqsmlaL0ABuffers[2];
     RingBuffer<Q_T> l0A;
-    StaticBuffer<Q_T> l0BBufs[2];
+    StaticBuffer<Q_T> mqsmlaL0BBuffers[2];
     RingBuffer<Q_T> l0B;
-    StaticBuffer<T> l0CBufs[2];
+    StaticBuffer<T> mqsmlaL0CBuffers[2];
     RingBuffer<T> l0C;
 };
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitLocalBuffer(uint32_t l1BaseAddr)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitLocalBuffer(uint32_t l1BaseAddr)
 {
-    AttentionCommon::InitCubeLocalBuffer<Q_T, T>(l1QBufs, l1RightBufs, l0ABufs, l0A, l0BBufs, l0B, l0CBufs, l0C,
-                                                 l1BaseAddr);
+    AttentionCommon::InitCubeLocalBuffer<Q_T, T>(mqsmlaL1QueryBuffers, mqsmlaL1KvBuffers, mqsmlaL0ABuffers, l0A,
+                                                 mqsmlaL0BBuffers, l0B, mqsmlaL0CBuffers, l0C, l1BaseAddr);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *cuSeqlensQ,
-                                                                     __gm__ uint8_t *sequsedQ,
-                                                                     const ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(__gm__ uint8_t *query,
+                                                                           __gm__ uint8_t *cuSeqlensQ,
+                                                                           __gm__ uint8_t *sequsedQ,
+                                                                           const ConstInfo<HIGH_PERF> &constInfo)
 {
     if ASCEND_IS_AIC {
         this->queryGm.gmTensor.SetGlobalBuffer((__gm__ Q_T *)query);
@@ -120,7 +121,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitGlobalBuffer(__gm__ uint
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::FreeEvent()
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::ReleaseMqsmlaCubeEvents()
 {
     WaitFlag<HardEvent::M_MTE1>(INNERCORE_L0AB(0));
     WaitFlag<HardEvent::M_MTE1>(INNERCORE_L0AB(1));
@@ -135,8 +136,9 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::FreeEvent()
 }
 /* 初始化GmTensor,设置shape信息并计算strides */
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitGmTensor(__gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
-                                                                 const ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitGmTensor(__gm__ uint8_t *cuSeqlensQ,
+                                                                       __gm__ uint8_t *sequsedQ,
+                                                                       const ConstInfo<HIGH_PERF> &constInfo)
 {
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::BSND) {
         this->queryGm.offsetCalculator.Init(constInfo.bSize, constInfo.n2Size, constInfo.gSize, constInfo.s1Size,
@@ -150,7 +152,7 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::InitGmTensor(__gm__ uint8_t 
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1(
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1(
     StaticBuffer<T> &outputBuf, Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
     bool notLastTwoLoop, RunInfo<HIGH_PERF> &runInfoNext, RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo)
 {
@@ -158,40 +160,40 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm2(StaticBuffer<T> &outputBuf,
-                                                                StaticBuffer<Q_T> &l1PBuffer,
-                                                                RunInfo<HIGH_PERF> &runInfo,
-                                                                ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2(StaticBuffer<T> &outputBuf,
+                                                                      StaticBuffer<Q_T> &l1PBuffer,
+                                                                      RunInfo<HIGH_PERF> &runInfo,
+                                                                      ConstInfo<HIGH_PERF> &constInfo)
 {
     IterateBmm2CSA(outputBuf, l1PBuffer, runInfo, constInfo);
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::CopyQGmToL1(RunInfo<HIGH_PERF> &runInfo,
-                                                                ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::CopyQGmToL1(RunInfo<HIGH_PERF> &runInfo,
+                                                                      ConstInfo<HIGH_PERF> &constInfo)
 {
     uint64_t gmOffset = this->queryGm.offsetCalculator.GetOffset(runInfo.boIdx, runInfo.n2oIdx, runInfo.goIdx,
                                                                  runInfo.s1oIdx * runInfo.qSNumInOneBlock, 0);
     for (uint32_t i = 0; i < 2U; i++) {
-        uint32_t mqsmlaCurL1QBufId = (l1QBufId + i) % 3U;
+        uint32_t mqsmlaCurL1QBufId = (mqsmlaL1QueryCursor + i) % 3U;
         WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(mqsmlaCurL1QBufId));
         uint64_t curGmOffset = gmOffset + i * (constInfo.dSize >> 1);
-        CopyToL1Nd2Nz<Q_T>(l1QBufs[mqsmlaCurL1QBufId].tensor, this->queryGm.gmTensor[curGmOffset], runInfo.mRealSize,
-                           constInfo.dSize >> 1, constInfo.mm1Ka);
+        CopyToL1Nd2Nz<Q_T>(mqsmlaL1QueryBuffers[mqsmlaCurL1QBufId].tensor, this->queryGm.gmTensor[curGmOffset],
+                           runInfo.mRealSize, constInfo.dSize >> 1, constInfo.mm1Ka);
         SetFlag<HardEvent::MTE2_MTE1>(INNERCORE_L1Q(mqsmlaCurL1QBufId));
     }
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateLoadQK(
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateLoadQK(
     Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm, RunInfo<HIGH_PERF> &runInfo,
     ConstInfo<HIGH_PERF> &constInfo, bool isFirstLoop)
 {
     if (unlikely(isFirstLoop)) {
         CopyQGmToL1(runInfo, constInfo);
     }
-    WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(l1KLoadBufId));
-    LocalTensor<Q_T> dst = l1RightBufs[runInfo.taskIdMod3].tensor;
+    WaitFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(mqsmlaL1KvLoadCursor));
+    LocalTensor<Q_T> dst = mqsmlaL1KvBuffers[runInfo.taskIdMod3].tensor;
     v0ResGm.WaitCrossCore();
     if constexpr (IS_SPLIT_G) {
         CrossCoreSetFlag<0, PIPE_MTE2>(15U);
@@ -199,17 +201,17 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateLoadQK(
     }
     GlobalTensor<Q_T> v0ResGmTensor = v0ResGm.template GetTensor<Q_T>();
     DataCopy(dst, v0ResGmTensor, Align16Func(runInfo.s2RealSize) * constInfo.dSize);
-    SetFlag<HardEvent::MTE2_MTE1>(INNERCORE_L1KV(l1KLoadBufId));
-    l1KLoadBufId = (l1KLoadBufId + 1) % 3U;
+    SetFlag<HardEvent::MTE2_MTE1>(INNERCORE_L1KV(mqsmlaL1KvLoadCursor));
+    mqsmlaL1KvLoadCursor = (mqsmlaL1KvLoadCursor + 1) % 3U;
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     StaticBuffer<T> &outputBuf, Buffer<BufferType::GM, SyncType::CROSS_CORE_SYNC_BACKWARD> &v0ResGm,
     bool notLastTwoLoop, RunInfo<HIGH_PERF> &runInfoNext, RunInfo<HIGH_PERF> &runInfo, ConstInfo<HIGH_PERF> &constInfo)
 {
-    WaitFlag<HardEvent::MTE2_MTE1>(INNERCORE_L1KV(l1KMatmul1BufId));
-    l1KMatmul1BufId = (l1KMatmul1BufId + 1) % 3U;
+    WaitFlag<HardEvent::MTE2_MTE1>(INNERCORE_L1KV(mqsmlaL1KvBmm1Cursor));
+    mqsmlaL1KvBmm1Cursor = (mqsmlaL1KvBmm1Cursor + 1) % 3U;
 
     StaticBuffer<T> &mqsmlaCBuf = l0C.GetNext();
     WaitFlag<HardEvent::FIX_M>(INNERCORE_L0C(mqsmlaCBuf.idx));
@@ -220,13 +222,13 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
         0,                                           // isLeftTranspose
         1                                            // isRightTranspose
     };
-    uint32_t mqsmlaCurL1QBufId = l1QBufId;
+    uint32_t mqsmlaCurL1QBufId = mqsmlaL1QueryCursor;
     if (unlikely(runInfo.s2LoopCount == 0)) {
         WaitFlag<HardEvent::MTE2_MTE1>(INNERCORE_L1Q(mqsmlaCurL1QBufId));
     }
-    LocalTensor<Q_T> curL1RightTensor = l1RightBufs[runInfo.taskIdMod3].tensor;
+    LocalTensor<Q_T> curL1RightTensor = mqsmlaL1KvBuffers[runInfo.taskIdMod3].tensor;
     MatmulKStatic<Q_T, Q_T, T, s1BaseSize, s2BaseSize, dBaseMatmulSize, ABLayout::MK, ABLayout::KN>(
-        l1QBufs[mqsmlaCurL1QBufId].tensor, curL1RightTensor, l0A, l0B, mqsmlaCBuf.tensor, mqsmlaParam);
+        mqsmlaL1QueryBuffers[mqsmlaCurL1QBufId].tensor, curL1RightTensor, l0A, l0B, mqsmlaCBuf.tensor, mqsmlaParam);
 
     mqsmlaCurL1QBufId = (mqsmlaCurL1QBufId + 1) % 3U;
     if (unlikely(runInfo.s2LoopCount == 0)) {
@@ -235,12 +237,13 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     mqsmlaParam.singleK = constInfo.dSize - mqsmlaParam.singleK;
     mqsmlaParam.isOutKFisrt = false;
     MatmulKStatic<Q_T, Q_T, T, s1BaseSize, s2BaseSize, dBaseMatmulSize, ABLayout::MK, ABLayout::KN>(
-        l1QBufs[mqsmlaCurL1QBufId].tensor, curL1RightTensor[(constInfo.dSize >> 1) * Align16Func(runInfo.s2RealSize)],
-        l0A, l0B, mqsmlaCBuf.tensor, mqsmlaParam);
+        mqsmlaL1QueryBuffers[mqsmlaCurL1QBufId].tensor,
+        curL1RightTensor[(constInfo.dSize >> 1) * Align16Func(runInfo.s2RealSize)], l0A, l0B, mqsmlaCBuf.tensor,
+        mqsmlaParam);
     if (unlikely(runInfo.s2LoopCount == runInfo.s2LoopLimit)) {
-        SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(l1QBufId));
+        SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(mqsmlaL1QueryCursor));
         SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1Q(mqsmlaCurL1QBufId));
-        l1QBufId = (l1QBufId + 2U) % 3U;
+        mqsmlaL1QueryCursor = (mqsmlaL1QueryCursor + 2U) % 3U;
         if (notLastTwoLoop) {
             CopyQGmToL1(runInfoNext, constInfo);
         }
@@ -274,10 +277,10 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(StaticBuffer<T> &outputBuf,
-                                                                   StaticBuffer<Q_T> &l1PBuffer,
-                                                                   RunInfo<HIGH_PERF> &runInfo,
-                                                                   ConstInfo<HIGH_PERF> &constInfo)
+__aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(StaticBuffer<T> &outputBuf,
+                                                                         StaticBuffer<Q_T> &l1PBuffer,
+                                                                         RunInfo<HIGH_PERF> &runInfo,
+                                                                         ConstInfo<HIGH_PERF> &constInfo)
 {
     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(CROSSCORE_L1P(l1PBuffer.idx));
     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE1>(CROSSCORE_L1P(l1PBuffer.idx) + AIV0_AIV1_OFFSET);
@@ -291,14 +294,14 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(StaticBuffer<
         0,                                         // isLeftTranspose
         0                                          // isRightTranspose
     };
-    LocalTensor<Q_T> curL1RightTensor = l1RightBufs[runInfo.taskIdMod3].tensor;
+    LocalTensor<Q_T> curL1RightTensor = mqsmlaL1KvBuffers[runInfo.taskIdMod3].tensor;
     MatmulNStatic<Q_T, Q_T, T, s1BaseSize, s2BaseSize, dBaseMatmulSize, ABLayout::MK, ABLayout::KN>(
         l1PBuffer.tensor, curL1RightTensor, l0A, l0B, mqsmlaCBuf.tensor, mqsmlaParam);
 
     SetFlag<HardEvent::M_FIX>(INNERCORE_L0C(mqsmlaCBuf.idx));
     WaitFlag<HardEvent::M_FIX>(INNERCORE_L0C(mqsmlaCBuf.idx));
-    SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(l1KMatmul2BufId));
-    l1KMatmul2BufId = (l1KMatmul2BufId + 1) % 3; // 3：循环使用三个L1 KV缓冲区
+    SetFlag<HardEvent::MTE1_MTE2>(INNERCORE_L1KV(mqsmlaL1KvBmm2Cursor));
+    mqsmlaL1KvBmm2Cursor = (mqsmlaL1KvBmm2Cursor + 1) % 3; // 3：循环使用三个L1 KV缓冲区
 
     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM2);
     CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(CROSSCORE_BMM2 + AIV0_AIV1_OFFSET);
@@ -323,38 +326,39 @@ __aicore__ inline void CSABlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(StaticBuffer<
 }
 
 TEMPLATES_DEF
-class CSABlockCubeDummy {
+class MqsmlaCsaBlockCubeDummy {
 public:
-    __aicore__ inline CSABlockCubeDummy(){};
+    __aicore__ inline MqsmlaCsaBlockCubeDummy(){};
     __aicore__ inline void InitLocalBuffer(uint32_t l1BaseAddr) {}
     __aicore__ inline void InitGlobalBuffer(__gm__ uint8_t *query, __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *sequsedQ,
                                             const ConstInfo<HIGH_PERF> &constInfo)
     {}
-    __aicore__ inline void FreeEvent() {}
+    __aicore__ inline void ReleaseMqsmlaCubeEvents() {}
 };
 
 template <typename T>
-struct CubeBlockTraits; // 声明
+struct MqsmlaCubeBlockTraits;
 
 /* 生成CubeBlockTraits */
-#define GEN_TRAIT_TYPE(name, ...) using name##_TRAITS = name;
-#define GEN_TRAIT_CONST(name, type, ...) static constexpr type name##Traits = name;
+#define GEN_MQSMLA_TRAIT_TYPE(name, ...) using name##_TRAITS = name;
+#define GEN_MQSMLA_TRAIT_CONST(name, type, ...) static constexpr type name##Traits = name;
 
-#define DEFINE_CUBE_BLOCK_TRAITS(CUBE_BLOCK_CLASS) \
+#define DEFINE_MQSMLA_CUBE_BLOCK_TRAITS(MQSMLA_CUBE_BLOCK_CLASS) \
     TEMPLATES_DEF_NO_DEFAULT \
-    struct CubeBlockTraits<CUBE_BLOCK_CLASS<TEMPLATE_ARGS>> { \
-        CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TRAIT_TYPE) \
-        CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TRAIT_CONST) \
+    struct MqsmlaCubeBlockTraits<MQSMLA_CUBE_BLOCK_CLASS<TEMPLATE_ARGS>> { \
+        MQSMLA_CUBE_TRAIT_TYPES(GEN_MQSMLA_TRAIT_TYPE) \
+        MQSMLA_CUBE_TRAIT_CONSTANTS(GEN_MQSMLA_TRAIT_CONST) \
     }
 
-DEFINE_CUBE_BLOCK_TRAITS(CSABlockCube);
-DEFINE_CUBE_BLOCK_TRAITS(CSABlockCubeDummy);
+DEFINE_MQSMLA_CUBE_BLOCK_TRAITS(MqsmlaCsaBlockCube);
+DEFINE_MQSMLA_CUBE_BLOCK_TRAITS(MqsmlaCsaBlockCubeDummy);
 
 // /* 生成Arg Traits, kernel中只需要调用ARGS_TRAITS就可以获取所有CubeBlock中的模板参数 */
-#define GEN_ARGS_TYPE(name, ...) using name = typename CubeBlockTraits<CubeBlockType>::name##_TRAITS;
-#define GEN_ARGS_CONST(name, type, ...) static constexpr type name = CubeBlockTraits<CubeBlockType>::name##Traits;
-#define ARGS_TRAITS \
-    CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARGS_TYPE) \
-    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARGS_CONST)
+#define GEN_MQSMLA_ARGS_TYPE(name, ...) using name = typename MqsmlaCubeBlockTraits<CubeBlockType>::name##_TRAITS;
+#define GEN_MQSMLA_ARGS_CONST(name, type, ...) \
+    static constexpr type name = MqsmlaCubeBlockTraits<CubeBlockType>::name##Traits;
+#define MQSMLA_ARGS_TRAITS \
+    MQSMLA_CUBE_TRAIT_TYPES(GEN_MQSMLA_ARGS_TYPE) \
+    MQSMLA_CUBE_TRAIT_CONSTANTS(GEN_MQSMLA_ARGS_CONST)
 } // namespace BaseApi
 #endif // MIXED_QUANT_SPARSE_FLASH_MLA_CSA_BLOCK_CUBE_H

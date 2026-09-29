@@ -40,13 +40,13 @@ __aicore__ constexpr uint64_t Align32Func(uint64_t data)
     Q_T, KV_T, T, OUTPUT_T, isFd, isPa, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G, IS_VEC_S2PHYADDR, \
         IS_BATCH_CONSISTENCY
 
-#define CUBE_BLOCK_TRAITS_TYPE_FIELDS(X) \
+#define QSMLA_CUBE_TRAIT_TYPES(X) \
     X(Q_T) \
     X(KV_T) \
     X(T) \
     X(OUTPUT_T)
 
-#define CUBE_BLOCK_TRAITS_CONST_FIELDS(X) \
+#define QSMLA_CUBE_TRAIT_CONSTANTS(X) \
     X(isFd, bool, false) \
     X(isPa, bool, true) \
     X(LAYOUT_T, QSMLA_LAYOUT, QSMLA_LAYOUT::BSND) \
@@ -57,24 +57,22 @@ __aicore__ constexpr uint64_t Align32Func(uint64_t data)
     X(IS_BATCH_CONSISTENCY, bool, false)
 
 /* 1. 生成带默认值的模版Template */
-#define GEN_TYPE_PARAM(name) typename name,
-#define GEN_CONST_PARAM(name, type, default_val) type name = default_val,
+#define QSMLA_TEMPLATE_TYPE(name) typename name,
+#define QSMLA_TEMPLATE_CONSTANT(name, type, default_val) type name = default_val,
 
 #define TEMPLATES_DEF \
-    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TYPE_PARAM) CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_CONST_PARAM) bool end = \
-                  true>
+    template <QSMLA_CUBE_TRAIT_TYPES(QSMLA_TEMPLATE_TYPE) \
+                  QSMLA_CUBE_TRAIT_CONSTANTS(QSMLA_TEMPLATE_CONSTANT) bool end = true>
 
 /* 2. 生成不带带默认值的模版Template */
-#define GEN_TEMPLATE_TYPE_NODEF(name) typename name,
-#define GEN_TEMPLATE_CONST_NODEF(name, type, default_val) type name,
+#define QSMLA_REQUIRED_TYPE(name) typename name,
+#define QSMLA_REQUIRED_CONSTANT(name, type, default_val) type name,
 #define TEMPLATES_DEF_NO_DEFAULT \
-    template <CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TEMPLATE_TYPE_NODEF) \
-                  CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TEMPLATE_CONST_NODEF) bool end>
+    template <QSMLA_CUBE_TRAIT_TYPES(QSMLA_REQUIRED_TYPE) QSMLA_CUBE_TRAIT_CONSTANTS(QSMLA_REQUIRED_CONSTANT) bool end>
 
 /* 3. 生成有默认值的Args */
-#define GEN_ARG_NAME(name, ...) name,
+#define QSMLA_TEMPLATE_ARGUMENT(name, ...) name,
 #define TEMPLATE_ARGS \
-    CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARG_NAME) \
-    CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARG_NAME) end
+    QSMLA_CUBE_TRAIT_TYPES(QSMLA_TEMPLATE_ARGUMENT) QSMLA_CUBE_TRAIT_CONSTANTS(QSMLA_TEMPLATE_ARGUMENT) end
 
 #endif
