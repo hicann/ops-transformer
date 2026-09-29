@@ -38,6 +38,7 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SetPlatMemoryInfo(const gert
     platformInfo_.aivNum = ascendcPlatform.GetCoreNumAiv();
     platformInfo_.aicNum = ascendcPlatform.GetCoreNumAic();
     platformInfo_.coreNum = platformInfo_.aivNum;
+    platformInfo_.cvRatio = platformInfo_.aivNum / platformInfo_.aicNum;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, platformInfo_.ubSize);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, platformInfo_.l1Size);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, platformInfo_.l0cSize);
@@ -181,7 +182,7 @@ bool FusedInferAttentionScoreTilingImpl::CheckAntiQuantGSMerge(const FiaTilingIn
     }
 
     int64_t totalSize = static_cast<int64_t>(fiaInfo.gSize) * fiaInfo.s1Size;
-    if (totalSize <= 0 || totalSize > NUM_32) {
+    if (totalSize <= 0 || totalSize > NUM_16 * platformInfo_.cvRatio) {
         return false;
     }
 
@@ -862,20 +863,33 @@ ge::graphStatus FusedInferAttentionScoreTilingImpl::SplitS2(const FiaTilingInfo 
 void FusedInferAttentionScoreTilingImpl::SetDequantBaseSize(const FiaTilingInfo &fiaInfo)
 {
     sOuterFactor_ = NUM_16;
-    if (fiaInfo.s1Size > 1 && gsMergeFlag_) { // pfa gs1合轴时 s1base=32
-        sOuterFactor_ = NUM_32;
-    }
-    if (fiaInfo.qkHeadDim <= NUM_64) {
-        sInnerFactor_ = NUM_1024;
-        if (fiaInfo.pseShiftFlag || (fiaInfo.s1Size > 1 && gsMergeFlag_)) { // pfa gs1合轴 s1base=32 s2base=512 dbase=64
+    if (platformInfo_.cvRatio == 1) {
+        if (fiaInfo.qkHeadDim <= NUM_64) {
             sInnerFactor_ = NUM_512;
+        } else if (fiaInfo.qkHeadDim <= NUM_128) {
+            sInnerFactor_ = NUM_512;
+        } else if (fiaInfo.qkHeadDim <= NUM_256) {
+            sInnerFactor_ = NUM_256;
+        } else {
+            sInnerFactor_ = NUM_128;
         }
-    } else if (fiaInfo.qkHeadDim <= NUM_128) {
-        sInnerFactor_ = NUM_512;
-    } else if (fiaInfo.qkHeadDim <= NUM_256) {
-        sInnerFactor_ = NUM_256;
     } else {
-        sInnerFactor_ = NUM_128;
+        if (fiaInfo.s1Size > 1 && gsMergeFlag_) { // pfa gs1合轴时 s1base=32
+            sOuterFactor_ = NUM_32;
+        }
+        if (fiaInfo.qkHeadDim <= NUM_64) {
+            sInnerFactor_ = NUM_1024;
+            if (fiaInfo.pseShiftFlag ||
+                (fiaInfo.s1Size > 1 && gsMergeFlag_)) { // pfa gs1合轴 s1base=32 s2base=512 dbase=64
+                sInnerFactor_ = NUM_512;
+            }
+        } else if (fiaInfo.qkHeadDim <= NUM_128) {
+            sInnerFactor_ = NUM_512;
+        } else if (fiaInfo.qkHeadDim <= NUM_256) {
+            sInnerFactor_ = NUM_256;
+        } else {
+            sInnerFactor_ = NUM_128;
+        }
     }
 }
 

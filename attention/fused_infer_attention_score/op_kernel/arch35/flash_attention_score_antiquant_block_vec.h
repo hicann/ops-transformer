@@ -48,9 +48,10 @@ public:
     static constexpr uint32_t s1BaseSize = (uint32_t)s1TemplateType;
     static constexpr uint32_t s2BaseSize = (uint32_t)s2TemplateType;
     static constexpr uint32_t vec1ScmBlockTrue = s1BaseSize * (16 / 2);
-    static constexpr uint32_t vec1Srcstride = (s1BaseSize >> 1) + 1;
+    static constexpr uint32_t vec1Srcstride = (s1BaseSize / CV_RATIO) + 1;
     static constexpr uint32_t dTemplateAlign64 = Align64FuncAntiquantup((uint16_t)dVTemplateType);
-    static constexpr uint32_t BUFFER_SIZE_BYTE_5K_ANTIQUANT = 5120; // 5K deal the tail
+    static constexpr uint32_t BUFFER_SIZE_BYTE_5K_ANTIQUANT = 5120;   // 5K deal the tail
+    static constexpr uint32_t BUFFER_SIZE_BYTE_10K_ANTIQUANT = 10240; // 10K deal the tail
     static constexpr uint32_t pseInputSize = s1BaseSize / CV_RATIO * s2BaseSize * sizeof(Q_T);
     static constexpr uint32_t attenMaskSize = s1BaseSize / CV_RATIO * s2BaseSize * 1;
     static constexpr uint32_t kvInputSize = dTemplateAlign64 * s2BaseSize / 4;
@@ -367,7 +368,7 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::InitLocalBu
     }
     if (constInfo.isSoftmaxLseEnable) {
         // 每行结果存为8个重复lse元素(32B对齐)
-        this->tPipe->InitBuffer(softmaxLseQueue, 1, (s1BaseSize >> 1U) * sizeof(float) * 8);
+        this->tPipe->InitBuffer(softmaxLseQueue, 1, (s1BaseSize / CV_RATIO) * sizeof(float) * 8);
     }
     this->tPipe->InitBuffer(this->stage1OutQue[0], 1, stage1OutQueSize);
     this->tPipe->InitBuffer(this->stage2OutQue[0], 1, stage2OutQueSize);
@@ -387,7 +388,11 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::InitAntiqua
     this->tPipe->InitBuffer(valueAntiqScaleInputQue, 1, 3072);  // 3072 is 3 * 1024, deal the tail
     this->tPipe->InitBuffer(valueAntiqOffsetInputQue, 1, 3072); // 3072 is 3 * 1024, deal the tail
     if constexpr (KVFP4) {
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        this->tPipe->InitBuffer(kvAntiqMxScaleRes, BUFFER_SIZE_BYTE_10K_ANTIQUANT);
+#else
         this->tPipe->InitBuffer(kvAntiqMxScaleRes, BUFFER_SIZE_BYTE_5K_ANTIQUANT);
+#endif
     }
 }
 
@@ -424,17 +429,32 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::InitOutputS
     ConstInfo<isInfer, hasRope> &constInfo)
 {
     auto &initParams = this->tilingData->initOutputParams;
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    uint32_t tailSize = initParams.totalOutputSize - constInfo.aivIdx * initParams.singleCoreSize;
+    uint32_t singleInitOutputSize = tailSize < initParams.singleCoreSize ? tailSize : initParams.singleCoreSize;
+    if constexpr (POST_QUANT) {
+        InitOutput<half>(this->attentionOutInitGm[constInfo.aivIdx * initParams.singleCoreSize / 2],
+                         singleInitOutputSize / 2, 0.0); // 2: 将内容一分为二
+    } else {
+        InitOutput<OUTPUT_T>(this->attentionOutGm[constInfo.aivIdx * initParams.singleCoreSize], singleInitOutputSize,
+                             0.0);
+    }
+#else
     if (initParams.totalOutputSize > constInfo.aivIdx * initParams.singleCoreSize) {
-        uint32_t tailSize = initParams.totalOutputSize - constInfo.aivIdx * initParams.singleCoreSize;
-        uint32_t singleInitOutputSize = tailSize < initParams.singleCoreSize ? tailSize : initParams.singleCoreSize;
-        if constexpr (POST_QUANT) {
-            InitOutput<half>(this->attentionOutInitGm[constInfo.aivIdx * initParams.singleCoreSize / 2],
-                             singleInitOutputSize / 2, 0.0); // 2: 将内容一分为二
-        } else {
-            InitOutput<OUTPUT_T>(this->attentionOutGm[constInfo.aivIdx * initParams.singleCoreSize],
-                                 singleInitOutputSize, 0.0);
+        int64_t coreNum = GetBlockNum() * GetTaskRation();
+        if (coreNum != 0 && constInfo.aivIdx < coreNum) {
+            uint32_t tailSize = initParams.totalOutputSize - constInfo.aivIdx * initParams.singleCoreSize;
+            uint32_t singleInitOutputSize = tailSize < initParams.singleCoreSize ? tailSize : initParams.singleCoreSize;
+            if constexpr (POST_QUANT) {
+                InitOutput<half>(this->attentionOutInitGm[constInfo.aivIdx * initParams.singleCoreSize / 2],
+                                 singleInitOutputSize / 2, 0.0); // 2: 将内容一分为二
+            } else {
+                InitOutput<OUTPUT_T>(this->attentionOutGm[constInfo.aivIdx * initParams.singleCoreSize],
+                                     singleInitOutputSize, 0.0);
+            }
         }
     }
+#endif
 }
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
@@ -618,11 +638,15 @@ ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::SetAntiqParamCommon(
     const RunInfo<isInfer> &runInfo, int64_t kvOffset, ConstInfo<isInfer, hasRope> &constInfo, bool isKey)
 {
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    taskParam.copyTotalS = GetRealDealSize(runInfo.s2RealSize);
+#else
     if (isBeforeHalf) {
         taskParam.copyTotalS = GetRealDealSize(runInfo.s2RealSize); // 2 is Vec num
     } else {
         taskParam.copyTotalS = runInfo.s2RealSize - (GetRealDealSize(runInfo.s2RealSize)); // 2 is Vec num
     }
+#endif
     uint32_t curSequence = constInfo.s2BaseSize * runInfo.s2LoopCount + runInfo.kvLeftPaddingSize +
                            constInfo.subBlockIdx * GetRealDealSize(runInfo.s2RealSize);
     if constexpr (isInfer) {
@@ -855,7 +879,11 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::ProcessVec1
     this->stage1OutQue[0].template FreeTensor(stage1CastTensor);
     // =======================================================
     if (runInfo.s2LoopCount != 0) {
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        UpdateExpSumAndExpMax<T, s1BaseSize>(sumUb, maxUb, expUb, sumUb, maxUb, apiTmpBuffer, runInfo.halfS1RealSize);
+#else
         UpdateExpSumAndExpMax<T>(sumUb, maxUb, expUb, sumUb, maxUb, apiTmpBuffer, runInfo.halfS1RealSize);
+#endif
     }
 
     if constexpr (implMode == ImplModeEnum::AA_INVALID_LINE_HIGH_PRECISION || IsSameType<Q_T, float>::value) {
@@ -1412,7 +1440,7 @@ __aicore__ inline void FABlockVecAntiquant<ANTIQUANT_TEMPLATE_ARGS>::InitFDBuffe
     }
     if (constInfo.isSoftmaxLseEnable) {
         // 8: 适配TND, 每行结果存为8个重复lse元素(32B对齐)
-        this->tPipe->InitBuffer(softmaxLseQueue, 1, (s1BaseSize >> 1U) * sizeof(float) * 8);
+        this->tPipe->InitBuffer(softmaxLseQueue, 1, (s1BaseSize / CV_RATIO) * sizeof(float) * 8);
     }
 }
 

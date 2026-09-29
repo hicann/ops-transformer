@@ -49,6 +49,7 @@ struct FiaPlatFormInfo {
     uint32_t coreNum = 0;
     uint32_t aicNum = 0;
     uint32_t aivNum = 0;
+    uint32_t cvRatio = 0;
     uint64_t defaultSysWorkspaceSize = 0;
 };
 

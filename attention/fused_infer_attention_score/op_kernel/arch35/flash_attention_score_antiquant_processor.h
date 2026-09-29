@@ -40,12 +40,18 @@ namespace BaseApi {
 
 __aicore__ constexpr uint16_t GetRealDealSize(uint16_t realSize)
 {
+    if (ArchInfo::CV_RATIO == 1) {
+        return realSize;
+    }
     uint16_t dealSize = ((realSize >> 1) + 31) >> 5 << 5; // 31 & 5 is Alighup 32
     return (dealSize > realSize) ? realSize : dealSize;
 }
 
 __aicore__ constexpr uint64_t AlignUp32(uint64_t size)
 {
+    if (ArchInfo::CV_RATIO == 1) {
+        return size;
+    }
     return (size + 31) >> 5 << 5; // 31 & 5 is Alignup 32
 }
 
@@ -271,10 +277,14 @@ AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::LoadAnt
     TBuf<> kvAntiqMxScaleRes, const AntiquantTaskParamBaseAPI &taskParam, bool isBeforeHalf, int32_t s2RealSize)
 {
     int32_t subBlockIdx;
-    if (isBeforeHalf) {
+    if (ArchInfo::CV_RATIO == 1) {
         subBlockIdx = 0;
     } else {
-        subBlockIdx = 1;
+        if (isBeforeHalf) {
+            subBlockIdx = 0;
+        } else {
+            subBlockIdx = 1;
+        }
     }
     uint32_t grpSize = 32;
     uint32_t grpNum = taskParam.headDim / grpSize;
@@ -343,10 +353,14 @@ AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::LoadAnt
     int32_t s2RealSize)
 {
     int32_t subBlockIdx;
-    if (isBeforeHalf) {
+    if (ArchInfo::CV_RATIO == 1) {
         subBlockIdx = 0;
     } else {
-        subBlockIdx = 1;
+        if (isBeforeHalf) {
+            subBlockIdx = 0;
+        } else {
+            subBlockIdx = 1;
+        }
     }
     uint64_t scaleOffset = 0;
     if (taskParam.isPerHead) {
@@ -755,10 +769,14 @@ AntiquantProcessorBaseAPI<ANTIQUANT_TEMPLATE_ARGS, ANTIQUANT_PER_TOKEN>::CopyAnt
     uint16_t elementTypeSize = ONE_BLK_SIZE / sizeof(Q_T);
     uint16_t dstStep = (s2RealSize + 16 - 1) / 16 * 16;
     int32_t subBlockIdx;
-    if (isBeforeHalf) {
+    if (ArchInfo::CV_RATIO == 1) {
         subBlockIdx = 0;
     } else {
-        subBlockIdx = 1;
+        if (isBeforeHalf) {
+            subBlockIdx = 0;
+        } else {
+            subBlockIdx = 1;
+        }
     }
     uint64_t outOffset = subBlockIdx * GetRealDealSize(s2RealSize) * 16 + copyLoopIdx * taskParam.copySplitS * 16;
 

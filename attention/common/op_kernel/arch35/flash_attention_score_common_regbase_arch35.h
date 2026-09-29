@@ -58,7 +58,7 @@ constexpr uint16_t ADD_NUM_63 = 63;
 
 constexpr uint32_t L0C_SHARED_SIZE_64K = 64 * 1024;
 constexpr uint32_t L0C_SHARED_SIZE_128K = 128 * 1024;
-constexpr uint32_t CV_RATIO = 2;
+constexpr uint32_t CV_RATIO = ArchInfo::CV_RATIO;
 constexpr uint64_t SYNC_MODE = 4;
 constexpr uint64_t MM2_RES_INTRA_EVENT[2] = {7, 8};  // mm2ResIntraEvent
 constexpr uint64_t MM1_RES_INTRA_EVENT[2] = {9, 10}; // mm1ResIntraEvent

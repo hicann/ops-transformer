@@ -22,15 +22,21 @@ using namespace optiling;
 #include "lib/matmul_intf.h"
 #include "lib/matrix/matmul/tiling.h"
 
+#if (__NPU_ARCH__ == 9201)
+#define FIA_ARCH35_TASK_TYPE KERNEL_TYPE_MIX_AIC_1_1
+#else
+#define FIA_ARCH35_TASK_TYPE KERNEL_TYPE_MIX_AIC_1_2
+#endif
+
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #ifdef __DAV_C310_CUBE__ // CUBE 实现
-#define FIA_REGBASE_COPY_TILING_DATA(tiling)                                                                     \
+#define FIA_REGBASE_COPY_TILING_DATA(tiling) \
     const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = nullptr
 
 #else // VECTOR 实现
-#define FIA_REGBASE_COPY_TILING_DATA(tiling)                                                                     \
-    GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling);                        \
+#define FIA_REGBASE_COPY_TILING_DATA(tiling) \
+    GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \
     const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = &tilingDataIn
 #endif
 

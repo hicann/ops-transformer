@@ -86,10 +86,15 @@ ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::SetCrossCoreFlag()
 {
     if ASCEND_IS_AIC {
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[0]);
+        CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[1]);
+#else
         CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[0]);
         CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + CV_L1_EVENT[0]); // 一个aic对应两个aiv,  一共32个核，所以是16
         CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[1]);
         CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + CV_L1_EVENT[1]); // 一个aic对应两个aiv,  一共32个核，所以是16
+#endif
     }
 }
 
@@ -97,6 +102,12 @@ ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::WaitCrossCoreFlag()
 {
     if ASCEND_IS_AIC {
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[0]);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[1]);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[0]);
+        CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[1]);
+#else
         CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[0]);
         CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[0] + 16);
         CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[1]);
@@ -105,6 +116,7 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::WaitCrossC
         CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[0] + 16);
         CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[1]);
         CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[1] + 16);
+#endif
     }
 }
 
@@ -149,10 +161,9 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::CopyToL1Nd
 }
 
 ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void
-FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::PrepareMm1Input(Buffer<BufferType::L1> &mm1A, RunInfo<isInfer> &runInfo,
-                                                               RunParamStr<isInfer> &runParam,
-                                                               ConstInfo<isInfer, hasRope> &constInfo)
+__aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::PrepareMm1Input(
+    Buffer<BufferType::L1> &mm1A, RunInfo<isInfer> &runInfo, RunParamStr<isInfer> &runParam,
+    ConstInfo<isInfer, hasRope> &constInfo)
 {
     if (unlikely(runInfo.s2LoopCount == 0)) {
         mm1A = mm1AL1Buffers.Get();
@@ -165,7 +176,8 @@ FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::PrepareMm1Input(Buffer<BufferType
                 constInfo.isPfaGS1Merge) {
                 CopyToL1Nd2Nz(mm1ATensor, this->queryGm[runParam.tensorQOffset], constInfo.s1Size, constInfo.gSize,
                               constInfo.dSize, constInfo.n2Size * constInfo.gSize * constInfo.dSize, constInfo.dSize,
-                              runInfo.s1RealSize, constInfo.gSize * 32 / sizeof(Q_T)); // 32 / sizeof(Q_T): 每Block元素个数
+                              runInfo.s1RealSize,
+                              constInfo.gSize * 32 / sizeof(Q_T)); // 32 / sizeof(Q_T): 每Block元素个数
             } else {
                 CopyToL1Nd2Nz(mm1ATensor, this->queryGm[runParam.tensorQOffset], 1, runInfo.s1RealSize, constInfo.dSize,
                               0, constInfo.mm1Ka, runInfo.s1RealSize, 0);
@@ -189,8 +201,12 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
 {
     Buffer<BufferType::L1> mm1A;
     PrepareMm1Input(mm1A, runInfo, runParam, constInfo);
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(VC_L1_EVENT[subTaskId % 2]); // 2 is double buffer
+#else
     CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(VC_L1_EVENT[subTaskId % 2]);      // 2 is double buffer
     CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(16 + VC_L1_EVENT[subTaskId % 2]); // 16 is Vec num, 2 is double buffer
+#endif
 
     mm1A.Wait<HardEvent::MTE2_MTE1>();
 
@@ -206,17 +222,28 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
     mm1ResL0C.Set<HardEvent::M_FIX>();  // 通知
     mm1ResL0C.Wait<HardEvent::M_FIX>(); // 等待
 
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[subTaskId % 2]); // 2 is double buffer
+    CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[runInfo.taskIdMod2]);
+#else
     CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[subTaskId % 2]);      // 2 is double buffer
     CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + CV_L1_EVENT[subTaskId % 2]); // 16 is Vec num, 2 is double buffer
     CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM1RES_EVENT[runInfo.taskIdMod2]);
     CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + VC_MM1RES_EVENT[runInfo.taskIdMod2]); // 16 is Vec num
+#endif
 
-    FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C->UB
+    FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;    // L0C->UB
     fixpipeParams.nSize = (runInfo.s2RealSize + 7) >> 3 << 3; // 7 >> 3 <<3: 8位对齐
-    fixpipeParams.mSize = (runInfo.s1RealSize + 1) >> 1 << 1; // 1 >> 1 << 1: 2位对齐，L0C上的bmm1结果矩阵M方向的size大小必须是偶数
-    fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16; // 15 / 16 / 16: L0C上matmul结果相邻连续数据片断间隔，单位为16
+    fixpipeParams.mSize =
+        (runInfo.s1RealSize + 1) >> 1 << 1; // 1 >> 1 << 1: 2位对齐，L0C上的bmm1结果矩阵M方向的size大小必须是偶数
+    fixpipeParams.srcStride =
+        ((fixpipeParams.mSize + 15) / 16) * 16; // 15 / 16 / 16: L0C上matmul结果相邻连续数据片断间隔，单位为16
     fixpipeParams.dstStride = s2BaseSize;
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    fixpipeParams.dualDstCtl = 0; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+#else
     fixpipeParams.dualDstCtl = 1; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+#endif
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
     fixpipeParams.params.dstNdStride = 0;
@@ -226,7 +253,7 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
                        0; // BSNGD/TNGD GS1合轴时，若s1为奇数且开启双目标模式，扩展M维度对齐g，避免计算中间块
         if ((constInfo.layoutType == static_cast<uint8_t>(LayOutTypeEnum::LAYOUT_BSH) ||
              constInfo.layoutType == static_cast<uint8_t>(LayOutTypeEnum::LAYOUT_TND)) &&
-            constInfo.isPfaGS1Merge && isS1Odd) {
+            constInfo.isPfaGS1Merge && isS1Odd && CV_RATIO != 1) {
             fixpipeParams.mSize = runInfo.s1RealSize + constInfo.gSize;
         }
     }
@@ -234,10 +261,15 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
     Fixpipe<T, T, PFA_CFG_ROW_MAJOR_UB>(outputTensor, mm1ResL0C.GetTensor<T>(),
                                         fixpipeParams); // 将matmul结果从L0C搬运到UB
 
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(
+        CV_MM1RES_EVENT[runInfo.taskIdMod2]); // fixpip将结果搬运到UB后，设置SYNC_C1_V1_FLAG
+#else
     CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(
         CV_MM1RES_EVENT[runInfo.taskIdMod2]); // fixpip将结果搬运到UB后，设置SYNC_C1_V1_FLAG
     CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(
         16 + CV_MM1RES_EVENT[runInfo.taskIdMod2]); // fixpip将结果搬运到UB后，设置SYNC_C1_V1_FLAG, 16 is Vec num
+#endif
 
     mm1ResL0C.Set<HardEvent::FIX_M>();
 }
@@ -247,8 +279,12 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
     const int64_t &subTaskId, const RunInfo<isInfer> &runInfo, Buffer<BufferType::L1> &inputBufA,
     Buffer<BufferType::L1> &inputBufB, LocalTensor<T> &outputTensor, ConstInfo<isInfer, hasRope> &constInfo)
 {
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(VC_L1_EVENT[subTaskId % 2]); // 2 is double buffer
+#else
     CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(VC_L1_EVENT[subTaskId % 2]);      // 2 is double buffer
     CrossCoreWaitFlag<SYNC_MODE, PIPE_MTE1>(16 + VC_L1_EVENT[subTaskId % 2]); // 16 is Vec num, 2 is double buffer
+#endif
 
     Buffer<BufferType::L0C> mm2ResL0C = mmL0CBuffers.Get();
     mm2ResL0C.Wait<HardEvent::FIX_M>(); // 占用
@@ -268,30 +304,42 @@ __aicore__ inline void FABlockCubeAntiquant<ANTIQUANT_TEMPLATE_ARGS>::IterateBmm
     mm2ResL0C.Set<HardEvent::M_FIX>();  // 通知
     mm2ResL0C.Wait<HardEvent::M_FIX>(); // 等待
 
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[subTaskId % 2]); // 2 is double buffer
+    CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[runInfo.taskIdMod2]);
+#else
     CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(CV_L1_EVENT[subTaskId % 2]);      // 2 is double buffer
     CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(16 + CV_L1_EVENT[subTaskId % 2]); // 16 is Vec num, 2 is double buffer
-
     CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(VC_MM2RES_EVENT[runInfo.taskIdMod2]);
     CrossCoreWaitFlag<SYNC_MODE, PIPE_FIX>(16 + VC_MM2RES_EVENT[runInfo.taskIdMod2]); // 16 is Vec num
+#endif
 
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;  // L0C->UB
     fixpipeParams.nSize = (constInfo.dSizeV + 7) >> 3 << 3; // 7 >> 3 << 3: 8位对齐
     fixpipeParams.mSize = s1BaseSize;
-    fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16; // 15 / 16 / 16: 16位对齐
+    fixpipeParams.srcStride = ((fixpipeParams.mSize + 15) / 16) * 16;    // 15 / 16 / 16: 16位对齐
     fixpipeParams.dstStride = ((uint32_t)dVTemplateType + 15) >> 4 << 4; // 15 >> 4 << 4: 16位对齐
-    fixpipeParams.dualDstCtl = 1;
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    fixpipeParams.dualDstCtl = 0; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+#else
+    fixpipeParams.dualDstCtl = 1; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+#endif
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
     fixpipeParams.params.dstNdStride = 0;
     Fixpipe<T, T, PFA_CFG_ROW_MAJOR_UB>(outputTensor, mm2ResL0C.GetTensor<T>(),
                                         fixpipeParams); // 将matmul结果从L0C搬运到UB
     mm2ResL0C.Set<HardEvent::FIX_M>();                  // 释放
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+    CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(
+        CV_MM2RES_EVENT[runInfo.taskIdMod2]); // fixpip将结果搬运到UB后，设置SYNC_C1_V1_FLAG
+#else
     CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(
         CV_MM2RES_EVENT[runInfo.taskIdMod2]); // fixpip将结果搬运到UB后，设置SYNC_C1_V1_FLAG
     CrossCoreSetFlag<SYNC_MODE, PIPE_FIX>(
         16 + CV_MM2RES_EVENT[runInfo.taskIdMod2]); // fixpip将结果搬运到UB后，设置SYNC_C1_V1_FLAG, 16 is aiv num
+#endif
 }
-
 
 ANTIQUANT_TEMPLATES_DEF
 class FABlockCubeAntiquantDummy {
@@ -299,20 +347,11 @@ public:
     __aicore__ inline void InitCubeBlock(__gm__ uint8_t *query,
                                          const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, TPipe *pipe,
                                          BufferManager<BufferType::L1> *l1BuffMgr)
-    {
-    }
-    __aicore__ inline void SetCrossCoreFlag()
-    {
-    }
-    __aicore__ inline void WaitCrossCoreFlag()
-    {
-    }
-    __aicore__ inline void InitLocalBuffer()
-    {
-    }
-    __aicore__ inline void UninitLocalBuffer()
-    {
-    }
+    {}
+    __aicore__ inline void SetCrossCoreFlag() {}
+    __aicore__ inline void WaitCrossCoreFlag() {}
+    __aicore__ inline void InitLocalBuffer() {}
+    __aicore__ inline void UninitLocalBuffer() {}
 };
 
 template <typename T>
@@ -322,22 +361,22 @@ struct CubeBlockTraitsAntiquant;
 #define GEN_TRAIT_TYPE_ANTIQUANT(name, ...) using name##_TRAITS = name;
 #define GEN_TRAIT_CONST_ANTIQAUNT(name, type, ...) static constexpr type name##Traits = name;
 
-#define DEFINE_CUBE_BLOCK_TRAITS_ANTIQUANT(CUBE_BLOCK_CLASS_ANTIQUANT)                                                 \
-    ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT                                                                                 \
-    struct CubeBlockTraitsAntiquant<CUBE_BLOCK_CLASS_ANTIQUANT<ANTIQUANT_TEMPLATE_ARGS>> {                             \
-        ANTIQUANT_CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TRAIT_TYPE_ANTIQUANT)                                              \
-        ANTIQUANT_CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TRAIT_CONST_ANTIQAUNT)                                            \
+#define DEFINE_CUBE_BLOCK_TRAITS_ANTIQUANT(CUBE_BLOCK_CLASS_ANTIQUANT) \
+    ANTIQUANT_TEMPLATES_DEF_NO_DEFAULT \
+    struct CubeBlockTraitsAntiquant<CUBE_BLOCK_CLASS_ANTIQUANT<ANTIQUANT_TEMPLATE_ARGS>> { \
+        ANTIQUANT_CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_TRAIT_TYPE_ANTIQUANT) \
+        ANTIQUANT_CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_TRAIT_CONST_ANTIQAUNT) \
     }
 
 DEFINE_CUBE_BLOCK_TRAITS_ANTIQUANT(FABlockCubeAntiquant);
 DEFINE_CUBE_BLOCK_TRAITS_ANTIQUANT(FABlockCubeAntiquantDummy);
 
-#define GEN_ARGS_TYPE_ANTIQUANT(name, ...)                                                                             \
+#define GEN_ARGS_TYPE_ANTIQUANT(name, ...) \
     using name = typename CubeBlockTraitsAntiquant<AntiquantCubeBlockType>::name##_TRAITS;
-#define GEN_ARGS_CONST_ANTIQUANT(name, type, ...)                                                                      \
+#define GEN_ARGS_CONST_ANTIQUANT(name, type, ...) \
     static constexpr type name = CubeBlockTraitsAntiquant<AntiquantCubeBlockType>::name##Traits;
-#define ARGS_TRAITS_ANTIQUANT                                                                                          \
-    ANTIQUANT_CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARGS_TYPE_ANTIQUANT)                                                   \
+#define ARGS_TRAITS_ANTIQUANT \
+    ANTIQUANT_CUBE_BLOCK_TRAITS_TYPE_FIELDS(GEN_ARGS_TYPE_ANTIQUANT) \
     ANTIQUANT_CUBE_BLOCK_TRAITS_CONST_FIELDS(GEN_ARGS_CONST_ANTIQUANT)
 } // namespace BaseApi
 #endif
