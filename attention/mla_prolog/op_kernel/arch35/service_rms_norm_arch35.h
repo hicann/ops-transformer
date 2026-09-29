@@ -149,6 +149,7 @@ __aicore__ inline void RmsNormDynamicQuant(const LocalTensor<O> &outputLocal, co
     } else {
         if (enableSmoothScalesCq) {
             Mul(xFp32Local, xFp32Local, smoothLocal, cnt);
+            PipeBarrier<PIPE_V>();
         }
         DynamicQuantPerTokenVf(outputLocal, outputScales, xFp32Local, rmsNormParams.row, rmsNormParams.col);
         PipeBarrier<PIPE_V>();

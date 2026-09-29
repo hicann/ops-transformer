@@ -876,6 +876,8 @@ __aicore__ inline void MatmulSplitMKOuter(const GlobalTensor<O> &tensorCGm, cons
         dn2nz.dstNzC0Stride = nValue;
         dn2nz.dstNzNStride = 1;
         dn2nz.dstNzMatrixStride = nValue;
+        // 等待前一次调用或上一轮M迭代的MTE1 scale读排空, 再覆写共享L1B scale区域
+        WaitFlag<HardEvent::MTE1_MTE2>(SCALE_EVENT);
         DataCopy(bL1Bf16[scaleAOff / FP8_TWO], scaleGmCast, dn2nz);
         aScaleL1Base = localTensors.bL1Tensor[scaleAOff];
 
@@ -977,6 +979,10 @@ __aicore__ inline void MatmulSplitMKOuter(const GlobalTensor<O> &tensorCGm, cons
             SetFlag<HardEvent::MTE1_MTE2>(B_EVENT0 + curSlot);
         }
         SetFlag<HardEvent::MTE1_MTE2>(A_EVENT0);
+    }
+    if constexpr (std::is_same<T, FP8E4M3>::value && std::is_same<S, fp8_e8m0_t>::value) {
+        // MTE1排空本函数所有scale读后释放SCALE_EVENT, 保护共享L1B scale区域跨阶段复用
+        SetFlag<HardEvent::MTE1_MTE2>(SCALE_EVENT);
     }
 }
 
