@@ -500,6 +500,10 @@ function(gen_norm_symbol)
   gen_opgraph_symbol()
   gen_onnx_plugin_symbol()
   gen_aicpu_const_symbol()
+  if(ENABLE_AICPU AND "${ASCEND_COMPUTE_UNIT}" MATCHES "^(ascend910b|ascend910_93)(;(ascend910b|ascend910_93))*$")
+    include(${OPS_TRANSFORMER_DIR}/cmake/turboquant.cmake)
+    gen_turboquant_aicpu_symbol()
+  endif()
 
 endfunction()
 

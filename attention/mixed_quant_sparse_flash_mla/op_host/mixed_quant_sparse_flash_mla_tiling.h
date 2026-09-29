@@ -29,6 +29,10 @@
 
 namespace optiling {
 
+std::vector<int64_t> ToVector(const gert::Shape &shape);
+std::string ToStringRaw(const gert::Shape &shape);
+std::string MQSMLALayoutToSerialString(MQSMLALayout layout);
+
 // -----------算子TilingData定义---------------
 BEGIN_TILING_DATA_DEF(MixedQuantSparseFlashMlaBaseParams)
 TILING_DATA_FIELD_DEF(uint32_t, batchSize)

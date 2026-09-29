@@ -48,7 +48,6 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoTurboQuantTiling(MQSMLATilingI
         static_cast<size_t>(PRELOAD_NUM) * bmm2ResUbSize * (MM2_RES_ELEM_SIZE + VEC2_RES_ELEM_SIZE) * aicNum;
     workspaceSize += static_cast<size_t>(MERGE_CACHE_GM_BUF_NUM) * S2_BASE_SIZE * tilingInfo->qkHeadDim *
                      MERGE_CACHE_ELEM_SIZE * aicNum;
-    workspaceSize += static_cast<size_t>(MERGE_CACHE_GM_BUF_NUM) * S2_BASE_SIZE * sizeof(uint16_t) * aicNum;
     size_t *workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OP_LOGE(tilingInfo->opName, "workspace sizes is nullptr"),
                 return ge::GRAPH_FAILED);

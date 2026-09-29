@@ -338,19 +338,17 @@ class GeneralizedSFAQuant:
     def _calculate_local_s2_block(
         self,
         q_fp32,
-        k_block_fp32,
+        k_tiles_fp32,
         initial_score_max,
-        s2_base_size=128,
     ):
         """Calculate one NPU reduction block and retain its local softmax state."""
         score_max = initial_score_max.clone()
         sumexp = torch.ones_like(score_max, dtype=torch.float32)
         acc_o = torch.zeros(
-            (q_fp32.shape[0], k_block_fp32.shape[-1]), dtype=torch.float32
+            (q_fp32.shape[0], k_tiles_fp32[0].shape[-1]), dtype=torch.float32
         )
 
-        for s2_start in range(0, k_block_fp32.shape[0], s2_base_size):
-            k_tile = k_block_fp32[s2_start : s2_start + s2_base_size]
+        for k_tile in k_tiles_fp32:
             score_max, sumexp, acc_o = self._update_s2_tile(
                 q_fp32,
                 k_tile,
@@ -375,26 +373,27 @@ class GeneralizedSFAQuant:
         cmp_s2_size = 0 if cmp_k_fp32 is None else cmp_k_fp32.shape[0]
         reduce_size = self._get_batch_consistency_reduce_size(ori_s2_size, cmp_s2_size)
 
-        # Metadata splits ORI and CMP independently, so a reduction block never
-        # crosses the boundary between the two KV regions.
+        # ORI、CMP 分别划分规约块，ORI 尾块结束后再开始 CMP 的规约。
         blocks = []
         for k_tensor in (ori_k_fp32, cmp_k_fp32):
-            if k_tensor is None:
+            if k_tensor is None or k_tensor.shape[0] == 0:
                 continue
-            for start in range(0, k_tensor.shape[0], reduce_size):
-                blocks.append(k_tensor[start : start + reduce_size])
+            blocks.extend(
+                list(block.split(128, dim=0))
+                for block in k_tensor.split(reduce_size, dim=0)
+            )
 
         merged_lse = None
         merged_sum = None
         merged_o = None
-        for block_id, k_block in enumerate(blocks):
+        for block_id, k_tiles in enumerate(blocks):
             initial_max = (
                 sinks.clone()
                 if block_id == 0 and sinks is not None
                 else torch.full((q_fp32.shape[0],), -torch.inf, dtype=torch.float32)
             )
             local_max, local_sum, local_o = self._calculate_local_s2_block(
-                q_fp32, k_block, initial_max
+                q_fp32, k_tiles, initial_max
             )
             if merged_lse is None:
                 merged_lse = local_max
@@ -2601,7 +2600,6 @@ def gen_data(params, generate_golden=True):
         if quant_mode == 2
         else d_aligned_32 - nope_head_dim - rope_head_dim * 2 - quant_scale_head_dim * 2
     )
-    block_num = block_num1 if block_num1 >= block_num2 else block_num2
     # 根据输入的data range，计算scale范围，生成scale tensor，取倒数保存为bin
     ori_quant_param_range_left, ori_quant_param_range_right = resolve_quant_param_range(
         ori_kv_datarange
@@ -2639,7 +2637,7 @@ def gen_data(params, generate_golden=True):
             quant_scale_head_dim,
             d_aligned_32,
             pad_d,
-            block_num,
+            block_num1,
             block_size1,
             ori_max_s2,
             ori_max_block_num_per_batch,
@@ -2730,7 +2728,7 @@ def gen_data(params, generate_golden=True):
                 quant_scale_head_dim,
                 d_aligned_32,
                 pad_d,
-                block_num,
+                block_num2,
                 block_size2,
                 cmp_max_s2,
                 cmp_max_block_num_per_batch,
@@ -2773,7 +2771,7 @@ def gen_data(params, generate_golden=True):
                 quant_scale_head_dim,
                 d_combined_quant_2,
                 pad_d,
-                block_num,
+                block_num2,
                 block_size2,
                 cmp_max_s2,
                 cmp_max_block_num_per_batch,

@@ -76,3 +76,17 @@ bash build.sh --help
 | --bisheng_flags  | 可选     | 指定一个毕昇编译器编译参数，不可与--mssanitizer、--oom、--dump_cce同时使用。     |
 | --kernel_template_input     | 可选     | 指定编译kernel时的tilingKey模板，仅支持指定一个模板，模板参数用英文逗号“,”分隔，与--ops同时使用且只能指定一个算子，不会编译该算子所依赖的其他算子二进制文件。     |
 | --cann_3rd_lib_path           | 可选     | 离线编译场景下第三方库存放的目录。                                                   |
+
+## TurboQuant整包接入补充
+
+本节适用于<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上DeepSeek V4的TurboQuant量化（quant_mode=3）。
+
+<term>Ascend 950PR&950DT系列产品</term>的quant_mode=1和quant_mode=2保持原有构建、安装和部署方式，包括对`--jit`、`--noaicpu`等参数的支持。
+
+在本仓库和ops-nn仓库分别使用`bash build.sh --pkg --soc=${soc_version}`构建整包，<term>Atlas A2系列产品</term>选择`ascend910b`，<term>Atlas A3系列产品</term>选择`ascend910_93`。TurboQuant需要算子二进制和AICPU内核，此场景不使用`--jit`或`--noaicpu`；custom包仍按原有规则构建。
+
+<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>整包包含MixedQuantSparseFlashMlaMetadata时，额外安装`opp/built-in/op_impl/aicpu/config/aicpu_transformer_turboquant.json`和`opp/built-in/op_impl/aicpu/kernel/libtransformer_turboquant_aicpu.so`。同一份注册信息和内核也安装至`opp/vendors/ops_transformer_turboquant`，兼容通过`ASCEND_CUSTOM_OPP_PATH`发现`CUSTAICPUKernel`的nnopbase版本。新增注册仅包含该Metadata算子。
+
+<term>Ascend 950PR&950DT系列产品</term>构建不生成上述TurboQuant注册文件，原有AICPU和custom包安装规则保持不变。
+
+vLLM-Ascend需包含对应适配，并重新编译安装C++扩展。安装上述整包、加载对应CANN的`set_env.sh`后，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>的`cache_dtype=turboquant_4bit_nc`配置校验通过时会自动注册兼容目录。Attention及Metadata通过`libopapi_transformer.so`加载，TurboQuant通过`libopapi_nn.so`加载。其它模型和<term>Ascend 950PR&950DT系列产品</term>基线的加载流程不变；原有custom包仍优先，应避免旧的同名算子遮蔽新包。

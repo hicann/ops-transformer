@@ -15,6 +15,10 @@
 
 - 算子功能：`MixedQuantSparseFlashMlaMetadata`是`MixedQuantSparseFlashMla`算子的前置算子，用于后续Attention计算生成负载均衡的任务划分方案。本算子不执行实际的Attention计算，而是根据输入参数在AI CPU计算出每个AI Core应处理的Attention计算起止范围，从而最大化计算资源的利用率，避免各Core间负载不均衡的问题。
 
+  <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>支持TurboQuant TQ4。本接口通过原有量化模式参数`quant_mode=3`生成配套分核信息，不执行KV量化或Attention计算，输出仍为INT32、shape为`(1024,)`。接口名、参数数量、顺序、声明类型、默认值和返回值保持不变。
+
+  <term>Ascend 950PR&950DT系列产品</term>使用原有的`quant_mode=1`和`quant_mode=2`量化模式。
+
 ## 参数说明
 
 <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
@@ -121,7 +125,7 @@
     <tr>
       <td>quant_mode</td>
       <td>属性</td>
-      <td>表示量化模式。1表示BF16 scale量化布局；2表示FLOAT8_E8M0 scale量化布局；3表示TurboQuant TQ4配套metadata。Metadata接口接受1、2、3，具体平台约束见约束说明。</td>
+      <td>表示量化模式，支持1、2、3，必须与主算子的quant_mode一致。quant_mode=1表示KV nope采用per-token-group量化、scale类型为BFLOAT16；quant_mode=2表示KV nope采用per-token-group量化、scale类型为FLOAT8_E8M0；quant_mode=3表示生成TurboQuant TQ4配套分核信息。本接口不执行KV量化或注意力计算；各模式的KV数据类型和存储布局详见<a href="../mixed_quant_sparse_flash_mla/README.md#quant_mode">quant_mode描述</a>。</td>
       <td>INT32</td>
       <td>-</td>
     </tr>
@@ -252,7 +256,7 @@
 - `quant_mode`支持1、2、3，具体产品支持的量化模式如下。
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT系列产品</term>：与`MixedQuantSparseFlashMla`算子配套使用时，仅支持`quant_mode=1/2`。
+- <term>Ascend 950PR&950DT系列产品</term>：与`MixedQuantSparseFlashMla`算子配套使用时，仅支持`quant_mode=1`或`quant_mode=2`。
 <!-- end id1 -->
 
 <!-- npu="A3" id2 -->
@@ -262,6 +266,8 @@
 <!-- npu="910b" id3 -->
 - <term>Atlas A2系列产品</term>：与`MixedQuantSparseFlashMla`算子配套使用时，仅支持`quant_mode=3`。
 <!-- end id3 -->
+- 在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>的TurboQuant TQ4场景，必须显式设置`quant_mode=3`。该模式新增的数据类型和布局不适用于其他量化模式。
+- Metadata接口与主算子的量化模式、head数、序列长度、布局、mask、压缩倍率和稀疏长度必须保持一致；主算子的必传项及`quant_mode=3`限制见[MixedQuantSparseFlashMla说明](../mixed_quant_sparse_flash_mla/README.md)。各量化模式的KV数据类型和存储布局详见主算子的`quant_mode`参数说明。
 - MixedQuantSparseFlashMlaMetadata算子需要与MixedQuantSparseFlashMla算子配套使用。
 - B（Batch）表示输入样本批量大小，q、ori_kv、cmp_kv为配套的MixedQuantSparseFlashMla算子的入参，S1表示layout_q=BSND时，q shape中的S轴的大小，T1表示layout_q=TND时，q shape中的T轴的大小，S2表示layout_kv=BSND时，ori_kv shape中的S轴的大小，S3表示layout_kv=BSND时，cmp_kv shape中的S轴的大小，N2表示ori_kv、cmp_kv shape中的N轴的大小。
 - 参数cu_seqlens_q、cu_seqlens_ori_kv及cu_seqlens_cmp_kv要求其值为当前Batch与前序Batch有效token数的累加值，第一个元素固定为0，后一个元素的值必须大于等于前一个元素的值。

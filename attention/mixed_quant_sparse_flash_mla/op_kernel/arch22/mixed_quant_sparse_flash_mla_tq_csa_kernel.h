@@ -157,7 +157,6 @@ private:
     GlobalTensor<KV_T> vec1ResGm;
     GlobalTensor<MM2_OUT_T> mm2ResGm;
     GlobalTensor<KV_T> kvMergeGm_;
-    GlobalTensor<half> tqScaleGm_;
 
     GlobalTensor<UPDATE_T> vec2ResGm;
 
@@ -482,13 +481,9 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::Init(
     kvMergeGm_.SetGlobalBuffer((__gm__ KV_T *)(workspace + offset + aiCoreIdx * mergeCacheCoreSize * sizeof(KV_T)));
     offset += static_cast<uint64_t>(tilingData->tqBaseParams.usedCoreNum) * mergeCacheCoreSize * sizeof(KV_T);
 
-    uint64_t scaleCacheCoreSize = static_cast<uint64_t>(constInfo.s2BaseSize) * MERGE_CACHE_GM_BUF_NUM;
-    tqScaleGm_.SetGlobalBuffer((__gm__ half *)(workspace + offset + aiCoreIdx * scaleCacheCoreSize * sizeof(half)));
-
     if ASCEND_IS_AIV {
         vectorBlock.InitParams(constInfo, tilingData);
-        vectorBlock.InitVec0GlobalTensor(kvMergeGm_, oriKvGm, cmpKvGm, cmpTqGm, tqScaleGm_, oriBlockTableGm,
-                                         cmpBlockTableGm);
+        vectorBlock.InitVec0GlobalTensor(kvMergeGm_, oriKvGm, cmpKvGm, cmpTqGm, oriBlockTableGm, cmpBlockTableGm);
         vectorBlock.InitVec1GlobalTensor(mm1ResGm, vec1ResGm, actualSeqLengthsQGm, actualSeqLengthsKVGm, topKGm,
                                          sinksGm, softmaxLseGm);
         vectorBlock.InitVec2GlobalTensor(accumOutGm, vec2ResGm, mm2ResGm, attentionOutGm);
