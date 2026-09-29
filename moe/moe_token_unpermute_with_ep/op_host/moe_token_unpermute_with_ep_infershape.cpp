@@ -35,13 +35,19 @@ static ge::graphStatus InferShapeForMoeTokenUnpermuteWithEp(gert::InferShapeCont
         return GRAPH_FAILED;
     }
     const gert::Shape *probs_shape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_PROBS);
-    const int64_t *topk = context->GetAttrs()->GetAttrPointer<int64_t>(UNPERMUTE_WITH_EP_ARRT_TOPK);
+    const auto *attrs = context->GetAttrs();
+    const int64_t *topk = attrs->GetAttrPointer<int64_t>(UNPERMUTE_WITH_EP_ARRT_TOPK);
+    const auto *range = attrs->GetAttrPointer<gert::ContinuousVector>(UNPERMUTE_WITH_EP_ARRT_RANGE);
     int64_t inputTopK = *topk;
     int64_t tokens_num;
     if (probs_shape == nullptr) {
         const gert::Shape *indices_shape = context->GetInputShape(UNPERMUTE_WITH_EP_INPUT_IDX);
         int64_t indicesDim0 = indices_shape->GetDim(0);
-        tokens_num = (indicesDim0 == -1) ? -1 : indicesDim0 / inputTopK;
+        if (range == nullptr || range->GetSize() == 0) {
+            tokens_num = indicesDim0;
+        } else {
+            tokens_num = (indicesDim0 == -1) ? -1 : indicesDim0 / inputTopK;
+        }
     } else {
         tokens_num = probs_shape->GetDim(0);
     }
