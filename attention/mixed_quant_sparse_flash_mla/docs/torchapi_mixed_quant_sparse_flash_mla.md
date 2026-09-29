@@ -186,7 +186,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | q | tensor | 必选 | 表示公式中的q | float16、bfloat16 | ND | <ul><li>(b, q_s, q_n, q_d)</li><li>(q_t, q_n, q_d)</li></ul>
-| quant_mode | int | 必选 | 量化模式。支持1、2、3；模式1/2保持原FP8量化布局，模式3表示融合TQ4反量化。具体产品支持的量化模式见约束说明。 | int32 | - | -
+| quant_mode | int | 必选 | 量化模式。支持1、2、3；模式1/2保持原FP8量化布局，模式3表示融合TQ4反量化。具体产品支持的量化模式见约束说明。量化模式2仅支持layout_kv为PA_BBND。 | int32 | - | -
 | ori_kv | tensor | 可选 | 原始KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入且dtype与q一致、kv_d=512。 | fp8_e4m3、float16、bfloat16 | ND | <ul><li>(b, ori_kv_s, kv_n, kv_d)</li><li>(ori_kv_t, kv_n, kv_d)</li><li>(ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d)</li></ul>
 | cmp_kv | tensor | 可选 | 压缩KV。quant_mode=1/2时使用fp8_e4m3；quant_mode=3时必须传入uint8 TQ4数据、kv_d=258。 | fp8_e4m3、uint8 | ND | <ul><li>(b, cmp_kv_s, kv_n, kv_d)</li><li>(cmp_kv_t, kv_n, kv_d)</li><li>(cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d)</li></ul>
 | ori_sparse_indices | tensor | 可选 | 表示原始KV topK索引，无效位置填-1 | int32 | ND | <ul><li>(q_t, kv_n, ori_kv_k)</li><li>(b, q_s, kv_n, ori_kv_k)</li></ul>
@@ -240,7 +240,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
   - 当ori_mask_mode/cmp_mask_mode为0时，ori_kv_k/cmp_kv_k需要大于等于ori_topk_length/cmp_topk_length的最大值。
   - quant_mode=1/2时，cmp_residual_kv配合cmp_ratio使用，可恢复压缩前KV长度。且每个batch的值需要小于cmp_ratio，即cmp_residual_kv[i] < cmp_ratio。仅当cmp_mask_mode=3且cmp_ratio!=1时允许传入；当cmp_mask_mode=0或cmp_ratio=1时不允许传入。
   - attention_out：tensor类型，公式中的输出。数据类型支持float16、bfloat16，数据格式支持ND，shape和dtype与q一致。
-  - return_softmax_lse=False时返回shape为[1]的值为0的tensor；return_softmax_lse=True时返回float32的log-sum-exp结果。
+  - return_softmax_lse=False时返回shape为[0]的空tensor；return_softmax_lse=True时返回float32的log-sum-exp结果。
   - cu_seqlens_q、cu_seqlens_ori_kv、cu_seqlens_cmp_kv须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
   - 当layout_kv为PA_BBND时，ori_kv和cmp_kv支持0轴非连续。
   - 各参数shape中以相同符号表示的维度，其对应轴的实际数值需保持一致。

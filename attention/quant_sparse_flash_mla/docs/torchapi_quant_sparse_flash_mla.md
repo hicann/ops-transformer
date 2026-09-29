@@ -242,7 +242,7 @@ cann_ops_transformer.quant_sparse_flash_mla(
   - 当ori_mask_mode/cmp_mask_mode为0时，ori_kv_k/cmp_kv_k需要大于等于ori_topk_length/cmp_topk_length的最大值。
   - cmp_residual_kv配合cmp_ratio使用，可恢复压缩前KV长度。且每个batch的值需要小于cmp_ratio。仅当cmp_mask_mode=3且cmp_ratio!=1时允许传入；当cmp_mask_mode=0或cmp_ratio=1时不允许传入。
   - attention_out：tensor类型，公式中的输出，数据类型支持bfloat16。数据格式支持ND。限制：该输出参数的shape与入参q的shape保持一致，dtype与q一致。
-  - return_softmax_lse=False时返回shape为[1]的值为0的tensor；return_softmax_lse=True时返回float32的log-sum-exp结果。
+  - return_softmax_lse=False时返回shape为[0]的空tensor；return_softmax_lse=True时返回float32的log-sum-exp结果。
   - cu_seqlens_q、cu_seqlens_ori_kv、cu_seqlens_cmp_kv须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
   - 当layout_kv为PA_BBND时，ori_kv和cmp_kv支持0轴非连续。
   - 各参数shape中以相同符号表示的维度，其对应轴的实际数值需保持一致。
