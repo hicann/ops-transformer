@@ -30,7 +30,7 @@ using namespace AscendC;
 using namespace arch35FIA;
 
 // check Q, KV, OUT 类型 全量化
-ge::graphStatus DequantChecker::CheckDataTypeSupportFullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckDataTypeSupportFullquant(const FiaTilingInfo& fiaInfo)
 {
     // {Q, KV, attenOut}
     const std::vector<std::tuple<ge::DataType, ge::DataType, ge::DataType>> fullQuantDtypeSupported = {
@@ -65,7 +65,7 @@ ge::graphStatus DequantChecker::CheckDataTypeSupportFullquant(const FiaTilingInf
 }
 
 // MLA dequantscale dtype:fp32
-ge::graphStatus DequantChecker::CheckDequantScaleDtypeMLAFullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckDequantScaleDtypeMLAFullquant(const FiaTilingInfo& fiaInfo)
 {
     if (!enableQPerTokenHeadKVPerTensor_) {
         return ge::GRAPH_SUCCESS;
@@ -95,15 +95,15 @@ ge::graphStatus DequantChecker::CheckDequantScaleDtypeMLAFullquant(const FiaTili
 
 // GQA perblock dequantscale dtype:fp32
 
-ge::graphStatus DequantChecker::CheckDequantScaleDtypeGQAPertensor(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckDequantScaleDtypeGQAPertensor(const FiaTilingInfo& fiaInfo)
 {
     if (!enableQKVPertensorQuant_) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *quantScale1Desc = fiaInfo.opParamInfo.quantScale1.desc;
-    const gert::CompileTimeTensorDesc *deqScale1Desc = fiaInfo.opParamInfo.deqScale1.desc;
-    const gert::CompileTimeTensorDesc *deqScale2Desc = fiaInfo.opParamInfo.deqScale2.desc;
+    const gert::CompileTimeTensorDesc* quantScale1Desc = fiaInfo.opParamInfo.quantScale1.desc;
+    const gert::CompileTimeTensorDesc* deqScale1Desc = fiaInfo.opParamInfo.deqScale1.desc;
+    const gert::CompileTimeTensorDesc* deqScale2Desc = fiaInfo.opParamInfo.deqScale2.desc;
     if (quantScale1Desc == nullptr || deqScale1Desc == nullptr || deqScale2Desc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -132,7 +132,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleDtypeGQAPertensor(const FiaTili
 }
 
 // MXFP8 dequantscale dtype:fp8_e8m0
-ge::graphStatus DequantChecker::CheckDequantScaleDtypeMXFP8Fullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckDequantScaleDtypeMXFP8Fullquant(const FiaTilingInfo& fiaInfo)
 {
     if (!enableQKVMxfp8FullQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -177,7 +177,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleDtypeMXFP8Fullquant(const FiaTi
 }
 
 // FP8 GQA fullquant dequantscale dtype:fp32
-ge::graphStatus DequantChecker::CheckDequantScaleDtypeFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleDtypeFP8GQAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKPerTokenHeadVPerHead_) {
         return ge::GRAPH_SUCCESS;
@@ -219,7 +219,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleDtypeFP8GQAFullquant(const FiaT
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckDequantScaleDtypeFullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckDequantScaleDtypeFullquant(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckDequantScaleDtypeMLAFullquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckDequantScaleDtypeGQAPertensor(fiaInfo) ||
@@ -231,7 +231,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleDtypeFullquant(const FiaTilingI
 }
 
 // MLA全量化 Q: per-token-head (3), KV: per-tensor (0)
-ge::graphStatus DequantChecker::CheckDequantModeMLAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantModeMLAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQPerTokenHeadKVPerTensor_) {
         return ge::GRAPH_SUCCESS;
@@ -261,7 +261,7 @@ ge::graphStatus DequantChecker::CheckDequantModeMLAFullquant(const FiaTilingInfo
 // per-block qkv antiquantMode(7)
 
 // per-tensor qkv antiquantMode(0)
-ge::graphStatus DequantChecker::CheckDequantModeGQAPertensor(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantModeGQAPertensor(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVPertensorQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -283,7 +283,7 @@ ge::graphStatus DequantChecker::CheckDequantModeGQAPertensor(const FiaTilingInfo
 }
 
 // mxfp9 qk:per-token-group v:per-channel-group
-ge::graphStatus DequantChecker::CheckDequantModeMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantModeMXFP8Fullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVMxfp8FullQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -311,7 +311,7 @@ ge::graphStatus DequantChecker::CheckDequantModeMXFP8Fullquant(const FiaTilingIn
 }
 
 // fp8 gqa qk:per-token-head v:per-tensor-head
-ge::graphStatus DequantChecker::CheckDequantModeFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantModeFP8GQAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKPerTokenHeadVPerHead_) {
         return ge::GRAPH_SUCCESS;
@@ -339,7 +339,7 @@ ge::graphStatus DequantChecker::CheckDequantModeFP8GQAFullquant(const FiaTilingI
 }
 
 // check dequant scale Mode
-ge::graphStatus DequantChecker::CheckDequantModeFullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckDequantModeFullquant(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckDequantModeGQAPertensor(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckDequantModeMLAFullquant(fiaInfo) ||
@@ -350,9 +350,9 @@ ge::graphStatus DequantChecker::CheckDequantModeFullquant(const FiaTilingInfo &f
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckTensorExistFullquant(const FiaTilingInfo &fiaInfo, const gert::Tensor *tensor,
-                                                          const std::string &quantModeName,
-                                                          const std::string &inputName) const
+ge::graphStatus DequantChecker::CheckTensorExistFullquant(const FiaTilingInfo& fiaInfo, const gert::Tensor* tensor,
+                                                          const std::string& quantModeName,
+                                                          const std::string& inputName) const
 {
     OP_CHECK_IF(tensor == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -362,9 +362,9 @@ ge::graphStatus DequantChecker::CheckTensorExistFullquant(const FiaTilingInfo &f
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckTensorNotExistFullquant(const FiaTilingInfo &fiaInfo, const gert::Tensor *tensor,
-                                                             const std::string &quantModeName,
-                                                             const std::string &inputName) const
+ge::graphStatus DequantChecker::CheckTensorNotExistFullquant(const FiaTilingInfo& fiaInfo, const gert::Tensor* tensor,
+                                                             const std::string& quantModeName,
+                                                             const std::string& inputName) const
 {
     OP_CHECK_IF(tensor != nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -373,11 +373,11 @@ ge::graphStatus DequantChecker::CheckTensorNotExistFullquant(const FiaTilingInfo
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus DequantChecker::CheckExistenceNoquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckExistenceNoquant(const FiaTilingInfo& fiaInfo) const
 {
     struct ParamInfo {
-        const char *paraName;
-        const gert::Tensor *tensor;
+        const char* paraName;
+        const gert::Tensor* tensor;
     };
 
     std::vector<ParamInfo> quantParams = {{"deq_scale1", fiaInfo.opParamInfo.deqScale1.tensor},
@@ -391,7 +391,7 @@ ge::graphStatus DequantChecker::CheckExistenceNoquant(const FiaTilingInfo &fiaIn
                                           {"value_antiquant_scale", fiaInfo.opParamInfo.valueAntiquantScale.tensor},
                                           {"value_antiquant_offset", fiaInfo.opParamInfo.valueAntiquantOffset.tensor}};
 
-    for (const auto &param : quantParams) {
+    for (const auto& param : quantParams) {
         if (param.tensor != nullptr) {
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
                 fiaInfo.opName, param.paraName,
@@ -404,15 +404,15 @@ ge::graphStatus DequantChecker::CheckExistenceNoquant(const FiaTilingInfo &fiaIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckExistencePertensorFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckExistencePertensorFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVPertensorQuant_) {
         return ge::GRAPH_SUCCESS;
     }
     string quantModeName = "per-tensor quant";
-    const gert::Tensor *quantScale1Tensor = fiaInfo.opParamInfo.quantScale1.tensor;
-    const gert::Tensor *deqScale1Tensor = fiaInfo.opParamInfo.deqScale1.tensor;
-    const gert::Tensor *deqScale2Tensor = fiaInfo.opParamInfo.deqScale2.tensor;
+    const gert::Tensor* quantScale1Tensor = fiaInfo.opParamInfo.quantScale1.tensor;
+    const gert::Tensor* deqScale1Tensor = fiaInfo.opParamInfo.deqScale1.tensor;
+    const gert::Tensor* deqScale2Tensor = fiaInfo.opParamInfo.deqScale2.tensor;
     // Q/K/V antiquantScale
     if (ge::GRAPH_SUCCESS != CheckTensorExistFullquant(fiaInfo, quantScale1Tensor, quantModeName, "quantScale1") ||
         ge::GRAPH_SUCCESS != CheckTensorExistFullquant(fiaInfo, deqScale1Tensor, quantModeName, "deqScale1") ||
@@ -451,7 +451,7 @@ ge::graphStatus DequantChecker::CheckExistencePertensorFullquant(const FiaTiling
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckExistenceMLAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckExistenceMLAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQPerTokenHeadKVPerTensor_) {
         return ge::GRAPH_SUCCESS;
@@ -494,7 +494,7 @@ ge::graphStatus DequantChecker::CheckExistenceMLAFullquant(const FiaTilingInfo &
 }
 
 // mxfp8
-ge::graphStatus DequantChecker::CheckExistenceMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckExistenceMXFP8Fullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVMxfp8FullQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -539,7 +539,7 @@ ge::graphStatus DequantChecker::CheckExistenceMXFP8Fullquant(const FiaTilingInfo
 }
 
 // fp8 gqa
-ge::graphStatus DequantChecker::CheckExistenceFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckExistenceFP8GQAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKPerTokenHeadVPerHead_) {
         return ge::GRAPH_SUCCESS;
@@ -591,7 +591,7 @@ ge::graphStatus DequantChecker::CheckExistenceFP8GQAFullquant(const FiaTilingInf
 }
 
 // GQA per-tensor
-ge::graphStatus DequantChecker::CheckFeaturePertensorFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckFeaturePertensorFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVPertensorQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -634,7 +634,7 @@ ge::graphStatus DequantChecker::CheckFeaturePertensorFullquant(const FiaTilingIn
 // GQA per-block
 
 // 不支持左padding、tensorlist、prefix、pse、alibipse
-ge::graphStatus DequantChecker::CheckFeatureMLAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckFeatureMLAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQPerTokenHeadKVPerTensor_) {
         return ge::GRAPH_SUCCESS;
@@ -682,7 +682,7 @@ ge::graphStatus DequantChecker::CheckFeatureMLAFullquant(const FiaTilingInfo &fi
 }
 
 // 不支持左padding、tensorlist、prefix、pse、alibipse
-ge::graphStatus DequantChecker::CheckFeatureMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckFeatureMXFP8Fullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVMxfp8FullQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -734,7 +734,7 @@ ge::graphStatus DequantChecker::CheckFeatureMXFP8Fullquant(const FiaTilingInfo &
 }
 
 // 不支持rope、pse、alibipse、左padding、tensorlist、prefix；仅支持page attention
-ge::graphStatus DequantChecker::CheckFeatureFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckFeatureFP8GQAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKPerTokenHeadVPerHead_) {
         return ge::GRAPH_SUCCESS;
@@ -783,7 +783,7 @@ ge::graphStatus DequantChecker::CheckFeatureFP8GQAFullquant(const FiaTilingInfo 
 }
 
 // 全量化不同量化方式 不支持的特性
-ge::graphStatus DequantChecker::CheckFeatureSupportFullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckFeatureSupportFullquant(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckFeaturePertensorFullquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckFeatureMLAFullquant(fiaInfo) ||
@@ -795,7 +795,7 @@ ge::graphStatus DequantChecker::CheckFeatureSupportFullquant(const FiaTilingInfo
 }
 
 // check scale shape
-ge::graphStatus DequantChecker::CheckDequantScaleKVMLAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleKVMLAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQPerTokenHeadKVPerTensor_) {
         return ge::GRAPH_SUCCESS;
@@ -822,7 +822,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleKVMLAFullquant(const FiaTilingI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckDequantScaleQueryMLAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleQueryMLAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQPerTokenHeadKVPerTensor_) {
         return ge::GRAPH_SUCCESS;
@@ -880,7 +880,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleQueryMLAFullquant(const FiaTili
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckDequantScaleShapePertensor(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleShapePertensor(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVPertensorQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -913,7 +913,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleShapePertensor(const FiaTilingI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckDequantScaleBnNBsDShapeMXFP8(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleBnNBsDShapeMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     if (fiaInfo.kvLayout != FiaLayout::BnNBsD) {
         return ge::GRAPH_SUCCESS;
@@ -981,7 +981,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleBnNBsDShapeMXFP8(const FiaTilin
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckDequantScaleNZShapeMXFP8(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleNZShapeMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     if (fiaInfo.kvLayout != FiaLayout::NZ) {
         return ge::GRAPH_SUCCESS;
@@ -1052,7 +1052,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleNZShapeMXFP8(const FiaTilingInf
 }
 
 // 非pa场景 不支持kv kvscale不连续
-ge::graphStatus DequantChecker::CheckDequantScaleContiguousMXFP8(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleContiguousMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     if (fiaInfo.pageAttentionFlag) {
         return ge::GRAPH_SUCCESS;
@@ -1082,7 +1082,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleContiguousMXFP8(const FiaTiling
 }
 
 // qscale/kvscale dim校验
-ge::graphStatus DequantChecker::CheckDequantScaleDimMXFP8(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleDimMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     const gert::Shape dequantScaleQueryShape = fiaInfo.opParamInfo.dequantScaleQuery.tensor->GetStorageShape();
     const uint32_t dequantScaleQueryDimNum = dequantScaleQueryShape.GetDimNum();
@@ -1123,7 +1123,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleDimMXFP8(const FiaTilingInfo &f
 }
 
 // query scale shape校验
-ge::graphStatus DequantChecker::CheckDequantScaleQueryShapeMXFP8(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleQueryShapeMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     const gert::Shape queryInputShape = fiaInfo.opParamInfo.query.shape->GetStorageShape();
     const gert::Shape dequantScaleQueryShape = fiaInfo.opParamInfo.dequantScaleQuery.tensor->GetStorageShape();
@@ -1166,7 +1166,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleQueryShapeMXFP8(const FiaTiling
 }
 
 // shape告警
-void DequantChecker::LogDequantScaleQueryShapeWarnMXFP8(const FiaTilingInfo &fiaInfo) const
+void DequantChecker::LogDequantScaleQueryShapeWarnMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     const gert::Shape queryInputShape = fiaInfo.opParamInfo.query.shape->GetStorageShape();
     const gert::Shape dequantScaleQueryShape = fiaInfo.opParamInfo.dequantScaleQuery.tensor->GetStorageShape();
@@ -1193,7 +1193,7 @@ void DequantChecker::LogDequantScaleQueryShapeWarnMXFP8(const FiaTilingInfo &fia
 }
 
 // pa场景 kv scale校验
-ge::graphStatus DequantChecker::CheckDequantScaleKVShapePAMXFP8(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleKVShapePAMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     const gert::Shape keyInputShape = fiaInfo.opParamInfo.key.shape->GetStorageShape();
     const uint32_t keyDimNum = keyInputShape.GetDimNum();
@@ -1232,7 +1232,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleKVShapePAMXFP8(const FiaTilingI
 }
 
 // 非pa场景 kv scale校验
-ge::graphStatus DequantChecker::CheckDequantScaleKVShapeNoPAMXFP8(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleKVShapeNoPAMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     const gert::Shape keyInputShape = fiaInfo.opParamInfo.key.shape->GetStorageShape();
     const gert::Shape keyAntiquantScaleShape = fiaInfo.opParamInfo.keyAntiquantScale.tensor->GetStorageShape();
@@ -1272,7 +1272,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleKVShapeNoPAMXFP8(const FiaTilin
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckDequantScaleShapeMXFP8(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleShapeMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVMxfp8FullQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -1305,13 +1305,13 @@ ge::graphStatus DequantChecker::CheckDequantScaleShapeMXFP8(const FiaTilingInfo 
     return ge::GRAPH_SUCCESS;
 }
 
-int64_t DequantChecker::GetValueScaleActualKVlens4TNDNoPa(const FiaTilingInfo &fiaInfo) const
+int64_t DequantChecker::GetValueScaleActualKVlens4TNDNoPa(const FiaTilingInfo& fiaInfo) const
 {
     int64_t valueScaleKVlens = 0;
     if (fiaInfo.isMaxWorkspace) {
         return valueScaleKVlens;
     }
-    auto &actualSeqLengthsKvTensor = fiaInfo.opParamInfo.actualSeqLengths.tensor;
+    auto& actualSeqLengthsKvTensor = fiaInfo.opParamInfo.actualSeqLengths.tensor;
     if (actualSeqLengthsKvTensor == nullptr) {
         return valueScaleKVlens;
     }
@@ -1331,12 +1331,12 @@ int64_t DequantChecker::GetValueScaleActualKVlens4TNDNoPa(const FiaTilingInfo &f
     return valueScaleKVlens;
 }
 
-ge::graphStatus DequantChecker::CheckQuantScale1ShapeMXFP8(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckQuantScale1ShapeMXFP8(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVMxfp8FullQuant_) {
         return ge::GRAPH_SUCCESS;
     }
-    const gert::Tensor *quantScale1Tensor = fiaInfo.opParamInfo.quantScale1.tensor;
+    const gert::Tensor* quantScale1Tensor = fiaInfo.opParamInfo.quantScale1.tensor;
     // shape:[1]
     if ((quantScale1Tensor != nullptr) &&
         (quantScale1Tensor->GetStorageShape().GetDimNum() != NUM1 || quantScale1Tensor->GetShapeSize() != NUM1)) {
@@ -1349,12 +1349,12 @@ ge::graphStatus DequantChecker::CheckQuantScale1ShapeMXFP8(const FiaTilingInfo &
 }
 
 // GQA antiquantscale
-ge::graphStatus DequantChecker::CheckQuantScale1ShapeFP8GQA(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckQuantScale1ShapeFP8GQA(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKPerTokenHeadVPerHead_) {
         return ge::GRAPH_SUCCESS;
     }
-    const gert::Tensor *quantScale1Tensor = fiaInfo.opParamInfo.quantScale1.tensor;
+    const gert::Tensor* quantScale1Tensor = fiaInfo.opParamInfo.quantScale1.tensor;
     // shape:[1]
     if ((quantScale1Tensor != nullptr) &&
         (quantScale1Tensor->GetStorageShape().GetDimNum() != NUM1 || quantScale1Tensor->GetShapeSize() != NUM1)) {
@@ -1367,7 +1367,7 @@ ge::graphStatus DequantChecker::CheckQuantScale1ShapeFP8GQA(const FiaTilingInfo 
 }
 
 // fp8 gqa q_scale: NT, k_scale: BnNBs, v_scale: N
-ge::graphStatus DequantChecker::CheckDequantScaleShapeFP8GQA(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDequantScaleShapeFP8GQA(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKPerTokenHeadVPerHead_) {
         return ge::GRAPH_SUCCESS;
@@ -1479,7 +1479,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleShapeFP8GQA(const FiaTilingInfo
 }
 
 // GQA FP8 Fullquant stride 校验
-ge::graphStatus DequantChecker::CheckStrideFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckStrideFP8GQAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKPerTokenHeadVPerHead_) {
         return ge::GRAPH_SUCCESS;
@@ -1538,7 +1538,7 @@ ge::graphStatus DequantChecker::CheckStrideFP8GQAFullquant(const FiaTilingInfo &
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckDequantScaleShapeFullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckDequantScaleShapeFullquant(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckDequantScaleKVMLAFullquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckDequantScaleShapePertensor(fiaInfo) ||
@@ -1549,7 +1549,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleShapeFullquant(const FiaTilingI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckDequantScaleShapeCrossFullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckDequantScaleShapeCrossFullquant(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckDequantScaleQueryMLAFullquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckDequantScaleShapeMXFP8(fiaInfo) ||
@@ -1560,7 +1560,7 @@ ge::graphStatus DequantChecker::CheckDequantScaleShapeCrossFullquant(const FiaTi
 }
 
 // check 不同量化方式 支持的数据类型
-ge::graphStatus DequantChecker::CheckInputDTypeFullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckInputDTypeFullquant(const FiaTilingInfo& fiaInfo)
 {
     if (enableQPerTokenHeadKVPerTensor_) { // MLA 全量化 QKV : fp8_e4m3/int8
         if (!(fiaInfo.inputQType == ge::DT_FLOAT8_E4M3FN || fiaInfo.inputQType == ge::DT_INT8 ||
@@ -1648,7 +1648,7 @@ ge::graphStatus DequantChecker::CheckInputDTypeFullquant(const FiaTilingInfo &fi
 // check per-block layout
 
 // check per-tensor layout
-ge::graphStatus DequantChecker::CheckInputLayoutPertensor(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckInputLayoutPertensor(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVPertensorQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -1670,7 +1670,7 @@ ge::graphStatus DequantChecker::CheckInputLayoutPertensor(const FiaTilingInfo &f
 }
 
 // check mla fullqunat layout
-ge::graphStatus DequantChecker::CheckInputLayoutMLAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckInputLayoutMLAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQPerTokenHeadKVPerTensor_) {
         return ge::GRAPH_SUCCESS;
@@ -1702,7 +1702,7 @@ ge::graphStatus DequantChecker::CheckInputLayoutMLAFullquant(const FiaTilingInfo
 }
 
 // check mxfp8 fullqunat layout
-ge::graphStatus DequantChecker::CheckInputLayoutMXFP8Fullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckInputLayoutMXFP8Fullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKVMxfp8FullQuant_) {
         return ge::GRAPH_SUCCESS;
@@ -1720,7 +1720,7 @@ ge::graphStatus DequantChecker::CheckInputLayoutMXFP8Fullquant(const FiaTilingIn
 }
 
 // check fp8 gqa fullquant layout: input layout仅支持NTD_TND, q layout仅支持NTD
-ge::graphStatus DequantChecker::CheckInputLayoutFP8GQAFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckInputLayoutFP8GQAFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!enableQKPerTokenHeadVPerHead_) {
         return ge::GRAPH_SUCCESS;
@@ -1749,7 +1749,7 @@ ge::graphStatus DequantChecker::CheckInputLayoutFP8GQAFullquant(const FiaTilingI
 }
 
 // check layout
-ge::graphStatus DequantChecker::CheckInputLayoutFullquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckInputLayoutFullquant(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckInputLayoutPertensor(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckInputLayoutMLAFullquant(fiaInfo) ||
@@ -1761,7 +1761,7 @@ ge::graphStatus DequantChecker::CheckInputLayoutFullquant(const FiaTilingInfo &f
 }
 
 // check n1 size
-ge::graphStatus DequantChecker::CheckN1SizeFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckN1SizeFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (enableQPerTokenHeadKVPerTensor_) {
         static const std::set<uint32_t> supportNumHeadForMLAFullQuant = {1U, 2U, 4U, 8U, 16U, 32U, 64U, 128U};
@@ -1799,7 +1799,7 @@ ge::graphStatus DequantChecker::CheckN1SizeFullquant(const FiaTilingInfo &fiaInf
 }
 
 // check n2 size
-ge::graphStatus DequantChecker::CheckN2SizeFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckN2SizeFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (enableQPerTokenHeadKVPerTensor_) {
         OP_CHECK_IF((fiaInfo.n2Size != NUM1),
@@ -1818,7 +1818,7 @@ ge::graphStatus DequantChecker::CheckN2SizeFullquant(const FiaTilingInfo &fiaInf
 }
 
 // check g size
-ge::graphStatus DequantChecker::CheckGSizeFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckGSizeFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (enableQPerTokenHeadKVPerTensor_) { // G <= 128
         if (fiaInfo.gSize < NUM1 || fiaInfo.gSize > NUM_128) {
@@ -1845,7 +1845,7 @@ ge::graphStatus DequantChecker::CheckGSizeFullquant(const FiaTilingInfo &fiaInfo
 }
 
 // check d size
-ge::graphStatus DequantChecker::CheckDSizeFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDSizeFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (enableQPerTokenHeadKVPerTensor_) {
         if (fiaInfo.qkHeadDim != NUM_512) {
@@ -1897,7 +1897,7 @@ ge::graphStatus DequantChecker::CheckDSizeFullquant(const FiaTilingInfo &fiaInfo
 }
 
 // check axis
-ge::graphStatus DequantChecker::CheckInputAxisFullquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckInputAxisFullquant(const FiaTilingInfo& fiaInfo) const
 {
     if (ge::GRAPH_SUCCESS != CheckN1SizeFullquant(fiaInfo) || ge::GRAPH_SUCCESS != CheckN2SizeFullquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckGSizeFullquant(fiaInfo) || ge::GRAPH_SUCCESS != CheckDSizeFullquant(fiaInfo)) {
@@ -1908,7 +1908,7 @@ ge::graphStatus DequantChecker::CheckInputAxisFullquant(const FiaTilingInfo &fia
 
 // enableAntiQuant 相关校验函数
 // singlePara
-ge::graphStatus DequantChecker::CheckSingleParaForAntiquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckSingleParaForAntiquant(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckAntiquantModeForAntiquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckInputKVTypeForAntiquant(fiaInfo)) {
@@ -1917,7 +1917,7 @@ ge::graphStatus DequantChecker::CheckSingleParaForAntiquant(const FiaTilingInfo 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckAntiquantModeForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckAntiquantModeForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     // antiquantMode合法性校验
     // keyAntiquantMode
@@ -1976,7 +1976,7 @@ ge::graphStatus DequantChecker::CheckAntiquantModeForAntiquant(const FiaTilingIn
 }
 
 ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerChannel(
-    const FiaTilingInfo &fiaInfo, ge::DataType inputKvType, const gert::Tensor *keyAntiquantScaleTensor) const
+    const FiaTilingInfo& fiaInfo, ge::DataType inputKvType, const gert::Tensor* keyAntiquantScaleTensor) const
 {
     // per-tensor模式，仅当key/value的数据类型为INT8时支持
     gert::Shape expectedShape1 = gert::Shape({1});
@@ -2007,7 +2007,7 @@ ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerChannel(
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantMixed(const FiaTilingInfo &fiaInfo,
+ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantMixed(const FiaTilingInfo& fiaInfo,
                                                                   ge::DataType inputKvType) const
 {
     // key支持per-channel叠加value支持per-token，支持key/value的数据类型为INT8、INT4(INT32)
@@ -2028,7 +2028,7 @@ ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantMixed(const FiaTilin
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerToken(const FiaTilingInfo &fiaInfo,
+ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerToken(const FiaTilingInfo& fiaInfo,
                                                                      ge::DataType inputKvType) const
 {
     // per-token模式，支持key/value的数据类型为INT8、INT4(INT32)、FLOAT8_E4M3FN
@@ -2041,7 +2041,7 @@ ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerToken(const FiaTi
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenPA(const FiaTilingInfo &fiaInfo,
+ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenPA(const FiaTilingInfo& fiaInfo,
                                                                        ge::DataType inputKvType) const
 {
     // per-token模式，使用page attention管理scale/offset, 支持key/value的数据类型为INT8、FLAOT8_E4M3FN
@@ -2054,7 +2054,7 @@ ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenPA(const Fia
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTensorHead(const FiaTilingInfo &fiaInfo,
+ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTensorHead(const FiaTilingInfo& fiaInfo,
                                                                           ge::DataType inputKvType) const
 {
     // per-tensor-head模式，支持key/value的数据类型为INT8
@@ -2073,7 +2073,7 @@ ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTensorHead(const 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenHead(const FiaTilingInfo &fiaInfo,
+ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenHead(const FiaTilingInfo& fiaInfo,
                                                                          ge::DataType inputKvType) const
 {
     // per-token-head模式，支持key/value的数据类型为INT8、INT4(INT32)
@@ -2086,7 +2086,7 @@ ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenHead(const F
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenHeadPA(const FiaTilingInfo &fiaInfo,
+ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenHeadPA(const FiaTilingInfo& fiaInfo,
                                                                            ge::DataType inputKvType) const
 {
     // per-token-head模式使用page attention管理scale/offset，支持key/value的数据类型为INT8
@@ -2099,7 +2099,7 @@ ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenHeadPA(const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenGroup(const FiaTilingInfo &fiaInfo,
+ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenGroup(const FiaTilingInfo& fiaInfo,
                                                                           ge::DataType inputKvType) const
 {
     // per-token-group模式，支持key/value的数据类型为FLOAT4_E2M1
@@ -2112,12 +2112,12 @@ ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquantPerTokenGroup(const 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquant(const FiaTilingInfo& fiaInfo)
 {
     // 根据keyAntiquantMode和valueAntiquantMode，校验输入key、value的datatype的合法性
     auto inputKvType = fiaInfo.inputKvType;
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
-    auto &valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
     if (keyAntiquantScaleTensor == nullptr || valueAntiquantScaleTensor == nullptr) {
         // 若不存在keyAntiquantScaleTensor和valueAntiquantScaleTensor，则放弃后续校验
         return ge::GRAPH_SUCCESS;
@@ -2160,7 +2160,7 @@ ge::graphStatus DequantChecker::CheckInputKVTypeForAntiquant(const FiaTilingInfo
 }
 
 // existence
-ge::graphStatus DequantChecker::CheckExistenceForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckExistenceForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     if (ge::GRAPH_SUCCESS != CheckScaleExistenceForAntiquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckDescExistenceForAntiquant(fiaInfo) ||
@@ -2170,10 +2170,10 @@ ge::graphStatus DequantChecker::CheckExistenceForAntiquant(const FiaTilingInfo &
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckScaleExistenceForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckScaleExistenceForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
-    auto &valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
 
     int64_t antiquantMode = 0;
     if (fiaInfo.opParamInfo.antiquantMode != nullptr) {
@@ -2208,7 +2208,7 @@ ge::graphStatus DequantChecker::CheckScaleExistenceForAntiquant(const FiaTilingI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckDescExistenceForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckDescExistenceForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     // 所有输入若Tensor存在，则Desc必须存在
     // keyantiquantScale
@@ -2238,13 +2238,13 @@ ge::graphStatus DequantChecker::CheckDescExistenceForAntiquant(const FiaTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckOffsetExistenceForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckOffsetExistenceForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     // 校验Offset的存在性
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
-    auto &valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
-    auto &keyAntiquantOffsetTensor = fiaInfo.opParamInfo.keyAntiquantOffset.tensor;
-    auto &valueAntiquantOffsetTensor = fiaInfo.opParamInfo.valueAntiquantOffset.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
+    auto& keyAntiquantOffsetTensor = fiaInfo.opParamInfo.keyAntiquantOffset.tensor;
+    auto& valueAntiquantOffsetTensor = fiaInfo.opParamInfo.valueAntiquantOffset.tensor;
     auto inputKvType = fiaInfo.opParamInfo.key.desc->GetDataType();
 
     // keyAntiquantOffset和valueAntiquantOffset要么同时存在，要么同时不存在
@@ -2278,7 +2278,7 @@ ge::graphStatus DequantChecker::CheckOffsetExistenceForAntiquant(const FiaTiling
 }
 
 // feature
-ge::graphStatus DequantChecker::CheckFeatureForAntiquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckFeatureForAntiquant(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckFeatureLayoutForAntiquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckFeatureQuerySForAntiquant(fiaInfo) ||
@@ -2292,15 +2292,15 @@ ge::graphStatus DequantChecker::CheckFeatureForAntiquant(const FiaTilingInfo &fi
 }
 
 // 非PA场景: 若tensor存在则校验连续性
-ge::graphStatus DequantChecker::CheckContiguousIfExistsAntiquant(const FiaTilingInfo &fiaInfo,
-                                                                 const gert::Tensor *tensor, const char *tensorName,
-                                                                 const gert::Stride *strides) const
+ge::graphStatus DequantChecker::CheckContiguousIfExistsAntiquant(const FiaTilingInfo& fiaInfo,
+                                                                 const gert::Tensor* tensor, const char* tensorName,
+                                                                 const gert::Stride* strides) const
 {
     if (tensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
     int32_t dimIndex = 0;
-    const auto &shape = tensor->GetStorageShape();
+    const auto& shape = tensor->GetStorageShape();
     OP_CHECK_IF(
         CheckTensorContiguous(shape.GetDimNum(), shape, strides, dimIndex) != ge::GRAPH_SUCCESS,
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -2311,7 +2311,7 @@ ge::graphStatus DequantChecker::CheckContiguousIfExistsAntiquant(const FiaTiling
 }
 
 // 非PA场景 stride校验
-ge::graphStatus DequantChecker::CheckStrideForAntiquantNoPA(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckStrideForAntiquantNoPA(const FiaTilingInfo& fiaInfo) const
 {
     const gert::Shape keyShape = fiaInfo.opParamInfo.key.shape->GetStorageShape();
     const uint32_t keyDimNum = keyShape.GetDimNum();
@@ -2347,9 +2347,9 @@ ge::graphStatus DequantChecker::CheckStrideForAntiquantNoPA(const FiaTilingInfo 
 }
 
 // PA场景 key/value stride校验 (仅支持0/1轴非连续)
-ge::graphStatus DequantChecker::CheckStrideAllowedAntiquantPA(const FiaTilingInfo &fiaInfo, const char *tensorName,
-                                                              uint32_t dimNum, const gert::Shape &shape,
-                                                              const gert::Stride *strides) const
+ge::graphStatus DequantChecker::CheckStrideAllowedAntiquantPA(const FiaTilingInfo& fiaInfo, const char* tensorName,
+                                                              uint32_t dimNum, const gert::Shape& shape,
+                                                              const gert::Stride* strides) const
 {
     if (strides == nullptr || strides->GetDimNum() == 0) {
         return ge::GRAPH_SUCCESS;
@@ -2373,9 +2373,9 @@ ge::graphStatus DequantChecker::CheckStrideAllowedAntiquantPA(const FiaTilingInf
 }
 
 // PA场景 scale/offset stride校验 (仅 mode4/mode5 支持, mode4 仅 axis0, mode5 允许 axis0+axis1)
-ge::graphStatus DequantChecker::CheckScaleStrideAllowedAntiquantPA(const FiaTilingInfo &fiaInfo, const char *tensorName,
-                                                                   uint32_t dimNum, const gert::Shape &shape,
-                                                                   const gert::Stride *strides,
+ge::graphStatus DequantChecker::CheckScaleStrideAllowedAntiquantPA(const FiaTilingInfo& fiaInfo, const char* tensorName,
+                                                                   uint32_t dimNum, const gert::Shape& shape,
+                                                                   const gert::Stride* strides,
                                                                    uint32_t antiquantMode) const
 {
     if (strides == nullptr || strides->GetDimNum() == 0) {
@@ -2410,20 +2410,20 @@ ge::graphStatus DequantChecker::CheckScaleStrideAllowedAntiquantPA(const FiaTili
 }
 
 // PA场景: 若scale/offset tensor存在则校验stride
-ge::graphStatus DequantChecker::CheckScaleStrideIfExistsAntiquantPA(const FiaTilingInfo &fiaInfo,
-                                                                    const gert::Tensor *tensor, const char *tensorName,
-                                                                    const gert::Stride *strides,
+ge::graphStatus DequantChecker::CheckScaleStrideIfExistsAntiquantPA(const FiaTilingInfo& fiaInfo,
+                                                                    const gert::Tensor* tensor, const char* tensorName,
+                                                                    const gert::Stride* strides,
                                                                     uint32_t antiquantMode) const
 {
     if (tensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
-    const auto &shape = tensor->GetStorageShape();
+    const auto& shape = tensor->GetStorageShape();
     return CheckScaleStrideAllowedAntiquantPA(fiaInfo, tensorName, shape.GetDimNum(), shape, strides, antiquantMode);
 }
 
 // PA场景 stride校验
-ge::graphStatus DequantChecker::CheckStrideForAntiquantPA(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckStrideForAntiquantPA(const FiaTilingInfo& fiaInfo) const
 {
     const gert::Shape keyShape = fiaInfo.opParamInfo.key.shape->GetStorageShape();
     const uint32_t keyDimNum = keyShape.GetDimNum();
@@ -2462,7 +2462,7 @@ ge::graphStatus DequantChecker::CheckStrideForAntiquantPA(const FiaTilingInfo &f
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckStrideForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckStrideForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     if (!fiaInfo.hasViewStride) {
         return ge::GRAPH_SUCCESS;
@@ -2473,7 +2473,7 @@ ge::graphStatus DequantChecker::CheckStrideForAntiquant(const FiaTilingInfo &fia
     return CheckStrideForAntiquantPA(fiaInfo);
 }
 
-ge::graphStatus DequantChecker::CheckFeatureLayoutForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckFeatureLayoutForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     // 伪量化场景校验支持的inputLayout
     const std::string inputLayout = fiaInfo.opParamInfo.layOut;
@@ -2503,7 +2503,7 @@ ge::graphStatus DequantChecker::CheckFeatureLayoutForAntiquant(const FiaTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckFeatureQuerySForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckFeatureQuerySForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     if (fiaInfo.s1Size > 1) {
         int64_t keyAntiquantMode = 0;
@@ -2568,16 +2568,16 @@ ge::graphStatus DequantChecker::CheckFeatureQuerySForAntiquant(const FiaTilingIn
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckFeaturePAForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckFeaturePAForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     // 校验交叉特性page attention约束
     if (fiaInfo.kvStorageMode != KvStorageMode::PAGE_ATTENTION) {
         return ge::GRAPH_SUCCESS;
     }
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
-    auto &valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
-    auto &keyAntiquantOffsetTensor = fiaInfo.opParamInfo.keyAntiquantOffset.tensor;
-    auto &valueAntiquantOffsetTensor = fiaInfo.opParamInfo.valueAntiquantOffset.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
+    auto& keyAntiquantOffsetTensor = fiaInfo.opParamInfo.keyAntiquantOffset.tensor;
+    auto& valueAntiquantOffsetTensor = fiaInfo.opParamInfo.valueAntiquantOffset.tensor;
     int32_t blockSize = fiaInfo.blockSize;
     uint32_t maxBlockNumPerBatch = fiaInfo.maxBlockNumPerBatch;
 
@@ -2654,7 +2654,7 @@ ge::graphStatus DequantChecker::CheckFeaturePAForAntiquant(const FiaTilingInfo &
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckFeatureRopeForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckFeatureRopeForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     OP_CHECK_IF((fiaInfo.ropeMode == RopeMode::ROPE_COMBINE),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(fiaInfo.opName, "rope_mode", "ROPE_COMBINE",
@@ -2663,7 +2663,7 @@ ge::graphStatus DequantChecker::CheckFeatureRopeForAntiquant(const FiaTilingInfo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckFeatureD032ForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckFeatureD032ForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     if (fiaInfo.kvCacheNzD0 != NUM_32) {
         return ge::GRAPH_SUCCESS;
@@ -2690,7 +2690,7 @@ ge::graphStatus DequantChecker::CheckFeatureD032ForAntiquant(const FiaTilingInfo
                     "when PA_NZ D0=32 antiquant is enabled"),
                 return ge::GRAPH_FAILED);
 
-    const std::string &inputLayout = fiaInfo.opParamInfo.layOut;
+    const std::string& inputLayout = fiaInfo.opParamInfo.layOut;
     OP_CHECK_IF(inputLayout != "BSH" && inputLayout != "BSND" && inputLayout != "BNSD",
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                     fiaInfo.opName, "input_layout", inputLayout.c_str(),
@@ -2805,7 +2805,7 @@ ge::graphStatus DequantChecker::CheckFeatureD032ForAntiquant(const FiaTilingInfo
 }
 
 // multipara
-ge::graphStatus DequantChecker::CheckMultiParaForAntiquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckMultiParaForAntiquant(const FiaTilingInfo& fiaInfo)
 {
     if (ge::GRAPH_SUCCESS != CheckScaleTypeForAntiquant(fiaInfo) ||
         ge::GRAPH_SUCCESS != CheckScaleShapeForAntiquant(fiaInfo) ||
@@ -2816,11 +2816,11 @@ ge::graphStatus DequantChecker::CheckMultiParaForAntiquant(const FiaTilingInfo &
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckScaleTypeForAntiquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckScaleTypeForAntiquant(const FiaTilingInfo& fiaInfo)
 {
     // 校验Scale矩阵的datatype的合法性
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
-    auto &valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
 
     int64_t keyAntiquantMode = 0;
     int64_t valueAntiquantMode = 0;
@@ -2830,9 +2830,9 @@ ge::graphStatus DequantChecker::CheckScaleTypeForAntiquant(const FiaTilingInfo &
     if (fiaInfo.opParamInfo.valueAntiquantMode != nullptr) {
         valueAntiquantMode = *fiaInfo.opParamInfo.valueAntiquantMode;
     }
-    auto &keyAntiquantScaleDesc = fiaInfo.opParamInfo.keyAntiquantScale.desc;
-    auto &valueAntiquantScaleDesc = fiaInfo.opParamInfo.valueAntiquantScale.desc;
-    auto &queryDesc = fiaInfo.opParamInfo.query.desc;
+    auto& keyAntiquantScaleDesc = fiaInfo.opParamInfo.keyAntiquantScale.desc;
+    auto& valueAntiquantScaleDesc = fiaInfo.opParamInfo.valueAntiquantScale.desc;
+    auto& queryDesc = fiaInfo.opParamInfo.query.desc;
 
     if (keyAntiquantMode == PER_CHANNEL_MODE && valueAntiquantMode == PER_CHANNEL_MODE) {
         // per-channel/per-tensor模式，keyAntiquantScale和valueAntiquantScale的数据类型与query相同
@@ -2987,11 +2987,11 @@ ge::graphStatus DequantChecker::CheckScaleTypeForAntiquant(const FiaTilingInfo &
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckScaleShapeForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckScaleShapeForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     // 校验scale矩阵的shape的合法性
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
-    auto &valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
 
     int64_t keyAntiquantMode = 0;
     int64_t valueAntiquantMode = 0;
@@ -3078,15 +3078,15 @@ ge::graphStatus DequantChecker::CheckScaleShapeForAntiquant(const FiaTilingInfo 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckOffsetTypeForAntiquant(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckOffsetTypeForAntiquant(const FiaTilingInfo& fiaInfo)
 {
     // 校验offset矩阵的datatype的合法性
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
-    auto &valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
 
     // keyAntiquantOffset的datatype与keyAntiquantScale一致
-    auto &keyAntiquantOffsetDesc = fiaInfo.opParamInfo.keyAntiquantOffset.desc;
-    auto &keyAntiquantScaleDesc = fiaInfo.opParamInfo.keyAntiquantScale.desc;
+    auto& keyAntiquantOffsetDesc = fiaInfo.opParamInfo.keyAntiquantOffset.desc;
+    auto& keyAntiquantScaleDesc = fiaInfo.opParamInfo.keyAntiquantScale.desc;
     if (keyAntiquantOffsetDesc != nullptr && keyAntiquantScaleDesc != nullptr) {
         OP_CHECK_IF((keyAntiquantOffsetDesc->GetDataType() != keyAntiquantScaleDesc->GetDataType()),
                     OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
@@ -3097,8 +3097,8 @@ ge::graphStatus DequantChecker::CheckOffsetTypeForAntiquant(const FiaTilingInfo 
                     return ge::GRAPH_FAILED);
     }
     // valueAntiquantOffset的datatype与valueAntiquantScale一致
-    auto &valueAntiquantOffsetDesc = fiaInfo.opParamInfo.valueAntiquantOffset.desc;
-    auto &valueAntiquantScaleDesc = fiaInfo.opParamInfo.valueAntiquantScale.desc;
+    auto& valueAntiquantOffsetDesc = fiaInfo.opParamInfo.valueAntiquantOffset.desc;
+    auto& valueAntiquantScaleDesc = fiaInfo.opParamInfo.valueAntiquantScale.desc;
     if (valueAntiquantOffsetDesc != nullptr && valueAntiquantScaleDesc != nullptr) {
         OP_CHECK_IF(
             (valueAntiquantOffsetDesc->GetDataType() != valueAntiquantScaleDesc->GetDataType()),
@@ -3113,13 +3113,13 @@ ge::graphStatus DequantChecker::CheckOffsetTypeForAntiquant(const FiaTilingInfo 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckOffsetShapeForAntiquant(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckOffsetShapeForAntiquant(const FiaTilingInfo& fiaInfo) const
 {
     // 校验offset矩阵的shape的合法性
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
-    auto &valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
-    auto &keyAntiquantOffsetTensor = fiaInfo.opParamInfo.keyAntiquantOffset.tensor;
-    auto &valueAntiquantOffsetTensor = fiaInfo.opParamInfo.valueAntiquantOffset.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
+    auto& keyAntiquantOffsetTensor = fiaInfo.opParamInfo.keyAntiquantOffset.tensor;
+    auto& valueAntiquantOffsetTensor = fiaInfo.opParamInfo.valueAntiquantOffset.tensor;
 
     if (keyAntiquantScaleTensor == nullptr || valueAntiquantScaleTensor == nullptr ||
         keyAntiquantOffsetTensor == nullptr || valueAntiquantOffsetTensor == nullptr) {
@@ -3153,9 +3153,9 @@ ge::graphStatus DequantChecker::CheckOffsetShapeForAntiquant(const FiaTilingInfo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckKScaleShapeForKvCacheNz(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckKScaleShapeForKvCacheNz(const FiaTilingInfo& fiaInfo) const
 {
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
     int64_t keyAntiquantMode = *fiaInfo.opParamInfo.keyAntiquantMode;
     gert::Shape keyAntiquantScaleTensorShape = keyAntiquantScaleTensor->GetStorageShape();
     uint32_t batchSize = fiaInfo.bSize;
@@ -3189,7 +3189,7 @@ ge::graphStatus DequantChecker::CheckKScaleShapeForKvCacheNz(const FiaTilingInfo
         return ge::GRAPH_SUCCESS;
     }
 
-    const std::string &inputLayout = fiaInfo.opParamInfo.layOut;
+    const std::string& inputLayout = fiaInfo.opParamInfo.layOut;
     if (inputLayout == "BSH") {
         gert::Shape expectedShapeH = gert::Shape({numKeyValueHeads * headDim});
         if (keyAntiquantScaleTensorShape != expectedShapeH) {
@@ -3238,9 +3238,9 @@ ge::graphStatus DequantChecker::CheckKScaleShapeForKvCacheNz(const FiaTilingInfo
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus DequantChecker::CheckKScaleShapeForPerChannelPerTensorMode(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckKScaleShapeForPerChannelPerTensorMode(const FiaTilingInfo& fiaInfo) const
 {
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
     gert::Shape keyAntiquantScaleTensorShape = keyAntiquantScaleTensor->GetStorageShape();
     uint32_t keyAntiquantScaleTensorDimNum = keyAntiquantScaleTensorShape.GetDimNum();
     uint32_t numKeyValueHeads = fiaInfo.n2Size;
@@ -3320,12 +3320,12 @@ ge::graphStatus DequantChecker::CheckKScaleShapeForPerChannelPerTensorMode(const
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenMode(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenMode(const FiaTilingInfo& fiaInfo) const
 {
     if (fiaInfo.isMaxWorkspace && (fiaInfo.qLayout == FiaLayout::TND || fiaInfo.qLayout == FiaLayout::NTD)) {
         return ge::GRAPH_SUCCESS;
     }
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
     gert::Shape keyAntiquantScaleTensorShape = keyAntiquantScaleTensor->GetStorageShape();
     uint32_t keyAntiquantScaleTensorDimNum = keyAntiquantScaleTensorShape.GetDimNum();
     uint32_t batchSize = fiaInfo.bSize;
@@ -3374,9 +3374,9 @@ ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenMode(const FiaTilingI
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus DequantChecker::CheckKScaleShapeForPerTensorHeadMode(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckKScaleShapeForPerTensorHeadMode(const FiaTilingInfo& fiaInfo) const
 {
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
     gert::Shape keyAntiquantScaleTensorShape = keyAntiquantScaleTensor->GetStorageShape();
     uint32_t keyAntiquantScaleTensorDimNum = keyAntiquantScaleTensorShape.GetDimNum();
     uint32_t numKeyValueHeads = fiaInfo.n2Size;
@@ -3399,12 +3399,12 @@ ge::graphStatus DequantChecker::CheckKScaleShapeForPerTensorHeadMode(const FiaTi
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenHeadMode(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenHeadMode(const FiaTilingInfo& fiaInfo) const
 {
     if (fiaInfo.isMaxWorkspace && (fiaInfo.qLayout == FiaLayout::TND || fiaInfo.qLayout == FiaLayout::NTD)) {
         return ge::GRAPH_SUCCESS;
     }
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
     gert::Shape keyAntiquantScaleTensorShape = keyAntiquantScaleTensor->GetStorageShape();
     uint32_t keyAntiquantScaleTensorDimNum = keyAntiquantScaleTensorShape.GetDimNum();
     uint32_t batchSize = fiaInfo.bSize;
@@ -3431,9 +3431,9 @@ ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenHeadMode(const FiaTil
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenPAMode(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenPAMode(const FiaTilingInfo& fiaInfo) const
 {
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
     gert::Shape keyAntiquantScaleTensorShape = keyAntiquantScaleTensor->GetStorageShape();
     uint32_t keyAntiquantScaleTensorDimNum = keyAntiquantScaleTensorShape.GetDimNum();
     // per-token模式使用page attention管理scale/offset
@@ -3458,9 +3458,9 @@ ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenPAMode(const FiaTilin
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenHeadPAMode(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenHeadPAMode(const FiaTilingInfo& fiaInfo) const
 {
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
     gert::Shape keyAntiquantScaleTensorShape = keyAntiquantScaleTensor->GetStorageShape();
     uint32_t keyAntiquantScaleTensorDimNum = keyAntiquantScaleTensorShape.GetDimNum();
     uint32_t numKeyValueHeads = fiaInfo.n2Size;
@@ -3486,12 +3486,12 @@ ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenHeadPAMode(const FiaT
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenGroupMode(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenGroupMode(const FiaTilingInfo& fiaInfo) const
 {
     if (fiaInfo.isMaxWorkspace && (fiaInfo.qLayout == FiaLayout::TND || fiaInfo.qLayout == FiaLayout::NTD)) {
         return ge::GRAPH_SUCCESS;
     }
-    auto &keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
+    auto& keyAntiquantScaleTensor = fiaInfo.opParamInfo.keyAntiquantScale.tensor;
     gert::Shape keyAntiquantScaleTensorShape = keyAntiquantScaleTensor->GetStorageShape();
     uint32_t keyAntiquantScaleTensorDimNum = keyAntiquantScaleTensorShape.GetDimNum();
     uint32_t batchSize = fiaInfo.bSize;
@@ -3522,12 +3522,12 @@ ge::graphStatus DequantChecker::CheckKScaleShapeForPerTokenGroupMode(const FiaTi
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus DequantChecker::CheckVScaleShapeForPerTokenMode(const FiaTilingInfo &fiaInfo) const
+ge::graphStatus DequantChecker::CheckVScaleShapeForPerTokenMode(const FiaTilingInfo& fiaInfo) const
 {
     if (fiaInfo.isMaxWorkspace && (fiaInfo.qLayout == FiaLayout::TND || fiaInfo.qLayout == FiaLayout::NTD)) {
         return ge::GRAPH_SUCCESS;
     }
-    auto &valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
+    auto& valueAntiquantScaleTensor = fiaInfo.opParamInfo.valueAntiquantScale.tensor;
     gert::Shape valueAntiquantScaleTensorShape = valueAntiquantScaleTensor->GetStorageShape();
     uint32_t valueAntiquantScaleTensorDimNum = valueAntiquantScaleTensorShape.GetDimNum();
     uint32_t batchSize = fiaInfo.bSize;
@@ -3570,7 +3570,7 @@ ge::graphStatus DequantChecker::CheckVScaleShapeForPerTokenMode(const FiaTilingI
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus DequantChecker::CheckSinglePara(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckSinglePara(const FiaTilingInfo& fiaInfo)
 {
     if (enableFullQuant_) {
         // 量化方式
@@ -3597,7 +3597,7 @@ ge::graphStatus DequantChecker::CheckSinglePara(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckParaExistence(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckParaExistence(const FiaTilingInfo& fiaInfo)
 {
     if (enableNonQuant_) {
         if (fiaInfo.socVersion != platform_ascendc::SocVersion::ASCEND910B) {
@@ -3618,7 +3618,7 @@ ge::graphStatus DequantChecker::CheckParaExistence(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckCrossFeature(const FiaTilingInfo& fiaInfo)
 {
     if (enableFullQuant_) {
         if (ge::GRAPH_SUCCESS != CheckDataTypeSupportFullquant(fiaInfo) ||
@@ -3638,7 +3638,7 @@ ge::graphStatus DequantChecker::CheckCrossFeature(const FiaTilingInfo &fiaInfo)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DequantChecker::CheckMultiParaConsistency(const FiaTilingInfo &fiaInfo)
+ge::graphStatus DequantChecker::CheckMultiParaConsistency(const FiaTilingInfo& fiaInfo)
 {
     if (enableAntiQuant_) {
         if (CheckMultiParaForAntiquant(fiaInfo) != ge::GRAPH_SUCCESS) {
