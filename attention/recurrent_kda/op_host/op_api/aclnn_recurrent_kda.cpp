@@ -381,7 +381,7 @@ aclnnStatus aclnnRecurrentKdaGetWorkspaceSize(
                           aLogOptional, dtBiasOptional, numAcceptedTokensOptional, layout, scale, outputFinalState,
                           inplaceFinalState, useQkL2normInKernel, useGateInKernel, useBetaSigmoidInKernel,
                           allowNegEigval, safeGate, lowerBound, stateVFirst),
-                   DFX_OUT(initialStateRef, attnOut, finalState));
+                   DFX_OUT(attnOut, initialStateRef, finalState));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
