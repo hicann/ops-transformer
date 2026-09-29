@@ -139,7 +139,8 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             kwargs.get("N_q") or (q_shape[2] if layout_q == "BSND" else q_shape[1])
         )
         N_kv = int(
-            kwargs.get("N_kv") or (k_shape[2] if layout_kv == "PA_BBND" else k_shape[1])
+            kwargs.get("N_kv")
+            or (k_shape[2] if layout_kv in ("PA_BBND", "BSND") else k_shape[1])
         )
         head_dim_v = kwargs.get("head_dim_v")
         enable_pa = bool(kwargs.get("enable_pa")) or layout_kv.startswith("PA_")
