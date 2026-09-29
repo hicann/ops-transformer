@@ -69,12 +69,12 @@ public:
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_INT8, ge::DT_BF16, ge::DT_INT8, ge::DT_BF16, ge::DT_INT8})
             .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .IgnoreContiguous();
         this->Input("kr_cache")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_INT8, ge::DT_BF16, ge::DT_INT8, ge::DT_BF16, ge::DT_BF16})
             .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .IgnoreContiguous();
         this->Input("dequant_scale_x")
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_FLOAT})
@@ -199,12 +199,12 @@ public:
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_INT8, ge::DT_BF16, ge::DT_INT8, ge::DT_BF16, ge::DT_INT8, ge::DT_FLOAT8_E4M3FN, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN})
             .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .IgnoreContiguous();
         aicore_config_95.Input("kr_cache")
             .ParamType(REQUIRED)
             .DataType({ge::DT_BF16, ge::DT_INT8, ge::DT_BF16, ge::DT_INT8, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT8_E4M3FN, ge::DT_BF16, ge::DT_BF16})
             .FormatList({ge::FORMAT_ND})
-            .AutoContiguous();
+            .IgnoreContiguous();
         aicore_config_95.Input("dequant_scale_x")
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_FLOAT})

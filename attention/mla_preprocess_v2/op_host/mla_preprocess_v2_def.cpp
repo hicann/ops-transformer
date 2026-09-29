@@ -55,7 +55,7 @@ static const std::vector<ge::Format> nd_nz_Format = {ge::FORMAT_ND,         ge::
                                                      ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND,         ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ,
                                                      ge::FORMAT_ND,         ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND,
                                                      ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND,         ge::FORMAT_FRACTAL_NZ,
-                                                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND,         ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ}; 
+                                                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND,         ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ};
 static const std::vector<ge::Format> nd_nd_nz_Format = {ge::FORMAT_ND,         ge::FORMAT_ND,         ge::FORMAT_ND,         ge::FORMAT_ND,
                                                      ge::FORMAT_ND,         ge::FORMAT_ND,         ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ,
                                                      ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ,
@@ -89,8 +89,8 @@ public:
         this->Input("cos").ParamType(REQUIRED).DataType(qDtype).Format(qFormat).AutoContiguous();
         this->Input("sin").ParamType(REQUIRED).DataType(qDtype).Format(qFormat).AutoContiguous();
         this->Input("wuk").ParamType(REQUIRED).DataType(qDtype).Format(nd_nd_nz_Format).AutoContiguous();
-        this->Input("kv_cache").ParamType(REQUIRED).DataType(fp16_int8_Dtype).Format(nd_nz_Format).AutoContiguous();
-        this->Input("kv_cache_rope").ParamType(REQUIRED).DataType(qDtype).Format(nd_nz_Format).AutoContiguous();
+        this->Input("kv_cache").ParamType(REQUIRED).DataType(fp16_int8_Dtype).Format(nd_nz_Format).IgnoreContiguous();
+        this->Input("kv_cache_rope").ParamType(REQUIRED).DataType(qDtype).Format(nd_nz_Format).IgnoreContiguous();
         this->Input("slot_mapping").ParamType(REQUIRED).DataType(int32_Dtype).Format(qFormat).AutoContiguous();
         this->Input("ctkv_scale").ParamType(REQUIRED).DataType(qDtype).Format(qFormat).AutoContiguous();
         this->Input("q_nope_scale").ParamType(REQUIRED).DataType(qDtype).Format(qFormat).AutoContiguous();
