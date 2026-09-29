@@ -71,7 +71,7 @@
 > [!NOTE]
 >
 > - Q、K、V数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小batch_size、S（Seq-Length）表示输入样本序列长度、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸headdim，且满足D=H/N、G = Q_N / KV_N 表示GQA分组数。
-> - MxFP4场景（`quant_mode=5`）下，仅支持 Q_N == KV_N（即 G=1，不支持 GQA），仅支持 D=128，仅支持 BNSD 排布。
+> - MxFP4场景（`quant_mode=5`）下，仅支持 D=128，仅支持 BNSD 排布。
 > - MxFP8 Softmax FP16场景（`quant_mode=3`）下，仅支持 BNSD 排布，仅支持 D=128，不支持 Paged Attention。
 
 ## 函数原型
@@ -769,14 +769,14 @@ cann_ops_transformer.quant_flash_attn(
         </thead>
         <tbody>
             <tr>
+                <td>GQA</td>
+                <td>支持</td>
+                <td>支持 G = Q_N / KV_N（GQA）与 MHA（Q_N == KV_N）</td>
+            </tr>
+            <tr>
                 <td>layout_q_descale</td>
                 <td>仅支持 BNSD</td>
                 <td>MxFP4 仅支持 layout_q_descale = BNSD</td>
-            </tr>
-            <tr>
-                <td>GQA</td>
-                <td>Q_N == KV_N（G=1）</td>
-                <td>MxFP4 不支持 GQA，Q_N 必须等于 KV_N</td>
             </tr>
             <tr>
                 <td>q/k/v dtype</td>
