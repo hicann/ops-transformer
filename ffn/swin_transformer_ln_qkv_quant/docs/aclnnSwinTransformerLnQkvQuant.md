@@ -129,7 +129,7 @@ aclnnStatus aclnnSwinTransformerLnQkvQuant(
       <td>-</td>
       <td>INT8</td>
       <td>ND</td>
-      <td>只支持2维且维度为[H, 3 * H]</td>
+      <td>只支持2维且维度为[3 * H, H]。当前仅支持weightTranspose为true，此时第0维为N、第1维为K。</td>
       <td>-</td>
     </tr>
     <tr>
