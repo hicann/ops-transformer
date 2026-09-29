@@ -1,0 +1,127 @@
+version: 1
+ops:
+  attention:
+    dense_lightning_indexer_kl_loss_grad_metadata:
+      impact:
+      - dense_lightning_indexer_kl_loss_grad_metadata
+      - dense_lightning_indexer_kl_loss_grad
+      soc:
+      - ascend950
+    dense_lightning_indexer_softmax_lse_v2_metadata:
+      impact:
+      - dense_lightning_indexer_softmax_lse_v2_metadata
+      - dense_lightning_indexer_softmax_lse_v2
+      soc:
+      - ascend950
+    flash_attn_metadata:
+      impact:
+      - flash_attn_metadata
+      - flash_attn
+      soc:
+      - ascend950
+    flash_mla_with_kvcache_metadata:
+      impact:
+      - flash_mla_with_kvcache_metadata
+      - flash_mla_with_kvcache
+      soc:
+      - ascend950
+    generic_block_sparse_attention_grad_metadata:
+      impact:
+      - generic_block_sparse_attention_grad_metadata
+      - generic_block_sparse_attention_grad
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend950
+    generic_block_sparse_attention_metadata:
+      impact:
+      - generic_block_sparse_attention_metadata
+      - generic_block_sparse_attention
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend950
+    lightning_indexer_v2_metadata:
+      impact:
+      - lightning_indexer_v2_metadata
+      - lightning_indexer_v2
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend950
+    mixed_quant_sparse_flash_mla_metadata:
+      impact:
+      - mixed_quant_sparse_flash_mla_metadata
+      - mixed_quant_sparse_flash_mla
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend950
+    quant_flash_attn_metadata:
+      impact:
+      - quant_flash_attn_metadata
+      - quant_flash_attn
+      soc:
+      - ascend950
+    quant_lightning_indexer_v2_metadata:
+      impact:
+      - quant_lightning_indexer_v2_metadata
+      - quant_lightning_indexer_v2
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend950
+    quant_sparse_flash_mla_metadata:
+      impact:
+      - quant_sparse_flash_mla_metadata
+      - quant_sparse_flash_mla
+      soc:
+      - ascend950
+    sparse_flash_mla_grad_metadata:
+      impact:
+      - sparse_flash_mla_grad_metadata
+      - sparse_flash_mla_grad
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend950
+    sparse_flash_mla_metadata:
+      impact:
+      - sparse_flash_mla_metadata
+      - sparse_flash_mla
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend950
+    sparse_flash_mla_softmax_l1_norm_metadata:
+      impact:
+      - sparse_flash_mla_softmax_l1_norm_metadata
+      - sparse_flash_mla_softmax_l1_norm
+      soc:
+      - ascend950
+    sparse_lightning_indexer_kl_loss_grad_metadata:
+      impact:
+      - sparse_lightning_indexer_kl_loss_grad_metadata
+      - sparse_lightning_indexer_kl_loss_grad
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend950
+    attention_worker_scheduler:
+      impact:
+      - attention_worker_scheduler
+      soc:
+      - ascend910b
+  ffn:
+    ffn_worker_scheduler:
+      impact:
+      - ffn_worker_scheduler
+      soc:
+      - ascend910b
+  mhc:
+    mhc_sinkhorn_common:
+      impact:
+      - mhc_sinkhorn
+      - mhc_sinkhorn_backward
+      soc:
+      - ascend950

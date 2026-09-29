@@ -79,6 +79,14 @@ repos:
         always_run: true
         stages: [pre-commit]
         verbose: true
+      - id: compile-scope-whitelist-check
+        name: Compile Scope Whitelist Check
+        entry: python3 cmake/scripts/parse_compile_scope.py --check
+        language: system
+        pass_filenames: false
+        files: ^tests/compile_scope_whitelist\.yaml$
+        stages: [pre-commit]
+        verbose: true
 
   # OAT 合规性检查 (Open Source Audit Tool)
   - repo: local

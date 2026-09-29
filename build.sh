@@ -386,6 +386,7 @@ function help_info() {
     echo "    --opgraph_test build and run opgraph unit tests"
     echo "    --opkernel_test build and run opkernel unit tests"
     echo "    --run_example Compile and execute the test_aclnn_xxx.cpp/test_geir_xxx.cpp"
+    echo "    --PR_COMPILE Build changed compile scope from CMake/def.cpp with kernel bin"
     echo "    --simulator    Enable simulator mode for run_example (requires --soc parameter)"
     echo "    --genop Create the initial directory for op"
     echo "    --genop_aicpu Create the initial directory for AI CPU op"
@@ -1350,7 +1351,7 @@ SUPPORTED_LONG_OPTS=(
   "rule_launch=" "simulator=" "example_name=" "tiling_key=" "tiling-key="
   "kernel_template_input=" "vendor_name=" "genop=" "genop_aicpu="
   "cann_3rd_lib_path=" "op_build_tool" "ascend_cmake_dir"
-  "ccache" "PR_UT" "PR_PKG" "op_debug_config" "ops-compile-options"
+  "ccache" "PR_UT" "PR_PKG" "PR_COMPILE" "op_debug_config" "ops-compile-options"
   "op-name" "compute-unit" "package-path" "build" "changed_list"
   "test" "example" "verbose" "incremental"
 )
@@ -1880,6 +1881,27 @@ while [[ $# -gt 0 ]]; do
         if [ -z "${ops_names}" ]; then
             log "Info: No custom packages to build for this PR."
             # ops_names="incre_flash_attention"
+            exit 200
+        fi
+        ops_names="${ops_names%;}"
+        ops_names="${ops_names//;/,}"
+        ascend_op_name="$ops_names"
+        ENABLE_BUILD_PKG=TRUE
+        ENABLE_BUILT_CUSTOM=TRUE
+        ENABLE_BUILT_IN=FALSE
+        CI_MODE=TRUE
+        shift 2
+        ;;
+    --PR_COMPILE)
+        PR_CHANGED_FILES="$2"
+        experimental_flag=""
+        if [[ "$ENABLE_EXPERIMENTAL" == "TRUE" ]]; then
+            experimental_flag="--experimental"
+        fi
+        ops_names=$(python3 "$CURRENT_DIR"/cmake/scripts/parse_compile_scope.py -f "$PR_CHANGED_FILES" --soc "$ASCEND_SOC_UNITS" ${experimental_flag})
+        echo "Operators that need compile:$ops_names"
+        if [ -z "${ops_names}" ]; then
+            log "Info: No compile scope for this PR."
             exit 200
         fi
         ops_names="${ops_names%;}"
