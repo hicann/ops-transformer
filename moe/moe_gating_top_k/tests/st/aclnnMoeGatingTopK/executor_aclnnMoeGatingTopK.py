@@ -1,4 +1,14 @@
-# Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# -----------------------------------------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
 
 import numpy as np
 import torch
@@ -28,8 +38,20 @@ class MoeGatingTopKMethod(BaseApi):
         # print(" ans:",ans)
         return ans, x_max, x_sum
 
-    def single_golden(self, x, k, bias, k_group, group_count, group_select_mode, renorm,
-                      norm_type, y2_flag, routed_scaling_factor, eps):
+    def single_golden(
+        self,
+        x,
+        k,
+        bias,
+        k_group,
+        group_count,
+        group_select_mode,
+        renorm,
+        norm_type,
+        y2_flag,
+        routed_scaling_factor,
+        eps,
+    ):
         dtype = x.dtype
         # Convert to float32 if needed
         if dtype != torch.float32:
@@ -60,26 +82,29 @@ class MoeGatingTopKMethod(BaseApi):
             else:
                 group_x = np.partition(x, -2, axis=-1)[..., -2:].sum(axis=-1)
 
-            indices = np.argsort(-group_x, axis=-1, kind='stable')[:, :k_group]
+            indices = np.argsort(-group_x, axis=-1, kind="stable")[:, :k_group]
 
             mask = np.ones((x.shape[0], group_count), dtype=bool)
             mask[np.arange(x.shape[0])[:, None], indices] = False
-            x = np.where(mask[..., None], float('-inf'), x).reshape(x.shape[0], -1)
+            x = np.where(mask[..., None], float("-inf"), x).reshape(x.shape[0], -1)
 
         # Topk indices and gather
-        _, indices = torch.sort(torch.from_numpy(x), dim=-1, stable=True, descending=True)
+        _, indices = torch.sort(
+            torch.from_numpy(x), dim=-1, stable=True, descending=True
+        )
         indices = np.asarray(indices[:, :k]).astype(np.int32)
 
         y = np.take_along_axis(original_x, indices, axis=1)
 
         # Renorm and scaling
         if norm_type == 1 or renorm == 1:
-            y /= (np.sum(y, axis=-1, keepdims=True) + eps)
+            temp = np.sum(y, axis=-1, keepdims=True) + eps
+            y /= temp
         y *= routed_scaling_factor
 
         # Process y2 if needed
         if y2_flag:
-            y2 = torch.from_numpy(original_x).to(dtype)
+            y2 = torch.from_numpy(original_x).to(dtype).to(torch.float32)
         else:
             y2 = None
 
@@ -87,7 +112,7 @@ class MoeGatingTopKMethod(BaseApi):
         y = torch.from_numpy(np.asarray(y)).to(dtype)
         indices = torch.from_numpy(indices).to(torch.int32)
 
-        return y, indices, y2.to(torch.float32)
+        return y, indices, y2
 
     def __call__(self, input_data: InputDataset, with_output: bool = False):
         if self.device == "cpu":
@@ -105,7 +130,6 @@ class MoeGatingTopKMethod(BaseApi):
                 input_data.kwargs["eps"],
             )
             return output
-
 
 
 @register("function_aclnnMoeGatingTopK")
