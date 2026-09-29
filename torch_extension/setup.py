@@ -11,6 +11,7 @@
 import os
 import shutil
 import glob
+import re
 import logging
 from setuptools import setup, find_packages
 from setuptools import Command
@@ -79,7 +80,7 @@ def _non_python_files(directory):
             if (
                 len(parts) >= 2
                 and parts[0] in ("ops", "csrc")
-                and parts[1] not in _selected_ops
+                and parts[1] not in _collection_names
             ):
                 continue
         for filename in filenames:
@@ -101,17 +102,19 @@ for _subdir in ("csrc", "common"):
 _op_category_inits = {}
 _op_py_files = []
 _op_cpp_files = []
+_op_locations = {}
 
 
-def _collect_op(op_cat, op_dir, te_dir):
-    _selected_op_categories.append((op_cat, op_dir))
+def _collect_op(op_cat, op_dir, op_te_dir, exported=True):
+    if exported:
+        _selected_op_categories.append((op_cat, op_dir))
 
-    for f in sorted(os.listdir(te_dir)):
+    for f in sorted(os.listdir(op_te_dir)):
         if f.endswith(".py"):
-            f_src = os.path.join(te_dir, f)
+            f_src = os.path.join(op_te_dir, f)
             _op_py_files.append((os.path.join("ops", op_cat, op_dir, f), f_src))
 
-    csrc_dir = os.path.join(te_dir, "csrc")
+    csrc_dir = os.path.join(op_te_dir, "csrc")
     if os.path.isdir(csrc_dir):
         for cpp in sorted(os.listdir(csrc_dir)):
             if cpp.endswith(".cpp"):
@@ -120,6 +123,7 @@ def _collect_op(op_cat, op_dir, te_dir):
                 )
 
 
+# 第一遍：登记全部候选算子位置（依赖闭包解析需要全量目录表）
 for cat in sorted(os.listdir(OPS_TRANSFORMER_ROOT)):
     cat_path = os.path.join(OPS_TRANSFORMER_ROOT, cat)
     if not os.path.isdir(cat_path) or cat.startswith((".", "_")):
@@ -141,20 +145,78 @@ for cat in sorted(os.listdir(OPS_TRANSFORMER_ROOT)):
         # 2-level: <cat>/<name>/torch_extension  (e.g. attention/flash_attn)
         torch_extension = os.path.join(sub_path, "torch_extension")
         if os.path.isdir(torch_extension):
-            if _selected_ops is not None and name not in _selected_ops:
-                continue
-            _collect_op(cat, name, torch_extension)
+            _op_locations[(cat, name)] = torch_extension
             continue
 
         # 3-level: <cat>/<subcat>/<op>/torch_extension  (e.g. experimental/attention/<op>)
         if not os.path.isdir(sub_path):
             continue
         for op_name in sorted(os.listdir(sub_path)):
-            if _selected_ops is not None and op_name not in _selected_ops:
-                continue
             torch_extension = os.path.join(sub_path, op_name, "torch_extension")
             if os.path.isdir(torch_extension):
-                _collect_op(name, op_name, torch_extension)
+                _op_locations[(name, op_name)] = torch_extension
+
+
+# 第二遍：依赖闭包解析。被选算子内 `from ..X` 引用到的兄弟模块（如 mc2/common）会一并收集，
+# 但只收集不导出（不进 entry_points、不写进 ops/<cat>/__init__.py）。
+_SIBLING_IMPORT_RE = re.compile(r"from \.\.+([a-zA-Z_][a-zA-Z0-9_]*)")
+
+
+def _scan_sibling_deps(op_te_dir):
+    deps = []
+    for root_dir, _, filenames in os.walk(op_te_dir):
+        for filename in filenames:
+            if not filename.endswith(".py"):
+                continue
+            path = os.path.join(root_dir, filename)
+            try:
+                with open(path, "r", errors="ignore") as fh:
+                    text = fh.read()
+            except OSError:
+                continue
+            for match in _SIBLING_IMPORT_RE.finditer(text):
+                deps.append(match.group(1))
+    return deps
+
+
+def _resolve_required_ops(selected_pairs):
+    required = set(selected_pairs)
+    queue = list(selected_pairs)
+    while queue:
+        cur_cat, cur_op = queue.pop()
+        op_te_dir = _op_locations.get((cur_cat, cur_op))
+        if not op_te_dir:
+            continue
+        for dep_name in _scan_sibling_deps(op_te_dir):
+            dep_pair = (cur_cat, dep_name)
+            if dep_pair in _op_locations and dep_pair not in required:
+                required.add(dep_pair)
+                queue.append(dep_pair)
+    return required
+
+
+if _selected_ops is not None:
+    _selected_pairs = frozenset(
+        (cat, op) for (cat, op) in _op_locations if op in _selected_ops
+    )
+    _collected_pairs = _resolve_required_ops(_selected_pairs)
+else:
+    _selected_pairs = None
+    _collected_pairs = frozenset(_op_locations.keys())
+
+_collection_names = frozenset(op for _, op in _collected_pairs)
+
+for (cat, op_name), te_dir in _op_locations.items():
+    if _selected_ops is not None and (cat, op_name) not in _collected_pairs:
+        continue
+    _collect_op(
+        cat,
+        op_name,
+        te_dir,
+        exported=(cat, op_name) in _selected_pairs
+        if _selected_pairs is not None
+        else True,
+    )
 
 
 _sorted_selected_op_categories = sorted(set(_selected_op_categories))
@@ -204,7 +266,7 @@ class BuildPyWithOps(_build_py):
                     if not os.path.isdir(cat_dir):
                         continue
                     for sub_op in os.listdir(cat_dir):
-                        if sub_op not in _selected_ops and sub_op != "__pycache__":
+                        if sub_op not in _collection_names and sub_op != "__pycache__":
                             target = os.path.join(cat_dir, sub_op)
                             if os.path.isdir(target):
                                 shutil.rmtree(target)
