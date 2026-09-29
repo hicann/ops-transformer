@@ -67,8 +67,18 @@ def _load_op(name, target):
                 globals()[name] = getattr(_mod, name)
             else:
                 globals()[name] = _mod
+            for _extra in getattr(_mod, "__all__", []):
+                if _extra != name and not _extra.startswith("_"):
+                    globals()[_extra] = getattr(_mod, _extra)
         except (ImportError, RuntimeError, AttributeError) as e:
             logger.warning("Failed to load op '%s': %s", name, e)
+        try:
+            _gmod = importlib.import_module("%s.graph_convert_%s" % (module_path, name))
+            _func = "convert_%s" % name
+            if hasattr(_gmod, _func):
+                globals()[_func] = getattr(_gmod, _func)
+        except ImportError:
+            pass
         return
     try:
         _mod = importlib.import_module(target)
