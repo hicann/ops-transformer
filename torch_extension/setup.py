@@ -43,6 +43,9 @@ _selected_ops = (
 
 _vendor_env = os.environ.get("TORCH_EXTENSION_VENDOR", "").strip()
 
+_experimental_env = os.environ.get("TORCH_EXTENSION_EXPERIMENTAL", "").strip()
+_enable_experimental = _experimental_env.upper() == "TRUE"
+
 if _selected_ops:
     PACKAGE_NAME = "%s_%s" % (BASE_PACKAGE_NAME, _vendor_env or "custom")
 else:
@@ -124,6 +127,12 @@ def _collect_op(op_cat, op_dir, op_te_dir, exported=True):
 for cat in sorted(os.listdir(OPS_TRANSFORMER_ROOT)):
     cat_path = os.path.join(OPS_TRANSFORMER_ROOT, cat)
     if not os.path.isdir(cat_path) or cat.startswith((".", "_")):
+        continue
+
+    is_experimental = cat == "experimental"
+    if is_experimental and not _enable_experimental:
+        continue
+    if not is_experimental and _enable_experimental:
         continue
 
     cat_init_src = os.path.join(cat_path, "__init__.py")
