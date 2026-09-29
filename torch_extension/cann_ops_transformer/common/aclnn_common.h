@@ -19,6 +19,9 @@
 // 必须先于任何 torch_npu 头文件引入 acl 基础头文件：torch_npu 自带 third_party/acl 版本较旧，
 // 缺少 ACL_FLOAT8_E5M2/ACL_FLOAT4_E2M1 等新 dtype 常量。若在其之后 include，旧头文件已设置
 // 同名 include guard（INC_EXTERNAL_ACL_ACL_BASE_H_），新版 CANN 头文件会被跳过导致编译失败。
+// 注意：本文件的 include 顺序只是必要条件之一；<acl/acl_base.h> 能否解析到环境上实际安装的
+// CANN 头文件，还取决于编译期 -I 搜索顺序。OpBuilder.include_paths() 已将 CANN 路径排在
+// torch_npu 路径之前，两者缺一不可——仅调整 include 顺序而 -I 顺序未变时，仍会命中旧副本。
 #include <acl/acl_base.h>
 #include <torch_npu/csrc/framework/utils/OpAdapter.h>
 #include <dlfcn.h>
