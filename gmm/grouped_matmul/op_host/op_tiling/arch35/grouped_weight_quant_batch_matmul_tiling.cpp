@@ -1379,11 +1379,13 @@ bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXSingleWeightS
     nSize_ = transB_ ? wShape.GetDim(wDimNum - 2) : wShape.GetDim(wDimNum - 1);
     if (weightNzFlag_) {
         // 非转置NZ排布(N1, K1, K0, N0), 转置NZ排布(K1, N1, N0, K0)
-        // -3含义：转置N1索引；-2含义：转置N0索引
-        nSize_ = transB_ ? wShape.GetDim(wDimNum - 3) * wShape.GetDim(wDimNum - 2)
-                           // -4含义：非转置N1索引；-1含义：非转置N0索引
-                           :
-                           wShape.GetDim(wDimNum - 4) * wShape.GetDim(wDimNum - 1);
+        if (transB_) {
+            // wDimNum-3：转置N1索引；wDimNum-2：转置N0索引
+            nSize_ = wShape.GetDim(wDimNum - 3) * wShape.GetDim(wDimNum - 2);
+        } else {
+            // wDimNum-4：非转置N1索引；wDimNum-1：非转置N0索引
+            nSize_ = wShape.GetDim(wDimNum - 4) * wShape.GetDim(wDimNum - 1);
+        }
         const gert::StorageShape *yShapePtr = context->GetOutputShape(0);
         OP_CHECK_IF(yShapePtr == nullptr, OP_LOGE(context->GetNodeName(), "yShapePtr is nullptr."), return false);
         const gert::Shape &yShape = yShapePtr->GetOriginShape();
@@ -1450,11 +1452,13 @@ bool GroupedWeightQuantBatchMatmulTiling::SetShapeListSplitMSingleXMultiWeightSi
         }
         if (weightNzFlag_) {
             // 非转置NZ排布(N1, K1, K0, N0), 转置NZ排布(K1, N1, N0, K0)
-            // -3含义：转置N1索引；-2含义：转置N0索引
-            nSize = transB_ ? wShape.GetDim(wDimNum - 3) * wShape.GetDim(wDimNum - 2)
-                              // -4含义：非转置N1索引；-1含义：非转置N0索引
-                              :
-                              wShape.GetDim(wDimNum - 4) * wShape.GetDim(wDimNum - 1);
+            if (transB_) {
+                // wDimNum-3：转置N1索引；wDimNum-2：转置N0索引
+                nSize = wShape.GetDim(wDimNum - 3) * wShape.GetDim(wDimNum - 2);
+            } else {
+                // wDimNum-4：非转置N1索引；wDimNum-1：非转置N0索引
+                nSize = wShape.GetDim(wDimNum - 4) * wShape.GetDim(wDimNum - 1);
+            }
         }
         if (isFp4PackType && !transB_) {
             // 一个float32/int32表示8个fp4/int4，设置为正确shape；kSize来自x，不需要考虑转置场景k轴扩大

@@ -124,10 +124,10 @@ typename AclnnGroupedMatmulDAV3510Checker<T>::TensorIndexInfo AclnnGroupedMatmul
 }
 
 template <typename T>
-const char *AclnnGroupedMatmulDAV3510Checker<T>::GetAclnnOpName() const
+std::string AclnnGroupedMatmulDAV3510Checker<T>::GetAclnnOpName() const
 {
     if (!aclnnOpName_.empty()) {
-        return aclnnOpName_.c_str();
+        return aclnnOpName_;
     }
     switch (gmmParams_.apiVersion) {
         case gmm::GMMApiVersion::V1:
@@ -170,7 +170,7 @@ void AclnnGroupedMatmulDAV3510Checker<T>::SetInputName(const std::string &xName,
 template <typename T>
 aclnnStatus AclnnGroupedMatmulDAV3510Checker<T>::CheckInputTensorsNotNull() const
 {
-    const auto checkTensorContainer = [&](const auto *input, const std::string &name, bool required) -> aclnnStatus {
+    const auto checkTensorContainer = [this](const auto *input, const std::string &name, bool required) -> aclnnStatus {
         if (input == nullptr) {
             if (!required) {
                 return ACLNN_SUCCESS;

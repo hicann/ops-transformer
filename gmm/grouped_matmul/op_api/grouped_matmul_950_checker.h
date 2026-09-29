@@ -126,7 +126,7 @@ private:
     bool LastTwoDimValueIsOne(const aclTensor *tensor) const;
     bool IsSpecialperTileScene(int64_t groupNum, int64_t weightNDim, int64_t weightKDim, int64_t xMDim,
                                int64_t perTokenMDim) const;
-    const char *GetAclnnOpName() const;
+    std::string GetAclnnOpName() const;
 
 private:
     GroupedMatmulParamsBase<T> gmmParams_;
