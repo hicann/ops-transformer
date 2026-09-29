@@ -58,7 +58,7 @@ public:
     static constexpr uint32_t MAX_ROW_NUM_SUB_CORE = 256;
     static constexpr uint32_t SIZE_OF_16BIT = 2;
 
-    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    __aicore__ inline BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         // Allocate UB space
         constexpr uint32_t LO_UB_TENSOR_OFFSET = 6 * UB_UINT8_BLOCK_SIZE;
@@ -132,9 +132,9 @@ public:
     __aicore__ inline void SubCoreCompute(AscendC::GlobalTensor<ElementOutput> gOutput,
                                           AscendC::GlobalTensor<ElementInput> gInput,
                                           AscendC::GlobalTensor<ElementUpdate> gUpdate,
-                                          AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput &layoutOutput,
-                                          const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
-                                          const LayoutLse &layoutLse, uint32_t qNThisSubBlock, uint32_t qSThisSubBlock,
+                                          AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput& layoutOutput,
+                                          const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
+                                          const LayoutLse& layoutLse, uint32_t qNThisSubBlock, uint32_t qSThisSubBlock,
                                           uint32_t totalRowNum, uint32_t isFirstStackTile, uint32_t isLastStackTile,
                                           uint32_t curStackTileMod, uint32_t needRowLoop, uint32_t isLastRowLoop,
                                           uint32_t rowOffsetLoop, uint32_t proTokenIdx, uint32_t proTokenNum,
@@ -261,7 +261,10 @@ public:
                     AscendC::PipeBarrier<PIPE_V>();
                     AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID4);
                     AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID4);
-                    if (qNThisSubBlock == 0U) {
+                    if (stride == 1U) { // BNSD连续
+                        AscendC::DataCopyPad(gLse, lse32_ubuf_tensor,
+                                             AscendC::DataCopyExtParams(1, totalRowNum * sizeof(float), 0, 0, 0));
+                    } else if (qNThisSubBlock == 0U) {
                         AscendC::DataCopyPad(
                             gLse, tvUbTensor,
                             AscendC::DataCopyExtParams(totalRowNum, sizeof(float), 0, (stride - 1) * sizeof(float), 0));
@@ -287,9 +290,9 @@ public:
     __aicore__ inline void operator()(AscendC::GlobalTensor<ElementOutput> gOutput,
                                       AscendC::GlobalTensor<ElementInput> gInput,
                                       AscendC::GlobalTensor<ElementUpdate> gUpdate,
-                                      AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput &layoutOutput,
-                                      const LayoutInput &layoutInput, const LayoutUpdate &layoutUpdate,
-                                      const LayoutLse &layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
+                                      AscendC::GlobalTensor<ElementLse> gLse, const LayoutOutput& layoutOutput,
+                                      const LayoutInput& layoutInput, const LayoutUpdate& layoutUpdate,
+                                      const LayoutLse& layoutLse, GemmCoord actualBlockShape, uint32_t qSBlockSize,
                                       uint32_t qNBlockSize, uint32_t isFirstStackTile, uint32_t isLastStackTile,
                                       uint32_t curStackTileMod)
     {
