@@ -37,11 +37,11 @@ using namespace SMLAKernel;
 #define SMLA_OP_IMPL(templateClass, tilingdataClass, ...) \
     do { \
         using CubeBlockType = \
-            typename std::conditional<g_coreType == AscendC::AIC, SMLAKernel::CSABlockCube<__VA_ARGS__>, \
-                                      SMLAKernel::CSABlockCubeDummy<__VA_ARGS__>>::type; \
+            typename std::conditional<g_coreType == AscendC::AIC, SMLAKernel::SmlaCsaBlockCube<__VA_ARGS__>, \
+                                      SMLAKernel::SmlaCsaBlockCubeDummy<__VA_ARGS__>>::type; \
         using VecBlockType = \
             typename std::conditional<g_coreType == AscendC::AIC, SMLAKernel::CSABlockVecDummy<__VA_ARGS__>, \
-                                      SMLAKernel::CSABlockVec<__VA_ARGS__>>::type; \
+                                      SMLAKernel::SmlaCsaBlockVector<__VA_ARGS__>>::type; \
         templateClass<CubeBlockType, VecBlockType> op; \
         GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tilingDataIn, tiling); \
         const tilingdataClass *__restrict tilingData = &tilingDataIn; \

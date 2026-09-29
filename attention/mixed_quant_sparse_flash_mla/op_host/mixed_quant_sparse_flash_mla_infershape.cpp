@@ -26,8 +26,8 @@ ge::graphStatus InferShapeMixedQuantSparseFlashMla(gert::InferShapeContext *cont
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("MixedQuantSparseFlashMla", "InferShapeContext is nullptr"),
                 return ge::GRAPH_FAILED);
-    return SMLAInferShape(context, "MixedQuantSparseFlashMla", ATTR_RETURN_SOFTMAX_LSE_INDEX, ATTR_LAYOUT_Q_INDEX,
-                          ATTR_LAYOUT_KV_INDEX);
+    return SMLAInferShape(context, "MixedQuantSparseFlashMla", MQ_ATTR_RETURN_SOFTMAX_LSE_INDEX, MQ_ATTR_LAYOUT_Q_INDEX,
+                          MQ_ATTR_LAYOUT_KV_INDEX);
 }
 
 ge::graphStatus InferDataTypeMixedQuantSparseFlashMla(gert::InferDataTypeContext *context)

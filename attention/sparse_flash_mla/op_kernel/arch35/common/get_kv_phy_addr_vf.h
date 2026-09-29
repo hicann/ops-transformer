@@ -30,167 +30,153 @@ __simd_vf__ void GetKVPhyAddrVFPaImpl(__ubuf__ uint32_t *kvPhyAddrUb, __ubuf__ i
                                       const uint32_t blockSize, const int16_t shiftRightNum,
                                       const uint32_t sparseBlockSize, const uint32_t kvDim, const uint32_t kvStride)
 {
-    static const uint16_t s2_num_per_loop = 128;
-    static const uint16_t s2_num_per_reg = 64;
-    static const uint16_t out_offset_per_loop = 256;
-    static const uint16_t out_offset_per_reg = 128;
-    static const uint32_t invalid_value = 0xFFFFFFFF;
-    Reg::MaskReg preg_all_b32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg add_carry_l_1;
-    Reg::MaskReg add_carry_h_1;
-    Reg::MaskReg add_carry_l_2;
-    Reg::MaskReg add_carry_h_2;
-    Reg::MaskReg preg_tail_neg_1_b32;
-    Reg::MaskReg preg_tail_neg_2_b32;
+    static const uint16_t paElemsPerLoop = 128;
+    static const uint16_t paElemsPerReg = 64;
+    static const uint16_t paAddrPerLoop = 256;
+    static const uint16_t paAddrPerReg = 128;
+    static const uint32_t paInvalidAddr = 0xFFFFFFFF;
+    Reg::MaskReg paAllMask = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg paLowCarry0;
+    Reg::MaskReg paHighCarry0;
+    Reg::MaskReg paLowCarry1;
+    Reg::MaskReg paHighCarry1;
+    Reg::MaskReg paInvalidMask0;
+    Reg::MaskReg paInvalidMask1;
 
-    Reg::RegTensor<uint32_t> vreg_kv_stride;
-    Reg::RegTensor<uint32_t> vreg_sparse_idx_1;
-    Reg::RegTensor<uint32_t> vreg_sparse_idx_2;
-    Reg::RegTensor<uint32_t> vreg_block_size;
-    Reg::RegTensor<uint32_t> vreg_shift_rights_num;
-    Reg::RegTensor<uint32_t> vreg_pa_blk_idx_1;
-    Reg::RegTensor<uint32_t> vreg_pa_blk_idx_2;
-    Reg::RegTensor<uint32_t> vreg_pa_tmp_1;
-    Reg::RegTensor<uint32_t> vreg_pa_tmp_2;
-    Reg::RegTensor<uint32_t> vreg_pa_offset_1;
-    Reg::RegTensor<uint32_t> vreg_pa_offset_2;
-    Reg::RegTensor<uint32_t> vreg_phy_offset_1;
-    Reg::RegTensor<uint32_t> vreg_phy_offset_2;
-    Reg::RegTensor<uint32_t> vreg_phy_blk_idx_1;
-    Reg::RegTensor<uint32_t> vreg_phy_blk_idx_2;
+    Reg::RegTensor<uint32_t> paKvStride;
+    Reg::RegTensor<uint32_t> paSparseIndex0;
+    Reg::RegTensor<uint32_t> paSparseIndex1;
+    Reg::RegTensor<uint32_t> paBlockSize;
+    Reg::RegTensor<uint32_t> paShiftRight;
+    Reg::RegTensor<uint32_t> paBlockIndex0;
+    Reg::RegTensor<uint32_t> paBlockIndex1;
+    Reg::RegTensor<uint32_t> paBlockOffset0;
+    Reg::RegTensor<uint32_t> paBlockOffset1;
+    Reg::RegTensor<uint32_t> paTileOffset0;
+    Reg::RegTensor<uint32_t> paTileOffset1;
+    Reg::RegTensor<uint32_t> paPhysicalOffset0;
+    Reg::RegTensor<uint32_t> paPhysicalOffset1;
+    Reg::RegTensor<uint32_t> paPhysicalBlock0;
+    Reg::RegTensor<uint32_t> paPhysicalBlock1;
 
-    Reg::RegTensor<uint32_t> vreg_blk_id_mul_stride_h_1;
-    Reg::RegTensor<uint32_t> vreg_blk_id_mul_stride_tmp_h_1;
-    Reg::RegTensor<uint32_t> vreg_blk_id_mul_stride_l_1;
-    Reg::RegTensor<uint32_t> vreg_mul_overflow_l_1;
-    Reg::RegTensor<uint32_t> vreg_total_offset_l_1;
-    Reg::RegTensor<uint32_t> vreg_total_offset_h_1;
+    Reg::RegTensor<uint32_t> paBlockStrideHigh0;
+    Reg::RegTensor<uint32_t> paBlockStrideTemp0;
+    Reg::RegTensor<uint32_t> paBlockStrideLow0;
+    Reg::RegTensor<uint32_t> paMultiplyCarry0;
+    Reg::RegTensor<uint32_t> paAddressLow0;
+    Reg::RegTensor<uint32_t> paAddressHigh0;
 
-    Reg::RegTensor<uint32_t> vreg_blk_id_mul_stride_h_2;
-    Reg::RegTensor<uint32_t> vreg_blk_id_mul_stride_tmp_h_2;
-    Reg::RegTensor<uint32_t> vreg_blk_id_mul_stride_l_2;
-    Reg::RegTensor<uint32_t> vreg_mul_overflow_l_2;
-    Reg::RegTensor<uint32_t> vreg_total_offset_l_2;
-    Reg::RegTensor<uint32_t> vreg_total_offset_h_2;
+    Reg::RegTensor<uint32_t> paBlockStrideHigh1;
+    Reg::RegTensor<uint32_t> paBlockStrideTemp1;
+    Reg::RegTensor<uint32_t> paBlockStrideLow1;
+    Reg::RegTensor<uint32_t> paMultiplyCarry1;
+    Reg::RegTensor<uint32_t> paAddressLow1;
+    Reg::RegTensor<uint32_t> paAddressHigh1;
 
-    Reg::RegTensor<uint32_t> vreg_zero;
-    Reg::Duplicate(vreg_zero, 0);
-    Reg::Duplicate(vreg_kv_stride, kvStride);
+    Reg::RegTensor<uint32_t> paZero;
+    Reg::Duplicate(paZero, 0);
+    Reg::Duplicate(paKvStride, kvStride);
 
     for (; s2Loop > 1;) {
         for (uint16_t i = 0; i < s2Loop - 1; i++) {
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_1,
-                                                              sparseIdxUb + i * s2_num_per_loop);
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_2,
-                                                              sparseIdxUb + s2_num_per_reg + i * s2_num_per_loop);
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)paSparseIndex0,
+                                                              sparseIdxUb + i * paElemsPerLoop);
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)paSparseIndex1,
+                                                              sparseIdxUb + paElemsPerReg + i * paElemsPerLoop);
             // * sparseBlockSize
-            Reg::Muls(vreg_sparse_idx_1, vreg_sparse_idx_1, sparseBlockSize, preg_all_b32);
-            Reg::Muls(vreg_sparse_idx_2, vreg_sparse_idx_2, sparseBlockSize, preg_all_b32);
+            Reg::Muls(paSparseIndex0, paSparseIndex0, sparseBlockSize, paAllMask);
+            Reg::Muls(paSparseIndex1, paSparseIndex1, sparseBlockSize, paAllMask);
             // 计算右移位数
             // 右移 -> 除blockSize 得到paBlockIdx，vreg_sparse_idx - pa_idx * blocksize -> pa offset
-            Reg::ShiftRights(vreg_pa_blk_idx_1, vreg_sparse_idx_1, shiftRightNum, preg_all_b32);
-            Reg::ShiftRights(vreg_pa_blk_idx_2, vreg_sparse_idx_2, shiftRightNum, preg_all_b32);
+            Reg::ShiftRights(paBlockIndex0, paSparseIndex0, shiftRightNum, paAllMask);
+            Reg::ShiftRights(paBlockIndex1, paSparseIndex1, shiftRightNum, paAllMask);
 
-            Reg::Muls(vreg_pa_tmp_1, vreg_pa_blk_idx_1, blockSize, preg_all_b32);
-            Reg::Muls(vreg_pa_tmp_2, vreg_pa_blk_idx_2, blockSize, preg_all_b32);
+            Reg::Muls(paBlockOffset0, paBlockIndex0, blockSize, paAllMask);
+            Reg::Muls(paBlockOffset1, paBlockIndex1, blockSize, paAllMask);
             // offset
-            Reg::Sub(vreg_pa_offset_1, vreg_sparse_idx_1, vreg_pa_tmp_1, preg_all_b32);
-            Reg::Sub(vreg_pa_offset_2, vreg_sparse_idx_2, vreg_pa_tmp_2, preg_all_b32);
+            Reg::Sub(paTileOffset0, paSparseIndex0, paBlockOffset0, paAllMask);
+            Reg::Sub(paTileOffset1, paSparseIndex1, paBlockOffset1, paAllMask);
             // 物理页内offset
-            Reg::Muls(vreg_phy_offset_1, vreg_pa_offset_1, kvDim, preg_all_b32);
-            Reg::Muls(vreg_phy_offset_2, vreg_pa_offset_2, kvDim, preg_all_b32);
+            Reg::Muls(paPhysicalOffset0, paTileOffset0, kvDim, paAllMask);
+            Reg::Muls(paPhysicalOffset1, paTileOffset1, kvDim, paAllMask);
 
             // int32 paBlockId -> 物理id
-            DataCopyGather(vreg_phy_blk_idx_1, blkTableUb, vreg_pa_blk_idx_1, preg_all_b32);
-            DataCopyGather(vreg_phy_blk_idx_2, blkTableUb, vreg_pa_blk_idx_2, preg_all_b32);
+            DataCopyGather(paPhysicalBlock0, blkTableUb, paBlockIndex0, paAllMask);
+            DataCopyGather(paPhysicalBlock1, blkTableUb, paBlockIndex1, paAllMask);
 
             // 分高低32位计算int64物理地址 -- 乘 stride
             // 低位乘 带进位
-            Reg::Mull(vreg_blk_id_mul_stride_l_1, vreg_mul_overflow_l_1, vreg_phy_blk_idx_1, vreg_kv_stride,
-                      preg_all_b32);
-            Reg::Mull(vreg_blk_id_mul_stride_l_2, vreg_mul_overflow_l_2, vreg_phy_blk_idx_2, vreg_kv_stride,
-                      preg_all_b32);
+            Reg::Mull(paBlockStrideLow0, paMultiplyCarry0, paPhysicalBlock0, paKvStride, paAllMask);
+            Reg::Mull(paBlockStrideLow1, paMultiplyCarry1, paPhysicalBlock1, paKvStride, paAllMask);
 
             // 分高低32位计算int64物理地址 -- 加 offset
-            Reg::Add(add_carry_l_1, vreg_total_offset_l_1, vreg_blk_id_mul_stride_l_1, vreg_phy_offset_1, preg_all_b32);
-            Reg::Add(add_carry_l_2, vreg_total_offset_l_2, vreg_blk_id_mul_stride_l_2, vreg_phy_offset_2, preg_all_b32);
+            Reg::Add(paLowCarry0, paAddressLow0, paBlockStrideLow0, paPhysicalOffset0, paAllMask);
+            Reg::Add(paLowCarry1, paAddressLow1, paBlockStrideLow1, paPhysicalOffset1, paAllMask);
 
-            Reg::AddC(add_carry_h_1, vreg_total_offset_h_1, vreg_mul_overflow_l_1, vreg_zero, add_carry_l_1,
-                      preg_all_b32);
-            Reg::AddC(add_carry_h_2, vreg_total_offset_h_2, vreg_mul_overflow_l_2, vreg_zero, add_carry_l_2,
-                      preg_all_b32);
+            Reg::AddC(paHighCarry0, paAddressHigh0, paMultiplyCarry0, paZero, paLowCarry0, paAllMask);
+            Reg::AddC(paHighCarry1, paAddressHigh1, paMultiplyCarry1, paZero, paLowCarry1, paAllMask);
 
             // 搬出 由于拆分为了int32类型，元素个数翻倍
-            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-                kvPhyAddrUb + i * out_offset_per_loop, vreg_total_offset_l_1, vreg_total_offset_h_1, preg_all_b32);
-            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-                kvPhyAddrUb + out_offset_per_reg + i * out_offset_per_loop, vreg_total_offset_l_2,
-                vreg_total_offset_h_2, preg_all_b32);
+            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(kvPhyAddrUb + i * paAddrPerLoop, paAddressLow0,
+                                                                      paAddressHigh0, paAllMask);
+            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(kvPhyAddrUb + paAddrPerReg + i * paAddrPerLoop,
+                                                                      paAddressLow1, paAddressHigh1, paAllMask);
         }
         break;
     }
 
     for (uint16_t i = s2Loop - 1; i < s2Loop; i++) {
-        Reg::MaskReg preg_tail_1_b32 = Reg::UpdateMask<int32_t>(s2Tail);
-        Reg::MaskReg preg_tail_2_b32 = Reg::UpdateMask<int32_t>(s2Tail);
-        Reg::Not(preg_tail_neg_1_b32, preg_tail_1_b32, preg_all_b32);
-        Reg::Not(preg_tail_neg_2_b32, preg_tail_2_b32, preg_all_b32);
+        Reg::MaskReg paTailMask0 = Reg::UpdateMask<int32_t>(s2Tail);
+        Reg::MaskReg paTailMask1 = Reg::UpdateMask<int32_t>(s2Tail);
+        Reg::Not(paInvalidMask0, paTailMask0, paAllMask);
+        Reg::Not(paInvalidMask1, paTailMask1, paAllMask);
 
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_1,
-                                                          sparseIdxUb + i * s2_num_per_loop);
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_2,
-                                                          sparseIdxUb + s2_num_per_reg + i * s2_num_per_loop);
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)paSparseIndex0,
+                                                          sparseIdxUb + i * paElemsPerLoop);
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)paSparseIndex1,
+                                                          sparseIdxUb + paElemsPerReg + i * paElemsPerLoop);
         // * sparseBlockSize
-        Reg::Muls(vreg_sparse_idx_1, vreg_sparse_idx_1, sparseBlockSize, preg_tail_1_b32);
-        Reg::Muls(vreg_sparse_idx_2, vreg_sparse_idx_2, sparseBlockSize, preg_tail_2_b32);
+        Reg::Muls(paSparseIndex0, paSparseIndex0, sparseBlockSize, paTailMask0);
+        Reg::Muls(paSparseIndex1, paSparseIndex1, sparseBlockSize, paTailMask1);
         // 计算右移位数
         // 右移 -> 除blockSize 得到paBlockIdx，vreg_sparse_idx - pa_idx * blocksize -> pa offset
-        Reg::ShiftRights(vreg_pa_blk_idx_1, vreg_sparse_idx_1, shiftRightNum, preg_tail_1_b32);
-        Reg::ShiftRights(vreg_pa_blk_idx_2, vreg_sparse_idx_2, shiftRightNum, preg_tail_2_b32);
+        Reg::ShiftRights(paBlockIndex0, paSparseIndex0, shiftRightNum, paTailMask0);
+        Reg::ShiftRights(paBlockIndex1, paSparseIndex1, shiftRightNum, paTailMask1);
 
-        Reg::Muls(vreg_pa_tmp_1, vreg_pa_blk_idx_1, blockSize, preg_tail_1_b32);
-        Reg::Muls(vreg_pa_tmp_2, vreg_pa_blk_idx_2, blockSize, preg_tail_2_b32);
+        Reg::Muls(paBlockOffset0, paBlockIndex0, blockSize, paTailMask0);
+        Reg::Muls(paBlockOffset1, paBlockIndex1, blockSize, paTailMask1);
         // offset
-        Reg::Sub(vreg_pa_offset_1, vreg_sparse_idx_1, vreg_pa_tmp_1, preg_tail_1_b32);
-        Reg::Sub(vreg_pa_offset_2, vreg_sparse_idx_2, vreg_pa_tmp_2, preg_tail_2_b32);
+        Reg::Sub(paTileOffset0, paSparseIndex0, paBlockOffset0, paTailMask0);
+        Reg::Sub(paTileOffset1, paSparseIndex1, paBlockOffset1, paTailMask1);
         // 物理页内offset
-        Reg::Muls(vreg_phy_offset_1, vreg_pa_offset_1, kvDim, preg_tail_1_b32);
-        Reg::Muls(vreg_phy_offset_2, vreg_pa_offset_2, kvDim, preg_tail_2_b32);
+        Reg::Muls(paPhysicalOffset0, paTileOffset0, kvDim, paTailMask0);
+        Reg::Muls(paPhysicalOffset1, paTileOffset1, kvDim, paTailMask1);
 
         // int32 paBlockId -> 物理id
-        DataCopyGather(vreg_phy_blk_idx_1, blkTableUb, vreg_pa_blk_idx_1, preg_tail_1_b32);
-        DataCopyGather(vreg_phy_blk_idx_2, blkTableUb, vreg_pa_blk_idx_2, preg_tail_2_b32);
+        DataCopyGather(paPhysicalBlock0, blkTableUb, paBlockIndex0, paTailMask0);
+        DataCopyGather(paPhysicalBlock1, blkTableUb, paBlockIndex1, paTailMask1);
 
         // 分高低32位计算int64物理地址 -- 乘 stride
         // 低位乘 带进位
-        Reg::Mull(vreg_blk_id_mul_stride_l_1, vreg_mul_overflow_l_1, vreg_phy_blk_idx_1, vreg_kv_stride,
-                  preg_tail_1_b32);
-        Reg::Mull(vreg_blk_id_mul_stride_l_2, vreg_mul_overflow_l_2, vreg_phy_blk_idx_2, vreg_kv_stride,
-                  preg_tail_2_b32);
+        Reg::Mull(paBlockStrideLow0, paMultiplyCarry0, paPhysicalBlock0, paKvStride, paTailMask0);
+        Reg::Mull(paBlockStrideLow1, paMultiplyCarry1, paPhysicalBlock1, paKvStride, paTailMask1);
 
         // 分高低32位计算int64物理地址 -- 加 offset
-        Reg::Add(add_carry_l_1, vreg_total_offset_l_1, vreg_blk_id_mul_stride_l_1, vreg_phy_offset_1, preg_tail_1_b32);
-        Reg::Add(add_carry_l_2, vreg_total_offset_l_2, vreg_blk_id_mul_stride_l_2, vreg_phy_offset_2, preg_tail_2_b32);
+        Reg::Add(paLowCarry0, paAddressLow0, paBlockStrideLow0, paPhysicalOffset0, paTailMask0);
+        Reg::Add(paLowCarry1, paAddressLow1, paBlockStrideLow1, paPhysicalOffset1, paTailMask1);
 
-        Reg::AddC(add_carry_h_1, vreg_total_offset_h_1, vreg_mul_overflow_l_1, vreg_zero, add_carry_l_1,
-                  preg_tail_1_b32);
-        Reg::AddC(add_carry_h_2, vreg_total_offset_h_2, vreg_mul_overflow_l_2, vreg_zero, add_carry_l_2,
-                  preg_tail_2_b32);
+        Reg::AddC(paHighCarry0, paAddressHigh0, paMultiplyCarry0, paZero, paLowCarry0, paTailMask0);
+        Reg::AddC(paHighCarry1, paAddressHigh1, paMultiplyCarry1, paZero, paLowCarry1, paTailMask1);
 
         // 无效值填充-1(0xFFFFFFFF)
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_l_1, invalid_value,
-                                                              preg_tail_neg_1_b32);
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_h_1, invalid_value,
-                                                              preg_tail_neg_1_b32);
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_l_2, invalid_value,
-                                                              preg_tail_neg_2_b32);
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_h_2, invalid_value,
-                                                              preg_tail_neg_2_b32);
-        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-            kvPhyAddrUb + i * out_offset_per_loop, vreg_total_offset_l_1, vreg_total_offset_h_1, preg_all_b32);
-        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-            kvPhyAddrUb + out_offset_per_reg + i * out_offset_per_loop, vreg_total_offset_l_2, vreg_total_offset_h_2,
-            preg_all_b32);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(paAddressLow0, paInvalidAddr, paInvalidMask0);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(paAddressHigh0, paInvalidAddr, paInvalidMask0);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(paAddressLow1, paInvalidAddr, paInvalidMask1);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(paAddressHigh1, paInvalidAddr, paInvalidMask1);
+        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(kvPhyAddrUb + i * paAddrPerLoop, paAddressLow0,
+                                                                  paAddressHigh0, paAllMask);
+        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(kvPhyAddrUb + paAddrPerReg + i * paAddrPerLoop,
+                                                                  paAddressLow1, paAddressHigh1, paAllMask);
     }
 }
 
@@ -208,93 +194,88 @@ __aicore__ inline void GetKVPhyAddrVFPa(LocalTensor<uint32_t> kvPhyAddrTensor, L
 }
 
 template <typename T>
-__simd_vf__ void GetKVPhyAddrVFTndImpl(__ubuf__ uint32_t *kvPhyAddrUb, __ubuf__ int32_t *sparseIdxUb,
-                                       const uint16_t s2Loop, uint32_t s2Tail, const uint32_t sparseBlockSize,
-                                       const uint32_t kvDim, const uint32_t kvPrefix)
+__simd_vf__ void GetKVPhyAddrVFTndImpl(__ubuf__ uint32_t *tndAddrUb, __ubuf__ int32_t *tndSparseUb,
+                                       const uint16_t tndLoopCount, uint32_t tndTailSize,
+                                       const uint32_t tndSparseBlockSize, const uint32_t tndKvDim,
+                                       const uint32_t tndKvPrefix)
 {
-    static const uint16_t s2_num_per_loop = 128;
-    static const uint16_t s2_num_per_reg = 64;
-    static const uint16_t out_offset_per_loop = 256;
-    static const uint16_t out_offset_per_reg = 128;
-    static const uint32_t invalid_value = 0xFFFFFFFF;
-    Reg::MaskReg preg_all_b32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg preg_tail_neg_1_b32;
-    Reg::MaskReg preg_tail_neg_2_b32;
+    static const uint16_t tndElemsPerLoop = 128;
+    static const uint16_t tndElemsPerReg = 64;
+    static const uint16_t tndOutPerLoop = 256;
+    static const uint16_t tndOutPerReg = 128;
+    static const uint32_t tndInvalidAddr = 0xFFFFFFFF;
+    Reg::MaskReg tndAllMask = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg tndInvalidMask0;
+    Reg::MaskReg tndInvalidMask1;
 
-    Reg::RegTensor<uint32_t> vreg_sparse_idx_1;
-    Reg::RegTensor<uint32_t> vreg_sparse_idx_2;
-    Reg::RegTensor<uint32_t> vreg_kv_prefix;
-    Reg::RegTensor<uint32_t> vreg_kv_dim;
-    Reg::RegTensor<uint32_t> vreg_sum_1;
-    Reg::RegTensor<uint32_t> vreg_sum_2;
-    Reg::RegTensor<uint32_t> vreg_mul_overflow_l_1;
-    Reg::RegTensor<uint32_t> vreg_mul_overflow_l_2;
-    Reg::RegTensor<uint32_t> vreg_total_offset_l_1;
-    Reg::RegTensor<uint32_t> vreg_total_offset_h_1;
-    Reg::RegTensor<uint32_t> vreg_total_offset_l_2;
-    Reg::RegTensor<uint32_t> vreg_total_offset_h_2;
+    Reg::RegTensor<uint32_t> tndSparseIndex0;
+    Reg::RegTensor<uint32_t> tndSparseIndex1;
+    Reg::RegTensor<uint32_t> tndPrefixReg;
+    Reg::RegTensor<uint32_t> tndDimReg;
+    Reg::RegTensor<uint32_t> tndTokenOffset0;
+    Reg::RegTensor<uint32_t> tndTokenOffset1;
+    Reg::RegTensor<uint32_t> tndCarry0;
+    Reg::RegTensor<uint32_t> tndCarry1;
+    Reg::RegTensor<uint32_t> tndAddrLow0;
+    Reg::RegTensor<uint32_t> tndAddrHigh0;
+    Reg::RegTensor<uint32_t> tndAddrLow1;
+    Reg::RegTensor<uint32_t> tndAddrHigh1;
 
-    Reg::Duplicate(vreg_kv_prefix, kvPrefix);
-    Reg::Duplicate(vreg_kv_dim, kvDim);
+    Reg::Duplicate(tndPrefixReg, tndKvPrefix);
+    Reg::Duplicate(tndDimReg, tndKvDim);
 
-    for (; s2Loop > 1;) {
-        for (uint16_t i = 0; i < s2Loop - 1; i++) {
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_1,
-                                                              sparseIdxUb + i * s2_num_per_loop);
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_2,
-                                                              sparseIdxUb + s2_num_per_reg + i * s2_num_per_loop);
-            // * sparseBlockSize
-            Reg::Muls(vreg_sparse_idx_1, vreg_sparse_idx_1, sparseBlockSize, preg_all_b32);
-            Reg::Muls(vreg_sparse_idx_2, vreg_sparse_idx_2, sparseBlockSize, preg_all_b32);
-            // (kvPrefix + sparseIdx) * kvDim -> int64 物理地址
-            Reg::Add(vreg_sum_1, vreg_sparse_idx_1, vreg_kv_prefix, preg_all_b32);
-            Reg::Add(vreg_sum_2, vreg_sparse_idx_2, vreg_kv_prefix, preg_all_b32);
+    // * sparseBlockSize
+    // (kvPrefix + sparseIdx) * kvDim -> int64 物理地址
+    for (; tndLoopCount > 1;) {
+        for (uint16_t i = 0; i < tndLoopCount - 1; i++) {
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)tndSparseIndex0,
+                                                              tndSparseUb + i * tndElemsPerLoop);
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)tndSparseIndex1,
+                                                              tndSparseUb + tndElemsPerReg + i * tndElemsPerLoop);
+            Reg::Muls(tndSparseIndex0, tndSparseIndex0, tndSparseBlockSize, tndAllMask);
+            Reg::Muls(tndSparseIndex1, tndSparseIndex1, tndSparseBlockSize, tndAllMask);
+            Reg::Add(tndTokenOffset0, tndSparseIndex0, tndPrefixReg, tndAllMask);
+            Reg::Add(tndTokenOffset1, tndSparseIndex1, tndPrefixReg, tndAllMask);
             // 带进位乘法
-            Reg::Mull(vreg_total_offset_l_1, vreg_total_offset_h_1, vreg_sum_1, vreg_kv_dim, preg_all_b32);
-            Reg::Mull(vreg_total_offset_l_2, vreg_total_offset_h_2, vreg_sum_2, vreg_kv_dim, preg_all_b32);
+            Reg::Mull(tndAddrLow0, tndAddrHigh0, tndTokenOffset0, tndDimReg, tndAllMask);
+            Reg::Mull(tndAddrLow1, tndAddrHigh1, tndTokenOffset1, tndDimReg, tndAllMask);
             // 搬出
-            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-                kvPhyAddrUb + i * out_offset_per_loop, vreg_total_offset_l_1, vreg_total_offset_h_1, preg_all_b32);
-            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-                kvPhyAddrUb + out_offset_per_reg + i * out_offset_per_loop, vreg_total_offset_l_2,
-                vreg_total_offset_h_2, preg_all_b32);
+            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(tndAddrUb + i * tndOutPerLoop, tndAddrLow0,
+                                                                      tndAddrHigh0, tndAllMask);
+            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(tndAddrUb + tndOutPerReg + i * tndOutPerLoop,
+                                                                      tndAddrLow1, tndAddrHigh1, tndAllMask);
         }
         break;
     }
 
-    for (uint16_t i = s2Loop - 1; i < s2Loop; i++) {
-        Reg::MaskReg preg_tail_1_b32 = Reg::UpdateMask<int32_t>(s2Tail);
-        Reg::MaskReg preg_tail_2_b32 = Reg::UpdateMask<int32_t>(s2Tail);
-        Reg::Not(preg_tail_neg_1_b32, preg_tail_1_b32, preg_all_b32);
-        Reg::Not(preg_tail_neg_2_b32, preg_tail_2_b32, preg_all_b32);
+    for (uint16_t i = tndLoopCount - 1; i < tndLoopCount; i++) {
+        Reg::MaskReg tndTailMask0 = Reg::UpdateMask<int32_t>(tndTailSize);
+        Reg::MaskReg tndTailMask1 = Reg::UpdateMask<int32_t>(tndTailSize);
+        Reg::Not(tndInvalidMask0, tndTailMask0, tndAllMask);
+        Reg::Not(tndInvalidMask1, tndTailMask1, tndAllMask);
 
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_1,
-                                                          sparseIdxUb + i * s2_num_per_loop);
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_2,
-                                                          sparseIdxUb + s2_num_per_reg + i * s2_num_per_loop);
         // * sparseBlockSize
-        Reg::Muls(vreg_sparse_idx_1, vreg_sparse_idx_1, sparseBlockSize, preg_tail_1_b32);
-        Reg::Muls(vreg_sparse_idx_2, vreg_sparse_idx_2, sparseBlockSize, preg_tail_2_b32);
         // (kvPrefix + sparseIdx) * kvDim -> int64 物理地址
-        Reg::Add(vreg_sum_1, vreg_sparse_idx_1, vreg_kv_prefix, preg_tail_1_b32);
-        Reg::Add(vreg_sum_2, vreg_sparse_idx_2, vreg_kv_prefix, preg_tail_2_b32);
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)tndSparseIndex0,
+                                                          tndSparseUb + i * tndElemsPerLoop);
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)tndSparseIndex1,
+                                                          tndSparseUb + tndElemsPerReg + i * tndElemsPerLoop);
+        Reg::Muls(tndSparseIndex0, tndSparseIndex0, tndSparseBlockSize, tndTailMask0);
+        Reg::Muls(tndSparseIndex1, tndSparseIndex1, tndSparseBlockSize, tndTailMask1);
+        Reg::Add(tndTokenOffset0, tndSparseIndex0, tndPrefixReg, tndTailMask0);
+        Reg::Add(tndTokenOffset1, tndSparseIndex1, tndPrefixReg, tndTailMask1);
         // 带进位乘法
-        Reg::Mull(vreg_total_offset_l_1, vreg_total_offset_h_1, vreg_sum_1, vreg_kv_dim, preg_tail_1_b32);
-        Reg::Mull(vreg_total_offset_l_2, vreg_total_offset_h_2, vreg_sum_2, vreg_kv_dim, preg_tail_2_b32);
+        Reg::Mull(tndAddrLow0, tndAddrHigh0, tndTokenOffset0, tndDimReg, tndTailMask0);
+        Reg::Mull(tndAddrLow1, tndAddrHigh1, tndTokenOffset1, tndDimReg, tndTailMask1);
         // 无效值填充-1(0xFFFFFFFF)
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_l_1, invalid_value,
-                                                              preg_tail_neg_1_b32);
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_h_1, invalid_value,
-                                                              preg_tail_neg_1_b32);
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_l_2, invalid_value,
-                                                              preg_tail_neg_2_b32);
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_h_2, invalid_value,
-                                                              preg_tail_neg_2_b32);
-        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-            kvPhyAddrUb + i * out_offset_per_loop, vreg_total_offset_l_1, vreg_total_offset_h_1, preg_all_b32);
-        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-            kvPhyAddrUb + out_offset_per_reg + i * out_offset_per_loop, vreg_total_offset_l_2, vreg_total_offset_h_2,
-            preg_all_b32);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(tndAddrLow0, tndInvalidAddr, tndInvalidMask0);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(tndAddrHigh0, tndInvalidAddr, tndInvalidMask0);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(tndAddrLow1, tndInvalidAddr, tndInvalidMask1);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(tndAddrHigh1, tndInvalidAddr, tndInvalidMask1);
+        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(tndAddrUb + i * tndOutPerLoop, tndAddrLow0,
+                                                                  tndAddrHigh0, tndAllMask);
+        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(tndAddrUb + tndOutPerReg + i * tndOutPerLoop,
+                                                                  tndAddrLow1, tndAddrHigh1, tndAllMask);
     }
 }
 
@@ -309,109 +290,100 @@ __aicore__ inline void GetKVPhyAddrVFTnd(LocalTensor<uint32_t> kvPhyAddrTensor, 
 }
 
 template <typename T>
-__simd_vf__ void GetKVPhyAddrVFBsndImpl(__ubuf__ uint32_t *kvPhyAddrUb, __ubuf__ int32_t *sparseIdxUb,
-                                        const uint16_t s2Loop, uint32_t s2Tail, const uint32_t sparseBlockSize,
-                                        const uint32_t kvDim, const uint32_t bS2BaseLow, const uint32_t bS2BaseHigh)
+__simd_vf__ void GetKVPhyAddrVFBsndImpl(__ubuf__ uint32_t *bsndAddrUb, __ubuf__ int32_t *bsndSparseUb,
+                                        const uint16_t bsndLoopCount, uint32_t bsndTailSize,
+                                        const uint32_t bsndSparseBlockSize, const uint32_t bsndKvDim,
+                                        const uint32_t bsndBaseLow, const uint32_t bsndBaseHigh)
 {
-    static const uint16_t s2_num_per_loop = 128;
-    static const uint16_t s2_num_per_reg = 64;
-    static const uint16_t out_offset_per_loop = 256;
-    static const uint16_t out_offset_per_reg = 128;
-    static const uint32_t invalid_value = 0xFFFFFFFF;
-    Reg::MaskReg preg_all_b32 = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
-    Reg::MaskReg add_carry_l_1;
-    Reg::MaskReg add_carry_h_1;
-    Reg::MaskReg add_carry_l_2;
-    Reg::MaskReg add_carry_h_2;
-    Reg::MaskReg preg_tail_neg_1_b32;
-    Reg::MaskReg preg_tail_neg_2_b32;
+    static const uint16_t bsndElemsPerLoop = 128;
+    static const uint16_t bsndElemsPerReg = 64;
+    static const uint16_t bsndOutPerLoop = 256;
+    static const uint16_t bsndOutPerReg = 128;
+    static const uint32_t bsndInvalidAddr = 0xFFFFFFFF;
+    Reg::MaskReg bsndAllMask = Reg::CreateMask<uint32_t, Reg::MaskPattern::ALL>();
+    Reg::MaskReg bsndLowCarry0;
+    Reg::MaskReg bsndHighCarry0;
+    Reg::MaskReg bsndLowCarry1;
+    Reg::MaskReg bsndHighCarry1;
+    Reg::MaskReg bsndInvalidMask0;
+    Reg::MaskReg bsndInvalidMask1;
 
-    Reg::RegTensor<uint32_t> vreg_sparse_idx_1;
-    Reg::RegTensor<uint32_t> vreg_sparse_idx_2;
-    Reg::RegTensor<uint32_t> vreg_kv_dim;
-    Reg::RegTensor<uint32_t> vreg_b_s2_base_low;
-    Reg::RegTensor<uint32_t> vreg_b_s2_base_high;
-    Reg::RegTensor<uint32_t> vreg_s2_offset_l_1;
-    Reg::RegTensor<uint32_t> vreg_s2_offset_l_2;
-    Reg::RegTensor<uint32_t> vreg_mul_overflow_l_1;
-    Reg::RegTensor<uint32_t> vreg_mul_overflow_l_2;
-    Reg::RegTensor<uint32_t> vreg_total_offset_l_1;
-    Reg::RegTensor<uint32_t> vreg_total_offset_h_1;
-    Reg::RegTensor<uint32_t> vreg_total_offset_l_2;
-    Reg::RegTensor<uint32_t> vreg_total_offset_h_2;
-    Reg::RegTensor<uint32_t> vreg_zero;
+    Reg::RegTensor<uint32_t> bsndSparseIndex0;
+    Reg::RegTensor<uint32_t> bsndSparseIndex1;
+    Reg::RegTensor<uint32_t> bsndDimReg;
+    Reg::RegTensor<uint32_t> bsndBaseLowReg;
+    Reg::RegTensor<uint32_t> bsndBaseHighReg;
+    Reg::RegTensor<uint32_t> bsndOffsetLow0;
+    Reg::RegTensor<uint32_t> bsndOffsetLow1;
+    Reg::RegTensor<uint32_t> bsndOffsetHigh0;
+    Reg::RegTensor<uint32_t> bsndOffsetHigh1;
+    Reg::RegTensor<uint32_t> bsndAddrLow0;
+    Reg::RegTensor<uint32_t> bsndAddrHigh0;
+    Reg::RegTensor<uint32_t> bsndAddrLow1;
+    Reg::RegTensor<uint32_t> bsndAddrHigh1;
+    Reg::RegTensor<uint32_t> bsndZeroReg;
 
-    Reg::Duplicate(vreg_zero, 0);
-    Reg::Duplicate(vreg_kv_dim, kvDim);
-    Reg::Duplicate(vreg_b_s2_base_low, bS2BaseLow);
-    Reg::Duplicate(vreg_b_s2_base_high, bS2BaseHigh);
+    Reg::Duplicate(bsndZeroReg, 0);
+    Reg::Duplicate(bsndDimReg, bsndKvDim);
+    Reg::Duplicate(bsndBaseLowReg, bsndBaseLow);
+    Reg::Duplicate(bsndBaseHighReg, bsndBaseHigh);
 
-    for (; s2Loop > 1;) {
-        for (uint16_t i = 0; i < s2Loop - 1; i++) {
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_1,
-                                                              sparseIdxUb + i * s2_num_per_loop);
-            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_2,
-                                                              sparseIdxUb + s2_num_per_reg + i * s2_num_per_loop);
-            // * sparseBlockSize
-            Reg::Muls(vreg_sparse_idx_1, vreg_sparse_idx_1, sparseBlockSize, preg_all_b32);
-            Reg::Muls(vreg_sparse_idx_2, vreg_sparse_idx_2, sparseBlockSize, preg_all_b32);
-            // sparseIdx * kvDim (带进位乘法)
-            Reg::Mull(vreg_s2_offset_l_1, vreg_mul_overflow_l_1, vreg_sparse_idx_1, vreg_kv_dim, preg_all_b32);
-            Reg::Mull(vreg_s2_offset_l_2, vreg_mul_overflow_l_2, vreg_sparse_idx_2, vreg_kv_dim, preg_all_b32);
+    // * sparseBlockSize
+    // sparseIdx * kvDim (带进位乘法)
+    for (; bsndLoopCount > 1;) {
+        for (uint16_t i = 0; i < bsndLoopCount - 1; i++) {
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)bsndSparseIndex0,
+                                                              bsndSparseUb + i * bsndElemsPerLoop);
+            Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)bsndSparseIndex1,
+                                                              bsndSparseUb + bsndElemsPerReg + i * bsndElemsPerLoop);
+            Reg::Muls(bsndSparseIndex0, bsndSparseIndex0, bsndSparseBlockSize, bsndAllMask);
+            Reg::Muls(bsndSparseIndex1, bsndSparseIndex1, bsndSparseBlockSize, bsndAllMask);
+            Reg::Mull(bsndOffsetLow0, bsndOffsetHigh0, bsndSparseIndex0, bsndDimReg, bsndAllMask);
+            Reg::Mull(bsndOffsetLow1, bsndOffsetHigh1, bsndSparseIndex1, bsndDimReg, bsndAllMask);
             // s2_offset + bS2Base (int64 + int64)
-            Reg::Add(add_carry_l_1, vreg_total_offset_l_1, vreg_s2_offset_l_1, vreg_b_s2_base_low, preg_all_b32);
-            Reg::Add(add_carry_l_2, vreg_total_offset_l_2, vreg_s2_offset_l_2, vreg_b_s2_base_low, preg_all_b32);
-            Reg::AddC(add_carry_h_1, vreg_total_offset_h_1, vreg_mul_overflow_l_1, vreg_b_s2_base_high, add_carry_l_1,
-                      preg_all_b32);
-            Reg::AddC(add_carry_h_2, vreg_total_offset_h_2, vreg_mul_overflow_l_2, vreg_b_s2_base_high, add_carry_l_2,
-                      preg_all_b32);
+            Reg::Add(bsndLowCarry0, bsndAddrLow0, bsndOffsetLow0, bsndBaseLowReg, bsndAllMask);
+            Reg::Add(bsndLowCarry1, bsndAddrLow1, bsndOffsetLow1, bsndBaseLowReg, bsndAllMask);
+            Reg::AddC(bsndHighCarry0, bsndAddrHigh0, bsndOffsetHigh0, bsndBaseHighReg, bsndLowCarry0, bsndAllMask);
+            Reg::AddC(bsndHighCarry1, bsndAddrHigh1, bsndOffsetHigh1, bsndBaseHighReg, bsndLowCarry1, bsndAllMask);
             // 搬出
-            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-                kvPhyAddrUb + i * out_offset_per_loop, vreg_total_offset_l_1, vreg_total_offset_h_1, preg_all_b32);
-            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-                kvPhyAddrUb + out_offset_per_reg + i * out_offset_per_loop, vreg_total_offset_l_2,
-                vreg_total_offset_h_2, preg_all_b32);
+            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(bsndAddrUb + i * bsndOutPerLoop, bsndAddrLow0,
+                                                                      bsndAddrHigh0, bsndAllMask);
+            Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(bsndAddrUb + bsndOutPerReg + i * bsndOutPerLoop,
+                                                                      bsndAddrLow1, bsndAddrHigh1, bsndAllMask);
         }
         break;
     }
 
-    for (uint16_t i = s2Loop - 1; i < s2Loop; i++) {
-        Reg::MaskReg preg_tail_1_b32 = Reg::UpdateMask<int32_t>(s2Tail);
-        Reg::MaskReg preg_tail_2_b32 = Reg::UpdateMask<int32_t>(s2Tail);
-        Reg::Not(preg_tail_neg_1_b32, preg_tail_1_b32, preg_all_b32);
-        Reg::Not(preg_tail_neg_2_b32, preg_tail_2_b32, preg_all_b32);
+    for (uint16_t i = bsndLoopCount - 1; i < bsndLoopCount; i++) {
+        Reg::MaskReg bsndTailMask0 = Reg::UpdateMask<int32_t>(bsndTailSize);
+        Reg::MaskReg bsndTailMask1 = Reg::UpdateMask<int32_t>(bsndTailSize);
+        Reg::Not(bsndInvalidMask0, bsndTailMask0, bsndAllMask);
+        Reg::Not(bsndInvalidMask1, bsndTailMask1, bsndAllMask);
 
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_1,
-                                                          sparseIdxUb + i * s2_num_per_loop);
-        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)vreg_sparse_idx_2,
-                                                          sparseIdxUb + s2_num_per_reg + i * s2_num_per_loop);
         // * sparseBlockSize
-        Reg::Muls(vreg_sparse_idx_1, vreg_sparse_idx_1, sparseBlockSize, preg_tail_1_b32);
-        Reg::Muls(vreg_sparse_idx_2, vreg_sparse_idx_2, sparseBlockSize, preg_tail_2_b32);
         // sparseIdx * kvDim (带进位乘法)
-        Reg::Mull(vreg_s2_offset_l_1, vreg_mul_overflow_l_1, vreg_sparse_idx_1, vreg_kv_dim, preg_tail_1_b32);
-        Reg::Mull(vreg_s2_offset_l_2, vreg_mul_overflow_l_2, vreg_sparse_idx_2, vreg_kv_dim, preg_tail_2_b32);
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)bsndSparseIndex0,
+                                                          bsndSparseUb + i * bsndElemsPerLoop);
+        Reg::LoadAlign<int32_t, Reg::LoadDist::DIST_NORM>((Reg::RegTensor<int32_t> &)bsndSparseIndex1,
+                                                          bsndSparseUb + bsndElemsPerReg + i * bsndElemsPerLoop);
+        Reg::Muls(bsndSparseIndex0, bsndSparseIndex0, bsndSparseBlockSize, bsndTailMask0);
+        Reg::Muls(bsndSparseIndex1, bsndSparseIndex1, bsndSparseBlockSize, bsndTailMask1);
+        Reg::Mull(bsndOffsetLow0, bsndOffsetHigh0, bsndSparseIndex0, bsndDimReg, bsndTailMask0);
+        Reg::Mull(bsndOffsetLow1, bsndOffsetHigh1, bsndSparseIndex1, bsndDimReg, bsndTailMask1);
         // s2_offset + bS2Base (int64 + int64)
-        Reg::Add(add_carry_l_1, vreg_total_offset_l_1, vreg_s2_offset_l_1, vreg_b_s2_base_low, preg_tail_1_b32);
-        Reg::Add(add_carry_l_2, vreg_total_offset_l_2, vreg_s2_offset_l_2, vreg_b_s2_base_low, preg_tail_2_b32);
-        Reg::AddC(add_carry_h_1, vreg_total_offset_h_1, vreg_mul_overflow_l_1, vreg_b_s2_base_high, add_carry_l_1,
-                  preg_tail_1_b32);
-        Reg::AddC(add_carry_h_2, vreg_total_offset_h_2, vreg_mul_overflow_l_2, vreg_b_s2_base_high, add_carry_l_2,
-                  preg_tail_2_b32);
+        Reg::Add(bsndLowCarry0, bsndAddrLow0, bsndOffsetLow0, bsndBaseLowReg, bsndTailMask0);
+        Reg::Add(bsndLowCarry1, bsndAddrLow1, bsndOffsetLow1, bsndBaseLowReg, bsndTailMask1);
+        Reg::AddC(bsndHighCarry0, bsndAddrHigh0, bsndOffsetHigh0, bsndBaseHighReg, bsndLowCarry0, bsndTailMask0);
+        Reg::AddC(bsndHighCarry1, bsndAddrHigh1, bsndOffsetHigh1, bsndBaseHighReg, bsndLowCarry1, bsndTailMask1);
         // 无效值填充-1(0xFFFFFFFF)
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_l_1, invalid_value,
-                                                              preg_tail_neg_1_b32);
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_h_1, invalid_value,
-                                                              preg_tail_neg_1_b32);
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_l_2, invalid_value,
-                                                              preg_tail_neg_2_b32);
-        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(vreg_total_offset_h_2, invalid_value,
-                                                              preg_tail_neg_2_b32);
-        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-            kvPhyAddrUb + i * out_offset_per_loop, vreg_total_offset_l_1, vreg_total_offset_h_1, preg_all_b32);
-        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(
-            kvPhyAddrUb + out_offset_per_reg + i * out_offset_per_loop, vreg_total_offset_l_2, vreg_total_offset_h_2,
-            preg_all_b32);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(bsndAddrLow0, bsndInvalidAddr, bsndInvalidMask0);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(bsndAddrHigh0, bsndInvalidAddr, bsndInvalidMask0);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(bsndAddrLow1, bsndInvalidAddr, bsndInvalidMask1);
+        Reg::Duplicate<uint32_t, Reg::MaskMergeMode::MERGING>(bsndAddrHigh1, bsndInvalidAddr, bsndInvalidMask1);
+        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(bsndAddrUb + i * bsndOutPerLoop, bsndAddrLow0,
+                                                                  bsndAddrHigh0, bsndAllMask);
+        Reg::StoreAlign<uint32_t, Reg::StoreDist::DIST_INTLV_B32>(bsndAddrUb + bsndOutPerReg + i * bsndOutPerLoop,
+                                                                  bsndAddrLow1, bsndAddrHigh1, bsndAllMask);
     }
 }
 

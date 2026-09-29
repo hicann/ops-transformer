@@ -36,47 +36,47 @@ using namespace SMLAKernel;
 using namespace AttentionCommon;
 
 // ===================== 无模板参数的公共函数 =====================
-__aicore__ inline int64_t GetSeqLen(int32_t bIdx, bool hasActualSeq, bool hasCuSeqlens,
-                                    GlobalTensor<int32_t> &actualSeqGm, GlobalTensor<int32_t> &cuSeqlensGm,
-                                    int64_t defaultSize)
+__aicore__ inline int64_t GetSmlaSeqLen(int32_t batchIndex, bool useExplicitLength, bool useCumulativeLength,
+                                        GlobalTensor<int32_t> &explicitLengthGm,
+                                        GlobalTensor<int32_t> &cumulativeLengthGm, int64_t fallbackLength)
 {
-    if (hasActualSeq) {
-        return actualSeqGm.GetValue(bIdx);
-    } else if (hasCuSeqlens) {
-        return cuSeqlensGm.GetValue(bIdx + 1) - cuSeqlensGm.GetValue(bIdx);
+    if (useExplicitLength) {
+        return explicitLengthGm.GetValue(batchIndex);
+    } else if (useCumulativeLength) {
+        return cumulativeLengthGm.GetValue(batchIndex + 1) - cumulativeLengthGm.GetValue(batchIndex);
     } else {
-        return defaultSize;
+        return fallbackLength;
     }
 }
 
-__aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr &runParam, const ConstInfo &constInfo,
+__aicore__ inline int64_t ConvertS2MetadataBlockToToken(const RunParamStr &smlaRunParam, const ConstInfo &constInfo,
                                                         uint32_t s2BlockIdx)
 {
     int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
-    int64_t oriLen = runParam.s2OriLineEndIdx - runParam.s2OriLineStartIdx;
-    int64_t cmpLen = runParam.s2CmpLineEndIdx - runParam.s2CmpLineStartIdx;
+    int64_t smlaOriLength = smlaRunParam.s2OriLineEndIdx - smlaRunParam.s2OriLineStartIdx;
+    int64_t cmpLen = smlaRunParam.s2CmpLineEndIdx - smlaRunParam.s2CmpLineStartIdx;
     int64_t safeBaseBlockNum =
-        runParam.baseBlockNumPerReductionBlock > 0 ? runParam.baseBlockNumPerReductionBlock : 1LL;
+        smlaRunParam.baseBlockNumPerReductionBlock > 0 ? smlaRunParam.baseBlockNumPerReductionBlock : 1LL;
     int64_t reductionBlockSize = safeBaseBlockNum * s2BaseSize;
-    int64_t oriReductionBlockNum = (oriLen + reductionBlockSize - 1) / reductionBlockSize;
+    int64_t oriReductionBlockNum = (smlaOriLength + reductionBlockSize - 1) / reductionBlockSize;
     if (s2BlockIdx <= oriReductionBlockNum) {
         int64_t oriToken = static_cast<int64_t>(s2BlockIdx) * reductionBlockSize;
-        return oriToken < oriLen ? oriToken : oriLen;
+        return oriToken < smlaOriLength ? oriToken : smlaOriLength;
     }
     int64_t cmpToken = (static_cast<int64_t>(s2BlockIdx) - oriReductionBlockNum) * reductionBlockSize;
-    return oriLen + (cmpToken < cmpLen ? cmpToken : cmpLen);
+    return smlaOriLength + (cmpToken < cmpLen ? cmpToken : cmpLen);
 }
 
-__aicore__ inline bool ApplyS2MetadataRange(RunParamStr &runParam, ConstInfo &constInfo, int64_t s2StartPoint,
+__aicore__ inline bool ApplyS2MetadataRange(RunParamStr &smlaRunParam, ConstInfo &constInfo, int64_t s2StartPoint,
                                             int64_t s2EndPoint, bool isFirstS2RangeTask, bool isLastS2RangeTask)
 {
-    int64_t oriStart = runParam.s2OriLineStartIdx;
-    int64_t oriEnd = runParam.s2OriLineEndIdx;
-    int64_t oriLen = oriEnd - oriStart;
-    int64_t cmpStart = runParam.s2CmpLineStartIdx;
-    int64_t cmpEnd = runParam.s2CmpLineEndIdx;
+    int64_t oriStart = smlaRunParam.s2OriLineStartIdx;
+    int64_t oriEnd = smlaRunParam.s2OriLineEndIdx;
+    int64_t smlaOriLength = oriEnd - oriStart;
+    int64_t cmpStart = smlaRunParam.s2CmpLineStartIdx;
+    int64_t cmpEnd = smlaRunParam.s2CmpLineEndIdx;
     int64_t cmpLen = cmpEnd - cmpStart;
-    int64_t totalLen = oriLen + cmpLen;
+    int64_t totalLen = smlaOriLength + cmpLen;
 
     int64_t effectiveS2EndPoint = (isLastS2RangeTask && s2EndPoint == 0) ? totalLen : s2EndPoint;
     int64_t rangeStart = isFirstS2RangeTask ? s2StartPoint : 0;
@@ -86,60 +86,60 @@ __aicore__ inline bool ApplyS2MetadataRange(RunParamStr &runParam, ConstInfo &co
     rangeEnd = rangeEnd < 0 ? 0 : rangeEnd;
     rangeEnd = rangeEnd < totalLen ? rangeEnd : totalLen;
     if (rangeEnd <= rangeStart) {
-        runParam.oriKvLoopEndIdx = 0;
-        runParam.cmpKvLoopEndIdx = 0;
-        runParam.s2LoopEndIdx = 0;
-        runParam.isCrossCoreSplit = false;
+        smlaRunParam.oriKvLoopEndIdx = 0;
+        smlaRunParam.cmpKvLoopEndIdx = 0;
+        smlaRunParam.s2LoopEndIdx = 0;
+        smlaRunParam.isCrossCoreSplit = false;
         return true;
     }
 
     bool hasPrevCore = rangeStart > 0;
     bool hasNextCore = rangeEnd < totalLen;
-    runParam.isCrossCoreSplit = hasPrevCore || hasNextCore;
-    runParam.isFirstS2SplitCore = !hasPrevCore;
+    smlaRunParam.isCrossCoreSplit = hasPrevCore || hasNextCore;
+    smlaRunParam.isFirstS2SplitCore = !hasPrevCore;
 
-    int64_t oriRangeStart = rangeStart < oriLen ? rangeStart : oriLen;
-    int64_t oriRangeEnd = rangeEnd < oriLen ? rangeEnd : oriLen;
-    runParam.s2OriLineStartIdx = oriStart + oriRangeStart;
-    runParam.s2OriLineEndIdx = oriStart + oriRangeEnd;
+    int64_t oriRangeStart = rangeStart < smlaOriLength ? rangeStart : smlaOriLength;
+    int64_t oriRangeEnd = rangeEnd < smlaOriLength ? rangeEnd : smlaOriLength;
+    smlaRunParam.s2OriLineStartIdx = oriStart + oriRangeStart;
+    smlaRunParam.s2OriLineEndIdx = oriStart + oriRangeEnd;
 
-    int64_t cmpRangeStart = rangeStart > oriLen ? rangeStart - oriLen : 0;
+    int64_t cmpRangeStart = rangeStart > smlaOriLength ? rangeStart - smlaOriLength : 0;
     cmpRangeStart = cmpRangeStart < cmpLen ? cmpRangeStart : cmpLen;
-    int64_t cmpRangeEnd = rangeEnd > oriLen ? rangeEnd - oriLen : 0;
+    int64_t cmpRangeEnd = rangeEnd > smlaOriLength ? rangeEnd - smlaOriLength : 0;
     cmpRangeEnd = cmpRangeEnd < cmpLen ? cmpRangeEnd : cmpLen;
-    runParam.s2CmpLineStartIdx = cmpStart + cmpRangeStart;
-    runParam.s2CmpLineEndIdx = cmpStart + cmpRangeEnd;
+    smlaRunParam.s2CmpLineStartIdx = cmpStart + cmpRangeStart;
+    smlaRunParam.s2CmpLineEndIdx = cmpStart + cmpRangeEnd;
 
     int64_t s2BaseSize = static_cast<int64_t>(constInfo.s2BaseSize);
-    int64_t oriRangeLen = runParam.s2OriLineEndIdx - runParam.s2OriLineStartIdx;
-    int64_t cmpRangeLen = runParam.s2CmpLineEndIdx - runParam.s2CmpLineStartIdx;
-    runParam.oriKvLoopEndIdx = (oriRangeLen + s2BaseSize - 1) / s2BaseSize;
-    runParam.cmpKvLoopEndIdx = (cmpRangeLen + s2BaseSize - 1) / s2BaseSize;
-    runParam.s2LoopEndIdx = runParam.oriKvLoopEndIdx + runParam.cmpKvLoopEndIdx;
-    return runParam.s2LoopEndIdx == 0;
+    int64_t oriRangeLen = smlaRunParam.s2OriLineEndIdx - smlaRunParam.s2OriLineStartIdx;
+    int64_t cmpRangeLen = smlaRunParam.s2CmpLineEndIdx - smlaRunParam.s2CmpLineStartIdx;
+    smlaRunParam.oriKvLoopEndIdx = (oriRangeLen + s2BaseSize - 1) / s2BaseSize;
+    smlaRunParam.cmpKvLoopEndIdx = (cmpRangeLen + s2BaseSize - 1) / s2BaseSize;
+    smlaRunParam.s2LoopEndIdx = smlaRunParam.oriKvLoopEndIdx + smlaRunParam.cmpKvLoopEndIdx;
+    return smlaRunParam.s2LoopEndIdx == 0;
 }
 
-__aicore__ inline void ComputeBmm1Tail(RunInfo &runInfo, RunParamStr &runParam, const ConstInfo &constInfo)
+__aicore__ inline void ComputeBmm1Tail(RunInfo &smlaRunInfo, RunParamStr &smlaRunParam, const ConstInfo &constInfo)
 {
     // ------------------------S1 Base Related---------------------------
-    runInfo.s1RealSize = runParam.s1RealSize;
-    runInfo.halfS1RealSize = runParam.halfS1RealSize;
-    runInfo.firstHalfS1RealSize = runParam.firstHalfS1RealSize;
-    runInfo.mRealSize = runParam.mRealSize;
-    runInfo.halfMRealSize = runParam.halfMRealSize;
-    runInfo.firstHalfMRealSize = runParam.firstHalfMRealSize;
+    smlaRunInfo.s1RealSize = smlaRunParam.s1RealSize;
+    smlaRunInfo.halfS1RealSize = smlaRunParam.halfS1RealSize;
+    smlaRunInfo.firstHalfS1RealSize = smlaRunParam.firstHalfS1RealSize;
+    smlaRunInfo.mRealSize = smlaRunParam.mRealSize;
+    smlaRunInfo.halfMRealSize = smlaRunParam.halfMRealSize;
+    smlaRunInfo.firstHalfMRealSize = smlaRunParam.firstHalfMRealSize;
 
-    runInfo.vec2MBaseSize = runInfo.halfMRealSize;
+    smlaRunInfo.vec2MBaseSize = smlaRunInfo.halfMRealSize;
 
     // ------------------------S2 Base Related----------------------------
-    runInfo.s2RealSize = constInfo.s2BaseSize;
-    runInfo.s2AlignedSize = runInfo.s2RealSize;
-    int64_t curS2LoopCnt = (runInfo.s2LoopCount >= runParam.oriKvLoopEndIdx) ?
-                               (runInfo.s2LoopCount - runParam.oriKvLoopEndIdx) :
-                               runInfo.s2LoopCount;
-    if (runInfo.s2StartIdx + (curS2LoopCnt + 1) * runInfo.s2RealSize > runInfo.s2EndIdx) {
-        runInfo.s2RealSize = runInfo.s2EndIdx - curS2LoopCnt * runInfo.s2RealSize - runInfo.s2StartIdx;
-        runInfo.s2AlignedSize = Align(runInfo.s2RealSize);
+    smlaRunInfo.s2RealSize = constInfo.s2BaseSize;
+    smlaRunInfo.s2AlignedSize = smlaRunInfo.s2RealSize;
+    int64_t curS2LoopCnt = (smlaRunInfo.s2LoopCount >= smlaRunParam.oriKvLoopEndIdx) ?
+                               (smlaRunInfo.s2LoopCount - smlaRunParam.oriKvLoopEndIdx) :
+                               smlaRunInfo.s2LoopCount;
+    if (smlaRunInfo.s2StartIdx + (curS2LoopCnt + 1) * smlaRunInfo.s2RealSize > smlaRunInfo.s2EndIdx) {
+        smlaRunInfo.s2RealSize = smlaRunInfo.s2EndIdx - curS2LoopCnt * smlaRunInfo.s2RealSize - smlaRunInfo.s2StartIdx;
+        smlaRunInfo.s2AlignedSize = Align(smlaRunInfo.s2RealSize);
     }
 }
 
@@ -199,79 +199,82 @@ __aicore__ inline void ComputeConstexpr(ConstInfo &constInfo)
 }
 
 TEMPLATE_INTF
-__aicore__ inline void InitUniqueRunInfo(const RunParamStr &runParam, RunInfo &runInfo, const ConstInfo &constInfo)
+__aicore__ inline void InitUniqueRunInfo(const RunParamStr &smlaRunParam, RunInfo &smlaRunInfo,
+                                         const ConstInfo &constInfo)
 {
-    InitTaskParamByRun<TEMPLATE_INTF_ARGS>(runParam, runInfo, constInfo);
+    InitTaskParamByRun<TEMPLATE_INTF_ARGS>(smlaRunParam, smlaRunInfo, constInfo);
 }
 
 TEMPLATE_INTF
-__aicore__ inline void SetRunInfo(RunInfo &runInfo, RunParamStr &runParam, int64_t taskId, int64_t s2LoopCount,
-                                  int64_t s2LoopLimit, int64_t multiCoreInnerIdx, const ConstInfo &constInfo)
+__aicore__ inline void SetRunInfo(RunInfo &smlaRunInfo, RunParamStr &smlaRunParam, int64_t smlaTaskId,
+                                  int64_t smlaS2LoopCount, int64_t smlaS2LoopLimit, int64_t smlaCoreInnerIndex,
+                                  const ConstInfo &constInfo)
 {
-    if (s2LoopCount < runParam.oriKvLoopEndIdx) {
-        runInfo.s2StartIdx = runParam.s2OriLineStartIdx;
-        runInfo.s2EndIdx = runParam.s2OriLineEndIdx;
+    if (smlaS2LoopCount < smlaRunParam.oriKvLoopEndIdx) {
+        smlaRunInfo.s2StartIdx = smlaRunParam.s2OriLineStartIdx;
+        smlaRunInfo.s2EndIdx = smlaRunParam.s2OriLineEndIdx;
     } else {
-        runInfo.s2StartIdx = runParam.s2CmpLineStartIdx;
-        runInfo.s2EndIdx = runParam.s2CmpLineEndIdx;
+        smlaRunInfo.s2StartIdx = smlaRunParam.s2CmpLineStartIdx;
+        smlaRunInfo.s2EndIdx = smlaRunParam.s2CmpLineEndIdx;
     }
-    runInfo.s2LoopCount = s2LoopCount;
-    if (runInfo.multiCoreInnerIdx != multiCoreInnerIdx) {
-        runInfo.s1oIdx = runParam.s1oIdx;
-        runInfo.boIdx = runParam.boIdx;
-        runInfo.n2oIdx = runParam.n2oIdx;
-        runInfo.goIdx = runParam.goIdx;
-        runInfo.multiCoreInnerIdx = multiCoreInnerIdx;
-        runInfo.multiCoreIdxMod2 = multiCoreInnerIdx & 1;
-        runInfo.multiCoreIdxMod3 = multiCoreInnerIdx % 3; // 3：获取大小为3的组内的索引
+    smlaRunInfo.s2LoopCount = smlaS2LoopCount;
+    if (smlaRunInfo.multiCoreInnerIdx != smlaCoreInnerIndex) {
+        smlaRunInfo.s1oIdx = smlaRunParam.s1oIdx;
+        smlaRunInfo.boIdx = smlaRunParam.boIdx;
+        smlaRunInfo.n2oIdx = smlaRunParam.n2oIdx;
+        smlaRunInfo.goIdx = smlaRunParam.goIdx;
+        smlaRunInfo.multiCoreInnerIdx = smlaCoreInnerIndex;
+        smlaRunInfo.multiCoreIdxMod2 = smlaCoreInnerIndex & 1;
+        smlaRunInfo.multiCoreIdxMod3 = smlaCoreInnerIndex % 3; // 3：获取大小为3的组内的索引
     }
 
-    runInfo.taskId = taskId;
-    runInfo.taskIdMod2 = taskId & 1;
-    runInfo.taskIdMod3 = taskId % 3; // 3：同上
-    runInfo.s2LoopLimit = s2LoopLimit;
+    smlaRunInfo.taskId = smlaTaskId;
+    smlaRunInfo.taskIdMod2 = smlaTaskId & 1;
+    smlaRunInfo.taskIdMod3 = smlaTaskId % 3; // 3：同上
+    smlaRunInfo.s2LoopLimit = smlaS2LoopLimit;
 
-    runInfo.actualS1Size = runParam.actualS1Size;
-    runInfo.attentionOutOffset = runParam.attentionOutOffset;
-    runInfo.sOuterOffset = runParam.sOuterOffset;
-    runInfo.firstFdDataWorkspaceIdx = runParam.firstFdDataWorkspaceIdx;
-    runInfo.isCrossCoreSplit = runParam.isCrossCoreSplit;
-    runInfo.s2SplitIdx = runParam.s2SplitIdx;
-    runInfo.isFirstS2SplitCore = runParam.isFirstS2SplitCore;
+    smlaRunInfo.actualS1Size = smlaRunParam.actualS1Size;
+    smlaRunInfo.attentionOutOffset = smlaRunParam.attentionOutOffset;
+    smlaRunInfo.sOuterOffset = smlaRunParam.sOuterOffset;
+    smlaRunInfo.firstFdDataWorkspaceIdx = smlaRunParam.firstFdDataWorkspaceIdx;
+    smlaRunInfo.isCrossCoreSplit = smlaRunParam.isCrossCoreSplit;
+    smlaRunInfo.s2SplitIdx = smlaRunParam.s2SplitIdx;
+    smlaRunInfo.isFirstS2SplitCore = smlaRunParam.isFirstS2SplitCore;
     int64_t safeBaseBlockNum =
-        runParam.baseBlockNumPerReductionBlock > 0 ? runParam.baseBlockNumPerReductionBlock : 1LL;
-    int64_t reductionLoopCount = s2LoopCount;
+        smlaRunParam.baseBlockNumPerReductionBlock > 0 ? smlaRunParam.baseBlockNumPerReductionBlock : 1LL;
+    int64_t reductionLoopCount = smlaS2LoopCount;
     if constexpr (IS_BATCH_CONSISTENCY) {
         // 进入 CMP 时补齐规约计数，不增加实际计算。
-        if (s2LoopCount >= runParam.oriKvLoopEndIdx) {
-            reductionLoopCount += (safeBaseBlockNum - runParam.oriKvLoopEndIdx % safeBaseBlockNum) % safeBaseBlockNum;
+        if (smlaS2LoopCount >= smlaRunParam.oriKvLoopEndIdx) {
+            reductionLoopCount +=
+                (safeBaseBlockNum - smlaRunParam.oriKvLoopEndIdx % safeBaseBlockNum) % safeBaseBlockNum;
         }
     }
     int64_t baseBlockIdInReduceBlock = reductionLoopCount % safeBaseBlockNum;
-    runInfo.reduceBlockId = reductionLoopCount / safeBaseBlockNum;
-    runInfo.isFirstBase = baseBlockIdInReduceBlock == 0;
-    runInfo.isLastBase = baseBlockIdInReduceBlock == safeBaseBlockNum - 1LL || s2LoopCount == s2LoopLimit;
+    smlaRunInfo.reduceBlockId = reductionLoopCount / safeBaseBlockNum;
+    smlaRunInfo.isFirstBase = baseBlockIdInReduceBlock == 0;
+    smlaRunInfo.isLastBase = baseBlockIdInReduceBlock == safeBaseBlockNum - 1LL || smlaS2LoopCount == smlaS2LoopLimit;
     if constexpr (IS_BATCH_CONSISTENCY) {
-        runInfo.isLastBase = runInfo.isLastBase || s2LoopCount + 1 == runParam.oriKvLoopEndIdx;
+        smlaRunInfo.isLastBase = smlaRunInfo.isLastBase || smlaS2LoopCount + 1 == smlaRunParam.oriKvLoopEndIdx;
     }
-    runInfo.needReduce = runInfo.reduceBlockId > 0;
-    ComputeBmm1Tail(runInfo, runParam, constInfo);
-    InitUniqueRunInfo<TEMPLATE_INTF_ARGS>(runParam, runInfo, constInfo);
+    smlaRunInfo.needReduce = smlaRunInfo.reduceBlockId > 0;
+    ComputeBmm1Tail(smlaRunInfo, smlaRunParam, constInfo);
+    InitUniqueRunInfo<TEMPLATE_INTF_ARGS>(smlaRunParam, smlaRunInfo, constInfo);
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr &runParam,
+__aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr &smlaRunParam,
                                                 const ConstInfo &constInfo, int32_t aicIdx)
 {
     // GS1合轴, 不切G, 只切S1
-    runParam.s1oIdx = gS1Index * runParam.qSNumInOneBlock;
+    smlaRunParam.s1oIdx = gS1Index * smlaRunParam.qSNumInOneBlock;
     if constexpr (IS_SPLIT_G) {
         int64_t halfG = (constInfo.gSize + 1) / 2; // ceil(gSize/2), 第一个AIC多处理一行
-        runParam.goIdx = (aicIdx % 2 == 0) ? 0 : halfG;
-        runParam.gSplitSize = (aicIdx % 2 == 0) ? halfG : (constInfo.gSize - halfG); // 2：AIC切分数量
+        smlaRunParam.goIdx = (aicIdx % 2 == 0) ? 0 : halfG;
+        smlaRunParam.gSplitSize = (aicIdx % 2 == 0) ? halfG : (constInfo.gSize - halfG); // 2：AIC切分数量
     } else {
-        runParam.goIdx = 0;
-        runParam.gSplitSize = constInfo.gSize;
+        smlaRunParam.goIdx = 0;
+        smlaRunParam.gSplitSize = constInfo.gSize;
     }
 }
 

@@ -41,38 +41,38 @@ using QSMLATemplateMode = SMLATemplateMode;
 
 // ------------------算子原型索引常量定义----------------
 // Inputs Index
-constexpr uint32_t Q_INDEX = 0;
-constexpr uint32_t ORI_KV_INDEX = 1;
-constexpr uint32_t CMP_KV_INDEX = 2;
-constexpr uint32_t ORI_SPARSE_INDICES_INDEX = 3;
-constexpr uint32_t CMP_SPARSE_INDICES_INDEX = 4;
-constexpr uint32_t ORI_BLOCK_TABLE_INDEX = 5;
-constexpr uint32_t CMP_BLOCK_TABLE_INDEX = 6;
-constexpr uint32_t CU_SEQLENS_Q_INDEX = 7;
-constexpr uint32_t CU_SEQLENS_ORI_KV_INDEX = 8;
-constexpr uint32_t CU_SEQLENS_CMP_KV_INDEX = 9;
-constexpr uint32_t SEQUSED_Q_INDEX = 10;
-constexpr uint32_t SEQUSED_ORI_KV_INDEX = 11;
-constexpr uint32_t SEQUSED_CMP_KV_INDEX = 12;
-constexpr uint32_t CMP_RESIDUAL_KV_INDEX = 13;
-constexpr uint32_t ORI_TOPK_LENGTH_INDEX = 14;
-constexpr uint32_t CMP_TOPK_LENGTH_INDEX = 15;
-constexpr uint32_t SINKS_INDEX = 16;
-constexpr uint32_t METADATA_INDEX = 17;
+constexpr uint32_t MQ_Q_INDEX = 0;
+constexpr uint32_t MQ_ORI_KV_INDEX = 1;
+constexpr uint32_t MQ_CMP_KV_INDEX = 2;
+constexpr uint32_t MQ_ORI_SPARSE_INDICES_INDEX = 3;
+constexpr uint32_t MQ_CMP_SPARSE_INDICES_INDEX = 4;
+constexpr uint32_t MQ_ORI_BLOCK_TABLE_INDEX = 5;
+constexpr uint32_t MQ_CMP_BLOCK_TABLE_INDEX = 6;
+constexpr uint32_t MQ_CU_SEQLENS_Q_INDEX = 7;
+constexpr uint32_t MQ_CU_SEQLENS_ORI_KV_INDEX = 8;
+constexpr uint32_t MQ_CU_SEQLENS_CMP_KV_INDEX = 9;
+constexpr uint32_t MQ_SEQUSED_Q_INDEX = 10;
+constexpr uint32_t MQ_SEQUSED_ORI_KV_INDEX = 11;
+constexpr uint32_t MQ_SEQUSED_CMP_KV_INDEX = 12;
+constexpr uint32_t MQ_CMP_RESIDUAL_KV_INDEX = 13;
+constexpr uint32_t MQ_ORI_TOPK_LENGTH_INDEX = 14;
+constexpr uint32_t MQ_CMP_TOPK_LENGTH_INDEX = 15;
+constexpr uint32_t MQ_SINKS_INDEX = 16;
+constexpr uint32_t MQ_METADATA_INDEX = 17;
 
 // Attributes Index
-constexpr uint32_t ATTR_QUANT_SCALE_INDEX = 0;
-constexpr uint32_t ATTR_ROPE_HEAD_DIM_INDEX = 1;
-constexpr uint32_t ATTR_SOFTMAX_SCALE_INDEX = 2;
-constexpr uint32_t ATTR_CMP_RATIO_INDEX = 3;
-constexpr uint32_t ATTR_ORI_MASK_MODE_INDEX = 4;
-constexpr uint32_t ATTR_CMP_MASK_MODE_INDEX = 5;
-constexpr uint32_t ATTR_ORI_WIN_LEFT_INDEX = 6;
-constexpr uint32_t ATTR_ORI_WIN_RIGHT_INDEX = 7;
-constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 8;
-constexpr uint32_t ATTR_LAYOUT_KV_INDEX = 9;
-constexpr uint32_t ATTR_TOPK_VALUE_MODE_INDEX = 10;
-constexpr uint32_t ATTR_RETURN_SOFTMAX_LSE_INDEX = 11;
+constexpr uint32_t MQ_ATTR_QUANT_SCALE_INDEX = 0;
+constexpr uint32_t MQ_ATTR_ROPE_HEAD_DIM_INDEX = 1;
+constexpr uint32_t MQ_ATTR_SOFTMAX_SCALE_INDEX = 2;
+constexpr uint32_t MQ_ATTR_CMP_RATIO_INDEX = 3;
+constexpr uint32_t MQ_ATTR_ORI_MASK_MODE_INDEX = 4;
+constexpr uint32_t MQ_ATTR_CMP_MASK_MODE_INDEX = 5;
+constexpr uint32_t MQ_ATTR_ORI_WIN_LEFT_INDEX = 6;
+constexpr uint32_t MQ_ATTR_ORI_WIN_RIGHT_INDEX = 7;
+constexpr uint32_t MQ_ATTR_LAYOUT_Q_INDEX = 8;
+constexpr uint32_t MQ_ATTR_LAYOUT_KV_INDEX = 9;
+constexpr uint32_t MQ_ATTR_TOPK_VALUE_MODE_INDEX = 10;
+constexpr uint32_t MQ_ATTR_RETURN_SOFTMAX_LSE_INDEX = 11;
 
 const std::map<MQSMLALayout, std::vector<MQSMLAAxis>> QSMLA_LAYOUT_AXIS_MAP = {
     {MQSMLALayout::BSND, {MQSMLAAxis::B, MQSMLAAxis::S, MQSMLAAxis::N, MQSMLAAxis::D}},
@@ -85,8 +85,6 @@ const std::map<MQSMLALayout, size_t> QSMLA_LAYOUT_DIM_MAP = {
     {MQSMLALayout::TND, DIM_NUM_THREE},
     {MQSMLALayout::PA_BBND, DIM_NUM_FOUR},
 };
-std::vector<int64_t> ToVector(const gert::Shape &shape);
-std::string ToStringRaw(const gert::Shape &shape);
 std::string MQSMLALayoutToSerialString(MQSMLALayout layout);
 
 // -----------算子Tiling入参信息解析及Check类---------------
@@ -254,9 +252,9 @@ public:
 
 public:
     gert::TilingContext *context_ = nullptr;
-    const char *opName_;
-    fe::PlatFormInfos *platformInfo_;
-    MQSMLAParaInfo opParamInfo_;
+    const char *mqsmlaOpName_;
+    fe::PlatFormInfos *mqsmlaPlatformInfo_;
+    MQSMLAParaInfo mqsmlaParams_;
 
     bool HasAxis(const MQSMLAAxis &axis, const MQSMLALayout &layout, const gert::Shape &shape) const;
     size_t GetAxisIdx(const MQSMLAAxis &axis, const MQSMLALayout &layout) const;
@@ -264,44 +262,44 @@ public:
     static constexpr int64_t invalidDimValue_ = std::numeric_limits<int64_t>::min();
 
     // BaseParams
-    int64_t bSize_ = 0;
-    int64_t n1Size_ = 0;
-    int64_t n2Size_ = 0;
-    int64_t gSize_ = 0;
-    int64_t s1Size_ = 0;
-    int64_t s2Size_ = 0;
-    int64_t cmpS2Size_ = 0;
+    int64_t mqsmlaBatchSize_ = 0;
+    int64_t mqsmlaQueryHeads_ = 0;
+    int64_t mqsmlaKvHeads_ = 0;
+    int64_t mqsmlaGroupSize_ = 0;
+    int64_t mqsmlaQuerySeqSize_ = 0;
+    int64_t mqsmlaKvSeqSize_ = 0;
+    int64_t mqsmlaCmpKvSeqSize_ = 0;
     int64_t headDim_ = 0;
-    int64_t qTSize_ = 0;
-    int64_t qkHeadDim_ = 0;
+    int64_t mqsmlaQueryTokenSize_ = 0;
+    int64_t mqsmlaQkHeadDim_ = 0;
     int64_t sparseBlockSize_ = 0;
-    int64_t oriSparseBlockCount_ = 0;
-    int64_t cmpSparseBlockCount_ = 0;
+    int64_t mqsmlaOriSparseBlockCount_ = 0;
+    int64_t mqsmlaCmpSparseBlockCount_ = 0;
     int64_t maxActualseq_ = 0;
     bool isSameSeqAllKVTensor_ = true;
     bool batchConsistency_ = false;
-    int64_t dSizeQ_ = 0;
-    int64_t dSizeKV_ = 0;
-    int64_t oriKvStride_ = 0;
-    int64_t cmpKvStride_ = 0;
-    uint32_t actualLenDimsQ_ = 0;
-    uint32_t actualLenDimsKV_ = 0;
-    std::vector<int64_t> oriKvStridesVec_;
-    std::vector<int64_t> cmpKvStridesVec_;
+    int64_t mqsmlaQueryDim_ = 0;
+    int64_t mqsmlaKvDim_ = 0;
+    int64_t mqsmlaOriKvStride_ = 0;
+    int64_t mqsmlaCmpKvStride_ = 0;
+    uint32_t mqsmlaActualQueryLenDims_ = 0;
+    uint32_t mqsmlaActualKvLenDims_ = 0;
+    std::vector<int64_t> mqsmlaOriKvStrides_;
+    std::vector<int64_t> mqsmlaCmpKvStrides_;
     // Layout
-    MQSMLALayout qLayout_ = MQSMLALayout::BSND;
-    MQSMLALayout outLayout_ = MQSMLALayout::BSND;
-    MQSMLALayout kvLayout_ = MQSMLALayout::PA_BBND;
+    MQSMLALayout mqsmlaQLayout_ = MQSMLALayout::BSND;
+    MQSMLALayout mqsmlaOutputLayout_ = MQSMLALayout::BSND;
+    MQSMLALayout mqsmlaKvLayout_ = MQSMLALayout::PA_BBND;
     // PageAttention
-    uint32_t oriMaxBlockNumPerBatch_ = 0;
-    uint32_t cmpMaxBlockNumPerBatch_ = 0;
-    int64_t oriBlockSize_ = 0;
-    int64_t cmpBlockSize_ = 0;
+    uint32_t mqsmlaOriMaxBlocksPerBatch_ = 0;
+    uint32_t mqsmlaCmpMaxBlocksPerBatch_ = 0;
+    int64_t mqsmlaOriBlockSize_ = 0;
+    int64_t mqsmlaCmpBlockSize_ = 0;
     platform_ascendc::SocVersion socVersion_ = platform_ascendc::SocVersion::ASCEND910B;
     NpuArch npuArch_ = NpuArch::DAV_2201;
-    ge::DataType qType_ = ge::DT_FLOAT16;
-    ge::DataType oriKvType_ = ge::DT_FLOAT16;
-    ge::DataType cmpKvType_ = ge::DT_FLOAT16;
+    ge::DataType mqsmlaQType_ = ge::DT_FLOAT16;
+    ge::DataType mqsmlaOriKvType_ = ge::DT_FLOAT16;
+    ge::DataType mqsmlaCmpKvType_ = ge::DT_FLOAT16;
     ge::DataType cmpSparseIndicesType_ = ge::DT_INT32;
     ge::DataType oriBlockTableType_ = ge::DT_INT32;
     ge::DataType cmpBlockTableType_ = ge::DT_INT32;
@@ -309,13 +307,13 @@ public:
     ge::DataType seqsedKvType_ = ge::DT_INT32;
     ge::DataType sinksType_ = ge::DT_INT32;
     ge::DataType metadataType_ = ge::DT_INT32;
-    ge::DataType outputType_ = ge::DT_FLOAT16;
+    ge::DataType mqsmlaOutputType_ = ge::DT_FLOAT16;
 
-    gert::Shape qShape_{};
-    gert::Shape oriKvShape_{};
-    gert::Shape cmpKvShape_{};
-    gert::Shape oriSparseIndicesShape_{};
-    gert::Shape cmpSparseIndicesShape_{};
+    gert::Shape mqsmlaQShape_{};
+    gert::Shape mqsmlaOriKvShape_{};
+    gert::Shape mqsmlaCmpKvShape_{};
+    gert::Shape mqsmlaOriSparseIndicesShape_{};
+    gert::Shape mqsmlaCmpSparseIndicesShape_{};
 };
 
 } // namespace optiling

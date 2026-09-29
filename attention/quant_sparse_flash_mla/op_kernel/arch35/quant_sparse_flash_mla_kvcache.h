@@ -32,7 +32,7 @@ using namespace AscendC::Impl::Detail;
 
 TEMPLATE_INTF
 __aicore__ inline void GetSingleCoreParam(
-    RunParamStr &runParam, const ConstInfo &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
+    RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
     GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
     GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
     GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm, bool hasCuSeqlensOriKv,
@@ -41,12 +41,12 @@ __aicore__ inline void GetSingleCoreParam(
     int32_t localActualS1Size = 0;
     int32_t localActualS2OriSize = 0;
     int32_t localActualS2CmpSize = 0;
-    int32_t bIdx = runParam.boIdx;
+    int32_t bIdx = qsCacheRunParam.boIdx;
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
         localActualS1Size = (!hasActualSeqQlen) ? (cuSeqlensQGm.GetValue(bIdx + 1) - cuSeqlensQGm.GetValue(bIdx)) :
                                                   actualSeqQlenGm.GetValue(bIdx);
     } else {
-        localActualS1Size = (!hasActualSeqQlen) ? constInfo.s1Size : actualSeqQlenGm.GetValue(bIdx);
+        localActualS1Size = (!hasActualSeqQlen) ? qsCacheConstInfo.s1Size : actualSeqQlenGm.GetValue(bIdx);
     }
 
     if constexpr (KV_LAYOUT_T == QSMLA_LAYOUT::TND) {
@@ -56,7 +56,7 @@ __aicore__ inline void GetSingleCoreParam(
             localActualS2OriSize = cuSeqlensOriKvGm.GetValue(bIdx + 1) - cuSeqlensOriKvGm.GetValue(bIdx);
         }
     } else {
-        localActualS2OriSize = (!hasActualSeqOriKvlen) ? constInfo.s2Size : actualSeqOriKvlenGm.GetValue(bIdx);
+        localActualS2OriSize = (!hasActualSeqOriKvlen) ? qsCacheConstInfo.s2Size : actualSeqOriKvlenGm.GetValue(bIdx);
     }
 
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
@@ -68,81 +68,88 @@ __aicore__ inline void GetSingleCoreParam(
                 localActualS2CmpSize = cuSeqlensCmpKvGm.GetValue(bIdx + 1) - cuSeqlensCmpKvGm.GetValue(bIdx);
             }
         } else {
-            localActualS2CmpSize = (!hasActualSeqCmpKvlen) ? constInfo.cmpS2Size : actualSeqCmpKvlenGm.GetValue(bIdx);
+            localActualS2CmpSize =
+                (!hasActualSeqCmpKvlen) ? qsCacheConstInfo.cmpS2Size : actualSeqCmpKvlenGm.GetValue(bIdx);
         }
     }
 
-    runParam.actualS1Size = localActualS1Size;
-    runParam.actualS2OriSize = localActualS2OriSize;
+    qsCacheRunParam.actualS1Size = localActualS1Size;
+    qsCacheRunParam.actualS2OriSize = localActualS2OriSize;
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
-        runParam.actualS2CmpSize = localActualS2CmpSize;
-        if (constInfo.cmpMaskMode == 0) {
-            runParam.nextTokensPerBatchCmp = runParam.actualS2CmpSize * constInfo.cmpRatio;
+        qsCacheRunParam.actualS2CmpSize = localActualS2CmpSize;
+        if (qsCacheConstInfo.cmpMaskMode == 0) {
+            qsCacheRunParam.nextTokensPerBatchCmp = qsCacheRunParam.actualS2CmpSize * qsCacheConstInfo.cmpRatio;
         } else {
-            runParam.cmpResidual = (constInfo.cmpRatio != 1) ? cmpResidualKvGm.GetValue(bIdx) : 0;
-            runParam.nextTokensPerBatchCmp =
-                (int64_t)runParam.actualS2CmpSize * constInfo.cmpRatio + runParam.cmpResidual - runParam.actualS1Size;
+            qsCacheRunParam.cmpResidual = (qsCacheConstInfo.cmpRatio != 1) ? cmpResidualKvGm.GetValue(bIdx) : 0;
+            qsCacheRunParam.nextTokensPerBatchCmp =
+                (int64_t)qsCacheRunParam.actualS2CmpSize * qsCacheConstInfo.cmpRatio + qsCacheRunParam.cmpResidual -
+                qsCacheRunParam.actualS1Size;
         }
     }
 
-    if (constInfo.oriMaskMode == 0) {
-        runParam.nextTokensPerBatchOri = runParam.actualS2OriSize;
-        runParam.preTokensPerBatch = runParam.actualS1Size;
-    } else if (constInfo.oriMaskMode == 3) { // 3: RightDownCausal模式
-        runParam.nextTokensPerBatchOri = runParam.actualS2OriSize - runParam.actualS1Size;
-        runParam.preTokensPerBatch = runParam.actualS1Size;
-    } else if (constInfo.oriMaskMode == 4) { // 4: Band模式
-        const int64_t casualOffset = runParam.actualS2OriSize - runParam.actualS1Size;
-        runParam.preTokensPerBatch =
-            (constInfo.oriWinLeft == -1) ? runParam.actualS1Size : constInfo.oriWinLeft - casualOffset;
-        runParam.nextTokensPerBatchOri =
-            (constInfo.oriWinRight == -1) ? runParam.actualS2OriSize : casualOffset + constInfo.oriWinRight;
-        runParam.preTokensPerBatch = Min(runParam.preTokensPerBatch, static_cast<int64_t>(runParam.actualS1Size));
+    if (qsCacheConstInfo.oriMaskMode == 0) {
+        qsCacheRunParam.nextTokensPerBatchOri = qsCacheRunParam.actualS2OriSize;
+        qsCacheRunParam.preTokensPerBatch = qsCacheRunParam.actualS1Size;
+    } else if (qsCacheConstInfo.oriMaskMode == 3) { // 3: RightDownCausal模式
+        qsCacheRunParam.nextTokensPerBatchOri = qsCacheRunParam.actualS2OriSize - qsCacheRunParam.actualS1Size;
+        qsCacheRunParam.preTokensPerBatch = qsCacheRunParam.actualS1Size;
+    } else if (qsCacheConstInfo.oriMaskMode == 4) { // 4: Band模式
+        const int64_t casualOffset = qsCacheRunParam.actualS2OriSize - qsCacheRunParam.actualS1Size;
+        qsCacheRunParam.preTokensPerBatch = (qsCacheConstInfo.oriWinLeft == -1) ?
+                                                qsCacheRunParam.actualS1Size :
+                                                qsCacheConstInfo.oriWinLeft - casualOffset;
+        qsCacheRunParam.nextTokensPerBatchOri = (qsCacheConstInfo.oriWinRight == -1) ?
+                                                    qsCacheRunParam.actualS2OriSize :
+                                                    casualOffset + qsCacheConstInfo.oriWinRight;
+        qsCacheRunParam.preTokensPerBatch =
+            Min(qsCacheRunParam.preTokensPerBatch, static_cast<int64_t>(qsCacheRunParam.actualS1Size));
     }
 }
 
 TEMPLATE_INTF
 __aicore__ inline void ComputeParamBatch(
-    RunParamStr &runParam, const ConstInfo &constInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
+    RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo, GlobalTensor<int32_t> &cuSeqlensQGm,
     GlobalTensor<int32_t> &cuSeqlensOriKvGm, GlobalTensor<int32_t> &cuSeqlensCmpKvGm,
     GlobalTensor<int32_t> &actualSeqQlenGm, GlobalTensor<int32_t> &actualSeqOriKvlenGm,
     GlobalTensor<int32_t> &actualSeqCmpKvlenGm, GlobalTensor<int32_t> &cmpResidualKvGm, bool hasCuSeqlensOriKv,
     bool hasCuSeqlensCmpKv, bool hasActualSeqQlen, bool hasActualSeqOriKvlen, bool hasActualSeqCmpKvlen)
 {
-    GetSingleCoreParam<TEMPLATE_INTF_ARGS>(runParam, constInfo, cuSeqlensQGm, cuSeqlensOriKvGm, cuSeqlensCmpKvGm,
-                                           actualSeqQlenGm, actualSeqOriKvlenGm, actualSeqCmpKvlenGm, cmpResidualKvGm,
-                                           hasCuSeqlensOriKv, hasCuSeqlensCmpKv, hasActualSeqQlen, hasActualSeqOriKvlen,
-                                           hasActualSeqCmpKvlen);
+    GetSingleCoreParam<TEMPLATE_INTF_ARGS>(qsCacheRunParam, qsCacheConstInfo, cuSeqlensQGm, cuSeqlensOriKvGm,
+                                           cuSeqlensCmpKvGm, actualSeqQlenGm, actualSeqOriKvlenGm, actualSeqCmpKvlenGm,
+                                           cmpResidualKvGm, hasCuSeqlensOriKv, hasCuSeqlensCmpKv, hasActualSeqQlen,
+                                           hasActualSeqOriKvlen, hasActualSeqCmpKvlen);
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo &constInfo, bool lastBN,
+__aicore__ inline void ComputeS1LoopInfo(RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo, bool lastBN,
                                          int64_t nextGs1Idx, int64_t gS1StartIdx, int64_t s2EndIdx)
 {
     // 计算每个基本块可以拷贝多少行s
-    runParam.qSNumInOneBlock = 1;
-    runParam.gs1LoopStartIdx = gS1StartIdx;
+    qsCacheRunParam.qSNumInOneBlock = 1;
+    qsCacheRunParam.gs1LoopStartIdx = gS1StartIdx;
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         if constexpr (TEMPLATE_MODE == QSMLATemplateMode::HCA_TEMPLATE_MODE ||
                       TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE) {
             int64_t qsmlaSkipThreshold = 0;
-            if (runParam.nextTokensPerBatchOri < 0 && runParam.nextTokensPerBatchCmp < 0) {
-                qsmlaSkipThreshold = Min(-runParam.nextTokensPerBatchOri, -runParam.nextTokensPerBatchCmp);
+            if (qsCacheRunParam.nextTokensPerBatchOri < 0 && qsCacheRunParam.nextTokensPerBatchCmp < 0) {
+                qsmlaSkipThreshold =
+                    Min(-qsCacheRunParam.nextTokensPerBatchOri, -qsCacheRunParam.nextTokensPerBatchCmp);
             }
             if (qsmlaSkipThreshold > 0) {
-                int64_t qsmlaGs1LoopStartIdx = qsmlaSkipThreshold / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
+                int64_t qsmlaGs1LoopStartIdx =
+                    qsmlaSkipThreshold / qsCacheRunParam.qSNumInOneBlock * qsCacheRunParam.qSNumInOneBlock;
                 if (qsmlaGs1LoopStartIdx > gS1StartIdx) {
-                    runParam.gs1LoopStartIdx = qsmlaGs1LoopStartIdx;
+                    qsCacheRunParam.gs1LoopStartIdx = qsmlaGs1LoopStartIdx;
                 }
             }
         } else {
-            if (runParam.nextTokensPerBatchOri < 0) {
-                int64_t qsmlaGs1LoopStartIdx =
-                    runParam.nextTokensPerBatchOri * (-1) / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock;
+            if (qsCacheRunParam.nextTokensPerBatchOri < 0) {
+                int64_t qsmlaGs1LoopStartIdx = qsCacheRunParam.nextTokensPerBatchOri * (-1) /
+                                               qsCacheRunParam.qSNumInOneBlock * qsCacheRunParam.qSNumInOneBlock;
                 if (qsmlaGs1LoopStartIdx > gS1StartIdx) {
-                    runParam.gs1LoopStartIdx = qsmlaGs1LoopStartIdx;
+                    qsCacheRunParam.gs1LoopStartIdx = qsmlaGs1LoopStartIdx;
                 }
             }
         }
@@ -152,142 +159,151 @@ __aicore__ inline void ComputeS1LoopInfo(RunParamStr &runParam, const ConstInfo 
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        qsmlaGs1LoopEndIdx = runParam.actualS1Size;
+        qsmlaGs1LoopEndIdx = qsCacheRunParam.actualS1Size;
     } else { // SWA/HCA
         // 不需要取topk, 每次计算gSize行, 循环qs次
-        qsmlaGs1LoopEndIdx = (runParam.actualS1Size + runParam.qSNumInOneBlock - 1) / runParam.qSNumInOneBlock;
+        qsmlaGs1LoopEndIdx =
+            (qsCacheRunParam.actualS1Size + qsCacheRunParam.qSNumInOneBlock - 1) / qsCacheRunParam.qSNumInOneBlock;
     }
     if (!lastBN) {
-        runParam.gs1LoopEndIdx = qsmlaGs1LoopEndIdx;
+        qsCacheRunParam.gs1LoopEndIdx = qsmlaGs1LoopEndIdx;
     } else {
         uint32_t actualNextGs1Idx = s2EndIdx == 0 ? nextGs1Idx : nextGs1Idx + 1;
-        runParam.gs1LoopEndIdx = (nextGs1Idx == 0 && s2EndIdx == 0) ? qsmlaGs1LoopEndIdx : actualNextGs1Idx;
+        qsCacheRunParam.gs1LoopEndIdx = (nextGs1Idx == 0 && s2EndIdx == 0) ? qsmlaGs1LoopEndIdx : actualNextGs1Idx;
     }
 
-    if (runParam.gs1LoopStartIdx > runParam.gs1LoopEndIdx) {
-        runParam.gs1LoopStartIdx = runParam.gs1LoopEndIdx;
+    if (qsCacheRunParam.gs1LoopStartIdx > qsCacheRunParam.gs1LoopEndIdx) {
+        qsCacheRunParam.gs1LoopStartIdx = qsCacheRunParam.gs1LoopEndIdx;
     }
 }
 
 TEMPLATE_INTF
-__aicore__ inline void ComputeSouterParam(RunParamStr &runParam, const ConstInfo &constInfo, uint32_t sOuterLoopIdx)
+__aicore__ inline void ComputeSouterParam(RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo,
+                                          uint32_t sOuterLoopIdx)
 {
-    int64_t qsmlaCubeSOuterOffset = sOuterLoopIdx * runParam.qSNumInOneBlock;
-    if (runParam.actualS1Size == 0) {
-        runParam.s1RealSize = 0;
-        runParam.mRealSize = 0;
+    int64_t qsmlaCubeSOuterOffset = sOuterLoopIdx * qsCacheRunParam.qSNumInOneBlock;
+    if (qsCacheRunParam.actualS1Size == 0) {
+        qsCacheRunParam.s1RealSize = 0;
+        qsCacheRunParam.mRealSize = 0;
     } else {
-        runParam.s1RealSize = Min(runParam.qSNumInOneBlock, runParam.actualS1Size - qsmlaCubeSOuterOffset);
-        runParam.mRealSize = runParam.s1RealSize * constInfo.gSize;
+        qsCacheRunParam.s1RealSize =
+            Min(qsCacheRunParam.qSNumInOneBlock, qsCacheRunParam.actualS1Size - qsmlaCubeSOuterOffset);
+        qsCacheRunParam.mRealSize = qsCacheRunParam.s1RealSize * qsCacheConstInfo.gSize;
         if constexpr (IS_SPLIT_G) {
-            runParam.mRealSize = runParam.s1RealSize * runParam.gSplitSize;
+            qsCacheRunParam.mRealSize = qsCacheRunParam.s1RealSize * qsCacheRunParam.gSplitSize;
         }
     }
 
-    runParam.cubeMOuterOffset = qsmlaCubeSOuterOffset * constInfo.gSize;
-    runParam.halfMRealSize = (runParam.mRealSize + 1) >> 1;
-    runParam.firstHalfMRealSize = runParam.halfMRealSize;
-    if (constInfo.subBlockIdx == 1) {
-        runParam.halfMRealSize = runParam.mRealSize - runParam.halfMRealSize;
-        runParam.mOuterOffset = runParam.cubeMOuterOffset + runParam.firstHalfMRealSize;
+    qsCacheRunParam.cubeMOuterOffset = qsmlaCubeSOuterOffset * qsCacheConstInfo.gSize;
+    qsCacheRunParam.halfMRealSize = (qsCacheRunParam.mRealSize + 1) >> 1;
+    qsCacheRunParam.firstHalfMRealSize = qsCacheRunParam.halfMRealSize;
+    if (qsCacheConstInfo.subBlockIdx == 1) {
+        qsCacheRunParam.halfMRealSize = qsCacheRunParam.mRealSize - qsCacheRunParam.halfMRealSize;
+        qsCacheRunParam.mOuterOffset = qsCacheRunParam.cubeMOuterOffset + qsCacheRunParam.firstHalfMRealSize;
     } else {
-        runParam.mOuterOffset = runParam.cubeMOuterOffset;
+        qsCacheRunParam.mOuterOffset = qsCacheRunParam.cubeMOuterOffset;
     }
 
-    runParam.halfS1RealSize = (runParam.s1RealSize + 1) >> 1;
-    runParam.firstHalfS1RealSize = runParam.halfS1RealSize;
-    if (constInfo.subBlockIdx == 1) {
-        runParam.halfS1RealSize = runParam.s1RealSize - runParam.halfS1RealSize;
-        runParam.sOuterOffset = qsmlaCubeSOuterOffset + runParam.firstHalfMRealSize / constInfo.gSize;
+    qsCacheRunParam.halfS1RealSize = (qsCacheRunParam.s1RealSize + 1) >> 1;
+    qsCacheRunParam.firstHalfS1RealSize = qsCacheRunParam.halfS1RealSize;
+    if (qsCacheConstInfo.subBlockIdx == 1) {
+        qsCacheRunParam.halfS1RealSize = qsCacheRunParam.s1RealSize - qsCacheRunParam.halfS1RealSize;
+        qsCacheRunParam.sOuterOffset =
+            qsmlaCubeSOuterOffset + qsCacheRunParam.firstHalfMRealSize / qsCacheConstInfo.gSize;
     } else {
-        runParam.sOuterOffset = qsmlaCubeSOuterOffset;
+        qsCacheRunParam.sOuterOffset = qsmlaCubeSOuterOffset;
     }
-    runParam.cubeSOuterOffset = qsmlaCubeSOuterOffset;
+    qsCacheRunParam.cubeSOuterOffset = qsmlaCubeSOuterOffset;
 }
 
 TEMPLATE_INTF
-__aicore__ inline void LoopSOuterOffsetInit(RunParamStr &runParam, const ConstInfo &constInfo, int32_t sIdx,
-                                            GlobalTensor<int32_t> &cuSeqlensQGm)
+__aicore__ inline void LoopSOuterOffsetInit(RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo,
+                                            int32_t sIdx, GlobalTensor<int32_t> &cuSeqlensQGm)
 {
     if ASCEND_IS_AIV {
         int64_t qsmlaSeqOffset = 0;
         if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
             qsmlaSeqOffset = cuSeqlensQGm.GetValue(sIdx);
         } else {
-            qsmlaSeqOffset = sIdx * constInfo.s1Size;
+            qsmlaSeqOffset = sIdx * qsCacheConstInfo.s1Size;
         }
 
-        int64_t attentionOutSeqOffset = qsmlaSeqOffset * constInfo.n2GDv;
+        int64_t attentionOutSeqOffset = qsmlaSeqOffset * qsCacheConstInfo.n2GDv;
         if constexpr (LAYOUT_T == QSMLA_LAYOUT::BSND || LAYOUT_T == QSMLA_LAYOUT::TND) {
-            runParam.attentionOutOffset = attentionOutSeqOffset + runParam.sOuterOffset * constInfo.n2GDv +
-                                          runParam.n2oIdx * constInfo.gDv + runParam.goIdx * constInfo.dSizeV;
+            qsCacheRunParam.attentionOutOffset =
+                attentionOutSeqOffset + qsCacheRunParam.sOuterOffset * qsCacheConstInfo.n2GDv +
+                qsCacheRunParam.n2oIdx * qsCacheConstInfo.gDv + qsCacheRunParam.goIdx * qsCacheConstInfo.dSizeV;
         }
-        if (constInfo.subBlockIdx == 1) {
-            runParam.attentionOutOffset += runParam.firstHalfMRealSize * constInfo.dSizeV;
+        if (qsCacheConstInfo.subBlockIdx == 1) {
+            qsCacheRunParam.attentionOutOffset += qsCacheRunParam.firstHalfMRealSize * qsCacheConstInfo.dSizeV;
         }
-        if (constInfo.isSoftmaxLseEnable) {
+        if (qsCacheConstInfo.isSoftmaxLseEnable) {
             if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
                 // [N2, T, G] (TND)
-                runParam.softmaxLseOffset = runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
-                                            (qsmlaSeqOffset + runParam.sOuterOffset) * constInfo.gSize;
+                qsCacheRunParam.softmaxLseOffset =
+                    qsCacheRunParam.n2oIdx * qsCacheConstInfo.s1Size * qsCacheConstInfo.gSize +
+                    (qsmlaSeqOffset + qsCacheRunParam.sOuterOffset) * qsCacheConstInfo.gSize;
             } else {
                 // [B, N2, S1, G] (BSND)
-                runParam.softmaxLseOffset = sIdx * constInfo.n2Size * constInfo.s1Size * constInfo.gSize +
-                                            runParam.n2oIdx * constInfo.s1Size * constInfo.gSize +
-                                            runParam.sOuterOffset * constInfo.gSize;
+                qsCacheRunParam.softmaxLseOffset =
+                    sIdx * qsCacheConstInfo.n2Size * qsCacheConstInfo.s1Size * qsCacheConstInfo.gSize +
+                    qsCacheRunParam.n2oIdx * qsCacheConstInfo.s1Size * qsCacheConstInfo.gSize +
+                    qsCacheRunParam.sOuterOffset * qsCacheConstInfo.gSize;
             }
             if constexpr (IS_SPLIT_G) {
-                uint32_t qsmlaAicIdx = constInfo.aivIdx >> 1U;
+                uint32_t qsmlaAicIdx = qsCacheConstInfo.aivIdx >> 1U;
                 if (qsmlaAicIdx % 2U != 0) {
-                    runParam.softmaxLseOffset += runParam.goIdx;
+                    qsCacheRunParam.softmaxLseOffset += qsCacheRunParam.goIdx;
                 }
             }
-            if (constInfo.subBlockIdx == 1) {
-                runParam.softmaxLseOffset += runParam.firstHalfMRealSize;
+            if (qsCacheConstInfo.subBlockIdx == 1) {
+                qsCacheRunParam.softmaxLseOffset += qsCacheRunParam.firstHalfMRealSize;
             }
         }
     }
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeParamS1(RunParamStr &runParam, const ConstInfo &constInfo, uint32_t sOuterLoopIdx,
-                                      GlobalTensor<int32_t> &cuSeqlensQGm)
+__aicore__ inline bool ComputeParamS1(RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo,
+                                      uint32_t sOuterLoopIdx, GlobalTensor<int32_t> &cuSeqlensQGm)
 {
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
         if constexpr (TEMPLATE_MODE == QSMLATemplateMode::HCA_TEMPLATE_MODE ||
                       TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE) {
             int64_t qsmlaSkipThreshold = 0;
-            if (runParam.nextTokensPerBatchOri < 0 && runParam.nextTokensPerBatchCmp < 0) {
-                qsmlaSkipThreshold = Min(-runParam.nextTokensPerBatchOri, -runParam.nextTokensPerBatchCmp);
+            if (qsCacheRunParam.nextTokensPerBatchOri < 0 && qsCacheRunParam.nextTokensPerBatchCmp < 0) {
+                qsmlaSkipThreshold =
+                    Min(-qsCacheRunParam.nextTokensPerBatchOri, -qsCacheRunParam.nextTokensPerBatchCmp);
             }
             if (qsmlaSkipThreshold > 0) {
-                if (runParam.s1oIdx < qsmlaSkipThreshold / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock) {
+                if (qsCacheRunParam.s1oIdx <
+                    qsmlaSkipThreshold / qsCacheRunParam.qSNumInOneBlock * qsCacheRunParam.qSNumInOneBlock) {
                     return true;
                 }
             }
         } else {
-            if (runParam.nextTokensPerBatchOri < 0) {
-                if (runParam.s1oIdx <
-                    (runParam.nextTokensPerBatchOri * (-1)) / runParam.qSNumInOneBlock * runParam.qSNumInOneBlock) {
+            if (qsCacheRunParam.nextTokensPerBatchOri < 0) {
+                if (qsCacheRunParam.s1oIdx < (qsCacheRunParam.nextTokensPerBatchOri * (-1)) /
+                                                 qsCacheRunParam.qSNumInOneBlock * qsCacheRunParam.qSNumInOneBlock) {
                     return true;
                 }
             }
         }
     }
 
-    ComputeSouterParam<TEMPLATE_INTF_ARGS>(runParam, constInfo, sOuterLoopIdx);
+    ComputeSouterParam<TEMPLATE_INTF_ARGS>(qsCacheRunParam, qsCacheConstInfo, sOuterLoopIdx);
 
-    LoopSOuterOffsetInit<TEMPLATE_INTF_ARGS>(runParam, constInfo, runParam.boIdx, cuSeqlensQGm);
+    LoopSOuterOffsetInit<TEMPLATE_INTF_ARGS>(qsCacheRunParam, qsCacheConstInfo, qsCacheRunParam.boIdx, cuSeqlensQGm);
     return false;
 }
 
 TEMPLATE_INTF
-__aicore__ inline bool ComputeLastBN(RunParamStr &runParam, GlobalTensor<int32_t> &cuSeqlensQGm)
+__aicore__ inline bool ComputeLastBN(RunParamStr &qsCacheRunParam, GlobalTensor<int32_t> &cuSeqlensQGm)
 {
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
-        if (runParam.boIdx > 0 &&
-            cuSeqlensQGm.GetValue(runParam.boIdx + 1) - cuSeqlensQGm.GetValue(runParam.boIdx) == 0) {
+        if (qsCacheRunParam.boIdx > 0 &&
+            cuSeqlensQGm.GetValue(qsCacheRunParam.boIdx + 1) - cuSeqlensQGm.GetValue(qsCacheRunParam.boIdx) == 0) {
             return true;
         }
     }
@@ -305,99 +321,107 @@ __aicore__ inline int64_t ClipSInnerTokenCube(int64_t sInnerToken, int64_t minVa
 TEMPLATE_INTF
 __aicore__ inline bool ComputeS2LoopInfo(int64_t bnIndex, int64_t gS1Index, GlobalTensor<int32_t> &cuSeqlensQGm,
                                          GlobalTensor<int32_t> &oriTopkLengthGm, GlobalTensor<int32_t> &cmpTopkLengthGm,
-                                         RunParamStr &runParam, const ConstInfo &constInfo)
+                                         RunParamStr &qsCacheRunParam, const ConstInfo &qsCacheConstInfo)
 {
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        if (runParam.actualS2OriSize == 0) {
-            runParam.oriKvLoopEndIdx = 0;
-            runParam.cmpKvLoopEndIdx = 0;
-            runParam.s2LoopEndIdx = 0;
-            runParam.s2CmpLineStartIdx = 0;
+        if (qsCacheRunParam.actualS2OriSize == 0) {
+            qsCacheRunParam.oriKvLoopEndIdx = 0;
+            qsCacheRunParam.cmpKvLoopEndIdx = 0;
+            qsCacheRunParam.s2LoopEndIdx = 0;
+            qsCacheRunParam.s2CmpLineStartIdx = 0;
             return true;
         }
     }
-    uint32_t s2BaseSize = constInfo.s2BaseSize;
+    uint32_t s2BaseSize = qsCacheConstInfo.s2BaseSize;
 
     if constexpr (LAYOUT_T == QSMLA_LAYOUT::TND) {
-        uint64_t qsmlaActualSeqQPrefixSum = cuSeqlensQGm.GetValue(runParam.boIdx);
-        runParam.oriSparseBlockCount = constInfo.hasOriTopkLength ?
-                                           Min(oriTopkLengthGm.GetValue(qsmlaActualSeqQPrefixSum + runParam.s1oIdx),
-                                               constInfo.oriSparseBlockCount) :
-                                           constInfo.oriSparseBlockCount;
-        runParam.cmpSparseBlockCount = constInfo.hasCmpTopkLength ?
-                                           Min(cmpTopkLengthGm.GetValue(qsmlaActualSeqQPrefixSum + runParam.s1oIdx),
-                                               constInfo.cmpSparseBlockCount) :
-                                           constInfo.cmpSparseBlockCount;
+        uint64_t qsmlaActualSeqQPrefixSum = cuSeqlensQGm.GetValue(qsCacheRunParam.boIdx);
+        qsCacheRunParam.oriSparseBlockCount =
+            qsCacheConstInfo.hasOriTopkLength ?
+                Min(oriTopkLengthGm.GetValue(qsmlaActualSeqQPrefixSum + qsCacheRunParam.s1oIdx),
+                    qsCacheConstInfo.oriSparseBlockCount) :
+                qsCacheConstInfo.oriSparseBlockCount;
+        qsCacheRunParam.cmpSparseBlockCount =
+            qsCacheConstInfo.hasCmpTopkLength ?
+                Min(cmpTopkLengthGm.GetValue(qsmlaActualSeqQPrefixSum + qsCacheRunParam.s1oIdx),
+                    qsCacheConstInfo.cmpSparseBlockCount) :
+                qsCacheConstInfo.cmpSparseBlockCount;
     } else {
-        uint64_t qsmlaBsndTopkIdx = runParam.boIdx * constInfo.s1Size + runParam.s1oIdx;
-        runParam.oriSparseBlockCount = constInfo.hasOriTopkLength ? Min(oriTopkLengthGm.GetValue(qsmlaBsndTopkIdx),
-                                                                        constInfo.oriSparseBlockCount) :
-                                                                    constInfo.oriSparseBlockCount;
-        runParam.cmpSparseBlockCount = constInfo.hasCmpTopkLength ? Min(cmpTopkLengthGm.GetValue(qsmlaBsndTopkIdx),
-                                                                        constInfo.cmpSparseBlockCount) :
-                                                                    constInfo.cmpSparseBlockCount;
+        uint64_t qsmlaBsndTopkIdx = qsCacheRunParam.boIdx * qsCacheConstInfo.s1Size + qsCacheRunParam.s1oIdx;
+        qsCacheRunParam.oriSparseBlockCount =
+            qsCacheConstInfo.hasOriTopkLength ?
+                Min(oriTopkLengthGm.GetValue(qsmlaBsndTopkIdx), qsCacheConstInfo.oriSparseBlockCount) :
+                qsCacheConstInfo.oriSparseBlockCount;
+        qsCacheRunParam.cmpSparseBlockCount =
+            qsCacheConstInfo.hasCmpTopkLength ?
+                Min(cmpTopkLengthGm.GetValue(qsmlaBsndTopkIdx), qsCacheConstInfo.cmpSparseBlockCount) :
+                qsCacheConstInfo.cmpSparseBlockCount;
     }
 
-    runParam.s2LineStartIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
-        runParam.cubeSOuterOffset - runParam.preTokensPerBatch, 0, runParam.actualS2OriSize);
-    runParam.s2LineOriEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
-        runParam.cubeSOuterOffset + runParam.nextTokensPerBatchOri + runParam.s1RealSize, 0, runParam.actualS2OriSize);
+    qsCacheRunParam.s2LineStartIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
+        qsCacheRunParam.cubeSOuterOffset - qsCacheRunParam.preTokensPerBatch, 0, qsCacheRunParam.actualS2OriSize);
+    qsCacheRunParam.s2LineOriEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
+        qsCacheRunParam.cubeSOuterOffset + qsCacheRunParam.nextTokensPerBatchOri + qsCacheRunParam.s1RealSize, 0,
+        qsCacheRunParam.actualS2OriSize);
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        int64_t oriSparseRangeLen = runParam.s2LineOriEndIdx - runParam.s2LineStartIdx;
-        runParam.s2LineStartIdx = 0;
-        runParam.s2LineOriEndIdx = Min(oriSparseRangeLen, runParam.oriSparseBlockCount);
-        runParam.s2LineOriEndIdx = Min(runParam.s2LineOriEndIdx, runParam.actualS2OriSize);
+        int64_t oriSparseRangeLen = qsCacheRunParam.s2LineOriEndIdx - qsCacheRunParam.s2LineStartIdx;
+        qsCacheRunParam.s2LineStartIdx = 0;
+        qsCacheRunParam.s2LineOriEndIdx = Min(oriSparseRangeLen, qsCacheRunParam.oriSparseBlockCount);
+        qsCacheRunParam.s2LineOriEndIdx = Min(qsCacheRunParam.s2LineOriEndIdx, qsCacheRunParam.actualS2OriSize);
     }
-    runParam.oriKvLoopEndIdx = (runParam.s2LineOriEndIdx - runParam.s2LineStartIdx + s2BaseSize - 1) / s2BaseSize;
+    qsCacheRunParam.oriKvLoopEndIdx =
+        (qsCacheRunParam.s2LineOriEndIdx - qsCacheRunParam.s2LineStartIdx + s2BaseSize - 1) / s2BaseSize;
 
     if constexpr (TEMPLATE_MODE == QSMLATemplateMode::SWA_TEMPLATE_MODE ||
                   TEMPLATE_MODE == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
-        runParam.s2CmpLineStartIdx = 0;
-        runParam.s2CmpLineEndIdx = 0;
-        runParam.cmpKvLoopEndIdx = 0;
+        qsCacheRunParam.s2CmpLineStartIdx = 0;
+        qsCacheRunParam.s2CmpLineEndIdx = 0;
+        qsCacheRunParam.cmpKvLoopEndIdx = 0;
     } else if constexpr (TEMPLATE_MODE == QSMLATemplateMode::HCA_TEMPLATE_MODE) {
-        runParam.s2CmpLineStartIdx = 0;
-        runParam.s2LineCmpEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
-            (runParam.cubeSOuterOffset + runParam.s1RealSize + runParam.nextTokensPerBatchCmp) / constInfo.cmpRatio, 0,
-            runParam.actualS2CmpSize);
-        runParam.s2CmpLineEndIdx = Min(runParam.s2LineCmpEndIdx, runParam.actualS2CmpSize);
-        runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
+        qsCacheRunParam.s2CmpLineStartIdx = 0;
+        qsCacheRunParam.s2LineCmpEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
+            (qsCacheRunParam.cubeSOuterOffset + qsCacheRunParam.s1RealSize + qsCacheRunParam.nextTokensPerBatchCmp) /
+                qsCacheConstInfo.cmpRatio,
+            0, qsCacheRunParam.actualS2CmpSize);
+        qsCacheRunParam.s2CmpLineEndIdx = Min(qsCacheRunParam.s2LineCmpEndIdx, qsCacheRunParam.actualS2CmpSize);
+        qsCacheRunParam.cmpKvLoopEndIdx = (qsCacheRunParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
     } else if constexpr (TEMPLATE_MODE == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
                          TEMPLATE_MODE == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) {
-        runParam.s2CmpLineStartIdx = 0;
-        runParam.s2LineCmpEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
-            (runParam.cubeSOuterOffset + runParam.s1RealSize + runParam.nextTokensPerBatchCmp) / constInfo.cmpRatio, 0,
-            runParam.actualS2CmpSize);
-        runParam.s2CmpLineEndIdx = Min(runParam.s2LineCmpEndIdx, runParam.cmpSparseBlockCount);
-        runParam.s2CmpLineEndIdx = Min(runParam.s2CmpLineEndIdx, runParam.actualS2CmpSize);
-        runParam.cmpKvLoopEndIdx = (runParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
+        qsCacheRunParam.s2CmpLineStartIdx = 0;
+        qsCacheRunParam.s2LineCmpEndIdx = ClipSInnerTokenCube<TEMPLATE_INTF_ARGS>(
+            (qsCacheRunParam.cubeSOuterOffset + qsCacheRunParam.s1RealSize + qsCacheRunParam.nextTokensPerBatchCmp) /
+                qsCacheConstInfo.cmpRatio,
+            0, qsCacheRunParam.actualS2CmpSize);
+        qsCacheRunParam.s2CmpLineEndIdx = Min(qsCacheRunParam.s2LineCmpEndIdx, qsCacheRunParam.cmpSparseBlockCount);
+        qsCacheRunParam.s2CmpLineEndIdx = Min(qsCacheRunParam.s2CmpLineEndIdx, qsCacheRunParam.actualS2CmpSize);
+        qsCacheRunParam.cmpKvLoopEndIdx = (qsCacheRunParam.s2CmpLineEndIdx + s2BaseSize - 1) / s2BaseSize;
     }
 
-    runParam.s2LoopEndIdx = runParam.oriKvLoopEndIdx + runParam.cmpKvLoopEndIdx;
-    return (runParam.s2LoopEndIdx == 0);
+    qsCacheRunParam.s2LoopEndIdx = qsCacheRunParam.oriKvLoopEndIdx + qsCacheRunParam.cmpKvLoopEndIdx;
+    return (qsCacheRunParam.s2LoopEndIdx == 0);
 }
 
 TEMPLATE_INTF
-__aicore__ inline void InitTaskParamByRun(const RunParamStr &runParam, RunInfo &runInfo)
+__aicore__ inline void InitTaskParamByRun(const RunParamStr &qsCacheRunParam, RunInfo &qsCacheRunInfo)
 {
-    runInfo.boIdx = runParam.boIdx;
-    runInfo.preTokensPerBatch = runParam.preTokensPerBatch;
-    runInfo.nextTokensPerBatchOri = runParam.nextTokensPerBatchOri;
-    runInfo.actualS1Size = runParam.actualS1Size;
+    qsCacheRunInfo.boIdx = qsCacheRunParam.boIdx;
+    qsCacheRunInfo.preTokensPerBatch = qsCacheRunParam.preTokensPerBatch;
+    qsCacheRunInfo.nextTokensPerBatchOri = qsCacheRunParam.nextTokensPerBatchOri;
+    qsCacheRunInfo.actualS1Size = qsCacheRunParam.actualS1Size;
     if constexpr (TEMPLATE_MODE != QSMLATemplateMode::SWA_TEMPLATE_MODE &&
                   TEMPLATE_MODE != QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) {
-        runInfo.actualS2CmpSize = runParam.actualS2CmpSize;
-        runInfo.cmpResidual = runParam.cmpResidual;
-        runInfo.cmpKvLoopEndIdx = runParam.cmpKvLoopEndIdx;
+        qsCacheRunInfo.actualS2CmpSize = qsCacheRunParam.actualS2CmpSize;
+        qsCacheRunInfo.cmpResidual = qsCacheRunParam.cmpResidual;
+        qsCacheRunInfo.cmpKvLoopEndIdx = qsCacheRunParam.cmpKvLoopEndIdx;
     }
-    runInfo.softmaxLseOffset = runParam.softmaxLseOffset;
-    runInfo.qSNumInOneBlock = runParam.qSNumInOneBlock;
-    runInfo.oriKvLoopEndIdx = runParam.oriKvLoopEndIdx;
-    runInfo.isCmp = runInfo.s2LoopCount >= runInfo.oriKvLoopEndIdx;
-    runInfo.oriSparseBlockCount = runParam.oriSparseBlockCount;
-    runInfo.cmpSparseBlockCount = runParam.cmpSparseBlockCount;
+    qsCacheRunInfo.softmaxLseOffset = qsCacheRunParam.softmaxLseOffset;
+    qsCacheRunInfo.qSNumInOneBlock = qsCacheRunParam.qSNumInOneBlock;
+    qsCacheRunInfo.oriKvLoopEndIdx = qsCacheRunParam.oriKvLoopEndIdx;
+    qsCacheRunInfo.isCmp = qsCacheRunInfo.s2LoopCount >= qsCacheRunInfo.oriKvLoopEndIdx;
+    qsCacheRunInfo.oriSparseBlockCount = qsCacheRunParam.oriSparseBlockCount;
+    qsCacheRunInfo.cmpSparseBlockCount = qsCacheRunParam.cmpSparseBlockCount;
 }
 
 #endif // QUANT_SPARSE_FLASH_MLA_KVCACHE_H

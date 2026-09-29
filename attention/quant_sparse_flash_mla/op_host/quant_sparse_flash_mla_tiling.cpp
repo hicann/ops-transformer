@@ -50,7 +50,7 @@ struct QSMLACompileInfo {
 // --------------------------QSMLAInfoParser类成员函数定义-------------------------------------
 ge::graphStatus QSMLAInfoParser::CheckRequiredInOutExistence() const
 {
-    OP_CHECK_IF(opParamInfo_.q.shape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "Shape of tensor q"),
+    OP_CHECK_IF(qsmlaParams_.q.shape == nullptr, OP_LOGE_WITH_INVALID_INPUT(qsmlaOpName_, "Shape of tensor q"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -76,24 +76,26 @@ ge::graphStatus QSMLAInfoParser::GetOpName()
         OP_LOGE_WITH_INVALID_INPUT("QuantSparseFlashMla", "opName got from TilingContext");
         return ge::GRAPH_FAILED;
     }
-    opName_ = context_->GetNodeName();
+    qsmlaOpName_ = context_->GetNodeName();
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QSMLAInfoParser::GetNpuInfo()
 {
-    platformInfo_ = context_->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo_ == nullptr, OP_LOGE(opName_, "GetPlatformInfo is nullptr."), return ge::GRAPH_FAILED);
+    qsmlaPlatformInfo_ = context_->GetPlatformInfo();
+    OP_CHECK_IF(qsmlaPlatformInfo_ == nullptr, OP_LOGE(qsmlaOpName_, "GetPlatformInfo is nullptr."),
+                return ge::GRAPH_FAILED);
 
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo_);
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(qsmlaPlatformInfo_);
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
-    OP_CHECK_IF(aicNum == 0 || aivNum == 0, OP_LOGE(opName_, "num of core obtained is 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(aicNum == 0 || aivNum == 0, OP_LOGE(qsmlaOpName_, "num of core obtained is 0."),
+                return ge::GRAPH_FAILED);
 
     socVersion_ = ascendcPlatform.GetSocVersion();
     npuArch_ = ascendcPlatform.GetCurNpuArch();
     if (npuArch_ != NpuArch::DAV_3510) {
-        OP_LOGE(opName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
+        OP_LOGE(qsmlaOpName_, "NpuArch[%d] is not support.", static_cast<int32_t>(npuArch_));
         return GRAPH_FAILED;
     }
     int64_t deterministicLevel = context_->GetDeterministicLevel();
@@ -103,41 +105,41 @@ ge::graphStatus QSMLAInfoParser::GetNpuInfo()
 
 void QSMLAInfoParser::GetOptionalInputParaInfo()
 {
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_KV_INDEX, opParamInfo_.oriKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_KV_INDEX, opParamInfo_.cmpKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, Q_DESCALE, opParamInfo_.qDescale);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_KV_DESCALE, opParamInfo_.oriKvDescale);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_KV_DESCALE, opParamInfo_.cmpKvDescale);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_SPARSE_INDICES_INDEX, opParamInfo_.oriSparseIndices);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_SPARSE_INDICES_INDEX, opParamInfo_.cmpSparseIndices);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_BLOCK_TABLE_INDEX, opParamInfo_.oriBlockTable);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_BLOCK_TABLE_INDEX, opParamInfo_.cmpBlockTable);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, SINKS_INDEX, opParamInfo_.sinks);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_Q_INDEX, opParamInfo_.cuSeqLensQ);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_ORI_KV_INDEX, opParamInfo_.cuSeqLensOriKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_CMP_KV_INDEX, opParamInfo_.cuSeqLensCmpKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_Q_INDEX, opParamInfo_.seqUsedQ);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_ORI_KV_INDEX, opParamInfo_.sequsedOriKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_CMP_KV_INDEX, opParamInfo_.sequsedCmpKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_RESIDUAL_KV_INDEX, opParamInfo_.cmpResidualKv);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_TOPK_LENGTH_INDEX, opParamInfo_.oriTopkLength);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_TOPK_LENGTH_INDEX, opParamInfo_.cmpTopkLength);
-    sparse_mla_checker::PopulateOptionalTensorParam(context_, METADATA_INDEX, opParamInfo_.metadata);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_KV_INDEX, qsmlaParams_.oriKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_KV_INDEX, qsmlaParams_.cmpKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, Q_DESCALE, qsmlaParams_.qDescale);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_KV_DESCALE, qsmlaParams_.oriKvDescale);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_KV_DESCALE, qsmlaParams_.cmpKvDescale);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_SPARSE_INDICES_INDEX, qsmlaParams_.oriSparseIndices);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_SPARSE_INDICES_INDEX, qsmlaParams_.cmpSparseIndices);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_BLOCK_TABLE_INDEX, qsmlaParams_.oriBlockTable);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_BLOCK_TABLE_INDEX, qsmlaParams_.cmpBlockTable);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, SINKS_INDEX, qsmlaParams_.sinks);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_Q_INDEX, qsmlaParams_.cuSeqLensQ);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_ORI_KV_INDEX, qsmlaParams_.cuSeqLensOriKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CU_SEQLENS_CMP_KV_INDEX, qsmlaParams_.cuSeqLensCmpKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_Q_INDEX, qsmlaParams_.seqUsedQ);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_ORI_KV_INDEX, qsmlaParams_.sequsedOriKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, SEQUSED_CMP_KV_INDEX, qsmlaParams_.sequsedCmpKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_RESIDUAL_KV_INDEX, qsmlaParams_.cmpResidualKv);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, ORI_TOPK_LENGTH_INDEX, qsmlaParams_.oriTopkLength);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, CMP_TOPK_LENGTH_INDEX, qsmlaParams_.cmpTopkLength);
+    sparse_mla_checker::PopulateOptionalTensorParam(context_, METADATA_INDEX, qsmlaParams_.metadata);
 }
 
 void QSMLAInfoParser::GetInputParaInfo()
 {
-    opParamInfo_.q.desc = context_->GetInputDesc(Q_INDEX);
-    opParamInfo_.q.shape = context_->GetInputShape(Q_INDEX);
+    qsmlaParams_.q.desc = context_->GetInputDesc(Q_INDEX);
+    qsmlaParams_.q.shape = context_->GetInputShape(Q_INDEX);
     GetOptionalInputParaInfo();
 }
 
 void QSMLAInfoParser::GetOutputParaInfo()
 {
-    opParamInfo_.attnOut.desc = context_->GetOutputDesc(ATTN_OUT_INDEX);
-    opParamInfo_.attnOut.shape = context_->GetOutputShape(ATTN_OUT_INDEX);
-    opParamInfo_.softmaxLse.desc = context_->GetOutputDesc(SOFTMAX_LSE_INDEX);
-    opParamInfo_.softmaxLse.shape = context_->GetOutputShape(SOFTMAX_LSE_INDEX);
+    qsmlaParams_.attnOut.desc = context_->GetOutputDesc(ATTN_OUT_INDEX);
+    qsmlaParams_.attnOut.shape = context_->GetOutputShape(ATTN_OUT_INDEX);
+    qsmlaParams_.softmaxLse.desc = context_->GetOutputDesc(SOFTMAX_LSE_INDEX);
+    qsmlaParams_.softmaxLse.shape = context_->GetOutputShape(SOFTMAX_LSE_INDEX);
 }
 
 ge::graphStatus QSMLAInfoParser::GetAttrParaInfo()
@@ -147,17 +149,17 @@ ge::graphStatus QSMLAInfoParser::GetAttrParaInfo()
                 return ge::GRAPH_FAILED);
 
     OP_LOGI(context_->GetNodeName(), "GetAttrParaInfo start");
-    opParamInfo_.quantMode = attrs->GetAttrPointer<int64_t>(ATTR_QUANT_MODE_INDEX);
-    opParamInfo_.softmaxScale = attrs->GetAttrPointer<float>(ATTR_SOFTMAX_SCALE_INDEX);
-    opParamInfo_.cmpRatio = attrs->GetAttrPointer<int64_t>(ATTR_CMP_RATIO_INDEX);
-    opParamInfo_.oriMaskMode = attrs->GetAttrPointer<uint32_t>(ATTR_ORI_MASK_MODE_INDEX);
-    opParamInfo_.cmpMaskMode = attrs->GetAttrPointer<uint32_t>(ATTR_CMP_MASK_MODE_INDEX);
-    opParamInfo_.oriWinLeft = attrs->GetAttrPointer<int64_t>(ATTR_ORI_WIN_LEFT_INDEX);
-    opParamInfo_.oriWinRight = attrs->GetAttrPointer<int64_t>(ATTR_ORI_WIN_RIGHT_INDEX);
-    opParamInfo_.layoutQ = attrs->GetStr(ATTR_LAYOUT_Q_INDEX);
-    opParamInfo_.layoutKv = attrs->GetStr(ATTR_LAYOUT_KV_INDEX);
-    opParamInfo_.topkValueMode = attrs->GetAttrPointer<int64_t>(ATTR_TOPK_VALUE_MODE_INDEX);
-    opParamInfo_.returnSoftmaxLse = attrs->GetAttrPointer<bool>(ATTR_RETURN_SOFTMAX_LSE_INDEX);
+    qsmlaParams_.quantMode = attrs->GetAttrPointer<int64_t>(ATTR_QUANT_MODE_INDEX);
+    qsmlaParams_.softmaxScale = attrs->GetAttrPointer<float>(ATTR_SOFTMAX_SCALE_INDEX);
+    qsmlaParams_.cmpRatio = attrs->GetAttrPointer<int64_t>(ATTR_CMP_RATIO_INDEX);
+    qsmlaParams_.oriMaskMode = attrs->GetAttrPointer<uint32_t>(ATTR_ORI_MASK_MODE_INDEX);
+    qsmlaParams_.cmpMaskMode = attrs->GetAttrPointer<uint32_t>(ATTR_CMP_MASK_MODE_INDEX);
+    qsmlaParams_.oriWinLeft = attrs->GetAttrPointer<int64_t>(ATTR_ORI_WIN_LEFT_INDEX);
+    qsmlaParams_.oriWinRight = attrs->GetAttrPointer<int64_t>(ATTR_ORI_WIN_RIGHT_INDEX);
+    qsmlaParams_.layoutQ = attrs->GetStr(ATTR_LAYOUT_Q_INDEX);
+    qsmlaParams_.layoutKv = attrs->GetStr(ATTR_LAYOUT_KV_INDEX);
+    qsmlaParams_.topkValueMode = attrs->GetAttrPointer<int64_t>(ATTR_TOPK_VALUE_MODE_INDEX);
+    qsmlaParams_.returnSoftmaxLse = attrs->GetAttrPointer<bool>(ATTR_RETURN_SOFTMAX_LSE_INDEX);
     OP_LOGI(context_->GetNodeName(), "GetAttrParaInfo end");
 
     return ge::GRAPH_SUCCESS;
@@ -175,13 +177,13 @@ ge::graphStatus QSMLAInfoParser::GetOpParaInfo()
 
 ge::graphStatus QSMLAInfoParser::GetInOutDataType()
 {
-    qType_ = opParamInfo_.q.desc->GetDataType();
-    outputType_ = opParamInfo_.attnOut.desc->GetDataType();
-    if (opParamInfo_.oriKv.desc != nullptr) {
-        oriKvType_ = opParamInfo_.oriKv.desc->GetDataType();
+    qsmlaQType_ = qsmlaParams_.q.desc->GetDataType();
+    qsmlaOutputType_ = qsmlaParams_.attnOut.desc->GetDataType();
+    if (qsmlaParams_.oriKv.desc != nullptr) {
+        qsmlaOriKvType_ = qsmlaParams_.oriKv.desc->GetDataType();
     }
-    if (opParamInfo_.cmpKv.desc != nullptr) {
-        cmpKvType_ = opParamInfo_.cmpKv.desc->GetDataType();
+    if (qsmlaParams_.cmpKv.desc != nullptr) {
+        qsmlaCmpKvType_ = qsmlaParams_.cmpKv.desc->GetDataType();
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -195,13 +197,13 @@ ge::graphStatus QSMLAInfoParser::GetQueryAndOutLayout()
         {"TND", {QSMLALayout::TND, QSMLALayout::TND}},
     };
 
-    std::string layout(opParamInfo_.layoutQ);
+    std::string layout(qsmlaParams_.layoutQ);
     auto it = layoutMap.find(layout);
     if (it != layoutMap.end()) {
-        qLayout_ = it->second.first;
-        outLayout_ = it->second.second;
+        qsmlaQLayout_ = it->second.first;
+        qsmlaOutputLayout_ = it->second.second;
     } else {
-        OP_LOGE(opName_, "layout of Q is %s, it is unsupported.", layout.c_str());
+        OP_LOGE(qsmlaOpName_, "layout of Q is %s, it is unsupported.", layout.c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -215,12 +217,12 @@ ge::graphStatus QSMLAInfoParser::GetKvLayout()
         {"BSND", QSMLALayout::BSND},
     };
 
-    std::string layout(opParamInfo_.layoutKv);
+    std::string layout(qsmlaParams_.layoutKv);
     auto it = layoutKVMap.find(layout);
     if (it != layoutKVMap.end()) {
-        kvLayout_ = it->second;
+        qsmlaKvLayout_ = it->second;
     } else {
-        OP_LOGE(opName_, "layoutKV is %s, it is unsupported.", layout.c_str());
+        OP_LOGE(qsmlaOpName_, "layoutKV is %s, it is unsupported.", layout.c_str());
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -261,41 +263,41 @@ int64_t QSMLAInfoParser::GetAxisNum(const gert::Shape &shape, const QSMLAAxis &a
 
 void QSMLAInfoParser::SetQSMLAShape()
 {
-    qShape_ = opParamInfo_.q.shape->GetStorageShape();
-    if (opParamInfo_.oriKv.tensor != nullptr) {
-        oriKvShape_ = opParamInfo_.oriKv.tensor->GetStorageShape();
+    qsmlaQShape_ = qsmlaParams_.q.shape->GetStorageShape();
+    if (qsmlaParams_.oriKv.tensor != nullptr) {
+        qsmlaOriKvShape_ = qsmlaParams_.oriKv.tensor->GetStorageShape();
     }
-    if (opParamInfo_.cmpKv.tensor != nullptr) {
-        cmpKvShape_ = opParamInfo_.cmpKv.tensor->GetStorageShape();
+    if (qsmlaParams_.cmpKv.tensor != nullptr) {
+        qsmlaCmpKvShape_ = qsmlaParams_.cmpKv.tensor->GetStorageShape();
     }
-    if (opParamInfo_.oriSparseIndices.tensor != nullptr) {
-        oriSparseIndicesShape_ = opParamInfo_.oriSparseIndices.tensor->GetStorageShape();
+    if (qsmlaParams_.oriSparseIndices.tensor != nullptr) {
+        qsmlaOriSparseIndicesShape_ = qsmlaParams_.oriSparseIndices.tensor->GetStorageShape();
     }
-    if (opParamInfo_.cmpSparseIndices.tensor != nullptr) {
-        cmpSparseIndicesShape_ = opParamInfo_.cmpSparseIndices.tensor->GetStorageShape();
+    if (qsmlaParams_.cmpSparseIndices.tensor != nullptr) {
+        qsmlaCmpSparseIndicesShape_ = qsmlaParams_.cmpSparseIndices.tensor->GetStorageShape();
     }
 }
 
 ge::graphStatus QSMLAInfoParser::GetN1Size()
 {
-    n1Size_ = GetAxisNum(qShape_, QSMLAAxis::N, qLayout_);
+    qsmlaQueryHeads_ = GetAxisNum(qsmlaQShape_, QSMLAAxis::N, qsmlaQLayout_);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QSMLAInfoParser::GetN2Size()
 {
-    if (opParamInfo_.oriKv.tensor != nullptr) {
-        n2Size_ = GetAxisNum(oriKvShape_, QSMLAAxis::N, kvLayout_);
-    } else if (opParamInfo_.cmpKv.tensor != nullptr) {
-        n2Size_ = GetAxisNum(cmpKvShape_, QSMLAAxis::N, kvLayout_);
+    if (qsmlaParams_.oriKv.tensor != nullptr) {
+        qsmlaKvHeads_ = GetAxisNum(qsmlaOriKvShape_, QSMLAAxis::N, qsmlaKvLayout_);
+    } else if (qsmlaParams_.cmpKv.tensor != nullptr) {
+        qsmlaKvHeads_ = GetAxisNum(qsmlaCmpKvShape_, QSMLAAxis::N, qsmlaKvLayout_);
     }
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QSMLAInfoParser::GetGSize()
 {
-    if (n2Size_ != 0) {
-        gSize_ = n1Size_ / n2Size_;
+    if (qsmlaKvHeads_ != 0) {
+        qsmlaGroupSize_ = qsmlaQueryHeads_ / qsmlaKvHeads_;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -304,13 +306,13 @@ ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(int64_t &size, const gert::
                                                      const std::string &name) const
 {
     if ((tensor == nullptr)) {
-        OP_LOGE(opName_, "when layout of q is %s, %s must be provided.", QSMLALayoutToSerialString(layout).c_str(),
+        OP_LOGE(qsmlaOpName_, "when layout of q is %s, %s must be provided.", QSMLALayoutToSerialString(layout).c_str(),
                 name.c_str());
         return ge::GRAPH_FAILED;
     }
     size = tensor->GetShapeSize();
     if (size <= 0) {
-        OP_LOGE(opName_, "the shape size of %s is %ld, it should be greater than 0.", name.c_str(), size);
+        OP_LOGE(qsmlaOpName_, "the shape size of %s is %ld, it should be greater than 0.", name.c_str(), size);
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -318,10 +320,10 @@ ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(int64_t &size, const gert::
 
 ge::graphStatus QSMLAInfoParser::GetActualSeqLenQSize(int64_t &size)
 {
-    if (opParamInfo_.cuSeqLensQ.tensor != nullptr) {
-        int64_t shapeSize = opParamInfo_.cuSeqLensQ.tensor->GetShapeSize();
+    if (qsmlaParams_.cuSeqLensQ.tensor != nullptr) {
+        int64_t shapeSize = qsmlaParams_.cuSeqLensQ.tensor->GetShapeSize();
         if (shapeSize <= 1) {
-            OP_LOGE(opName_, "the shape size of cuSeqLensQ is %ld, it should be greater than 1.", shapeSize);
+            OP_LOGE(qsmlaOpName_, "the shape size of cuSeqLensQ is %ld, it should be greater than 1.", shapeSize);
             return ge::GRAPH_FAILED;
         }
         size = shapeSize - 1;
@@ -334,10 +336,10 @@ ge::graphStatus QSMLAInfoParser::GetBatchSize()
     // 获取B基准值
     // 1、非TND时, 以query的batch_size维度为基准;
     // 2、TND时, actual_seq_lens_q必须传入, 以actual_seq_lens_q数组的长度为B轴大小
-    if (qLayout_ == QSMLALayout::TND) {
-        return GetActualSeqLenQSize(bSize_);
+    if (qsmlaQLayout_ == QSMLALayout::TND) {
+        return GetActualSeqLenQSize(qsmlaBatchSize_);
     } else { // BSND
-        bSize_ = GetAxisNum(qShape_, QSMLAAxis::B, qLayout_);
+        qsmlaBatchSize_ = GetAxisNum(qsmlaQShape_, QSMLAAxis::B, qsmlaQLayout_);
         return ge::GRAPH_SUCCESS;
     }
 }
@@ -347,7 +349,8 @@ ge::graphStatus QSMLAInfoParser::GetQTSize()
     // 获取query的T基准值
     // 1、非TND时, 以query的batch_size维度为基准;
     // 2、TND时, actual_seq_lens_q必须传入, 以actual_seq_lens_q数组的长度为B轴大小
-    qTSize_ = (qLayout_ == QSMLALayout::TND) ? GetAxisNum(qShape_, QSMLAAxis::T, qLayout_) : 0;
+    qsmlaQueryTokenSize_ =
+        (qsmlaQLayout_ == QSMLALayout::TND) ? GetAxisNum(qsmlaQShape_, QSMLAAxis::T, qsmlaQLayout_) : 0;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -356,66 +359,66 @@ ge::graphStatus QSMLAInfoParser::GetS1Size()
     // 获取S1基准值
     // 1、非TND时, 以query的S维度为基准;
     // 2、TND时, actual_seq_lens_q必须传入, 以actual_seq_lens_q数组中的最大值为基准
-    if (qLayout_ == QSMLALayout::TND) {
-        s1Size_ = GetAxisNum(qShape_, QSMLAAxis::T, qLayout_);
+    if (qsmlaQLayout_ == QSMLALayout::TND) {
+        qsmlaQuerySeqSize_ = GetAxisNum(qsmlaQShape_, QSMLAAxis::T, qsmlaQLayout_);
         return ge::GRAPH_SUCCESS;
     } else { // BSND
-        s1Size_ = GetAxisNum(qShape_, QSMLAAxis::S, qLayout_);
+        qsmlaQuerySeqSize_ = GetAxisNum(qsmlaQShape_, QSMLAAxis::S, qsmlaQLayout_);
     }
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QSMLAInfoParser::GetMaxBlockNumPerBatch()
 {
-    if (kvLayout_ == QSMLALayout::TND || kvLayout_ == QSMLALayout::BSND) {
+    if (qsmlaKvLayout_ == QSMLALayout::TND || qsmlaKvLayout_ == QSMLALayout::BSND) {
         return ge::GRAPH_SUCCESS;
     }
-    if (opParamInfo_.oriBlockTable.tensor == nullptr) {
-        OP_LOGE(opName_, "the layout_kv is %s, blockTable must be provided.",
-                QSMLALayoutToSerialString(kvLayout_).c_str());
+    if (qsmlaParams_.oriBlockTable.tensor == nullptr) {
+        OP_LOGE(qsmlaOpName_, "the layout_kv is %s, blockTable must be provided.",
+                QSMLALayoutToSerialString(qsmlaKvLayout_).c_str());
         return ge::GRAPH_FAILED;
     }
-    uint32_t oriDimNum = opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDimNum();
+    uint32_t oriDimNum = qsmlaParams_.oriBlockTable.tensor->GetStorageShape().GetDimNum();
     if (oriDimNum != DIM_NUM_TWO) {
-        OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "ori_block_table", std::to_string(oriDimNum).c_str(),
+        OP_LOGE_FOR_INVALID_SHAPEDIM(qsmlaOpName_, "ori_block_table", std::to_string(oriDimNum).c_str(),
                                      std::to_string(DIM_NUM_TWO).c_str());
         return ge::GRAPH_FAILED;
     }
-    if (opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
+    if (qsmlaParams_.oriBlockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-            opName_, ORI_BLOCK_TABLE_NAME.c_str(),
-            Ops::Base::ToString(opParamInfo_.oriBlockTable.tensor->GetStorageShape()).c_str(),
+            qsmlaOpName_, ORI_BLOCK_TABLE_NAME.c_str(),
+            Ops::Base::ToString(qsmlaParams_.oriBlockTable.tensor->GetStorageShape()).c_str(),
             ORI_BLOCK_TABLE_NAME + "'s second dimension should be greater than 0");
         return ge::GRAPH_FAILED;
     }
-    oriMaxBlockNumPerBatch_ = opParamInfo_.oriBlockTable.tensor->GetStorageShape().GetDim(1);
+    qsmlaOriMaxBlocksPerBatch_ = qsmlaParams_.oriBlockTable.tensor->GetStorageShape().GetDim(1);
 
-    if (opParamInfo_.cmpBlockTable.tensor != nullptr) {
-        uint32_t cmpDimNum = opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDimNum();
+    if (qsmlaParams_.cmpBlockTable.tensor != nullptr) {
+        uint32_t cmpDimNum = qsmlaParams_.cmpBlockTable.tensor->GetStorageShape().GetDimNum();
         if (cmpDimNum != DIM_NUM_TWO) {
-            OP_LOGE_FOR_INVALID_SHAPEDIM(opName_, "cmp_block_table", std::to_string(cmpDimNum).c_str(),
+            OP_LOGE_FOR_INVALID_SHAPEDIM(qsmlaOpName_, "cmp_block_table", std::to_string(cmpDimNum).c_str(),
                                          std::to_string(DIM_NUM_TWO).c_str());
             return ge::GRAPH_FAILED;
         }
-        if (opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
+        if (qsmlaParams_.cmpBlockTable.tensor->GetStorageShape().GetDim(1) <= 0) {
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                opName_, CMP_BLOCK_TABLE_NAME.c_str(),
-                Ops::Base::ToString(opParamInfo_.cmpBlockTable.tensor->GetStorageShape()).c_str(),
+                qsmlaOpName_, CMP_BLOCK_TABLE_NAME.c_str(),
+                Ops::Base::ToString(qsmlaParams_.cmpBlockTable.tensor->GetStorageShape()).c_str(),
                 CMP_BLOCK_TABLE_NAME + "'s second dimension should be greater than 0");
             return ge::GRAPH_FAILED;
         }
-        cmpMaxBlockNumPerBatch_ = opParamInfo_.cmpBlockTable.tensor->GetStorageShape().GetDim(1);
+        qsmlaCmpMaxBlocksPerBatch_ = qsmlaParams_.cmpBlockTable.tensor->GetStorageShape().GetDim(1);
     }
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QSMLAInfoParser::GetBlockSize()
 {
-    if (opParamInfo_.oriKv.tensor != nullptr) {
-        oriBlockSize_ = GetAxisNum(oriKvShape_, QSMLAAxis::Bs, kvLayout_);
+    if (qsmlaParams_.oriKv.tensor != nullptr) {
+        qsmlaOriBlockSize_ = GetAxisNum(qsmlaOriKvShape_, QSMLAAxis::Bs, qsmlaKvLayout_);
     }
-    if (opParamInfo_.cmpKv.tensor != nullptr) {
-        cmpBlockSize_ = GetAxisNum(cmpKvShape_, QSMLAAxis::Bs, kvLayout_);
+    if (qsmlaParams_.cmpKv.tensor != nullptr) {
+        qsmlaCmpBlockSize_ = GetAxisNum(qsmlaCmpKvShape_, QSMLAAxis::Bs, qsmlaKvLayout_);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -425,22 +428,22 @@ ge::graphStatus QSMLAInfoParser::GetS2SizeForPageAttention()
     if (GetMaxBlockNumPerBatch() != ge::GRAPH_SUCCESS || GetBlockSize() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    s2Size_ = oriMaxBlockNumPerBatch_ * oriBlockSize_;
-    cmpS2Size_ = cmpMaxBlockNumPerBatch_ * cmpBlockSize_;
+    qsmlaKvSeqSize_ = qsmlaOriMaxBlocksPerBatch_ * qsmlaOriBlockSize_;
+    qsmlaCmpKvSeqSize_ = qsmlaCmpMaxBlocksPerBatch_ * qsmlaCmpBlockSize_;
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QSMLAInfoParser::GetS2Size()
 {
-    if (kvLayout_ == QSMLALayout::TND) {
-        s2Size_ = GetAxisNum(oriKvShape_, QSMLAAxis::T, kvLayout_);
-        cmpS2Size_ = GetAxisNum(cmpKvShape_, QSMLAAxis::T, kvLayout_);
+    if (qsmlaKvLayout_ == QSMLALayout::TND) {
+        qsmlaKvSeqSize_ = GetAxisNum(qsmlaOriKvShape_, QSMLAAxis::T, qsmlaKvLayout_);
+        qsmlaCmpKvSeqSize_ = GetAxisNum(qsmlaCmpKvShape_, QSMLAAxis::T, qsmlaKvLayout_);
         return ge::GRAPH_SUCCESS;
-    } else if (kvLayout_ == QSMLALayout::BSND) {
-        s2Size_ = GetAxisNum(oriKvShape_, QSMLAAxis::S, kvLayout_);
-        cmpS2Size_ = GetAxisNum(cmpKvShape_, QSMLAAxis::S, kvLayout_);
+    } else if (qsmlaKvLayout_ == QSMLALayout::BSND) {
+        qsmlaKvSeqSize_ = GetAxisNum(qsmlaOriKvShape_, QSMLAAxis::S, qsmlaKvLayout_);
+        qsmlaCmpKvSeqSize_ = GetAxisNum(qsmlaCmpKvShape_, QSMLAAxis::S, qsmlaKvLayout_);
         return ge::GRAPH_SUCCESS;
-    } else if (kvLayout_ == QSMLALayout::PA_BBND) {
+    } else if (qsmlaKvLayout_ == QSMLALayout::PA_BBND) {
         return GetS2SizeForPageAttention();
     }
     return ge::GRAPH_FAILED;
@@ -450,17 +453,17 @@ ge::graphStatus QSMLAInfoParser::GetQkHeadDim()
 {
     // 获取qkHeadDim基准值
     // 以query的D维度为基准
-    qkHeadDim_ = GetAxisNum(qShape_, QSMLAAxis::D, qLayout_);
+    qsmlaQkHeadDim_ = GetAxisNum(qsmlaQShape_, QSMLAAxis::D, qsmlaQLayout_);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QSMLAInfoParser::GetSparseBlockCount()
 {
-    if (opParamInfo_.cmpSparseIndices.tensor != nullptr) {
-        cmpSparseBlockCount_ = GetAxisNum(cmpSparseIndicesShape_, QSMLAAxis::K, qLayout_);
+    if (qsmlaParams_.cmpSparseIndices.tensor != nullptr) {
+        qsmlaCmpSparseBlockCount_ = GetAxisNum(qsmlaCmpSparseIndicesShape_, QSMLAAxis::K, qsmlaQLayout_);
     }
-    if (opParamInfo_.oriSparseIndices.tensor != nullptr) {
-        oriSparseBlockCount_ = GetAxisNum(oriSparseIndicesShape_, QSMLAAxis::K, qLayout_);
+    if (qsmlaParams_.oriSparseIndices.tensor != nullptr) {
+        qsmlaOriSparseBlockCount_ = GetAxisNum(qsmlaOriSparseIndicesShape_, QSMLAAxis::K, qsmlaQLayout_);
     }
 
     return ge::GRAPH_SUCCESS;
@@ -468,19 +471,19 @@ ge::graphStatus QSMLAInfoParser::GetSparseBlockCount()
 
 ge::graphStatus QSMLAInfoParser::GetActualseqInfo()
 {
-    maxActualseq_ = s2Size_;
+    maxActualseq_ = qsmlaKvSeqSize_;
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QSMLAInfoParser::GetDSizeQ()
 {
-    dSizeQ_ = GetAxisNum(qShape_, QSMLAAxis::D, qLayout_);
+    qsmlaQueryDim_ = GetAxisNum(qsmlaQShape_, QSMLAAxis::D, qsmlaQLayout_);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus QSMLAInfoParser::GetDSizeKV()
 {
-    dSizeKV_ = GetAxisNum(oriKvShape_, QSMLAAxis::D, kvLayout_);
+    qsmlaKvDim_ = GetAxisNum(qsmlaOriKvShape_, QSMLAAxis::D, qsmlaKvLayout_);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -490,86 +493,86 @@ ge::graphStatus QSMLAInfoParser::GetKvstride()
     auto cmpKvStrides = context_->GetDynamicInputStride(CMP_KV_INDEX, 0);
     if (oriKvStrides != nullptr && oriKvStrides->GetDimNum() > 0) {
         for (size_t i = 0; i < oriKvStrides->GetDimNum(); i++) {
-            oriKvStridesVec_.push_back(oriKvStrides->GetStride(i));
+            qsmlaOriKvStrides_.push_back(oriKvStrides->GetStride(i));
         }
-        if (kvLayout_ == QSMLALayout::PA_BBND) {
-            oriKvStride_ = oriKvStrides->GetStride(0);
+        if (qsmlaKvLayout_ == QSMLALayout::PA_BBND) {
+            qsmlaOriKvStride_ = oriKvStrides->GetStride(0);
         }
-    } else if (kvLayout_ == QSMLALayout::PA_BBND) {
-        oriKvStride_ = oriBlockSize_ * n2Size_ * dSizeKV_;
+    } else if (qsmlaKvLayout_ == QSMLALayout::PA_BBND) {
+        qsmlaOriKvStride_ = qsmlaOriBlockSize_ * qsmlaKvHeads_ * qsmlaKvDim_;
     }
     if (cmpKvStrides != nullptr && cmpKvStrides->GetDimNum() > 0) {
         for (size_t i = 0; i < cmpKvStrides->GetDimNum(); i++) {
-            cmpKvStridesVec_.push_back(cmpKvStrides->GetStride(i));
+            qsmlaCmpKvStrides_.push_back(cmpKvStrides->GetStride(i));
         }
-        if (kvLayout_ == QSMLALayout::PA_BBND) {
-            cmpKvStride_ = cmpKvStrides->GetStride(0);
+        if (qsmlaKvLayout_ == QSMLALayout::PA_BBND) {
+            qsmlaCmpKvStride_ = cmpKvStrides->GetStride(0);
         }
-    } else if (kvLayout_ == QSMLALayout::PA_BBND) {
-        cmpKvStride_ = cmpBlockSize_ * n2Size_ * dSizeKV_;
+    } else if (qsmlaKvLayout_ == QSMLALayout::PA_BBND) {
+        qsmlaCmpKvStride_ = qsmlaCmpBlockSize_ * qsmlaKvHeads_ * qsmlaKvDim_;
     }
     return ge::GRAPH_SUCCESS;
 }
 
 void QSMLAInfoParser::GenerateInfo(QSMLATilingInfo &qsmlaInfo)
 {
-    qsmlaInfo.opName = opName_;
-    qsmlaInfo.platformInfo = platformInfo_;
-    qsmlaInfo.opParamInfo = opParamInfo_;
+    qsmlaInfo.opName = qsmlaOpName_;
+    qsmlaInfo.platformInfo = qsmlaPlatformInfo_;
+    qsmlaInfo.opParamInfo = qsmlaParams_;
     qsmlaInfo.socVersion = socVersion_;
     qsmlaInfo.npuArch = npuArch_;
 
-    qsmlaInfo.bSize = bSize_;
-    qsmlaInfo.n1Size = n1Size_;
-    qsmlaInfo.n2Size = n2Size_;
-    qsmlaInfo.s1Size = s1Size_;
-    qsmlaInfo.s2Size = s2Size_;
-    qsmlaInfo.cmpS2Size = cmpS2Size_;
-    qsmlaInfo.gSize = gSize_;
-    qsmlaInfo.qkHeadDim = qkHeadDim_;
-    qsmlaInfo.qTSize = qTSize_;
-    qsmlaInfo.oriSparseBlockCount = oriSparseBlockCount_;
-    qsmlaInfo.cmpSparseBlockCount = cmpSparseBlockCount_;
+    qsmlaInfo.bSize = qsmlaBatchSize_;
+    qsmlaInfo.n1Size = qsmlaQueryHeads_;
+    qsmlaInfo.n2Size = qsmlaKvHeads_;
+    qsmlaInfo.s1Size = qsmlaQuerySeqSize_;
+    qsmlaInfo.s2Size = qsmlaKvSeqSize_;
+    qsmlaInfo.cmpS2Size = qsmlaCmpKvSeqSize_;
+    qsmlaInfo.gSize = qsmlaGroupSize_;
+    qsmlaInfo.qkHeadDim = qsmlaQkHeadDim_;
+    qsmlaInfo.qTSize = qsmlaQueryTokenSize_;
+    qsmlaInfo.oriSparseBlockCount = qsmlaOriSparseBlockCount_;
+    qsmlaInfo.cmpSparseBlockCount = qsmlaCmpSparseBlockCount_;
 
-    qsmlaInfo.qType = qType_;
-    qsmlaInfo.oriKvType = oriKvType_;
-    qsmlaInfo.cmpKvType = cmpKvType_;
-    qsmlaInfo.outputType = outputType_;
-    qsmlaInfo.dSize = dSizeQ_;
+    qsmlaInfo.qType = qsmlaQType_;
+    qsmlaInfo.oriKvType = qsmlaOriKvType_;
+    qsmlaInfo.cmpKvType = qsmlaCmpKvType_;
+    qsmlaInfo.outputType = qsmlaOutputType_;
+    qsmlaInfo.dSize = qsmlaQueryDim_;
     qsmlaInfo.dSizeV = 512; // 512：V张量的维度大小
-    qsmlaInfo.dSizeVInput = dSizeKV_;
+    qsmlaInfo.dSizeVInput = qsmlaKvDim_;
 
     qsmlaInfo.totalBlockNum =
-        (opParamInfo_.oriKv.tensor != nullptr) ? opParamInfo_.oriKv.tensor->GetStorageShape().GetDim(0) : 0;
-    qsmlaInfo.sparseBlockSize = 1; // 写死为1
-    qsmlaInfo.oriBlockSize = oriBlockSize_;
-    qsmlaInfo.cmpBlockSize = cmpBlockSize_;
+        (qsmlaParams_.oriKv.tensor != nullptr) ? qsmlaParams_.oriKv.tensor->GetStorageShape().GetDim(0) : 0;
+    qsmlaInfo.sparseBlockSize = 1;
+    qsmlaInfo.oriBlockSize = qsmlaOriBlockSize_;
+    qsmlaInfo.cmpBlockSize = qsmlaCmpBlockSize_;
     qsmlaInfo.blockTypeSize = sizeof(float);
-    qsmlaInfo.oriMaxBlockNumPerBatch = oriMaxBlockNumPerBatch_;
-    qsmlaInfo.cmpMaxBlockNumPerBatch = cmpMaxBlockNumPerBatch_;
+    qsmlaInfo.oriMaxBlockNumPerBatch = qsmlaOriMaxBlocksPerBatch_;
+    qsmlaInfo.cmpMaxBlockNumPerBatch = qsmlaCmpMaxBlocksPerBatch_;
 
     qsmlaInfo.isSameSeqAllKVTensor = isSameSeqAllKVTensor_;
     qsmlaInfo.batchConsistency = batchConsistency_;
 
-    qsmlaInfo.quantMode = *opParamInfo_.quantMode;
-    qsmlaInfo.softmaxScale = *opParamInfo_.softmaxScale;
-    qsmlaInfo.oriKvStride = oriKvStride_;
-    qsmlaInfo.cmpKvStride = cmpKvStride_;
-    qsmlaInfo.oriKvStrides = oriKvStridesVec_;
-    qsmlaInfo.cmpKvStrides = cmpKvStridesVec_;
-    qsmlaInfo.oriKvStorageShape = oriKvShape_;
-    qsmlaInfo.cmpKvStorageShape = cmpKvShape_;
-    qsmlaInfo.cmpRatio = *opParamInfo_.cmpRatio;
-    qsmlaInfo.oriMaskMode = *opParamInfo_.oriMaskMode;
-    qsmlaInfo.cmpMaskMode = *opParamInfo_.cmpMaskMode;
-    qsmlaInfo.topkValueMode = *opParamInfo_.topkValueMode;
-    qsmlaInfo.oriWinLeft = *opParamInfo_.oriWinLeft;
-    qsmlaInfo.oriWinRight = *opParamInfo_.oriWinRight;
+    qsmlaInfo.quantMode = *qsmlaParams_.quantMode;
+    qsmlaInfo.softmaxScale = *qsmlaParams_.softmaxScale;
+    qsmlaInfo.oriKvStride = qsmlaOriKvStride_;
+    qsmlaInfo.cmpKvStride = qsmlaCmpKvStride_;
+    qsmlaInfo.oriKvStrides = qsmlaOriKvStrides_;
+    qsmlaInfo.cmpKvStrides = qsmlaCmpKvStrides_;
+    qsmlaInfo.oriKvStorageShape = qsmlaOriKvShape_;
+    qsmlaInfo.cmpKvStorageShape = qsmlaCmpKvShape_;
+    qsmlaInfo.cmpRatio = *qsmlaParams_.cmpRatio;
+    qsmlaInfo.oriMaskMode = *qsmlaParams_.oriMaskMode;
+    qsmlaInfo.cmpMaskMode = *qsmlaParams_.cmpMaskMode;
+    qsmlaInfo.topkValueMode = *qsmlaParams_.topkValueMode;
+    qsmlaInfo.oriWinLeft = *qsmlaParams_.oriWinLeft;
+    qsmlaInfo.oriWinRight = *qsmlaParams_.oriWinRight;
 
-    qsmlaInfo.qLayout = qLayout_;
-    qsmlaInfo.kvLayout = kvLayout_;
-    qsmlaInfo.outLayout = outLayout_;
-    qsmlaInfo.returnSoftmaxLse = (opParamInfo_.returnSoftmaxLse != nullptr) ? *opParamInfo_.returnSoftmaxLse : false;
+    qsmlaInfo.qLayout = qsmlaQLayout_;
+    qsmlaInfo.kvLayout = qsmlaKvLayout_;
+    qsmlaInfo.outLayout = qsmlaOutputLayout_;
+    qsmlaInfo.returnSoftmaxLse = (qsmlaParams_.returnSoftmaxLse != nullptr) ? *qsmlaParams_.returnSoftmaxLse : false;
 }
 
 ge::graphStatus QSMLAInfoParser::Parse(QSMLATilingInfo &qsmlaInfo)

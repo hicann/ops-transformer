@@ -217,8 +217,8 @@ __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::InitTilingData
     constInfo.oriWinLeft = tilingData->tqBaseParams.oriWinLeft;
     constInfo.oriWinRight = tilingData->tqBaseParams.oriWinRight;
 
-    constInfo.actualLenDimsQ = tilingData->tqBaseParams.actualLenDimsQ;
-    constInfo.actualLenDimsKV = tilingData->tqBaseParams.actualLenDimsKV;
+    constInfo.mqActualLenDimsQ = tilingData->tqBaseParams.actualLenDimsQ;
+    constInfo.mqActualLenDimsKV = tilingData->tqBaseParams.actualLenDimsKV;
     constInfo.returnSoftmaxLse = tilingData->tqBaseParams.returnSoftmaxLse;
     constInfo.kvQuantMode = tilingData->tqBaseParams.kvQuantMode;
     // innerSplitParams
@@ -254,11 +254,11 @@ template <typename SAST>
 __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::InitActualSeqLen(__gm__ uint8_t *actualSeqLengthsQ,
                                                                                    __gm__ uint8_t *actualSeqLengthsKV)
 {
-    if (constInfo.actualLenDimsKV != 0) {
-        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsKV, constInfo.actualLenDimsKV);
+    if (constInfo.mqActualLenDimsKV != 0) {
+        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsKV, constInfo.mqActualLenDimsKV);
     }
-    if (constInfo.actualLenDimsQ != 0) {
-        actualSeqLengthsQGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsQ, constInfo.actualLenDimsQ);
+    if (constInfo.mqActualLenDimsQ != 0) {
+        actualSeqLengthsQGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsQ, constInfo.mqActualLenDimsQ);
     }
 }
 
@@ -266,12 +266,12 @@ template <typename SAST>
 __aicore__ inline void MixedQuantSparseFlashMlaTqCsaKernel<SAST>::InitActualSeqLen(
     __gm__ uint8_t *actualSeqLengthsQ, __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *actualSeqLengthsCmpKV)
 {
-    if (constInfo.actualLenDimsKV != 0) {
-        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsKV, constInfo.actualLenDimsKV);
-        actualSeqLengthsCmpKVGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsCmpKV, constInfo.actualLenDimsKV);
+    if (constInfo.mqActualLenDimsKV != 0) {
+        actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsKV, constInfo.mqActualLenDimsKV);
+        actualSeqLengthsCmpKVGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsCmpKV, constInfo.mqActualLenDimsKV);
     }
-    if (constInfo.actualLenDimsQ != 0) {
-        actualSeqLengthsQGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsQ, constInfo.actualLenDimsQ);
+    if (constInfo.mqActualLenDimsQ != 0) {
+        actualSeqLengthsQGm.SetGlobalBuffer((__gm__ int32_t *)actualSeqLengthsQ, constInfo.mqActualLenDimsQ);
     }
 }
 
@@ -335,7 +335,7 @@ __aicore__ inline int32_t MixedQuantSparseFlashMlaTqCsaKernel<SAST>::GetActualSe
         return actualSeqQNextSum - actualSeqQPrefixSum;
     } else {
         tempLoopInfo.actualSeqQPrefixSum = static_cast<uint64_t>(bIdx * constInfo.qSeqSize);
-        if (constInfo.actualLenDimsQ == 0) {
+        if (constInfo.mqActualLenDimsQ == 0) {
             return static_cast<int32_t>(constInfo.qSeqSize);
         } else {
             return actualSeqLengthsQGm.GetValue(bIdx);
@@ -348,7 +348,7 @@ __aicore__ inline int32_t MixedQuantSparseFlashMlaTqCsaKernel<SAST>::GetActualSe
 {
     if constexpr (PAGE_ATTENTION) {
         tempLoopInfo.actualSeqKVPrefixSum = static_cast<uint64_t>(bIdx * constInfo.kvSeqSize);
-        if (constInfo.actualLenDimsKV == 0) {
+        if (constInfo.mqActualLenDimsKV == 0) {
             return static_cast<int32_t>(constInfo.kvSeqSize);
         }
         return actualSeqLengthsKVGm.GetValue(bIdx);
