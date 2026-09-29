@@ -512,56 +512,27 @@ class SymmBuffer:
         return tensor[: size.numel()].view(size)
 
     def update_group(self, group) -> None:
-        """Destroy the old links after a replacement context has been created."""
+        """Update the communication group without changing the context address."""
         self._check_mask_buffer_supported()
         rank_id = torch.distributed.get_rank(group)
         group_name = group._get_backend(torch.device("npu")).get_hccl_comm_name(
             rank_id, init_comm=True
         )
         ep_world_size = torch.distributed.get_world_size(group)
-        ccl_buffer_size_params = _MegaMoeCclBufferSizeParams(
-            ep_world_size=ep_world_size,
-            moe_expert_num=self.num_experts,
-            num_max_tokens_per_rank=self.num_max_tokens_per_rank,
-            num_topk=self.num_topk,
-            hidden=self.hidden,
-            max_recv_token_num=self.max_recv_token_num,
-            dispatch_quant_mode=self.dispatch_quant_mode,
-            dispatch_quant_out_dtype=self.dispatch_quant_out_dtype,
-            combine_quant_mode=self.combine_quant_mode,
-            comm_alg=self.comm_alg,
-            combine_comm_mode=self.combine_comm_mode,
-            topk_weights_type=self.topk_weights_type,
-        )
-        required_ccl_buffer_size = ccl_buffer_size_params()
-        new_manager = CommContextManager(
-            group_name,
-            ep_world_size,
-            backend={
-                "Ascend910B": "kfc",
-                "Ascend910_93": "kfc",
-                "Ascend950": "channel",
-            },
-            customCclBufferSize=required_ccl_buffer_size,
-            customCclBufferSizeResolver=ccl_buffer_size_params,
-        )
-        try:
-            new_context = new_manager.create_context()
-        except Exception:
-            new_manager.destroy()
-            raise
+        if ep_world_size != self.ep_world_size:
+            raise ValueError(
+                "The new group world size must match the original ep_world_size "
+                f"{self.ep_world_size}, got {ep_world_size}."
+            )
 
-        old_manager = self._ctx_manager
+        self._ctx_manager.update_group(group_name, self.context)
+
         self.group = group
         self.rank_id = rank_id
         self.group_name = group_name
-        self.ep_world_size = ep_world_size
-        self._ctx_manager = new_manager
-        self.context = new_context
-        self.ccl_buffer_size = new_manager.ccl_buffer_size
-        self.topo_type = new_manager.topo_type
-        self.rank_num_per_server = new_manager.rank_num_per_server
-        old_manager.destroy()
+        self.ccl_buffer_size = self._ctx_manager.ccl_buffer_size
+        self.topo_type = self._ctx_manager.topo_type
+        self.rank_num_per_server = self._ctx_manager.rank_num_per_server
 
 
 _TORCH_DTYPE_TO_INT = {  # torch枚举

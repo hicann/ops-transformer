@@ -655,7 +655,7 @@ sym_buffer.update_group(group) -> None
 
 - `clean_mask_buffer` 在当前 NPU stream 上将本地掩码的所有元素清零；各 rank 需要分别调用，跨 rank 的一致性仍由调用者保证。掩码尚未创建时，接口会创建全 0 掩码。
 - `get_local_buffer_tensor` 将当前 Rank 的本地 CCL Buffer 零拷贝包装为 NPU Tensor。`offset` 以 `dtype` 元素为单位，`size` 为 `None` 时返回从 `offset` 到 Buffer 末尾的一维视图，否则返回指定 shape。返回 Tensor 不持有底层内存，其生命周期不得超过 `SymmBuffer`；调用 `update_group` 后旧视图失效，必须重新获取。调用者写入原始通信 Buffer 前必须保证相关算子已经执行完成，并确保写入范围正确。
-- `update_group` 使用新 group 完整重建通信链路；旧通信链路的算子执行完成以及新 group 与现有 mask shape 的一致性需要调用者保证。如需清除失能状态，应显式调用 `clean_mask_buffer`。
+- `update_group` 使用新 group 原地更新 `context`，不会改变 `context` Tensor 的地址，以便已捕获的图继续复用。新 group 的 world size 必须与原通信域一致，旧通信链路的算子执行完成需要调用者保证。如需清除失能状态，应显式调用 `clean_mask_buffer`。
 
 ## 参数说明
 
