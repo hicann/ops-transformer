@@ -21,6 +21,8 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
+        # md 保留行尾双空格（markdown 硬换行语法），其余尾随空白照删
+        args: ["--markdown-linebreak-ext=md"]
       - id: end-of-file-fixer
       - id: check-yaml
         args: ["--allow-multiple-documents"]
@@ -57,6 +59,8 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
+        # 包装 entry：输出 tee 到 pre-commit_reports/codespell.log（仍跑在托管 venv）
+        entry: bash scripts/run_codespell.sh
         args: [
             "-L",
             "CANN,cann,NNAL,nnal,ASCEND,ascend,EnQue,CopyIn,ArchType,AND,ND,tbe,copyin,alog,wIh,dout,indexs,inH,padD,outWeight",

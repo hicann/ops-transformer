@@ -75,6 +75,8 @@ git commit --no-verify -m "msg"
 
 搜索输出中的 `Failed` 定位失败项，查看该 hook 下方输出处理，或粘贴给 AI 获取修复建议。
 
+拦截类钩子的报告同时落盘在 `pre-commit_reports/`（不入 git）：`codespell.log`（拼写命中清单）、`oat_result.txt`（合规违规明细），可随时复查。
+
 | 报错                  | 原因               | 处理方式                                          |
 |-----------------------|--------------------|---------------------------------------------------|
 | clang-format Failed   | 代码存在规范问题 | 钩子会自动修复文件，重新 `git add` 后再次 commit 即可 |
@@ -94,7 +96,7 @@ git pc <commit>^     # 某一笔提交
 ## 七、检查项说明
 
 1. **pre-commit-hooks** (v4.6.0)：trailing-whitespace、end-of-file-fixer、check-yaml/json、check-added-large-files、check-merge-conflict、detect-private-key
-2. **clang-format** (v18.1.8)：遵循项目 `.clang-format`（Google 风格，4 空格缩进，不限列宽不自动拆行，枚举逐行，构造函数初始化列表逐行换行，函数定义大括号换行，指针右对齐 `int *ptr`）
+2. **clang-format** (v18.1.8)：遵循项目 `.clang-format`（Google 风格，4 空格缩进，不限列宽不自动拆行，枚举逐行，构造函数初始化列表逐行换行，函数定义大括号换行，指针左对齐 `int* ptr`）
 3. **ruff** (v0.14.14)：ruff-check（`--fix` 自动修复）+ ruff-format
 4. **codespell** (v2.4.1)：拼写检查，CANN、ascend、EnQue 等术语已加白名单
 5. **OAT**：基于 oat-py，检查许可证头（YAML/CSV 已豁免）、禁止二进制和归档文件
