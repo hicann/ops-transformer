@@ -54,8 +54,8 @@ public:
     __aicore__ inline MoeDistributeDispatchTeardown(){};
     __aicore__ inline void Init(GM_ADDR context, GM_ADDR x, GM_ADDR y, GM_ADDR expertIds, GM_ADDR commCmdInfo,
                                 GM_ADDR expandXOut, GM_ADDR dynamicScalesOut, GM_ADDR assistInfoForCombineOut,
-                                GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, TPipe *pipe,
-                                const MoeDistributeDispatchTeardownTilingData *tilingData);
+                                GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM, TPipe* pipe,
+                                const MoeDistributeDispatchTeardownTilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -64,17 +64,17 @@ private:
     __aicore__ __attribute__((noinline)) void LocalWindowCopyPipeline();
     __aicore__ inline void WaitDispatch();
     __aicore__ inline void FlipDataState();
-    __aicore__ inline void GetCumSum(LocalTensor<int32_t> &outLocal, uint32_t totalCount);
+    __aicore__ inline void GetCumSum(LocalTensor<int32_t>& outLocal, uint32_t totalCount);
     __aicore__ inline void UpdateTokenNumsOut();
     __aicore__ inline void UpdateMultiMoeTokenNumsOut();
     __aicore__ inline void QuantInit();
-    __aicore__ inline void CopyScalesToOut(uint32_t currentTokenIndex, LocalTensor<ExpandXOutType> &quantTok);
-    __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId,
-                                       uint32_t &endTokenId, uint32_t &sendTokenNum, bool isFront = true);
-    __aicore__ inline void FillTriple(LocalTensor<ExpandXOutType> &xOutTensor, uint32_t tokenIndex, uint32_t k);
-    __aicore__ inline void SyncCntOnCore(LocalTensor<float> &gatherMaskOutTensor,
-                                         LocalTensor<uint32_t> &gatherTmpTensor,
-                                         LocalTensor<float> &statusSumOutTensor);
+    __aicore__ inline void CopyScalesToOut(uint32_t currentTokenIndex, LocalTensor<ExpandXOutType>& quantTok);
+    __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startTokenId,
+                                       uint32_t& endTokenId, uint32_t& sendTokenNum, bool isFront = true);
+    __aicore__ inline void FillTriple(LocalTensor<ExpandXOutType>& xOutTensor, uint32_t tokenIndex, uint32_t k);
+    __aicore__ inline void SyncCntOnCore(LocalTensor<float>& gatherMaskOutTensor,
+                                         LocalTensor<uint32_t>& gatherTmpTensor,
+                                         LocalTensor<float>& statusSumOutTensor);
     __aicore__ inline GM_ADDR GetWindAddrByRankId(const int32_t rankId)
     {
         return (GM_ADDR)(mc2Context_->epHcclBuffer_[rankId] + STATE_SIZE + winDataSizeOffset_);
@@ -100,7 +100,7 @@ private:
         return iter1AlignEnd;
     }
 
-    TPipe *tpipe_{nullptr};
+    TPipe* tpipe_{nullptr};
     GlobalTensor<XType> xGMTensor_;
     GlobalTensor<ExpandXOutType> expandXOutGMTensor_;
     GlobalTensor<uint8_t> dynamicScalesOutGMTensor_;
@@ -171,7 +171,7 @@ private:
     uint32_t remainderRankNum_{0};
     uint32_t startStatusIndex_{0};
     uint32_t scaleOutBytes_{0};
-    __gm__ Mc2MoeContext *mc2Context_{nullptr};
+    __gm__ Mc2MoeContext* mc2Context_{nullptr};
 
     DataCopyExtParams floatDataCopyParams_;
     DataCopyExtParams expandXCopyParams_;
@@ -182,13 +182,13 @@ template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Init(
     GM_ADDR context, GM_ADDR x, GM_ADDR y, GM_ADDR expertIds, GM_ADDR commCmdInfo, GM_ADDR expandXOut,
     GM_ADDR dynamicScalesOut, GM_ADDR assistInfoForCombineOut, GM_ADDR expertTokenNumsOut, GM_ADDR workspaceGM,
-    TPipe *pipe, const MoeDistributeDispatchTeardownTilingData *tilingData)
+    TPipe* pipe, const MoeDistributeDispatchTeardownTilingData* tilingData)
 {
     tpipe_ = pipe;
     aivId_ = GetBlockIdx();
     aivNum_ = tilingData->moeDistributeDispatchTeardownInfo.aivNum;
     auto contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-    mc2Context_ = (__gm__ Mc2MoeContext *)context;
+    mc2Context_ = (__gm__ Mc2MoeContext*)context;
     // 与 setup/combine 保持一致，统一从 Mc2MoeContext 取 epRankId，避免 tiling 与 context 不一致导致等/清错 buffer
     epRankId_ = mc2Context_->epRankId;
 
@@ -196,7 +196,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Init(
     GlobalTensor<int32_t> selfDataStatusTensor;
     GM_ADDR statusDataSpaceGm = (GM_ADDR)(mc2Context_->epHcclBuffer_[epRankId_]);
     dataStateGM_ = statusDataSpaceGm + STATE_WIN_OFFSET + aivId_ * WIN_ADDR_ALIGN + CTRL_DISPATCH_STATE_OFFSET;
-    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t *)dataStateGM_);
+    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t*)dataStateGM_);
 
     axisBS_ = tilingData->moeDistributeDispatchTeardownInfo.bs;
     axisH_ = tilingData->moeDistributeDispatchTeardownInfo.h;
@@ -212,10 +212,10 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Init(
     moeExpertRankNum_ = epWorldSize_ - sharedExpertRankNum_;
     moeExpertNumPerRank_ = moeExpertNum_ / moeExpertRankNum_;
     axisK_ = tilingData->moeDistributeDispatchTeardownInfo.k;
-    xGMTensor_.SetGlobalBuffer((__gm__ XType *)x);
-    expandXOutGMTensor_.SetGlobalBuffer((__gm__ ExpandXOutType *)expandXOut);
-    dynamicScalesOutGMTensor_.SetGlobalBuffer((__gm__ uint8_t *)dynamicScalesOut);
-    expertTokenNumsOutGMTensor_.SetGlobalBuffer((__gm__ int64_t *)expertTokenNumsOut);
+    xGMTensor_.SetGlobalBuffer((__gm__ XType*)x);
+    expandXOutGMTensor_.SetGlobalBuffer((__gm__ ExpandXOutType*)expandXOut);
+    dynamicScalesOutGMTensor_.SetGlobalBuffer((__gm__ uint8_t*)dynamicScalesOut);
+    expertTokenNumsOutGMTensor_.SetGlobalBuffer((__gm__ int64_t*)expertTokenNumsOut);
     expandXOutGM_ = expandXOut;
     sendCountsOutGM_ = assistInfoForCombineOut; // 无GlobalTensor
     dynamicScalesOutGM_ = dynamicScalesOut;
@@ -266,7 +266,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Init(
     winDataSizeOffset_ = dataState_ * (tilingData->moeDistributeDispatchTeardownInfo.totalWinSize / 4);
     tempTotalWinSize_ = tilingData->moeDistributeDispatchTeardownInfo.totalWinSize;
     windowGM_ = GetWindAddrByRankId(epRankId_);
-    windowInstatusFp32Tensor_.SetGlobalBuffer((__gm__ float *)(statusSpaceGm_));
+    windowInstatusFp32Tensor_.SetGlobalBuffer((__gm__ float*)(statusSpaceGm_));
     hOutAlignUbSize_ = Ceil(hOutSizeAlign_, UB_ALIGN) * UB_ALIGN;
     tpipe_->InitBuffer(xQueue_, BUFFER_NUM, hOutAlignUbSize_); // 7k*2 + 32 + 6
     expertIdsCnt_ = axisBS_ * axisK_;
@@ -307,7 +307,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Quant
 
 template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::CopyScalesToOut(
-    uint32_t currentTokenIndex, LocalTensor<ExpandXOutType> &quantTok)
+    uint32_t currentTokenIndex, LocalTensor<ExpandXOutType>& quantTok)
 {
     DataCopyParams scaleOutParams = {1U, static_cast<uint16_t>(scaleOutBytes_), 0U, 0U};
     if constexpr ((QuantMode > UNQUANT) && (QuantMode != STATIC_QUANT)) {
@@ -323,7 +323,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::CopyS
 
 template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::SplitToCore(
-    uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId, uint32_t &endTokenId, uint32_t &sendTokenNum,
+    uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startTokenId, uint32_t& endTokenId, uint32_t& sendTokenNum,
     bool isFront)
 {
     sendTokenNum = curSendCnt / curUseAivNum;               // 每个aiv需要发送的token数
@@ -346,8 +346,8 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Split
 
 template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::SyncCntOnCore(
-    LocalTensor<float> &gatherMaskOutTensor, LocalTensor<uint32_t> &gatherTmpTensor,
-    LocalTensor<float> &statusSumOutTensor)
+    LocalTensor<float>& gatherMaskOutTensor, LocalTensor<uint32_t>& gatherTmpTensor,
+    LocalTensor<float>& statusSumOutTensor)
 {
     gatherTmpTensor.SetValue(0, 2); // 源操作数每个datablock取下标为1的元素
     uint32_t mask = 2;              // 源操作数每个datablock只需要处理两个元素
@@ -367,9 +367,9 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::SyncC
 
     // 把当前核的所有专家的recv cnt之和写到workspace
     uint32_t coreOffset = WORKSPACE_ELEMENT_OFFSET * aivNum_;
-    GM_ADDR wAddr = (__gm__ uint8_t *)(recvCntWorkspaceGM_) + coreOffset * aivId_; // 写workspace需要按照512字节对齐
+    GM_ADDR wAddr = (__gm__ uint8_t*)(recvCntWorkspaceGM_) + coreOffset * aivId_; // 写workspace需要按照512字节对齐
     GlobalTensor<int32_t> sumTensor;
-    sumTensor.SetGlobalBuffer((__gm__ int32_t *)wAddr);
+    sumTensor.SetGlobalBuffer((__gm__ int32_t*)wAddr);
     uint16_t workCoreNum = MIN(recvWinBlockNum_, aivNum_);
     // 每个核把sumOfRecvCnt重复写workCoreNum份
     LocalTensor<int32_t> sumCoreTensor = sumCoreBuf_.Get<int32_t>();
@@ -438,21 +438,21 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::FlipD
 {
     // WaitDispatch 成功后再切换 D_S，供下一轮 dispatch_setup 使用（不影响 C_S）
     GlobalTensor<int32_t> selfDataStatusTensor;
-    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t *)dataStateGM_);
+    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t*)dataStateGM_);
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(selfDataStatusTensor);
     selfDataStatusTensor(0) = static_cast<int32_t>(1U - dataState_);
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(selfDataStatusTensor);
 }
 
 template <TemplateMC2TypeClass>
-__aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::GetCumSum(LocalTensor<int32_t> &outLocal,
+__aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::GetCumSum(LocalTensor<int32_t>& outLocal,
                                                                                      uint32_t totalCount)
 {
     outLocal = gatherMaskOutBuf_.Get<int32_t>();
     // 获取workspace中每个核的recvcnt
-    GM_ADDR wAddr = (__gm__ uint8_t *)(recvCntWorkspaceGM_) + WORKSPACE_ELEMENT_OFFSET * aivId_;
+    GM_ADDR wAddr = (__gm__ uint8_t*)(recvCntWorkspaceGM_) + WORKSPACE_ELEMENT_OFFSET * aivId_;
     GlobalTensor<int32_t> sumTensor;
-    sumTensor.SetGlobalBuffer((__gm__ int32_t *)wAddr);
+    sumTensor.SetGlobalBuffer((__gm__ int32_t*)wAddr);
 
     // 不支持allgather场景，只需要拷贝totalCount个核的recv cnt
     uint16_t copySumNum = totalCount;
@@ -512,15 +512,15 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Local
                 winOffset = index % epWorldSize_ * moeExpertNumPerRank_ + index / epWorldSize_;
             }
         }
-        GM_ADDR wAddr = (__gm__ uint8_t *)(windowGM_) + winOffset * expertPerSizeOnWin_;
+        GM_ADDR wAddr = (__gm__ uint8_t*)(windowGM_) + winOffset * expertPerSizeOnWin_;
         GlobalTensor<ExpandXOutType> tokGlobal;
         GlobalTensor<ExpandXOutType> expandXOutGlobal;
         tokGlobal.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-        tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType *)(wAddr));
+        tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(wAddr));
         DataCacheCleanAndInvalid<ExpandXOutType, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(tokGlobal);
         LocalTensor<int32_t> xTmpTensorInt;
         for (uint32_t j = 0; j < count; j++) {
-            tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType *)(wAddr + j * hAlignWinSize_));
+            tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(wAddr + j * hAlignWinSize_));
             // 将数据从Window拷贝到UB
             xTmpTensor_ = xQueue_.AllocTensor<ExpandXOutType>();
             DataCopyPad(xTmpTensor_, tokGlobal, hCommuCopyOutParams_, copyPadParams);
@@ -529,8 +529,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Local
             xTmpTensor_ = xQueue_.DeQue<ExpandXOutType>();
             xTmpTensorInt = xTmpTensor_.template ReinterpretCast<int32_t>();
             CopyScalesToOut(beginIdx + j, xTmpTensor_);
-            expandXOutGlobal.SetGlobalBuffer((__gm__ ExpandXOutType *)(expandXOutGM_) + (beginIdx + j) * axisH_,
-                                             axisH_);
+            expandXOutGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(expandXOutGM_) + (beginIdx + j) * axisH_, axisH_);
             DataCopyPad(expandXOutGlobal, xTmpTensor_, expandXCopyParams_);
             xQueue_.FreeTensor(xTmpTensor_);
         }
@@ -539,7 +538,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Local
     totalCnt_ = beginIdx;
     lastCore_ = MIN(rscvStatusNum_, aivNum_) - 1;
     GlobalTensor<int32_t> sendCountsGlobal;
-    sendCountsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(sendCountsOutGM_));
+    sendCountsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sendCountsOutGM_));
     DataCopyPad(sendCountsGlobal[startExpertId_], outCountLocal, dataCopyOutParams);
     PipeBarrier<PIPE_MTE3>();
 }
@@ -554,8 +553,8 @@ __aicore__ __attribute__((noinline)) void MoeDistributeDispatchTeardown<Template
     GetCumSum(outCountLocal, aivId_);
     uint32_t beginIdx = outCountLocal.GetValue(0);
     statusTensor_ = waitStatusBuf_.Get<int32_t>();
-    DataCopyPadExtParams<ExpandXOutType> copyPadExtParams{false, 0U, 0U,
-                                                          *reinterpret_cast<ExpandXOutType *>(uint8_t(0))};
+    // 与 LocalWindowCopy 一致：hCommuCopyOutParams_ 是 DataCopyParams，pad 必须用 DataCopyPadParams
+    DataCopyPadParams copyPadParams{false, 0U, 0U, 0U};
     DataCopyExtParams dataCopyOutParams{1U, static_cast<uint32_t>(sendExpertNum_ * sizeof(int32_t)), 0U, 0U, 0U};
     for (uint32_t index = startExpertId_; index < endExpertId_; index++) {
         uint32_t i = index - startExpertId_;
@@ -567,27 +566,27 @@ __aicore__ __attribute__((noinline)) void MoeDistributeDispatchTeardown<Template
                 winOffset = index % epWorldSize_ * moeExpertNumPerRank_ + index / epWorldSize_;
             }
         }
-        GM_ADDR wAddr = (__gm__ uint8_t *)(windowGM_) + winOffset * expertPerSizeOnWin_;
+        GM_ADDR wAddr = (__gm__ uint8_t*)(windowGM_) + winOffset * expertPerSizeOnWin_;
         GlobalTensor<ExpandXOutType> tokGlobal;
         GlobalTensor<ExpandXOutType> expandXOutGlobal;
         tokGlobal.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
-        tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType *)(wAddr));
+        tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(wAddr));
         DataCacheCleanAndInvalid<ExpandXOutType, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(tokGlobal);
         if (count > 0U) {
-            tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType *)(wAddr));
+            tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(wAddr));
             LocalTensor<ExpandXOutType> preTok = xQueue_.AllocTensor<ExpandXOutType>();
-            DataCopyPad(preTok, tokGlobal, hCommuCopyOutParams_, copyPadExtParams);
+            DataCopyPad(preTok, tokGlobal, hCommuCopyOutParams_, copyPadParams);
             xQueue_.EnQue(preTok);
             for (uint32_t j = 0; j < count; j++) {
                 xTmpTensor_ = xQueue_.DeQue<ExpandXOutType>();
                 if (j + 1U < count) {
-                    tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType *)(wAddr + (j + 1U) * hAlignWinSize_));
+                    tokGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(wAddr + (j + 1U) * hAlignWinSize_));
                     LocalTensor<ExpandXOutType> nextTok = xQueue_.AllocTensor<ExpandXOutType>();
-                    DataCopyPad(nextTok, tokGlobal, hCommuCopyOutParams_, copyPadExtParams);
+                    DataCopyPad(nextTok, tokGlobal, hCommuCopyOutParams_, copyPadParams);
                     xQueue_.EnQue(nextTok);
                 }
                 CopyScalesToOut(beginIdx + j, xTmpTensor_);
-                expandXOutGlobal.SetGlobalBuffer((__gm__ ExpandXOutType *)(expandXOutGM_) + (beginIdx + j) * axisH_,
+                expandXOutGlobal.SetGlobalBuffer((__gm__ ExpandXOutType*)(expandXOutGM_) + (beginIdx + j) * axisH_,
                                                  axisH_);
                 DataCopyPad(expandXOutGlobal, xTmpTensor_, expandXCopyParams_);
                 xQueue_.FreeTensor(xTmpTensor_);
@@ -598,7 +597,7 @@ __aicore__ __attribute__((noinline)) void MoeDistributeDispatchTeardown<Template
     totalCnt_ = beginIdx;
     lastCore_ = MIN(rscvStatusNum_, aivNum_) - 1;
     GlobalTensor<int32_t> sendCountsGlobal;
-    sendCountsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(sendCountsOutGM_));
+    sendCountsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sendCountsOutGM_));
     DataCopyPad(sendCountsGlobal[startExpertId_], outCountLocal, dataCopyOutParams);
     PipeBarrier<PIPE_MTE3>();
 }
@@ -609,7 +608,7 @@ __aicore__ inline void MoeDistributeDispatchTeardown<TemplateMC2TypeFunc>::Updat
 {
     uint32_t tokenSums = 0;
     GlobalTensor<int32_t> sendCountsGlobal;
-    sendCountsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(sendCountsOutGM_));
+    sendCountsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sendCountsOutGM_));
     for (uint32_t localMoeIndex = 0; localMoeIndex < moeExpertNumPerRank_; ++localMoeIndex) {
         if (localMoeIndex == 0) {
             DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(
