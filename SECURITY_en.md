@@ -27,11 +27,11 @@ The public network addresses included in this project code are as follows:
 
 | Type | Open Source Code Address | File Name | Public Network IP Address/Public URL Address/Domain Name/Email Address/Compressed File Address | Usage Description |
 | :------------: |:------------------------------------------------------------------------------------------:|:----------------------------------------------------------| :---------------------------------------------------------- |:-----------------------------------------|
-| Dependency | Not applicable | cmake/third_party/makeself-fetch.cmake | https://gitcode.com/cann-src-third-party/makeself/releases/download/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz | Download makeself source code from gitcode, used as a compilation dependency |
-| Dependency | Not applicable | cmake/third_party/protobuf.cmake | https://github.com/protocolbuffers/protobuf/archive/v25.1.tar.gz | Download protobuf source code from github, used as a compilation dependency |
-| Dependency | Not applicable | cmake/third_party/json.cmake | https://gitcode.com/cann-src-third-party/json/releases/download/v3.11.3/include.zip | Download JSON source code from gitcode, used as a compilation dependency |
-| Dependency | Not applicable | cmake/third_party/gtest.cmake | https://github.com/google/googletest/archive/release-1.8.0.tar.gz | Download googletest source code from github, used as a compilation dependency |
-| Dependency | Not applicable | cmake/third_party/secure_c.cmake | https://gitee.com/openeuler/libboundscheck/repository/archive/v1.1.10.tar.gz | Download libboundscheck source code from gitee, used as a compilation dependency |
+| Dependency | Not applicable | cmake/third_party/makeself-fetch.cmake | [https://gitcode.com/cann-src-third-party/makeself/releases/download/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz](https://gitcode.com/cann-src-third-party/makeself/releases/download/release-2.5.0-patch1.0/makeself-release-2.5.0-patch1.tar.gz)| Download makeself source code from gitcode, used as a compilation dependency |
+| Dependency | Not applicable | cmake/third_party/protobuf.cmake | [https://github.com/protocolbuffers/protobuf/archive/v25.1.tar.gz](https://github.com/protocolbuffers/protobuf/archive/v25.1.tar.gz) | Download protobuf source code from github, used as a compilation dependency |
+| Dependency | Not applicable | cmake/third_party/json.cmake | [https://gitcode.com/cann-src-third-party/json/releases/download/v3.11.3/include.zip](https://gitcode.com/cann-src-third-party/json/releases/download/v3.11.3/include.zip) | Download JSON source code from gitcode, used as a compilation dependency |
+| Dependency | Not applicable | cmake/third_party/gtest.cmake |[https://github.com/google/googletest/archive/release-1.8.0.tar.gz](https://github.com/google/googletest/archive/release-1.8.0.tar.gz)| Download googletest source code from github, used as a compilation dependency |
+| Dependency | Not applicable | cmake/third_party/secure_c.cmake |[https://gitee.com/openeuler/libboundscheck/repository/archive/v1.1.10.tar.gz](https://gitee.com/openeuler/libboundscheck/repository/archive/v1.1.10.tar.gz)| Download libboundscheck source code from gitee, used as a compilation dependency |
 
 ## Vulnerability Mechanism Description
 

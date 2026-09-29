@@ -275,21 +275,21 @@
 
       - **计算过程**
         - 1.根据groupList[i]确定当前分组的 token ，$i \in [0,Len(groupList)]$
- 	 
- 	      - 2.根据分组确定的入参进行如下计算：
- 	 
- 	           $C_{i} = (X_{i}\cdot W_{i} )\odot xScale_{i} \odot wScale_{i}$
- 	 
- 	           $C_{i,act}, gate_{i} = split(C_{i})$
- 	 
- 	           $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
+ 
+        - 2.根据分组确定的入参进行如下计算：
+ 
+             $C_{i} = (X_{i}\cdot W_{i} )\odot xScale_{i} \odot wScale_{i}$
+ 
+             $C_{i,act}, gate_{i} = split(C_{i})$
+ 
+            $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
- 	           其中,$xScale_{i}$代表的是对应token对应的量化因子
- 	      - 3.量化输出结果
+             其中,$xScale_{i}$代表的是对应token对应的量化因子
+        - 3.量化输出结果
 
- 	           $Q\_scale_{i} = \frac{max(|S_{i}|)}{max(type)}$
+             $Q\_scale_{i} = \frac{max(|S_{i}|)}{max(type)}$
 
- 	           $Q_{i} = \lfloor \frac{S_{i}}{Q\_scale_{i}} \rceil$
+             $Q_{i} = \lfloor \frac{S_{i}}{Q\_scale_{i}} \rceil$
     </details>
 
 ## 函数原型

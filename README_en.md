@@ -33,7 +33,7 @@ Note that to ensure your source code customization development proceeds smoothly
 
 If you want to **understand and quickly experience the project from zero to one**, visit the following documents. You can first learn about the project operator information, and then try operator invocation, development, contribution, and so on.
 
-1. [Operator List](docs/en/op_list.md): Full operator information of the project for quick querying.
+1. [Operator List](./docs/zh/op_api_list_en.md): Full operator information of the project for quick querying.
 2. [QuickStart](QUICKSTART_en.md): Provides a simplified quick start guide **based on WebIDE or Docker environments**, including environment setup, compilation and deployment, operator invocation/development/debugging, contribution, and so on.
 
     > **Note**: Whether using WebIDE or Docker environments, the latest commercially released CANN software package is provided by default, which is currently CANN 8.5.0. If you want to manually install the CANN package or experience the latest capabilities of the master branch, refer to the steps in [Learning Tutorial](#learning-tutorial) to complete environment setup, compilation and execution, operator development, and other operations.

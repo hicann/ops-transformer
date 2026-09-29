@@ -30,8 +30,8 @@ The full project documents are as follows. Obtain the corresponding content as n
 
 | Document | Description |
 | ------------------------------------------------ | ------------------------------------------------------------ |
-| [Operator List](en/op_list.md) | Introduces the list of all operators included in the project. |
-| [aclnn List](en/op_api_list.md) | Introduces all operator APIs included in the project. Operators can be directly invoked through this API. |
+| [Operator List](zh/op_list.md) | Introduces the list of all operators included in the project. |
+| [aclnn List](zh/op_api_list_en.md) | Introduces all operator APIs included in the project. Operators can be directly invoked through this API. |
 | [Environment Deployment](en/context/quick_install.md) | Introduces the basic environment setup process, including the acquisition and installation of software packages and third-party dependencies for different scenarios. |
 | [Operator Invocation](en/invocation/quick_op_invocation.md) | Introduces how to compile source code and execute operators, including operator package compilation, operator sample execution, UT execution, and so on for different scenarios. |
 | [Operator Development](en/develop/aicore_develop_guide.md) | Introduces how to develop new operators based on this project, including operator prototype definition, Tiling implementation, Kernel implementation, and so on. |

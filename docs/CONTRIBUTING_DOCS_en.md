@@ -182,7 +182,7 @@ None
 <tbody>
   <tr>
     <td>aclnn Invocation</td>
-    <td><a href="../examples/add_example/examples/test_aclnn_add_example_en.cpp">test_aclnn_add_example</a></td>
+    <td><a href="../examples/add_example/examples/test_aclnn_add_example.cpp">test_aclnn_add_example</a></td>
     <td rowspan="2">Refer to [Operator Invocation](./en/invocation/quick_op_invocation.md) to complete operator compilation and verification.</td>
   </tr>
 </tbody>

@@ -35,7 +35,7 @@ For users without an environment, use the WebIDE development platform directly, 
 
 2. Follow the page prompts to create and start a cloud development environment. Click "`Connect > WebIDE`" to enter the one-stop operator development platform. The open-source project resources are in the `/mnt/workspace` directory by default.
 
-  <!--  <img src="docs/en/figures/webIDE.png" alt="Cloud Platform" width="1000px" height="150px"> -->
+    <!--  <img src="docs/en/figures/webIDE.png" alt="Cloud Platform" width="1000px" height="150px"> -->
 
 3. Check whether the environment is complete.
 
