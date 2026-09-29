@@ -359,12 +359,13 @@ aclnnStatus aclnnMlaPreprocessV2(
         <li>cacheMode为0：shape为[blockNum,blockSize,1,576]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为1：shape为[blockNum,blockSize,1,512]，tensor的shape为拆分情况，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
         <li>cacheMode为2：shape为[blockNum,16,blockSize,32]，dtype为int8，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li>
-        <li>cacheMode为3：shape为[blockNum,32,blockSize,16]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li></ul>
+        <li>cacheMode为3：shape为[blockNum,32,blockSize,16]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li>
+        <li>仅支持首轴非连续；除首轴外的其余轴必须连续</li></ul>
       </td>
       <td>INT8、FLOAT16、BFLOAT16</td>
       <td>ND、NZ</td>
       <td>-</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>kvCacheRope</td>
@@ -373,12 +374,13 @@ aclnnStatus aclnnMlaPreprocessV2(
       <td>可选参数，支出传入空指针，输入格式随cacheMode变化：<ul>
         <li>cacheMode为0：不传入。</li>
         <li>cacheMode为1：shape为[blockNum,blockSize,1,64]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为ND。</li>
-        <li>cacheMode为2或3：shape为[blockNum,4,blockSize,16]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li></ul>
+        <li>cacheMode为2或3：shape为[blockNum,4,blockSize,16]，dtype与input保持一致，<a href="../../../docs/zh/context/data_format.md">数据格式</a>为NZ。</li>
+        <li>仅支持首轴非连续；除首轴外的其余轴必须连续</li></ul>
       </td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND、NZ</td>
       <td>-</td>
-      <td>-</td>
+      <td>√</td>
     </tr>
     <tr>
       <td>slotMapping</td>
