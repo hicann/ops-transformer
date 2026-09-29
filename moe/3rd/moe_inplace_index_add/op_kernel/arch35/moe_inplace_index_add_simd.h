@@ -172,6 +172,9 @@ __aicore__ inline void MoeInplaceIndexAddSimd<VAR_T, IDX_T, CAST_T, IS_CONTIGUOU
         }
     }
 
+    event_t eventIdSToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE2));
+    SetFlag<HardEvent::S_MTE2>(eventIdSToMte2);
+    WaitFlag<HardEvent::S_MTE2>(eventIdSToMte2);
     updatesQue_.FreeTensor(updatesLocal);
     indicesQue_.FreeTensor(indicesLocal);
 }
@@ -243,6 +246,9 @@ __aicore__ inline void MoeInplaceIndexAddSimd<VAR_T, IDX_T, CAST_T, IS_CONTIGUOU
             }
         }
     }
+    event_t eventIdSToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE2));
+    SetFlag<HardEvent::S_MTE2>(eventIdSToMte2);
+    WaitFlag<HardEvent::S_MTE2>(eventIdSToMte2);
     updatesQue_.FreeTensor(updatesLocal);
     indicesQue_.FreeTensor(indicesLocal);
 }
@@ -357,6 +363,9 @@ __aicore__ inline void MoeInplaceIndexAddSimd<VAR_T, IDX_T, CAST_T, IS_CONTIGUOU
             }
         }
     }
+    event_t eventIdSToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE2));
+    SetFlag<HardEvent::S_MTE2>(eventIdSToMte2);
+    WaitFlag<HardEvent::S_MTE2>(eventIdSToMte2);
     updatesQue_.FreeTensor(updatesLocal);
     indicesQue_.FreeTensor(indicesLocal);
 }
@@ -454,6 +463,9 @@ __aicore__ inline void MoeInplaceIndexAddSimd<VAR_T, IDX_T, CAST_T, IS_CONTIGUOU
             }
         }
     }
+    event_t eventIdSToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE2));
+    SetFlag<HardEvent::S_MTE2>(eventIdSToMte2);
+    WaitFlag<HardEvent::S_MTE2>(eventIdSToMte2);
     updatesQue_.FreeTensor(updatesLocal);
     indicesQue_.FreeTensor(indicesLocal);
 }
