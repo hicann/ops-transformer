@@ -29,6 +29,7 @@
 #include "../../../core/aiv_comm/collective_comm_context.h"
 #include "../../../tiling/comm_tiling_data.h"
 #include "../../../core/aiv_comm/barrier/barrier_ubmem.h"
+#include "apace/basic/buffer/buffer_channel.h"
 
 namespace Apace {
 
@@ -87,6 +88,7 @@ private:
     __gm__ CommUdmaContext *udmaCtx_{nullptr};
     CollectiveComm<CommCollectiveOp::AllToAll, CommMode::GET, CType, TeamBarrier> allToAll_;
     TeamBarrier teamBarrier_;
+    Apace::Basic::BufferChannel bufferChannel_;
 
     struct BaseParams {
         GM_ADDR selfWinAddr{nullptr};
@@ -171,6 +173,9 @@ __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::In
     teamBarrier_.Init(barrierPtr.get(), barrierCtx_, udmaCtx_->rankSize, static_cast<uint32_t>(GetBlockIdx()));
     allToAll_.Init(udmaCtx_, teamBarrier_, tilingData->commTilingData, cGM, commPtr.get(),
                    static_cast<uint32_t>(udmaCtx_->rankSize), static_cast<uint32_t>(GetBlockIdx()));
+    // buffer channel 管理
+    uint64_t slotDataSize = baseParams_.rankSize * baseParams_.tileChunkBytes;
+    bufferChannel_.Init(slotDataSize, tilingData->commTilingData.slotNum);
 }
 
 template <typename AType, typename BType, typename CType, bool LocalDelay>
@@ -286,6 +291,8 @@ __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::Ru
     for (uint32_t tid = 0; tid < baseParams_.totalTileCnt; ++tid) {
         bool isTail = (tid >= baseParams_.tileCnt);
         uint32_t curTileM = isTail ? baseParams_.tailM : baseParams_.tileM;
+        auto curSlot = bufferChannel_.GetNextSlot();
+
         if (isTail && !switchFlag) {
             // tiling切换前排空L1
             AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(MTE1_MTE2_EVENT_FLAG);
@@ -294,7 +301,7 @@ __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::Ru
             switchFlag = true;
         }
 
-        GM_ADDR cCur = baseParams_.selfWinAddr + tid * baseParams_.bufferSlotBytes;
+        GM_ADDR cCur = baseParams_.selfWinAddr + curSlot.offset;
         param.mmadParams.aGmAddr = aCur;
         param.mmadParams.scaleAGmAddr = aScaleCur;
         param.mmadParams.cGmAddr = cCur;
@@ -302,10 +309,16 @@ __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::Ru
             // 本 rank batch 的结果直写 cGM
             param.localParams.cGmSelfAddr = cSelfCur;
         }
+        if (tid >= bufferChannel_.GetSlotNum()) {
+            // 使能buffer复用后 地址与flagID回绕, 覆盖前等本 Core 的 V 核通知:
+            // 通知由 AIV 在 CrossDevice(全局消费完成)+SyncAll 后发出, 携带
+            // "所有 rank 均已完成本 tile GET"的信息, 覆盖安全
+            CrossCoreWaitFlag<0x2, PIPE_S>(curSlot.slotIdx);
+        }
         quantMatmulKernelImpl_(param);
 
         // 通知 AIV：本 tile 全部 batch 已写完 Win 区
-        CrossCoreSetFlag<0x2, PIPE_FIX>(tid);
+        CrossCoreSetFlag<0x2, PIPE_FIX>(curSlot.slotIdx);
 
         aCur += curTileM * baseParams_.aByteStrideK;
         aScaleCur += curTileM * baseParams_.scaleAByteStride;
@@ -332,17 +345,42 @@ template <typename AType, typename BType, typename CType, bool LocalDelay>
 __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::RunAllToAll()
 {
     for (uint32_t tid = 0; tid < baseParams_.totalTileCnt; ++tid) {
+        auto curSlot = bufferChannel_.GetNextSlot();
         // 与 AIC 的 RunMatmul 逐 tile 同步
-        CrossCoreWaitFlag<0x2, PIPE_S>(tid);
+        CrossCoreWaitFlag<0x2, PIPE_S>(curSlot.slotIdx);
         // 每个 AIV 负责拉取一部分远端 rank 的数据
         if (GetBlockIdx() < baseParams_.rankSize) {
-            allToAll_.Commit();
-            allToAll_.Wait(true);
+            // Commit 内部含 CrossCore(本rank V核对齐) + CrossDevice(跨rank对齐):
+            // 返回时保证所有 rank 的 Win 区本 tile 数据均已就绪(GET 发起前置条件)
+            allToAll_.Commit(curSlot.offset);
+            if (tid + bufferChannel_.GetSlotNum() < baseParams_.totalTileCnt) {
+                // 本 tile 数据会被后续轮次覆盖: 立即排空读请求, 保证消费通知有效
+                allToAll_.Wait();
+            } else {
+                // 不被覆盖: 保持 GET 流水化, 仅最后一个 tile 收尾排空(与未复用行为一致)
+                allToAll_.Wait(true);
+            }
+        }
+        if (tid + bufferChannel_.GetSlotNum() < baseParams_.totalTileCnt) {
+            // 本 slot 在后续轮次会被 AIC 覆盖, 通知 AIC 可覆盖前需两级确认:
+            // 1) CrossDevice: 跨 rank 对齐, 确认所有 rank 的通信核都已完成本 tile 的 GET
+            //    (0x2 硬件 flag 为单 AI Core 内 C<->V 语义, AIC 的复用等待只等本 Core 的
+            //     V 核, 因此通知必须携带"全局消费完成"的信息才有放行覆盖的资格)
+            // 2) SyncAll: rank 内全员(含非通信核)对齐, 非通信核不参与 CrossDevice,
+            //    由 SyncAll 把全局完成信息传递给它们, 保证非通信 Core 的 C 核的
+            //    覆盖同样受保护
+            // 通知必须提前一圈发出(当前圈消费完即发), 若等本圈回绕后才通知, AIC 下一圈
+            // 覆盖前的 Wait 会先于本通知发生导致死锁
+            teamBarrier_.CrossDevice();
+            SyncAll<true>();
+            CrossCoreSetFlag<0x2, PIPE_MTE3>(curSlot.slotIdx);
         }
     }
     if (GetBlockIdx() < baseParams_.rankSize) {
         allToAll_.Finalize();
     }
+    dcci(reinterpret_cast<__gm__ void *>(udmaCtx_->commBufferAddrs),
+         static_cast<uint64_t>(CacheLine::ENTIRE_DATA_CACHE), static_cast<uint64_t>(DcciDst::CACHELINE_OUT));
 }
 
 } // namespace Apace

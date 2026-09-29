@@ -44,7 +44,7 @@ public:
     __aicore__ inline void Init(uint64_t slotSize, uint32_t slotNum)
     {
         slotSize_ = slotSize;
-        slotNum_ = slotNum;
+        slotNum_ = (slotNum == 0) ? 1 : slotNum;
         slotIdxRaw_ = 0;
     }
 

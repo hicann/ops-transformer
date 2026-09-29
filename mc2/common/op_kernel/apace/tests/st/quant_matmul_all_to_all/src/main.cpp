@@ -49,6 +49,7 @@ static constexpr int32_t BENCHMARK_ITERATIONS = 10;
 static constexpr int32_t MXFP_K_ALIGN_SIZE = 32;
 static constexpr uint16_t HCCL_ROOT_INFO_PORT = 8998;
 static constexpr double MS_TO_US = 1000.0;
+static constexpr uint64_t Y_OUTPUT_BYTE = 2;
 
 enum QuantType {
     QUANT_E2M1_E2M1 = 0,
@@ -311,6 +312,41 @@ int RunMatmulAllToAll(const AllToAllArgs &args, int rankId)
         return -1;
     }
 
+    void *hcclBuf = nullptr;
+    uint64_t hcclBufSize = 0;
+    if (HcclGetHcclBuffer(comm, &hcclBuf, &hcclBufSize) != HCCL_SUCCESS || hcclBuf == nullptr) {
+        ERROR_LOG("rank %d HcclGetHcclBuffer failed", rankId);
+        HcclCommDestroy(comm);
+        ReleaseStreamDevice(stream, deviceId);
+        return -1;
+    }
+    INFO_LOG("rank %d HcclGetHcclBuffer: buf=%p, size=%lu bytes (%lu MB)", rankId, hcclBuf,
+             static_cast<unsigned long>(hcclBufSize), static_cast<unsigned long>(hcclBufSize / (1024UL * 1024UL)));
+    uint64_t totalTileCntAll = static_cast<uint64_t>(tileCnt) + static_cast<uint64_t>(tailCnt);
+    uint64_t maxTileM = (tileSize > tailSize) ? static_cast<uint64_t>(tileSize) : static_cast<uint64_t>(tailSize);
+    // no-reuse 判定须按 kernel 实际占用口径: 全部 slot 按 maxTileM 步进预留
+    uint64_t totalSlotBytesNeeded = totalTileCntAll * maxTileM * static_cast<uint64_t>(n) * Y_OUTPUT_BYTE;
+    uint64_t slotNum = 0;
+    if (totalSlotBytesNeeded <= hcclBufSize) {
+        slotNum = totalTileCntAll; // 空间足够不复用buffer 此时slotNum = tileNum
+    } else {
+        uint64_t slotDataSize = maxTileM * static_cast<uint64_t>(n) * Y_OUTPUT_BYTE;
+        if (slotDataSize > hcclBufSize) {
+            ERROR_LOG("rank %d per-tile datasize %lu exceeds hccl buffer %lu", rankId,
+                      static_cast<unsigned long>(slotDataSize), static_cast<unsigned long>(hcclBufSize));
+            HcclCommDestroy(comm);
+            ReleaseStreamDevice(stream, deviceId);
+            return -1;
+        }
+        uint64_t budgetDepth = hcclBufSize / slotDataSize;
+        slotNum = (budgetDepth < totalTileCntAll) ? budgetDepth : totalTileCntAll;
+        slotNum = (slotNum > WIN_REUSE_DEPTH_CAP) ? WIN_REUSE_DEPTH_CAP : slotNum;
+    }
+    commTd.slotNum = slotNum;
+    INFO_LOG("BufferReuse: totalSlotBytesNeeded=%lu hcclBufSize=%lu totalTileCnt=%lu slotNum=%lu",
+             static_cast<unsigned long>(totalSlotBytesNeeded), static_cast<unsigned long>(hcclBufSize),
+             static_cast<unsigned long>(totalTileCntAll), static_cast<unsigned long>(slotNum));
+
     exchanger.Barrier();
     exchanger.Close();
 
@@ -322,7 +358,8 @@ int RunMatmulAllToAll(const AllToAllArgs &args, int rankId)
 
 #define DO_TILING(dTypeA, dTypeB) \
     do { \
-        QuantMatmulTilingSwat<dTypeA, dTypeB> tilingEngine; \
+        QuantMatmulTilingSwat<dTypeA, dTypeB, mm::BiasDataType::DT_FLOAT> tilingEngine; \
+        tilingEngine.SetBiasInfo(args.isBias != 0); \
         tilingEngine.GetTilingData(mmTileM, np, static_cast<uint64_t>(k), tilingData.tileQbmmTilingData, remoteBatch); \
         if (tailSize > 0) { \
             tilingEngine.GetTilingData(static_cast<uint64_t>(tailSize), np, static_cast<uint64_t>(k), \
