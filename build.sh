@@ -876,6 +876,13 @@ function build_torch_extension_whl() {
             unset TORCH_EXTENSION_VENDOR
         fi
 
+        if [[ "${ENABLE_EXPERIMENTAL}" == "TRUE" ]]; then
+            export TORCH_EXTENSION_EXPERIMENTAL="TRUE"
+            log "[INFO] Building torch_extension whl with experimental ops only"
+        else
+            unset TORCH_EXTENSION_EXPERIMENTAL
+        fi
+
         python3 -m build --wheel -n 2>&1 || {
             log "[ERROR] Failed to build torch_extension whl package"
             cd "${original_dir}"
