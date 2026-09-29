@@ -28,38 +28,47 @@ extern "C" {
 
 // inner 接口（由框架根据 L0 op 注册自动生成）
 extern aclnnStatus aclnnInnerFlashAttnGetWorkspaceSize(
-    const aclTensor *q, const aclTensor *k, const aclTensor *v, const aclTensor *blockTableOptional,
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, const aclTensor *sinksOptional, const aclTensor *attnMaskOptional,
-    const aclTensor *metadataOptional, double softmaxScale, int64_t maskMode, int64_t winLeft, int64_t winRight,
-    int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char *layoutQ, const char *layoutKv, const char *layoutOut,
-    int64_t returnSoftmaxLse, const aclTensor *attnOut, const aclTensor *softmaxLse, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor* q, const aclTensor* k, const aclTensor* v, const aclTensor* blockTableOptional,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, const aclTensor* sinksOptional, const aclTensor* attnMaskOptional,
+    const aclTensor* metadataOptional, double softmaxScale, int64_t maskMode, int64_t winLeft, int64_t winRight,
+    int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char* layoutQ, const char* layoutKv, const char* layoutOut,
+    int64_t returnSoftmaxLse, const aclTensor* attnOut, const aclTensor* softmaxLse, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerFlashAttn(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerFlashAttn(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                        const aclrtStream stream);
 
 namespace {
 
-void FlashAttnProcessSoftmaxLse(int64_t returnSoftmaxLse, const aclTensor *softmaxLse, const aclTensor *&tempTensor,
-                                const aclTensor *&placeHolder)
+aclnnStatus FlashAttnProcessSoftmaxLse(int64_t returnSoftmaxLse, const aclTensor* softmaxLse,
+                                       const aclTensor*& tempTensor, const aclTensor*& placeHolder)
 {
     if (returnSoftmaxLse == false) {
         std::vector<int64_t> shape = {0};
-        int64_t addr = 0xff;
         tempTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_FLOAT, shape.data(), 0, ACL_FORMAT_ND,
-                                     shape.data(), shape.size(), static_cast<void *>(&addr));
+                                     shape.data(), shape.size(), nullptr);
+        if (tempTensor == nullptr) {
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Create placeholder tensor for softmaxLse failed.");
+            return ACLNN_ERR_INNER_NULLPTR;
+        }
         placeHolder = tempTensor;
     } else {
+        if (softmaxLse == nullptr) {
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
+                    "When returnSoftmaxLse is enabled, softmaxLse must be provided, but got nullptr.");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
         placeHolder = softmaxLse;
     }
+    return ACLNN_SUCCESS;
 }
 
 // sinks shape为{0}时置nullptr
-void FlashAttnProcessSinks(const aclTensor *&sinksOptional)
+void FlashAttnProcessSinks(const aclTensor*& sinksOptional)
 {
     if (sinksOptional != nullptr) {
-        const auto &shape = sinksOptional->GetViewShape();
+        const auto& shape = sinksOptional->GetViewShape();
         if (shape.GetDimNum() == 1U && shape[0] == 0) {
             OP_LOGD("sinks shape is {0}, treat as nullptr.");
             sinksOptional = nullptr;
@@ -70,28 +79,31 @@ void FlashAttnProcessSinks(const aclTensor *&sinksOptional)
 } // namespace
 
 // 第一段接口：计算workspace大小
-aclnnStatus aclnnFlashAttnGetWorkspaceSize(const aclTensor *q, const aclTensor *k, const aclTensor *v,
-                                           const aclTensor *blockTableOptional, const aclTensor *cuSeqlensQOptional,
-                                           const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-                                           const aclTensor *sequsedKvOptional, const aclTensor *sinksOptional,
-                                           const aclTensor *attnMaskOptional, const aclTensor *metadataOptional,
+aclnnStatus aclnnFlashAttnGetWorkspaceSize(const aclTensor* q, const aclTensor* k, const aclTensor* v,
+                                           const aclTensor* blockTableOptional, const aclTensor* cuSeqlensQOptional,
+                                           const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+                                           const aclTensor* sequsedKvOptional, const aclTensor* sinksOptional,
+                                           const aclTensor* attnMaskOptional, const aclTensor* metadataOptional,
                                            double softmaxScale, int64_t maskMode, int64_t winLeft, int64_t winRight,
-                                           int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char *layoutQ,
-                                           const char *layoutKv, const char *layoutOut, int64_t returnSoftmaxLse,
-                                           const aclTensor *attnOut, const aclTensor *softmaxLseOptional,
-                                           uint64_t *workspaceSize, aclOpExecutor **executor)
+                                           int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char* layoutQ,
+                                           const char* layoutKv, const char* layoutOut, int64_t returnSoftmaxLse,
+                                           const aclTensor* attnOut, const aclTensor* softmaxLseOptional,
+                                           uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("start aclnnFlashAttnGetWorkspaceSize");
 
     // sinks shape为{0}时置nullptr
     FlashAttnProcessSinks(sinksOptional);
 
-    const aclTensor *placeHolder = nullptr;
-    const aclTensor *tempTensor = nullptr;
+    const aclTensor* placeHolder = nullptr;
+    const aclTensor* tempTensor = nullptr;
 
-    FlashAttnProcessSoftmaxLse(returnSoftmaxLse, softmaxLseOptional, tempTensor, placeHolder);
+    aclnnStatus ret = FlashAttnProcessSoftmaxLse(returnSoftmaxLse, softmaxLseOptional, tempTensor, placeHolder);
+    if (ret != ACLNN_SUCCESS) {
+        return ret;
+    }
 
-    aclnnStatus ret = aclnnInnerFlashAttnGetWorkspaceSize(
+    ret = aclnnInnerFlashAttnGetWorkspaceSize(
         q, k, v, blockTableOptional, cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional,
         sinksOptional, attnMaskOptional, metadataOptional, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ,
         maxSeqlenKV, layoutQ, layoutKv, layoutOut, returnSoftmaxLse, attnOut, placeHolder, workspaceSize, executor);
@@ -105,7 +117,7 @@ aclnnStatus aclnnFlashAttnGetWorkspaceSize(const aclTensor *q, const aclTensor *
 }
 
 // 第二段接口：执行计算
-aclnnStatus aclnnFlashAttn(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, const aclrtStream stream)
+aclnnStatus aclnnFlashAttn(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, const aclrtStream stream)
 {
     return aclnnInnerFlashAttn(workspace, workspaceSize, executor, stream);
 }
