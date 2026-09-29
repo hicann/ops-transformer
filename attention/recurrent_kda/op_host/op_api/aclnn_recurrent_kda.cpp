@@ -43,18 +43,18 @@ enum class RecurrentKdaLayout {
 };
 
 struct RecurrentKdaParams {
-    const aclTensor *query = nullptr;
-    const aclTensor *key = nullptr;
-    const aclTensor *value = nullptr;
-    const aclTensor *gate = nullptr;
-    const aclTensor *beta = nullptr;
-    aclTensor *initialStateRef = nullptr;
-    const aclTensor *cuSeqlensOptional = nullptr;
-    const aclTensor *ssmStateIndicesOptional = nullptr;
-    const aclTensor *aLogOptional = nullptr;
-    const aclTensor *dtBiasOptional = nullptr;
-    const aclTensor *numAcceptedTokensOptional = nullptr;
-    const char *layout = "BSND";
+    const aclTensor* query = nullptr;
+    const aclTensor* key = nullptr;
+    const aclTensor* value = nullptr;
+    const aclTensor* gate = nullptr;
+    const aclTensor* beta = nullptr;
+    aclTensor* initialStateRef = nullptr;
+    const aclTensor* cuSeqlensOptional = nullptr;
+    const aclTensor* ssmStateIndicesOptional = nullptr;
+    const aclTensor* aLogOptional = nullptr;
+    const aclTensor* dtBiasOptional = nullptr;
+    const aclTensor* numAcceptedTokensOptional = nullptr;
+    const char* layout = "BSND";
     double scale = 1.0;
     bool outputFinalState = false;
     bool inplaceFinalState = true;
@@ -65,8 +65,8 @@ struct RecurrentKdaParams {
     bool safeGate = false;
     double lowerBound = -5.0;
     bool stateVFirst = false;
-    const aclTensor *attnOut = nullptr;
-    const aclTensor *finalState = nullptr;
+    const aclTensor* attnOut = nullptr;
+    const aclTensor* finalState = nullptr;
 };
 
 static const std::initializer_list<op::DataType> QKV_TYPE_SUPPORT_LIST = {op::DataType::DT_BF16};
@@ -78,17 +78,17 @@ static const std::initializer_list<op::DataType> F32_TYPE_SUPPORT_LIST = {op::Da
 static const std::initializer_list<op::DataType> INT_TYPE_SUPPORT_LIST = {op::DataType::DT_INT32,
                                                                           op::DataType::DT_INT64};
 
-static size_t Rank(const aclTensor *tensor)
+static size_t Rank(const aclTensor* tensor)
 {
     return tensor->GetViewShape().GetDimNum();
 }
 
-static int64_t Dim(const aclTensor *tensor, size_t idx)
+static int64_t Dim(const aclTensor* tensor, size_t idx)
 {
     return tensor->GetViewShape().GetDim(idx);
 }
 
-static bool SameShape(const aclTensor *lhs, const aclTensor *rhs)
+static bool SameShape(const aclTensor* lhs, const aclTensor* rhs)
 {
     if (Rank(lhs) != Rank(rhs)) {
         return false;
@@ -101,7 +101,7 @@ static bool SameShape(const aclTensor *lhs, const aclTensor *rhs)
     return true;
 }
 
-static bool ParseLayout(const char *layout, RecurrentKdaLayout &parsed)
+static bool ParseLayout(const char* layout, RecurrentKdaLayout& parsed)
 {
     if (layout == nullptr || std::strcmp(layout, "BSND") == 0) {
         parsed = RecurrentKdaLayout::BSND;
@@ -115,7 +115,7 @@ static bool ParseLayout(const char *layout, RecurrentKdaLayout &parsed)
     return false;
 }
 
-static bool CheckCuSeqlensShape(const aclTensor *cuSeqlens, const char *opName)
+static bool CheckCuSeqlensShape(const aclTensor* cuSeqlens, const char* opName)
 {
     if (cuSeqlens == nullptr) {
         return true;
@@ -128,7 +128,7 @@ static bool CheckCuSeqlensShape(const aclTensor *cuSeqlens, const char *opName)
     return true;
 }
 
-static bool CheckShape(const RecurrentKdaParams &params, RecurrentKdaLayout layout)
+static bool CheckShape(const RecurrentKdaParams& params, RecurrentKdaLayout layout)
 {
     if (!SameShape(params.query, params.key)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "npu_recurrent_kda: query and key must have identical shape.");
@@ -269,7 +269,7 @@ static bool CheckShape(const RecurrentKdaParams &params, RecurrentKdaLayout layo
     return true;
 }
 
-static bool CheckNotNull(const RecurrentKdaParams &params)
+static bool CheckNotNull(const RecurrentKdaParams& params)
 {
     OP_CHECK_NULL(params.query, return false);
     OP_CHECK_NULL(params.key, return false);
@@ -282,7 +282,7 @@ static bool CheckNotNull(const RecurrentKdaParams &params)
     return true;
 }
 
-static bool CheckDtypeValid(const RecurrentKdaParams &params)
+static bool CheckDtypeValid(const RecurrentKdaParams& params)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(params.query, QKV_TYPE_SUPPORT_LIST, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(params.key, QKV_TYPE_SUPPORT_LIST, return false);
@@ -314,7 +314,7 @@ static bool CheckDtypeValid(const RecurrentKdaParams &params)
     return true;
 }
 
-static aclnnStatus DataContiguous(const aclTensor *&tensor, aclOpExecutor *executor)
+static aclnnStatus DataContiguous(const aclTensor*& tensor, aclOpExecutor* executor)
 {
     if (tensor == nullptr) {
         return ACLNN_SUCCESS;
@@ -324,14 +324,14 @@ static aclnnStatus DataContiguous(const aclTensor *&tensor, aclOpExecutor *execu
     return ACLNN_SUCCESS;
 }
 
-static void SetTensorOriginalShape(const aclTensor *tensor)
+static void SetTensorOriginalShape(const aclTensor* tensor)
 {
     if (tensor != nullptr) {
         tensor->SetOriginalShape(tensor->GetViewShape());
     }
 }
 
-static void SetInputOriginalShape(RecurrentKdaParams &params)
+static void SetInputOriginalShape(RecurrentKdaParams& params)
 {
     SetTensorOriginalShape(params.query);
     SetTensorOriginalShape(params.key);
@@ -346,7 +346,7 @@ static void SetInputOriginalShape(RecurrentKdaParams &params)
     SetTensorOriginalShape(params.numAcceptedTokensOptional);
 }
 
-static aclnnStatus PreProcess(RecurrentKdaParams &params, aclOpExecutor *executor)
+static aclnnStatus PreProcess(RecurrentKdaParams& params, aclOpExecutor* executor)
 {
     SetInputOriginalShape(params);
     CHECK_RET(DataContiguous(params.query, executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
@@ -368,20 +368,20 @@ static aclnnStatus PreProcess(RecurrentKdaParams &params, aclOpExecutor *executo
 } // namespace
 
 aclnnStatus aclnnRecurrentKdaGetWorkspaceSize(
-    const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *gate, const aclTensor *beta,
-    aclTensor *initialStateRef, const aclTensor *cuSeqlensOptional, const aclTensor *ssmStateIndicesOptional,
-    const aclTensor *aLogOptional, const aclTensor *dtBiasOptional, const aclTensor *numAcceptedTokensOptional,
-    const char *layout, double scale, bool outputFinalState, bool inplaceFinalState, bool useQkL2normInKernel,
+    const aclTensor* query, const aclTensor* key, const aclTensor* value, const aclTensor* gate, const aclTensor* beta,
+    aclTensor* initialStateRef, const aclTensor* cuSeqlensOptional, const aclTensor* ssmStateIndicesOptional,
+    const aclTensor* aLogOptional, const aclTensor* dtBiasOptional, const aclTensor* numAcceptedTokensOptional,
+    const char* layout, double scale, bool outputFinalState, bool inplaceFinalState, bool useQkL2normInKernel,
     bool useGateInKernel, bool useBetaSigmoidInKernel, bool allowNegEigval, bool safeGate, double lowerBound,
-    bool stateVFirst, const aclTensor *attnOut, const aclTensor *finalState, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    bool stateVFirst, const aclTensor* attnOut, const aclTensor* finalState, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnRecurrentKda,
                    DFX_IN(query, key, value, gate, beta, initialStateRef, cuSeqlensOptional, ssmStateIndicesOptional,
                           aLogOptional, dtBiasOptional, numAcceptedTokensOptional, layout, scale, outputFinalState,
                           inplaceFinalState, useQkL2normInKernel, useGateInKernel, useBetaSigmoidInKernel,
                           allowNegEigval, safeGate, lowerBound, stateVFirst),
-                   DFX_OUT(attnOut, initialStateRef, finalState));
+                   DFX_OUT(initialStateRef, attnOut, finalState));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -419,14 +419,14 @@ aclnnStatus aclnnRecurrentKdaGetWorkspaceSize(
     CHECK_RET(CheckShape(params, parsedLayout), ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(PreProcess(params, executorPtr) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
-    aclTensor *initialStateForKernel = params.initialStateRef;
+    aclTensor* initialStateForKernel = params.initialStateRef;
     if (!IsContiguous(initialStateForKernel)) {
         initialStateForKernel = executorPtr->CreateView(
             initialStateForKernel, initialStateForKernel->GetViewShape(), initialStateForKernel->GetStorageShape(),
             initialStateForKernel->GetViewStrides(), initialStateForKernel->GetViewOffset());
         CHECK_RET(initialStateForKernel != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    const aclTensor *finalStateForKernel = params.finalState;
+    const aclTensor* finalStateForKernel = params.finalState;
     if (!IsContiguous(finalStateForKernel)) {
         finalStateForKernel = executorPtr->CreateView(
             finalStateForKernel, finalStateForKernel->GetViewShape(), finalStateForKernel->GetStorageShape(),
@@ -451,7 +451,7 @@ aclnnStatus aclnnRecurrentKdaGetWorkspaceSize(
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnRecurrentKda(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnRecurrentKda(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnRecurrentKda);
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
