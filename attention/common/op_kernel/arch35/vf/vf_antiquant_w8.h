@@ -184,16 +184,18 @@ __simd_vf__ void AntiquantVFImplFp8Nz(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T 
     uint32_t colSrcStride = (dealRowCount * colBaseSize + 31) / 32 * 32; // 32B对齐
     const uint16_t colLoopCnt = static_cast<uint16_t>(baseSize / colBaseSize);
     const uint16_t rowLoopCnt = static_cast<uint16_t>((dealRowCount + rowBaseSize - 1) / rowBaseSize);
+    uint16_t tailRowLoopIdx = rowLoopCnt - 1;
+    uint32_t validElements = (dealRowCount - tailRowLoopIdx * rowBaseSize) * colBaseSize;
+    Reg::MaskReg storeMask = Reg::UpdateMask<Q_T>(validElements);
 
     for (uint16_t colLoopIdx = 0; colLoopIdx < colLoopCnt; colLoopIdx++) {
         // 加载 scale
         Reg::LoadAlign<Q_T, Reg::LoadDist::DIST_BLK>(vScale, ubScaleAddr + colLoopIdx * colBaseSize);
 
-        for (uint16_t rowLoop = 0; rowLoop < rowLoopCnt; rowLoop++) {
+        for (uint16_t rowLoop = 1; rowLoop < rowLoopCnt; rowLoop++) {
             uint16_t rowLoopIdx = rowLoopCnt - 1 - rowLoop;
             __ubuf__ Q_T *ubDstAddrTmp = ubDstAddr + colDstStride * colLoopIdx + dealBaseNum * rowLoopIdx;
             __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr + colSrcStride * colLoopIdx + dealBaseNum * rowLoopIdx;
-            ;
             Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_UNPACK_B16>((Reg::RegTensor<uint8_t> &)vKvData, ubSrcTemp);
 
             // cast操作, Fp8->Fp32
@@ -209,6 +211,22 @@ __simd_vf__ void AntiquantVFImplFp8Nz(__ubuf__ uint8_t *ubSrcAddr, __ubuf__ Q_T 
             // 将输出结果copy到UB
             Reg::StoreAlign<Q_T, Reg::StoreDist::DIST_NORM_B16>(ubDstAddrTmp, vRes, qTypeMaskAll);
         }
+        __ubuf__ Q_T *ubDstAddrTmp = ubDstAddr + colDstStride * colLoopIdx + dealBaseNum * tailRowLoopIdx;
+        __ubuf__ uint8_t *ubSrcTemp = ubSrcAddr + colSrcStride * colLoopIdx + dealBaseNum * tailRowLoopIdx;
+        Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_UNPACK_B16>((Reg::RegTensor<uint8_t> &)vKvData, ubSrcTemp);
+
+        // cast操作, Fp8->Fp32
+        Reg::Cast<float, KV_T, castTraitFp8_1>(vCastFp32Res0, vKvData, kvTypeMaskAll);
+        Reg::Cast<float, KV_T, castTraitFp8_2>(vCastFp32Res1, vKvData, kvTypeMaskAll);
+        // cast操作, Fp32->Fp16/Bf16
+        Reg::Cast<Q_T, float, castTraitFp8_3>(vCastRes0, vCastFp32Res0, kvTypeMaskAll);
+        Reg::Cast<Q_T, float, castTraitFp8_4>(vCastRes1, vCastFp32Res1, kvTypeMaskAll);
+        Reg::Or<uint16_t, Reg::MaskMergeMode::ZEROING>((Reg::RegTensor<uint16_t> &)vCastRes0,
+                                                       (Reg::RegTensor<uint16_t> &)vCastRes0,
+                                                       (Reg::RegTensor<uint16_t> &)vCastRes1, kvTypeMaskAll);
+        Reg::Mul<Q_T, Reg::MaskMergeMode::ZEROING>(vRes, vCastRes0, vScale, qTypeMaskAll);
+        // 将输出结果copy到UB
+        Reg::StoreAlign<Q_T, Reg::StoreDist::DIST_NORM_B16>(ubDstAddrTmp, vRes, storeMask);
     }
 }
 
