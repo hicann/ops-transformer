@@ -21,12 +21,15 @@ constexpr uint32_t RANK_SYNC_COUNTER_SLOT_BYTES = 64U;
 constexpr uint8_t ALL_AICORE_SYNC_MODE = 0;
 // mode 4：同一 AI Core 内 AIC 与单个 AIV 的同步，支持双向通知。
 constexpr uint8_t AIC_SINGLE_AIV_SYNC_MODE = 4;
-// reset、MoE 及共享量化写回完成事件；与 GMM mode 4 独立，避开 SyncAll 的 11--14。
-constexpr uint16_t MTE_QUANT_READY_FLAG = 8;
+// token 数据就绪事件编号：count 发送前等待全部 AIV 完成 token 数据及 scale 写回。
+constexpr uint16_t TOKEN_DATA_READY_FLAG = 8;
 // count 表读取完成事件编号：count 表清零前等待所有读取结束。
 constexpr uint16_t COUNT_TABLE_READ_DONE_FLAG = 9;
-// 输入就绪事件编号：AIV0 通知配对 AIC，本卡全部 AIV 已完成 reset 和量化。
-constexpr uint16_t INPUT_READY_FLAG = 2;
+// reset 完成事件编号：等待全部 AIV 完成状态清零。
+constexpr uint16_t INPUT_RESET_DONE_FLAG = 10;
+// 输入准备完成事件编号：AIV0 通知配对 AIC，全部 reset 及当前路径所需的 quant/pack 已完成。
+// 共享直接读取原始输入时仅汇总 reset，AIC 在 MoE 前消费；其余路径在入口消费。
+constexpr uint16_t INPUT_PREPARE_DONE_FLAG = 2;
 // UB 释放事件编号：AIV0 通知配对 AIC，可以通过 FIX 写入输入准备阶段占用的 UB。
 constexpr uint16_t INPUT_UB_FREE_FLAG = 15;
 

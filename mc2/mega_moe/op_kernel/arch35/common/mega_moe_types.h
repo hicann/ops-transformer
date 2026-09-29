@@ -26,6 +26,13 @@ namespace MegaMoeImpl {
 
 using namespace AscendC;
 
+// 共享 GMM 的输入来源决定 AIC 搬入前是否需要等待 quant/pack。
+enum class SharedGmmStartCondition {
+    NoSharedExpert,
+    InputDirectly,
+    QuantOrPackDone,
+};
+
 enum DispatchQuantOutDtype : int64_t {
     E5M2_QUANT = 3U,
     E4M3_QUANT = 4U,
@@ -45,9 +52,9 @@ struct ExpertLoopState {
 
 // GMM1 执行期间共同维护的流水状态；引用成员将更新直接回写到调用方持有的状态。
 struct GmmRuntimeState {
-    uint32_t &startBlockIdx;
-    int32_t &vecSetSyncCom;
-    uint16_t &pingpongIdx;
+    uint32_t& startBlockIdx;
+    int32_t& vecSetSyncCom;
+    uint16_t& pingpongIdx;
 };
 
 // 标识 MoE 专家序列中的二维 token 位置。
@@ -74,15 +81,15 @@ struct GMMAddrInfo {
     GM_ADDR gmm1OutGlobal;
     GM_ADDR gmm2OutGlobal;
     GM_ADDR metaInfoGlobal;
-    __gm__ int32_t *activationToGmm2Flag;
-    __gm__ int32_t *dispatchToGmm1Flag;
-    __gm__ int32_t *gmm2CombineSyncCounter;
-    __gm__ int32_t *gmmToEpilogueFlag;
-    __gm__ int32_t *gmm1TileStatus;
-    __gm__ int32_t *sharedExpertGmm2TileCounter;
+    __gm__ int32_t* activationToGmm2Flag;
+    __gm__ int32_t* dispatchToGmm1Flag;
+    __gm__ int32_t* gmm2CombineSyncCounter;
+    __gm__ int32_t* gmmToEpilogueFlag;
+    __gm__ int32_t* gmm1TileStatus;
+    __gm__ int32_t* sharedExpertGmm2TileCounter;
     uint32_t gmm2CombineLogicalCoreCount = 0U;
-    Gmm1ActivationSync *gmm1ActivationSync = nullptr;
-    Gmm2CombineSync *gmm2CombineSync =
+    Gmm1ActivationSync* gmm1ActivationSync = nullptr;
+    Gmm2CombineSync* gmm2CombineSync =
         nullptr; // per-tile credit 握手对象；是否参与握手由模板参 NotifyCombineTileReady 编译期决定
 };
 
@@ -94,7 +101,7 @@ struct StridedAConfig {
 
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
 struct CombineCommParams {
-    Hcomm<COMM_PROTOCOL_UBC_CTP> *hcomm;
+    Hcomm<COMM_PROTOCOL_UBC_CTP>* hcomm;
 };
 #endif
 
@@ -123,7 +130,7 @@ struct Params {
     GM_ADDR expertTokenNumsOutGmAddr;
     WorkspaceInfo workspaceInfo;
     PeermemInfo peermemInfo;
-    MegaMoeTilingData *tilingData;
+    MegaMoeTilingData* tilingData;
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL)
     CombineCommParams combineCommParams;
 #endif

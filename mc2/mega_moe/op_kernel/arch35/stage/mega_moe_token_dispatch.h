@@ -67,8 +67,8 @@ struct DispatchCopyTargets {
 
 // 由 tiling/peermem/quant 配置装配 Token Dispatch 阶段配置（普通与 wave 编排模板共用）。
 template <typename TopkIndexType>
-__aicore__ inline TokenDispatchConfig CreateTokenDispatchConfig(const Params &params,
-                                                                const QuantProcessConfig &quantProcessConfig)
+__aicore__ inline TokenDispatchConfig CreateTokenDispatchConfig(const Params& params,
+                                                                const QuantProcessConfig& quantProcessConfig)
 {
     uint64_t quantWinOffset =
         static_cast<uint64_t>(params.peermemInfo.quantTokenScalePtr - params.peermemInfo.rankSyncInWorldPtr);
@@ -84,7 +84,7 @@ __aicore__ inline TokenDispatchConfig CreateTokenDispatchConfig(const Params &pa
 
 template <typename ActivationType, typename TopkIndexType>
 __aicore__ inline LocalTensor<ActivationType> GetDispatchCopyBuffer(
-    const TokenDispatchConfig &context, const TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
+    const TokenDispatchConfig& context, const TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
     int32_t bufferIdx)
 {
     return LocalTensor<ActivationType>(
@@ -94,10 +94,10 @@ __aicore__ inline LocalTensor<ActivationType> GetDispatchCopyBuffer(
 }
 
 template <bool IsBufferReuse, bool TopkWeightsPrefetch, typename ActivationType, typename TopkIndexType>
-__aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchConfig &context, const Params &params,
-                                                     TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
+__aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchConfig& context, const Params& params,
+                                                     TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
                                                      int32_t bufferIdx, int32_t topkIndex, int32_t remoteRankIdx,
-                                                     GlobalTensor<ActivationType> &remoteRankGlobalTensor)
+                                                     GlobalTensor<ActivationType>& remoteRankGlobalTensor)
 {
     TEventID eventId = static_cast<TEventID>(bufferIdx);
     LocalTensor<ActivationType> copyTmpTensor = GetDispatchCopyBuffer(context, scratch, bufferIdx);
@@ -129,13 +129,13 @@ __aicore__ inline void FetchDispatchTokenAndMetaInfo(const TokenDispatchConfig &
 
 // copyIdx 同时是段内目标行号：三个调用点的 ring 排空顺序保证写出行与匹配序恒一一对应。
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
-__aicore__ inline void StoreDispatchTokenAndMetaInfo(const TokenDispatchConfig &context, const Params &params,
-                                                     TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
+__aicore__ inline void StoreDispatchTokenAndMetaInfo(const TokenDispatchConfig& context, const Params& params,
+                                                     TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
                                                      int32_t bufferIdx,
-                                                     GlobalTensor<ActivationType> &tokenRevGlobalTensor,
-                                                     GlobalTensor<QuantScaleType> &scaleRevGlobalTensor,
-                                                     GlobalTensor<int32_t> &metaInfoGlobalTensor,
-                                                     GlobalTensor<int32_t> &revWeightsGlobalTensor,
+                                                     GlobalTensor<ActivationType>& tokenRevGlobalTensor,
+                                                     GlobalTensor<QuantScaleType>& scaleRevGlobalTensor,
+                                                     GlobalTensor<int32_t>& metaInfoGlobalTensor,
+                                                     GlobalTensor<int32_t>& revWeightsGlobalTensor,
                                                      int32_t copyStartIdx, int32_t copyIdx)
 {
     TEventID eventId = static_cast<TEventID>(bufferIdx);
@@ -179,17 +179,17 @@ __aicore__ inline void StoreDispatchTokenAndMetaInfo(const TokenDispatchConfig &
 
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
 __aicore__ inline DispatchCopyTargets<ActivationType, QuantScaleType> CreateDispatchCopyTargets(
-    const TokenDispatchConfig &context, const Params &params, GM_ADDR *winRankAddr,
-    const TokenDispatchScratch<ActivationType, TopkIndexType> &scratch, int32_t rowDstOffset, int32_t remoteRankIdx)
+    const TokenDispatchConfig& context, const Params& params, GM_ADDR* winRankAddr,
+    const TokenDispatchScratch<ActivationType, TopkIndexType>& scratch, int32_t rowDstOffset, int32_t remoteRankIdx)
 {
     DispatchCopyTargets<ActivationType, QuantScaleType> targets;
-    targets.tokenRev.SetGlobalBuffer(reinterpret_cast<__gm__ ActivationType *>(params.workspaceInfo.dispatchRevDataPtr +
-                                                                               rowDstOffset * scratch.revTokenElemCnt));
-    targets.scaleRev.SetGlobalBuffer(reinterpret_cast<__gm__ QuantScaleType *>(
-        params.workspaceInfo.dispatchRevScalePtr + rowDstOffset * scratch.revScaleElemCnt));
+    targets.tokenRev.SetGlobalBuffer(reinterpret_cast<__gm__ ActivationType*>(params.workspaceInfo.dispatchRevDataPtr +
+                                                                              rowDstOffset * scratch.revTokenElemCnt));
+    targets.scaleRev.SetGlobalBuffer(reinterpret_cast<__gm__ QuantScaleType*>(params.workspaceInfo.dispatchRevScalePtr +
+                                                                              rowDstOffset * scratch.revScaleElemCnt));
     targets.remoteRank.SetGlobalBuffer(
-        reinterpret_cast<__gm__ ActivationType *>(winRankAddr[remoteRankIdx] + context.quantWinOffset));
-    targets.metaInfo.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
+        reinterpret_cast<__gm__ ActivationType*>(winRankAddr[remoteRankIdx] + context.quantWinOffset));
+    targets.metaInfo.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(
         params.workspaceInfo.metaInfoPtr + rowDstOffset * INT32_PER_256B * sizeof(int32_t)));
     // tkw=0 的 combine 去重且 dispatch 去重未开（dc 单开）：本基线路径是唯一落地入口，每行把
     // 整 token 权重段写到自己的 revWeights 槽（merge 在 LAST 行上读，LAST 行也经本路径写过）。
@@ -200,7 +200,7 @@ __aicore__ inline DispatchCopyTargets<ActivationType, QuantScaleType> CreateDisp
                                                                  static_cast<uint32_t>(sizeof(float)),
                                                              static_cast<uint32_t>(ALIGN_32)) /
                                         static_cast<uint32_t>(sizeof(int32_t));
-            targets.revWeights.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
+            targets.revWeights.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(
                 params.workspaceInfo.dispatchRevWeightsPtr +
                 static_cast<uint64_t>(rowDstOffset) * weightAlignInt32 * sizeof(int32_t)));
         }
@@ -209,9 +209,9 @@ __aicore__ inline DispatchCopyTargets<ActivationType, QuantScaleType> CreateDisp
 }
 
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
-__aicore__ inline void CopyTokensAndMetaForDispatch(const TokenDispatchConfig &context, const Params &params,
-                                                    GM_ADDR *winRankAddr,
-                                                    TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
+__aicore__ inline void CopyTokensAndMetaForDispatch(const TokenDispatchConfig& context, const Params& params,
+                                                    GM_ADDR* winRankAddr,
+                                                    TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
                                                     int32_t rowDstOffset, int32_t remoteRankIdx, int32_t copyStartIdx,
                                                     int32_t copyNum)
 {
@@ -219,11 +219,11 @@ __aicore__ inline void CopyTokensAndMetaForDispatch(const TokenDispatchConfig &c
     DispatchCopyTargets<ActivationType, QuantScaleType> targets =
         CreateDispatchCopyTargets<TopkIndexType, ActivationType, QuantScaleType, TopkWeightsPrefetch>(
             context, params, winRankAddr, scratch, rowDstOffset, remoteRankIdx);
-    GlobalTensor<ActivationType> &remoteRankGlobalTensor = targets.remoteRank;
-    GlobalTensor<ActivationType> &tokenRevGlobalTensor = targets.tokenRev;
-    GlobalTensor<QuantScaleType> &scaleRevGlobalTensor = targets.scaleRev;
-    GlobalTensor<int32_t> &metaInfoGlobalTensor = targets.metaInfo;
-    GlobalTensor<int32_t> &revWeightsGlobalTensor = targets.revWeights;
+    GlobalTensor<ActivationType>& remoteRankGlobalTensor = targets.remoteRank;
+    GlobalTensor<ActivationType>& tokenRevGlobalTensor = targets.tokenRev;
+    GlobalTensor<QuantScaleType>& scaleRevGlobalTensor = targets.scaleRev;
+    GlobalTensor<int32_t>& metaInfoGlobalTensor = targets.metaInfo;
+    GlobalTensor<int32_t>& revWeightsGlobalTensor = targets.revWeights;
 
     int32_t firstTopkIndex = static_cast<int32_t>(scratch.validTopkIndexTensor.GetValue(copyStartIdx));
     FetchDispatchTokenAndMetaInfo<false, TopkWeightsPrefetch>(context, params, scratch, 0, firstTopkIndex,
@@ -264,7 +264,7 @@ __aicore__ inline void CopyTokensAndMetaForDispatch(const TokenDispatchConfig &c
 }
 
 // 发布一个 source-rank 段覆盖到的 GMM1 tile ready 计数。
-__aicore__ inline void PublishGmm1TileReady(const MoeSyncWorkspaceLayout &syncLayout, const Params &params,
+__aicore__ inline void PublishGmm1TileReady(const MoeSyncWorkspaceLayout& syncLayout, const Params& params,
                                             uint32_t localExpertId, int32_t gmm1TileRowCount,
                                             int32_t segmentExpertRowBegin, int32_t segmentExpertRowEnd)
 {
@@ -272,8 +272,8 @@ __aicore__ inline void PublishGmm1TileReady(const MoeSyncWorkspaceLayout &syncLa
         return;
     }
     SyncFuncStatic<AscendC::HardEvent::MTE3_S, SYNC_EVENT_ID5>();
-    __gm__ int32_t *gmm1TileReadyCount =
-        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.flagDispatchToGmm1Ptr) +
+    __gm__ int32_t* gmm1TileReadyCount =
+        reinterpret_cast<__gm__ int32_t*>(params.workspaceInfo.flagDispatchToGmm1Ptr) +
         static_cast<uint64_t>(localExpertId) * syncLayout.dispatchFlagSlotCountPerExpert;
     int32_t firstTileIdx = segmentExpertRowBegin / gmm1TileRowCount;
     int32_t lastTileIdx = (segmentExpertRowEnd - 1) / gmm1TileRowCount;
@@ -292,14 +292,14 @@ __aicore__ inline void PublishGmm1TileReady(const MoeSyncWorkspaceLayout &syncLa
  * compact index 已按 [expert][source rank] 分槽保存，因此这里只需按 ordinal 分批顺序读取，无需再次筛选 mask。
  */
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
-__aicore__ inline int32_t DispatchRankTokens(const TokenDispatchConfig &context, const MoeStageCommonConfig &common,
-                                             const Params &params, GM_ADDR *winRankAddr,
-                                             TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
+__aicore__ inline int32_t DispatchRankTokens(const TokenDispatchConfig& context, const MoeStageCommonConfig& common,
+                                             const Params& params, GM_ADDR* winRankAddr,
+                                             TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
                                              uint32_t localExpertId, int32_t expertGlobalRowBegin,
                                              uint32_t remoteRankIdx, int32_t rankSegmentRowBegin,
                                              int32_t segmentMatchOrdinalBegin, int32_t segmentMatchOrdinalEnd)
 {
-    const MegaMoeDispatchBufferConfig &bufferConfig = context.bufferConfig;
+    const MegaMoeDispatchBufferConfig& bufferConfig = context.bufferConfig;
     int32_t processedRouteCount = 0;
     int32_t dispatchedRowCount = 0;
     GlobalTensor<TopkIndexType> remoteRouteIndexGlobal;
@@ -312,7 +312,7 @@ __aicore__ inline int32_t DispatchRankTokens(const TokenDispatchConfig &context,
         // 直接定位当前专家、source rank 的 route ordinal，不再扫描完整 topK mask。
         uint64_t slotOffset =
             (static_cast<uint64_t>(localExpertId) * common.worldSize + remoteRankIdx) * context.routeIndexAlignSize;
-        remoteRouteIndexGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ TopkIndexType *>(
+        remoteRouteIndexGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ TopkIndexType*>(
             params.peermemInfo.maskRecvPtr + slotOffset + static_cast<uint64_t>(routeOrdinal) * sizeof(TopkIndexType)));
         DataCopyExtParams routeCopyParams{1U, static_cast<uint32_t>(batchDispatchRowCount * sizeof(TopkIndexType)), 0U,
                                           0U, 0U};
@@ -335,8 +335,8 @@ __aicore__ inline int32_t DispatchRankTokens(const TokenDispatchConfig &context,
  * 返回值作为 DispatchOwnedExpertRows 的扫描起点，后续只访问与本核范围相交的连续 rank 段。
  */
 template <typename ActivationType, typename TopkIndexType>
-__aicore__ inline uint32_t FindDispatchSourceRank(const MoeStageCommonConfig &common,
-                                                  const TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
+__aicore__ inline uint32_t FindDispatchSourceRank(const MoeStageCommonConfig& common,
+                                                  const TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
                                                   uint32_t localExpertId, uint32_t globalRowIdx)
 {
     uint32_t expertRankBegin = localExpertId * common.worldSize;
@@ -361,11 +361,11 @@ __aicore__ inline uint32_t FindDispatchSourceRank(const MoeStageCommonConfig &co
  */
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, uint32_t PipelineTileM,
           bool TopkWeightsPrefetch>
-__aicore__ inline void DispatchOwnedExpertRows(const TokenDispatchConfig &context, const MoeStageCommonConfig &common,
-                                               const MoeSyncWorkspaceLayout &syncLayout, const Params &params,
-                                               GM_ADDR *winRankAddr,
-                                               TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
-                                               uint32_t localExpertId, const ExpertDispatchCoreRange &coreRange)
+__aicore__ inline void DispatchOwnedExpertRows(const TokenDispatchConfig& context, const MoeStageCommonConfig& common,
+                                               const MoeSyncWorkspaceLayout& syncLayout, const Params& params,
+                                               GM_ADDR* winRankAddr,
+                                               TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
+                                               uint32_t localExpertId, const ExpertDispatchCoreRange& coreRange)
 {
     constexpr int32_t gmm1TileRowCount = static_cast<int32_t>(PipelineTileM);
     uint32_t coreGlobalRowBegin = coreRange.expertGlobalRowBegin + coreRange.localExpertRowBegin;
@@ -412,9 +412,9 @@ __aicore__ inline void DispatchOwnedExpertRows(const TokenDispatchConfig &contex
 // 计算本核负责的全局行区间：先按 maxOutputSize（Dispatch workspace 硬边界）统一裁剪，再对整个
 // 输入范围一次连续均分；按全局起点轮转首 owner，避免余数长期集中在低编号 AIV1。
 // 返回 false = 本核无行可做。
-__aicore__ inline bool CalcDispatchCoreRowRange(const TokenDispatchConfig &context, const BlockJobContext &blockJob,
-                                                const ExpertTokenRange &range, uint32_t &coreGlobalRowBegin,
-                                                uint32_t &coreGlobalRowEnd)
+__aicore__ inline bool CalcDispatchCoreRowRange(const TokenDispatchConfig& context, const BlockJobContext& blockJob,
+                                                const ExpertTokenRange& range, uint32_t& coreGlobalRowBegin,
+                                                uint32_t& coreGlobalRowEnd)
 {
     uint32_t dispatchGlobalRowBegin = static_cast<uint32_t>(
         range.begin.globalTokenIndex < context.maxOutputSize ? range.begin.globalTokenIndex : context.maxOutputSize);
@@ -443,8 +443,8 @@ __aicore__ inline bool CalcDispatchCoreRowRange(const TokenDispatchConfig &conte
  * 在自己的 UB 里得到一份本地前缀表（发布仍由 AIV1 独担；count 槽只被读，无并发写）。
  */
 template <typename ActivationType, typename TopkIndexType>
-__aicore__ inline void LoadAndComputeExpertCountTable(const MoeStageCommonConfig &common, const Params &params,
-                                                      TokenDispatchScratch<ActivationType, TopkIndexType> &scratch)
+__aicore__ inline void LoadAndComputeExpertCountTable(const MoeStageCommonConfig& common, const Params& params,
+                                                      TokenDispatchScratch<ActivationType, TopkIndexType>& scratch)
 {
     uint32_t rawCountElementCount = common.worldSize * common.moeExpertPerRank;
 
@@ -453,11 +453,12 @@ __aicore__ inline void LoadAndComputeExpertCountTable(const MoeStageCommonConfig
      * 本核已在输入准备阶段更新同步计数，直接读取本核计数生成预期标签。
      * 整表搬入 UB 后批量检查本轮标签，包括零 count；失败退避重试，成功快照直接用于 cumsum。
      */
-    const int32_t syncCount = GetSyncCount(params.peermemInfo.rankSyncInWorldPtr, GetBlockIdx());
+    auto* syncCountAddr = GetSyncCountAddress(params.peermemInfo.rankSyncInWorldPtr, GetBlockIdx());
+    const int32_t syncCount = ReadGmBypassDCache(syncCountAddr);
     const uint32_t expectedSyncRoundTag = GetSyncRoundTag(syncCount);
     GlobalTensor<int32_t> expertCountGlobal;
-    expertCountGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params.peermemInfo.expertCountRecvPtr));
-    // 共享计算之后已有 MTE3_MTE2，保护此处 MTE2 对同一 UB 的复用。
+    expertCountGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(params.peermemInfo.expertCountRecvPtr));
+    // MoE 阶段入口已通过 MTE3_MTE2 完成这段 UB 的交接。
     // expertTokenNumsOutTensor 尚未保存输出，首项暂存整表检查结果，不增加 UB 分配。
     WaitForCountTable(expertCountGlobal, scratch.cumsumInfoTensor, scratch.expertTokenNumsOutTensor,
                       rawCountElementCount, expectedSyncRoundTag);
@@ -471,10 +472,10 @@ __aicore__ inline void LoadAndComputeExpertCountTable(const MoeStageCommonConfig
 // Wave 进入逐专家流水前一次准备完整 count 表；每个物理 block 只发布一次 ready。
 // W4 Wave-ahead 路径同时将 prefix 持久化到 GM，避免后续 Activation 覆盖 UB 后丢失 Dispatch 状态。
 template <bool NeedCumsumReload = false, typename ActivationType, typename TopkIndexType>
-__aicore__ inline void PrepareMoeExpertTokenCountTable(const MoeStageCommonConfig &common,
-                                                       const BlockWorkspaceContext &countWorkspace,
-                                                       const Params &params,
-                                                       TokenDispatchScratch<ActivationType, TopkIndexType> &scratch)
+__aicore__ inline void PrepareMoeExpertTokenCountTable(const MoeStageCommonConfig& common,
+                                                       const BlockWorkspaceContext& countWorkspace,
+                                                       const Params& params,
+                                                       TokenDispatchScratch<ActivationType, TopkIndexType>& scratch)
 {
     if constexpr (g_coreType == AIC) {
         return;
@@ -501,8 +502,8 @@ __aicore__ inline void PrepareMoeExpertTokenCountTable(const MoeStageCommonConfi
     }
     SyncFuncStatic<AscendC::HardEvent::MTE3_S, SYNC_EVENT_ID2>();
 
-    __gm__ int32_t *countTableReady =
-        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.flagSendCntCalToUpdParamsPtr) +
+    __gm__ int32_t* countTableReady =
+        reinterpret_cast<__gm__ int32_t*>(params.workspaceInfo.flagSendCntCalToUpdParamsPtr) +
         static_cast<uint64_t>(countWorkspace.blockIdx) * INT_CACHELINE;
     WriteGmBypassDCache(countTableReady, static_cast<int32_t>(1));
 }
@@ -512,8 +513,8 @@ __aicore__ inline void PrepareMoeExpertTokenCountTable(const MoeStageCommonConfi
  * 从当前物理 block 的 GM 备份恢复“首专家前缀 + 本次范围覆盖的专家前缀”。
  */
 template <typename ActivationType, typename TopkIndexType>
-__aicore__ inline void ReloadDispatchCumsumRange(const MoeStageCommonConfig &common,
-                                                 TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
+__aicore__ inline void ReloadDispatchCumsumRange(const MoeStageCommonConfig& common,
+                                                 TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
                                                  uint32_t firstExpertIdx, uint32_t lastExpertIdx)
 {
     if constexpr (g_coreType == AIC) {
@@ -540,9 +541,9 @@ __aicore__ inline void ReloadDispatchCumsumRange(const MoeStageCommonConfig &com
 }
 
 template <typename ActivationType, typename TopkIndexType>
-__aicore__ inline void ExportExpertTokenCounts(const MoeStageCommonConfig &common,
-                                               const BlockWorkspaceContext &countWorkspace, const Params &params,
-                                               TokenDispatchScratch<ActivationType, TopkIndexType> &scratch)
+__aicore__ inline void ExportExpertTokenCounts(const MoeStageCommonConfig& common,
+                                               const BlockWorkspaceContext& countWorkspace, const Params& params,
+                                               TokenDispatchScratch<ActivationType, TopkIndexType>& scratch)
 {
     if constexpr (g_coreType == AIC) {
         return;
@@ -554,13 +555,13 @@ __aicore__ inline void ExportExpertTokenCounts(const MoeStageCommonConfig &commo
     uint64_t countOffset = GetExpertCountWorkspaceOffset(countWorkspace, common.moeExpertPerRank, 0U, true);
     GlobalTensor<int32_t> expertRecvTokenCount;
     expertRecvTokenCount.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.expertRecvTokenCountPtr));
+        reinterpret_cast<__gm__ int32_t*>(params.workspaceInfo.expertRecvTokenCountPtr));
     DataCopyPad(scratch.expertTokenNumsOutTensor, expertRecvTokenCount[countOffset],
                 {1U, common.moeExpertPerRank * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U}, {true, 0U, 0U, 0U});
     SyncFuncStatic<HardEvent::MTE2_MTE3, SYNC_EVENT_ID2>();
 
     GlobalTensor<int32_t> expertTokenNumsOut;
-    expertTokenNumsOut.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params.expertTokenNumsOutGmAddr));
+    expertTokenNumsOut.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(params.expertTokenNumsOutGmAddr));
     DataCopyPad(expertTokenNumsOut, scratch.expertTokenNumsOutTensor,
                 {1U, common.moeExpertPerRank * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U});
     SyncFuncStatic<HardEvent::MTE3_S, SYNC_EVENT_ID2>();

@@ -30,23 +30,17 @@ using namespace AscendC;
 
 constexpr uint32_t UINT64_BYTE_OFFSET_SHIFT = 3U;
 
-__aicore__ inline __gm__ int32_t *GetSyncCountAddress(GM_ADDR rankSyncBase, uint32_t aivCoreIdx)
+__aicore__ inline __gm__ int32_t* GetSyncCountAddress(GM_ADDR rankSyncBase, uint32_t aivCoreIdx)
 {
-    return reinterpret_cast<__gm__ int32_t *>(rankSyncBase + RANK_SYNC_COUNTER_OFFSET_BYTES +
-                                              static_cast<uint64_t>(aivCoreIdx) * RANK_SYNC_COUNTER_SLOT_BYTES);
-}
-
-// 绕过 DCache 读取指定 AIV 的当前同步计数。
-__aicore__ inline int32_t GetSyncCount(GM_ADDR rankSyncBase, uint32_t aivCoreIdx)
-{
-    return ReadGmBypassDCache(GetSyncCountAddress(rankSyncBase, aivCoreIdx));
+    return reinterpret_cast<__gm__ int32_t*>(rankSyncBase + RANK_SYNC_COUNTER_OFFSET_BYTES +
+                                             static_cast<uint64_t>(aivCoreIdx) * RANK_SYNC_COUNTER_SLOT_BYTES);
 }
 
 // 推进指定物理 AIV 的同步轮次，仅负责计数，不表示量化数据已写回。
 __aicore__ inline void IncrementSyncCount(GM_ADDR rankSyncBase, uint32_t aivCoreIdx)
 {
-    auto *sequenceAddr = GetSyncCountAddress(rankSyncBase, aivCoreIdx);
-    uint32_t nextSequence = static_cast<uint32_t>(GetSyncCount(rankSyncBase, aivCoreIdx)) + 1U;
+    auto* sequenceAddr = GetSyncCountAddress(rankSyncBase, aivCoreIdx);
+    uint32_t nextSequence = static_cast<uint32_t>(ReadGmBypassDCache(sequenceAddr)) + 1U;
     WriteGmBypassDCache(sequenceAddr, static_cast<int32_t>(nextSequence));
 }
 
@@ -69,7 +63,7 @@ __aicore__ inline uint32_t GetSyncRoundTag(int32_t syncCount)
  */
 // InputMask 可在加载时去除输入中的标记位，默认保留完整 int32 数值。
 template <int32_t InputMask = -1>
-__simd_callee__ inline void InclusivePrefixSumInt32(__ubuf__ int32_t *values, uint32_t elementCount)
+__simd_callee__ inline void InclusivePrefixSumInt32(__ubuf__ int32_t* values, uint32_t elementCount)
 {
     constexpr uint32_t ELEMENTS_PER_VECTOR = GetVecLen() / sizeof(int32_t);
     AscendC::Reg::RegTensor<int32_t> prefixReg;
@@ -99,7 +93,7 @@ __simd_callee__ inline void InclusivePrefixSumInt32(__ubuf__ int32_t *values, ui
             AscendC::Reg::Adds(shiftedIndexReg, laneIndexReg, -static_cast<int32_t>(shift), fullMask);
             AscendC::Reg::Maxs(shiftedIndexReg, shiftedIndexReg, 0, fullMask);
             AscendC::Reg::Gather(shiftedReg, prefixReg,
-                                 reinterpret_cast<AscendC::Reg::RegTensor<uint32_t> &>(shiftedIndexReg));
+                                 reinterpret_cast<AscendC::Reg::RegTensor<uint32_t>&>(shiftedIndexReg));
             AscendC::Reg::MaskReg shiftedLaneMask;
             AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::GE>(shiftedLaneMask, laneIndexReg,
                                                                   static_cast<int32_t>(shift), activeMask);
@@ -112,7 +106,7 @@ __simd_callee__ inline void InclusivePrefixSumInt32(__ubuf__ int32_t *values, ui
 
         AscendC::Reg::Duplicate(shiftedIndexReg, static_cast<int32_t>(validCount - 1U), fullMask);
         AscendC::Reg::Gather(carryReg, prefixReg,
-                             reinterpret_cast<AscendC::Reg::RegTensor<uint32_t> &>(shiftedIndexReg));
+                             reinterpret_cast<AscendC::Reg::RegTensor<uint32_t>&>(shiftedIndexReg));
     }
 }
 
@@ -139,14 +133,14 @@ __aicore__ inline GroupSyncSlotLayout CalcGroupSyncSlotLayout(uint32_t expertTok
     return {totalSyncSlotCount / groupCount, totalSyncSlotCount % groupCount};
 }
 
-__aicore__ inline __gm__ int32_t *GetCombineSyncCounterAddress(__gm__ int32_t *expertCounterBase,
+__aicore__ inline __gm__ int32_t* GetCombineSyncCounterAddress(__gm__ int32_t* expertCounterBase,
                                                                uint32_t localSyncSlotIndex)
 {
     return expertCounterBase + static_cast<uint64_t>(localSyncSlotIndex) * INT_CACHELINE;
 }
 
-__aicore__ inline void GetGroupSyncSlotRange(uint32_t groupIndex, const GroupSyncSlotLayout &slotLayout,
-                                             uint32_t &firstSyncSlot, uint32_t &syncSlotCount)
+__aicore__ inline void GetGroupSyncSlotRange(uint32_t groupIndex, const GroupSyncSlotLayout& slotLayout,
+                                             uint32_t& firstSyncSlot, uint32_t& syncSlotCount)
 {
     syncSlotCount = slotLayout.baseSlotCountPerGroup + (groupIndex < slotLayout.extraSlotGroupCount ? 1U : 0U);
     uint32_t precedingExtraSlotCount =
@@ -167,8 +161,8 @@ __aicore__ inline uint32_t GetMGroupCountForRows(uint64_t rowCount, uint32_t row
 }
 
 // 当前 AIC 未分到该 Wave problem 的任何 tile 时，补偿推进 rolling 游标并返回 true。
-__aicore__ inline bool HandleWaveProblemWithoutWork(uint32_t problemTileCount, const BlockJobContext &blockJob,
-                                                    uint32_t &startBlockIdx)
+__aicore__ inline bool HandleWaveProblemWithoutWork(uint32_t problemTileCount, const BlockJobContext& blockJob,
+                                                    uint32_t& startBlockIdx)
 {
     if constexpr (g_coreType == AIC) {
         if (problemTileCount < blockJob.totalJobs) {
@@ -197,7 +191,7 @@ __aicore__ inline uint32_t GetWaveEndRowOffsetInExpert(uint64_t expertRowCount, 
 }
 
 // 连续均衡分配工作项，前 totalWorkItems % job.totalJobs 个任务各多处理一项。
-__aicore__ inline WorkRange GetBalancedWorkRange(uint32_t totalWorkItems, const AivJobContext &job)
+__aicore__ inline WorkRange GetBalancedWorkRange(uint32_t totalWorkItems, const AivJobContext& job)
 {
     if (job.totalJobs == 0U || job.jobIndex >= job.totalJobs) {
         return {};
@@ -222,11 +216,11 @@ __aicore__ inline WorkRange GetRotatedBalancedWorkRange(uint32_t totalWorkItems,
 
 #if defined(__DAV_C310_CUBE__) || defined(__DAV_C310_VEC__)
 // 使用调用方准备的全零 UB Tensor 清理指定范围；range 以 int32 元素为单位。
-__aicore__ inline void ResetWorkspaceRegion(const WorkRange &range, GM_ADDR regionPtr, int32_t batchElementCount,
-                                            LocalTensor<int32_t> &resetTensor)
+__aicore__ inline void ResetWorkspaceRegion(const WorkRange& range, GM_ADDR regionPtr, int32_t batchElementCount,
+                                            LocalTensor<int32_t>& resetTensor)
 {
     GlobalTensor<int32_t> regionGm;
-    regionGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(regionPtr));
+    regionGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(regionPtr));
     for (uint32_t offset = 0; offset < range.count; offset += static_cast<uint32_t>(batchElementCount)) {
         uint32_t batchCount = range.count - offset < static_cast<uint32_t>(batchElementCount) ?
                                   range.count - offset :
@@ -238,8 +232,8 @@ __aicore__ inline void ResetWorkspaceRegion(const WorkRange &range, GM_ADDR regi
 
 // 按任务划分对齐范围，再复用范围版本执行清零。
 template <int32_t JobAlignment>
-__aicore__ inline void ResetWorkspaceRegion(const AivJobContext &job, GM_ADDR regionPtr, int32_t elementCount,
-                                            int32_t batchElementCount, LocalTensor<int32_t> &resetTensor)
+__aicore__ inline void ResetWorkspaceRegion(const AivJobContext& job, GM_ADDR regionPtr, int32_t elementCount,
+                                            int32_t batchElementCount, LocalTensor<int32_t>& resetTensor)
 {
     const WorkRange range = TilingByJobContext(static_cast<uint32_t>(elementCount), job.jobIndex, job.totalJobs,
                                                static_cast<uint32_t>(JobAlignment));
@@ -248,7 +242,7 @@ __aicore__ inline void ResetWorkspaceRegion(const AivJobContext &job, GM_ADDR re
 
 #endif
 
-__aicore__ inline void TilingByCore(int32_t totalLen, int32_t &coreLen, int32_t &coreOffset, int32_t align = ALIGN_32)
+__aicore__ inline void TilingByCore(int32_t totalLen, int32_t& coreLen, int32_t& coreOffset, int32_t align = ALIGN_32)
 {
     int32_t coreIdx = GetBlockIdx();
     int32_t coreNum = GetBlockNum() * 2;
@@ -266,7 +260,7 @@ __aicore__ inline void TilingByCore(int32_t totalLen, int32_t &coreLen, int32_t 
 
 // 普通路径沿用 [expert][block] 的 32B 槽；Wave 一次发布完整表后使用
 // [block][expert] 连续布局，减少逐专家元数据同步。
-__aicore__ inline uint64_t GetExpertCountWorkspaceOffset(const BlockWorkspaceContext &workspace, uint32_t expertCount,
+__aicore__ inline uint64_t GetExpertCountWorkspaceOffset(const BlockWorkspaceContext& workspace, uint32_t expertCount,
                                                          uint32_t expertIdx, bool useBlockMajorLayout)
 {
     if (useBlockMajorLayout) {
@@ -277,7 +271,7 @@ __aicore__ inline uint64_t GetExpertCountWorkspaceOffset(const BlockWorkspaceCon
            static_cast<uint64_t>(INT32_PER_256B) * workspace.blockIdx;
 }
 
-__aicore__ inline void GmSignalWaitBarrier(__gm__ int32_t *sigAddr, int32_t compareValue)
+__aicore__ inline void GmSignalWaitBarrier(__gm__ int32_t* sigAddr, int32_t compareValue)
 {
     do {
         if (ReadGmBypassDCache(sigAddr) == compareValue) {
@@ -286,7 +280,7 @@ __aicore__ inline void GmSignalWaitBarrier(__gm__ int32_t *sigAddr, int32_t comp
     } while (true);
 }
 
-__aicore__ inline uint64_t GetUrmaCommHandle(__gm__ Mc2MoeContext *mc2Context, uint32_t rankId, uint32_t epRankId)
+__aicore__ inline uint64_t GetUrmaCommHandle(__gm__ Mc2MoeContext* mc2Context, uint32_t rankId, uint32_t epRankId)
 {
     uint32_t index = rankId > epRankId ? rankId - 1U : rankId;
     return mc2Context->hcommHandle_[index];
@@ -301,9 +295,9 @@ __aicore__ inline GM_ADDR GetRankWinAddrWithOffset(uint32_t rankId, uint64_t off
 
 __aicore__ inline GM_ADDR GetTensorAddr(uint16_t index, GM_ADDR tensorPtr)
 {
-    __gm__ uint64_t *dataAddr = reinterpret_cast<__gm__ uint64_t *>(tensorPtr);
+    __gm__ uint64_t* dataAddr = reinterpret_cast<__gm__ uint64_t*>(tensorPtr);
     uint64_t tensorPtrOffset = *dataAddr;
-    __gm__ uint64_t *retPtr = dataAddr + (tensorPtrOffset >> UINT64_BYTE_OFFSET_SHIFT);
+    __gm__ uint64_t* retPtr = dataAddr + (tensorPtrOffset >> UINT64_BYTE_OFFSET_SHIFT);
     return reinterpret_cast<GM_ADDR>(*(retPtr + index));
 }
 
@@ -320,18 +314,18 @@ __aicore__ inline GM_ADDR GetExpertWeightAddr(GM_ADDR tensorListAddr, bool isPer
 }
 
 template <size_t I, typename T>
-__aicore__ constexpr inline decltype(auto) Get(T &&value)
+__aicore__ constexpr inline decltype(auto) Get(T&& value)
 {
     return AscendC::Std::get<I>(AscendC::Std::forward<T>(value));
 }
 
 template <size_t First, size_t Second, size_t... Rest, typename T>
-__aicore__ constexpr inline decltype(auto) Get(T &&value)
+__aicore__ constexpr inline decltype(auto) Get(T&& value)
 {
     return Get<Second, Rest...>(AscendC::Std::get<First>(AscendC::Std::forward<T>(value)));
 }
 
-__aicore__ inline ExpertLoopState CreateExpertLoopState(const MoeStageCommonConfig &context)
+__aicore__ inline ExpertLoopState CreateExpertLoopState(const MoeStageCommonConfig& context)
 {
     ExpertLoopState state;
     Get<N_VALUE>(state.problemShape) = context.gmm1OutputDim;
@@ -340,7 +334,7 @@ __aicore__ inline ExpertLoopState CreateExpertLoopState(const MoeStageCommonConf
 }
 
 // 按专家顺序推进连续 token 行偏移，并用当前专家的 token 数更新 M 维度。
-__aicore__ inline void UpdateExpertLoopState(ExpertLoopState &state, uint32_t expertIdx, uint64_t expertTokenCount)
+__aicore__ inline void UpdateExpertLoopState(ExpertLoopState& state, uint32_t expertIdx, uint64_t expertTokenCount)
 {
     if (expertIdx != state.expertIdx) {
         state.globalTokenStartIndex += Get<M_VALUE>(state.problemShape);
@@ -352,7 +346,7 @@ __aicore__ inline void UpdateExpertLoopState(ExpertLoopState &state, uint32_t ex
 // 按当前 Wave 的剩余容量推进专家 token 位置，返回本次推进覆盖的 token 数。
 template <uint32_t TileM>
 __aicore__ inline uint32_t AdvanceExpertTokenPositionInWave(uint32_t expertTokenCount, uint32_t waveMGroupTarget,
-                                                            uint32_t &waveMGroupCount, ExpertTokenPosition &position)
+                                                            uint32_t& waveMGroupCount, ExpertTokenPosition& position)
 {
     uint32_t expertRemainingTokenCount = expertTokenCount - position.tokenIndexInExpert;
     uint32_t waveRemainingTokenCapacity = (waveMGroupTarget - waveMGroupCount) * TileM;
@@ -369,7 +363,7 @@ __aicore__ inline uint32_t AdvanceExpertTokenPositionInWave(uint32_t expertToken
 }
 
 // 轮询 GM 中的 int32 ready flag，并在两次读取之间加入短暂退避。
-__aicore__ inline void WaitUntilGmFlagIsNonZero(__gm__ int32_t *flagAddr)
+__aicore__ inline void WaitUntilGmFlagIsNonZero(__gm__ int32_t* flagAddr)
 {
     while (AscendC::ReadGmBypassDCache(flagAddr) == 0) {
         int64_t startCycle = AscendC::GetSystemCycle();
@@ -383,9 +377,9 @@ __aicore__ inline void WaitUntilGmFlagIsNonZero(__gm__ int32_t *flagAddr)
  * 的 Dispatch 数据就绪依赖由 WaitForGmm1InputReady 处理。
  */
 __aicore__ inline void WaitForMoeExpertTokenCountReady(GM_ADDR tokenCountReadyFlagWorkspace,
-                                                       const BlockWorkspaceContext &countWorkspace, uint32_t expertIdx)
+                                                       const BlockWorkspaceContext& countWorkspace, uint32_t expertIdx)
 {
-    __gm__ int32_t *tokenCountReadyFlag = reinterpret_cast<__gm__ int32_t *>(tokenCountReadyFlagWorkspace) +
+    __gm__ int32_t* tokenCountReadyFlag = reinterpret_cast<__gm__ int32_t*>(tokenCountReadyFlagWorkspace) +
                                           static_cast<uint64_t>(expertIdx) * countWorkspace.blockNum * INT_CACHELINE +
                                           static_cast<uint64_t>(countWorkspace.blockIdx) * INT_CACHELINE;
     WaitUntilGmFlagIsNonZero(tokenCountReadyFlag);
@@ -393,12 +387,12 @@ __aicore__ inline void WaitForMoeExpertTokenCountReady(GM_ADDR tokenCountReadyFl
 
 // 从当前 block 的 [block][expert] workspace 行读取专家 token 数。
 __aicore__ inline uint32_t GetExpertTokenCountFromWorkspace(GM_ADDR expertTokenCountWorkspace,
-                                                            const BlockWorkspaceContext &countWorkspace,
+                                                            const BlockWorkspaceContext& countWorkspace,
                                                             uint32_t expertCount, uint32_t expertIdx)
 {
     uint64_t countSlotIndex = GetExpertCountWorkspaceOffset(countWorkspace, expertCount, expertIdx, true);
-    __gm__ int32_t *expertTokenCountAddr =
-        reinterpret_cast<__gm__ int32_t *>(expertTokenCountWorkspace) + countSlotIndex;
+    __gm__ int32_t* expertTokenCountAddr =
+        reinterpret_cast<__gm__ int32_t*>(expertTokenCountWorkspace) + countSlotIndex;
     return static_cast<uint32_t>(AscendC::ReadGmBypassDCache(expertTokenCountAddr));
 }
 
@@ -409,10 +403,10 @@ __aicore__ inline uint32_t GetExpertTokenCountFromWorkspace(GM_ADDR expertTokenC
  */
 template <uint32_t TileM>
 __aicore__ inline ExpertTokenRange PlanNextExpertTokenRangeInWave(GM_ADDR expertTokenCountWorkspace,
-                                                                  const BlockWorkspaceContext &countWorkspace,
+                                                                  const BlockWorkspaceContext& countWorkspace,
                                                                   uint32_t expertCount, uint32_t waveMGroupTarget,
-                                                                  uint32_t &waveMGroupCount,
-                                                                  const ExpertTokenPosition &position)
+                                                                  uint32_t& waveMGroupCount,
+                                                                  const ExpertTokenPosition& position)
 {
     ExpertTokenPosition plannedPosition = position;
     while (plannedPosition.expertIdx < expertCount && waveMGroupCount < waveMGroupTarget) {
@@ -435,12 +429,12 @@ __aicore__ inline ExpertTokenRange PlanNextExpertTokenRangeInWave(GM_ADDR expert
 
 // 出口跨卡握手：物理 AIV 分别推进自己的 sequence，入口已在 MoE 量化后推进一次。
 __aicore__ inline int32_t CrossRankHandshakeInWorldSize(GM_ADDR rankSyncInWorldPtr, uint32_t rankId, uint32_t worldSize,
-                                                        const AivJobContext &syncJob, __gm__ int32_t *syncCount)
+                                                        const AivJobContext& syncJob, __gm__ int32_t* syncCount)
 {
-    auto *syncRank = reinterpret_cast<__gm__ int32_t *>(rankSyncInWorldPtr);
+    auto* syncRank = reinterpret_cast<__gm__ int32_t*>(rankSyncInWorldPtr);
     const int32_t count = static_cast<int32_t>(static_cast<uint32_t>(ReadGmBypassDCache(syncCount)) + 1U);
     for (uint32_t rankIdx = syncJob.jobIndex; rankIdx < worldSize; rankIdx += syncJob.totalJobs) {
-        auto *remoteSyncAddr = reinterpret_cast<__gm__ int32_t *>(g_winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
+        auto* remoteSyncAddr = reinterpret_cast<__gm__ int32_t*>(g_winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
         WriteGmBypassDCache(remoteSyncAddr, count);
         GmSignalWaitBarrier(syncRank + rankIdx * INT_CACHELINE, count);
     }
@@ -450,9 +444,9 @@ __aicore__ inline int32_t CrossRankHandshakeInWorldSize(GM_ADDR rankSyncInWorldP
 
 // Caller selects participating AIV cores; this entry performs full-AIV synchronization.
 __aicore__ inline void CrossRankSyncInWorldSize(GM_ADDR rankSyncInWorldPtr, uint32_t rankId, uint32_t worldSize,
-                                                const AivJobContext &aivJob)
+                                                const AivJobContext& aivJob)
 {
-    auto *syncCount = GetSyncCountAddress(rankSyncInWorldPtr, aivJob.jobIndex);
+    auto* syncCount = GetSyncCountAddress(rankSyncInWorldPtr, aivJob.jobIndex);
     CrossRankHandshakeInWorldSize(rankSyncInWorldPtr, rankId, worldSize, aivJob, syncCount);
     PipeBarrier<PIPE_ALL>();
     SyncAll<true>();
