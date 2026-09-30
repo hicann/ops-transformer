@@ -382,7 +382,7 @@ int main() {
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   std::vector<int64_t> keyCacheShape = {2, 2, 32, 2};
   std::vector<int64_t> valueCacheShape = {2, 2, 32, 4};
-  std::vector<int64_t> blockTablesShape = {4,6};
+  std::vector<int64_t> blockTablesShape = {4, 6};
   std::vector<int64_t> seqLensShape = {4};
   std::vector<int64_t> keyShape = {12, 32, 2};
   std::vector<int64_t> valueShape = {12, 32, 4};
@@ -397,13 +397,13 @@ int main() {
   void* valueDeviceAddr = nullptr;
   void* seqOffsetAddr = nullptr;
 
-  aclTensor* keyCache= nullptr;
+  aclTensor* keyCache = nullptr;
   aclTensor* valueCache = nullptr;
-  aclTensor* blockTables= nullptr;
-  aclTensor* seqLens= nullptr;
+  aclTensor* blockTables = nullptr;
+  aclTensor* seqLens = nullptr;
   aclTensor* key = nullptr;
-  aclTensor* value= nullptr;
-  aclTensor* seqOffset= nullptr;
+  aclTensor* value = nullptr;
+  aclTensor* seqOffset = nullptr;
 
   std::vector<uint16_t> keyCacheHostData(256, 1);
   std::vector<uint16_t> valueCacheHostData(512, 1);
@@ -481,8 +481,8 @@ int main() {
   // 7. 释放device资源，需要根据具体API的接口定义修改
   aclrtFree(keyCacheDeviceAddr);
   aclrtFree(valueCacheDeviceAddr);
-  aclrtFree(blockTablesDeviceAddr );
-  aclrtFree(seqLensDeviceAddr );
+  aclrtFree(blockTablesDeviceAddr);
+  aclrtFree(seqLensDeviceAddr);
   aclrtFree(keyDeviceAddr);
   aclrtFree(valueDeviceAddr);
   aclrtFree(seqOffsetAddr);
