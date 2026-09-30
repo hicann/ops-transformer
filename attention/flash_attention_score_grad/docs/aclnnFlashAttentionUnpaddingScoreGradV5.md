@@ -846,18 +846,18 @@ int main() {
   aclTensor* dpse = nullptr;
   aclTensor* dsink = nullptr;
 
-  std::vector<float> qHostData(32768, 1);
-  std::vector<float> kHostData(32768, 1);
-  std::vector<float> vHostData(32768, 1);
-  std::vector<float> dxHostData(32768, 1);
+  std::vector<uint16_t> qHostData(32768, 0);
+  std::vector<uint16_t> kHostData(32768, 0);
+  std::vector<uint16_t> vHostData(32768, 0);
+  std::vector<uint16_t> dxHostData(32768, 0);
   std::vector<uint8_t> attenmaskHostData(65536, 0);
   std::vector<float> softmaxMaxHostData(2048, 3.0);
   std::vector<float> softmaxSumHostData(2048, 3.0);
-  std::vector<float> attentionInHostData(32768, 1);
+  std::vector<uint16_t> attentionInHostData(32768, 0);
   std::vector<float> sinkInOptionalHostData(1, 0);
-  std::vector<float> dqHostData(32768, 0);
-  std::vector<float> dkHostData(32768, 0);
-  std::vector<float> dvHostData(32768, 0);
+  std::vector<uint16_t> dqHostData(32768, 0);
+  std::vector<uint16_t> dkHostData(32768, 0);
+  std::vector<uint16_t> dvHostData(32768, 0);
   std::vector<float> dsinkHostData(1, 0);
   ret = CreateAclTensor(qHostData, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT16, &q);
   CHECK_RET(ret == ACL_SUCCESS, return ret);

@@ -280,7 +280,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3(
         <td>-</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>[N,T,8]</td>
+        <td>[T,N,8]</td>
         <td>√</td>
       </tr>
       <tr>
@@ -290,7 +290,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3(
         <td>-</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>[N,T,8]</td>
+        <td>[T,N,8]</td>
         <td>√</td>
       </tr>
       <tr>

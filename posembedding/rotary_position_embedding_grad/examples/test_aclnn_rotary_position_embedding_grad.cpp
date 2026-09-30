@@ -14,18 +14,18 @@
 #include <vector>
 
 #define CHECK_RET(cond, return_expr) \
-    do {                             \
-        if (!(cond)) {               \
-            return_expr;             \
-        }                            \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)         \
-    do {                                \
+#define LOG_PRINT(message, ...) \
+    do { \
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t>& shape)
+int64_t GetShapeSize(const std::vector<int64_t> &shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -34,7 +34,7 @@ int64_t GetShapeSize(const std::vector<int64_t>& shape)
     return shape_size;
 }
 
-int Init(int32_t deviceId, aclrtStream* stream)
+int Init(int32_t deviceId, aclrtStream *stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -47,8 +47,8 @@ int Init(int32_t deviceId, aclrtStream* stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor)
+int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
+                    aclDataType dataType, aclTensor **tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -87,16 +87,16 @@ int main()
     std::vector<int64_t> dxOutShape = {1, 1, 1, 128};
     int64_t mode = 1;
 
-    void* dyDeviceAddr = nullptr;
-    void* cosDeviceAddr = nullptr;
-    void* sinDeviceAddr = nullptr;
-    void* dxOutDeviceAddr = nullptr;
-    aclTensor* dy = nullptr;
-    aclTensor* cos = nullptr;
-    aclTensor* sin = nullptr;
-    aclTensor* dxOut = nullptr;
-    aclTensor* dcosOut = nullptr;
-    aclTensor* dsinOut = nullptr;
+    void *dyDeviceAddr = nullptr;
+    void *cosDeviceAddr = nullptr;
+    void *sinDeviceAddr = nullptr;
+    void *dxOutDeviceAddr = nullptr;
+    aclTensor *dy = nullptr;
+    aclTensor *cos = nullptr;
+    aclTensor *sin = nullptr;
+    aclTensor *dxOut = nullptr;
+    aclTensor *dcosOut = nullptr;
+    aclTensor *dsinOut = nullptr;
 
     std::vector<float> dyHostData = {
         74,  54, 84, 125, 23,  78,  37,  72,  27, 98,  34,  107, 29,  23,  54,  60, 70,  49,  119, 54,  29,  54,
@@ -141,10 +141,10 @@ int main()
                               emptyTensorOutShape.size(), nullptr);
     dsinOut = aclCreateTensor(emptyTensorOutShape.data(), emptyTensorOutShape.size(), aclDataType::ACL_FLOAT,
                               emptyTensorStride.data(), 0, aclFormat::ACL_FORMAT_ND, emptyTensorOutShape.data(),
-                              emptyTensorOutShape.size(), nullptr);                               
+                              emptyTensorOutShape.size(), nullptr);
     // 3. 调用CANN算子库API，需要修改为具体的API
     uint64_t workspaceSize = 0;
-    aclOpExecutor* executor;
+    aclOpExecutor *executor;
     // 调用aclnnRotaryPositionEmbeddingGrad第一段接口
     ret = aclnnRotaryPositionEmbeddingGradGetWorkspaceSize(dy, cos, sin, nullptr, mode, dxOut, dcosOut, dsinOut,
                                                            &workspaceSize, &executor);
@@ -152,7 +152,7 @@ int main()
               LOG_PRINT("aclnnRotaryPositionEmbeddingGradGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
-    void* workspaceAddr = nullptr;
+    void *workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret;);
