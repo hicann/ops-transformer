@@ -414,7 +414,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>winLeft</td>
       <td>输入</td>
       <td>滑窗attention场景下，滑窗需要向前包含多少个token。</td>
-      <td>用于滑窗attention；不开启时必须为-1，需与maskType配合，见<a href="#掩码说明">掩码说明</a>。当前只支持传入-1。</td>
+      <td>用于滑窗attention；不使能时必须为-1，需与maskType配合，见<a href="#掩码说明">掩码说明</a>。当前只支持传入-1。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -424,7 +424,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>winRight</td>
       <td>输入</td>
       <td>滑窗attention场景下，滑窗需要向后包含多少个token。</td>
-      <td>用于滑窗attention；不开启时必须为-1，需与maskType配合，见<a href="#掩码说明">掩码说明</a>。当前只支持传入-1。</td>
+      <td>用于滑窗attention；不使能时必须为-1，需与maskType配合，见<a href="#掩码说明">掩码说明</a>。当前只支持传入-1。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -433,7 +433,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
     <tr>
       <td>returnSoftmaxlse</td>
       <td>输入</td>
-      <td>是否开启softmaxLse输出的标志位。</td>
+      <td>是否使能softmaxLse输出的标志位。</td>
       <td>
     当前仅支持传0
     <ul>
@@ -448,8 +448,8 @@ aclnnStatus aclnnGenericBlockSparseAttention(
     <tr>
       <td>residualBlockMode</td>
       <td>输入</td>
-      <td>表示KV序列以blockShapeY为单位进行稀疏后，尾部不完整块的状态。</td>
-      <td>当前仅支持取0或1。0代表尾部不完整块是否参与运算由sparseBlockIdx传入的值决定，1表示尾部不完整块必定参与运算，但必定不包含在sparseBlockIdx中。</td>
+      <td>表示KV序列以blockShapeY为单位进行稀疏后，末尾块的状态。</td>
+      <td>当前仅支持取0或1。0代表末尾块是否参与运算由sparseBlockIdx传入的值决定，1表示尾部不完整块必定参与运算，但必定不包含在sparseBlockIdx中。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -779,7 +779,7 @@ sparseBlockIdx、sparseBlockCount的shape由layoutSparsePattern决定，当前la
   </tbody>
   </table>
 
-key、value的shape由layoutKv及是否开启Paged Cache决定，见<a href="#paged-attention相关说明">Paged Attention相关说明</a>。
+key、value的shape由layoutKv及是否使能Paged Cache决定，见<a href="#paged-attention相关说明">Paged Attention相关说明</a>。
 
 ### Paged Attention相关说明
 
@@ -797,7 +797,7 @@ key、value的shape由layoutKv及是否开启Paged Cache决定，见<a href="#pa
   </thead>
   <tbody>
     <tr>
-      <td rowspan="2">非空，shape为[batch, maxNumBlocksPerBatch]，代表开启paged cache</td>
+      <td rowspan="2">非空，shape为[batch, maxNumBlocksPerBatch]，代表使能paged cache</td>
       <td>PA_BBND</td>
       <td>[numBlocks, blockSize, numKeyValueHeads, headDim]</td>
     </tr>
@@ -806,7 +806,7 @@ key、value的shape由layoutKv及是否开启Paged Cache决定，见<a href="#pa
       <td>[numBlocks, numKeyValueHeads, blockSize, headDim]</td>
     </tr>
     <tr>
-      <td rowspan="3">空，代表不开启paged cache，算子接收原始KV输入</td>
+      <td rowspan="3">空，代表不使能paged cache，算子接收原始KV输入</td>
       <td>TND</td>
       <td>[totalKTokens, numKeyValueHeads, headDim]</td>
     </tr>
