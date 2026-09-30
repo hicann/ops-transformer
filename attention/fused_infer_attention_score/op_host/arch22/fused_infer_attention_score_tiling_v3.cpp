@@ -898,7 +898,7 @@ constexpr uint32_t TND_NTD_D_IDX = 2;
 constexpr int64_t HEAD_DIM_192 = 192;
 constexpr int64_t HEAD_DIM_64 = 64;
 
-FIA_EXTERN_C ge::graphStatus TilingFusedInferAttentionScoreV3(gert::TilingContext *context)
+FIA_EXTERN_C ge::graphStatus TilingFusedInferAttentionScoreV3(gert::TilingContext* context)
 {
     FiaTilingInfo fiaInfo;
     FiaInfoParser fiaInfoParser(context);
@@ -917,7 +917,7 @@ FIA_EXTERN_C ge::graphStatus TilingFusedInferAttentionScoreV3(gert::TilingContex
     return FiaTilingRegistry::GetInstance().DoTilingImpl(context, &fiaInfo);
 }
 
-int32_t GetLayoutGroup(const std::string &inputLayoutStr)
+int32_t GetLayoutGroup(const std::string& inputLayoutStr)
 {
     if (inputLayoutStr == "BNSD_BSND" || inputLayoutStr == "BSND_BNSD" || inputLayoutStr == "BNSD_NBSD" ||
         inputLayoutStr == "BSND_NBSD" || inputLayoutStr == "BNSD" || inputLayoutStr == "BSND") {
@@ -931,8 +931,8 @@ int32_t GetLayoutGroup(const std::string &inputLayoutStr)
     return -1;
 }
 
-bool GetQueryDByLayoutGroup(int32_t layoutGroup, const gert::Shape &qStorageShape, const gert::StorageShape *qRopeShape,
-                            int64_t numHeads, int64_t &queryD, int64_t &queryRopeD)
+bool GetQueryDByLayoutGroup(int32_t layoutGroup, const gert::Shape& qStorageShape, const gert::StorageShape* qRopeShape,
+                            int64_t numHeads, int64_t& queryD, int64_t& queryRopeD)
 {
     if (layoutGroup == 0) { // 0: layout is "BNSD_BSND" || "BSND_BNSD" || "BNSD_NBSD" || "BSND_NBSD" || "BNSD" || "BSND"
         if (qStorageShape.GetDimNum() != DIM_BNSD_OR_BSND) {
@@ -964,7 +964,7 @@ bool GetQueryDByLayoutGroup(int32_t layoutGroup, const gert::Shape &qStorageShap
     return true;
 }
 
-bool GetValueDByLayoutGroup(int32_t layoutGroup, const gert::Shape &vStorageShape, int64_t numKvHeads, int64_t &valueD)
+bool GetValueDByLayoutGroup(int32_t layoutGroup, const gert::Shape& vStorageShape, int64_t numKvHeads, int64_t& valueD)
 {
     if (layoutGroup == 0) { // 0: layout is "BNSD_BSND" || "BSND_BNSD" || "BNSD_NBSD" || "BSND_NBSD" || "BNSD" || "BSND"
         if (vStorageShape.GetDimNum() != DIM_BNSD_OR_BSND) {
@@ -987,7 +987,7 @@ bool GetValueDByLayoutGroup(int32_t layoutGroup, const gert::Shape &vStorageShap
     return true;
 }
 
-bool GetPaValueD(const gert::TilingContext *context, int64_t &valueD)
+bool GetPaValueD(const gert::TilingContext* context, int64_t& valueD)
 {
     auto attrs = context->GetAttrs();
     int64_t numHeads = *attrs->GetAttrPointer<int64_t>(ATTR_N_INDEX);
@@ -1008,7 +1008,7 @@ bool GetPaValueD(const gert::TilingContext *context, int64_t &valueD)
     return true;
 }
 
-bool GetValueD(gert::TilingContext *context, int64_t &valueD)
+bool GetValueD(gert::TilingContext* context, int64_t& valueD)
 {
     auto vShape = context->GetInputShape(VALUE_INDEX);
     if (vShape == nullptr) {
@@ -1030,7 +1030,7 @@ bool GetValueD(gert::TilingContext *context, int64_t &valueD)
     return GetValueDByLayoutGroup(layoutGroup, vShape->GetStorageShape(), numKvHeads, valueD);
 }
 
-bool GetQS(const gert::TilingContext *context, int64_t &queryS)
+bool GetQS(const gert::TilingContext* context, int64_t& queryS)
 {
     const std::string inputLayoutStr = std::string(context->GetAttrs()->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX));
     auto qShape = context->GetInputShape(QUERY_INDEX);
@@ -1059,7 +1059,7 @@ bool GetQS(const gert::TilingContext *context, int64_t &queryS)
     return true;
 }
 
-bool GetQkvD(gert::TilingContext *context, int64_t &queryD, int64_t &queryRopeD, int64_t &valueD)
+bool GetQkvD(gert::TilingContext* context, int64_t& queryD, int64_t& queryRopeD, int64_t& valueD)
 {
     auto qShape = context->GetInputShape(QUERY_INDEX);
     auto qRopeShape = context->GetOptionalInputShape(QUERY_ROPE_INDEX);
@@ -1079,7 +1079,7 @@ bool GetQkvD(gert::TilingContext *context, int64_t &queryD, int64_t &queryRopeD,
     return GetValueD(context, valueD);
 }
 
-bool CheckGqaDSupport(gert::TilingContext *context)
+bool CheckGqaDSupport(gert::TilingContext* context)
 {
     int64_t queryD = 0;
     int64_t queryRopeD = 0;
@@ -1096,7 +1096,7 @@ bool CheckGqaDSupport(gert::TilingContext *context)
     return false;
 }
 
-bool CheckGqaInputLayoutSupport(const gert::TilingContext *context)
+bool CheckGqaInputLayoutSupport(const gert::TilingContext* context)
 {
     const std::string inputLayoutStr = std::string(context->GetAttrs()->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX));
     if (inputLayoutStr == "BNSD_BSND" || inputLayoutStr == "BSND_BNSD" || inputLayoutStr == "BNSD" ||
@@ -1108,7 +1108,7 @@ bool CheckGqaInputLayoutSupport(const gert::TilingContext *context)
     return false;
 }
 
-bool IsEmptyTensor(const gert::TilingContext *context)
+bool IsEmptyTensor(const gert::TilingContext* context)
 {
     auto qShape = context->GetInputShape(QUERY_INDEX);
     if ((qShape != nullptr) && (qShape->GetStorageShape().GetShapeSize() == 0)) {
@@ -1130,7 +1130,7 @@ bool IsEmptyTensor(const gert::TilingContext *context)
 
     uint32_t keyBIdx = 0;
     while ((context->GetDynamicInputShape(KEY_INDEX, keyBIdx)) != nullptr) {
-        const gert::StorageShape *keyShape = context->GetDynamicInputShape(KEY_INDEX, keyBIdx);
+        const gert::StorageShape* keyShape = context->GetDynamicInputShape(KEY_INDEX, keyBIdx);
         if (keyShape->GetStorageShape().GetShapeSize() == 0) {
             return true;
         }
@@ -1139,7 +1139,7 @@ bool IsEmptyTensor(const gert::TilingContext *context)
 
     uint32_t valueBIdx = 0;
     while ((context->GetDynamicInputShape(VALUE_INDEX, valueBIdx)) != nullptr) {
-        const gert::StorageShape *valueShape = context->GetDynamicInputShape(VALUE_INDEX, valueBIdx);
+        const gert::StorageShape* valueShape = context->GetDynamicInputShape(VALUE_INDEX, valueBIdx);
         if (valueShape->GetStorageShape().GetShapeSize() == 0) {
             return true;
         }
@@ -1149,7 +1149,7 @@ bool IsEmptyTensor(const gert::TilingContext *context)
     return false;
 }
 
-bool CheckGqaFeatureSupport(const gert::TilingContext *context)
+bool CheckGqaFeatureSupport(const gert::TilingContext* context)
 {
     auto quantScale2 = context->GetOptionalInputTensor(QUANT_SCALE2_INDEX);
     auto quantOffset2 = context->GetOptionalInputTensor(QUANT_OFFSET2_INDEX);
@@ -1166,7 +1166,7 @@ bool CheckSpecCondNoPA(int64_t tempQD, int64_t tempKD, int64_t tempVD)
     return isFAIDSize;
 }
 
-bool CheckSpecCondPA3Dim(int64_t tempQD, const gert::Shape &kShape, const gert::Shape &vShape, int64_t kvHeadNum)
+bool CheckSpecCondPA3Dim(int64_t tempQD, const gert::Shape& kShape, const gert::Shape& vShape, int64_t kvHeadNum)
 {
     int64_t tempKD = kShape.GetDim(DIM_2) / kvHeadNum;
     int64_t tempVD = vShape.GetDim(DIM_2) / kvHeadNum;
@@ -1178,7 +1178,7 @@ bool CheckSpecCondPA3Dim(int64_t tempQD, const gert::Shape &kShape, const gert::
     return isFAIDSize && blockSizeSupported;
 }
 
-bool CheckSpecCondPA5Dim(int64_t tempQD, const gert::Shape &kShape, const gert::Shape &vShape)
+bool CheckSpecCondPA5Dim(int64_t tempQD, const gert::Shape& kShape, const gert::Shape& vShape)
 {
     int64_t tempKD = kShape.GetDim(DIM_2) * 16;
     int64_t tempVD = vShape.GetDim(DIM_2) * 16;
@@ -1192,7 +1192,7 @@ bool CheckSpecCondPA5Dim(int64_t tempQD, const gert::Shape &kShape, const gert::
     return isFAIDSize && blockSizeSupported;
 }
 
-bool CheckSpecConditions(const gert::TilingContext *context)
+bool CheckSpecConditions(const gert::TilingContext* context)
 {
     auto tempQ = context->GetInputShape(QUERY_INDEX);
     auto tempK = context->GetInputShape(KEY_INDEX);
@@ -1228,7 +1228,9 @@ bool CheckSpecConditions(const gert::TilingContext *context)
     bool isMha = (kvHeadNum == 0) || (headNum == kvHeadNum);
     bool mhaConditions = isMha && !((qDataType == ge::DT_BF16) && (innerPrecise == 1)) &&
                          !((sparseMode == 0) && (tempAttnMaskShape != nullptr));
-    bool nonMhaConditions = !isMha && (innerPrecise == 0);
+    bool nonMhaConditions =
+        !isMha && (innerPrecise == 0) &&
+        !((sparseMode == 0) && (tempAttnMaskShape != nullptr) && (tempQ->GetStorageShape().GetDim(DIM_2) == 256));
     bool quantScale2Flag = context->GetOptionalInputTensor(QUANT_SCALE2_INDEX) != nullptr ? true : false;
     if (!(isLayoutSupported && isLearnableSinkFlag && !isRopeSplitMla && sparseModeSupported &&
           (nonMhaConditions || mhaConditions) && !quantScale2Flag)) {
@@ -1247,7 +1249,7 @@ bool CheckSpecConditions(const gert::TilingContext *context)
     return false;
 }
 
-bool isNotLegacyGQA(gert::TilingContext *context)
+bool isNotLegacyGQA(gert::TilingContext* context)
 {
     const std::string inputLayoutStr = std::string(context->GetAttrs()->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX));
     if (inputLayoutStr != "BSH" && inputLayoutStr != "BSND" && inputLayoutStr != "BNSD" &&
@@ -1281,7 +1283,7 @@ bool isNotLegacyGQA(gert::TilingContext *context)
     return false;
 }
 
-bool CheckGqaConstrain(gert::TilingContext *context)
+bool CheckGqaConstrain(gert::TilingContext* context)
 {
     if (isNotLegacyGQA(context)) {
         return true;
@@ -1295,7 +1297,7 @@ bool CheckGqaConstrain(gert::TilingContext *context)
 }
 
 // mla layout支持范围
-bool CheckMlaInputLayoutSupport(const gert::TilingContext *context)
+bool CheckMlaInputLayoutSupport(const gert::TilingContext* context)
 {
     const std::string inputLayoutStr = std::string(context->GetAttrs()->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX));
     if (inputLayoutStr == "BSH" || inputLayoutStr == "BNSD" || inputLayoutStr == "BSND" ||
@@ -1307,7 +1309,7 @@ bool CheckMlaInputLayoutSupport(const gert::TilingContext *context)
     return false;
 }
 
-bool CheckMlaDSupport(gert::TilingContext *context)
+bool CheckMlaDSupport(gert::TilingContext* context)
 {
     int64_t queryD = 0;
     int64_t queryRopeD = 0;
@@ -1323,7 +1325,7 @@ bool CheckMlaDSupport(gert::TilingContext *context)
     return false;
 }
 
-bool CheckMlaConstrain(gert::TilingContext *context)
+bool CheckMlaConstrain(gert::TilingContext* context)
 {
     if (isNotLegacyGQA(context)) {
         return true;
@@ -1336,7 +1338,7 @@ bool CheckMlaConstrain(gert::TilingContext *context)
     return false;
 }
 
-bool CheckRouteToFiaPrerequisites(gert::TilingContext *context)
+bool CheckRouteToFiaPrerequisites(gert::TilingContext* context)
 {
     if ((context == nullptr) || context->GetAttrs() == nullptr || (context->GetInputDesc(QUERY_INDEX) == nullptr) ||
         (context->GetInputDesc(KEY_INDEX) == nullptr)) {
@@ -1357,14 +1359,14 @@ bool CheckRouteToFiaPrerequisites(gert::TilingContext *context)
 }
 
 bool IsLegacyTemplatePreferred(int64_t queryD, int64_t valueD, int64_t queryRopeD, int64_t queryS,
-                               const std::string &inputLayoutStr, bool isPrefix, bool isMha, bool isPageAttention)
+                               const std::string& inputLayoutStr, bool isPrefix, bool isMha, bool isPageAttention)
 {
     return queryD == valueD && queryRopeD == 0 && queryS == 1 &&
            (inputLayoutStr == "BNSD" || inputLayoutStr == "BSND" || inputLayoutStr == "BSH") &&
            ((queryD == 256U && !isPrefix) || (queryD == 80U && isPrefix)) && isMha && !isPageAttention;
 }
 
-bool RouteToFia(gert::TilingContext *context)
+bool RouteToFia(gert::TilingContext* context)
 {
     if (!CheckRouteToFiaPrerequisites(context)) {
         return false;
@@ -1400,11 +1402,22 @@ bool RouteToFia(gert::TilingContext *context)
 
     const std::string inputLayoutStr = std::string(context->GetAttrs()->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX));
 
-    // TND without rope only supports headDim 64/128/192 in FIA V3 (see CommonChecker::ValidateNoRopeLayoutDim);
-    // other headDim values (e.g. 256) are handled by the original route (FAI), which supports D up to 256.
-    // Note: this covers both 3D (BnBsH) and 4D (BNBD) page-attention KV, so BNBD itself needs no extra block.
+    // For TND without rope, only the full-mask scenarios (sparseMode=1 allMask, or sparseMode=0 with an
+    // external default mask) are handled by FIA V3 at headDim=256. All other TND headDim=256 configs
+    // (sparse 0/3/4 without full mask, 4D BNBD page attention, learnable sink, ...) keep the original
+    // route, so cases that already passed continue to run on their previous path (no route/performance change).
+    const int64_t sparseMode = *(attrs->GetAttrPointer<int64_t>(ATTR_SPARSE_MODE_INDEX));
+    const bool attenMaskPresent = (context->GetOptionalInputShape(ATTEN_MASK_INDEX) != nullptr);
+    const bool isTndNoRopeD256 = (inputLayoutStr == "TND" && queryRopeD == 0 && queryD == valueD && queryD == 256);
+    const bool isFullMaskD256 = isTndNoRopeD256 && (sparseMode == 1 || (sparseMode == 0 && attenMaskPresent));
+    if (isTndNoRopeD256 && !isFullMaskD256) {
+        return false;
+    }
+
+    // TND without rope only supports headDim 64/128/192/256 in FIA V3 (see CommonChecker::ValidateNoRopeLayoutDim);
+    // other headDim values are handled by the original route (FAI), which supports D up to 256.
     if (inputLayoutStr == "TND" && queryRopeD == 0 && queryD == valueD && queryD != 64 && queryD != 128 &&
-        queryD != 192) {
+        queryD != 192 && queryD != 256) {
         return false;
     }
 

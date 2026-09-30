@@ -19,7 +19,20 @@ import time
 import random
 import ctypes
 import copy
-import tensorflow as tf
+
+try:
+    import tensorflow as tf
+except ImportError:
+    # tensorflow is optional here; only tf.bfloat16.as_numpy_dtype is used.
+    import ml_dtypes as _ml_dtypes
+
+    class _TfBfloat16:
+        as_numpy_dtype = _ml_dtypes.bfloat16
+
+    class _TfShim:
+        bfloat16 = _TfBfloat16
+
+    tf = _TfShim()
 from functools import wraps
 from enum import Enum
 from array import array
@@ -12499,7 +12512,15 @@ def overwrite_structured_mask(input_data):
 
 def get_split_fuse_flag(input_data):
     layout = input_data.kwargs["inputLayout"]
-    return layout == "TND"
+    if layout != "TND":
+        return False
+    # TND + sparseMode 0/1 with a user-provided full mask(defaultMask/allMask) is handled by the
+    # FIA V3 path, not by split-fuse (which only supports sparse 3/4 with a compressed mask).
+    sparse_mode = input_data.kwargs.get("sparseMode", 0)
+    atten_mask = input_data.kwargs.get("attenMaskOptional", None)
+    if sparse_mode in (0, 1) and atten_mask is not None:
+        return False
+    return True
 
 
 def load_kv_cache(input_data: InputDataset):

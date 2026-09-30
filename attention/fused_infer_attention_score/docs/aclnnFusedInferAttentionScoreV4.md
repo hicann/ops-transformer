@@ -215,7 +215,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <ul>
             <li>sparseMode = 0、1时
                 <ul>
-                    <li>支持shape传入(B,Q_S,KV_S)、(1,Q_S,KV_S)、(B,1,Q_S,KV_S)、(1,1,Q_S,KV_S)。</li>
+                    <li>支持shape传入(B,Q_S,KV_S)、(1,Q_S,KV_S)、(B,1,Q_S,KV_S)、(1,1,Q_S,KV_S)；inputLayout为TND时，Q_S、KV_S分别为各batch有效Sequence Length的最大值（不要求各batch相等）。</li>
                     <li>另外输入Layout为BSH、BSND、BNSD、BNSD_BSND时，且query与key的D等于value的D，并且不传query_rope和key_rope时，Q_S=1可支持传入(B,KV_S)，Q_S>1时可支持传入(Q_S,KV_S)。</li>
                 </ul>
             </li>
@@ -1582,7 +1582,6 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                 <li>数据类型：FLOAT16、BFLOAT16</li>
                 <li>sparse模式：
                     <ul>
-                    <li>sparse=0（attenMask为nullptr）</li>
                     <li>sparse=3（传优化后的attenMask）</li>
                     <li>sparse=4（传优化后的attenMask，需满足：Q_D=K_D=V_D≤256或Q_D=K_D=192且V_D=128/192；同时preTokens≥-actualSeqLengths、nextTokens≥-actualSeqLengthsKv、preTokens+nextTokens≥0）</li>
                     <li>sparse=9（传入tree mask，inputLayout为BSH/BSND/BNSD时shape为(B,Q_S,Q_S)，inputLayout为TND时shape为(∑Q_Si²,)）</li>
@@ -1597,7 +1596,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                 <li>数据类型：FLOAT16、BFLOAT16</li>
                 <li>sparse模式：
                     <ul>
-                    <li>sparse=0（attenMask为nullptr）</li>
+                    <li>sparse=0（attenMask可为nullptr，此时不做mask操作；也可传入完整的defaultMask矩阵，shape为(B,Q_S,KV_S)、(1,Q_S,KV_S)、(B,1,Q_S,KV_S)或(1,1,Q_S,KV_S)，其中Q_S、KV_S分别为各batch有效Sequence Length的最大值）</li>
                     <li>sparse=3/4（传优化后的attenMask）</li>
                     </ul>
                 </li>
