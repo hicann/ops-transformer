@@ -20,6 +20,8 @@
 #include <cstdint>
 #endif
 
+#include "grouped_matmul_swiglu_quant_swiglu_params.h"
+
 namespace GroupedMatmulSwigluQuantV2TensorApi {
 #pragma pack(push, 8)
 struct GMMTensorApiQuantParams {
@@ -60,6 +62,7 @@ struct GMMTensorApiMMTiling {
 struct GMMSwigluQuantV2TensorApiTilingData {
     GMMTensorApiQuantParams gmmQuantParams;
     GMMTensorApiMMTiling mmTilingData;
+    GMMSwigluQuantSwigluParams swigluParams;
 };
 #pragma pack(pop)
 } // namespace GroupedMatmulSwigluQuantV2TensorApi

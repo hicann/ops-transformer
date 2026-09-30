@@ -37,7 +37,7 @@ public:
     using BType = typename BlockMmadMxOp::BType;
     using CType = typename BlockMmadMxOp::CType;
 
-    __aicore__ inline void Init(TCubeTiling *__restrict matmulTiling, AscendC::TPipe *tpipe = nullptr)
+    __aicore__ inline void Init(TCubeTiling* __restrict matmulTiling, AscendC::TPipe* tpipe = nullptr)
     {
         (void)tpipe;
         uint64_t scaleFactorA = matmulTiling->mxTypePara & MX_SCALE_FACTOR_MASK;
@@ -56,11 +56,11 @@ public:
     }
 
     template <typename SingleShape>
-    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType> &aGlobal,
-                                      const AscendC::GlobalTensor<BType> &bGlobal,
-                                      const AscendC::GlobalTensor<AscendC::fp8_e8m0_t> &scaleAGlobal,
-                                      const AscendC::GlobalTensor<AscendC::fp8_e8m0_t> &scaleBGlobal,
-                                      const AscendC::LocalTensor<CType> &cLocal, const SingleShape &singleShape,
+    __aicore__ inline void operator()(const AscendC::GlobalTensor<AType>& aGlobal,
+                                      const AscendC::GlobalTensor<BType>& bGlobal,
+                                      const AscendC::GlobalTensor<AscendC::fp8_e8m0_t>& scaleAGlobal,
+                                      const AscendC::GlobalTensor<AscendC::fp8_e8m0_t>& scaleBGlobal,
+                                      const AscendC::LocalTensor<CType>& cLocal, const SingleShape& singleShape,
                                       bool transA, bool transB)
     {
         (void)transA;
@@ -136,8 +136,8 @@ __aicore__ inline void GmmSwigluMxFp4WeightNz(GM_ADDR x, GM_ADDR weight, GM_ADDR
                                               GM_ADDR weightAssistanceMatrix, GM_ADDR smoothScale, GM_ADDR groupList,
                                               GM_ADDR y, GM_ADDR yScale, GM_ADDR workspace, GM_ADDR tiling)
 {
-    GET_TILING_DATA_MEMBER(GMMSwigluQuantTilingDataParams, gmmSwigluQuantParams, gmmSwigluQuantParams_, tiling);
-    GET_TILING_DATA_MEMBER(GMMSwigluQuantTilingDataParams, mmTilingData, mmTilingData_, tiling);
+    GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, gmmSwigluQuantParams, gmmSwigluQuantParams_, tiling);
+    GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, mmTilingData, mmTilingData_, tiling);
     using L1TileShape = AscendC::Shape<_0, _0, _0>;
     using L0TileShape = AscendC::Shape<_0, _0, _0>;
     using AType = DTYPE_X;

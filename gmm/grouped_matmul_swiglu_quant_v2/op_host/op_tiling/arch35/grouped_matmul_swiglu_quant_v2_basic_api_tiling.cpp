@@ -19,6 +19,7 @@
 #include "log/log.h"
 #include "platform/platform_infos_def.h"
 #include "../../../op_kernel/arch35/grouped_matmul_swiglu_quant_v2_tiling_key.h"
+#include "grouped_matmul_swiglu_quant_tensor_api_tiling_common.h"
 
 namespace optiling {
 namespace {
@@ -28,15 +29,8 @@ constexpr size_t SHAPE_DIM_ONE = 1;
 constexpr size_t SHAPE_DIM_TWO = 2;
 constexpr size_t SHAPE_DIM_THREE = 3;
 constexpr size_t SHAPE_DIM_FOUR = 4;
-constexpr uint64_t TENSOR_API_FP8_N_ALIGN = 128UL;
-constexpr uint64_t TENSOR_API_TRANS_B_M_PER_GROUP_LOWER_LIMIT = 128UL;
-constexpr uint64_t TENSOR_API_NOT_TRANS_B_M_PER_GROUP_LOWER_LIMIT = 512UL;
-constexpr uint64_t TENSOR_API_B_NOTRANS_M_LOWER_LIMIT = 512UL;
-constexpr uint64_t TENSOR_API_LARGE_M_BASE_M = GmmConstant::BASIC_BLOCK_SIZE_256;
-constexpr uint64_t TENSOR_API_LARGE_N_BASE_N = GmmConstant::BASIC_BLOCK_SIZE_128;
 constexpr uint64_t MX_SCALE_K_ALIGN = 64UL;
 constexpr int64_t MX_QUANT_MODE = 2L;
-constexpr uint64_t AIC_AIV_CORE_RATIO = 2UL;
 
 } // namespace
 
@@ -58,7 +52,7 @@ ge::graphStatus GroupedMatmulSwigluQuantV2BasicApiTiling950::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
-        const auto *compileInfo = context_->GetCompileInfo<GMMSwigluV2CompileInfo>();
+        const auto* compileInfo = context_->GetCompileInfo<GMMSwigluV2CompileInfo>();
         OP_CHECK_IF(compileInfo == nullptr, OP_LOGE(context_->GetNodeName(), "Compile info is nullptr."),
                     return ge::GRAPH_FAILED);
         aicoreParams_.aicNum = compileInfo->aicNum_;
@@ -138,10 +132,10 @@ bool GroupedMatmulSwigluQuantV2BasicApiTiling950::AnalyzeAttrs()
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "Attrs is nullptr."), return false);
 
-    const int64_t *dequantMode = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_DEQUANT_MODE);
-    const int64_t *dequantDtype = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_DEQUANT_DTYPE);
-    const int64_t *quantMode = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_QUANT_MODE);
-    const int64_t *quantDtype = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_QUANT_DTYPE);
+    const int64_t* dequantMode = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_DEQUANT_MODE);
+    const int64_t* dequantDtype = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_DEQUANT_DTYPE);
+    const int64_t* quantMode = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_QUANT_MODE);
+    const int64_t* quantDtype = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_QUANT_DTYPE);
     OP_CHECK_IF(dequantMode == nullptr || dequantDtype == nullptr || quantMode == nullptr || quantDtype == nullptr,
                 OP_LOGE(context_->GetNodeName(), "Required quantization attrs are nullptr."), return false);
     OP_CHECK_IF(*dequantMode != MX_QUANT_MODE || *quantMode != MX_QUANT_MODE,
@@ -150,8 +144,8 @@ bool GroupedMatmulSwigluQuantV2BasicApiTiling950::AnalyzeAttrs()
     OP_CHECK_IF(static_cast<ge::DataType>(*dequantDtype) != ge::DT_FLOAT,
                 OP_LOGE(context_->GetNodeName(), "dequant_dtype must be DT_FLOAT for MX quant."), return false);
     quantDtype_ = static_cast<ge::DataType>(*quantDtype);
-    const bool *transposeWeight = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANSPOSE_WEIGHT);
-    const int64_t *groupListType = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPLIST_TYPE);
+    const bool* transposeWeight = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANSPOSE_WEIGHT);
+    const int64_t* groupListType = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPLIST_TYPE);
     inputParams_.transA = false;
     inputParams_.transB = transposeWeight != nullptr ? *transposeWeight : false;
     inputParams_.groupListType = groupListType != nullptr ? static_cast<int8_t>(*groupListType) : 0;
@@ -171,9 +165,9 @@ bool GroupedMatmulSwigluQuantV2BasicApiTiling950::AnalyzeInputs()
     OP_CHECK_IF(xStorageShape == nullptr || weightStorageShape == nullptr || groupListStorageShape == nullptr,
                 OP_LOGE(context_->GetNodeName(), "x, weight or group_list shape is nullptr."), return false);
 
-    const auto &xShape = xStorageShape->GetOriginShape();
-    const auto &weightShape = weightStorageShape->GetOriginShape();
-    const auto &groupListShape = groupListStorageShape->GetStorageShape();
+    const auto& xShape = xStorageShape->GetOriginShape();
+    const auto& weightShape = weightStorageShape->GetOriginShape();
+    const auto& groupListShape = groupListStorageShape->GetStorageShape();
     OP_CHECK_IF(xShape.GetDimNum() < SHAPE_DIM_TWO || weightShape.GetDimNum() < SHAPE_DIM_TWO,
                 OP_LOGE(context_->GetNodeName(), "x and weight must have at least two dimensions."), return false);
     OP_CHECK_IF(groupListShape.GetDimNum() != SHAPE_DIM_ONE,
@@ -232,8 +226,8 @@ bool GroupedMatmulSwigluQuantV2BasicApiTiling950::CheckTensorApiShapes() const
         GetDynamicInputCount(WEIGHT_SCALE_INDEX) != 1U) {
         return false;
     }
-    const auto &xShape = xShapePtr->GetOriginShape();
-    const auto &weightShape = weightShapePtr->GetOriginShape();
+    const auto& xShape = xShapePtr->GetOriginShape();
+    const auto& weightShape = weightShapePtr->GetOriginShape();
     if (xShape.GetDimNum() != SHAPE_DIM_TWO ||
         (weightShape.GetDimNum() != SHAPE_DIM_TWO && weightShape.GetDimNum() != SHAPE_DIM_THREE)) {
         return false;
@@ -250,8 +244,8 @@ bool GroupedMatmulSwigluQuantV2BasicApiTiling950::CheckTensorApiScaleShapes() co
     if (xScaleShapePtr == nullptr || weightScaleShapePtr == nullptr) {
         return false;
     }
-    const auto &xScaleShape = xScaleShapePtr->GetOriginShape();
-    const auto &weightScaleShape = weightScaleShapePtr->GetOriginShape();
+    const auto& xScaleShape = xScaleShapePtr->GetOriginShape();
+    const auto& weightScaleShape = weightScaleShapePtr->GetOriginShape();
     if (xScaleShape.GetDimNum() != SHAPE_DIM_THREE || weightScaleShape.GetDimNum() != SHAPE_DIM_FOUR) {
         return false;
     }
@@ -281,84 +275,56 @@ bool GroupedMatmulSwigluQuantV2BasicApiTiling950::IsCapable()
     const bool formatSupported = IsSupportedFormat(inputParams_.aFormat) && IsSupportedFormat(inputParams_.bFormat) &&
                                  IsSupportedFormat(xScaleFormat_) && IsSupportedFormat(weightScaleFormat_) &&
                                  IsSupportedFormat(inputParams_.cFormat) && IsSupportedFormat(yScaleFormat_);
-    const bool coreSupported = aicoreParams_.aicNum > 0 && aivNum_ == AIC_AIV_CORE_RATIO * aicoreParams_.aicNum;
     const bool checkTensorApiShapes = CheckTensorApiShapes();
     const bool checkTensorApiScaleShapes = CheckTensorApiScaleShapes();
     const uint64_t averageMPerGroup = inputParams_.mSize / inputParams_.groupNum;
-    const uint64_t mPerGroupLowerLimit = inputParams_.transB ? TENSOR_API_TRANS_B_M_PER_GROUP_LOWER_LIMIT :
-                                                               TENSOR_API_NOT_TRANS_B_M_PER_GROUP_LOWER_LIMIT;
-    const bool checkMSizeGroupNumRatio = averageMPerGroup > mPerGroupLowerLimit;
-    const bool checkNSizeAlign = inputParams_.nSize % TENSOR_API_FP8_N_ALIGN == 0;
-    const bool checkBNoTransMLimlit =
-        inputParams_.transB ? true : inputParams_.mSize > TENSOR_API_B_NOTRANS_M_LOWER_LIMIT;
-    const bool checkKSize = inputParams_.kSize > 64;
-    const bool checkKSizeAlign = inputParams_.kSize % GmmConstant::BASIC_BLOCK_SIZE_128 == 0;
-    const bool capable = dtypeSupported && quantDtypeSupported && formatSupported && checkMSizeGroupNumRatio &&
-                         checkNSizeAlign && coreSupported && checkTensorApiShapes && checkTensorApiScaleShapes &&
-                         checkBNoTransMLimlit && checkKSize && checkKSizeAlign;
-    OP_LOGD(context_->GetNodeName(),
-            "Tensor API capability: dtype=%d, quantDtypeSupported=%d, format=%d, groupNum=%lu, M=%lu, "
-            "averageMPerGroup=%lu, mPerGroupLowerLimit=%lu, transB=%d, N=%lu, "
-            "cores=%lu:%u, "
-            "checkTensorApiShapes=%d, checkKSize=%d, checkKSizeAlign=%d, "
-            "checkTensorApiScaleShapes=%d, checkMSizeGroupNumRatio=%d, checkBNoTransMLimlit=%d, capable=%d.",
-            dtypeSupported, quantDtypeSupported, formatSupported, inputParams_.groupNum, inputParams_.mSize,
-            averageMPerGroup, mPerGroupLowerLimit, inputParams_.transB, inputParams_.nSize, aicoreParams_.aicNum,
-            aivNum_, checkTensorApiShapes, checkKSize, checkKSizeAlign, checkTensorApiScaleShapes,
-            checkMSizeGroupNumRatio, checkBNoTransMLimlit, capable);
+    const uint64_t mPerGroupLowerLimit =
+        inputParams_.transB ? GroupedMatmulSwigluQuantTensorApiTiling::TRANS_B_M_PER_GROUP_LOWER_LIMIT :
+                              GroupedMatmulSwigluQuantTensorApiTiling::NOT_TRANS_B_M_PER_GROUP_LOWER_LIMIT;
+    const bool commonCapable = GroupedMatmulSwigluQuantTensorApiTiling::IsShapeAndPlatformCapable(
+        {inputParams_.mSize, inputParams_.nSize, inputParams_.kSize, inputParams_.groupNum, aicoreParams_.aicNum,
+         aivNum_, inputParams_.transB, platformMemoryReady_});
+    const bool capable = dtypeSupported && quantDtypeSupported && formatSupported && checkTensorApiShapes &&
+                         checkTensorApiScaleShapes && commonCapable;
+    OP_LOGD(
+        context_->GetNodeName(),
+        "Tiling conditions: dtype=%d, quantDtypeSupported=%d, format=%d, groupNum=%lu, M=%lu, "
+        "averageMPerGroup=%lu, mPerGroupLowerLimit=%lu, transB=%d, N=%lu, "
+        "cores=%lu:%u, "
+        "checkTensorApiShapes=%d, checkKSize=%d, checkKSizeAlign=%d, "
+        "checkTensorApiScaleShapes=%d, checkMSizeGroupNumRatio=%d, checkBNoTransMLimlit=%d, capable=%d.",
+        dtypeSupported, quantDtypeSupported, formatSupported, inputParams_.groupNum, inputParams_.mSize,
+        averageMPerGroup, mPerGroupLowerLimit, inputParams_.transB, inputParams_.nSize, aicoreParams_.aicNum, aivNum_,
+        checkTensorApiShapes, inputParams_.kSize > GroupedMatmulSwigluQuantTensorApiTiling::K_LOWER_LIMIT,
+        inputParams_.kSize % GroupedMatmulSwigluQuantTensorApiTiling::K_ALIGN == 0UL, checkTensorApiScaleShapes,
+        averageMPerGroup > mPerGroupLowerLimit,
+        inputParams_.transB || inputParams_.mSize > GroupedMatmulSwigluQuantTensorApiTiling::NOT_TRANS_B_M_LOWER_LIMIT,
+        capable);
     return capable;
 }
 
 ge::graphStatus GroupedMatmulSwigluQuantV2BasicApiTiling950::DoOpTiling()
 {
-    auto &params = tilingData_.gmmQuantParams;
-    params.groupNum = static_cast<uint32_t>(inputParams_.groupNum);
-    params.activeType = static_cast<uint32_t>(inputParams_.actType);
-    params.aQuantMode = static_cast<uint32_t>(inputParams_.aQuantMode);
-    params.bQuantMode = static_cast<uint32_t>(inputParams_.bQuantMode);
-    params.singleX = static_cast<uint8_t>(inputParams_.isSingleX);
-    params.singleW = static_cast<uint8_t>(inputParams_.isSingleW);
-    params.singleY = static_cast<uint8_t>(inputParams_.isSingleY);
-    params.groupType = static_cast<int8_t>(inputParams_.groupType);
-    params.groupListType = static_cast<uint8_t>(inputParams_.groupListType);
+    GroupedMatmulSwigluQuantTensorApiTiling::FillQuantParams(tilingData_.gmmQuantParams, inputParams_);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus GroupedMatmulSwigluQuantV2BasicApiTiling950::DoLibApiTiling()
 {
     GroupedQmmTiling::CalBasicBlock();
+    GroupedMatmulSwigluQuantTensorApiTiling::PrepareBasicBlockForL1(basicTiling_);
     OP_CHECK_IF(GroupedQmmBasicApiTiling::CalL1Tiling() != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed."), return ge::GRAPH_FAILED);
-    if (inputParams_.mSize >= GmmConstant::BASIC_BLOCK_SIZE_256) {
-        basicTiling_.baseM = TENSOR_API_LARGE_M_BASE_M;
-    }
-    if (inputParams_.nSize > GmmConstant::BASIC_BLOCK_SIZE_256 &&
-        inputParams_.kSize >= GmmConstant::BASIC_BLOCK_SIZE_128) {
-        basicTiling_.baseN = TENSOR_API_LARGE_N_BASE_N;
-    }
+    GroupedMatmulSwigluQuantTensorApiTiling::RestoreBasicBlockAfterL1(basicTiling_);
 
-    auto &mmTiling = tilingData_.mmTilingData;
-    mmTiling.m = static_cast<uint32_t>(inputParams_.mSize);
-    mmTiling.n = static_cast<uint32_t>(inputParams_.nSize);
-    mmTiling.k = static_cast<uint32_t>(inputParams_.kSize);
-    mmTiling.baseM = static_cast<uint32_t>(basicTiling_.baseM);
-    mmTiling.baseN = static_cast<uint32_t>(basicTiling_.baseN);
-    mmTiling.baseK = static_cast<uint32_t>(basicTiling_.baseK);
-    mmTiling.kAL1 = static_cast<uint32_t>(basicTiling_.stepKa * basicTiling_.baseK);
-    mmTiling.kBL1 = static_cast<uint32_t>(basicTiling_.stepKb * basicTiling_.baseK);
-    const uint64_t scaleKL1 = std::min(
-        std::max(basicTiling_.scaleFactorA * basicTiling_.stepKa, basicTiling_.scaleFactorB * basicTiling_.stepKb) *
-            basicTiling_.baseK,
-        inputParams_.kSize);
-    mmTiling.scaleKAL1 = static_cast<uint32_t>(scaleKL1);
-    mmTiling.scaleKBL1 = static_cast<uint32_t>(scaleKL1);
-    mmTiling.dbL0C = static_cast<uint8_t>(basicTiling_.dbL0c);
+    GroupedMatmulSwigluQuantTensorApiTiling::FillMatmulTiling(tilingData_.mmTilingData, inputParams_, basicTiling_,
+                                                              basicTiling_.scaleFactorA, basicTiling_.scaleFactorB);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus GroupedMatmulSwigluQuantV2BasicApiTiling950::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = GmmConstant::SYS_WORKSPACE_SIZES;
     return ge::GRAPH_SUCCESS;

@@ -29,11 +29,11 @@ template <uint8_t dequantDtype, typename layoutA, typename layoutB>
 __aicore__ inline void GmmSwigluAswtPertokenKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR weightScale, GM_ADDR xScale,
                                                    GM_ADDR weightAssistanceMatrix, GM_ADDR smoothScale,
                                                    GM_ADDR groupList, GM_ADDR y, GM_ADDR yScale, GM_ADDR workspace,
-                                                   GM_ADDR tiling, TPipe *pipe)
+                                                   GM_ADDR tiling, TPipe* pipe)
 {
     /* 1. 取 tiling 数据 */
-    GET_TILING_DATA_MEMBER(GMMSwigluQuantTilingDataParams, gmmSwigluQuantParams, gmmSwigluQuantParams_, tiling);
-    GET_TILING_DATA_MEMBER(GMMSwigluQuantTilingDataParams, mmTilingData, mmTilingData_, tiling);
+    GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, gmmSwigluQuantParams, gmmSwigluQuantParams_, tiling);
+    GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, mmTilingData, mmTilingData_, tiling);
 
     /* 2. 编译期常量决定 DequantType / C1Type */
     using DequantType =
@@ -90,9 +90,9 @@ __aicore__ inline void GmmSwigluAswtPertokenKernel(GM_ADDR x, GM_ADDR weight, GM
 template <typename layoutA, typename layoutB>
 __aicore__ inline void GmmSwigluAswtPertoken(GM_ADDR x, GM_ADDR weight, GM_ADDR weightScale, GM_ADDR xScale,
                                              GM_ADDR weightAssistanceMatrix, GM_ADDR smoothScale, GM_ADDR groupList,
-                                             GM_ADDR y, GM_ADDR yScale, GM_ADDR workspace, GM_ADDR tiling, TPipe *pipe)
+                                             GM_ADDR y, GM_ADDR yScale, GM_ADDR workspace, GM_ADDR tiling, TPipe* pipe)
 {
-    GET_TILING_DATA_MEMBER(GMMSwigluQuantTilingDataParams, gmmSwigluQuantParams, gmmSwigluQuantParams_, tiling);
+    GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, gmmSwigluQuantParams, gmmSwigluQuantParams_, tiling);
 
     switch (gmmSwigluQuantParams_.dequantDtype) {
         case 1:

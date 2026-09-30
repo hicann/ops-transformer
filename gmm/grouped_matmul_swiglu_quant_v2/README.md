@@ -2,18 +2,19 @@
 
 ## 产品支持情况
 
-|产品      | 是否支持 |
-|:----------------------------|:-----------:|
-|<term>Ascend 950PR&950DT系列产品</term>|      √     |
-|<term>Atlas A3系列产品</term>|      √     |
-|<term>Atlas A2系列产品</term>|      √     |
-|<term>Atlas 200I/500 A2推理产品</term>|      ×     |
-|<term>Atlas推理系列产品</term>|      ×     |
-|<term>Atlas训练系列产品</term>|      ×     |
+| 产品 | 是否支持 |
+| :---------------------------- | :-----------: |
+| <term>Ascend 950PR&950DT系列产品</term> | √ |
+| <term>Atlas A3系列产品</term> | √ |
+| <term>Atlas A2系列产品</term> | √ |
+| <term>Atlas 200I/500 A2推理产品</term> | × |
+| <term>Atlas推理系列产品</term> | × |
+| <term>Atlas训练系列产品</term> | × |
 
 ## 功能说明
 
 - 算子功能：融合GroupedMatmul 、dequant、swiglu和quant，详细解释见计算公式。
+- Ascend 950PR/Ascend 950DT上新增`aclnnGroupedMatmulSwigluQuantWeightNzV3`接口，用于单Tensor MXFP8 weight FRACTAL_NZ场景下的可配置SwiGLU计算。当前`swigluMode`仅支持2，详见[aclnnGroupedMatmulSwigluQuantWeightNzV3](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)。
 - 计算公式：
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     <details>
@@ -442,6 +443,8 @@
       - MXFP4场景不支持K=2。
       - MXFP4场景需满足K为偶数。
 
+    - `aclnnGroupedMatmulSwigluQuantWeightNzV3`增量场景仅支持MXFP8、单Tensor和weight FRACTAL_NZ；`x`、`weight`和`output`仅支持FLOAT8_E4M3FN，`swigluMode`仅支持2，`scaleAlg`支持0（OCP）或1（cuBLAS）。完整约束见[ACLNN接口资料](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)。
+
   - 确定性计算：
       - aclnnGroupedMatmulSwigluQuantV2默认为确定性实现。
 
@@ -449,4 +452,6 @@
 
 | 调用方式      | 调用样例                 | 说明                                                         |
 |--------------|-------------------------|--------------------------------------------------------------|
-| aclnn调用 | [test_aclnn_quant_grouped_matmul_swiglu_quant_V2](examples/test_aclnn_grouped_matmul_swiglu_quant_v2_a8w8.cpp) | 通过接口方式调用[GroupedMatmulSwigluQuantV2](docs/aclnnGroupedMatmulSwigluQuantV2.md)算子。 |
+| aclnn API | [test_aclnn_quant_grouped_matmul_swiglu_quant_V2](examples/test_aclnn_grouped_matmul_swiglu_quant_v2_a8w8.cpp) | 通过接口方式调用[GroupedMatmulSwigluQuantV2](docs/aclnnGroupedMatmulSwigluQuantV2.md)算子。 |
+| aclnn API | [test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3](examples/arch35/test_aclnn_grouped_matmul_swiglu_quant_weight_nz_v3.cpp) | 通过[aclnnGroupedMatmulSwigluQuantWeightNzV3](docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)调用Ascend 950PR/Ascend 950DT的MXFP8 weight FRACTAL_NZ增量场景。 |
+| PyTorch API | [grouped_matmul_swiglu_quant](docs/torchapi_grouped_matmul_swiglu_quant.md) | 通过`cann_ops_transformer.grouped_matmul_swiglu_quant`调用上述增量场景。 |

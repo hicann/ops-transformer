@@ -23,13 +23,13 @@
 using namespace Cgmct::Gemm;
 using namespace Cgmct::Gemm::Kernel;
 
-template <typename layoutA, typename layoutB>
+template <typename layoutA, typename layoutB, bool EnableSwigluAttrs = false>
 __aicore__ inline void GmmSwigluAswt(GM_ADDR x, GM_ADDR weight, GM_ADDR weightScale, GM_ADDR xScale,
                                      GM_ADDR weightAssistanceMatrix, GM_ADDR smoothScale, GM_ADDR groupList, GM_ADDR y,
                                      GM_ADDR yScale, GM_ADDR workspace, GM_ADDR tiling)
 {
-    GET_TILING_DATA_MEMBER(GMMSwigluQuantTilingDataParams, gmmSwigluQuantParams, gmmSwigluQuantParams_, tiling);
-    GET_TILING_DATA_MEMBER(GMMSwigluQuantTilingDataParams, mmTilingData, mmTilingData_,
+    GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, gmmSwigluQuantParams, gmmSwigluQuantParams_, tiling);
+    GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, mmTilingData, mmTilingData_,
                            tiling); // 定义L1和L0的TileShape
     using L1TileShape = AscendC::Shape<_0, _0, _0>;
     using L0TileShape = AscendC::Shape<_0, _0, _0>;
@@ -58,6 +58,7 @@ __aicore__ inline void GmmSwigluAswt(GM_ADDR x, GM_ADDR weight, GM_ADDR weightSc
     using QGmmKernel = Kernel::KernelGmmSwiGluMixOnlineDynamic<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;
     using Params = typename QGmmKernel::Params;
     using GMMTiling = typename QGmmKernel::GMMTiling;
+    using EpilogueArguments = typename QGmmKernel::BlockEpilogueArguments;
     GMMTiling gmmParams{gmmSwigluQuantParams_.groupNum,
                         gmmSwigluQuantParams_.groupListType,
                         mmTilingData_.baseM,
@@ -65,12 +66,27 @@ __aicore__ inline void GmmSwigluAswt(GM_ADDR x, GM_ADDR weight, GM_ADDR weightSc
                         mmTilingData_.baseK,
                         gmmSwigluQuantParams_.isMxWeightNzMultiTensor};
     gmmParams.matmulTiling = &mmTilingData_;
+    EpilogueArguments epilogueArgs{y,
+                                   yScale,
+                                   nullptr,
+                                   nullptr,
+                                   nullptr,
+                                   static_cast<uint32_t>(mmTilingData_.baseM),
+                                   static_cast<uint32_t>(mmTilingData_.baseN)};
+    if constexpr (EnableSwigluAttrs) {
+        GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, swigluParams, swigluParams_, tiling);
+        epilogueArgs.swigluMode = swigluParams_.swigluMode;
+        epilogueArgs.clampLimit = swigluParams_.clampLimit;
+        epilogueArgs.gluAlpha = swigluParams_.gluAlpha;
+        epilogueArgs.gluBias = swigluParams_.gluBias;
+        epilogueArgs.scaleAlg = swigluParams_.scaleAlg;
+        epilogueArgs.dstTypeMax = swigluParams_.dstTypeMax;
+    }
     Params params = {// template shape, gmm shape can not get now
                      {1, 1, 1, 1},
                      // mmad args
                      {x, weight, weightScale, xScale, y, groupList},
-                     {y, yScale, nullptr, nullptr, nullptr, static_cast<uint32_t>(mmTilingData_.baseM),
-                      static_cast<uint32_t>(mmTilingData_.baseN)},
+                     epilogueArgs,
                      // gmm tiling data
                      gmmParams};
     QGmmKernel op;

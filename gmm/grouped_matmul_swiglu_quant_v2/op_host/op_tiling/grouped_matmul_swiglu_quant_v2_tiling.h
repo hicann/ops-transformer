@@ -18,6 +18,7 @@
 #include <set>
 #include "op_host/tiling_base.h"
 #include "tiling/tiling_api.h"
+#include "../../op_kernel/arch35/grouped_matmul_swiglu_quant_swiglu_params.h"
 
 namespace optiling {
 
@@ -83,9 +84,37 @@ TILING_DATA_FIELD_DEF(uint32_t, ubAvail);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(GMMSwigluQuantParamsOp, GMMSwigluQuantParams)
 
+BEGIN_TILING_DATA_DEF(GMMSwigluQuantSwigluParamsHost)
+TILING_DATA_FIELD_DEF(int64_t, swigluMode);
+TILING_DATA_FIELD_DEF(float, clampLimit);
+TILING_DATA_FIELD_DEF(float, gluAlpha);
+TILING_DATA_FIELD_DEF(float, gluBias);
+TILING_DATA_FIELD_DEF(float, dstTypeMax);
+TILING_DATA_FIELD_DEF(uint8_t, scaleAlg);
+TILING_DATA_FIELD_DEF(uint8_t, roundMode);
+TILING_DATA_FIELD_DEF(uint16_t, reserved0);
+TILING_DATA_FIELD_DEF(uint32_t, reserved1);
+END_TILING_DATA_DEF;
+REGISTER_TILING_DATA_CLASS(GMMSwigluQuantSwigluParamsOp, GMMSwigluQuantSwigluParamsHost)
+
+inline void SetGMMSwigluQuantSwigluParams(GMMSwigluQuantSwigluParamsHost& target,
+                                          const ::GMMSwigluQuantSwigluParams& source = {})
+{
+    target.set_swigluMode(source.swigluMode);
+    target.set_clampLimit(source.clampLimit);
+    target.set_gluAlpha(source.gluAlpha);
+    target.set_gluBias(source.gluBias);
+    target.set_dstTypeMax(source.dstTypeMax);
+    target.set_scaleAlg(source.scaleAlg);
+    target.set_roundMode(source.roundMode);
+    target.set_reserved0(source.reserved0);
+    target.set_reserved1(source.reserved1);
+}
+
 BEGIN_TILING_DATA_DEF(GMMSwigluQuantTilingDataParams)
 TILING_DATA_FIELD_DEF_STRUCT(GMMSwigluQuantParams, gmmSwigluQuantParams);
 TILING_DATA_FIELD_DEF_STRUCT(TCubeTiling, mmTilingData);
+TILING_DATA_FIELD_DEF_STRUCT(GMMSwigluQuantSwigluParamsHost, swigluParams);
 END_TILING_DATA_DEF;
 
 BEGIN_TILING_DATA_DEF(GMMSwigluQuantV2TensorApiQuantParams)
@@ -124,6 +153,7 @@ REGISTER_TILING_DATA_CLASS(GMMSwigluQuantV2TensorApiMMTilingOp, GMMSwigluQuantV2
 BEGIN_TILING_DATA_DEF(GMMSwigluQuantV2TensorApiTilingData)
 TILING_DATA_FIELD_DEF_STRUCT(GMMSwigluQuantV2TensorApiQuantParams, gmmQuantParams);
 TILING_DATA_FIELD_DEF_STRUCT(GMMSwigluQuantV2TensorApiMMTiling, mmTilingData);
+TILING_DATA_FIELD_DEF_STRUCT(GMMSwigluQuantSwigluParamsHost, swigluParams);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(GroupedMatmulSwigluQuantV2_0, GMMSwigluQuantTilingDataParams)
@@ -140,7 +170,10 @@ struct GMMSwigluV2CompileInfo {
     uint32_t aivNum_ = 0;
     uint32_t baseM_ = 128;
     uint32_t baseN_ = 256;
-    bool supportL12BtBf16;
+    bool supportL12BtBf16 = false;
+    uint64_t l1Size_ = 0;
+    uint64_t l0CSize_ = 0;
+    int32_t npuArch_ = 0;
 };
 
 namespace GroupedMatmulSwigluQuantV2Tiling {
@@ -162,6 +195,13 @@ constexpr uint32_t ATTR_INDEX_QUANT_DTYPE = 3;
 constexpr uint32_t ATTR_INDEX_TRANSPOSE_WEIGHT = 4;
 constexpr uint32_t ATTR_INDEX_GROUPLIST_TYPE = 5;
 constexpr uint32_t ATTR_INDEX_TUNING_CONFIG = 6;
+constexpr uint32_t ATTR_INDEX_SWIGLU_MODE = 7;
+constexpr uint32_t ATTR_INDEX_CLAMP_LIMIT = 8;
+constexpr uint32_t ATTR_INDEX_GLU_ALPHA = 9;
+constexpr uint32_t ATTR_INDEX_GLU_BIAS = 10;
+constexpr uint32_t ATTR_INDEX_ROUND_MODE = 11;
+constexpr uint32_t ATTR_INDEX_SCALE_ALG = 12;
+constexpr uint32_t ATTR_INDEX_DST_TYPE_MAX = 13;
 constexpr uint32_t DIM_0 = 0;
 constexpr uint32_t DIM_1 = 1;
 constexpr uint32_t DIM_2 = 2;
@@ -196,7 +236,7 @@ constexpr int64_t SIZE_OF_HALF_2 = 2;
 
 class GroupedMatmulSwigluQuantV2Tiling : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit GroupedMatmulSwigluQuantV2Tiling(gert::TilingContext *context)
+    explicit GroupedMatmulSwigluQuantV2Tiling(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
 
     ~GroupedMatmulSwigluQuantV2Tiling() override = default;

@@ -53,13 +53,16 @@ struct TensorDescParam {
     ge::Format format = ge::FORMAT_ND;
 };
 
+constexpr float DEFAULT_CLAMP_LIMIT = 7.0F;
+constexpr float DEFAULT_GLU_ALPHA = 1.702F;
+constexpr float DEFAULT_GLU_BIAS = 1.0F;
 constexpr size_t kInputTensorCount = 8U;
 constexpr size_t kOutputTensorCount = 2U;
 constexpr size_t kTensorFieldCount = 4U;
 constexpr size_t kScalarFieldCount = 19U;
 constexpr size_t kCsvColumnCount = kScalarFieldCount + (kInputTensorCount + kOutputTensorCount) * kTensorFieldCount;
 
-vector<string> ParseListField(const string &value)
+vector<string> ParseListField(const string& value)
 {
     vector<string> items;
     const string trimmed = Trim(value);
@@ -67,13 +70,13 @@ vector<string> ParseListField(const string &value)
         return items;
     }
     SplitStr2Vec(trimmed, ";", items);
-    for (auto &item : items) {
+    for (auto& item : items) {
         item = Trim(item);
     }
     return items;
 }
 
-const string &GetRepeatedField(const vector<string> &items, size_t index, const char *fieldName)
+const string& GetRepeatedField(const vector<string>& items, size_t index, const char* fieldName)
 {
     if (items.empty()) {
         throw invalid_argument(string(fieldName) + " list is empty");
@@ -87,8 +90,8 @@ const string &GetRepeatedField(const vector<string> &items, size_t index, const 
     return items[index];
 }
 
-vector<TensorDescParam> ParseTensorDescList(const string &origin, const string &storage, const string &dtype,
-                                            const string &format)
+vector<TensorDescParam> ParseTensorDescList(const string& origin, const string& storage, const string& dtype,
+                                            const string& format)
 {
     const vector<string> originList = ParseListField(origin);
     if (originList.empty()) {
@@ -110,7 +113,7 @@ vector<TensorDescParam> ParseTensorDescList(const string &origin, const string &
 }
 
 struct GroupedMatmulSwigluQuantV2TilingCase {
-    gert::TilingContextPara BuildContext(optiling::GMMSwigluV2CompileInfo *compileInfoForRun) const
+    gert::TilingContextPara BuildContext(optiling::GMMSwigluV2CompileInfo* compileInfoForRun) const
     {
         *compileInfoForRun = compileInfo;
         vector<int64_t> tuningConfigVec = ops::ut::ParseDims(tuningConfig, {});
@@ -130,6 +133,13 @@ struct GroupedMatmulSwigluQuantV2TilingCase {
                 {"transpose_weight", Ops::Transformer::AnyValue::CreateFrom<bool>(transposeWeight)},
                 {"group_list_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(groupListType)},
                 {"tuning_config", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(tuningConfigVec)},
+                {"swiglu_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                {"clamp_limit", Ops::Transformer::AnyValue::CreateFrom<float>(DEFAULT_CLAMP_LIMIT)},
+                {"glu_alpha", Ops::Transformer::AnyValue::CreateFrom<float>(DEFAULT_GLU_ALPHA)},
+                {"glu_bias", Ops::Transformer::AnyValue::CreateFrom<float>(DEFAULT_GLU_BIAS)},
+                {"round_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("rint")},
+                {"scale_alg", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+                {"dst_type_max", Ops::Transformer::AnyValue::CreateFrom<float>(0.0F)},
             },
             inputInstanceNum, outputInstanceNum, compileInfoForRun, socVersion, compileInfoForRun->aicNum_,
             compileInfoForRun->ubSize_);
@@ -172,12 +182,12 @@ struct GroupedMatmulSwigluQuantV2TilingCase {
 private:
     template <size_t N>
     static vector<gert::TilingContextPara::TensorDescription> BuildTensorDescs(
-        const array<vector<TensorDescParam>, N> &tensors, vector<uint32_t> &instanceNum)
+        const array<vector<TensorDescParam>, N>& tensors, vector<uint32_t>& instanceNum)
     {
         vector<gert::TilingContextPara::TensorDescription> descs;
-        for (const auto &tensorList : tensors) {
+        for (const auto& tensorList : tensors) {
             instanceNum.push_back(static_cast<uint32_t>(tensorList.size()));
-            for (const auto &tensor : tensorList) {
+            for (const auto& tensor : tensorList) {
                 descs.emplace_back(ops::ut::MakeGertStorageShape(tensor.originDims, tensor.storageDims), tensor.dtype,
                                    tensor.format);
             }
@@ -186,7 +196,7 @@ private:
     }
 };
 
-vector<GroupedMatmulSwigluQuantV2TilingCase> LoadCases(const string &socVersion)
+vector<GroupedMatmulSwigluQuantV2TilingCase> LoadCases(const string& socVersion)
 {
     vector<GroupedMatmulSwigluQuantV2TilingCase> cases;
     string csvPath = ops::ut::ResolveCsvPath("test_grouped_matmul_swiglu_quant_v2_tiling.csv",
@@ -259,14 +269,14 @@ vector<GroupedMatmulSwigluQuantV2TilingCase> LoadCases(const string &socVersion)
             tc.groupListType = stoll(Trim(items[idx++]));
             tc.tuningConfig = Trim(items[idx++]);
             cases.push_back(tc);
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return cases;
 }
 
-string MakeParamName(const testing::TestParamInfo<GroupedMatmulSwigluQuantV2TilingCase> &info)
+string MakeParamName(const testing::TestParamInfo<GroupedMatmulSwigluQuantV2TilingCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
@@ -277,13 +287,13 @@ namespace GroupedMatmulSwigluQuantV2UT {
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestGroupedMatmulSwigluQuantV2Tiling950);
 
-const vector<GroupedMatmulSwigluQuantV2TilingCase> &GetAscend950Cases()
+const vector<GroupedMatmulSwigluQuantV2TilingCase>& GetAscend950Cases()
 {
     static const vector<GroupedMatmulSwigluQuantV2TilingCase> cases = LoadCases("Ascend950");
     return cases;
 }
 
-const vector<GroupedMatmulSwigluQuantV2TilingCase> &GetAscend910BCases()
+const vector<GroupedMatmulSwigluQuantV2TilingCase>& GetAscend910BCases()
 {
     static const vector<GroupedMatmulSwigluQuantV2TilingCase> cases = LoadCases("Ascend910B");
     return cases;
@@ -291,36 +301,45 @@ const vector<GroupedMatmulSwigluQuantV2TilingCase> &GetAscend910BCases()
 
 class TestGroupedMatmulSwigluQuantV2Tiling950 : public testing::TestWithParam<GroupedMatmulSwigluQuantV2TilingCase> {
 protected:
-    static void SetUpTestCase() { std::cout << "GroupedMatmulSwigluQuantV2Tiling950 SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "GroupedMatmulSwigluQuantV2Tiling950 SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "GroupedMatmulSwigluQuantV2Tiling950 TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "GroupedMatmulSwigluQuantV2Tiling950 TearDown" << std::endl;
+    }
 };
 
-TEST_P(TestGroupedMatmulSwigluQuantV2Tiling950, csvDrivenCase) { GetParam().Run(); }
+TEST_P(TestGroupedMatmulSwigluQuantV2Tiling950, csvDrivenCase)
+{
+    GetParam().Run();
+}
 
 INSTANTIATE_TEST_SUITE_P(GMMSQ_V2_TILING_950, TestGroupedMatmulSwigluQuantV2Tiling950,
                          testing::ValuesIn(GetAscend950Cases()), MakeParamName);
 
-const GroupedMatmulSwigluQuantV2TilingCase *FindAscend950Case(const string &prefix)
+const GroupedMatmulSwigluQuantV2TilingCase* FindAscend950Case(const string& prefix)
 {
-    const auto &cases = GetAscend950Cases();
+    const auto& cases = GetAscend950Cases();
     const auto iter =
-        find_if(cases.begin(), cases.end(), [&prefix](const auto &item) { return item.prefix == prefix; });
+        find_if(cases.begin(), cases.end(), [&prefix](const auto& item) { return item.prefix == prefix; });
     return iter == cases.end() ? nullptr : &(*iter);
 }
 
 TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, RequiredInputNullptrErrorCase)
 {
-    const auto *testCase = FindAscend950Case("test_mxa8w4_sms_wb002_wq_nz_ws_nd_g2_glt1_min_k_n");
+    const auto* testCase = FindAscend950Case("test_mxa8w4_sms_wb002_wq_nz_ws_nd_g2_glt1_min_k_n");
     ASSERT_NE(testCase, nullptr);
 
-    const array<pair<uint32_t, const char *>, 5> requiredInputs = {
+    const array<pair<uint32_t, const char*>, 5> requiredInputs = {
         {{optiling::GroupedMatmulSwigluQuantV2Tiling::X_INDEX, "x"},
          {optiling::GroupedMatmulSwigluQuantV2Tiling::X_SCALE_INDEX, "xScale"},
          {optiling::GroupedMatmulSwigluQuantV2Tiling::GROUPLIST_INDEX, "groupList"},
          {optiling::GroupedMatmulSwigluQuantV2Tiling::WEIGHT_INDEX, "weight"},
          {optiling::GroupedMatmulSwigluQuantV2Tiling::WEIGHT_SCALE_INDEX, "weightScale"}}};
-    for (const auto &[inputIndex, inputName] : requiredInputs) {
+    for (const auto& [inputIndex, inputName] : requiredInputs) {
         SCOPED_TRACE(inputName);
         auto nullInputCase = *testCase;
         nullInputCase.inputs[inputIndex].clear();
@@ -332,7 +351,7 @@ TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, RequiredInputNullptrErrorC
 
 TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, SmsTilingKeyAndDataFields)
 {
-    const auto *testCase = FindAscend950Case("test_mxa8w4_sms_wb002_wq_nz_ws_nd_g2_glt1_min_k_n");
+    const auto* testCase = FindAscend950Case("test_mxa8w4_sms_wb002_wq_nz_ws_nd_g2_glt1_min_k_n");
     ASSERT_NE(testCase, nullptr);
 
     auto compileInfoForRun = testCase->compileInfo;
@@ -342,8 +361,8 @@ TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, SmsTilingKeyAndDataFields)
     EXPECT_EQ(tilingInfo.tilingKey, GET_TPL_TILING_KEY(1, 0, 1));
     ASSERT_GE(tilingInfo.tilingDataSize, sizeof(GMMSQArch35Tiling::GMMSQWeightQuantTilingData));
 
-    const auto *tilingData =
-        reinterpret_cast<const GMMSQArch35Tiling::GMMSQWeightQuantTilingData *>(tilingInfo.tilingData.get());
+    const auto* tilingData =
+        reinterpret_cast<const GMMSQArch35Tiling::GMMSQWeightQuantTilingData*>(tilingInfo.tilingData.get());
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->groupListType, 1);
     EXPECT_EQ(tilingData->groupNum, 2U);
@@ -355,7 +374,7 @@ TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, SmsTilingKeyAndDataFields)
 
 TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, NonSmsTilingKeyAndDataFields)
 {
-    const auto *testCase = FindAscend950Case("test_mxa8w4_sms_wb014_non_sms_tiling_key_whitebox");
+    const auto* testCase = FindAscend950Case("test_mxa8w4_sms_wb014_non_sms_tiling_key_whitebox");
     ASSERT_NE(testCase, nullptr);
 
     auto compileInfoForRun = testCase->compileInfo;
@@ -365,8 +384,8 @@ TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, NonSmsTilingKeyAndDataFiel
     EXPECT_EQ(tilingInfo.tilingKey, GET_TPL_TILING_KEY(1, 0, 0));
     ASSERT_GE(tilingInfo.tilingDataSize, sizeof(GMMSQArch35Tiling::GMMSQWeightQuantTilingData));
 
-    const auto *tilingData =
-        reinterpret_cast<const GMMSQArch35Tiling::GMMSQWeightQuantTilingData *>(tilingInfo.tilingData.get());
+    const auto* tilingData =
+        reinterpret_cast<const GMMSQArch35Tiling::GMMSQWeightQuantTilingData*>(tilingInfo.tilingData.get());
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->groupListType, 0);
     EXPECT_EQ(tilingData->groupNum, 1U);
@@ -378,12 +397,21 @@ TEST(TestGroupedMatmulSwigluQuantV2Tiling950WhiteBox, NonSmsTilingKeyAndDataFiel
 
 class TestGroupedMatmulSwigluQuantV2Tiling910B : public testing::TestWithParam<GroupedMatmulSwigluQuantV2TilingCase> {
 protected:
-    static void SetUpTestCase() { std::cout << "GroupedMatmulSwigluQuantV2Tiling910B SetUp" << std::endl; }
+    static void SetUpTestCase()
+    {
+        std::cout << "GroupedMatmulSwigluQuantV2Tiling910B SetUp" << std::endl;
+    }
 
-    static void TearDownTestCase() { std::cout << "GroupedMatmulSwigluQuantV2Tiling910B TearDown" << std::endl; }
+    static void TearDownTestCase()
+    {
+        std::cout << "GroupedMatmulSwigluQuantV2Tiling910B TearDown" << std::endl;
+    }
 };
 
-TEST_P(TestGroupedMatmulSwigluQuantV2Tiling910B, csvDrivenCase) { GetParam().Run(); }
+TEST_P(TestGroupedMatmulSwigluQuantV2Tiling910B, csvDrivenCase)
+{
+    GetParam().Run();
+}
 
 INSTANTIATE_TEST_SUITE_P(GMMSQ_V2_TILING_910B, TestGroupedMatmulSwigluQuantV2Tiling910B,
                          testing::ValuesIn(GetAscend910BCases()), MakeParamName);
@@ -413,15 +441,15 @@ TEST_F(TestTilingParseForGroupedMatmulSwigluQuantV2, TilingPrepareSuccess)
     platformInfo.SetPlatformRes("AICoreSpec", aicoreSpec);
     platformInfo.SetPlatformRes("AICoreintrinsicDtypeMap", intrinsics);
 
-    const char *compileJsonStr = "{}";
+    const char* compileJsonStr = "{}";
 
     gert::OpTilingParseContextBuilder builder;
     builder.OpType("GroupedMatmulSwigluQuantV2")
         .OpName("GroupedMatmulSwigluQuantV2")
         .IONum(2, 1)
         .CompiledJson(compileJsonStr)
-        .CompiledInfo(reinterpret_cast<void *>(&compileInfo))
-        .PlatformInfo(reinterpret_cast<void *>(&platformInfo));
+        .CompiledInfo(reinterpret_cast<void*>(&compileInfo))
+        .PlatformInfo(reinterpret_cast<void*>(&platformInfo));
     auto holder = builder.Build();
     auto parseContext = holder.GetContext();
 
@@ -431,14 +459,14 @@ TEST_F(TestTilingParseForGroupedMatmulSwigluQuantV2, TilingPrepareSuccess)
     ASSERT_NE(opImpl, nullptr);
     ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext));
+    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext));
     EXPECT_EQ(ret, ge::GRAPH_SUCCESS);
 }
 
 TEST_F(TestTilingParseForGroupedMatmulSwigluQuantV2, TilingDataFieldCoverage)
 {
     optiling::GMMSwigluQuantV2TilingData tilingData;
-    auto &bp = tilingData.gmmSwigluQuantV2BaseParams;
+    auto& bp = tilingData.gmmSwigluQuantV2BaseParams;
     bp.set_groupNum(1);
     EXPECT_EQ(bp.get_groupNum(), 1);
     bp.set_coreNum(24);
@@ -470,7 +498,7 @@ TEST_F(TestTilingParseForGroupedMatmulSwigluQuantV2, TilingDataFieldCoverage)
     bp.set_singleN(256);
     EXPECT_EQ(bp.get_singleN(), 256);
 
-    auto &sq = tilingData.gmmSwigluQuantV2;
+    auto& sq = tilingData.gmmSwigluQuantV2;
     sq.set_maxProcessRowNum(100);
     EXPECT_EQ(sq.get_maxProcessRowNum(), 100);
     sq.set_groupListLen(16);

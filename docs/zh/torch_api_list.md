@@ -56,6 +56,7 @@
 |[generic_block_sparse_attention](../../attention/generic_block_sparse_attention/docs/torchapi_generic_block_sparse_attention.md)|调用`GenericBlockSparseAttention`完成任意粒度块稀疏注意力计算。|-|-|
 |[generic_block_sparse_attention_grad](../../attention/generic_block_sparse_attention_grad/docs/torchapi_generic_block_sparse_attention_grad.md)|调用`GenericBlockSparseAttentionGrad`完成通用块稀疏注意力反向计算。|-|-|
 |[grouped_matmul_activation_quant](../../gmm/grouped_matmul_activation_quant/docs/torchapi_grouped_matmul_activation_quant.md)|融合GMM、激活函数和量化算子，完成分组矩阵乘、激活和量化计算，输出量化结果及量化因子。|-|默认确定性实现|
+|[grouped_matmul_swiglu_quant](../../gmm/grouped_matmul_swiglu_quant_v2/docs/torchapi_grouped_matmul_swiglu_quant.md)|融合GMM、SwiGLU和MX量化，当前支持MXFP8 weightNZ的`swiglu_mode=2`场景。|-|默认确定性实现|
 |[indexer_quant_cache](../../attention/indexer_quant_cache/docs/torchapi_indexer_quant_cache.md)| 在Indexer注意力机制的Epilog阶段对KV Cache进行原地动态量化压缩更新，封装aclnnIndexerQuantCache。  |-|默认确定性实现|
 |[inplace_partial_rotary_mul](../../posembedding/inplace_partial_rotary_mul/docs/torchapi_inplace_partial_rotary_mul.md)|执行单路旋转位置编码的Inplace计算，直接修改输入张量，不产生新的输出张量。|默认确定性实现|默认确定性实现|
 |[inplace_partial_rotary_mul_backward](../../posembedding/inplace_partial_rotary_mul_grad/docs/torchapi_inplace_partial_rotary_mul_backward.md)|执行`inplace_partial_rotary_mul`的反向计算，对输入梯度张量执行inplace更新，切片内替换为RoPE梯度，切片外保持不变。|-|默认支持确定性计算|

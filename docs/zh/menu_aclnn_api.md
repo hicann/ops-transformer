@@ -96,6 +96,7 @@
 - [aclnnGroupedMatmulSwigluQuantV2](../../gmm/grouped_matmul_swiglu_quant_v2/docs/aclnnGroupedMatmulSwigluQuantV2.md)
 - [aclnnGroupedMatmulSwigluQuantWeightNZ](../../gmm/grouped_matmul_swiglu_quant/docs/aclnnGroupedMatmulSwigluQuantWeightNZ.md)
 - [aclnnGroupedMatmulSwigluQuantWeightNzV2](../../gmm/grouped_matmul_swiglu_quant_v2/docs/aclnnGroupedMatmulSwigluQuantWeightNzV2.md)
+- [aclnnGroupedMatmulSwigluQuantWeightNzV3](../../gmm/grouped_matmul_swiglu_quant_v2/docs/aclnnGroupedMatmulSwigluQuantWeightNzV3.md)
 - [aclnnGroupedMatmulV2](../../gmm/grouped_matmul/docs/aclnnGroupedMatmulV2.md)
 - [aclnnGroupedMatmulV3](../../gmm/grouped_matmul/docs/aclnnGroupedMatmulV3.md)
 - [aclnnGroupedMatmulV4](../../gmm/grouped_matmul/docs/aclnnGroupedMatmulV4.md)
