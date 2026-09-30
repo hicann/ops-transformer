@@ -221,6 +221,7 @@ struct ConstInfo {
     uint32_t headDim = 0;
     uint32_t cmpRatio = 0;
     uint64_t stateCacheStrideDim0 = 0;
+    uint64_t stateCacheSnapshotSize = 0;
 
     uint32_t curGroupIdx = 0;
     uint32_t tailGroupIdx = 0;

@@ -42,18 +42,23 @@ public:
 
     __aicore__ inline CompressorV2BlockVectorPerf(){};
     // =================================设置参数=================================
-    __aicore__ inline void InitParams(const ConstInfo &constInfo, const CompressorV2Tools<COMP> &tools);
-    __aicore__ inline void Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv, __gm__ uint8_t *wGate,
-                                __gm__ uint8_t *stateCache, __gm__ uint8_t *stateBlockTable, __gm__ uint8_t *cuSeqlens,
-                                __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos, __gm__ uint8_t *cmpKvOut);
+    __aicore__ inline void InitParams(const ConstInfo& constInfo, const CompressorV2Tools<COMP>& tools);
+    __aicore__ inline void Init(__gm__ uint8_t* x, __gm__ uint8_t* wKv, __gm__ uint8_t* wGate,
+                                __gm__ uint8_t* stateCache, __gm__ uint8_t* stateBlockTable, __gm__ uint8_t* cuSeqlens,
+                                __gm__ uint8_t* seqUsed, __gm__ uint8_t* startPos, __gm__ uint8_t* cmpKvOut);
     // =================================资源管理=================================
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
     // =================================执行计算=================================
-    __aicore__ inline void ComputeVec1(const Vec1RunInfo &info);
+    __aicore__ inline void ComputeVec1(const Vec1RunInfo& info);
     __aicore__ inline void InitVec1GlobalTensor(GlobalTensor<T> kvMm1ResGm, GlobalTensor<T> scoreMm1ResGm,
-                                                GlobalTensor<T> kvCacheTcGm, GlobalTensor<T> scoreCacheTcGm);
+                                                GlobalTensor<T> kvCacheTcGm, GlobalTensor<T> scoreCacheTcGm,
+                                                GlobalTensor<T> stateCacheSnapshotGm);
+    __aicore__ inline bool IsPotentialStateCacheConflict();
+    __aicore__ inline bool NeedBatchPrefixSnapshot(uint64_t startPos, uint32_t seqUsed);
+    __aicore__ inline void SetStateCacheSnapshotEnabled(bool enabled);
+    __aicore__ inline void SnapshotStateCache();
 
 protected:
     GlobalTensor<T> scoreMm1ResGm_;
@@ -65,9 +70,9 @@ private:
     __aicore__ inline uint32_t GetSeqUsed(uint32_t bIdx);
     __aicore__ inline uint32_t GetStartPos(uint32_t bIdx);
     __aicore__ inline uint32_t GetSeqLength(uint32_t bIdx);
-    __aicore__ inline void DealVec1BaseBlock(const Vec1RunInfo &info,
-                                             CompressorV2Vec1SliceIterator<COMP> &sliceIterator,
-                                             const LoopInfo &loopInfo, uint32_t dStartIdx, uint32_t dDealSize,
+    __aicore__ inline void DealVec1BaseBlock(const Vec1RunInfo& info,
+                                             CompressorV2Vec1SliceIterator<COMP>& sliceIterator,
+                                             const LoopInfo& loopInfo, uint32_t dStartIdx, uint32_t dDealSize,
                                              uint32_t dBaseSize);
     template <typename O>
     __aicore__ inline void DataCopyAlignUbToUb(const LocalTensor<O> dstLocal, const LocalTensor<O> srcLocal,
@@ -86,57 +91,60 @@ private:
                                                  uint32_t copyRowCount, uint32_t copyColCount,
                                                  uint32_t srcSingleRowCount, uint32_t dstSingleRowCount);
     __aicore__ inline void PadAlign(const LocalTensor<T> dstLocal, const LocalTensor<T> srcLocal,
-                                    const Vec1SliceInfo &sliceInfo, uint32_t dStartIdx, uint32_t dDealSize);
+                                    const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx, uint32_t dDealSize);
     template <bool IS_SCORE>
     __aicore__ inline void OverLap(const LocalTensor<T> dstLocal, const LocalTensor<T> srcLocal,
-                                   const GlobalTensor<T> &srcGm, const GlobalTensor<T> &stateGm,
-                                   const GlobalTensor<int32_t> &blockTableGm, const GlobalTensor<T> &cacheTcGm,
-                                   const Vec1RunInfo &info, const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo,
+                                   const GlobalTensor<T>& srcGm, const GlobalTensor<T>& stateGm,
+                                   const GlobalTensor<int32_t>& blockTableGm, const GlobalTensor<T>& cacheTcGm,
+                                   const Vec1RunInfo& info, const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo,
                                    uint32_t dStartIdx, uint32_t globalSeqIdx, uint32_t dDealSize);
-    __aicore__ inline void FromWokrSpaceToUb(const LocalTensor<T> &dstLocal, const GlobalTensor<T> &srcGm,
-                                             const Vec1SliceInfo &sliceInfo, const StatisticInfo &statisticInfo,
+    __aicore__ inline void FromWokrSpaceToUb(const LocalTensor<T>& dstLocal, const GlobalTensor<T>& srcGm,
+                                             const Vec1SliceInfo& sliceInfo, const StatisticInfo& statisticInfo,
                                              uint32_t dStartIdx, uint32_t dDealSize);
-    __aicore__ inline void WriteToCacheState(const GlobalTensor<T> &state, const GlobalTensor<int32_t> &blockTableGm,
-                                             const LocalTensor<T> &input, uint32_t batchIdx, uint32_t startSeqIdx,
+    __aicore__ inline void WriteToCacheState(const GlobalTensor<T>& state, const GlobalTensor<int32_t>& blockTableGm,
+                                             const LocalTensor<T>& input, uint32_t batchIdx, uint32_t startSeqIdx,
                                              uint32_t endSeqIdx, uint32_t dStartIdx, uint32_t dDealSize,
                                              uint32_t stateIdx);
-    __aicore__ inline void ReadFromCacheState(const LocalTensor<T> &output, const GlobalTensor<T> &state,
-                                              const GlobalTensor<int32_t> &blockTableGm, uint32_t batchIdx,
+    __aicore__ inline void ReadFromCacheState(const LocalTensor<T>& output, const GlobalTensor<T>& state,
+                                              const GlobalTensor<int32_t>& blockTableGm, uint32_t batchIdx,
                                               uint32_t startSeqIdx, uint32_t endSeqIdx, uint32_t dStartIdx,
                                               uint32_t dDealSize, uint32_t stateIdx);
-    __aicore__ inline void SaveToWorkSpace(const LocalTensor<T> srcLocal, const GlobalTensor<T> &cacheTcGm,
-                                           const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo, uint32_t dStartIdx,
+    __aicore__ inline void ReadFromStateCacheSnapshot(const LocalTensor<T>& output, const Vec1SliceInfo& sliceInfo,
+                                                      uint32_t startSeqIdx, uint32_t endSeqIdx, uint32_t dStartIdx,
+                                                      uint32_t dDealSize, uint32_t stateIdx);
+    __aicore__ inline void SaveToWorkSpace(const LocalTensor<T> srcLocal, const GlobalTensor<T>& cacheTcGm,
+                                           const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo, uint32_t dStartIdx,
                                            uint32_t dDealSize);
-    __aicore__ inline void LoadFromWorkSpace(const LocalTensor<T> dstLocal, const GlobalTensor<T> &cacheTcGm,
-                                             const GlobalTensor<T> &srcGm, const LocalTensor<T> srcLocal,
-                                             const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo,
+    __aicore__ inline void LoadFromWorkSpace(const LocalTensor<T> dstLocal, const GlobalTensor<T>& cacheTcGm,
+                                             const GlobalTensor<T>& srcGm, const LocalTensor<T> srcLocal,
+                                             const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo,
                                              uint32_t dStartIdx, uint32_t globalSeqIdx, uint32_t dDealSize);
-    __aicore__ inline void SoftmaxDN(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &tmpUb, uint32_t tcDealSize,
+    __aicore__ inline void SoftmaxDN(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& tmpUb, uint32_t tcDealSize,
                                      uint32_t dDealSize);
-    __aicore__ inline void KvMulReduceScore(const LocalTensor<T> &kvLocal, const LocalTensor<T> &scoreLocal,
-                                            const LocalTensor<T> &dstLocal, const LocalTensor<T> &tmpUb,
+    __aicore__ inline void KvMulReduceScore(const LocalTensor<T>& kvLocal, const LocalTensor<T>& scoreLocal,
+                                            const LocalTensor<T>& dstLocal, const LocalTensor<T>& tmpUb,
                                             uint32_t tcDealSize, uint32_t dDealSize);
-    __aicore__ inline void OverLapScoreKv(const LocalTensor<T> &scoreLocal, const LocalTensor<T> &kvLocal,
-                                          const Vec1RunInfo &info, const LoopInfo &loopInfo,
-                                          const StatisticInfo &statisticInfo, const Vec1SliceInfo &originSliceInfo,
+    __aicore__ inline void OverLapScoreKv(const LocalTensor<T>& scoreLocal, const LocalTensor<T>& kvLocal,
+                                          const Vec1RunInfo& info, const LoopInfo& loopInfo,
+                                          const StatisticInfo& statisticInfo, const Vec1SliceInfo& originSliceInfo,
                                           uint32_t dStartIdx, uint32_t dDealSize, uint32_t dBaseSize,
                                           uint32_t needDealTcSize);
-    __aicore__ inline void CopyOutVec1ResToOutput(const LocalTensor<T> &comperssoredUb, const Vec1SliceInfo &sliceInfo,
+    __aicore__ inline void CopyOutVec1ResToOutput(const LocalTensor<T>& comperssoredUb, const Vec1SliceInfo& sliceInfo,
                                                   uint32_t compressTcSize, uint32_t dStartIdx, uint32_t dDealSize);
-    __aicore__ inline void CalcGroupInfo(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
-    __aicore__ inline void CalcTaskDistribution(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
-    __aicore__ inline void UpdateIteratorState(const Vec1RunInfo &info, Vec1SplitInfo &splitInfo);
-    __aicore__ inline void CalcTilingStrategy(Vec1SplitInfo &splitInfo);
-    __aicore__ inline Vec1SplitInfo SplitCoreV1(const Vec1RunInfo &info);
-    __aicore__ inline void SaveState(const LocalTensor<T> &srcLocal, const GlobalTensor<T> &stateGm,
-                                     const GlobalTensor<int32_t> &blockTableGm, const Vec1SliceInfo &sliceInfo,
+    __aicore__ inline void CalcGroupInfo(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo);
+    __aicore__ inline void CalcTaskDistribution(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo);
+    __aicore__ inline void UpdateIteratorState(const Vec1RunInfo& info, Vec1SplitInfo& splitInfo);
+    __aicore__ inline void CalcTilingStrategy(Vec1SplitInfo& splitInfo);
+    __aicore__ inline Vec1SplitInfo SplitCoreV1(const Vec1RunInfo& info);
+    __aicore__ inline void SaveState(const LocalTensor<T>& srcLocal, const GlobalTensor<T>& stateGm,
+                                     const GlobalTensor<int32_t>& blockTableGm, const Vec1SliceInfo& sliceInfo,
                                      uint32_t dStartIdx, uint32_t dDealSize, uint32_t stateIdx);
     template <bool IS_SCORE>
-    __aicore__ inline void DuplicateFirstBlock(const LocalTensor<T> &dstLocal, uint32_t duplicateRowCount,
+    __aicore__ inline void DuplicateFirstBlock(const LocalTensor<T>& dstLocal, uint32_t duplicateRowCount,
                                                uint32_t duplicateColCount, uint32_t singleRowCount);
     template <bool IS_SCORE>
-    __aicore__ inline void ReadState(const LocalTensor<T> &srcLocal, const GlobalTensor<T> &stateGm,
-                                     const GlobalTensor<int32_t> &blockTableGm, const Vec1SliceInfo &sliceInfo,
+    __aicore__ inline void ReadState(const LocalTensor<T>& srcLocal, const GlobalTensor<T>& stateGm,
+                                     const GlobalTensor<int32_t>& blockTableGm, const Vec1SliceInfo& sliceInfo,
                                      uint32_t dStartIdx, uint32_t dDealSize, uint32_t stateIdx);
     uint32_t cmpRatio_ = 0U;
     uint32_t coff_ = 0U;
@@ -159,7 +167,9 @@ private:
     GlobalTensor<int32_t> sequsedGm_;
     GlobalTensor<int32_t> stateBlockTableGm_;
     GlobalTensor<T> stateCacheGm_;
+    GlobalTensor<T> stateCacheSnapshotGm_;
     GlobalTensor<X_T> cmpKvOutGm_;
+    bool isStateCacheSnapshotEnabled_ = false;
 
     // ================================Local Buffer区====================================
     // TBuf<TPosition::VECIN> mm1ResUb;
@@ -176,8 +186,8 @@ private:
 };
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::InitParams(const ConstInfo &constInfo,
-                                                                     const CompressorV2Tools<COMP> &tools)
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::InitParams(const ConstInfo& constInfo,
+                                                                     const CompressorV2Tools<COMP>& tools)
 {
     this->constInfo_ = constInfo;
     this->tools_ = tools;
@@ -186,31 +196,31 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::InitParams(const Const
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::Init(__gm__ uint8_t *x, __gm__ uint8_t *wKv,
-                                                               __gm__ uint8_t *wGate, __gm__ uint8_t *stateCache,
-                                                               __gm__ uint8_t *stateBlockTable,
-                                                               __gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed,
-                                                               __gm__ uint8_t *startPos, __gm__ uint8_t *cmpKvOut)
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::Init(__gm__ uint8_t* x, __gm__ uint8_t* wKv,
+                                                               __gm__ uint8_t* wGate, __gm__ uint8_t* stateCache,
+                                                               __gm__ uint8_t* stateBlockTable,
+                                                               __gm__ uint8_t* cuSeqlens, __gm__ uint8_t* seqUsed,
+                                                               __gm__ uint8_t* startPos, __gm__ uint8_t* cmpKvOut)
 {
-    stateBlockTableGm_.SetGlobalBuffer((__gm__ int32_t *)stateBlockTable);
-    stateCacheGm_.SetGlobalBuffer((__gm__ T *)stateCache);
+    stateBlockTableGm_.SetGlobalBuffer((__gm__ int32_t*)stateBlockTable);
+    stateCacheGm_.SetGlobalBuffer((__gm__ T*)stateCache);
 
-    cmpKvOutGm_.SetGlobalBuffer((__gm__ X_T *)cmpKvOut);
+    cmpKvOutGm_.SetGlobalBuffer((__gm__ X_T*)cmpKvOut);
     isExistSeqUsed = (seqUsed != nullptr);
     isExistStartPos = (startPos != nullptr);
     if constexpr (COMP::xLayout == X_LAYOUT::TH) {
-        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t *)cuSeqlens);
+        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t*)cuSeqlens);
     }
     if (isExistSeqUsed) {
-        sequsedGm_.SetGlobalBuffer((__gm__ int32_t *)seqUsed);
+        sequsedGm_.SetGlobalBuffer((__gm__ int32_t*)seqUsed);
     }
     if (isExistStartPos) {
-        startPosGm_.SetGlobalBuffer((__gm__ int32_t *)startPos);
+        startPosGm_.SetGlobalBuffer((__gm__ int32_t*)startPos);
     }
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::InitBuffers(TPipe *pipe)
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(inputQue1, 1, BUFFER_SIZE_BYTE_32K);
     pipe->InitBuffer(tmpBuff1, BUFFER_SIZE_BYTE_32K);
@@ -231,12 +241,122 @@ template <typename COMP>
 __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::InitVec1GlobalTensor(GlobalTensor<T> kvMm1ResGm,
                                                                                GlobalTensor<T> scoreMm1ResGm,
                                                                                GlobalTensor<T> kvCacheTcGm,
-                                                                               GlobalTensor<T> scoreCacheTcGm)
+                                                                               GlobalTensor<T> scoreCacheTcGm,
+                                                                               GlobalTensor<T> stateCacheSnapshotGm)
 {
     this->kvMm1ResGm_ = kvMm1ResGm;
     this->scoreMm1ResGm_ = scoreMm1ResGm;
     this->kvCacheTcGm_ = kvCacheTcGm;
     this->scoreCacheTcGm_ = scoreCacheTcGm;
+    this->stateCacheSnapshotGm_ = stateCacheSnapshotGm;
+}
+
+template <typename COMP>
+__aicore__ inline bool CompressorV2BlockVectorPerf<COMP>::NeedBatchPrefixSnapshot(uint64_t startPos, uint32_t seqUsed)
+{
+    uint32_t prefixSize = startPos % cmpRatio_;
+    return prefixSize != 0 && seqUsed != 0 && (startPos + seqUsed) / cmpRatio_ != startPos / cmpRatio_ &&
+           static_cast<uint64_t>(prefixSize) + min(seqUsed, constInfo_.blockSize) > constInfo_.blockSize;
+}
+
+template <typename COMP>
+__aicore__ inline bool CompressorV2BlockVectorPerf<COMP>::IsPotentialStateCacheConflict()
+{
+    if (constInfo_.stateCacheSnapshotSize == 0 || constInfo_.blockSize == 0 || cmpRatio_ <= 1) {
+        return false;
+    }
+
+    bool hasRingSlotOverlap = false;
+    uint64_t totalDealTcNum = 0;
+    for (uint32_t batchIdx = 0; batchIdx < constInfo_.batchSize; ++batchIdx) {
+        uint64_t startPos = tools_.GetStartPos(batchIdx);
+        uint32_t seqLength = tools_.GetSeqLength(batchIdx);
+        uint32_t seqUsed = tools_.GetSeqUsed(batchIdx);
+        uint32_t prefixSize = startPos % cmpRatio_;
+        totalDealTcNum += CeilDivT(prefixSize + seqLength, cmpRatio_);
+
+        if (NeedBatchPrefixSnapshot(startPos, seqUsed)) {
+            hasRingSlotOverlap = true;
+        }
+    }
+
+    if (!hasRingSlotOverlap || totalDealTcNum == 0) {
+        return false;
+    }
+
+    Vec1RunInfo maxWorkInfo{};
+    maxWorkInfo.dealTcNum = static_cast<uint32_t>(totalDealTcNum);
+    Vec1SplitInfo maxWorkSplitInfo{};
+    CalcGroupInfo(maxWorkInfo, maxWorkSplitInfo);
+    return maxWorkSplitInfo.vec1GroupNum > 1;
+}
+
+template <typename COMP>
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SetStateCacheSnapshotEnabled(bool enabled)
+{
+    isStateCacheSnapshotEnabled_ = enabled;
+}
+
+template <typename COMP>
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SnapshotStateCache()
+{
+    isStateCacheSnapshotEnabled_ = true;
+    const uint32_t maxPrefixSize = cmpRatio_ - 1;
+    const uint32_t dChunkAlignment = BlockElementNum<T>();
+    const uint32_t maxDChunkSize = (BUFFER_SIZE_BYTE_32K / sizeof(T)) / maxPrefixSize;
+    const uint32_t dChunkSize =
+        min(constInfo_.headDim, max(dChunkAlignment, (maxDChunkSize / dChunkAlignment) * dChunkAlignment));
+    const uint32_t dChunkNum = CeilDivT(constInfo_.headDim, dChunkSize);
+    LocalTensor<T> snapshotUb = tmpBuff1.Get<T>();
+
+    for (uint32_t dChunkIdx = 0; dChunkIdx < dChunkNum; ++dChunkIdx) {
+        uint32_t dStartIdx = dChunkIdx * dChunkSize;
+        uint32_t dDealSize = min(dChunkSize, constInfo_.headDim - dStartIdx);
+        for (uint32_t batchIdx = constInfo_.aiCoreIdx; batchIdx < constInfo_.batchSize;
+             batchIdx += constInfo_.usedCoreNum) {
+            uint64_t startPos = tools_.GetStartPos(batchIdx);
+            uint32_t seqUsed = tools_.GetSeqUsed(batchIdx);
+            uint32_t prefixSize = startPos % cmpRatio_;
+            if (!NeedBatchPrefixSnapshot(startPos, seqUsed)) {
+                continue;
+            }
+
+            uint64_t ringBlockId = stateBlockTableGm_.GetValue(batchIdx);
+            uint64_t seqIdx = startPos - prefixSize;
+            uint32_t copiedRows = 0;
+            for (uint32_t stateIdx = 0; stateIdx < STATE_INTERLEAVE_FACTOR; ++stateIdx) {
+                copiedRows = 0;
+                seqIdx = startPos - prefixSize;
+                while (copiedRows < prefixSize) {
+                    uint32_t ringOffset = seqIdx % constInfo_.blockSize;
+                    uint32_t copyRows = min(constInfo_.blockSize - ringOffset, prefixSize - copiedRows);
+                    uint64_t stateOffset = ringBlockId * constInfo_.stateCacheStrideDim0 +
+                                           ringOffset * STATE_INTERLEAVE_FACTOR * coff_ * constInfo_.headDim +
+                                           stateIdx * coff_ * constInfo_.headDim + dStartIdx;
+                    DataCopyAlignGmToUb(snapshotUb[copiedRows * dDealSize], stateCacheGm_[stateOffset], copyRows,
+                                        dDealSize, STATE_INTERLEAVE_FACTOR * coff_ * constInfo_.headDim, dDealSize);
+                    event_t eventIdMte2Mte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_MTE3));
+                    SetFlag<HardEvent::MTE2_MTE3>(eventIdMte2Mte3);
+                    WaitFlag<HardEvent::MTE2_MTE3>(eventIdMte2Mte3);
+
+                    uint64_t snapshotOffset =
+                        ((static_cast<uint64_t>(batchIdx) * STATE_INTERLEAVE_FACTOR + stateIdx) * maxPrefixSize +
+                         copiedRows) *
+                            constInfo_.headDim +
+                        dStartIdx;
+                    DataCopyAlignUbToGm(stateCacheSnapshotGm_[snapshotOffset], snapshotUb[copiedRows * dDealSize],
+                                        copyRows, dDealSize, dDealSize, constInfo_.headDim);
+                    event_t eventIdMte3Mte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
+                    SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3Mte2);
+                    WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3Mte2);
+                    copiedRows += copyRows;
+                    seqIdx += copyRows;
+                }
+            }
+        }
+    }
+
+    PipeBarrier<PIPE_MTE3>();
 }
 
 template <typename COMP>
@@ -356,7 +476,7 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::DataCopyWithOutputQue(
 template <typename COMP>
 __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::PadAlign(const LocalTensor<T> dstLocal,
                                                                    const LocalTensor<T> srcLocal,
-                                                                   const Vec1SliceInfo &sliceInfo, uint32_t dStartIdx,
+                                                                   const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx,
                                                                    uint32_t dDealSize)
 {
     // Ub data layout after overlap when r = 4 and coff = 2:
@@ -385,9 +505,9 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::PadAlign(const LocalTe
 template <typename COMP>
 template <bool IS_SCORE>
 __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::OverLap(
-    const LocalTensor<T> dstLocal, const LocalTensor<T> srcLocal, const GlobalTensor<T> &srcGm,
-    const GlobalTensor<T> &stateGm, const GlobalTensor<int32_t> &blockTableGm, const GlobalTensor<T> &cacheTcGm,
-    const Vec1RunInfo &info, const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo, uint32_t dStartIdx,
+    const LocalTensor<T> dstLocal, const LocalTensor<T> srcLocal, const GlobalTensor<T>& srcGm,
+    const GlobalTensor<T>& stateGm, const GlobalTensor<int32_t>& blockTableGm, const GlobalTensor<T>& cacheTcGm,
+    const Vec1RunInfo& info, const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo, uint32_t dStartIdx,
     uint32_t globalSeqIdx, uint32_t dDealSize)
 {
     if (sliceInfo.dealTcSize == 0) {
@@ -397,8 +517,6 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::OverLap(
     if constexpr (IS_SCORE) {
         PipeBarrier<PIPE_V>();
     }
-    SaveState(srcLocal, stateGm, blockTableGm, sliceInfo, dStartIdx, dDealSize, static_cast<uint32_t>(IS_SCORE));
-
     event_t eventId_V_MTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
     SetFlag<HardEvent::V_MTE2>(eventId_V_MTE2);
     WaitFlag<HardEvent::V_MTE2>(eventId_V_MTE2);
@@ -411,13 +529,14 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::OverLap(
     event_t eventId_MTE2_V = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
     SetFlag<HardEvent::MTE2_V>(eventId_MTE2_V);
     WaitFlag<HardEvent::MTE2_V>(eventId_MTE2_V);
+    SaveState(srcLocal, stateGm, blockTableGm, sliceInfo, dStartIdx, dDealSize, static_cast<uint32_t>(IS_SCORE));
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::FromWokrSpaceToUb(const LocalTensor<T> &dstLocal,
-                                                                            const GlobalTensor<T> &srcGm,
-                                                                            const Vec1SliceInfo &sliceInfo,
-                                                                            const StatisticInfo &statisticInfo,
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::FromWokrSpaceToUb(const LocalTensor<T>& dstLocal,
+                                                                            const GlobalTensor<T>& srcGm,
+                                                                            const Vec1SliceInfo& sliceInfo,
+                                                                            const StatisticInfo& statisticInfo,
                                                                             uint32_t dStartIdx, uint32_t dDealSize)
 {
     uint32_t srcSingleRowElemNum = constInfo_.headDim;
@@ -431,9 +550,9 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::FromWokrSpaceToUb(cons
 
 template <typename COMP>
 __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SaveToWorkSpace(const LocalTensor<T> srcLocal,
-                                                                          const GlobalTensor<T> &cacheTcGm,
-                                                                          const Vec1SliceInfo &sliceInfo,
-                                                                          const LoopInfo &loopInfo, uint32_t dStartIdx,
+                                                                          const GlobalTensor<T>& cacheTcGm,
+                                                                          const Vec1SliceInfo& sliceInfo,
+                                                                          const LoopInfo& loopInfo, uint32_t dStartIdx,
                                                                           uint32_t dDealSize)
 {
     uint64_t curSeqLen = sliceInfo.bStartPos + sliceInfo.sIdx + sliceInfo.validSeqCnt;
@@ -453,8 +572,8 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SaveToWorkSpace(const 
 
 template <typename COMP>
 __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::LoadFromWorkSpace(
-    const LocalTensor<T> dstLocal, const GlobalTensor<T> &cacheTcGm, const GlobalTensor<T> &srcGm,
-    const LocalTensor<T> srcLocal, const Vec1SliceInfo &sliceInfo, const LoopInfo &loopInfo, uint32_t dStartIdx,
+    const LocalTensor<T> dstLocal, const GlobalTensor<T>& cacheTcGm, const GlobalTensor<T>& srcGm,
+    const LocalTensor<T> srcLocal, const Vec1SliceInfo& sliceInfo, const LoopInfo& loopInfo, uint32_t dStartIdx,
     uint32_t globalSeqIdx, uint32_t dDealSize)
 {
     if (sliceInfo.sIdx == 0) {
@@ -484,9 +603,9 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::LoadFromWorkSpace(
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::ReadFromCacheState(const LocalTensor<T> &output,
-                                                                             const GlobalTensor<T> &state,
-                                                                             const GlobalTensor<int32_t> &blockTableGm,
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::ReadFromCacheState(const LocalTensor<T>& output,
+                                                                             const GlobalTensor<T>& state,
+                                                                             const GlobalTensor<int32_t>& blockTableGm,
                                                                              uint32_t batchIdx, uint32_t startSeqIdx,
                                                                              uint32_t endSeqIdx, uint32_t dStartIdx,
                                                                              uint32_t dDealSize, uint32_t stateIdx)
@@ -521,9 +640,30 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::ReadFromCacheState(con
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::WriteToCacheState(const GlobalTensor<T> &state,
-                                                                            const GlobalTensor<int32_t> &blockTableGm,
-                                                                            const LocalTensor<T> &input,
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::ReadFromStateCacheSnapshot(
+    const LocalTensor<T>& output, const Vec1SliceInfo& sliceInfo, uint32_t startSeqIdx, uint32_t endSeqIdx,
+    uint32_t dStartIdx, uint32_t dDealSize, uint32_t stateIdx)
+{
+    if (endSeqIdx <= startSeqIdx) {
+        return;
+    }
+
+    uint32_t prefixStartSeqIdx = sliceInfo.bStartPos - sliceInfo.bStartPos % cmpRatio_;
+    uint32_t rowStart = startSeqIdx - prefixStartSeqIdx;
+    uint32_t copyRowCount = endSeqIdx - startSeqIdx;
+    uint32_t maxPrefixSize = cmpRatio_ - 1;
+    uint64_t snapshotOffset =
+        ((static_cast<uint64_t>(sliceInfo.bIdx) * STATE_INTERLEAVE_FACTOR + stateIdx) * maxPrefixSize + rowStart) *
+            constInfo_.headDim +
+        dStartIdx;
+    DataCopyAlignGmToUb(output, stateCacheSnapshotGm_[snapshotOffset], copyRowCount, dDealSize, constInfo_.headDim,
+                        coff_ * dDealSize);
+}
+
+template <typename COMP>
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::WriteToCacheState(const GlobalTensor<T>& state,
+                                                                            const GlobalTensor<int32_t>& blockTableGm,
+                                                                            const LocalTensor<T>& input,
                                                                             uint32_t batchIdx, uint32_t startSeqIdx,
                                                                             uint32_t endSeqIdx, uint32_t dStartIdx,
                                                                             uint32_t dDealSize, uint32_t stateIdx)
@@ -560,10 +700,10 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::WriteToCacheState(cons
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SaveState(const LocalTensor<T> &srcLocal,
-                                                                    const GlobalTensor<T> &stateGm,
-                                                                    const GlobalTensor<int32_t> &blockTableGm,
-                                                                    const Vec1SliceInfo &sliceInfo, uint32_t dStartIdx,
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SaveState(const LocalTensor<T>& srcLocal,
+                                                                    const GlobalTensor<T>& stateGm,
+                                                                    const GlobalTensor<int32_t>& blockTableGm,
+                                                                    const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx,
                                                                     uint32_t dDealSize, uint32_t stateIdx)
 {
     uint64_t startSeqIdx = sliceInfo.bStartPos + sliceInfo.sIdx;
@@ -589,7 +729,7 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SaveState(const LocalT
 
 template <typename COMP>
 template <bool IS_SCORE>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::DuplicateFirstBlock(const LocalTensor<T> &dstLocal,
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::DuplicateFirstBlock(const LocalTensor<T>& dstLocal,
                                                                               uint32_t duplicateRowCount,
                                                                               uint32_t duplicateColCount,
                                                                               uint32_t singleRowCount)
@@ -608,10 +748,10 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::DuplicateFirstBlock(co
 
 template <typename COMP>
 template <bool IS_SCORE>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::ReadState(const LocalTensor<T> &dstLocal,
-                                                                    const GlobalTensor<T> &stateGm,
-                                                                    const GlobalTensor<int32_t> &blockTableGm,
-                                                                    const Vec1SliceInfo &sliceInfo, uint32_t dStartIdx,
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::ReadState(const LocalTensor<T>& dstLocal,
+                                                                    const GlobalTensor<T>& stateGm,
+                                                                    const GlobalTensor<int32_t>& blockTableGm,
+                                                                    const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx,
                                                                     uint32_t dDealSize, uint32_t stateIdx)
 {
     // 没有需要压缩的块时, 不需要读state的信息
@@ -624,16 +764,22 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::ReadState(const LocalT
         uint64_t startSeqIdx = Trunc(sliceInfo.bStartPos + sliceInfo.sIdx, (uint64_t)constInfo_.cmpRatio);
         uint32_t endSeqIdx = sliceInfo.bStartPos;
         uint64_t dstBaseOffset = sliceInfo.compressoredScCnt * constInfo_.cmpRatio * coff_ * dDealSize;
-        ReadFromCacheState(dstLocal[dstBaseOffset], stateGm, blockTableGm, sliceInfo.bIdx, startSeqIdx, endSeqIdx,
-                           dStartIdx + (coff_ - 1) * constInfo_.headDim, dDealSize, stateIdx);
+        if (isStateCacheSnapshotEnabled_ &&
+            NeedBatchPrefixSnapshot(sliceInfo.bStartPos, tools_.GetSeqUsed(sliceInfo.bIdx))) {
+            ReadFromStateCacheSnapshot(dstLocal[dstBaseOffset], sliceInfo, startSeqIdx, endSeqIdx,
+                                       dStartIdx + (coff_ - 1) * constInfo_.headDim, dDealSize, stateIdx);
+        } else {
+            ReadFromCacheState(dstLocal[dstBaseOffset], stateGm, blockTableGm, sliceInfo.bIdx, startSeqIdx, endSeqIdx,
+                               dStartIdx + (coff_ - 1) * constInfo_.headDim, dDealSize, stateIdx);
+        }
     }
 
     // 填充左边
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SoftmaxDN(const LocalTensor<T> &scoreLocal,
-                                                                    const LocalTensor<T> &tmpUb, uint32_t tcDealSize,
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SoftmaxDN(const LocalTensor<T>& scoreLocal,
+                                                                    const LocalTensor<T>& tmpUb, uint32_t tcDealSize,
                                                                     uint32_t dDealSize)
 {
     float minValue = SOFTMAX_MIN_VALUE;
@@ -645,10 +791,10 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::SoftmaxDN(const LocalT
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::KvMulReduceScore(const LocalTensor<T> &kvLocal,
-                                                                           const LocalTensor<T> &scoreLocal,
-                                                                           const LocalTensor<T> &dstLocal,
-                                                                           const LocalTensor<T> &tmpUb,
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::KvMulReduceScore(const LocalTensor<T>& kvLocal,
+                                                                           const LocalTensor<T>& scoreLocal,
+                                                                           const LocalTensor<T>& dstLocal,
+                                                                           const LocalTensor<T>& tmpUb,
                                                                            uint32_t tcDealSize, uint32_t dDealSize)
 {
     uint32_t ReduceSize = coff_ * constInfo_.cmpRatio;
@@ -661,8 +807,8 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::KvMulReduceScore(const
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CopyOutVec1ResToOutput(const LocalTensor<T> &comperssoredUb,
-                                                                                 const Vec1SliceInfo &sliceInfo,
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CopyOutVec1ResToOutput(const LocalTensor<T>& comperssoredUb,
+                                                                                 const Vec1SliceInfo& sliceInfo,
                                                                                  uint32_t compressTcSize,
                                                                                  uint32_t dStartIdx, uint32_t dDealSize)
 {
@@ -701,13 +847,13 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CopyOutVec1ResToOutput
 
 template <typename COMP>
 __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::OverLapScoreKv(
-    const LocalTensor<T> &scoreLocal, const LocalTensor<T> &kvLocal, const Vec1RunInfo &info, const LoopInfo &loopInfo,
-    const StatisticInfo &statisticInfo, const Vec1SliceInfo &originSliceInfo, uint32_t dStartIdx, uint32_t dDealSize,
+    const LocalTensor<T>& scoreLocal, const LocalTensor<T>& kvLocal, const Vec1RunInfo& info, const LoopInfo& loopInfo,
+    const StatisticInfo& statisticInfo, const Vec1SliceInfo& originSliceInfo, uint32_t dStartIdx, uint32_t dDealSize,
     uint32_t dBaseSize, uint32_t needDealTcSize)
 {
     CompressorV2Vec1SliceIterator overLapSliceIterator(tools_);
     overLapSliceIterator.SetMaxBatchSize(constInfo_.batchSize);
-    Vec1SliceInfo &overLapSliceInfo = overLapSliceIterator.GetSlice();
+    Vec1SliceInfo& overLapSliceInfo = overLapSliceIterator.GetSlice();
 
     GlobalTensor<T> scoreDBMm1ResGm = scoreMm1ResGm_[info.c1v1DbIdx * constInfo_.dbSize];
     LocalTensor<T> scoreUb = inputQue1.AllocTensor<T>();
@@ -744,12 +890,12 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::OverLapScoreKv(
 
 template <typename COMP>
 __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::DealVec1BaseBlock(
-    const Vec1RunInfo &info, CompressorV2Vec1SliceIterator<COMP> &sliceIterator, const LoopInfo &loopInfo,
+    const Vec1RunInfo& info, CompressorV2Vec1SliceIterator<COMP>& sliceIterator, const LoopInfo& loopInfo,
     uint32_t dStartIdx, uint32_t dDealSize, uint32_t dBaseSize)
 {
     Vec1SliceInfo originSliceInfo = sliceIterator.GetSlice();
     uint32_t needDealTcSize = sliceIterator.GetNeedDealTcSize();
-    StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+    StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
     if (statisticInfo.actualTcCnt == 0) {
         return;
     }
@@ -772,8 +918,8 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::DealVec1BaseBlock(
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CalcGroupInfo(const Vec1RunInfo &info,
-                                                                        Vec1SplitInfo &splitInfo)
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CalcGroupInfo(const Vec1RunInfo& info,
+                                                                        Vec1SplitInfo& splitInfo)
 {
     uint32_t aiCoreNum = constInfo_.usedCoreNum * 2;
     splitInfo.dBaseSize = constInfo_.headDim / min(FloorPow2(aiCoreNum), CeilPow2(CeilDivT(aiCoreNum, info.dealTcNum)));
@@ -789,8 +935,8 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CalcGroupInfo(const Ve
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CalcTaskDistribution(const Vec1RunInfo &info,
-                                                                               Vec1SplitInfo &splitInfo)
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CalcTaskDistribution(const Vec1RunInfo& info,
+                                                                               Vec1SplitInfo& splitInfo)
 {
     uint32_t blockIdx = GetBlockIdx();
     uint32_t groupSize = splitInfo.vec1GroupSize;
@@ -810,18 +956,18 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CalcTaskDistribution(c
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::UpdateIteratorState(const Vec1RunInfo &info,
-                                                                              Vec1SplitInfo &splitInfo)
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::UpdateIteratorState(const Vec1RunInfo& info,
+                                                                              Vec1SplitInfo& splitInfo)
 {
     CompressorV2Vec1SliceIterator sliceIterator(tools_);
     sliceIterator.SetMaxBatchSize(constInfo_.batchSize);
     sliceIterator.Reset(info.bStart, info.sStart, 0U, 0U);
-    Vec1SliceInfo &sliceInfo = sliceIterator.GetSlice();
+    Vec1SliceInfo& sliceInfo = sliceIterator.GetSlice();
 
     // 处理前序任务量，更新起始索引
     if (splitInfo.preDealTcSize > 0) {
         sliceIterator.SetNeedDealTcSize(splitInfo.preDealTcSize);
-        StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+        StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
         splitInfo.curCompressedCnt = statisticInfo.compressorScCnt;
         splitInfo.dealSeqStartIdx = sliceInfo.dealedSeqCnt;
         splitInfo.curBStart = sliceInfo.bIdx;
@@ -835,12 +981,12 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::UpdateIteratorState(co
 
     // 处理当前核实际要跑的任务量
     sliceIterator.SetNeedDealTcSize(info.dealTcNum - splitInfo.preDealTcSize);
-    StatisticInfo &statisticInfo = sliceIterator.template FullIteratorSlice<true>();
+    StatisticInfo& statisticInfo = sliceIterator.template FullIteratorSlice<true>();
     splitInfo.totalCompressedCnt = splitInfo.curCompressedCnt + statisticInfo.compressorScCnt;
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CalcTilingStrategy(Vec1SplitInfo &splitInfo)
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CalcTilingStrategy(Vec1SplitInfo& splitInfo)
 {
     // 计算headDim和Tc方向切分大小
     uint32_t maxDealColNum = BUFFER_SIZE_BYTE_32K / (constInfo_.cmpRatio * coff_ * sizeof(T));
@@ -858,7 +1004,7 @@ __aicore__ inline void CompressorV2BlockVectorPerf<COMP>::CalcTilingStrategy(Vec
 }
 
 template <typename COMP>
-__aicore__ inline Vec1SplitInfo CompressorV2BlockVectorPerf<COMP>::SplitCoreV1(const Vec1RunInfo &info)
+__aicore__ inline Vec1SplitInfo CompressorV2BlockVectorPerf<COMP>::SplitCoreV1(const Vec1RunInfo& info)
 {
     Vec1SplitInfo splitInfo;
 
@@ -882,7 +1028,7 @@ __aicore__ inline Vec1SplitInfo CompressorV2BlockVectorPerf<COMP>::SplitCoreV1(c
 }
 
 template <typename COMP>
-__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::ComputeVec1(const Vec1RunInfo &info)
+__aicore__ inline void CompressorV2BlockVectorPerf<COMP>::ComputeVec1(const Vec1RunInfo& info)
 {
     if (info.dealTcNum == 0) {
         return;

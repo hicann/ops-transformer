@@ -13,8 +13,8 @@ import pytest
 import torch
 import torch_npu
 
-from cann_ops_transformer.ops.ds41 import compressor
-from compressor_golden import check_result, cpu_compressor
+from cann_ops_transformer_custom.ops.attention.compressor_v2 import compressor
+from compressor_golden_arch22 import check_result, cpu_compressor
 
 
 @pytest.mark.ci
@@ -24,6 +24,36 @@ from compressor_golden import check_result, cpu_compressor
 @pytest.mark.parametrize("head_dim", [128, 512])
 def test_arch22_ring_state(dtype, layout_th, length, head_dim):
     _run_ring_sequence(dtype, layout_th, [length, 1, 1, 1, 1], head_dim)
+
+
+@pytest.mark.ci
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+@pytest.mark.parametrize("start_pos", [5, 6, 7])
+@pytest.mark.parametrize("length", [3, 5])
+def test_arch22_read_before_write_conflict(dtype, length, start_pos):
+    _run_ring_sequence(
+        dtype,
+        False,
+        [length],
+        head_dim=128,
+        capacity=3,
+        starts=[start_pos],
+        state_padding=1,
+    )
+
+
+@pytest.mark.ci
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
+def test_arch22_full_load_empty_loop_advances_batch_cursor(dtype):
+    starts = [0, 0, 1] + [0] * 78
+    _run_ring_sequence(
+        dtype,
+        False,
+        [3],
+        head_dim=512,
+        capacity=8,
+        starts=starts,
+    )
 
 
 def _run_ring_sequence(
