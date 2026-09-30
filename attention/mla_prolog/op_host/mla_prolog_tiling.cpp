@@ -54,7 +54,7 @@ inline auto Align(T num, T rnd) -> T
     return (((rnd) == 0) ? 0 : (((num) + (rnd)-1) / (rnd) * (rnd)));
 }
 
-inline bool GetDefaultStride0(const gert::Shape &shape, uint64_t &stride0)
+inline bool GetDefaultStride0(const gert::Shape& shape, uint64_t& stride0)
 {
     stride0 = 1U;
     for (size_t dim = 1U; dim < shape.GetDimNum(); ++dim) {
@@ -68,8 +68,8 @@ inline bool GetDefaultStride0(const gert::Shape &shape, uint64_t &stride0)
     return true;
 }
 
-inline ge::graphStatus GetCacheStride0(gert::TilingContext &context, uint32_t inputIndex, const gert::Shape &shape,
-                                       const char *tensorName, uint64_t &stride0)
+inline ge::graphStatus GetCacheStride0(gert::TilingContext& context, uint32_t inputIndex, const gert::Shape& shape,
+                                       const char* tensorName, uint64_t& stride0)
 {
     OP_CHECK_IF(shape.GetDimNum() == 0U, OP_LOGE(context.GetNodeName(), "%s rank must be greater than 0.", tensorName),
                 return ge::GRAPH_FAILED);
@@ -87,7 +87,7 @@ inline ge::graphStatus GetCacheStride0(gert::TilingContext &context, uint32_t in
     OP_CHECK_IF(!GetDefaultStride0(shape, defaultStride0),
                 OP_LOGE(context.GetNodeName(), "%s shape cannot be represented by an int64 stride.", tensorName),
                 return ge::GRAPH_FAILED);
-    auto *stride = context.GetInputStride(inputIndex);
+    auto* stride = context.GetInputStride(inputIndex);
     if (stride == nullptr || stride->GetDimNum() != shape.GetDimNum()) {
         stride0 = defaultStride0;
         OP_LOGW(context.GetNodeName(), "%s has no valid stride descriptor, use contiguous stride0=%lu.", tensorName,
@@ -208,7 +208,7 @@ QUANT_MODE MlaPrologTiling::GetQuantizationModeV3Dav() const
     auto kvIt = wqIt->second.find(kvQuantMode);
     if (kvIt == wqIt->second.end()) {
         auto reasonIt = VALID_KV_REASON_TABLE.find(weightQuantMode);
-        const char *reason = (reasonIt != VALID_KV_REASON_TABLE.end()) ? reasonIt->second : "invalid kvQuantMode";
+        const char* reason = (reasonIt != VALID_KV_REASON_TABLE.end()) ? reasonIt->second : "invalid kvQuantMode";
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->opName, "kvQuantMode", std::to_string(kvQuantMode), reason);
         return QUANT_MODE::ERROR_MODE;
     }
@@ -220,7 +220,7 @@ QUANT_MODE MlaPrologTiling::GetQuantizationModeV3Dav() const
 QUANT_MODE MlaPrologTiling::GetQuantizationMode() const
 {
     if (std::strncmp(context_->opType, V3_OP_NAME, OP_NAME_LEN) == 0) {
-        if (GetCurNpuArch() == NpuArch::DAV_3510) {
+        if (GetCurNpuArch() == NpuArch::DAV_3510 || GetCurNpuArch() == NpuArch::DAV_9201) {
             return GetQuantizationModeV3Dav();
         } else {
             return GetQuantizationModeV3();
@@ -297,7 +297,7 @@ void MlaPrologTiling::SetShapeInfoDrSize()
 {
     if (context_->doRope != nullptr && !(*(context_->doRope))) {
         // do_rope=false 时 ropeSin/ropeCos 为空 tensor，dr 由 weightDkvKr 的 (Hckv+Dr) 与 weightUk 的 Hckv 推导
-        const auto &weightDkvKrShape = context_->weightDkvKr.shape->GetStorageShape();
+        const auto& weightDkvKrShape = context_->weightDkvKr.shape->GetStorageShape();
         uint32_t hckvPlusDr =
             (weightDkvKrShape.GetDimNum() == MLA_PROLOG_DIM_NUM_4) ?
                 weightDkvKrShape.GetDim(MLA_PROLOG_DIM_INDEX_0) * weightDkvKrShape.GetDim(MLA_PROLOG_DIM_INDEX_3) :
@@ -319,7 +319,7 @@ ge::graphStatus MlaPrologTiling::SetScenarioInfo()
     }
 
     // 由 quantMode_ 反向映射 wq/kvq（V1/V2 按 dtype 推断、V3 正向查表，均唯一可反推）
-    const auto &wqKvq = QUANT_MODE_REVERSE_TABLE.at(scenarioInfo_.quantMode_);
+    const auto& wqKvq = QUANT_MODE_REVERSE_TABLE.at(scenarioInfo_.quantMode_);
     scenarioInfo_.weightQuantMode_ = wqKvq.first;
     scenarioInfo_.kvQuantMode_ = wqKvq.second;
 
@@ -350,7 +350,7 @@ ge::graphStatus MlaPrologTiling::SetScenarioInfo()
     uint32_t cvRatio = aivNum_ / aicNum_;
     // 当前仅在BS>=8K且数据类型为MXFP8时路由到切M模板，其他情况均路由到切N模板
     scenarioInfo_.splitMFlag_ = 0U;
-    if (scenarioInfo_.weightQuantMode_ == WEIGHT_QUANT_MODE::MXFP8_FULL_QUANT && cvRatio == 2 &&
+    if (scenarioInfo_.weightQuantMode_ == WEIGHT_QUANT_MODE::MXFP8_FULL_QUANT &&
         baseShapeInfo_.tSize >= 8192) { // 8192：BS >= 8K
         if ((baseShapeInfo_.heSize == HEAD_SIZE1 || baseShapeInfo_.heSize == HEAD_SIZE2) &&
             baseShapeInfo_.nSize == 128) { // 128：N为128时路由到切M模板
@@ -385,7 +385,7 @@ ge::graphStatus MlaPrologTiling::SetAttrInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-bool MlaPrologTiling::GetMatmulType(ge::DataType getype, matmul_tiling::DataType *mmType)
+bool MlaPrologTiling::GetMatmulType(ge::DataType getype, matmul_tiling::DataType* mmType)
 {
     auto mmdt = GE_TO_MM_DTYPE.find(getype);
     if (mmdt != GE_TO_MM_DTYPE.end()) {
@@ -671,20 +671,52 @@ ge::graphStatus MlaPrologTiling::GenTilingKey() const
         quantType = static_cast<uint8_t>(scenarioInfo_.quantMode_);
     }
 
-    uint8_t cvMode = ASCENDC_TPL_MIX_AIC_1_2; // 默认cv 1:2模式
+    uint8_t cvMode = ASCENDC_TPL_MIX_AIC_1_2;
     if (aivNum_ == aicNum_) {
-        cvMode = ASCENDC_TPL_MIX_AIC_1_1; // cv 1:1模式
+        cvMode = ASCENDC_TPL_MIX_AIC_1_1;
     }
-
-    if (cvMode == ASCENDC_TPL_MIX_AIC_1_1 &&
-        (scenarioInfo_.quantMode_ != QUANT_MODE::NO_QUANT ||
-         (scenarioInfo_.cacheMode_ != CACHE_MODE::PA_BSND && scenarioInfo_.cacheMode_ != CACHE_MODE::PA_NZ))) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-            context_->opName, "quantMode",
-            std::to_string(static_cast<uint32_t>(scenarioInfo_.quantMode_)) + ", cacheMode is " +
-                std::to_string(static_cast<uint32_t>(scenarioInfo_.cacheMode_)),
-            "CV1:1 mode only support quantMode in {NO_QUANT} and cacheMode in {PA_BSND,PA_NZ}");
-        return ge::GRAPH_FAILED;
+    if (GetCurNpuArch() == NpuArch::DAV_3510) {
+        if (cvMode == ASCENDC_TPL_MIX_AIC_1_1 &&
+            (scenarioInfo_.quantMode_ != QUANT_MODE::NO_QUANT ||
+             (scenarioInfo_.cacheMode_ != CACHE_MODE::PA_BSND && scenarioInfo_.cacheMode_ != CACHE_MODE::PA_NZ))) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                context_->opName, "quantMode",
+                std::to_string(static_cast<uint32_t>(scenarioInfo_.quantMode_)) + ", cacheMode is " +
+                    std::to_string(static_cast<uint32_t>(scenarioInfo_.cacheMode_)),
+                "CV1:1 mode only support quantMode in {NO_QUANT} and cacheMode in {PA_BSND,PA_NZ}");
+            return ge::GRAPH_FAILED;
+        }
+    } else if (GetCurNpuArch() == NpuArch::DAV_9201) {
+        if ((cvMode == ASCENDC_TPL_MIX_AIC_1_1) &&
+            (scenarioInfo_.quantMode_ != QUANT_MODE::NO_QUANT &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::MXFP8_FULL_QUANT_KV_NO_QUANT &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::MXFP8_FULL_QUANT_KV_QUANT_PER_TENSOR &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::MXFP8_FULL_QUANT_KV_QUANT_PER_TILE &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::HIF8_FULL_QUANT_KV_NO_QUANT &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::HIF8_FULL_QUANT_KV_QUANT_PER_TENSOR &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::HIF8_FULL_QUANT_KV_QUANT_PER_TILE &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::FP8_FULL_QUANT_KV_NO_QUANT &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::FP8_FULL_QUANT_KV_QUANT_PER_TENSOR &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::FP8_FULL_QUANT_KV_QUANT_PER_TILE &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::PARTIAL_QUANT_KV_NO_QUANT &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::PARTIAL_QUANT_KV_QUANT_PER_CHANNEL &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::PARTIAL_QUANT_KV_QUANT_PER_TILE &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::FULL_QUANT_KV_NO_QUANT &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::FULL_QUANT_KV_QUANT_PER_TENSOR &&
+             scenarioInfo_.quantMode_ != QUANT_MODE::FULL_QUANT_KV_QUANT_PER_TILE)) {
+            OP_LOGE(
+                context_->opName,
+                "When socversion is V121, CV1:1 mode only support quantMode is in {NO_QUANT,"
+                "MXFP8_FULL_QUANT_KV_NO_QUANT, MXFP8_FULL_QUANT_KV_QUANT_PER_TENSOR, "
+                "MXFP8_FULL_QUANT_KV_QUANT_PER_TILE,"
+                "HIF8_FULL_QUANT_KV_NO_QUANT, HIF8_FULL_QUANT_KV_QUANT_PER_TENSOR, HIF8_FULL_QUANT_KV_QUANT_PER_TILE,"
+                "FP8_FULL_QUANT_KV_NO_QUANT, FP8_FULL_QUANT_KV_QUANT_PER_TENSOR, FP8_FULL_QUANT_KV_QUANT_PER_TILE,"
+                "PARTIAL_QUANT_KV_NO_QUANT, PARTIAL_QUANT_KV_QUANT_PER_CHANNEL, PARTIAL_QUANT_KV_QUANT_PER_TILE,"
+                "FULL_QUANT_KV_NO_QUANT, FULL_QUANT_KV_QUANT_PER_TENSOR, FULL_QUANT_KV_QUANT_PER_TILE}, quantMode is "
+                "%d.",
+                scenarioInfo_.quantMode_);
+            return ge::GRAPH_FAILED;
+        }
     }
 
     if (scenarioInfo_.emptyTensorMode_ == EMPTY_TENSOR_MODE::EMPTY_QUERY) {
@@ -710,7 +742,7 @@ ge::graphStatus MlaPrologTiling::GenTilingKey() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MlaPrologTiling::RunBigKernelTiling(MlaPrologContext &context, MlaPrologTilingData *tilingData)
+ge::graphStatus MlaPrologTiling::RunBigKernelTiling(MlaPrologContext& context, MlaPrologTilingData* tilingData)
 {
     this->context_ = &context;
     this->baseParams_ = &tilingData->baseParams;
@@ -732,7 +764,7 @@ ge::graphStatus MlaPrologTiling::RunBigKernelTiling(MlaPrologContext &context, M
         std::bind(&MlaPrologTiling::SetAttrInfo, this),
         std::bind(&MlaPrologTiling::ProcessBaseInputs, this),
     };
-    for (const auto &func : requiredTilingFuncs) {
+    for (const auto& func : requiredTilingFuncs) {
         if (func() != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -753,7 +785,7 @@ ge::graphStatus MlaPrologTiling::RunBigKernelTiling(MlaPrologContext &context, M
         std::bind(&MlaPrologTiling::FillMatmul3Tiling, this), std::bind(&MlaPrologTiling::FillMatmul4Tiling, this),
         std::bind(&MlaPrologTiling::FillTiling, this),        std::bind(&MlaPrologTiling::CalcWorkSpace, this),
         std::bind(&MlaPrologTiling::GenTilingKey, this)};
-    for (const auto &func : optionalTilingFuncs) {
+    for (const auto& func : optionalTilingFuncs) {
         if (func() != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -764,7 +796,7 @@ ge::graphStatus MlaPrologTiling::RunBigKernelTiling(MlaPrologContext &context, M
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MlaPrologTiling::ConvertContext(gert::TilingContext &context, MlaPrologContext &mlaPrologContext)
+ge::graphStatus MlaPrologTiling::ConvertContext(gert::TilingContext& context, MlaPrologContext& mlaPrologContext)
 {
     OP_CHECK_IF(context.GetNodeName() == nullptr, OP_LOGE_WITH_INVALID_INPUT(V1_OP_NAME, "OpName"),
                 return ge::GRAPH_FAILED);
@@ -778,8 +810,8 @@ ge::graphStatus MlaPrologTiling::ConvertContext(gert::TilingContext &context, Ml
 
     OP_CHECK_IF(mlaPrologContext.kvCache.shape == nullptr || mlaPrologContext.krCache.shape == nullptr,
                 OP_LOGE(context.GetNodeName(), "kvCache or krCache shape is nullptr."), return ge::GRAPH_FAILED);
-    const gert::Shape &kvCacheShape = mlaPrologContext.kvCache.shape->GetStorageShape();
-    const gert::Shape &krCacheShape = mlaPrologContext.krCache.shape->GetStorageShape();
+    const gert::Shape& kvCacheShape = mlaPrologContext.kvCache.shape->GetStorageShape();
+    const gert::Shape& krCacheShape = mlaPrologContext.krCache.shape->GetStorageShape();
     const bool isV3 = std::strncmp(mlaPrologContext.opType, V3_OP_NAME, OP_NAME_LEN) == 0;
     const uint32_t kvCacheIndex = isV3 ? KV_CACHE_INPUT_INDEX_V3 : KV_CACHE_INPUT_INDEX;
     const uint32_t krCacheIndex = isV3 ? KR_CACHE_INPUT_INDEX_V3 : KR_CACHE_INPUT_INDEX;
@@ -801,7 +833,7 @@ ge::graphStatus MlaPrologTiling::ConvertContext(gert::TilingContext &context, Ml
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MlaPrologTiling::ConvertContextAttrs(gert::TilingContext &context, MlaPrologContext &mlaPrologContext)
+ge::graphStatus MlaPrologTiling::ConvertContextAttrs(gert::TilingContext& context, MlaPrologContext& mlaPrologContext)
 {
     auto attrs = context.GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context.GetNodeName(), "attrs"), return ge::GRAPH_FAILED);
@@ -843,7 +875,7 @@ ge::graphStatus MlaPrologTiling::ConvertContextAttrs(gert::TilingContext &contex
     return ge::GRAPH_SUCCESS;
 }
 
-void MlaPrologTiling::ConvertRequiredParams(gert::TilingContext &context, MlaPrologContext &mlaPrologContext)
+void MlaPrologTiling::ConvertRequiredParams(gert::TilingContext& context, MlaPrologContext& mlaPrologContext)
 {
     mlaPrologContext.tokenX.desc = context.GetRequiredInputDesc(TOKEN_X_INPUT_INDEX);
     mlaPrologContext.tokenX.shape = context.GetRequiredInputShape(TOKEN_X_INPUT_INDEX);
@@ -888,7 +920,7 @@ void MlaPrologTiling::ConvertRequiredParams(gert::TilingContext &context, MlaPro
     mlaPrologContext.krCacheOut.shape = context.GetOutputShape(KR_CACHE_OUT_OUTPUT_INDEX);
 }
 
-void MlaPrologTiling::ConvertOptionalParams(gert::TilingContext &context, MlaPrologContext &mlaPrologContext)
+void MlaPrologTiling::ConvertOptionalParams(gert::TilingContext& context, MlaPrologContext& mlaPrologContext)
 {
     if (std::strncmp(mlaPrologContext.opType, V3_OP_NAME, OP_NAME_LEN) == 0) {
         mlaPrologContext.cacheIndex.desc = context.GetRequiredInputDesc(CACHE_INDEX_INPUT_INDEX_V3);
@@ -935,7 +967,7 @@ void MlaPrologTiling::ConvertOptionalParams(gert::TilingContext &context, MlaPro
     }
 }
 
-MLA_EXTERN_C ge::graphStatus TilingMlaProlog(gert::TilingContext *context)
+MLA_EXTERN_C ge::graphStatus TilingMlaProlog(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR(V1_OP_NAME, "Context is nullptr."),
                 return ge::GRAPH_FAILED);
@@ -947,7 +979,7 @@ MLA_EXTERN_C ge::graphStatus TilingMlaProlog(gert::TilingContext *context)
                 return ge::GRAPH_FAILED);
 
     MlaPrologTiling mlaPrologTiling;
-    MlaPrologTilingData *tilingData = context->GetTilingData<MlaPrologTilingData>();
+    MlaPrologTilingData* tilingData = context->GetTilingData<MlaPrologTilingData>();
     OP_CHECK_IF(tilingData == nullptr, OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "TilingData is nullptr."),
                 return ge::GRAPH_FAILED);
     if (mlaPrologTiling.RunBigKernelTiling(mlaPrologContext, tilingData) == ge::SUCCESS) {

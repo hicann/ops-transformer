@@ -28,7 +28,6 @@
 #include <unordered_set>
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
-#include "op_host/data_copy_transpose_tiling.h"
 #include "exe_graph/runtime/tiling_context.h"
 #include "register/op_def_registry.h"
 #include "../op_kernel/mla_prolog_template_tiling_key.h"
@@ -246,7 +245,7 @@ inline const std::unordered_map<int, std::unordered_map<int, QUANT_MODE>> QUANT_
       {3, QUANT_MODE::HIF8_FULL_QUANT_KV_QUANT_PER_TILE}}}};
 
 // 各 weightQuantMode 下合法 kvQuantMode 集合说明（用于错误日志 reason 文本，与原实现逐字一致）
-inline const std::unordered_map<int, const char *> VALID_KV_REASON_TABLE = {
+inline const std::unordered_map<int, const char*> VALID_KV_REASON_TABLE = {
     {0, "When weightQuantMode==0, must be {0}"},       {1, "When weightQuantMode==1, must be {0, 2, 3}"},
     {2, "When weightQuantMode==2, must be {0, 1, 3}"}, {3, "When weightQuantMode==3, must be {0, 1, 3}"},
     {4, "When weightQuantMode==4, must be {0, 1, 3}"}, {5, "When weightQuantMode==5, must be {0, 1, 3}"}};
@@ -305,8 +304,8 @@ struct MlaPrologCompileInfo {
 };
 
 struct BaseParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct RequiredParaInfo : BaseParaInfo {};
@@ -328,9 +327,9 @@ constexpr uint32_t GROUP_COMPUTE_MIN_AIV_NUM = 32U;
 constexpr uint32_t GROUP_COMPUTE_N_SIZE = 8U;
 
 struct MlaPrologContext {
-    const char *opName;
-    const char *opType;
-    fe::PlatFormInfos *platformInfo;
+    const char* opName;
+    const char* opType;
+    fe::PlatFormInfos* platformInfo;
     RequiredParaInfo tokenX;
     RequiredParaInfo weightDq;
     RequiredParaInfo weightUqQr;
@@ -360,28 +359,28 @@ struct MlaPrologContext {
     OptionalParaInfo queryNorm;
     OptionalParaInfo dequantScaleQNorm;
 
-    const float *rmsNormEspilonCq;
-    const float *rmsNormEspilonCkv;
-    const char *cacheMode;
-    const bool *queryNormFlag;
+    const float* rmsNormEspilonCq;
+    const float* rmsNormEspilonCkv;
+    const char* cacheMode;
+    const bool* queryNormFlag;
 
-    const int64_t *weightQuantMode;
-    const int64_t *kvQuantMode;
-    const int64_t *queryQuantMode;
-    const int64_t *ckvkrRepoMode;
-    const int64_t *quantScaleRepoMode;
-    const int64_t *tileSize;
+    const int64_t* weightQuantMode;
+    const int64_t* kvQuantMode;
+    const int64_t* queryQuantMode;
+    const int64_t* ckvkrRepoMode;
+    const int64_t* quantScaleRepoMode;
+    const int64_t* tileSize;
 
-    const float *qcQrScale;
-    const float *kcScale;
+    const float* qcQrScale;
+    const float* kcScale;
 
     uint64_t kvCacheStride0 = 0U;
     uint64_t krCacheStride0 = 0U;
 
     bool doRopeValue = true; // RoPE 开关：由 do_rope attr 控制，V1/V2 默认开启
-    const bool *doRope = nullptr;
+    const bool* doRope = nullptr;
 
-    size_t *workSpaces;
+    size_t* workSpaces;
     uint64_t tilingKey;
     uint32_t blockDim;
 };
@@ -391,13 +390,13 @@ public:
     MlaPrologTiling() = default;
     ~MlaPrologTiling() = default;
 
-    ge::graphStatus RunBigKernelTiling(MlaPrologContext &context, MlaPrologTilingData *tilingData);
-    static ge::graphStatus ConvertContext(gert::TilingContext &context, MlaPrologContext &mlaPrologContext);
-    static ge::graphStatus ConvertContextAttrs(gert::TilingContext &context, MlaPrologContext &mlaPrologContext);
+    ge::graphStatus RunBigKernelTiling(MlaPrologContext& context, MlaPrologTilingData* tilingData);
+    static ge::graphStatus ConvertContext(gert::TilingContext& context, MlaPrologContext& mlaPrologContext);
+    static ge::graphStatus ConvertContextAttrs(gert::TilingContext& context, MlaPrologContext& mlaPrologContext);
 
 private:
-    static void ConvertRequiredParams(gert::TilingContext &context, MlaPrologContext &mlaPrologContext);
-    static void ConvertOptionalParams(gert::TilingContext &context, MlaPrologContext &mlaPrologContext);
+    static void ConvertRequiredParams(gert::TilingContext& context, MlaPrologContext& mlaPrologContext);
+    static void ConvertOptionalParams(gert::TilingContext& context, MlaPrologContext& mlaPrologContext);
     ge::graphStatus GetNpuInfo();
     ge::graphStatus SetScenarioInfo();
     ge::graphStatus SetAttrInfo();
@@ -414,7 +413,7 @@ private:
     ge::graphStatus FillMatmul3Tiling();
     ge::graphStatus FillMatmul4Tiling();
     uint32_t CalcSingleCoreN(uint32_t n, uint32_t coreNum, uint32_t alignNum = 16) const;
-    bool GetMatmulType(ge::DataType getype, matmul_tiling::DataType *mmType);
+    bool GetMatmulType(ge::DataType getype, matmul_tiling::DataType* mmType);
     ge::graphStatus CalcWorkSpace();
     ge::graphStatus GenTilingKey() const;
 
@@ -469,12 +468,12 @@ private:
     size_t libapiSize_ = 0;
     size_t workspaceSize_ = 0;
 
-    MlaPrologContext *context_ = nullptr;
-    MlaPrologBaseParams *baseParams_ = nullptr;
+    MlaPrologContext* context_ = nullptr;
+    MlaPrologBaseParams* baseParams_ = nullptr;
 };
 
-ge::graphStatus TilingPrepareForMlaProlog(gert::TilingParseContext *context);
-MLA_EXTERN_C ge::graphStatus TilingMlaProlog(gert::TilingContext *context);
+ge::graphStatus TilingPrepareForMlaProlog(gert::TilingParseContext* context);
+MLA_EXTERN_C ge::graphStatus TilingMlaProlog(gert::TilingContext* context);
 } // namespace optiling
 
 #endif // MLA_PROLOG_TILING_H

@@ -31,31 +31,32 @@ extern "C" {
 namespace {
 
 extern aclnnStatus aclnnInnerMlaPrologGetWorkspaceSize(
-    const aclTensor *tokenX, const aclTensor *weightDq, const aclTensor *weightUqQr, const aclTensor *weightUk,
-    const aclTensor *weightDkvKr, const aclTensor *rmsnormGammaCq, const aclTensor *rmsnormGammaCkv,
-    const aclTensor *ropeSin, const aclTensor *ropeCos, const aclTensor *cacheIndex, aclTensor *kvCacheRef,
-    aclTensor *krCacheRef, const aclTensor *dequantScaleXOptional, const aclTensor *dequantScaleWDqOptional,
-    const aclTensor *dequantScaleWUqQrOptional, const aclTensor *dequantScaleWDkvKrOptional,
-    const aclTensor *quantScaleCkvOptional, const aclTensor *quantScaleCkrOptional,
-    const aclTensor *smoothScalesCqOptional, double rmsnormEpsilonCq, double rmsnormEpsilonCkv, char *cacheModeOptional,
-    const aclTensor *queryOut, const aclTensor *queryRopeOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* tokenX, const aclTensor* weightDq, const aclTensor* weightUqQr, const aclTensor* weightUk,
+    const aclTensor* weightDkvKr, const aclTensor* rmsnormGammaCq, const aclTensor* rmsnormGammaCkv,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, const aclTensor* cacheIndex, aclTensor* kvCacheRef,
+    aclTensor* krCacheRef, const aclTensor* dequantScaleXOptional, const aclTensor* dequantScaleWDqOptional,
+    const aclTensor* dequantScaleWUqQrOptional, const aclTensor* dequantScaleWDkvKrOptional,
+    const aclTensor* quantScaleCkvOptional, const aclTensor* quantScaleCkrOptional,
+    const aclTensor* smoothScalesCqOptional, double rmsnormEpsilonCq, double rmsnormEpsilonCkv, char* cacheModeOptional,
+    const aclTensor* queryOut, const aclTensor* queryRopeOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerMlaProlog(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerMlaProlog(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                        aclrtStream stream);
 
 aclnnStatus aclnnMlaPrologGetWorkspaceSize(
-    const aclTensor *tokenX, const aclTensor *weightDq, const aclTensor *weightUqQr, const aclTensor *weightUk,
-    const aclTensor *weightDkvKr, const aclTensor *rmsnormGammaCq, const aclTensor *rmsnormGammaCkv,
-    const aclTensor *ropeSin, const aclTensor *ropeCos, const aclTensor *cacheIndex, aclTensor *kvCacheRef,
-    aclTensor *krCacheRef, const aclTensor *dequantScaleXOptional, const aclTensor *dequantScaleWDqOptional,
-    const aclTensor *dequantScaleWUqQrOptional, const aclTensor *dequantScaleWDkvKrOptional,
-    const aclTensor *quantScaleCkvOptional, const aclTensor *quantScaleCkrOptional,
-    const aclTensor *smoothScalesCqOptional, double rmsnormEpsilonCq, double rmsnormEpsilonCkv, char *cacheModeOptional,
-    const aclTensor *queryOut, const aclTensor *queryRopeOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* tokenX, const aclTensor* weightDq, const aclTensor* weightUqQr, const aclTensor* weightUk,
+    const aclTensor* weightDkvKr, const aclTensor* rmsnormGammaCq, const aclTensor* rmsnormGammaCkv,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, const aclTensor* cacheIndex, aclTensor* kvCacheRef,
+    aclTensor* krCacheRef, const aclTensor* dequantScaleXOptional, const aclTensor* dequantScaleWDqOptional,
+    const aclTensor* dequantScaleWUqQrOptional, const aclTensor* dequantScaleWDkvKrOptional,
+    const aclTensor* quantScaleCkvOptional, const aclTensor* quantScaleCkrOptional,
+    const aclTensor* smoothScalesCqOptional, double rmsnormEpsilonCq, double rmsnormEpsilonCkv, char* cacheModeOptional,
+    const aclTensor* queryOut, const aclTensor* queryRopeOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnMlaPrologGetWorkspaceSize "
-                                         "are no longer supported on Ascend950.");
+                                         "are no longer supported on Ascend950 and Ascend960DT.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;
@@ -72,10 +73,12 @@ aclnnStatus aclnnMlaPrologGetWorkspaceSize(
         rmsnormEpsilonCq, rmsnormEpsilonCkv, cacheModeOptional, queryOut, queryRopeOut, workspaceSize, executor);
 }
 
-aclnnStatus aclnnMlaProlog(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMlaProlog(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnMlaProlog are no longer supported on Ascend950.");
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "Interface aclnnMlaProlog are no longer supported on Ascend950 and Ascend960DT.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;

@@ -31,22 +31,22 @@ extern "C" {
 namespace {
 
 extern aclnnStatus aclnnInnerMlaPrologV2GetWorkspaceSize(
-    const aclTensor *tokenX, const aclTensor *weightDq, const aclTensor *weightUqQr, const aclTensor *weightUk,
-    const aclTensor *weightDkvKr, const aclTensor *rmsnormGammaCq, const aclTensor *rmsnormGammaCkv,
-    const aclTensor *ropeSin, const aclTensor *ropeCos, const aclTensor *cacheIndex, aclTensor *kvCacheRef,
-    aclTensor *krCacheRef, const aclTensor *dequantScaleXOptional, const aclTensor *dequantScaleWDqOptional,
-    const aclTensor *dequantScaleWUqQrOptional, const aclTensor *dequantScaleWDkvKrOptional,
-    const aclTensor *quantScaleCkvOptional, const aclTensor *quantScaleCkrOptional,
-    const aclTensor *smoothScalesCqOptional, double rmsnormEpsilonCq, double rmsnormEpsilonCkv, char *cacheModeOptional,
-    const aclTensor *queryOut, const aclTensor *queryRopeOut, const aclTensor *dequantScaleQNopeOutOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* tokenX, const aclTensor* weightDq, const aclTensor* weightUqQr, const aclTensor* weightUk,
+    const aclTensor* weightDkvKr, const aclTensor* rmsnormGammaCq, const aclTensor* rmsnormGammaCkv,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, const aclTensor* cacheIndex, aclTensor* kvCacheRef,
+    aclTensor* krCacheRef, const aclTensor* dequantScaleXOptional, const aclTensor* dequantScaleWDqOptional,
+    const aclTensor* dequantScaleWUqQrOptional, const aclTensor* dequantScaleWDkvKrOptional,
+    const aclTensor* quantScaleCkvOptional, const aclTensor* quantScaleCkrOptional,
+    const aclTensor* smoothScalesCqOptional, double rmsnormEpsilonCq, double rmsnormEpsilonCkv, char* cacheModeOptional,
+    const aclTensor* queryOut, const aclTensor* queryRopeOut, const aclTensor* dequantScaleQNopeOutOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerMlaPrologV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerMlaPrologV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                          const aclrtStream stream);
 
 class TensorHolder {
 public:
-    TensorHolder(const aclTensor *&output, aclDataType dataType, std::string varName)
+    TensorHolder(const aclTensor*& output, aclDataType dataType, std::string varName)
     {
         inner_ = nullptr;
         name_ = varName;
@@ -54,7 +54,7 @@ public:
             std::vector<int64_t> shape = {0};
             int64_t addr = 0xff;
             inner_ = aclCreateTensor(shape.data(), shape.size(), dataType, shape.data(), 0, ACL_FORMAT_ND, shape.data(),
-                                     shape.size(), static_cast<void *>(&addr));
+                                     shape.size(), static_cast<void*>(&addr));
             output = inner_;
         }
     }
@@ -82,24 +82,25 @@ public:
     }
 
 private:
-    const aclTensor *inner_;
+    const aclTensor* inner_;
     std::string name_;
 };
 
 aclnnStatus aclnnMlaPrologV2WeightNzGetWorkspaceSize(
-    const aclTensor *tokenX, const aclTensor *weightDq, const aclTensor *weightUqQr, const aclTensor *weightUk,
-    const aclTensor *weightDkvKr, const aclTensor *rmsnormGammaCq, const aclTensor *rmsnormGammaCkv,
-    const aclTensor *ropeSin, const aclTensor *ropeCos, const aclTensor *cacheIndex, aclTensor *kvCacheRef,
-    aclTensor *krCacheRef, const aclTensor *dequantScaleXOptional, const aclTensor *dequantScaleWDqOptional,
-    const aclTensor *dequantScaleWUqQrOptional, const aclTensor *dequantScaleWDkvKrOptional,
-    const aclTensor *quantScaleCkvOptional, const aclTensor *quantScaleCkrOptional,
-    const aclTensor *smoothScalesCqOptional, double rmsnormEpsilonCq, double rmsnormEpsilonCkv, char *cacheModeOptional,
-    const aclTensor *queryOut, const aclTensor *queryRopeOut, const aclTensor *dequantScaleQNopeOutOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* tokenX, const aclTensor* weightDq, const aclTensor* weightUqQr, const aclTensor* weightUk,
+    const aclTensor* weightDkvKr, const aclTensor* rmsnormGammaCq, const aclTensor* rmsnormGammaCkv,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, const aclTensor* cacheIndex, aclTensor* kvCacheRef,
+    aclTensor* krCacheRef, const aclTensor* dequantScaleXOptional, const aclTensor* dequantScaleWDqOptional,
+    const aclTensor* dequantScaleWUqQrOptional, const aclTensor* dequantScaleWDkvKrOptional,
+    const aclTensor* quantScaleCkvOptional, const aclTensor* quantScaleCkrOptional,
+    const aclTensor* smoothScalesCqOptional, double rmsnormEpsilonCq, double rmsnormEpsilonCkv, char* cacheModeOptional,
+    const aclTensor* queryOut, const aclTensor* queryRopeOut, const aclTensor* dequantScaleQNopeOutOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnMlaPrologV2WeightNzGetWorkspaceSize "
-                                         "are no longer supported on Ascend950.");
+                                         "are no longer supported on Ascend950 and Ascend960DT.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;
@@ -134,11 +135,13 @@ aclnnStatus aclnnMlaPrologV2WeightNzGetWorkspaceSize(
         workspaceSize, executor);
 }
 
-aclnnStatus aclnnMlaPrologV2WeightNz(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMlaPrologV2WeightNz(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                      const aclrtStream stream)
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
-        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Interface aclnnMlaPrologV2WeightNz are no longer supported on Ascend950.");
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
+        OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+                "Interface aclnnMlaPrologV2WeightNz are no longer supported on Ascend950 and Ascend960DT.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;

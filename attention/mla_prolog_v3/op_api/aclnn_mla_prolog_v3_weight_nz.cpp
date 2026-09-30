@@ -32,21 +32,21 @@ extern "C" {
 #endif
 
 extern aclnnStatus aclnnInnerMlaPrologV3GetWorkspaceSize(
-    const aclTensor *tokenX, const aclTensor *weightDq, const aclTensor *weightUqQr, const aclTensor *weightUk,
-    const aclTensor *weightDkvKr, const aclTensor *rmsnormGammaCq, const aclTensor *rmsnormGammaCkv,
-    const aclTensor *ropeSin, const aclTensor *ropeCos, aclTensor *kvCacheRef, aclTensor *krCacheRef,
-    const aclTensor *cacheIndexOptional, const aclTensor *dequantScaleXOptional,
-    const aclTensor *dequantScaleWDqOptional, const aclTensor *dequantScaleWUqQrOptional,
-    const aclTensor *dequantScaleWDkvKrOptional, const aclTensor *quantScaleCkvOptional,
-    const aclTensor *quantScaleCkrOptional, const aclTensor *smoothScalesCqOptional,
-    const aclTensor *actualSeqLenOptional, const aclTensor *kNopeClipAlphaOptional, double rmsnormEpsilonCq,
-    double rmsnormEpsilonCkv, char *cacheModeOptional, bool queryNormFlag, int64_t weightQuantMode,
+    const aclTensor* tokenX, const aclTensor* weightDq, const aclTensor* weightUqQr, const aclTensor* weightUk,
+    const aclTensor* weightDkvKr, const aclTensor* rmsnormGammaCq, const aclTensor* rmsnormGammaCkv,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, aclTensor* kvCacheRef, aclTensor* krCacheRef,
+    const aclTensor* cacheIndexOptional, const aclTensor* dequantScaleXOptional,
+    const aclTensor* dequantScaleWDqOptional, const aclTensor* dequantScaleWUqQrOptional,
+    const aclTensor* dequantScaleWDkvKrOptional, const aclTensor* quantScaleCkvOptional,
+    const aclTensor* quantScaleCkrOptional, const aclTensor* smoothScalesCqOptional,
+    const aclTensor* actualSeqLenOptional, const aclTensor* kNopeClipAlphaOptional, double rmsnormEpsilonCq,
+    double rmsnormEpsilonCkv, char* cacheModeOptional, bool queryNormFlag, int64_t weightQuantMode,
     int64_t kvCacheQuantMode, int64_t queryQuantMode, int64_t ckvkrRepoMode, int64_t quantScaleRepoMode,
-    int64_t tileSize, double qcQrScale, double kcScale, bool doRope, const aclTensor *queryOut,
-    const aclTensor *queryRopeOut, const aclTensor *dequantScaleQNopeOut, const aclTensor *queryNormOut,
-    const aclTensor *dequantScaleQNormOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t tileSize, double qcQrScale, double kcScale, bool doRope, const aclTensor* queryOut,
+    const aclTensor* queryRopeOut, const aclTensor* dequantScaleQNopeOut, const aclTensor* queryNormOut,
+    const aclTensor* dequantScaleQNormOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerMlaPrologV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerMlaPrologV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                          const aclrtStream stream);
 
 #ifdef __cplusplus
@@ -57,7 +57,7 @@ namespace {
 
 class TensorHolder {
 public:
-    TensorHolder(const aclTensor *&output, aclDataType dataType, std::string varName)
+    TensorHolder(const aclTensor*& output, aclDataType dataType, std::string varName)
     {
         tensorPtr_ = nullptr;
         paramName_ = varName;
@@ -65,7 +65,7 @@ public:
             std::vector<int64_t> shape = {0};
             int64_t addr = 0xff;
             tensorPtr_ = aclCreateTensor(shape.data(), shape.size(), dataType, shape.data(), 0, ACL_FORMAT_ND,
-                                         shape.data(), shape.size(), static_cast<void *>(&addr));
+                                         shape.data(), shape.size(), static_cast<void*>(&addr));
             output = tensorPtr_;
         }
     }
@@ -98,14 +98,15 @@ public:
     }
 
 private:
-    const aclTensor *tensorPtr_;
+    const aclTensor* tensorPtr_;
     std::string paramName_;
 };
 
 bool CheckWeightQuantModeValidity(int64_t weightQuantMode)
 {
     std::set<int64_t> validWeightModes;
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 ||
+        op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201) {
         validWeightModes = {0LL, 1LL, 2LL, 3LL, 4LL, 5LL};
     } else {
         validWeightModes = {0LL, 1LL, 2LL};
@@ -152,7 +153,7 @@ bool CheckKvCacheQuantModeValidity(int64_t weightQuantMode, int64_t kvCacheQuant
     }
     if (modeIter->second.find(kvCacheQuantMode) == modeIter->second.end()) {
         std::string modeList;
-        const auto &kvModes = modeIter->second;
+        const auto& kvModes = modeIter->second;
         size_t modeTotal = kvModes.size();
         size_t modeIdx = 0;
         for (auto quantMode : kvModes) {
@@ -191,19 +192,19 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
-    const aclTensor *tokenX, const aclTensor *weightDq, const aclTensor *weightUqQr, const aclTensor *weightUk,
-    const aclTensor *weightDkvKr, const aclTensor *rmsnormGammaCq, const aclTensor *rmsnormGammaCkv,
-    const aclTensor *ropeSin, const aclTensor *ropeCos, aclTensor *kvCacheRef, aclTensor *krCacheRef,
-    const aclTensor *cacheIndexOptional, const aclTensor *dequantScaleXOptional,
-    const aclTensor *dequantScaleWDqOptional, const aclTensor *dequantScaleWUqQrOptional,
-    const aclTensor *dequantScaleWDkvKrOptional, const aclTensor *quantScaleCkvOptional,
-    const aclTensor *quantScaleCkrOptional, const aclTensor *smoothScalesCqOptional,
-    const aclTensor *actualSeqLenOptional, const aclTensor *kNopeClipAlphaOptional, double rmsnormEpsilonCq,
-    double rmsnormEpsilonCkv, char *cacheModeOptional, int64_t weightQuantMode, int64_t kvCacheQuantMode,
+    const aclTensor* tokenX, const aclTensor* weightDq, const aclTensor* weightUqQr, const aclTensor* weightUk,
+    const aclTensor* weightDkvKr, const aclTensor* rmsnormGammaCq, const aclTensor* rmsnormGammaCkv,
+    const aclTensor* ropeSin, const aclTensor* ropeCos, aclTensor* kvCacheRef, aclTensor* krCacheRef,
+    const aclTensor* cacheIndexOptional, const aclTensor* dequantScaleXOptional,
+    const aclTensor* dequantScaleWDqOptional, const aclTensor* dequantScaleWUqQrOptional,
+    const aclTensor* dequantScaleWDkvKrOptional, const aclTensor* quantScaleCkvOptional,
+    const aclTensor* quantScaleCkrOptional, const aclTensor* smoothScalesCqOptional,
+    const aclTensor* actualSeqLenOptional, const aclTensor* kNopeClipAlphaOptional, double rmsnormEpsilonCq,
+    double rmsnormEpsilonCkv, char* cacheModeOptional, int64_t weightQuantMode, int64_t kvCacheQuantMode,
     int64_t queryQuantMode, int64_t ckvkrRepoMode, int64_t quantScaleRepoMode, int64_t tileSize, double qcQrScale,
-    double kcScale, const aclTensor *queryOut, const aclTensor *queryRopeOut,
-    const aclTensor *dequantScaleQNopeOutOptional, const aclTensor *queryNormOutOptional,
-    const aclTensor *dequantScaleQNormOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
+    double kcScale, const aclTensor* queryOut, const aclTensor* queryRopeOut,
+    const aclTensor* dequantScaleQNopeOutOptional, const aclTensor* queryNormOutOptional,
+    const aclTensor* dequantScaleQNormOutOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     const int KV_CACHE_QUANT_MODE_NO_QUANT = 0;
     const int KV_CACHE_QUANT_MODE_PER_TENSOR = 1;
@@ -277,7 +278,7 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
         queryNormOutOptional, dequantScaleQNormOutOptional, workspaceSize, executor);
 }
 
-aclnnStatus aclnnMlaPrologV3WeightNz(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMlaPrologV3WeightNz(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                      const aclrtStream stream)
 {
     return aclnnInnerMlaPrologV3(workspace, workspaceSize, executor, stream);
