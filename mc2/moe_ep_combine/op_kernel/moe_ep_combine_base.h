@@ -19,4 +19,23 @@
 
 #include "../../common/op_kernel/mc2_moe_context.h"
 
+namespace MoeEpCombineLayout {
+
+// Each received token has five int32 metadata fields.
+constexpr uint32_t RECV_META_FIELDS = 5U;
+constexpr uint32_t META_TOKEN_IDX_OFFSET = 1U;
+constexpr uint32_t META_TOPK_IDX_OFFSET = 2U;
+constexpr uint32_t META_RECV_X_IDX_OFFSET = 4U;
+
+// Metadata batches are measured in tokens, independently of Hcomm's WQEBB capacity.
+constexpr uint32_t METADATA_BATCH_TOKENS = 256U;
+constexpr uint32_t METADATA_BATCH_ELEMS = METADATA_BATCH_TOKENS * RECV_META_FIELDS;
+
+// One address buffer contains SoA regions of uint64 byte offsets, each padded to 256 tokens.
+// The weight region is allocated and used only when HasTopkWeight == 1.
+constexpr uint32_t X_OFFSET_REGION = METADATA_BATCH_TOKENS;
+constexpr uint32_t WEIGHT_OFFSET_REGION = METADATA_BATCH_TOKENS * 2U;
+
+} // namespace MoeEpCombineLayout
+
 #endif // MOE_EP_COMBINE_BASE_H

@@ -46,30 +46,28 @@
 
 #include "moe_ep_combine_base.h"
 #include "moe_ep_combine_tiling.h"
+#include "moe_ep_combine_vf.h"
 
 namespace MoeEpCombineImpl {
 
 #if defined(ENABLE_MOE_EP_COMBINE_KERNEL)
 
 using namespace AscendC;
+using namespace MoeEpCombineLayout;
 
 #define TemplateMoeEpCombineTypeClass typename XType, uint32_t HasTopkWeight
 #define TemplateMoeEpCombineTypeFunc XType, HasTopkWeight
 #define HCOMM_INIT_SIZE 512UL
 
 static constexpr uint32_t WIN_ADDR_ALIGN = 512;
-static constexpr uint32_t RECV_META_FIELDS = 5U;
-static constexpr uint32_t META_TOKEN_IDX_OFFSET = 1U;
-static constexpr uint32_t META_TOPK_IDX_OFFSET = 2U;
-static constexpr uint32_t META_RECV_X_IDX_OFFSET = 4U;
-// Keep one SQ entry unused. A token that would make the following token cross this limit requests a CQE and drains.
+// SQ holds 32768 WQEBBs. The token that pushes the pending count past 32767 carries a CQE and drains
+// (drain fires exactly when the count reaches 32768, for both the 1-WQEBB and 2-WQEBB token paths).
 static constexpr uint32_t HCOMM_SQ_MAX_PENDING = 32767U;
 // PR 111 requires each committed batch to contain fewer WQEBBs than the SQ depth.
 static constexpr uint32_t HCOMM_BATCH_CAPACITY = 256;
 static constexpr uint32_t HCOMM_PLAIN_WRITE_WQE_BYTES = 64;
 static constexpr uint32_t HCOMM_BATCH_BUFFER_BYTES = HCOMM_BATCH_CAPACITY * HCOMM_PLAIN_WRITE_WQE_BYTES;
 constexpr uint64_t UB_ALIGN = 32UL;
-static constexpr uint32_t META_CHUNK_TOKEN_MAX = 2048U;
 static constexpr struct UrmaWqeEntry DEFAULT_WQE_CONFIG = {.odr = 5, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
 static constexpr struct UrmaWqeEntry DEFAULT_CQE_WQE_CONFIG = {.odr = 5, .fence = 1, .se = 0, .cqe = 1, .inlineEn = 0};
 static constexpr struct UrmaWqeEntry CHANNEL_FLAG_WQE_CONFIG = {.odr = 6, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
@@ -91,18 +89,24 @@ private:
     __aicore__ inline void InitFlagSource();
     template <auto const& config>
     __aicore__ inline void PrepareWrite(GM_ADDR dst, GM_ADDR src, uint64_t len);
-    template <auto const& config>
-    __aicore__ inline void PrepareMultiSgeWrite(GM_ADDR dst, const AscendC::BufDesc* srcDescs, uint32_t srcNum);
     __aicore__ inline void FlushPreparedWrites(bool keepHandle = false);
     __aicore__ inline void SplitRange(uint64_t rangeBegin, uint64_t rangeEnd, uint32_t coreCount, uint32_t coreIndex,
                                       uint64_t& coreBegin, uint64_t& coreEnd);
     __aicore__ inline void GetCoreAssignment(uint32_t totalBlocks, uint32_t& targetRank, uint32_t& coreIndexInGroup,
                                              uint32_t& groupSize);
-    __aicore__ inline void SendRemoteMetadataSlot(uint32_t recvXIdx, int32_t srcTokenIdx, int32_t srcTopKIdx,
-                                                  GM_ADDR remoteDataBase, GM_ADDR remoteStateBase, uint64_t tokenBytes,
-                                                  bool lastToken);
     __aicore__ inline void ProcessRemoteMetadataRange(uint32_t targetRank, uint64_t rangeBegin, uint64_t rangeEnd,
                                                       uint32_t channelIndex);
+    __aicore__ inline uint32_t PipeBatchCount(uint64_t totalCount, uint32_t batchIdx) const;
+    __aicore__ inline void CopyMetaBatch(uint64_t globalBegin, uint32_t batchCount, uint32_t bufIdx, event_t evId);
+    __aicore__ inline void BuildBatchAddrs(uint32_t batchCount, __ubuf__ uint32_t* metaUb, __ubuf__ uint64_t* addrUb);
+    template <auto const& config>
+    __aicore__ inline void EmitTokenWrite(uint32_t regionOff, uint32_t tokenIdx, const LocalTensor<uint64_t>& addrUb,
+                                          GM_ADDR remoteDataBase, GM_ADDR xBase, GM_ADDR weightBase,
+                                          uint64_t tokenBytes);
+    __aicore__ inline void ConsumeBatchAddrs(uint32_t batchCount, uint64_t globalBegin, uint64_t rangeEnd,
+                                             uint32_t regionOff, const LocalTensor<uint64_t>& addrUb,
+                                             GM_ADDR remoteDataBase, GM_ADDR xBase, GM_ADDR weightBase,
+                                             uint64_t tokenBytes, uint32_t& sqBudget, uint32_t& wqebbBudget);
     __aicore__ inline void SendPhaseDirectFromMetadata();
 
     __aicore__ inline uint64_t GetCommHandle(uint32_t rankId, uint32_t channelIndex)
@@ -134,12 +138,14 @@ private:
     uint64_t combineStateWinOffset_{0};
     uint64_t combineDataWinOffset_{0};
 
+    // WQEBBs occupied per token write: multi-SGE (x + weight) rounds up to 2, single-SGE is 1.
+    static constexpr uint32_t kTokenWqebbCount = (HasTopkWeight == 1) ? 2U : 1U;
+    static constexpr uint32_t kPipeAddrElemsPerBatch = METADATA_BATCH_TOKENS * ((HasTopkWeight == 1) ? 3U : 2U);
+
     uint32_t perSlotBytes_{0};
     uint64_t actualA_{0};
     uint64_t recvCapacity_{0};
     uint32_t aivNum_{0};
-    uint32_t metadataChunkTokens_{1};
-    uint32_t wqebbCount_{0};
 
     GlobalTensor<XType> xGm_;
     GlobalTensor<int32_t> recvSrcMetadataGm_;
@@ -156,9 +162,10 @@ private:
     TBuf<> hcommBuf_;
     TBuf<TPosition::VECOUT> hcommBatchBuf_;
 
-    TBuf<> metadataBuf_; // 发送阶段recvSrcMetadata的UB缓冲，批量搬运避免GetValue
+    TBuf<> metaPipeBuf_; // Double-buffered UB batches of recvSrcMetadata.
+    TBuf<> addrPipeBuf_; // Double-buffered token send/receive byte offsets generated by the VF.
 
-    AscendC::Hcomm<COMM_PROTOCOL_UBC_CTP> hcomm_; // 通信上下文
+    AscendC::Hcomm<COMM_PROTOCOL_UBC_CTP> hcomm_; // Communication context.
     using HcommBatchHandle = AscendC::BatchHandle<AscendC::ChannelHandle>;
 
     GM_ADDR winRankAddr_[Mc2Aclnn::HCCL_MAX_RANK_SIZE];
@@ -167,9 +174,12 @@ private:
     HcommBatchHandle activeBatchHandle_{};
     uint64_t activeBatchChannel_{0};
     uint32_t preparedWriteCount_{0};
-    uint32_t sqWriteCount_{0};
     bool hcommInitialized_{false};
     bool activeBatchInitialized_{false};
+    // Reserve two event IDs per ring with AllocEventID during Init. FetchEventID does not reserve an ID,
+    // so calling it twice could return the same ID.
+    event_t evMte2V_[2] = {};
+    event_t evVS_[2] = {};
 };
 
 template <TemplateMoeEpCombineTypeClass>
@@ -239,11 +249,12 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::Init(GM_ADDR 
     if constexpr (HasTopkWeight == 1) {
         topkWeightsGm_.SetGlobalBuffer((__gm__ float*)topkWeights);
     }
-    metadataChunkTokens_ = (actualA_ < META_CHUNK_TOKEN_MAX) ? static_cast<uint32_t>(actualA_) : META_CHUNK_TOKEN_MAX;
-    metadataChunkTokens_ = (metadataChunkTokens_ == 0U) ? 1U : metadataChunkTokens_;
-    uint32_t metadataChunkBytes =
-        Ceil(static_cast<uint64_t>(metadataChunkTokens_) * RECV_META_FIELDS * sizeof(int32_t), UB_ALIGN) * UB_ALIGN;
-    tpipe_->InitBuffer(metadataBuf_, metadataChunkBytes);
+    tpipe_->InitBuffer(metaPipeBuf_, METADATA_BATCH_ELEMS * sizeof(int32_t) * 2U);
+    tpipe_->InitBuffer(addrPipeBuf_, kPipeAddrElemsPerBatch * sizeof(uint64_t) * 2U);
+    evMte2V_[0] = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
+    evMte2V_[1] = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
+    evVS_[0] = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_S>());
+    evVS_[1] = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_S>());
     tpipe_->InitBuffer(readStateBuf_, WIN_ADDR_ALIGN);
     statusTensor_ = readStateBuf_.Get<uint32_t>();
     diagWriter_.RunPosRecord(MOE_EP_COMBINE_RUN_POS_INIT_DONE);
@@ -292,7 +303,6 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::BeginPrepared
     activeBatchHandle_ =
         hcomm_.MakeBatchHandle(commHandle, hcommBatchTensor_, HCOMM_BATCH_BUFFER_BYTES, winRankAddr_[dstRank]);
     activeBatchChannel_ = commHandle;
-    sqWriteCount_ = 0;
     activeBatchInitialized_ = true;
 }
 
@@ -306,26 +316,6 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::PrepareWrite(
     }
     (void)hcomm_.WriteNbi<config>(activeBatchHandle_, dst, src, len);
     ++preparedWriteCount_;
-    ++sqWriteCount_;
-}
-
-template <TemplateMoeEpCombineTypeClass>
-template <auto const& config>
-__aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::PrepareMultiSgeWrite(
-    GM_ADDR dst, const AscendC::BufDesc* srcDescs, uint32_t srcNum)
-{
-    // Multi-SGE WQE: SQE header (48B) + srcNum * SGE (16B each), rounded up to WQEBB boundary (64B).
-    constexpr uint32_t sqeHeaderBytes = 48U;
-    constexpr uint32_t sgeEntryBytes = 16U;
-    constexpr uint32_t wqebbSize = HCOMM_PLAIN_WRITE_WQE_BYTES;
-    uint32_t wqeBytes = sqeHeaderBytes + srcNum * sgeEntryBytes;
-    wqebbCount_ = (wqeBytes + wqebbSize - 1U) / wqebbSize;
-    if (preparedWriteCount_ + wqebbCount_ > HCOMM_BATCH_CAPACITY) {
-        FlushPreparedWrites(true);
-    }
-    (void)hcomm_.WriteNbi<config>(activeBatchHandle_, dst, srcDescs, srcNum);
-    preparedWriteCount_ += wqebbCount_;
-    sqWriteCount_ += wqebbCount_;
 }
 
 template <TemplateMoeEpCombineTypeClass>
@@ -384,37 +374,113 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SplitRange(ui
 }
 
 template <TemplateMoeEpCombineTypeClass>
-__aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendRemoteMetadataSlot(
-    uint32_t recvXIdx, int32_t srcTokenIdx, int32_t srcTopKIdx, GM_ADDR remoteDataBase, GM_ADDR remoteStateBase,
-    uint64_t tokenBytes, bool lastToken)
+__aicore__ inline uint32_t MoeEpCombine<TemplateMoeEpCombineTypeFunc>::PipeBatchCount(uint64_t totalCount,
+                                                                                      uint32_t batchIdx) const
 {
-    uint64_t dstSlot =
-        static_cast<uint64_t>(static_cast<uint32_t>(srcTokenIdx)) * topK_ + static_cast<uint32_t>(srcTopKIdx);
-    GM_ADDR tokenAddr = reinterpret_cast<GM_ADDR>(xGm_.GetPhyAddr(static_cast<uint64_t>(recvXIdx) * axisH_));
-    GM_ADDR remoteSlotBase = remoteDataBase + dstSlot * perSlotBytes_;
-    // After multi-SGE merge, each token produces 1 WQE (was 2 when HasTopkWeight==1).
-    bool drainAfterToken = sqWriteCount_ + wqebbCount_ > HCOMM_SQ_MAX_PENDING;
-    // Request a CQE on the last token's final write; drain at the end of epilogue.
-    bool needCqe = drainAfterToken || lastToken;
-    if constexpr (HasTopkWeight == 1) {
-        GM_ADDR weightAddr = reinterpret_cast<GM_ADDR>(topkWeightsGm_.GetPhyAddr(recvXIdx));
-        AscendC::BufDesc srcDescs[2] = {{tokenAddr, hAlignSize_}, {weightAddr, sizeof(float)}};
-        if (needCqe) {
-            PrepareMultiSgeWrite<DEFAULT_CQE_WQE_CONFIG>(remoteSlotBase, srcDescs, 2U);
-        } else {
-            PrepareMultiSgeWrite<DEFAULT_WQE_CONFIG>(remoteSlotBase, srcDescs, 2U);
-        }
+    uint64_t left = totalCount - static_cast<uint64_t>(batchIdx) * METADATA_BATCH_TOKENS;
+    return (left > METADATA_BATCH_TOKENS) ? METADATA_BATCH_TOKENS : static_cast<uint32_t>(left);
+}
+
+template <TemplateMoeEpCombineTypeClass>
+__aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::CopyMetaBatch(uint64_t globalBegin,
+                                                                                 uint32_t batchCount, uint32_t bufIdx,
+                                                                                 event_t evId)
+{
+    LocalTensor<int32_t> metaUb = metaPipeBuf_.Get<int32_t>()[bufIdx * METADATA_BATCH_ELEMS];
+    DataCopyExtParams copyParams{1U, static_cast<uint32_t>(batchCount * RECV_META_FIELDS * sizeof(int32_t)), 0U, 0U,
+                                 0U};
+    DataCopyPadExtParams<int32_t> padParams{false, 0U, 0U, 0U};
+    DataCopyPad(metaUb, recvSrcMetadataGm_[globalBegin * RECV_META_FIELDS], copyParams, padParams);
+    SetFlag<HardEvent::MTE2_V>(evId);
+}
+
+template <TemplateMoeEpCombineTypeClass>
+__aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::BuildBatchAddrs(uint32_t batchCount,
+                                                                                   __ubuf__ uint32_t* metaUb,
+                                                                                   __ubuf__ uint64_t* addrUb)
+{
+    // Host limits: topK <= 32, hidden <= 8192, sizeof(XType) == 2, perSlotBytes <= 16896.
+    // Scalar strides fit u32; the VF retains u64 token-dependent byte offsets.
+    const uint32_t slotStep = perSlotBytes_;
+    const uint32_t xStep = axisH_ * sizeof(XType);
+    const uint32_t dstTokenStep = topK_ * slotStep;
+    // Select once on the scalar side; each batch launches exactly one VF.
+    if (batchCount == METADATA_BATCH_TOKENS) {
+        asc_vf_call<MoeEpCombineVf::BuildBatchAddrs<HasTopkWeight, true>>(metaUb, addrUb, batchCount, slotStep,
+                                                                          dstTokenStep, xStep);
     } else {
-        if (needCqe) {
-            PrepareWrite<DEFAULT_CQE_WQE_CONFIG>(remoteSlotBase, tokenAddr, tokenBytes);
-        } else {
-            PrepareWrite<DEFAULT_WQE_CONFIG>(remoteSlotBase, tokenAddr, tokenBytes);
-        }
+        asc_vf_call<MoeEpCombineVf::BuildBatchAddrs<HasTopkWeight, false>>(metaUb, addrUb, batchCount, slotStep,
+                                                                           dstTokenStep, xStep);
     }
-    if (drainAfterToken) {
-        FlushPreparedWrites(true);
-        (void)hcomm_.Drain(activeBatchChannel_);
-        sqWriteCount_ = 0U;
+}
+
+template <TemplateMoeEpCombineTypeClass>
+template <auto const& config>
+__aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::EmitTokenWrite(uint32_t regionOff, uint32_t tokenIdx,
+                                                                                  const LocalTensor<uint64_t>& addrUb,
+                                                                                  GM_ADDR remoteDataBase, GM_ADDR xBase,
+                                                                                  GM_ADDR weightBase,
+                                                                                  uint64_t tokenBytes)
+{
+    // ConsumeBatchAddrs accounts for WQEBBs once per run (or once for a CQE token).
+    GM_ADDR dst = remoteDataBase + addrUb.GetValue(regionOff + tokenIdx);
+    GM_ADDR src = xBase + addrUb.GetValue(regionOff + X_OFFSET_REGION + tokenIdx);
+    if constexpr (HasTopkWeight == 1) {
+        AscendC::BufDesc srcDescs[2] = {
+            {src, hAlignSize_},
+            {weightBase + addrUb.GetValue(regionOff + WEIGHT_OFFSET_REGION + tokenIdx), sizeof(float)}};
+        (void)hcomm_.WriteNbi<config>(activeBatchHandle_, dst, srcDescs, 2U);
+    } else {
+        (void)hcomm_.WriteNbi<config>(activeBatchHandle_, dst, src, tokenBytes);
+    }
+}
+
+template <TemplateMoeEpCombineTypeClass>
+__aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ConsumeBatchAddrs(
+    uint32_t batchCount, uint64_t globalBegin, uint64_t rangeEnd, uint32_t regionOff,
+    const LocalTensor<uint64_t>& addrUb, GM_ADDR remoteDataBase, GM_ADDR xBase, GM_ADDR weightBase, uint64_t tokenBytes,
+    uint32_t& sqBudget, uint32_t& wqebbBudget)
+{
+    const bool batchIsLast = (globalBegin + batchCount == rangeEnd);
+    const uint32_t plainEnd = batchIsLast ? (batchCount - 1U) : batchCount;
+    uint32_t t = 0U;
+    while (t < batchCount) {
+        if (wqebbBudget < kTokenWqebbCount) {
+            FlushPreparedWrites(true);
+            wqebbBudget = HCOMM_BATCH_CAPACITY;
+        }
+        const uint32_t sqCap = sqBudget / kTokenWqebbCount;
+        const uint32_t batchCap = wqebbBudget / kTokenWqebbCount;
+        uint32_t run = plainEnd - t;
+        run = (run < sqCap) ? run : sqCap;
+        run = (run < batchCap) ? run : batchCap;
+        if (run != 0U) {
+            // The whole run fits both budgets: no capacity checks or counter updates per token.
+            for (uint32_t i = 0; i < run; ++i) {
+                EmitTokenWrite<DEFAULT_WQE_CONFIG>(regionOff, t + i, addrUb, remoteDataBase, xBase, weightBase,
+                                                   tokenBytes);
+            }
+            const uint32_t used = run * kTokenWqebbCount;
+            preparedWriteCount_ += used;
+            wqebbBudget -= used;
+            sqBudget -= used;
+            t += run;
+        } else {
+            // Only the range's last token or the token filling the SQ requests a CQE.
+            const bool drainNow = (sqBudget < kTokenWqebbCount);
+            EmitTokenWrite<DEFAULT_CQE_WQE_CONFIG>(regionOff, t, addrUb, remoteDataBase, xBase, weightBase, tokenBytes);
+            preparedWriteCount_ += kTokenWqebbCount;
+            wqebbBudget -= kTokenWqebbCount;
+            if (drainNow) {
+                FlushPreparedWrites(true);
+                (void)hcomm_.Drain(activeBatchChannel_);
+                sqBudget = HCOMM_SQ_MAX_PENDING;
+                wqebbBudget = HCOMM_BATCH_CAPACITY;
+            } else {
+                sqBudget -= kTokenWqebbCount;
+            }
+            ++t;
+        }
     }
 }
 
@@ -428,30 +494,55 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ProcessRemote
         return;
     }
     BeginPreparedWrites(targetRank, channelIndex);
-    constexpr uint32_t metaBytesPerToken = RECV_META_FIELDS * sizeof(int32_t);
-    LocalTensor<int32_t> metadataLocal = metadataBuf_.Get<int32_t>();
-    const DataCopyPadExtParams<int32_t> padParams{false, 0U, 0U, 0U};
+    // Three-stage software pipeline: MTE2 copies metadata, the VF builds offsets, and scalar code builds WQEs.
+    // Metadata and offsets each use two buffers. MTE2_V signals metadata readiness; V_S signals offset readiness.
+    // Each event type uses two IDs selected by batch parity. Scalar program order protects buffer reuse:
+    // WaitFlag<V_S>(k) confirms VF(k) has finished reading metadata before MTE2(k+2) overwrites meta[k&1];
+    // VF(k+2) is launched only after scalar stage S(k) has finished reading addr[k&1].
+    LocalTensor<int32_t> metaAll = metaPipeBuf_.Get<int32_t>();
+    LocalTensor<uint64_t> addrAll = addrPipeBuf_.Get<uint64_t>();
+    __ubuf__ uint32_t* metaBase = (__ubuf__ uint32_t*)metaAll.GetPhyAddr();
+    __ubuf__ uint64_t* addrBase = (__ubuf__ uint64_t*)addrAll.GetPhyAddr();
     GM_ADDR remoteDataBase = GetUrmaWinAddrByRankId(targetRank, combineDataWinOffset_);
-    GM_ADDR remoteStateBase = GetUrmaStateAddrByRankId(targetRank, combineStateWinOffset_);
+    GM_ADDR xBase = reinterpret_cast<GM_ADDR>(xGm_.GetPhyAddr(0));
+    GM_ADDR weightBase = nullptr;
+    if constexpr (HasTopkWeight == 1) {
+        weightBase = reinterpret_cast<GM_ADDR>(topkWeightsGm_.GetPhyAddr(0));
+    }
     uint64_t tokenBytes = static_cast<uint64_t>(axisH_) * sizeof(XType);
+    uint32_t sqBudget = HCOMM_SQ_MAX_PENDING;
+    uint32_t wqebbBudget = HCOMM_BATCH_CAPACITY;
 
-    for (uint64_t chunkStart = rangeBegin; chunkStart < rangeEnd; chunkStart += metadataChunkTokens_) {
-        uint64_t chunkEnd =
-            (chunkStart + metadataChunkTokens_ > rangeEnd) ? rangeEnd : chunkStart + metadataChunkTokens_;
-        uint32_t chunkCount = static_cast<uint32_t>(chunkEnd - chunkStart);
-        DataCopyExtParams copyParams{1U, chunkCount * metaBytesPerToken, 0U, 0U, 0U};
-        DataCopyPad(metadataLocal, recvSrcMetadataGm_[chunkStart * RECV_META_FIELDS], copyParams, padParams);
-        SyncFunc<AscendC::HardEvent::MTE2_S>();
-
-        for (uint32_t i = 0; i < chunkCount; ++i) {
-            uint32_t metaOffset = i * RECV_META_FIELDS;
-            int32_t srcTokenIdx = metadataLocal.GetValue(metaOffset + META_TOKEN_IDX_OFFSET);
-            int32_t srcTopKIdx = metadataLocal.GetValue(metaOffset + META_TOPK_IDX_OFFSET);
-            int32_t recvXIdx = metadataLocal.GetValue(metaOffset + META_RECV_X_IDX_OFFSET);
-            SendRemoteMetadataSlot(static_cast<uint32_t>(recvXIdx), srcTokenIdx, srcTopKIdx, remoteDataBase,
-                                   remoteStateBase, tokenBytes, chunkStart + i + 1U == rangeEnd);
+    const uint64_t totalCount = rangeEnd - rangeBegin;
+    const uint32_t batchNum = static_cast<uint32_t>((totalCount + METADATA_BATCH_TOKENS - 1U) / METADATA_BATCH_TOKENS);
+    // Prime both metadata buffers and launch the first address batch.
+    if (batchNum > 0U) {
+        CopyMetaBatch(rangeBegin, PipeBatchCount(totalCount, 0U), 0U, evMte2V_[0]);
+        if (batchNum > 1U) {
+            CopyMetaBatch(rangeBegin + METADATA_BATCH_TOKENS, PipeBatchCount(totalCount, 1U), 1U, evMte2V_[1]);
         }
-        SyncFunc<AscendC::HardEvent::S_MTE2>();
+        WaitFlag<HardEvent::MTE2_V>(evMte2V_[0]);
+        BuildBatchAddrs(PipeBatchCount(totalCount, 0U), metaBase, addrBase);
+        SetFlag<HardEvent::V_S>(evVS_[0]);
+    }
+    // Steady state: wait VF(k), prefetch metadata(k+2), launch VF(k+1), then consume addresses(k).
+    for (uint32_t k = 0U; k < batchNum; ++k) {
+        uint32_t buf = k & 1U;
+        uint32_t nextBuf = (k + 1U) & 1U;
+        uint32_t cnt = PipeBatchCount(totalCount, k);
+        WaitFlag<HardEvent::V_S>(evVS_[buf]);
+        if (k + 2U < batchNum) {
+            CopyMetaBatch(rangeBegin + (k + 2U) * METADATA_BATCH_TOKENS, PipeBatchCount(totalCount, k + 2U), buf,
+                          evMte2V_[buf]);
+        }
+        if (k + 1U < batchNum) {
+            WaitFlag<HardEvent::MTE2_V>(evMte2V_[nextBuf]);
+            BuildBatchAddrs(PipeBatchCount(totalCount, k + 1U), metaBase + nextBuf * METADATA_BATCH_ELEMS,
+                            addrBase + nextBuf * kPipeAddrElemsPerBatch);
+            SetFlag<HardEvent::V_S>(evVS_[nextBuf]);
+        }
+        ConsumeBatchAddrs(cnt, rangeBegin + k * METADATA_BATCH_TOKENS, rangeEnd, buf * kPipeAddrElemsPerBatch, addrAll,
+                          remoteDataBase, xBase, weightBase, tokenBytes, sqBudget, wqebbBudget);
     }
 }
 
@@ -508,7 +599,6 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::SendPhaseDire
     activeBatchHandle_ = {};
     activeBatchChannel_ = 0U;
     preparedWriteCount_ = 0U;
-    sqWriteCount_ = 0U;
     activeBatchInitialized_ = false;
 
     // Match upstream's rank/channel owners, including the local flag group and low-AIV rank stride.
