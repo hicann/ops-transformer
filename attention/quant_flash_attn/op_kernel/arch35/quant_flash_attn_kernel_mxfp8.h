@@ -325,6 +325,8 @@ public:
         const auto& qfaVTailParams = tiling.baseTiling.quantFlashAttnVTailParams;
         constInfo_.seqUsedKvTailSize = qfaVTailParams.seqUsedKvTailSize;
         constInfo_.tailMaxBlockNum = qfaVTailParams.tailMaxBlockNum;
+        constInfo_.vTailStrides.bnStride = qfaVTailParams.vTailStrides.bnStride;
+        constInfo_.vTailStrides.n2Stride = qfaVTailParams.vTailStrides.n2Stride;
 
         // strides
         constInfo_.keyStrides.bnStride = qfaBaseParams.keyStrides.bnStride;

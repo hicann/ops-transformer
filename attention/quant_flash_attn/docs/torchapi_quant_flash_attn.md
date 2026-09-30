@@ -1184,7 +1184,7 @@ mask_mode参数解释：
                 <ul>
                     <li>tensor_type仅支持bfloat16</li>
                     <li>tensor_shape见下方布局匹配表</li>
-                    <li>建议传入连续Tensor</li>
+                    <li>PA_BNBD/PA_NZ支持0轴或0轴1轴非连续；PA_BBND仅支持0轴非连续。每一维stride必须大于0。非连续Tensor需要支持TensorV2的opbase。</li>
                 </ul>
             </td>
             <td rowspan="3">

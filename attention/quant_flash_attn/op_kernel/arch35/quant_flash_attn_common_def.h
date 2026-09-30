@@ -265,6 +265,7 @@ struct CommonConstInfo {
     StridesConstInfo valueStrides;
     StridesConstInfo kDescaleStrides;
     StridesConstInfo vDescaleStrides;
+    StridesConstInfo vTailStrides;
 };
 
 struct PAConstInfo {

@@ -297,15 +297,15 @@ public:
             // v_tail与主KV同布局, btt=block_table_tail寻址; 尾窗<64落单块(blockIdxInBatch=0)
             vTailBttGm_.SetGlobalBuffer((__gm__ int32_t*)blockTableTail);
             if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_NZ) {
-                // NZ: (Bn,N2,D/16,Bs,16) — bf16的32B分形内径D0=16; 张量恒连续(stride用默认)
                 // dSizeV/nzD0整除: host侧vtailDimOk已保证PA_NZ下D%16==0(拒绝D=72), 此处无余数
                 constexpr uint32_t nzD0 = 32 / sizeof(bfloat16_t);
                 vTailGm_.offsetCalculator.Init(constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSizeV / nzD0, nzD0,
-                                               vTailBttGm_, constInfo_.tailMaxBlockNum);
+                                               vTailBttGm_, constInfo_.tailMaxBlockNum,
+                                               constInfo_.vTailStrides.bnStride, constInfo_.vTailStrides.n2Stride);
             } else {
-                // BnNBsD/BnBsND: (Bn,N2,Bs,D)/(Bn,Bs,N2,D) — GmLayout按格式自处理轴序, 连续用默认
                 vTailGm_.offsetCalculator.Init(constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSizeV, vTailBttGm_,
-                                               constInfo_.tailMaxBlockNum);
+                                               constInfo_.tailMaxBlockNum, constInfo_.vTailStrides.bnStride,
+                                               constInfo_.vTailStrides.n2Stride);
             }
         }
         // 非PA(TND等)不支持v_tail(checker入口拒绝), 无需初始化

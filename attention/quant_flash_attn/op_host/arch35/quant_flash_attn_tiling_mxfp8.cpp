@@ -358,6 +358,13 @@ void QuantFlashAttnTilingImpl::SetQFATilingData()
         qfaInfo_->hasVTail ? static_cast<uint32_t>(qfaInfo_->bSize) : 0;
     tilingData_.baseTiling.quantFlashAttnVTailParams.tailMaxBlockNum =
         qfaInfo_->hasVTail ? static_cast<uint32_t>(qfaInfo_->tailMaxBlockNum) : 0;
+    auto& vTailStrides = tilingData_.baseTiling.quantFlashAttnVTailParams.vTailStrides;
+    vTailStrides.bnStride = 0;
+    vTailStrides.n2Stride = 0;
+    if (qfaInfo_->hasVTail && qfaInfo_->vTailStrides != nullptr) {
+        vTailStrides.bnStride = qfaInfo_->vTailStrides->GetStride(0);
+        vTailStrides.n2Stride = qfaInfo_->vTailStrides->GetStride(1);
+    }
     if (qfaInfo_->hasStride) {
         tilingData_.baseTiling.quantFlashAttnPageAttentionParams.maxBlockNumPerBatch = maxBlockNumPerBatch;
         tilingData_.baseTiling.quantFlashAttnBaseParams.keyStrides.bnStride = qfaInfo_->keyStrides->GetStride(0);

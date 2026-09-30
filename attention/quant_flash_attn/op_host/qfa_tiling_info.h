@@ -276,6 +276,7 @@ public:
     // V tail (高精窗口) Param
     bool hasVTail = false;
     int64_t tailMaxBlockNum = 0;
+    const gert::Stride* vTailStrides = nullptr;
 
     // DType
     ge::DataType inputQType = ge::DT_FLOAT8_E4M3FN;

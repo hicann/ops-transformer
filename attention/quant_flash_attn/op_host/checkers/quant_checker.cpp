@@ -1067,6 +1067,20 @@ ge::graphStatus QuantChecker::CheckVTailShape(const QfaTilingInfo& qfaInfo) cons
     //   PA_BNBD(BnNBsD): (Bn, N2, Bs, D) / PA_BBND(BnBsND): (Bn, Bs, N2, D)
     //   PA_NZ: (Bn, N2, D/16, Bs, 16)(bf16的32B分形内径=16) / TND: (B, N2, 64, D)
     const gert::Tensor* vTail = qfaInfo.opParamInfo.vTail.tensor;
+    if (qfaInfo.vTailStrides != nullptr) {
+        for (size_t dim = 0; dim < qfaInfo.vTailStrides->GetDimNum(); ++dim) {
+            OP_CHECK_IF(qfaInfo.vTailStrides->GetStride(dim) <= 0,
+                        OP_LOGE(qfaInfo.opName, "v_tail strides must be positive"), return ge::GRAPH_FAILED);
+        }
+        int32_t dimIndex = 0;
+        const auto& shape = vTail->GetStorageShape();
+        const bool contiguous =
+            CheckTensorContiguous(shape.GetDimNum(), shape, qfaInfo.vTailStrides, dimIndex) == ge::GRAPH_SUCCESS;
+        const int32_t lastStridedAxis = qfaInfo.kvLayout == QfaLayout::PA_BBND ? 0 : 1;
+        OP_CHECK_IF(!contiguous && dimIndex > lastStridedAxis,
+                    OP_LOGE(qfaInfo.opName, "v_tail only supports non-contiguous axes 0 through %d", lastStridedAxis),
+                    return ge::GRAPH_FAILED);
+    }
     if ((vTail != nullptr) && (vTail->GetStorageShape().GetShapeSize() != 0)) {
         uint32_t vTailDimNum = vTail->GetStorageShape().GetDimNum();
         if (qfaInfo.kvLayout == QfaLayout::PA_NZ) {
