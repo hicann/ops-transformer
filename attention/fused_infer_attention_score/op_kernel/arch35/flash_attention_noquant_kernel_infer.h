@@ -34,20 +34,20 @@ public:
                                                       CubeBlockType, VecBlockType>;
     /* =====================UB变量==================== */
     __aicore__ inline void InitUniqueConstInfo();
-    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer> &runParam, RunInfo<isInfer> &runInfo);
+    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer>& runParam, RunInfo<isInfer>& runInfo);
     __aicore__ inline void Process();
-    __aicore__ inline void ProcessS2Loop(RunParamStr<isInfer> &runParam, RunInfo<isInfer> *runInfo, int64_t s2LoopLimit,
-                                         int64_t multiCoreInnerIdx, int64_t &taskId, bool notLastThreeLoop,
+    __aicore__ inline void ProcessS2Loop(RunParamStr<isInfer>& runParam, RunInfo<isInfer>* runInfo, int64_t s2LoopLimit,
+                                         int64_t multiCoreInnerIdx, int64_t& taskId, bool notLastThreeLoop,
                                          bool notLastTwoLoop, bool notLast);
     __aicore__ inline void ProcessMainLoop();
     __aicore__ inline void ProcessS1OutSplitLoop();
     __aicore__ inline int64_t CalcRealCoreIdxVarlen(int64_t calcLoops, int64_t calcLoopsRemain, int64_t cycleCoreNums);
-    __aicore__ inline void CalS1OuterSize(const int64_t &multiCoreInnerOffset, RunParamStr<isInfer> &runParam);
-    __aicore__ inline int64_t CalS1RealSize(const int64_t &actualS1Len, const int64_t &actualS2Len);
-    __aicore__ inline void ComputeAxisIdx(int64_t multiCoreInnerIdx, RunParamStr<isInfer> &runParam);
+    __aicore__ inline void CalS1OuterSize(const int64_t& multiCoreInnerOffset, RunParamStr<isInfer>& runParam);
+    __aicore__ inline int64_t CalS1RealSize(const int64_t& actualS1Len, const int64_t& actualS2Len);
+    __aicore__ inline void ComputeAxisIdx(int64_t multiCoreInnerIdx, RunParamStr<isInfer>& runParam);
 
 private:
-    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer> &runParam);
+    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer>& runParam);
 };
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -103,24 +103,22 @@ __aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockT
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::InitUniqueRunInfo(const RunParamStr<isInfer> &runParam,
-                                                                                 RunInfo<isInfer> &runInfo)
+__aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::InitUniqueRunInfo(
+    const RunParamStr<isInfer>& runParam, RunInfo<isInfer>& runInfo)
 {
     InitTaskParamByRun<CHILD_SPEC_TEMPLATE_ARGS, BaseClass::useDn, BaseClass::enableKVPrefix>(runParam, runInfo);
     ComputeOffset<CHILD_SPEC_TEMPLATE_ARGS, BaseClass::useDn, BaseClass::enableKVPrefix>(
         runParam, this->constInfo, runInfo.s2LoopCount + runInfo.s2StartIdx / this->constInfo.s2BaseSize, runInfo);
 }
 
-
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::ProcessS2Loop(
-    RunParamStr<isInfer> &runParam, RunInfo<isInfer> *runInfo, int64_t s2LoopLimit, int64_t multiCoreInnerIdx,
-    int64_t &taskId, bool notLastThreeLoop, bool notLastTwoLoop, bool notLast)
+    RunParamStr<isInfer>& runParam, RunInfo<isInfer>* runInfo, int64_t s2LoopLimit, int64_t multiCoreInnerIdx,
+    int64_t& taskId, bool notLastThreeLoop, bool notLastTwoLoop, bool notLast)
 {
     for (int64_t s2LoopCount = 0; s2LoopCount <= s2LoopLimit; ++s2LoopCount) {
         if (notLastThreeLoop) {
-            RunInfo<isInfer> &runInfo1 = runInfo[taskId & 3];
+            RunInfo<isInfer>& runInfo1 = runInfo[taskId & 3];
             this->SetRunInfo(runInfo1, runParam, taskId, s2LoopCount, s2LoopLimit, multiCoreInnerIdx);
             if ASCEND_IS_AIC {
                 this->cubeBlock.IterateBmm1(this->bmm1Buffers.Get(), runInfo1, this->constInfo);
@@ -128,13 +126,13 @@ __aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockT
         }
         if (taskId > 0 && notLastTwoLoop) {
             if ASCEND_IS_AIV {
-                auto &runInfo3 = runInfo[(taskId + 3) & 3];
+                auto& runInfo3 = runInfo[(taskId + 3) & 3];
                 this->vecBlock.ProcessVec1(this->l1PBuffers.Get(), this->bmm1Buffers.Get(), runInfo3, this->constInfo);
             }
         }
         if (taskId > 1 && notLast) {
             if ASCEND_IS_AIC {
-                RunInfo<isInfer> &runInfo2 = runInfo[(taskId + 2) & 3];
+                RunInfo<isInfer>& runInfo2 = runInfo[(taskId + 2) & 3];
                 if constexpr (BaseClass::bmm2Write2Ub) {
                     this->cubeBlock.IterateBmm2(this->bmm2Buffers.Get(), this->l1PBuffers, runInfo2, this->constInfo);
                 } else {
@@ -145,7 +143,7 @@ __aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockT
         }
         if (taskId > 2) {
             if ASCEND_IS_AIV {
-                RunInfo<isInfer> &runInfo3 = runInfo[(taskId + 1) & 3];
+                RunInfo<isInfer>& runInfo3 = runInfo[(taskId + 1) & 3];
                 if constexpr (BaseClass::bmm2Write2Ub) {
                     this->vecBlock.ProcessVec2(this->bmm2Buffers.Get(), runInfo3, this->constInfo);
                 } else {
@@ -296,9 +294,8 @@ __aicore__ inline int64_t FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlo
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline int64_t
-FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::CalS1RealSize(const int64_t &actualS1Len,
-                                                                             const int64_t &actualS2Len)
+__aicore__ inline int64_t FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::CalS1RealSize(
+    const int64_t& actualS1Len, const int64_t& actualS2Len)
 {
     if constexpr (hasAtten) {
         if (this->attenMaskInfo.compressMode == static_cast<uint8_t>(AttenMaskCompressMode::RIGHT_DOWN_CAUSAL_MODE)) {
@@ -310,9 +307,8 @@ FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::CalS1RealSize(con
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::CalS1OuterSize(const int64_t &multiCoreInnerOffset,
-                                                                              RunParamStr<isInfer> &runParam)
+__aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::CalS1OuterSize(
+    const int64_t& multiCoreInnerOffset, RunParamStr<isInfer>& runParam)
 {
     int64_t actualS1Outersize = 0;
     this->s1OuterSizeAcc = 0;
@@ -342,9 +338,8 @@ FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::CalS1OuterSize(co
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void
-FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::ComputeAxisIdx(int64_t multiCoreInnerIdx,
-                                                                              RunParamStr<isInfer> &runParam)
+__aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::ComputeAxisIdx(
+    int64_t multiCoreInnerIdx, RunParamStr<isInfer>& runParam)
 {
     this->GetSeqQlenKvlenByBoidx(runParam.boIdx, runParam.actualS1Size, runParam.actualS2Size);
     int64_t tmpS1Outersize = CalS1RealSize(runParam.actualS1Size, runParam.actualS2Size);
@@ -370,7 +365,7 @@ FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::ComputeAxisIdx(in
     runParam.s1oIdx = actualS1Outersize % tmpS1Outersize;
 
     runParam.s1RealSize = CalS1RealSize(runParam.actualS1Size, runParam.actualS2Size);
-    runParam.halfS1RealSize = (runParam.s1RealSize + 1) >> 1;
+    runParam.halfS1RealSize = (runParam.s1RealSize + ArchInfo::CV_RATIO - 1) / ArchInfo::CV_RATIO;
     runParam.firstHalfS1RealSize = runParam.halfS1RealSize;
     if (this->constInfo.subBlockIdx == 1) {
         runParam.halfS1RealSize = runParam.s1RealSize - runParam.halfS1RealSize;
@@ -480,6 +475,12 @@ __aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockT
     } else {
         ProcessMainLoop();
     }
+    this->UnInitMMResBuf();
+    if ASCEND_IS_AIC {
+        this->cubeBlock.UnInitCubeBlock();
+    } else {
+        this->vecBlock.UnInitLocalBuffer();
+    }
     if constexpr (isFd) {
         if ASCEND_IS_AIV {
             SyncAll();
@@ -493,7 +494,7 @@ __aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockT
 // =========================================== private functions ===========================================
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionNoQuantKernelInfer<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(
-    int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer> &runParam)
+    int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer>& runParam)
 {
     constexpr uint64_t fp8QBlockSize = 128U;  // 128 is SOuterSize
     constexpr uint64_t fp8KvBlockSize = 256U; // 256 is SInnerSize

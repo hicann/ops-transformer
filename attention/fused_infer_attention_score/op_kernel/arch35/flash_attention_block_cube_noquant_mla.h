@@ -31,25 +31,25 @@ class FABlockCubeNoquantMla {
 public:
     __aicore__ inline FABlockCubeNoquantMla(){};
     __aicore__ inline void InitCubeBlock(
-        TPipe *pipe, __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *blockTable,
-        __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-        const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, BufferManager<BufferType::L1> *l1BuffMgr,
-        BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> *mm12Bmm2AL1BuffersPtr);
-    __aicore__ inline void IterateBmm1(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
-                                       RunInfo<isInfer> &runInfo, RunParamStr<isInfer> &runParam, bool isLast,
-                                       ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline void IterateBmm2(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf,
-                                       RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
+        TPipe* pipe, __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* blockTable,
+        __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+        const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, BufferManager<BufferType::L1>* l1BuffMgr,
+        BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>* mm12Bmm2AL1BuffersPtr);
+    __aicore__ inline void IterateBmm1(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
+                                       RunInfo<isInfer>& runInfo, RunParamStr<isInfer>& runParam, bool isLast,
+                                       ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline void IterateBmm2(Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf,
+                                       RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
 
 private:
-    __aicore__ inline void InitInput(TPipe *pipe, __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                     __gm__ uint8_t *blockTable, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-                                     const FlashAttentionScoreSimplifiedTilingData *__restrict tiling);
+    __aicore__ inline void InitInput(TPipe* pipe, __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                     __gm__ uint8_t* blockTable, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+                                     const FlashAttentionScoreSimplifiedTilingData* __restrict tiling);
     __aicore__ inline void InitLocalBuffer(
-        BufferManager<BufferType::L1> *l1BuffMgr,
-        BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> *mm12Bmm2AL1BuffMgr);
-    __aicore__ inline int64_t GetQueryRopeOffset(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
-    __aicore__ inline int64_t GetKeyRopeOffset(RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo);
+        BufferManager<BufferType::L1>* l1BuffMgr,
+        BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>* mm12Bmm2AL1BuffMgr);
+    __aicore__ inline int64_t GetQueryRopeOffset(RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
+    __aicore__ inline int64_t GetKeyRopeOffset(RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo);
 
 public:
     /* =================编译期常量的基本块信息================= */
@@ -60,13 +60,13 @@ public:
     static constexpr bool splitD = (uint16_t)dVTemplateType > (uint16_t)DTemplateType::Aligned256;
 
 private:
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = nullptr;
-    TPipe *tPipe = nullptr;
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData = nullptr;
+    TPipe* tPipe = nullptr;
 
     GlobalTensor<INPUT_T> queryGm;
-    __gm__ uint8_t *currentKey;
+    __gm__ uint8_t* currentKey;
     GlobalTensor<INPUT_T> keyGm;
-    __gm__ uint8_t *currentValue;
+    __gm__ uint8_t* currentValue;
     GlobalTensor<INPUT_T> valueGm;
     GlobalTensor<INPUT_T> queryRopeGm;
     GlobalTensor<INPUT_T> keyRopeGm;
@@ -76,11 +76,11 @@ private:
     uint32_t maxBlockNumPerBatch = 0;
     KVLAYOUT kvLayout;
 
-    BufferManager<BufferType::L1> *l1BufferManagerPtr;
+    BufferManager<BufferType::L1>* l1BufferManagerPtr;
     BufferManager<BufferType::L0A> l0aBufferManager;
     BufferManager<BufferType::L0B> l0bBufferManager;
     BufferManager<BufferType::L0C> l0cBufferManager;
-    BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> *mm12Bmm2AL1BuffersPtr;
+    BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>* mm12Bmm2AL1BuffersPtr;
     // mm1左矩阵，GS1循环内左矩阵复用，GS1循环间不开pingpong
     BuffersPolicySingleBuffer<BufferType::L1> mm1AL1Buffers;
     // L0A
@@ -102,10 +102,10 @@ private:
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::InitCubeBlock(
-    TPipe *pipe, __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *blockTable,
-    __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, BufferManager<BufferType::L1> *l1BuffMgr,
-    BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> *mm12Bmm2AL1BuffMgr)
+    TPipe* pipe, __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* blockTable,
+    __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, BufferManager<BufferType::L1>* l1BuffMgr,
+    BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>* mm12Bmm2AL1BuffMgr)
 {
     InitInput(pipe, query, key, value, blockTable, queryRope, keyRope, tiling);
     InitLocalBuffer(l1BuffMgr, mm12Bmm2AL1BuffMgr);
@@ -113,27 +113,27 @@ __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::InitCubeBlock(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::InitInput(
-    TPipe *pipe, __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *blockTable,
-    __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tiling)
+    TPipe* pipe, __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* blockTable,
+    __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tiling)
 {
     this->tilingData = tiling;
     this->tPipe = pipe;
 
-    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T *)query);
-    ListTensorDesc keyListTensorDescInit((__gm__ void *)key);
-    ListTensorDesc valueListTensorDescInit((__gm__ void *)value);
-    currentKey = (__gm__ uint8_t *)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
-    currentValue = (__gm__ uint8_t *)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+    this->queryGm.SetGlobalBuffer((__gm__ INPUT_T*)query);
+    ListTensorDesc keyListTensorDescInit((__gm__ void*)key);
+    ListTensorDesc valueListTensorDescInit((__gm__ void*)value);
+    currentKey = (__gm__ uint8_t*)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+    currentValue = (__gm__ uint8_t*)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
     if (this->tilingData->inputParamsRegbase.isKvContinuous == 1) {
-        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)currentKey);
-        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T *)currentValue);
+        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T*)currentKey);
+        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T*)currentValue);
     } else {
-        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)key);
-        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T *)value);
+        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T*)key);
+        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T*)value);
     }
     if constexpr (isPa) {
-        this->blockTableGm.SetGlobalBuffer((__gm__ int32_t *)blockTable);
+        this->blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
         this->kvCacheBlockSize = this->tilingData->inputParamsRegbase.blockSize;
         this->maxBlockNumPerBatch = this->tilingData->inputParamsRegbase.blockTableDim2;
         if (this->tilingData->inputParamsRegbase.paLayoutType == 2) { // NZ下paLayoutType == 2
@@ -143,15 +143,15 @@ __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::InitInput(
         }
     }
     if constexpr (hasRope) {
-        this->queryRopeGm.SetGlobalBuffer((__gm__ INPUT_T *)queryRope);
-        this->keyRopeGm.SetGlobalBuffer((__gm__ INPUT_T *)keyRope);
+        this->queryRopeGm.SetGlobalBuffer((__gm__ INPUT_T*)queryRope);
+        this->keyRopeGm.SetGlobalBuffer((__gm__ INPUT_T*)keyRope);
     }
 }
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::InitLocalBuffer(
-    BufferManager<BufferType::L1> *l1BuffMgr,
-    BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> *mm12Bmm2AL1BuffMgr)
+    BufferManager<BufferType::L1>* l1BuffMgr,
+    BuffersPolicy3buff<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>* mm12Bmm2AL1BuffMgr)
 {
     if ASCEND_IS_AIC {
         l1BufferManagerPtr = l1BuffMgr;
@@ -172,8 +172,8 @@ __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::InitLocalBuffer(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::IterateBmm1(
-    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf, RunInfo<isInfer> &runInfo,
-    RunParamStr<isInfer> &runParam, bool isLast, ConstInfo<isInfer, hasRope> &constInfo)
+    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf, RunInfo<isInfer>& runInfo,
+    RunParamStr<isInfer>& runParam, bool isLast, ConstInfo<isInfer, hasRope>& constInfo)
 {
     Buffer<BufferType::L1> mm1A;
     Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> mm1B;
@@ -325,7 +325,8 @@ __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::IterateBmm1(
               // *sizeof(T) //源NZ矩阵中相邻Z排布的起始地址偏移
     fixpipeParams.dstStride = s2BaseSize; // mmResUb上两行之间的间隔，单位：element。 //
                                           // 128：根据比对dump文件得到，ND方案(S1 * S2)时脏数据用mask剔除
-    fixpipeParams.dualDstCtl = CV_RATIO == 2 ? 1 : 0; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+    fixpipeParams.dualDstCtl =
+        ArchInfo::CV_RATIO == 2 ? 1 : 0; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
     fixpipeParams.params.dstNdStride = 0;
@@ -338,7 +339,7 @@ __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::IterateBmm1(
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline int64_t FABlockCubeNoquantMla<TEMPLATE_ARGS>::GetQueryRopeOffset(
-    RunInfo<isInfer> &runInfo, ConstInfo<isInfer, hasRope> &constInfo)
+    RunInfo<isInfer>& runInfo, ConstInfo<isInfer, hasRope>& constInfo)
 {
     // 计算gm上的offset
     int64_t bOffsetRope = 0;
@@ -377,8 +378,8 @@ __aicore__ inline int64_t FABlockCubeNoquantMla<TEMPLATE_ARGS>::GetQueryRopeOffs
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline int64_t FABlockCubeNoquantMla<TEMPLATE_ARGS>::GetKeyRopeOffset(RunInfo<isInfer> &runInfo,
-                                                                                 ConstInfo<isInfer, hasRope> &constInfo)
+__aicore__ inline int64_t FABlockCubeNoquantMla<TEMPLATE_ARGS>::GetKeyRopeOffset(RunInfo<isInfer>& runInfo,
+                                                                                 ConstInfo<isInfer, hasRope>& constInfo)
 {
     // 计算gm上的offset
     int64_t bOffsetRope = 0;
@@ -408,8 +409,8 @@ __aicore__ inline int64_t FABlockCubeNoquantMla<TEMPLATE_ARGS>::GetKeyRopeOffset
 
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::IterateBmm2(
-    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH> &outputBuf, RunInfo<isInfer> &runInfo,
-    ConstInfo<isInfer, hasRope> &constInfo)
+    Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& outputBuf, RunInfo<isInfer>& runInfo,
+    ConstInfo<isInfer, hasRope>& constInfo)
 {
     // 获取 mm2 的左右矩阵
     Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD> mm2AB;
@@ -451,7 +452,8 @@ __aicore__ inline void FABlockCubeNoquantMla<TEMPLATE_ARGS>::IterateBmm2(
     fixpipeParams.dstStride =
         (fixpipeParams.nSize + 15) >> 4 << 4; // mmResUb上两行之间的间隔，单位：element。 //
                                               // 128：根据比对dump文件得到，ND方案(S1 * S2)时脏数据用mask剔除
-    fixpipeParams.dualDstCtl = CV_RATIO == 2 ? 1 : 0; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
+    fixpipeParams.dualDstCtl =
+        ArchInfo::CV_RATIO == 2 ? 1 : 0; // 双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
     fixpipeParams.params.dstNdStride = 0;

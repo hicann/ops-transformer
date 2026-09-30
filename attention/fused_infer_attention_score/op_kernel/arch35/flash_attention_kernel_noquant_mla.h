@@ -28,37 +28,37 @@ class FAKernelNoquantMla {
 public:
     ARGS_TRAITS;
     __aicore__ inline FAKernelNoquantMla(){};
-    __aicore__ inline void Init(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse,
-                                __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *blockTable,
-                                __gm__ uint8_t *postQuantScale, __gm__ uint8_t *postQuantOffset,
-                                __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope, __gm__ uint8_t *softmaxLse,
-                                __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pse,
+                                __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* blockTable,
+                                __gm__ uint8_t* postQuantScale, __gm__ uint8_t* postQuantOffset,
+                                __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope, __gm__ uint8_t* softmaxLse,
+                                __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+                                const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                     __gm__ uint8_t *pse, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
-                                     __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *blockTable,
-                                     __gm__ uint8_t *postQuantScale, __gm__ uint8_t *postQuantOffset,
-                                     __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope, __gm__ uint8_t *softmaxLse,
-                                     __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-                                     const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void InitInput(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                     __gm__ uint8_t* pse, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
+                                     __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* blockTable,
+                                     __gm__ uint8_t* postQuantScale, __gm__ uint8_t* postQuantOffset,
+                                     __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope, __gm__ uint8_t* softmaxLse,
+                                     __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+                                     const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void InitMMResBuf();
     __aicore__ inline void SetFlag3Buffer();
     __aicore__ inline void InitBuffer();
     __aicore__ inline void ComputeConstexpr();
-    __aicore__ inline void SetRunInfo(RunInfo<isInfer> &runInfo, RunParamStr<isInfer> &runParam, int64_t taskId,
+    __aicore__ inline void SetRunInfo(RunInfo<isInfer>& runInfo, RunParamStr<isInfer>& runParam, int64_t taskId,
                                       int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx);
-    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndx, int64_t gS1Index, RunParamStr<isInfer> &runParam);
-    __aicore__ inline void GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvLen);
-    __aicore__ inline void ComputeBmm1Tail(RunInfo<isInfer> &runInfo, RunParamStr<isInfer> &runParam);
+    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndx, int64_t gS1Index, RunParamStr<isInfer>& runParam);
+    __aicore__ inline void GetSeqQlenKvlenByBoidx(int64_t boIdx, int64_t& actualSeqQlen, int64_t& actualSeqKvLen);
+    __aicore__ inline void ComputeBmm1Tail(RunInfo<isInfer>& runInfo, RunParamStr<isInfer>& runParam);
     __aicore__ inline bool IsLastBN(uint32_t bnStartIdx, uint32_t bnEndIdx);
 
 private:
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tilingData = nullptr;
-    TPipe *tPipe = nullptr;
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData = nullptr;
+    TPipe* tPipe = nullptr;
 
     static constexpr uint32_t dTemplateAlign64 = CubeBlockType::dTemplateAlign64;
     static constexpr uint32_t s1BaseSize = CubeBlockType::s1BaseSize;
@@ -72,8 +72,8 @@ private:
     VecBlockType vecBlock;
 
     /* Public Variable */
-    __gm__ uint8_t *currentKey;
-    __gm__ uint8_t *currentValue;
+    __gm__ uint8_t* currentKey;
+    __gm__ uint8_t* currentValue;
     GlobalTensor<INPUT_T> keyGm;
     GlobalTensor<INPUT_T> valueGm;
 
@@ -87,8 +87,8 @@ private:
     AttenMaskInfo attenMaskInfo;
     CVSharedParams<isInfer, isPa> sharedParams;
 
-    __gm__ int64_t *actualSeqQlenAddr;
-    __gm__ int64_t *actualSeqKvlenAddr;
+    __gm__ int64_t* actualSeqQlenAddr;
+    __gm__ int64_t* actualSeqKvlenAddr;
     uint64_t s1SizeAcc = 0;
     uint64_t s2SizeAcc = 0;
     uint64_t b1SSOffset = 0;
@@ -105,17 +105,17 @@ private:
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::Init(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *attenMask,
-    __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *blockTable,
-    __gm__ uint8_t *postQuantScale, __gm__ uint8_t *postQuantOffset, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-    __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pse, __gm__ uint8_t* attenMask,
+    __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* blockTable,
+    __gm__ uint8_t* postQuantScale, __gm__ uint8_t* postQuantOffset, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, TPipe* tPipe)
 {
     this->tilingData = tiling;
     constInfo.aivIdx = GetBlockIdx();
     constInfo.subBlockIdx = GetSubBlockIdx();
     if ASCEND_IS_AIV {
-        this->aicIdx = constInfo.aivIdx / CV_RATIO;
+        this->aicIdx = constInfo.aivIdx / ArchInfo::CV_RATIO;
     }
     if ASCEND_IS_AIC {
         this->aicIdx = constInfo.aivIdx;
@@ -142,8 +142,8 @@ __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::Init(
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::InitMMResBuf()
 {
-    constexpr uint32_t mm1ResultSize = s1BaseSize / CV_RATIO * s2BaseSize * sizeof(T);
-    constexpr uint32_t mm2ResultSize = s1BaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T);
+    constexpr uint32_t mm1ResultSize = s1BaseSize / ArchInfo::CV_RATIO * s2BaseSize * sizeof(T);
+    constexpr uint32_t mm2ResultSize = s1BaseSize / ArchInfo::CV_RATIO * dTemplateAlign64 * sizeof(T);
     uint32_t mm12RightSize =
         max(static_cast<uint32_t>(dTemplateType), static_cast<uint32_t>(dVTemplateType)) * s2BaseSize * sizeof(INPUT_T);
 
@@ -181,30 +181,30 @@ __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::SetFlag3
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::InitInput(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *attenMask,
-    __gm__ uint8_t *actualSeqLengths, __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *blockTable,
-    __gm__ uint8_t *postQuantScale, __gm__ uint8_t *postQuantOffset, __gm__ uint8_t *queryRope, __gm__ uint8_t *keyRope,
-    __gm__ uint8_t *softmaxLse, __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
-    const FlashAttentionScoreSimplifiedTilingData *__restrict tiling, TPipe *tPipe)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pse, __gm__ uint8_t* attenMask,
+    __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* blockTable,
+    __gm__ uint8_t* postQuantScale, __gm__ uint8_t* postQuantOffset, __gm__ uint8_t* queryRope, __gm__ uint8_t* keyRope,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
+    const FlashAttentionScoreSimplifiedTilingData* __restrict tiling, TPipe* tPipe)
 {
     // init global buffer
-    ListTensorDesc keyListTensorDescInit((__gm__ void *)key);
-    ListTensorDesc valueListTensorDescInit((__gm__ void *)value);
-    currentKey = (__gm__ uint8_t *)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
-    currentValue = (__gm__ uint8_t *)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+    ListTensorDesc keyListTensorDescInit((__gm__ void*)key);
+    ListTensorDesc valueListTensorDescInit((__gm__ void*)value);
+    currentKey = (__gm__ uint8_t*)keyListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
+    currentValue = (__gm__ uint8_t*)valueListTensorDescInit.GetDataPtr<__gm__ uint8_t>(0);
     if (this->tilingData->inputParamsRegbase.isKvContinuous == 1) {
-        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)currentKey);
-        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T *)currentValue);
+        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T*)currentKey);
+        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T*)currentValue);
     } else {
-        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T *)key);
-        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T *)value);
+        this->keyGm.SetGlobalBuffer((__gm__ INPUT_T*)key);
+        this->valueGm.SetGlobalBuffer((__gm__ INPUT_T*)value);
     }
 
     if (this->tilingData->inputParamsRegbase.isActualSeqLengthsNull != 1) {
-        actualSeqQlenAddr = (__gm__ int64_t *)actualSeqLengths;
+        actualSeqQlenAddr = (__gm__ int64_t*)actualSeqLengths;
     }
     if (this->tilingData->inputParamsRegbase.isActualSeqLengthsKVNull != 1) {
-        actualSeqKvlenAddr = (__gm__ int64_t *)actualSeqLengthsKv;
+        actualSeqKvlenAddr = (__gm__ int64_t*)actualSeqLengthsKv;
     }
 
     this->vecBlock.InitGlobalBuffer(pse, nullptr, nullptr, nullptr, nullptr, postQuantScale, postQuantOffset, nullptr,
@@ -226,7 +226,7 @@ __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::ComputeC
     constInfo.s1BaseSize = s1BaseSize;
     constInfo.s2BaseSize = s2BaseSize;
 
-    auto &inputParamsRegbase = this->tilingData->inputParamsRegbase;
+    auto& inputParamsRegbase = this->tilingData->inputParamsRegbase;
 
     constInfo.bSize = inputParamsRegbase.bSize;
     constInfo.t1Size = inputParamsRegbase.t1Size;
@@ -459,7 +459,7 @@ __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::Process(
             }
             for (int64_t s2LoopCount = 0; s2LoopCount <= s2LoopLimit; s2LoopCount++) {
                 if (s2LoopCount < runParam.s2LoopEndIdx) {
-                    RunInfo<isInfer> &runInfo1 = runInfo[taskId & 3];
+                    RunInfo<isInfer>& runInfo1 = runInfo[taskId & 3];
                     this->SetRunInfo(runInfo1, runParam, taskId, s2LoopCount, runParam.s2LoopEndIdx - 1,
                                      multiCoreInnerIdx);
                     if ASCEND_IS_AIC {
@@ -473,7 +473,7 @@ __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::Process(
                     }
                 }
                 if (taskId >= PRELOAD_N) {
-                    RunInfo<isInfer> &runInfo2 = runInfo[(taskId - PRELOAD_N) & 3];
+                    RunInfo<isInfer>& runInfo2 = runInfo[(taskId - PRELOAD_N) & 3];
                     if ASCEND_IS_AIC {
                         this->cubeBlock.IterateBmm2(this->bmm2Buffers.Get(), runInfo2, constInfo);
                     }
@@ -490,7 +490,7 @@ __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::Process(
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(
-    int64_t bnIndx, int64_t gS1Index, RunParamStr<isInfer> &runParam)
+    int64_t bnIndx, int64_t gS1Index, RunParamStr<isInfer>& runParam)
 {
     if constexpr (layout == LayOutTypeEnum::LAYOUT_TND) {
         if (runParam.boIdx == 0) {
@@ -513,8 +513,8 @@ __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::ComputeA
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::SetRunInfo(RunInfo<isInfer> &runInfo,
-                                                                                   RunParamStr<isInfer> &runParam,
+__aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::SetRunInfo(RunInfo<isInfer>& runInfo,
+                                                                                   RunParamStr<isInfer>& runParam,
                                                                                    int64_t taskId, int64_t s2LoopCount,
                                                                                    int64_t s2LoopLimit,
                                                                                    int64_t multiCoreInnerIdx)
@@ -564,8 +564,8 @@ __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::SetRunIn
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::GetSeqQlenKvlenByBoidx(int64_t boIdx,
-                                                                                               int64_t &actualSeqQlen,
-                                                                                               int64_t &actualSeqKvLen)
+                                                                                               int64_t& actualSeqQlen,
+                                                                                               int64_t& actualSeqKvLen)
 {
     if (unlikely(boIdx == 0)) {
         actualSeqQlen = actualSeqQlenAddr[0];
@@ -582,8 +582,8 @@ __aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::GetSeqQl
 }
 
 template <typename CubeBlockType, typename VecBlockType>
-__aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::ComputeBmm1Tail(RunInfo<isInfer> &runInfo,
-                                                                                        RunParamStr<isInfer> &runParam)
+__aicore__ inline void FAKernelNoquantMla<CubeBlockType, VecBlockType>::ComputeBmm1Tail(RunInfo<isInfer>& runInfo,
+                                                                                        RunParamStr<isInfer>& runParam)
 {
     // -----------S1 Base Related----------------
     runInfo.s1RealSize = runParam.s1RealSize;
