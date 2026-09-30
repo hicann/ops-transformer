@@ -499,7 +499,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考编译与运行样例。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy,请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[《HCCL API (C)》](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
 
 <!-- npu="950,910b" id16 -->
 - <term>Atlas A2系列产品</term>、<term>Ascend 950PR&950DT系列产品</term>：
@@ -563,7 +563,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(
       aclrtContext context;
   };
 
-  int launchOneThreadweightQuantmatmulAllReduce(Args &args) {
+  int launchOneThreadWeightQuantmatmulAllReduce(Args &args) {
       int ret;
       ret = aclrtSetCurrentContext(args.context);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetCurrentContext failed. ERROR: %d\n", ret); return ret);
@@ -739,7 +739,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(
           args[rankId].stream = stream[rankId];
           args[rankId].context = context[rankId];
           threads[rankId].reset(
-                  new(std::nothrow) std::thread(&launchOneThreadweightQuantmatmulAllReduce, std::ref(args[rankId])));
+                  new(std::nothrow) std::thread(&launchOneThreadWeightQuantmatmulAllReduce, std::ref(args[rankId])));
       }
       for (uint32_t rankId = 0; rankId < ndev; rankId++) {
           threads[rankId]->join();
