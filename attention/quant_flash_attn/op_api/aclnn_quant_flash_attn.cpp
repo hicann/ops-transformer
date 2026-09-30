@@ -33,7 +33,8 @@ extern aclnnStatus aclnnInnerQuantFlashAttnGetWorkspaceSize(
     const aclTensor* vDescale, const aclTensor* blockTableOptional, const aclTensor* pScaleOptional,
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
     const aclTensor* sequsedKvOptional, const aclTensor* sinksOptional, const aclTensor* attnMaskOptional,
-    const aclTensor* metadataOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
+    const aclTensor* metadataOptional, const aclTensor* vTailOptional, const aclTensor* blockTableTailOptional,
+    const aclTensor* sequsedVTailOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
     int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char* layoutQ, const char* layoutQDescale,
     const char* layoutKv, const char* layoutOut, bool returnSoftmaxLse, const aclTensor* attnOut,
     const aclTensor* softmaxLse, uint64_t* workspaceSize, aclOpExecutor** executor);
@@ -82,12 +83,15 @@ void QuantFlashAttnProcessSinks(const aclTensor*& sinksOptional)
 }
 
 aclnnStatus QuantFlashAttnCheckTensorContiguous(const aclTensor* k, const aclTensor* v, const aclTensor* kDescale,
-                                                const aclTensor* vDescale)
+                                                const aclTensor* vDescale, const aclTensor* vTail)
 {
     if ((k != nullptr && !IsContiguous(k)) || (v != nullptr && !IsContiguous(v))) {
         return ACLNN_ERR_INNER;
     }
     if ((kDescale != nullptr && !IsContiguous(kDescale)) || (vDescale != nullptr && !IsContiguous(vDescale))) {
+        return ACLNN_ERR_INNER;
+    }
+    if (vTail != nullptr && !IsContiguous(vTail)) {
         return ACLNN_ERR_INNER;
     }
     return ACLNN_SUCCESS;
@@ -101,7 +105,8 @@ aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
     const aclTensor* vDescale, const aclTensor* blockTableOptional, const aclTensor* pScaleOptional,
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
     const aclTensor* sequsedKvOptional, const aclTensor* sinksOptional, const aclTensor* attnMaskOptional,
-    const aclTensor* metadataOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
+    const aclTensor* metadataOptional, const aclTensor* vTailOptional, const aclTensor* blockTableTailOptional,
+    const aclTensor* sequsedVTailOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
     int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char* layoutQ, const char* layoutQDescale,
     const char* layoutKv, const char* layoutOut, bool returnSoftmaxLse, const aclTensor* attnOut,
     const aclTensor* softmaxLseOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
@@ -119,7 +124,7 @@ aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
         return ret;
     }
 
-    ret = QuantFlashAttnCheckTensorContiguous(k, v, kDescale, vDescale);
+    ret = QuantFlashAttnCheckTensorContiguous(k, v, kDescale, vDescale, vTailOptional);
     if (ret != ACLNN_SUCCESS && NnopbaseSupportTensorV2 == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER, "When tensor is not contiguous, opbase package version check failed");
         if (!returnSoftmaxLse) {
@@ -130,8 +135,9 @@ aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
     ret = aclnnInnerQuantFlashAttnGetWorkspaceSize(
         q, k, v, qDescale, kDescale, vDescale, blockTableOptional, pScaleOptional, cuSeqlensQOptional,
         cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, sinksOptional, attnMaskOptional, metadataOptional,
-        quantMode, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKV, layoutQ, layoutQDescale,
-        layoutKv, layoutOut, returnSoftmaxLse, attnOut, placeHolder, workspaceSize, executor);
+        vTailOptional, blockTableTailOptional, sequsedVTailOptional, quantMode, softmaxScale, maskMode, winLeft,
+        winRight, maxSeqlenQ, maxSeqlenKV, layoutQ, layoutQDescale, layoutKv, layoutOut, returnSoftmaxLse, attnOut,
+        placeHolder, workspaceSize, executor);
 
     // 销毁占位符
     if (!returnSoftmaxLse) {

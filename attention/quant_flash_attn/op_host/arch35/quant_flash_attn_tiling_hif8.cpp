@@ -30,9 +30,9 @@ namespace optiling {
 namespace quant_flash_attn {
 using namespace arch35QFA;
 
-void QuantFlashAttnTilingHif8Impl::InitTilingInfo(TilingInfo *tilingInfo)
+void QuantFlashAttnTilingHif8Impl::InitTilingInfo(TilingInfo* tilingInfo)
 {
-    qfaInfo_ = static_cast<QfaTilingInfo *>(tilingInfo);
+    qfaInfo_ = static_cast<QfaTilingInfo*>(tilingInfo);
 }
 
 bool QuantFlashAttnTilingHif8Impl::IsCapable()
@@ -98,14 +98,14 @@ ge::graphStatus QuantFlashAttnTilingHif8Impl::SetPlatMemoryInfo()
 
 void QuantFlashAttnTilingHif8Impl::InitImplParam()
 {
-    const gert::Tensor *actSeqLenQ = qfaInfo_->opParamInfo.cuSeqlensQ.tensor;
-    const gert::Tensor *actSeqLenKV = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
+    const gert::Tensor* actSeqLenQ = qfaInfo_->opParamInfo.cuSeqlensQ.tensor;
+    const gert::Tensor* actSeqLenKV = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
     uint32_t actSeqLenQDims = (actSeqLenQ != nullptr) ? actSeqLenQ->GetShapeSize() : 0;
     uint32_t actSeqLenKVDims = (actSeqLenKV != nullptr) ? actSeqLenKV->GetShapeSize() : 0;
-    const gert::Tensor *actSeqLenQTensor = qfaInfo_->opParamInfo.cuSeqlensQ.tensor;
-    const gert::Tensor *seqUsedQTensor = qfaInfo_->opParamInfo.sequsedQ.tensor;
-    const gert::Tensor *actSeqLenKVTensor = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
-    const gert::Tensor *seqUsedKvTensor = qfaInfo_->opParamInfo.sequsedKv.tensor;
+    const gert::Tensor* actSeqLenQTensor = qfaInfo_->opParamInfo.cuSeqlensQ.tensor;
+    const gert::Tensor* seqUsedQTensor = qfaInfo_->opParamInfo.sequsedQ.tensor;
+    const gert::Tensor* actSeqLenKVTensor = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
+    const gert::Tensor* seqUsedKvTensor = qfaInfo_->opParamInfo.sequsedKv.tensor;
     bool hasAnyData = (actSeqLenQTensor != nullptr && actSeqLenQTensor->GetData<int32_t>() != nullptr) ||
                       (actSeqLenKVTensor != nullptr && actSeqLenKVTensor->GetData<int32_t>() != nullptr) ||
                       (seqUsedQTensor != nullptr && seqUsedQTensor->GetData<int32_t>() != nullptr) ||
@@ -113,11 +113,11 @@ void QuantFlashAttnTilingHif8Impl::InitImplParam()
     if (!hasAnyData) {
         // 静态编译: 无运行时数据, 按 shape 判定
         cuSeqLenQFlag_ = (actSeqLenQTensor != nullptr) && (actSeqLenQTensor->GetShapeSize() > 0);
-        const gert::Tensor *actSeqLenKVT = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
+        const gert::Tensor* actSeqLenKVT = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
         cuSeqLenKVFlag_ = (actSeqLenKVT != nullptr) && (actSeqLenKVT->GetShapeSize() > 0);
-        const gert::Tensor *seqUsedQT = qfaInfo_->opParamInfo.sequsedQ.tensor;
+        const gert::Tensor* seqUsedQT = qfaInfo_->opParamInfo.sequsedQ.tensor;
         seqUsedQFlag_ = (seqUsedQT != nullptr) && (seqUsedQT->GetShapeSize() > 0);
-        const gert::Tensor *seqUsedKvT = qfaInfo_->opParamInfo.sequsedKv.tensor;
+        const gert::Tensor* seqUsedKvT = qfaInfo_->opParamInfo.sequsedKv.tensor;
         seqUsedKvFlag_ = (seqUsedKvT != nullptr) && (seqUsedKvT->GetShapeSize() > 0);
     } else {
         cuSeqLenQFlag_ =
@@ -125,8 +125,8 @@ void QuantFlashAttnTilingHif8Impl::InitImplParam()
         cuSeqLenKVFlag_ =
             !((actSeqLenKVDims == 0) || (actSeqLenKV == nullptr) || (actSeqLenKV->GetData<int32_t>() == nullptr));
 
-        const gert::Tensor *seqUsedQ = qfaInfo_->opParamInfo.sequsedQ.tensor;
-        const gert::Tensor *seqUsedKv = qfaInfo_->opParamInfo.sequsedKv.tensor;
+        const gert::Tensor* seqUsedQ = qfaInfo_->opParamInfo.sequsedQ.tensor;
+        const gert::Tensor* seqUsedKv = qfaInfo_->opParamInfo.sequsedKv.tensor;
         uint32_t seqUsedQDims = (seqUsedQ != nullptr) ? seqUsedQ->GetShapeSize() : 0;
         uint32_t seqUsedKvDims = (seqUsedKv != nullptr) ? seqUsedKv->GetShapeSize() : 0;
         seqUsedQFlag_ = !((seqUsedQDims == 0) || (seqUsedQ == nullptr) || (seqUsedQ->GetData<int32_t>() == nullptr));
@@ -183,8 +183,9 @@ void QuantFlashAttnTilingHif8Impl::UpdateTilingKeyQuantMode()
 void QuantFlashAttnTilingHif8Impl::GenTilingKey()
 {
     UpdateTilingKeyInfo();
-    tilingKey_ = GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.quantMode,
-                                    tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd);
+    tilingKey_ =
+        GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.quantMode,
+                           tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd, false);
 
     OP_LOGI(qfaInfo_->opName, "HIF8 The tilingkey is %llu.", tilingKey_);
     OP_LOGI(qfaInfo_->opName,
@@ -292,9 +293,9 @@ bool QuantFlashAttnTilingHif8Impl::CheckNeedInitOutput() const
     return false;
 }
 
-ge::graphStatus QuantFlashAttnTilingHif8Impl::SetTilingData(QuantFlashAttnTilingData &tilingData)
+ge::graphStatus QuantFlashAttnTilingHif8Impl::SetTilingData(QuantFlashAttnTilingData& tilingData)
 {
-    QuantFlashAttnTilingData *tiling = context_->GetTilingData<QuantFlashAttnTilingData>();
+    QuantFlashAttnTilingData* tiling = context_->GetTilingData<QuantFlashAttnTilingData>();
     OP_CHECK_IF(tiling == nullptr, OP_LOGE(qfaInfo_->opName, "The tiling data is nullptr"), return ge::GRAPH_FAILED);
     *tiling = tilingData;
     return ge::GRAPH_SUCCESS;
@@ -302,11 +303,11 @@ ge::graphStatus QuantFlashAttnTilingHif8Impl::SetTilingData(QuantFlashAttnTiling
 
 void QuantFlashAttnTilingHif8Impl::PrintAllTilingData()
 {
-    QuantFlashAttnQuantTilingArch35 &baseTiling = tilingData_.baseTiling;
-    QuantFlashAttnBaseParams &params = baseTiling.quantFlashAttnBaseParams;
-    QuantFlashAttnAttenMaskParams &maskParams = baseTiling.quantFlashAttnAttenMaskParams;
-    QuantFlashAttnPageAttentionParams &paParams = baseTiling.quantFlashAttnPageAttentionParams;
-    QuantFlashAttnWorkspaceParams &wsParams = baseTiling.quantFlashAttnWorkspaceParams;
+    QuantFlashAttnQuantTilingArch35& baseTiling = tilingData_.baseTiling;
+    QuantFlashAttnBaseParams& params = baseTiling.quantFlashAttnBaseParams;
+    QuantFlashAttnAttenMaskParams& maskParams = baseTiling.quantFlashAttnAttenMaskParams;
+    QuantFlashAttnPageAttentionParams& paParams = baseTiling.quantFlashAttnPageAttentionParams;
+    QuantFlashAttnWorkspaceParams& wsParams = baseTiling.quantFlashAttnWorkspaceParams;
 
     OP_LOGD(qfaInfo_->opName, "HIF8 bSize:%d", params.bSize);
     OP_LOGD(qfaInfo_->opName, "HIF8 t1Size:%d", params.t1Size);

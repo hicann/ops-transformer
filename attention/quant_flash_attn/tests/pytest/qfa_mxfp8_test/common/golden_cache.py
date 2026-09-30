@@ -127,8 +127,9 @@ def build_input_dict(
     qr_bf16,
     kr_bf16,
     block_table_torch,
+    vtail_bundle=None,
 ):
-    return {
+    input_dict = {
         "q_fp8": q_fp8,
         "k_fp8": k_fp8,
         "v_fp8": v_fp8,
@@ -140,3 +141,15 @@ def build_input_dict(
         "kr_bf16": kr_bf16,
         "block_table_torch": block_table_torch,
     }
+    if vtail_bundle is not None:
+        input_dict["vtail_bundle"] = vtail_bundle
+    return input_dict
+
+
+def load_vtail_bundle(case_name, cache_dir=None):
+    """从缓存input中恢复尾块bundle(无则返回None), 供golden模块级状态回填"""
+    path = _path(case_name, "input", cache_dir)
+    if not os.path.exists(path):
+        return None
+    data = torch.load(path, weights_only=False)
+    return data.get("vtail_bundle")

@@ -41,7 +41,7 @@ def _load_npu_modules():
 
 
 def _apply_golden_globals(params, quant_mode, modules):
-    """把 case 参数注入 golden 模块全局变量 (按 quant_mode 选择目标模块, 与 qfa_wrapper 一致).
+    """把 case 参数注入 golden 模块全局变量 (按 quant_mode 选择目标模块, 与直调 op 约定一致).
 
     prepare_npu_inputs 读目标 golden_mod 的全局变量 (B/N_q/N_kv/D/ENABLE_PA/...),
     必须在调 prepare_npu_inputs 前把 csv attributes 全部注入.
@@ -72,7 +72,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
       5. quant_flash_attn_metadata 构建 (capture 之前, metadata 是 int32 tensor)
       6. 所有运行时入参存为 self. 属性, forward 直接读
 
-    入参对齐 15 位置 tensor (与 CSV tensor_view_shapes / qfa_wrapper 一致):
+    入参对齐 15 位置 tensor (与 CSV tensor_view_shapes (直调 op 顺序) 一致):
       0 q .. 7 block_table, 8 cu_seqlens_q_t, 9 cu_seqlens_kv_t, 10 seqused_q_t,
       11 seqused_kv_t, 12 sinks_t, 13 attn_mask_t, 14 metadata_t。
 
@@ -98,6 +98,9 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         sinks: torch.Tensor,
         attn_mask: torch.Tensor,
         metadata: torch.Tensor,
+        v_tail: torch.Tensor = None,
+        block_table_tail: torch.Tensor = None,
+        seqused_v_tail: torch.Tensor = None,
         softmax_scale: float = 1.0,
         mask_mode: int = 0,
         win_left: int = -1,
@@ -129,6 +132,23 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         seqused_q_t = seqused_q
         seqused_kv_t = seqused_kv
         attn_mask_t = attn_mask
+
+        # 空 slot / 全零尾长 → None (与 checker hasVTail 契约对齐,
+        # 避免 kernel 对全零 seqused_v_tail 走未验证路径)
+        def _vtail_none(t):
+            if t is None or not isinstance(t, torch.Tensor) or t.numel() == 0:
+                return None
+            return t
+
+        v_tail_arg = _vtail_none(v_tail)
+        block_table_tail_arg = _vtail_none(block_table_tail)
+        seqused_v_tail_arg = _vtail_none(seqused_v_tail)
+        if seqused_v_tail_arg is not None and all(
+            int(x) == 0 for x in seqused_v_tail_arg.detach().cpu().flatten().tolist()
+        ):
+            v_tail_arg = None
+            block_table_tail_arg = None
+            seqused_v_tail_arg = None
 
         layout_q = str(layout_q)
         layout_q_descale = str(layout_q_descale)
@@ -185,7 +205,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         )
 
         # cu_seqlens/seqused 真实值由 inputs.py 写入 _t tensor slot (8-11)；
-        # 这里从 tensor 读回 list（与 qfa_wrapper 一致）。
+        # 这里从 tensor 读回 list（从 tensor slot 读回）。
         # _t 端可能是 NPU tensor，.cpu().tolist() 读回；空 tensor (numel==0) → None。
         def _tolist_t(t, default=None):
             if t is None:
@@ -407,6 +427,9 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         self.q = inputs["q"]
         self.k = inputs["k"]
         self.v = inputs["v"]
+        self.v_tail = v_tail_arg
+        self.block_table_tail = block_table_tail_arg
+        self.seqused_v_tail = seqused_v_tail_arg
         self.q_descale = inputs["dequant_scale_q"]
         self.k_descale = inputs["dequant_scale_k"]
         self.v_descale = inputs["dequant_scale_v"]
@@ -466,6 +489,9 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
             seqused_kv=self.seqused_kv,
             attn_mask=self.attn_mask,
             metadata=self.metadata,
+            v_tail=self.v_tail,
+            block_table_tail=self.block_table_tail,
+            seqused_v_tail=self.seqused_v_tail,
             softmax_scale=self.softmax_scale,
             mask_mode=self.mask_mode,
             layout_q=self.layout_q,

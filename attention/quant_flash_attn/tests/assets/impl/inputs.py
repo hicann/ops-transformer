@@ -73,6 +73,49 @@ def _write_int32_list(slot, values, slot_name):
         slot[...] = arr
 
 
+def _inplace_write_bf16(slot, src_bf16, slot_name):
+    """bf16 slot 覆写 (v_tail 专用)。
+
+    torch slot: 直接 copy_ (dtype 对齐);
+    numpy slot: ml_dtypes.bfloat16 / uint16 走 uint16 位级拷贝 (numpy 不支持
+    torch bf16 → numpy 的直接转换, 位级拷贝保证 bit-exact)。
+    空 slot (shape (0,)) 且期望非空 → 报错 (CSV 未分配 v_tail slot)。
+    """
+    expected_shape = tuple(src_bf16.shape)
+    if isinstance(slot, torch.Tensor):
+        if slot.numel() == 0:
+            raise ValueError(
+                f"[INPUTS] {slot_name} slot 为空 (0,) 但 enable_v_tail=True — "
+                f"CSV tensor_view_shapes 未分配 v_tail slot, 检查 excel_to_csv 推导"
+            )
+        if tuple(slot.shape) != expected_shape:
+            raise ValueError(
+                f"[INPUTS] {slot_name} shape mismatch: CSV slot {tuple(slot.shape)} "
+                f"!= computed {expected_shape}. "
+                f"Check Excel shape vs v_tail layout derivation (B/N_kv/block_size/D)."
+            )
+        slot.copy_(src_bf16.to(slot.dtype))
+        return
+    arr = numpy.asarray(slot)
+    if arr.size == 0:
+        raise ValueError(
+            f"[INPUTS] {slot_name} slot 为空 (0,) 但 enable_v_tail=True — "
+            f"CSV tensor_view_shapes 未分配 v_tail slot, 检查 excel_to_csv 推导"
+        )
+    if tuple(arr.shape) != expected_shape:
+        raise ValueError(
+            f"[INPUTS] {slot_name} shape mismatch: CSV slot {tuple(arr.shape)} "
+            f"!= computed {expected_shape}. "
+            f"Check Excel shape vs v_tail layout derivation (B/N_kv/block_size/D)."
+        )
+    src_u16 = src_bf16.contiguous().view(torch.uint16).numpy()
+    if arr.dtype == numpy.uint16:
+        arr[...] = src_u16
+    else:
+        # ml_dtypes.bfloat16: 同 itemsize(2B) 的 uint16 视图位级拷贝
+        arr.view(numpy.uint16)[...] = src_u16
+
+
 def _write_causal_mask(slot, mask_mode, mask_shape):
     """mask_mode != 0 时生成上三角 causal mask 写入 attn_mask slot。
 
@@ -118,6 +161,9 @@ def generate_qfa_mxfp8_inputs(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
+    v_tail: torch.Tensor = None,
+    block_table_tail: torch.Tensor = None,
+    seqused_v_tail: torch.Tensor = None,
     softmax_scale: float = 1.0,
     mask_mode: int = 0,
     win_left: int = -1,
@@ -236,8 +282,40 @@ def generate_qfa_mxfp8_inputs(
     quant_scale_k_bnsd = mxfp8_golden_mod.get_mxfp8_per_token_group_quant_scale(
         k_bf16, fp8_dtype, group_size
     )
+    # 主体段(每batch前align_down(kvLen,64)行)才参与V的量化, 尾段置零不进cache
+    # (真值只在v_tail, 模拟写入路径的cache尾块剥离); 尾长=kv%64。
+    # v_tail PA专属(checker 契约); PA_NZ 要求 D%16==0 (bf16 32B分形内径16)
+    enable_v_tail = bool(kwargs.get("enable_v_tail", False))
+    if enable_v_tail:
+        if not enable_pa:
+            raise ValueError(
+                "[INPUTS] enable_v_tail=True 但 enable_pa=False — "
+                "v_tail 仅支持 PA (paged KV cache) 场景 (checker 契约)"
+            )
+        _layout_up = str(kv_cache_layout or "").upper()
+        if _layout_up in ("PA_NZ",) and D % 16 != 0:
+            raise ValueError(
+                f"[INPUTS] PA_NZ + D={D} + v_tail 结构性不成立: NZ 的16列分形要求 "
+                f"D%16==0 (与 golden bundle / checker / kernel D/16 寻址一致)"
+            )
+    tail_lens = []
+    v_quant_input = v_bf16
+    if enable_v_tail:
+        v_quant_input = v_bf16.clone()
+        for b in range(B):
+            main_len = (actual_seq_kv[b] // 64) * 64
+            tail_len = actual_seq_kv[b] - main_len
+            tail_lens.append(tail_len)
+            if tail_len > 0:
+                v_quant_input[b, :, main_len : actual_seq_kv[b], :] = 0
+        logger.info(
+            "[V_TAIL] enable_v_tail=True, actual_seq_kv=%s, tail_lens=%s",
+            actual_seq_kv,
+            tail_lens,
+        )
+
     quant_scale_v_bnsd = mxfp8_golden_mod.get_mxfp8_per_channel_group_quant_scale(
-        v_bf16, fp8_dtype, group_size
+        v_quant_input, fp8_dtype, group_size
     )
 
     q_fp8_bnsd_f32 = (
@@ -256,13 +334,65 @@ def generate_qfa_mxfp8_inputs(
     )
     v_fp8_bnsd_f32 = (
         mxfp8_golden_mod.mxfp8_per_channel_group_quant(
-            v_bf16, quant_scale_v_bnsd, group_size
+            v_quant_input, quant_scale_v_bnsd, group_size
         )
         .clamp(-fp8_max, fp8_max)
         .to(fp8_dtype)
     )
 
     # ----- Step 3: layout 转换 (BNSD -> final layout) -----
+    # bf16尾块原值(pad到block_size) + 尾块表 + 每batch尾长。
+    # v_tail与主KV cache同布局: PA_BNBD(BnNBsD)=(Bn,N2,Bs,D) /
+    # PA_BBND(BnBsND)=(Bn,Bs,N2,D) / PA_NZ=(Bn,N2,D/16,Bs,16)(bf16的32B分形内径16)
+    v_tail_final = None
+    block_table_tail_final = None
+    seqused_v_tail_final = None
+    if enable_v_tail:
+        tail_capacity = block_size
+        v_tail_bnsd_list = []
+        for b in range(B):
+            main_len = actual_seq_kv[b] - tail_lens[b]
+            seg = v_bf16[
+                b, :, main_len : actual_seq_kv[b], :
+            ]  # (N_kv, tail, D) bf16原值
+            # data_range极端值(±fp32_max)时bf16表示溢出为NaN/Inf —
+            # clamp到bf16安全范围(finfo), 避免NaN毒化golden(全NaN)与NPU输入
+            if torch.isnan(seg.float()).any() or torch.isinf(seg.float()).any():
+                seg = (
+                    seg.float()
+                    .clamp(
+                        torch.finfo(torch.bfloat16).min, torch.finfo(torch.bfloat16).max
+                    )
+                    .to(torch.bfloat16)
+                )
+            seg_pad = torch.zeros(N_kv, tail_capacity, D, dtype=torch.bfloat16)
+            if tail_lens[b] > 0:
+                seg_pad[:, : tail_lens[b], :] = seg
+            v_tail_bnsd_list.append(seg_pad)
+        v_tail_bnsd = torch.stack(
+            v_tail_bnsd_list, dim=0
+        ).contiguous()  # (B,N_kv,Bs,D) bf16
+        layout_up = str(kv_cache_layout or "").upper()
+        if layout_up in ("BBSND", "PA_BBND"):
+            v_tail_final = v_tail_bnsd.transpose(1, 2).contiguous()
+        elif layout_up in ("PA_NZ",):
+            Bn, N2c, Bsc, Dc = v_tail_bnsd.shape
+            v_tail_final = (
+                v_tail_bnsd.reshape(Bn, N2c, Bsc, Dc // 16, 16)
+                .permute(0, 1, 3, 2, 4)
+                .contiguous()
+            )
+        else:  # BNSD / BNNBSD / PA_BNBD (BnNBsD)
+            v_tail_final = v_tail_bnsd
+        block_table_tail_final = torch.arange(B, dtype=torch.int32).view(B, 1)
+        seqused_v_tail_final = torch.tensor(tail_lens, dtype=torch.int32)
+        logger.info(
+            "[V_TAIL] bundle ready: v_tail=%s btt=%s tail=%s",
+            tuple(v_tail_final.shape),
+            tuple(block_table_tail_final.shape),
+            tail_lens,
+        )
+
     q_fp8_final = mxfp8_golden_mod.convert_q_bnsd_to_layout(
         q_fp8_bnsd_f32, actual_seq_q, "TND", cu_seqlens=cu_seqlens_q
     )
@@ -421,6 +551,16 @@ def generate_qfa_mxfp8_inputs(
     _write_int32_list(seqused_q_t, seqused_q, "seqused_q (slot 10)")
     _write_int32_list(seqused_kv_t, seqused_kv, "seqused_kv (slot 11)")
     _write_causal_mask(attn_mask_t, mask_mode, kwargs.get("attn_mask_shape"))
+
+    # ----- v_tail 三件套 slot 15-17: 尾块 bf16 原值(final layout) + 尾块表 + 尾长 -----
+    if enable_v_tail:
+        _inplace_write_bf16(v_tail, v_tail_final, "v_tail (slot 15)")
+        _write_int32_list(
+            block_table_tail,
+            block_table_tail_final.tolist(),
+            "block_table_tail (slot 16)",
+        )
+        _write_int32_list(seqused_v_tail, tail_lens, "seqused_v_tail (slot 17)")
 
     logger.info(
         "[INPUTS] in-place wrote fp8 q/k/v (q=%s), e8m0 descale (dq=%s, dk=%s, dv=%s), "

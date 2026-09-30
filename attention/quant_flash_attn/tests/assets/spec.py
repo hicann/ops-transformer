@@ -32,15 +32,18 @@ def load_impl_module(stem):
     改为在 golden/customize_inputs/compare/npu_preprocess 首次被 ttk 调用时
     (fork 之后的 worker) 才加载。
     """
-    if stem not in _impl_cache:
-        path = ASSET_IMPL_DIR / f"{stem}.py"
-        spec = importlib.util.spec_from_file_location(
-            f"qfa_assets_impl_{stem}_{abs(hash(path))}", path
-        )
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
-        _impl_cache[stem] = module
+    # 模块名必须稳定(hash(path)每进程随机) — torch.compile/
+    # npugraph_ex 的 dynamo 追踪需按名 import 回模块, 未注册时报
+    # ModuleNotFoundError: qfa_assets_impl_graph_xxx
+    mod_name = f"qfa_assets_impl_{stem}"
+    if mod_name in sys.modules:
+        return sys.modules[mod_name]
+    path = ASSET_IMPL_DIR / f"{stem}.py"
+    spec = importlib.util.spec_from_file_location(mod_name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = module
+    spec.loader.exec_module(module)
+    _impl_cache[stem] = module
     return _impl_cache[stem]
 
 

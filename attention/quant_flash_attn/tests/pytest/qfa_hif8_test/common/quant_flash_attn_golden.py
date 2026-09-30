@@ -38,8 +38,18 @@ try:
 
     _HAS_NPU = True
 except ImportError as e:
-    logger.warning("Failed to import cann_ops_transformer.ops: %s", e)
-    _HAS_NPU = False
+    try:
+        from cann_ops_transformer_custom.ops.attention.quant_flash_attn import (
+            quant_flash_attn,
+            quant_flash_attn_metadata,
+        )
+
+        _HAS_NPU = True
+    except ImportError as e2:
+        logger.warning(
+            "Failed to import quant_flash_attn (builtin: %s, custom: %s)", e, e2
+        )
+        _HAS_NPU = False
 
 try:
     from . import result_compare_method

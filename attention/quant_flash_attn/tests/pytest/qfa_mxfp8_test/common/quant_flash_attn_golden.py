@@ -28,6 +28,26 @@ import torch.nn as nn
 import torch_npu
 
 try:
+    # v_tail特性扩展了aclnn签名(15->18输入), 必须优先custom包(配套python层);
+    # builtin包的15输入schema先注册会导致custom注册被拒, 故不可先import builtin.ops
+    from cann_ops_transformer_custom.ops.attention.quant_flash_attn import (
+        quant_flash_attn,
+        quant_flash_attn_metadata,
+    )
+
+    _HAS_NPU = True
+except ImportError:
+    try:
+        from cann_ops_transformer.ops import quant_flash_attn_metadata, quant_flash_attn
+
+        _HAS_NPU = True
+    except ImportError as e:
+        quant_flash_attn = None
+        quant_flash_attn_metadata = None
+        _NPU_IMPORT_ERR = str(e)
+        _HAS_NPU = False
+
+try:
     from . import result_compare_method
 except ImportError:
     import sys
@@ -47,14 +67,12 @@ except ImportError:
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
+if not _HAS_NPU:
+    logger.warning(
+        "Failed to import quant_flash_attn (cann_ops_transformer / custom): %s",
+        _NPU_IMPORT_ERR,
+    )
 
-try:
-    from cann_ops_transformer.ops import quant_flash_attn_metadata, quant_flash_attn
-
-    _HAS_NPU = True
-except ImportError as e:
-    logger.warning("Failed to import cann_ops_transformer.ops: %s", e)
-    _HAS_NPU = False
 
 # ==============================================================================
 # 配置区
@@ -120,6 +138,10 @@ KV_CACHE_LAYOUT = "BnNBsD"
 IS_CONTIGUOUS = True
 
 ENABLE_LSE = False
+
+# V尾块高精窗口: 尾段(非64对齐部分)以bf16直存独立cache, 不参与量化
+ENABLE_V_TAIL = False
+_VTAIL_BUNDLE = None  # generate_data产出: {v_tail_bnsd, v_tail_pa, block_table_tail, seqused_v_tail}
 
 # 三方比对 (method=12 CV 双标杆): golden=FP64(最高精度参考) | benchmark=FP32 | actual=NPU
 USE_FP64_GOLDEN = (
@@ -876,8 +898,26 @@ def generate_data():
     quant_scale_k = get_mxfp8_per_token_group_quant_scale(
         k_fp16, FP8_DTYPE, QUANT_GROUP_SIZE
     )
+    # 尾块高精窗口: 主体段(每batch前align_down(kvLen,64)行)才参与V的量化, 尾段置零不进cache
+    global _VTAIL_BUNDLE
+    _VTAIL_BUNDLE = None
+    v_quant_input = v_fp16
+    if ENABLE_V_TAIL:
+        v_quant_input = v_fp16.clone()
+        tail_lens = []
+        for b in range(B):
+            main_len = (seqused_kv[b] // 64) * 64
+            tail_len = seqused_kv[b] - main_len
+            tail_lens.append(tail_len)
+            if tail_len > 0:
+                v_quant_input[b, :, main_len : seqused_kv[b], :] = 0
+        logger.info(
+            "[V_TAIL] enable_v_tail=True, seqused_kv=%s, tail_lens=%s",
+            seqused_kv,
+            tail_lens,
+        )
     quant_scale_v = get_mxfp8_per_channel_group_quant_scale(
-        v_fp16, FP8_DTYPE, QUANT_GROUP_SIZE
+        v_quant_input, FP8_DTYPE, QUANT_GROUP_SIZE
     )
 
     dequant_scale_q = quant_scale_q
@@ -899,10 +939,58 @@ def generate_data():
         .to(FP8_DTYPE)
     )
     v_fp8 = (
-        mxfp8_per_channel_group_quant(v_fp16, quant_scale_v, QUANT_GROUP_SIZE)
+        mxfp8_per_channel_group_quant(v_quant_input, quant_scale_v, QUANT_GROUP_SIZE)
         .clamp(-fp8_max, fp8_max)
         .to(FP8_DTYPE)
     )
+
+    if ENABLE_V_TAIL and any(t > 0 for t in tail_lens):
+        # 构造尾块三件套: BNSD原值(供CPU参考替换) / NPU版v_tail / 尾块表 / 每batch尾长
+        # v_tail容量: PA=block_size(块结构), TND=64(尾窗固定容量直存); TND无btt(None)
+        tail_capacity = BLOCK_SIZE if ENABLE_PA else 64
+        v_tail_bnsd_list = []
+        for b in range(B):
+            main_len = seqused_kv[b] - tail_lens[b]
+            seg = v_fp16[b, :, main_len : seqused_kv[b], :]  # (N_kv, tail, D) fp16原值
+            seg_pad = torch.zeros(N_kv, tail_capacity, D, dtype=torch.float16)
+            seg_pad[:, : tail_lens[b], :] = seg
+            v_tail_bnsd_list.append(seg_pad)
+        block_table_tail = (
+            torch.arange(B, dtype=torch.int32).view(B, 1) if ENABLE_PA else None
+        )
+        # v_tail与主KV cache同布局: BnNBsD=(Bn,N2,Bs,D) / BnBsND=(Bn,Bs,N2,D)
+        # / PA_NZ=(Bn,N2,D/16,Bs,16)(bf16的32B分形内径16) — 复用主cache的布局变换语义
+        v_tail_bnsd = torch.stack(v_tail_bnsd_list, dim=0).to(
+            torch.bfloat16
+        )  # (B,N2,Bs,D)
+        if KV_CACHE_LAYOUT == "BnBsND":
+            v_tail_pa = v_tail_bnsd.transpose(1, 2).contiguous()
+        elif KV_CACHE_LAYOUT == "PA_NZ":
+            Bn, N2c, Bsc, Dc = v_tail_bnsd.shape
+            nz_inner = 16  # bf16
+            v_tail_pa = (
+                v_tail_bnsd.reshape(Bn, N2c, Bsc, Dc // nz_inner, nz_inner)
+                .permute(0, 1, 3, 2, 4)
+                .contiguous()
+            )
+        else:
+            v_tail_pa = v_tail_bnsd
+        seqused_v_tail = torch.tensor(tail_lens, dtype=torch.int32)
+        _VTAIL_BUNDLE = {
+            # 各batch尾长可能不同(0<tail<64), 用list按batch存放原值, CPU参考逐batch切片替换
+            "v_tail_bnsd_fp16": [
+                t[:, : tail_lens[b], :] for b, t in enumerate(v_tail_bnsd_list)
+            ],
+            "v_tail_pa": v_tail_pa,
+            "block_table_tail": block_table_tail,
+            "seqused_v_tail": seqused_v_tail,
+        }
+        logger.info(
+            "[V_TAIL] bundle ready: v_tail_pa=%s btt=%s tail=%s",
+            tuple(v_tail_pa.shape),
+            tuple(block_table_tail.shape) if block_table_tail is not None else None,
+            tail_lens,
+        )
 
     block_table_torch = None
     if ENABLE_PA:
@@ -978,20 +1066,8 @@ def _compute_s_block(
     return S_ij * softmax_scale
 
 
-def _online_softmax_update(S_ij, mask_j, mi, si, oi, ln_p_scale, LN2):
-    """Online softmax: 计算 m, P, s 更新 (MXFP8: stored max 不含 -ln(p_scale), P 含 p_scale 因子)
-    1. mask 位置填 -inf
-    2. 求 block 内 max (m_block_j)
-    3. m 对齐到 ln2 整数倍 (ceil)，模拟 NPU MXFP8 量化精度损失
-    4. P 的 fp8 cast 网格由调用方决定: kernel 实际在 max(本块对齐 max, running
-       max) 网格上先做 2 的幂缩放再 cast (小 P 进 subnormal/flush 区, 见
-       ProcessVec1DnUpdateMxfp8VF); 本函数只按本块 own grid 计算并返回
-       P 量化结果, 需要 running 网格语义时调用方应先缩放再 cast
-    5. 计算 P = exp(S - m_own)，调用方负责用 exp(m_own - m_run) 精确重标定
-    6. 求 s = sum(P_raw) (kernel x_sum 为 raw 累加, LSE 亦基于 raw 和)
-    7. P 转 FP8 再转回 FP32，模拟 NPU 侧 P 的量化损失
-    返回 (m_own, s_raw, P_quant, s_quant)。
-    """
+def _online_softmax_update(S_ij, mask_j, mi, si, oi, ln_p_scale, LN2, tail_mask=None):
+    """Return the p_scale-adjusted block max, raw sum and quantized probabilities."""
     S_ij = S_ij.masked_fill(mask_j, float("-inf"))
 
     m_block_j, _ = torch.max(S_ij, dim=-1, keepdims=True)
@@ -1006,6 +1082,10 @@ def _online_softmax_update(S_ij, mask_j, mi, si, oi, ln_p_scale, LN2):
     P_ij_raw = torch.exp(S_ij - m_safe)
     s_block_j = torch.sum(P_ij_raw, dim=-1, keepdims=True)
     P_ij_drop = P_ij_raw.to(FP8_DTYPE).to(torch.float32)
+    if tail_mask is not None:
+        P_ij_drop = torch.where(
+            tail_mask, P_ij_raw.to(torch.bfloat16).to(torch.float32), P_ij_drop
+        )
     s_block_j_quant = torch.sum(P_ij_drop, dim=-1, keepdims=True)
 
     return m_own_j, s_block_j, P_ij_drop, s_block_j_quant
@@ -1313,6 +1393,8 @@ def _cpu_mxfp8_golden_sectioned(
     actual_seq_kv,
     section_info,
     softmax_scale=None,
+    v_tail_bnsd=None,
+    tail_lens=None,
     qr_bf16=None,
     kr_bf16=None,
 ):
@@ -1361,6 +1443,18 @@ def _cpu_mxfp8_golden_sectioned(
     deq_q_exp = dequant_scale_q.repeat_interleave(QUANT_GROUP_SIZE, dim=-1)[..., :D]
     deq_k_exp = dequant_scale_k.repeat_interleave(QUANT_GROUP_SIZE, dim=-1)[..., :D]
     v_ds_exp = v_descale.repeat_interleave(QUANT_GROUP_SIZE, dim=2)
+    tail_starts = [int(length) for length in actual_seq_kv]
+    if v_tail_bnsd is not None and tail_lens is not None:
+        v_tensor = v_tensor.clone()
+        for bi, tail_len in enumerate(tail_lens):
+            tail_len = int(tail_len)
+            if tail_len == 0:
+                continue
+            kv_len = int(actual_seq_kv[bi])
+            tail_starts[bi] = kv_len - tail_len
+            tail = v_tail_bnsd[bi][:, :tail_len, :].to(torch.bfloat16).float()
+            v_tensor[bi, :, kv_len - tail_len : kv_len, :] = tail
+            v_ds_exp[bi, :, kv_len - tail_len : kv_len, :] = 1.0
 
     # MXFP8 dequantization may exceed FP32 even though the FP8 value and
     # E8M0 scale are both finite. Avoid premature inf/NaN on CPU: widen
@@ -1429,6 +1523,9 @@ def _cpu_mxfp8_golden_sectioned(
                     o = torch.zeros_like(o_g)
                     st = torch.zeros_like(s_g)
                     mx = torch.full_like(m_g, minValue)
+                    ranges = []
+                    tail_start = tail_starts[bi]
+                    has_tail = tail_start < kv_len
                     for j in range(blk_a * chunks_per_s2, blk_b * chunks_per_s2):
                         lo = j * K_BLOCK_SIZE
                         hi = min(
@@ -1437,6 +1534,13 @@ def _cpu_mxfp8_golden_sectioned(
                         )
                         if lo >= hi:
                             break
+                        if has_tail and lo < tail_start < hi:
+                            ranges.extend(
+                                [(lo, tail_start), (tail_start, min(hi, kv_len))]
+                            )
+                        else:
+                            ranges.append((lo, min(hi, kv_len) if has_tail else hi))
+                    for lo, hi in ranges:
                         # Only real KV rows participate in QK/PV. Padding scores
                         # contribute to the denominator, with zero V contribution.
                         data_hi = min(hi, kv_len)
@@ -1489,6 +1593,9 @@ def _cpu_mxfp8_golden_sectioned(
                         upd_cur = torch.exp(m_own - m_run_new)
                         p_run = torch.exp(sij_masked - m_own_safe) * upd_cur
                         p_drop = p_run.to(FP8_DTYPE).to(torch.float32)
+                        if has_tail and lo >= tail_start:
+                            p_drop = p_run.to(torch.bfloat16).to(torch.float32)
+
                         vj = v_bn[lo:data_hi, :].to(pv_dtype) * vd_bn[lo:data_hi, :].to(
                             pv_dtype
                         )
@@ -1588,6 +1695,16 @@ def cpu_mxfp8_golden(
                 actual_seq_q,
                 actual_seq_kv,
                 section_info,
+                v_tail_bnsd=(
+                    _VTAIL_BUNDLE["v_tail_bnsd_fp16"]
+                    if ENABLE_V_TAIL and _VTAIL_BUNDLE is not None
+                    else None
+                ),
+                tail_lens=(
+                    _VTAIL_BUNDLE["seqused_v_tail"].tolist()
+                    if ENABLE_V_TAIL and _VTAIL_BUNDLE is not None
+                    else None
+                ),
                 softmax_scale=softmax_scale,
                 qr_bf16=qr_bf16,
                 kr_bf16=kr_bf16,
@@ -1657,6 +1774,38 @@ def cpu_mxfp8_golden(
     )[:, :, :, :D]
     v_descale_expanded = v_descale.repeat_interleave(QUANT_GROUP_SIZE, dim=2)
 
+    # 尾块高精窗口: CPU参考 = 主体V反量化 + 尾段V的bf16原值(模拟完美尾块cache, 尾段scale恒1)
+    vtail_tail_lens = None
+    vtail_tail_start = None
+    if ENABLE_V_TAIL and _VTAIL_BUNDLE is not None:
+        tail_lens = _VTAIL_BUNDLE["seqused_v_tail"].tolist()
+        vtail_tail_lens = tail_lens
+        for b_i in range(v_tensor.shape[0]):
+            kv_len = actual_seq_kv[b_i]
+            tail_len = tail_lens[b_i]
+            main_len = kv_len - tail_len
+            if tail_len > 0 and main_len < v_tensor.shape[2]:
+                # Match the BF16 precision of the VTAIL input.
+                tail_seg = (
+                    _VTAIL_BUNDLE["v_tail_bnsd_fp16"][b_i]
+                    .to(torch.bfloat16)
+                    .to(torch.float32)
+                )
+                # GQA: 尾块原值按KV head组织, 需与已广播的v_tensor头数对齐(同broadcast_kv语义)
+                if tail_seg.shape[0] != v_tensor.shape[1]:
+                    factor = v_tensor.shape[1] // tail_seg.shape[0]
+                    tail_seg = tail_seg.repeat_interleave(factor, dim=0)
+                v_tensor[b_i, :, main_len:kv_len, :] = tail_seg
+                v_descale_expanded[b_i, :, main_len:kv_len, :] = 1.0
+        logger.info("[V_TAIL] CPU参考已注入尾段bf16原值, tail_lens=%s", tail_lens)
+        # 尾窗口起点(per batch): 尾列P直存bf16的判定边界, 与V注入窗口同语义
+        vtail_tail_start = torch.tensor(
+            [
+                actual_seq_kv[b_i] - vtail_tail_lens[b_i]
+                for b_i in range(v_tensor.shape[0])
+            ]
+        )
+
     logger.info(
         "[CPU Golden] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
         TILES_Q,
@@ -1683,12 +1832,21 @@ def cpu_mxfp8_golden(
             deq_scale_k_j = dequant_scale_k_expanded[:, :, Sk_start:Sk_end, :]
             Krj = Kr_BLOCKS[j] if Kr_BLOCKS is not None else None
 
+            # 尾列(全局列号>=kv_len-tail_len)的P直存bf16不量化e4m3,
+            # 与V注入窗口同语义, 模拟kernel纯尾task的VF bf16直出
+            tail_mask_j = None
+            if vtail_tail_start is not None:
+                col_j = torch.arange(Sk_start, Sk_end)
+                tail_mask_j = col_j.view(1, 1, 1, -1) >= vtail_tail_start.view(
+                    -1, 1, 1, 1
+                )
+
             S_ij = _compute_s_block(
                 Qi, Kj, deq_scale_q_i, deq_scale_k_j, softmax_scale, Qri, Krj
             )
             mask_j = mask_global[:, :, Sq_start:Sq_end, Sk_start:Sk_end]
             m_block_j, s_block_j, P_ij_drop, s_block_j_q = _online_softmax_update(
-                S_ij, mask_j, mi, si, oi, ln_p_scale, LN2
+                S_ij, mask_j, mi, si, oi, ln_p_scale, LN2, tail_mask=tail_mask_j
             )
 
             if j + 1 < TILES_KV:
@@ -1703,9 +1861,22 @@ def cpu_mxfp8_golden(
                     Qi, Kj1, deq_scale_q_i, deq_scale_k_j1, softmax_scale, Qri, Krj1
                 )
                 mask_j1 = mask_global[:, :, Sq_start:Sq_end, Sk1_start:Sk1_end]
+                tail_mask_j1 = None
+                if vtail_tail_start is not None:
+                    col_j1 = torch.arange(Sk1_start, Sk1_end)
+                    tail_mask_j1 = col_j1.view(1, 1, 1, -1) >= vtail_tail_start.view(
+                        -1, 1, 1, 1
+                    )
                 m_block_j1, s_block_j1, P_ij1_drop, s_block_j1_q = (
                     _online_softmax_update(
-                        S_ij1, mask_j1, m_block_j, s_block_j, oi, ln_p_scale, LN2
+                        S_ij1,
+                        mask_j1,
+                        m_block_j,
+                        s_block_j,
+                        oi,
+                        ln_p_scale,
+                        LN2,
+                        tail_mask=tail_mask_j1,
                     )
                 )
 
@@ -1746,11 +1917,27 @@ def cpu_mxfp8_golden(
                     .to(FP8_DTYPE)
                     .to(torch.float32)
                 )
+                if tail_mask_j is not None:
+                    P_ij_drop = torch.where(
+                        tail_mask_j,
+                        torch.exp(S_ij_masked - m_run_j_safe)
+                        .to(torch.bfloat16)
+                        .float(),
+                        P_ij_drop,
+                    )
                 P_ij1_drop = (
                     torch.exp(S_ij1_masked - m_run_j1_safe)
                     .to(FP8_DTYPE)
                     .to(torch.float32)
                 )
+                if tail_mask_j1 is not None:
+                    P_ij1_drop = torch.where(
+                        tail_mask_j1,
+                        torch.exp(S_ij1_masked - m_run_j1_safe)
+                        .to(torch.bfloat16)
+                        .float(),
+                        P_ij1_drop,
+                    )
                 # 子块 A 的 P 从 G_j 网格精确 (2 的幂) 缩到 G_j1
                 gap_j = m_run_j - m_run_j1
                 gap_j = torch.where(torch.isnan(gap_j), torch.zeros_like(gap_j), gap_j)
@@ -1786,6 +1973,14 @@ def cpu_mxfp8_golden(
                     .to(FP8_DTYPE)
                     .to(torch.float32)
                 )
+                if tail_mask_j is not None:
+                    P_ij_drop = torch.where(
+                        tail_mask_j,
+                        torch.exp(S_ij_masked_tail - m_run_j_safe)
+                        .to(torch.bfloat16)
+                        .float(),
+                        P_ij_drop,
+                    )
                 P_ij_Vj = torch.matmul(P_ij_drop, Vj_dequant)
                 update_mul_si = torch.exp(mi - m_run_j)
                 si_new = update_mul_si * si + s_block_j * torch.exp(m_block_j - m_run_j)
@@ -1907,6 +2102,22 @@ def cpu_mxfp8_golden_fp64(
         QUANT_GROUP_SIZE, dim=-1
     )[:, :, :, :D]
     v_descale_expanded = v_descale.repeat_interleave(QUANT_GROUP_SIZE, dim=2)
+    if ENABLE_V_TAIL and _VTAIL_BUNDLE is not None:
+        v_tensor = v_tensor.clone()
+        V_BLOCKS = list(torch.split(v_tensor, V_BLOCK_SIZE, dim=2))
+        for bi, tail_len in enumerate(_VTAIL_BUNDLE["seqused_v_tail"].tolist()):
+            if tail_len == 0:
+                continue
+            kv_len = int(actual_seq_kv[bi])
+            tail = (
+                _VTAIL_BUNDLE["v_tail_bnsd_fp16"][bi][:, :tail_len, :]
+                .to(torch.bfloat16)
+                .double()
+            )
+            if tail.shape[0] != v_tensor.shape[1]:
+                tail = tail.repeat_interleave(v_tensor.shape[1] // tail.shape[0], dim=0)
+            v_tensor[bi, :, kv_len - tail_len : kv_len, :] = tail
+            v_descale_expanded[bi, :, kv_len - tail_len : kv_len, :] = 1.0
 
     logger.info(
         "[CPU Golden FP64] TILES_Q=%d, TILES_KV=%d, Sq=%d, Skv=%d",
@@ -2067,6 +2278,9 @@ def _call_npu_fa_op(
     block_size,
     sparse_mode,
     out_dtype,
+    v_tail=None,
+    block_table_tail=None,
+    seqused_v_tail=None,
 ):
     """调用 NPU 双算子 (QFA: quant_flash_attn_metadata + quant_flash_attn)"""
     if not _HAS_NPU:
@@ -2149,7 +2363,24 @@ def _call_npu_fa_op(
         max_seqlen_q=max_seqlen_q,
         max_seqlen_kv=max_seqlen_kv,
     )
+    # v_tail 三件套仅在新版 cann_ops_transformer 接口存在；旧接口无此时需跳过
+    # v_tail args exist only in newer cann_ops_transformer interface; skip for older ones
+    if v_tail is not None:
+        main_kwargs["v_tail"] = v_tail
+        main_kwargs["seqused_v_tail"] = seqused_v_tail
+        if block_table_tail is not None:  # TND(PREFILL)无btt: v_tail为(B,N2,64,D)直存
+            main_kwargs["block_table_tail"] = block_table_tail
     main_kwargs.update(_get_npu_fa_kwargs())
+    if v_tail is not None:
+        vt_dev = main_kwargs["v_tail"]
+        btt_dev = main_kwargs.get("block_table_tail")
+        logger.info(
+            "[VT_DATA] vt dev ptr=%s first4=%s tailLen=%s btt=%s",
+            hex(vt_dev.data_ptr()),
+            vt_dev.flatten()[:4].float().tolist(),
+            main_kwargs["seqused_v_tail"].flatten().tolist(),
+            btt_dev.flatten().tolist() if btt_dev is not None else None,
+        )
     atten_out, lse_out = quant_flash_attn(**main_kwargs)
     torch.npu.synchronize()
     return atten_out, lse_out
@@ -2196,6 +2427,9 @@ class Network(nn.Module):
         out_dtype,
         max_seqlen_q,
         max_seqlen_kv,
+        v_tail=None,
+        block_table_tail=None,
+        seqused_v_tail=None,
     ):
         metadata = quant_flash_attn_metadata(
             num_heads_q=q_n,
@@ -2239,6 +2473,9 @@ class Network(nn.Module):
             layout_out=layout_out,
             max_seqlen_q=max_seqlen_q,
             max_seqlen_kv=max_seqlen_kv,
+            v_tail=v_tail,
+            block_table_tail=block_table_tail,
+            seqused_v_tail=seqused_v_tail,
         )
         main_kwargs.update(_get_npu_fa_kwargs())
         atten_out, lse_out = quant_flash_attn(**main_kwargs)
@@ -2482,6 +2719,15 @@ def prepare_npu_inputs(
         _pa_layout_kv_map = {"BnNBsD": "PA_BNBD", "BnBsND": "PA_BBND", "PA_NZ": "PA_NZ"}
         pa_layout_kv = _pa_layout_kv_map.get(KV_CACHE_LAYOUT, "PA_BNBD")
 
+        # v_tail三件套: PA场景同样需要传递(一期v_tail仅PA_BNBD支持, 必须在本分支透传)
+        _vtail_pa = _VTAIL_BUNDLE if ENABLE_V_TAIL else None
+        import os as _os_amp
+
+        if _vtail_pa is not None and _os_amp.environ.get("VTAIL_AMP", "0") == "1":
+            _vtail_pa = dict(_vtail_pa)
+            _vtail_pa["v_tail_pa"] = (_vtail_pa["v_tail_pa"].float() * 10000.0).to(
+                torch.bfloat16
+            )
         logger.info("[NPU] prepare PA inputs done.")
         return dict(
             q=q_npu,
@@ -2511,6 +2757,13 @@ def prepare_npu_inputs(
             block_size=BLOCK_SIZE,
             sparse_mode=SPARSE_MODE,
             out_dtype=out_dtype,
+            v_tail=_vtail_pa["v_tail_pa"].npu() if _vtail_pa is not None else None,
+            block_table_tail=_vtail_pa["block_table_tail"].npu()
+            if _vtail_pa is not None
+            else None,
+            seqused_v_tail=_vtail_pa["seqused_v_tail"].npu()
+            if _vtail_pa is not None
+            else None,
         )
 
     # 非 PA 模式: K/V 按 INPUT_LAYOUT 转换
@@ -2563,6 +2816,7 @@ def prepare_npu_inputs(
     )
 
     logger.info("[NPU] prepare non-PA inputs done.")
+    _vtail = _VTAIL_BUNDLE if ENABLE_V_TAIL else None
     return dict(
         q=q_npu,
         k=k_npu,
@@ -2591,6 +2845,13 @@ def prepare_npu_inputs(
         block_size=0,
         sparse_mode=SPARSE_MODE,
         out_dtype=out_dtype,
+        v_tail=_vtail["v_tail_pa"].npu() if _vtail is not None else None,
+        block_table_tail=(
+            _vtail["block_table_tail"].npu()
+            if _vtail is not None and _vtail["block_table_tail"] is not None
+            else None
+        ),  # TND(PREFILL)无btt: v_tail为(B,N2,64,D)直存
+        seqused_v_tail=_vtail["seqused_v_tail"].npu() if _vtail is not None else None,
     )
 
 
@@ -2680,6 +2941,9 @@ def mxfp8_fa_torch_npu(
     block_size,
     sparse_mode,
     out_dtype,
+    v_tail=None,
+    block_table_tail=None,
+    seqused_v_tail=None,
 ):
     """NPU 调用入口, 支持 GRAPH_PATH=0 (单算子) 和 GRAPH_PATH=7 (aclgraph)"""
     if GRAPH_PATH == 0:
@@ -2712,6 +2976,9 @@ def mxfp8_fa_torch_npu(
             block_size,
             sparse_mode,
             out_dtype,
+            v_tail,
+            block_table_tail,
+            seqused_v_tail,
         )
 
     # GRAPH_PATH == 7: aclgraph
@@ -2770,6 +3037,9 @@ def mxfp8_fa_torch_npu(
             out_dtype,
             max_seqlen_q,
             max_seqlen_kv,
+            v_tail,
+            block_table_tail,
+            seqused_v_tail,
         )
 
         # aclgraph: 直接使用 npugraph_ex backend
@@ -2795,6 +3065,9 @@ def mxfp8_fa_torch_npu(
             v_descale,
             p_scale,
             block_table,
+            v_tail,
+            block_table_tail,
+            seqused_v_tail,
         ):
             if t is not None:
                 torch._dynamo.mark_static(t)

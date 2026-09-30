@@ -111,12 +111,20 @@ struct QuantFlashAttnWorkspaceParams {
     uint32_t logSumExpSize;
 };
 
+struct QuantFlashAttnVTailParams {
+    uint8_t hasVTail = 0;           // V尾块(高精窗口)功能开关, v_tail传入时为1
+    uint32_t seqUsedKvTailSize = 0; // seqused_v_tail 的 batch 数, 0 表示未传
+    uint32_t tailMaxBlockNum = 0;   // block_table_tail 列数 = ceil(64/blockSize), 非PA场景为0
+    StridesParams vTailStrides;     // v_tail 的 bnStride/n2Stride, 一期约束连续默认0
+};
+
 class QuantFlashAttnQuantTilingArch35 {
 public:
     QuantFlashAttnBaseParams quantFlashAttnBaseParams;
     QuantFlashAttnAttenMaskParams quantFlashAttnAttenMaskParams;
     QuantFlashAttnPageAttentionParams quantFlashAttnPageAttentionParams;
     QuantFlashAttnWorkspaceParams quantFlashAttnWorkspaceParams;
+    QuantFlashAttnVTailParams quantFlashAttnVTailParams;
 };
 
 class QuantFlashAttnTilingData {

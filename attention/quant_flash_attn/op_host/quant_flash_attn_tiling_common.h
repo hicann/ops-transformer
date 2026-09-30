@@ -38,6 +38,7 @@ struct QfaTilingKeyInfo {
     bool hasAttenMask = false;
     uint64_t kvLayoutType = 0;
     bool isFd = false;
+    bool hasVTail = false;
 };
 
 struct QfaPlatFormInfo {

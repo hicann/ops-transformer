@@ -44,7 +44,7 @@
 
   `quant_flash_attn`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantFlashAttn`算子完成量化场景下的全量化注意力计算，训练推理归一化。当前支持三类量化场景：
   - HIF8场景：Q/K/V 均采用 HIFLOAT8 per-tensor 量化。
-  - MxFP8场景：Q/K/V 均采用 MXFP8 量化。
+  - MxFP8场景：Q/K/V 均采用 MXFP8 量化。支持在Paged Attention的decode/prefill场景下，将最后不足64个token的V保留为BF16高精尾块，通过三个新增尾块参数传入。
   - FP8场景：Q/K 采用 FP8_E4M3 per-token-head 量化，V 采用 FP8_E4M3 per-head 量化。
 
   `quant_flash_attn_metadata`是`quant_flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AICore/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
@@ -138,6 +138,9 @@ cann_ops_transformer.quant_flash_attn(
     sinks=None,
     attn_mask=None,
     metadata=None,
+    v_tail=None,
+    block_table_tail=None,
+    seqused_v_tail=None,
     softmax_scale=1.0,
     mask_mode=0,
     win_left=-1,
@@ -239,6 +242,9 @@ cann_ops_transformer.quant_flash_attn(
 | sinks                | Tensor        | 可选    | sink场景下的输入tensor。当前版本不支持，传None即可 | float32                 | ND   | (Q_N,)                                                                                                            | ×         |
 | attn_mask           | Tensor        | 可选    | 掩码矩阵                                                 | int8                    | ND   | (2048, 2048)                                                                                                       | ×         |
 | metadata             | Tensor        | 可选    | `quant_flash_attn_metadata`生成的任务切分结果，传入后可优化调度        | int32                   | ND   | (2, max_schedule_size)                                                                                             | ×         |
+| v_tail               | Tensor        | 可选    | BF16高精V尾块；默认None，启用时与另外两个尾块参数一起传入                    | bfloat16                | ND   | 见「V高精尾块参数组」                                                                                                        | 见下文       |
+| block_table_tail     | Tensor        | 可选    | 高精尾块独立块表，索引v_tail的第0维；默认None                         | int32                   | ND   | (B, Bt)                                                                                                            | ×         |
+| seqused_v_tail       | Tensor        | 可选    | 每个batch的有效V尾块长度；默认None                               | int32                   | ND   | (B,)                                                                                                               | ×         |
 | softmax_scale       | float         | 可选    | 可显式设置缩放因子，覆盖默认计算                                     | float32                 | -    | -                                                                                                                  | -         |
 | mask_mode           | int/MaskMode  | 可选    | 掩码模式，支持传入枚举或对应 int 值，枚举定义见「mask_mode 枚举」。当前版本仅支持0/3 | int32                   | -    | -                                                                                                                  | -         |
 | win_left            | int           | 可选    | window左界限                                            | int32                   | -    | -                                                                                                                  | -         |
@@ -272,8 +278,18 @@ cann_ops_transformer.quant_flash_attn(
 
 ## 约束说明
 
-- 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、block_table及attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+- 参数cu_seqlens_q、cu_seqlens_kv、seqused_q、seqused_kv、block_table、block_table_tail、seqused_v_tail及attn_mask属于tensor。由于算子在Tiling阶段无法获取tensor的具体数值，tiling侧不对值进行校验，正确性需要用户自行保证。若上述参数传入非法值，会触发未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
 - quant_flash_attn_metadata和quant_flash_attn的入参在调用时应该保持一致。由于算子分为两个接口分段调用，算子无法自行校验，正确性需要由客户自行保证。若接口传入参数不一致，会发生未定义行为（精度问题、非法内存访问导致的程序崩溃等）。
+
+### 版本配套要求
+
+底层沿用`aclnnQuantFlashAttnGetWorkspaceSize`和`aclnnQuantFlashAttn`接口名称，其中工作空间查询接口在`metadata`后新增三个尾块参数。该签名与引入高精尾块前的接口不具备二进制兼容性。
+
+升级时须配套编译、安装custom包和`cann_ops_transformer` Torch扩展，并在新Python进程中加载。确认`ASCEND_CUSTOM_OPP_PATH`、`LD_LIBRARY_PATH`和扩展构建缓存对应的实际加载产物均为目标版本。
+
+> [!NOTE]
+>
+> 仅更新custom包或Torch扩展会造成底层调用参数错位，可能导致段错误。三个尾块参数均传`None`仍会占用参数位置，不能替代版本配套更新。
 
 ### 特性参数组
 
@@ -305,6 +321,9 @@ cann_ops_transformer.quant_flash_attn(
 |       <br />       |    max_seqlen_q    |  ATTR(OPTIONAL)  |   int  |
 |       <br />       |    max_seqlen_kv   |  ATTR(OPTIONAL)  |   int  |
 | Paged Attention参数组 |     block_table     |  INPUT(OPTIONAL) | Tensor |
+|    V高精尾块参数组    |       v_tail        |  INPUT(OPTIONAL) | Tensor |
+|       <br />       |   block_table_tail   |  INPUT(OPTIONAL) | Tensor |
+|       <br />       |   seqused_v_tail    |  INPUT(OPTIONAL) | Tensor |
 |      Sinks参数组      |         sinks        |  INPUT(OPTIONAL) | Tensor |
 |    SoftmaxLSE参数组   | return_softmax_lse |  ATTR(OPTIONAL)  |  bool  |
 |       <br />       |     softmax_lse     | OUTPUT(OPTIONAL) | Tensor |
@@ -1137,6 +1156,119 @@ mask_mode参数解释：
     </tbody>
 </table>
 
+#### V高精尾块参数组
+
+高精尾块仅支持`quant_mode=1`的Paged Attention场景，`layout_kv`支持`PA_BNBD`、`PA_BBND`和`PA_NZ`，可用于decode和prefill。`layout_q`、`layout_out`仍按MxFP8场景使用`TND`；其他参数继续遵循主接口约束。
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>v_tail</td>
+            <td>
+                <ul>
+                    <li>tensor_type仅支持bfloat16</li>
+                    <li>tensor_shape见下方布局匹配表</li>
+                    <li>建议传入连续Tensor</li>
+                </ul>
+            </td>
+            <td rowspan="3">
+                <ul>
+                    <li>启用时，<code>v_tail</code>、<code>block_table_tail</code>、<code>seqused_v_tail</code>必须成组提供；不启用时三个参数均传<code>None</code>。</li>
+                </ul>
+            </td>
+            <td rowspan="3">
+                <ul>
+                    <li><code>seqused_kv</code>、metadata生成所用的KV长度以及causal mask位置均使用包含尾块在内的总长度<code>L</code>，不能改成主体长度。metadata接口没有新增尾块参数。</li>
+                    <li>Q、K及其descale仍使用原量化路径；K cache必须覆盖全部有效token。V主体从原量化cache读取，最后<code>T</code>个token的V从<code>v_tail</code>读取，不使用<code>v_descale</code>反量化。<code>v</code>、<code>v_descale</code>仍为必选输入，保持主cache的形状要求。</li>
+                    <li><code>v_tail</code>使用独立物理块池和<code>block_table_tail</code>，每个batch的尾块从其尾块逻辑位置0开始存放。不要把尾块在整条KV序列中的绝对位置作为尾块池内偏移；主<code>block_table</code>仍用于原KV cache。</li>
+                    <li>三个Tensor应与Q/K/V位于同一NPU设备。</li>
+                </ul>
+            </td>
+            <td rowspan="3">
+                <ul>
+                    <li>仅支持quant_mode=1的Paged Attention场景。</li>
+                    <li>Q/K和V的head dimension需分别属于<code>{64, 72, 128, 256}</code>，并满足主接口的维度匹配约束；<code>PA_NZ</code>另外要求D能被16整除，因此不支持D=72。</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>block_table_tail</td>
+            <td>
+                <ul>
+                    <li>tensor_type仅支持int32</li>
+                    <li>tensor_shape为(B, Bt)，Bt &gt;= ceil(64 / Bs)</li>
+                    <li>有效块号满足0 &lt;= block_id &lt; Bn_tail</li>
+                    <li>须为连续Tensor</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td>seqused_v_tail</td>
+            <td>
+                <ul>
+                    <li>tensor_type仅支持int32</li>
+                    <li>tensor_shape为(B,)</li>
+                    <li>每个batch的值等于seqused_kv[b] % 64，范围为[0, 64)</li>
+                    <li>须为连续Tensor</li>
+                </ul>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+设第b个batch的总KV长度为`L = seqused_kv[b]`，尾块长度必须为`T = seqused_v_tail[b] = L % 64`，满足`0 <= T < 64`，主体长度为`L - T`。例如`L=1555`时，主体为1536，尾块为19；`L`为64的倍数时，尾块长度为0。当前不支持任意长度或任意位置的高精窗口。
+
+`v_tail`的块大小`Bs`、KV头数`KV_N`、head dimension `D`与主V cache一致。设尾块池物理块数为`Bn_tail`，其shape如下；BF16的NZ内维为16，不能直接使用量化V的D/32、32布局。
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 232px">
+        <col style="width: 293px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>layout_kv</th>
+            <th>v_tail shape</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>PA_BNBD</td>
+            <td>(Bn_tail, KV_N, Bs, D)</td>
+        </tr>
+        <tr>
+            <td>PA_BBND</td>
+            <td>(Bn_tail, Bs, KV_N, D)</td>
+        </tr>
+        <tr>
+            <td>PA_NZ</td>
+            <td>(Bn_tail, KV_N, D/16, Bs, 16)</td>
+        </tr>
+    </tbody>
+</table>
+
+尾块池至少能容纳一个64-token窗口，并为所有被引用的尾块提供实际存储；不同batch的数据不应意外共用同一个物理块。当前支持的`Bs >= 64`，每个batch一列尾块表即可。
+
+> [!NOTE]
+>
+> 尾长和块表中的数值由调用方保证有效，不能依赖Host侧shape/dtype检查验证device上的全部数值。
+
 #### Sinks参数组
 
 <table style="undefined;table-layout: fixed; width:1625px">
@@ -1386,5 +1518,45 @@ mask_mode参数解释：
   torch_npu.npu.synchronize()
   assert attn_out.shape == (B * Q_S, Q_N, D)
   assert attn_out.dtype == out_dtype
+  assert torch.isfinite(attn_out.float()).all().item()
+  ```
+
+- MxFP8高精V尾块调用示例（接续上面的`PA_BNBD`示例）
+
+  保持上例的Q/K/V、descale、主块表、总KV长度和metadata。这里为每个batch分配一个BF16尾块，示例使用随机高精V数据；业务调用应填入对应最后`tail_len`个token的原始BF16 V值。
+
+  ```python
+  tail_len = KV_S % 64
+  v_tail = torch.zeros(
+      B, KV_N, pa_block_size, D, dtype=torch.bfloat16, device="npu"
+  )
+  v_tail[:, :, :tail_len, :] = torch.randn(
+      B, KV_N, tail_len, D, dtype=torch.bfloat16, device="npu"
+  )
+  block_table_tail = torch.arange(B, dtype=torch.int32, device="npu").reshape(B, 1)
+  seqused_v_tail = torch.full((B,), tail_len, dtype=torch.int32, device="npu")
+
+  attn_out, softmax_lse = cann_ops_transformer.ops.quant_flash_attn(
+      q, k, v, q_descale, k_descale, v_descale,
+      quant_mode=1,
+      block_table=block_table,
+      cu_seqlens_q=cu_seqlens_q,
+      seqused_kv=seqused_kv,
+      attn_mask=attn_mask,
+      metadata=metadata,
+      v_tail=v_tail,
+      block_table_tail=block_table_tail,
+      seqused_v_tail=seqused_v_tail,
+      softmax_scale=1.0 / (D ** 0.5),
+      mask_mode=3,
+      layout_q="TND",
+      layout_q_descale="TND",
+      layout_kv="PA_BNBD",
+      layout_out="TND",
+      return_softmax_lse=False,
+  )
+  torch_npu.npu.synchronize()
+  assert attn_out.shape == (B * Q_S, Q_N, D)
+  assert attn_out.dtype == torch.bfloat16
   assert torch.isfinite(attn_out.float()).all().item()
   ```

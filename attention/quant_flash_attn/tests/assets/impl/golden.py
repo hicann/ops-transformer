@@ -66,6 +66,72 @@ def _to_torch_int32(t):
     return torch.from_numpy(numpy.asarray(t)).to(torch.int32)
 
 
+def _to_torch_bf16(t):
+    """CSV slot → bf16 torch tensor (CPU)。numpy 侧 ml_dtypes.bfloat16 经 uint8
+    视图位级还原 (numpy 原生不支持 bfloat16); 空/None → None。"""
+    if t is None:
+        return None
+    if isinstance(t, torch.Tensor):
+        if t.numel() == 0:
+            return None
+        return t if t.dtype == torch.bfloat16 else t.to(torch.bfloat16)
+    arr = numpy.asarray(t)
+    if arr.size == 0:
+        return None
+    if arr.dtype.name == "bfloat16":
+        return torch.from_numpy(arr.view(numpy.uint8)).view(torch.bfloat16)
+    if arr.dtype == numpy.uint16:
+        return torch.from_numpy(arr.copy()).view(torch.bfloat16)
+    return torch.from_numpy(arr).to(torch.bfloat16)
+
+
+def _reverse_vtail_to_bnsd(v_tail_bf16, kv_cache_layout):
+    """v_tail slot (final layout, 与主KV cache同布局) → (B, N_kv, Bs, D) BNSD bf16。
+
+    前向变换 (inputs.py): BNSD --reshape(B,N2,Bs,D/16,16)--permute(0,1,3,2,4)--> PA_NZ;
+    逆变换: permute(0,1,3,2,4) (交换回 Bs/Df 轴) --reshape--> BNSD, D 序 = f*16+j 还原。
+    """
+    layout_up = str(kv_cache_layout or "").upper()
+    if layout_up in ("BBSND", "PA_BBND"):
+        return v_tail_bf16.transpose(1, 2).contiguous()  # (B,Bs,N2,D) → (B,N2,Bs,D)
+    if layout_up in ("PA_NZ",):
+        Bn, N2, Df, Bs, inner = v_tail_bf16.shape  # (B,N2,D/16,Bs,16)
+        return (
+            v_tail_bf16.permute(0, 1, 3, 2, 4)
+            .reshape(Bn, N2, Bs, Df * inner)
+            .contiguous()
+        )
+    # BNSD / BNNBSD / PA_BNBD (BnNBsD): 布局即 BNSD
+    return v_tail_bf16.contiguous()
+
+
+def _extract_vtail_bundle(
+    v_tail, block_table_tail, seqused_v_tail, enable_pa, kv_cache_layout
+):
+    """从 v_tail 三件套 slot 提取 CPU 参考注入所需的 (v_tail_bnsd, tail_lens)。
+
+    gate (与 NPU 侧 vtail_slots_to_npu_args 一致): 空 slot / 全零尾长 → (None, None)。
+    非 PA + 非空 slot → 报错 (v_tail PA 专属, checker 契约)。
+    """
+    v_tail_bf16 = _to_torch_bf16(v_tail)
+    if v_tail_bf16 is None:
+        return None, None
+    if not enable_pa:
+        raise ValueError(
+            "[GOLDEN] v_tail slot 非空但 enable_pa=False — v_tail 仅支持 PA 场景 (checker 契约)"
+        )
+    skt = _to_torch_int32(seqused_v_tail) if seqused_v_tail is not None else None
+    if skt is None or skt.numel() == 0:
+        raise ValueError(
+            "[GOLDEN] v_tail slot 非空但 seqused_v_tail slot 为空 — CSV slot 不一致"
+        )
+    tail_lens = [int(x) for x in skt.flatten().tolist()]
+    if all(t == 0 for t in tail_lens):
+        return None, None
+    v_tail_bnsd = _reverse_vtail_to_bnsd(v_tail_bf16, kv_cache_layout)
+    return v_tail_bnsd, tail_lens
+
+
 def _tnd_to_bnsd_fixed(tensor_tnd, seq_lens, cu_seqlens=None):
     tensor = (
         tensor_tnd
@@ -341,6 +407,9 @@ def cpu_qfa_mxfp8(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
+    v_tail: torch.Tensor = None,
+    block_table_tail: torch.Tensor = None,
+    seqused_v_tail: torch.Tensor = None,
     softmax_scale: float = 1.0,
     mask_mode: int = 0,
     win_left: int = -1,
@@ -588,7 +657,14 @@ def cpu_qfa_mxfp8(
         if dv_bnsd_grouped.shape[3] > D:
             dv_bnsd_grouped = dv_bnsd_grouped[:, :, :, :D].contiguous()
 
+    # ----- v_tail 尾块高精窗口: 从 slot 反算 BNSD bf16 + 尾长 (slot 驱动 gate) -----
+    vtail_bnsd, vtail_tail_lens = _extract_vtail_bundle(
+        v_tail, block_table_tail, seqused_v_tail, enable_pa, kv_cache_layout
+    )
+
     # ----- 调 cpu_mxfp8_golden (BNSD fp8 + group 维 fp32 scale) -----
+    # v_tail_bnsd: (B,N_kv,block_size,D) bf16 尾块原值, cpu_mxfp8_golden 内注入
+    # 尾段V原值(scale=1) + 尾列P直存bf16 (与 kernel 纯尾task VF bf16 直出对齐)
     cpu_out, cpu_lse = mxfp8_golden_mod.cpu_mxfp8_golden(
         q_fp8_bnsd,
         k_fp8_bnsd,
@@ -600,6 +676,8 @@ def cpu_qfa_mxfp8(
         actual_seq_q,
         actual_seq_kv,
         softmax_scale=softmax_scale,
+        v_tail_bnsd=vtail_bnsd,
+        tail_lens=vtail_tail_lens,
     )
 
     compare_layout = "TND" if enable_pa else input_layout
@@ -665,6 +743,9 @@ def cpu_qfa_gqa_fp8(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
+    v_tail: torch.Tensor = None,
+    block_table_tail: torch.Tensor = None,
+    seqused_v_tail: torch.Tensor = None,
     softmax_scale: float = 1.0,
     mask_mode: int = 0,
     win_left: int = -1,
@@ -867,6 +948,9 @@ def cpu_qfa_hif8(
     sinks_t: torch.Tensor,
     attn_mask_t: torch.Tensor,
     metadata_t: torch.Tensor,
+    v_tail: torch.Tensor = None,
+    block_table_tail: torch.Tensor = None,
+    seqused_v_tail: torch.Tensor = None,
     softmax_scale: float = 1.0,
     mask_mode: int = 0,
     win_left: int = -1,

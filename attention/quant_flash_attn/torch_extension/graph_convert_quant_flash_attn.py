@@ -1,3 +1,12 @@
+# -----------------------------------------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# -----------------------------------------------------------------------------------------------------------
 try:
     import torch
     import torch_npu
@@ -81,6 +90,9 @@ if _TORCHAIR_AVAILABLE:
         sinks: Optional[Tensor] = None,
         attn_mask: Optional[Tensor] = None,
         metadata: Optional[Tensor] = None,
+        v_tail: Optional[Tensor] = None,
+        block_table_tail: Optional[Tensor] = None,
+        seqused_v_tail: Optional[Tensor] = None,
         softmax_scale: float = 1.0,
         mask_mode: int = 0,
         win_left: int = -1,
@@ -115,6 +127,9 @@ if _TORCHAIR_AVAILABLE:
         sinks: Tensor = None,
         attn_mask: Tensor = None,
         metadata: Tensor = None,
+        v_tail: Tensor = None,
+        block_table_tail: Tensor = None,
+        seqused_v_tail: Tensor = None,
         softmax_scale: float = 1.0,
         mask_mode: int = 0,
         win_left: int = -1,

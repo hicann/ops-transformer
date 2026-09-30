@@ -43,6 +43,9 @@ const std::string SEQUSED_Q_NAME = "seqused_q";
 const std::string SEQUSED_KV_NAME = "seqused_kv";
 const std::string SINKS_NAME = "sinks";
 const std::string METADATA_NAME = "metadata";
+const std::string V_TAIL_NAME = "v_tail";
+const std::string BLOCK_TABLE_TAIL_NAME = "block_table_tail";
+const std::string SEQUSED_V_TAIL_NAME = "seqused_v_tail";
 const std::string ATTN_MASK_NAME = "attn_mask";
 const std::string SOFTMAX_SCALE_NAME = "softmax_scale";
 const std::string MASK_MODE_NAME = "mask_mode";
@@ -79,6 +82,9 @@ constexpr uint32_t SEQUSED_KV_INDEX = 11;
 constexpr uint32_t SINKS_INDEX = 12;
 constexpr uint32_t ATTN_MASK_INDEX = 13;
 constexpr uint32_t METADATA_INDEX = 14;
+constexpr uint32_t V_TAIL_INDEX = 15;
+constexpr uint32_t BLOCK_TABLE_TAIL_INDEX = 16;
+constexpr uint32_t SEQUSED_V_TAIL_INDEX = 17;
 
 // Attributes Index
 constexpr uint32_t ATTR_QUANT_MODE_INDEX = 0;
@@ -169,13 +175,13 @@ std::string QfaQuantModeToSerialString(QfaQuantMode qfaQuantMode);
 // ============================================================
 
 struct QfaRequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct QfaOptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::Tensor* tensor;
 };
 
 struct QfaParaInfo {
@@ -195,19 +201,22 @@ struct QfaParaInfo {
     QfaOptionalParaInfo sinks = {nullptr, nullptr};
     QfaOptionalParaInfo metadata = {nullptr, nullptr};
     QfaOptionalParaInfo attnMask = {nullptr, nullptr};
+    QfaOptionalParaInfo vTail = {nullptr, nullptr};
+    QfaOptionalParaInfo blockTableTail = {nullptr, nullptr};
+    QfaOptionalParaInfo sequsedVTail = {nullptr, nullptr};
 
-    const int64_t *quantMode = nullptr;
-    const float *softmaxScale = nullptr;
-    const int64_t *maskMode = nullptr;
-    const int64_t *winLeft = nullptr;
-    const int64_t *winRight = nullptr;
-    const int64_t *maxSeqlenQ = nullptr;
-    const int64_t *maxSeqlenKV = nullptr;
-    const char *layoutQ = nullptr;
-    const char *layoutQDescale = nullptr;
-    const char *layoutKV = nullptr;
-    const char *layoutOut = nullptr;
-    const bool *returnSoftMaxLse = nullptr;
+    const int64_t* quantMode = nullptr;
+    const float* softmaxScale = nullptr;
+    const int64_t* maskMode = nullptr;
+    const int64_t* winLeft = nullptr;
+    const int64_t* winRight = nullptr;
+    const int64_t* maxSeqlenQ = nullptr;
+    const int64_t* maxSeqlenKV = nullptr;
+    const char* layoutQ = nullptr;
+    const char* layoutQDescale = nullptr;
+    const char* layoutKV = nullptr;
+    const char* layoutOut = nullptr;
+    const bool* returnSoftMaxLse = nullptr;
 
     QfaRequiredParaInfo attnOut = {nullptr, nullptr};
     QfaRequiredParaInfo lseOut = {nullptr, nullptr};
@@ -219,8 +228,8 @@ struct QfaParaInfo {
 
 class QfaTilingInfo : public TilingInfo {
 public:
-    const char *opName = nullptr;
-    fe::PlatFormInfos *platformInfo = nullptr;
+    const char* opName = nullptr;
+    fe::PlatFormInfos* platformInfo = nullptr;
     QfaParaInfo opParamInfo;
 
     // Base Param
@@ -264,6 +273,10 @@ public:
     bool sinksFlag = false;
     bool emptyTensorFlag = false;
 
+    // V tail (高精窗口) Param
+    bool hasVTail = false;
+    int64_t tailMaxBlockNum = 0;
+
     // DType
     ge::DataType inputQType = ge::DT_FLOAT8_E4M3FN;
     ge::DataType inputKvType = ge::DT_FLOAT8_E4M3FN;
@@ -279,10 +292,10 @@ public:
     QfaLayout layoutQDescale = QfaLayout::BSND;
 
     // Strides (for non-contiguous tensor check)
-    const gert::Stride *keyStrides = nullptr;
-    const gert::Stride *valueStrides = nullptr;
-    const gert::Stride *kDescaleStrides = nullptr;
-    const gert::Stride *vDescaleStrides = nullptr;
+    const gert::Stride* keyStrides = nullptr;
+    const gert::Stride* valueStrides = nullptr;
+    const gert::Stride* kDescaleStrides = nullptr;
+    const gert::Stride* vDescaleStrides = nullptr;
     bool hasStride = false;
 };
 

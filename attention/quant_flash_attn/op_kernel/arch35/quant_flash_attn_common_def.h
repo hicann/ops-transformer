@@ -33,6 +33,9 @@ static constexpr float FLOAT_INF = 3e+99;
 
 static constexpr uint32_t QFA_HEAD_NEED_INIT_OUTPUT_INDEX = 15U;
 
+// V尾块(高精窗口)边界: 与 v_descale 的 64 粒度保持一致, kernel与量化cache写入侧共享的单一事实来源
+static constexpr uint32_t MXFP8_V_TAIL_BOUNDARY = 64U;
+
 #define ASCENDC_TPL_5_BW 5
 #define ASCENDC_TPL_10_BW 10
 #define ASCENDC_TPL_3_BW 3
@@ -195,6 +198,14 @@ struct RunInfoX {
     uint32_t actSingleLoopS2SizeAlign;
     bool isS2SplitCore = false;
     uint32_t faTmpOutWsPos = 0;
+    uint32_t kvTailLen = 0; // Number of BF16 V tail tokens in the current batch (<64).
+    // 本task为v_tail尾task(纯尾或拆分尾半步): 强制按ND范式执行
+    // (Mmad0/FixpipeMm1/VF bf16直出/L1直搬/尾片乘全部复用decode已验证路径),
+    // 主体task保持DN; DN的FixpipeMm1Dn双核交错布局不适用于尾task的P直搬链
+    bool isVtailTask = false;
+    // 本行最后一个DN主体task(最后块主体半步或非拆分末块):
+    // IterateBmm1Dn据此释放l1Q slot(尾task的ND范式Q装载需Wait)
+    bool isLastDnTask = false;
 
     int64_t preTokensLeftUp = 0;
     int64_t nextTokensLeftUp = 0;
@@ -241,6 +252,10 @@ struct CommonConstInfo {
 
     uint32_t accumOutSize;
     uint32_t logSumExpSize;
+
+    // V tail (高精窗口)
+    uint32_t seqUsedKvTailSize = 0;
+    uint32_t tailMaxBlockNum = 0;
 
     FA_LAYOUT outputLayout;
     bool needInitOutput;

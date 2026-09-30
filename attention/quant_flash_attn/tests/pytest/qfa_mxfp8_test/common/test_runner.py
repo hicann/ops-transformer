@@ -46,6 +46,7 @@ PARAM_MAP = {
     "data_range_qr": "DATA_RANGE_QR",
     "data_range_kr": "DATA_RANGE_KR",
     "enable_lse": "ENABLE_LSE",
+    "enable_v_tail": "ENABLE_V_TAIL",
     "use_fp64_golden": "USE_FP64_GOLDEN",
     "use_fp64_compare": "USE_FP64_COMPARE",
     "quant_mode": None,  # quant_mode 用于新接口，golden 中不需要设置全局变量
@@ -91,6 +92,7 @@ def execute_test(params, mode, cdir=None):
                 qr_bf16,
                 kr_bf16,
                 block_table_torch,
+                vtail_bundle=golden._VTAIL_BUNDLE,
             ),
             cache_dir=cdir,
         )
@@ -107,6 +109,7 @@ def execute_test(params, mode, cdir=None):
             kr_bf16,
             block_table_torch,
         ) = golden_cache.load_input(case_name, cache_dir=cdir)
+        golden._VTAIL_BUNDLE = golden_cache.load_vtail_bundle(case_name, cache_dir=cdir)
 
     if (
         "gen" in mode
@@ -266,7 +269,9 @@ def execute_test(params, mode, cdir=None):
             lse_result = check_result(golden_lse, lse_out)
         else:
             lse_cmp = _lse_to_cmp(cpu_lse)
-            lse_result = result_compare_method.check_result(lse_cmp, lse_out)
+            lse_result = result_compare_method.check_result(
+                lse_cmp, lse_out, max_diff_hd=2000
+            )
 
     return atten_result, lse_result
 

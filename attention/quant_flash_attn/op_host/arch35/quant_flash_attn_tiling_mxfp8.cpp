@@ -31,9 +31,9 @@ namespace quant_flash_attn {
 using namespace arch35QFA;
 constexpr uint64_t PRE_LOAD_NUM_QFA_ARCH35 = 3;
 
-void QuantFlashAttnTilingImpl::InitTilingInfo(TilingInfo *tilingInfo)
+void QuantFlashAttnTilingImpl::InitTilingInfo(TilingInfo* tilingInfo)
 {
-    qfaInfo_ = static_cast<QfaTilingInfo *>(tilingInfo);
+    qfaInfo_ = static_cast<QfaTilingInfo*>(tilingInfo);
 }
 
 bool QuantFlashAttnTilingImpl::IsCapable()
@@ -99,14 +99,14 @@ ge::graphStatus QuantFlashAttnTilingImpl::SetPlatMemoryInfo()
 
 void QuantFlashAttnTilingImpl::InitImplParam()
 {
-    const gert::Tensor *actSeqLenQ = qfaInfo_->opParamInfo.cuSeqlensQ.tensor;
-    const gert::Tensor *actSeqLenKV = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
+    const gert::Tensor* actSeqLenQ = qfaInfo_->opParamInfo.cuSeqlensQ.tensor;
+    const gert::Tensor* actSeqLenKV = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
     uint32_t actSeqLenQDims = (actSeqLenQ != nullptr) ? actSeqLenQ->GetShapeSize() : 0;
     uint32_t actSeqLenKVDims = (actSeqLenKV != nullptr) ? actSeqLenKV->GetShapeSize() : 0;
-    const gert::Tensor *actSeqLenQTensor = qfaInfo_->opParamInfo.cuSeqlensQ.tensor;
-    const gert::Tensor *seqUsedQTensor = qfaInfo_->opParamInfo.sequsedQ.tensor;
-    const gert::Tensor *actSeqLenKVTensor = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
-    const gert::Tensor *seqUsedKvTensor = qfaInfo_->opParamInfo.sequsedKv.tensor;
+    const gert::Tensor* actSeqLenQTensor = qfaInfo_->opParamInfo.cuSeqlensQ.tensor;
+    const gert::Tensor* seqUsedQTensor = qfaInfo_->opParamInfo.sequsedQ.tensor;
+    const gert::Tensor* actSeqLenKVTensor = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
+    const gert::Tensor* seqUsedKvTensor = qfaInfo_->opParamInfo.sequsedKv.tensor;
     bool hasAnyData = (actSeqLenQTensor != nullptr && actSeqLenQTensor->GetData<int32_t>() != nullptr) ||
                       (actSeqLenKVTensor != nullptr && actSeqLenKVTensor->GetData<int32_t>() != nullptr) ||
                       (seqUsedQTensor != nullptr && seqUsedQTensor->GetData<int32_t>() != nullptr) ||
@@ -114,11 +114,11 @@ void QuantFlashAttnTilingImpl::InitImplParam()
     if (!hasAnyData) {
         // 静态编译: 无运行时数据, 按 shape 判定
         cuSeqLenQFlag_ = (actSeqLenQTensor != nullptr) && (actSeqLenQTensor->GetShapeSize() > 0);
-        const gert::Tensor *actSeqLenKVT = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
+        const gert::Tensor* actSeqLenKVT = qfaInfo_->opParamInfo.cuSeqlensKv.tensor;
         cuSeqLenKVFlag_ = (actSeqLenKVT != nullptr) && (actSeqLenKVT->GetShapeSize() > 0);
-        const gert::Tensor *seqUsedQT = qfaInfo_->opParamInfo.sequsedQ.tensor;
+        const gert::Tensor* seqUsedQT = qfaInfo_->opParamInfo.sequsedQ.tensor;
         seqUsedQFlag_ = (seqUsedQT != nullptr) && (seqUsedQT->GetShapeSize() > 0);
-        const gert::Tensor *seqUsedKvT = qfaInfo_->opParamInfo.sequsedKv.tensor;
+        const gert::Tensor* seqUsedKvT = qfaInfo_->opParamInfo.sequsedKv.tensor;
         seqUsedKvFlag_ = (seqUsedKvT != nullptr) && (seqUsedKvT->GetShapeSize() > 0);
     } else {
         cuSeqLenQFlag_ =
@@ -126,8 +126,8 @@ void QuantFlashAttnTilingImpl::InitImplParam()
         cuSeqLenKVFlag_ =
             !((actSeqLenKVDims == 0) || (actSeqLenKV == nullptr) || (actSeqLenKV->GetData<int32_t>() == nullptr));
 
-        const gert::Tensor *seqUsedQ = qfaInfo_->opParamInfo.sequsedQ.tensor;
-        const gert::Tensor *seqUsedKv = qfaInfo_->opParamInfo.sequsedKv.tensor;
+        const gert::Tensor* seqUsedQ = qfaInfo_->opParamInfo.sequsedQ.tensor;
+        const gert::Tensor* seqUsedKv = qfaInfo_->opParamInfo.sequsedKv.tensor;
         uint32_t seqUsedQDims = (seqUsedQ != nullptr) ? seqUsedQ->GetShapeSize() : 0;
         uint32_t seqUsedKvDims = (seqUsedKv != nullptr) ? seqUsedKv->GetShapeSize() : 0;
         seqUsedQFlag_ = !((seqUsedQDims == 0) || (seqUsedQ == nullptr) || (seqUsedQ->GetData<int32_t>() == nullptr));
@@ -226,6 +226,7 @@ void QuantFlashAttnTilingImpl::UpdateTilingKeyInfo()
     tilingKeyInfo_.hasAttenMask = (qfaInfo_->maskMode != static_cast<int64_t>(MaskMode::NO_MASK));
     UpdateTilingKeyKvLayout();
     tilingKeyInfo_.isFd = flashDecodeFlag_;
+    tilingKeyInfo_.hasVTail = qfaInfo_->hasVTail;
 }
 
 void QuantFlashAttnTilingImpl::UpdateTilingKeyQuantMode()
@@ -238,14 +239,15 @@ void QuantFlashAttnTilingImpl::GenTilingKey()
 {
     UpdateTilingKeyInfo();
     tilingKey_ = GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.quantMode,
-                                    tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd);
+                                    tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd,
+                                    tilingKeyInfo_.hasVTail);
 
     OP_LOGI(qfaInfo_->opName, "The tilingkey is %llu.", tilingKey_);
     OP_LOGI(qfaInfo_->opName,
             "The tilingkey param is inOutLayoutType: %llu, config: %llu, quantMode: %llu, "
-            "hasAttenMask: %u, kvLayoutType: %llu, isFd: %u.",
+            "hasAttenMask: %u, kvLayoutType: %llu, isFd: %u, hasVTail: %u.",
             tilingKeyInfo_.inputLayout, tilingKeyInfo_.config, tilingKeyInfo_.quantMode, tilingKeyInfo_.hasAttenMask,
-            tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd);
+            tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.isFd, tilingKeyInfo_.hasVTail);
 }
 
 void QuantFlashAttnTilingImpl::CalcNumBlocks(uint32_t aicNum)
@@ -351,6 +353,11 @@ void QuantFlashAttnTilingImpl::SetQFATilingData()
         maxBlockNumPerBatch = qfaInfo_->maxBlockNumPerBatch;
     }
     tilingData_.baseTiling.quantFlashAttnPageAttentionParams.maxBlockNumPerBatch = maxBlockNumPerBatch;
+    tilingData_.baseTiling.quantFlashAttnVTailParams.hasVTail = qfaInfo_->hasVTail ? 1 : 0;
+    tilingData_.baseTiling.quantFlashAttnVTailParams.seqUsedKvTailSize =
+        qfaInfo_->hasVTail ? static_cast<uint32_t>(qfaInfo_->bSize) : 0;
+    tilingData_.baseTiling.quantFlashAttnVTailParams.tailMaxBlockNum =
+        qfaInfo_->hasVTail ? static_cast<uint32_t>(qfaInfo_->tailMaxBlockNum) : 0;
     if (qfaInfo_->hasStride) {
         tilingData_.baseTiling.quantFlashAttnPageAttentionParams.maxBlockNumPerBatch = maxBlockNumPerBatch;
         tilingData_.baseTiling.quantFlashAttnBaseParams.keyStrides.bnStride = qfaInfo_->keyStrides->GetStride(0);
@@ -368,9 +375,9 @@ void QuantFlashAttnTilingImpl::SetQFATilingData()
     }
 }
 
-ge::graphStatus QuantFlashAttnTilingImpl::SetTilingData(QuantFlashAttnTilingData &tilingData)
+ge::graphStatus QuantFlashAttnTilingImpl::SetTilingData(QuantFlashAttnTilingData& tilingData)
 {
-    QuantFlashAttnTilingData *tiling = context_->GetTilingData<QuantFlashAttnTilingData>();
+    QuantFlashAttnTilingData* tiling = context_->GetTilingData<QuantFlashAttnTilingData>();
     OP_CHECK_IF(tiling == nullptr, OP_LOGE(qfaInfo_->opName, "The tiling data is nullptr"), return ge::GRAPH_FAILED);
     *tiling = tilingData;
     return ge::GRAPH_SUCCESS;
@@ -378,11 +385,11 @@ ge::graphStatus QuantFlashAttnTilingImpl::SetTilingData(QuantFlashAttnTilingData
 
 void QuantFlashAttnTilingImpl::PrintAllTilingData()
 {
-    QuantFlashAttnQuantTilingArch35 &baseTiling = tilingData_.baseTiling;
-    QuantFlashAttnBaseParams &params = baseTiling.quantFlashAttnBaseParams;
-    QuantFlashAttnAttenMaskParams &maskParams = baseTiling.quantFlashAttnAttenMaskParams;
-    QuantFlashAttnPageAttentionParams &paParams = baseTiling.quantFlashAttnPageAttentionParams;
-    QuantFlashAttnWorkspaceParams &wsParams = baseTiling.quantFlashAttnWorkspaceParams;
+    QuantFlashAttnQuantTilingArch35& baseTiling = tilingData_.baseTiling;
+    QuantFlashAttnBaseParams& params = baseTiling.quantFlashAttnBaseParams;
+    QuantFlashAttnAttenMaskParams& maskParams = baseTiling.quantFlashAttnAttenMaskParams;
+    QuantFlashAttnPageAttentionParams& paParams = baseTiling.quantFlashAttnPageAttentionParams;
+    QuantFlashAttnWorkspaceParams& wsParams = baseTiling.quantFlashAttnWorkspaceParams;
 
     OP_LOGD(qfaInfo_->opName, "bSize:%d", params.bSize);
     OP_LOGD(qfaInfo_->opName, "t1Size:%d", params.t1Size);
@@ -416,6 +423,11 @@ void QuantFlashAttnTilingImpl::PrintAllTilingData()
 
     OP_LOGD(qfaInfo_->opName, "accumOutSize:%d", wsParams.accumOutSize);
     OP_LOGD(qfaInfo_->opName, "logSumExpSize:%d", wsParams.logSumExpSize);
+
+    OP_LOGD(qfaInfo_->opName, "hasVTail:%d", tilingData_.baseTiling.quantFlashAttnVTailParams.hasVTail);
+    OP_LOGD(qfaInfo_->opName, "seqUsedKvTailSize:%d",
+            tilingData_.baseTiling.quantFlashAttnVTailParams.seqUsedKvTailSize);
+    OP_LOGD(qfaInfo_->opName, "tailMaxBlockNum:%d", tilingData_.baseTiling.quantFlashAttnVTailParams.tailMaxBlockNum);
 
     OP_LOGD(qfaInfo_->opName, "tilingKey:%llu", tilingKey_);
 }
