@@ -16,7 +16,7 @@
 #ifndef QUANT_COMPRESSOR_TOOLS_H
 #define QUANT_COMPRESSOR_TOOLS_H
 
-#include "quant_compressor_comm.h"
+#include "quant_compressor_comm_arch92.h"
 
 using namespace AscendC;
 
@@ -32,7 +32,7 @@ class QuantCompressorTools {
 public:
     __aicore__ inline QuantCompressorTools() {}
 
-    __aicore__ inline void Init(__gm__ uint8_t *cuSeqlens, __gm__ uint8_t *seqUsed, __gm__ uint8_t *startPos);
+    __aicore__ inline void Init(__gm__ uint8_t* cuSeqlens, __gm__ uint8_t* seqUsed, __gm__ uint8_t* startPos);
 
     __aicore__ inline uint32_t GetSeqUsed(uint32_t bIdx);
     __aicore__ inline uint32_t GetStartPos(uint32_t bIdx);
@@ -51,21 +51,21 @@ private:
 };
 
 template <typename COMP>
-__aicore__ inline void QuantCompressorTools<COMP>::Init(__gm__ uint8_t *startPos, __gm__ uint8_t *seqUsed,
-                                                        __gm__ uint8_t *cuSeqlens)
+__aicore__ inline void QuantCompressorTools<COMP>::Init(__gm__ uint8_t* startPos, __gm__ uint8_t* seqUsed,
+                                                        __gm__ uint8_t* cuSeqlens)
 {
     isExistStartPos_ = (startPos != nullptr);
     if (isExistStartPos_) {
-        startPosGm_.SetGlobalBuffer((__gm__ int32_t *)startPos);
+        startPosGm_.SetGlobalBuffer((__gm__ int32_t*)startPos);
     }
 
     isExistSeqUsed_ = (seqUsed != nullptr);
     if (isExistSeqUsed_) {
-        sequsedGm_.SetGlobalBuffer((__gm__ int32_t *)seqUsed);
+        sequsedGm_.SetGlobalBuffer((__gm__ int32_t*)seqUsed);
     }
 
     if constexpr (COMP::xLayout == X_LAYOUT::TH) {
-        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t *)cuSeqlens);
+        cuSeqlensGm_.SetGlobalBuffer((__gm__ int32_t*)cuSeqlens);
     }
 }
 
@@ -162,7 +162,7 @@ struct StatisticInfo {
 template <typename COMP>
 class QuantCompressorVec1SliceIterator {
 public:
-    __aicore__ inline QuantCompressorVec1SliceIterator(QuantCompressorTools<COMP> &tools)
+    __aicore__ inline QuantCompressorVec1SliceIterator(QuantCompressorTools<COMP>& tools)
         : tools_(tools)
     {}
 
@@ -178,14 +178,14 @@ public:
     __aicore__ inline bool IsEnd();
     template <bool IS_STATISTIC = false>
     __aicore__ inline void IteratorSlice();
-    __aicore__ inline Vec1SliceInfo &GetSlice();
+    __aicore__ inline Vec1SliceInfo& GetSlice();
     template <bool IS_STATISTIC = false>
-    __aicore__ inline StatisticInfo &FullIteratorSlice();
+    __aicore__ inline StatisticInfo& FullIteratorSlice();
 
 private:
     __aicore__ inline void AdvanceToNextUsedBatch();
     __aicore__ inline bool SkipBatchGap();
-    QuantCompressorTools<COMP> &tools_;
+    QuantCompressorTools<COMP>& tools_;
 
     bool isFirst_ = true;
     Vec1SliceInfo sliceInfo_{};
@@ -383,7 +383,7 @@ __aicore__ inline bool QuantCompressorVec1SliceIterator<COMP>::IsEnd()
 }
 
 template <typename COMP>
-__aicore__ inline Vec1SliceInfo &QuantCompressorVec1SliceIterator<COMP>::GetSlice()
+__aicore__ inline Vec1SliceInfo& QuantCompressorVec1SliceIterator<COMP>::GetSlice()
 {
     uint32_t cmpRatio = tools_.toolParams_.cmpRatio;
     if (sliceInfo_.bSeqUsed <= sliceInfo_.sIdx) {
@@ -421,7 +421,7 @@ __aicore__ inline Vec1SliceInfo &QuantCompressorVec1SliceIterator<COMP>::GetSlic
 
 template <typename COMP>
 template <bool IS_STATISTIC>
-__aicore__ inline StatisticInfo &QuantCompressorVec1SliceIterator<COMP>::FullIteratorSlice()
+__aicore__ inline StatisticInfo& QuantCompressorVec1SliceIterator<COMP>::FullIteratorSlice()
 {
     if constexpr (IS_STATISTIC) {
         statisticInfo_ = {0U, 0U, 0U};

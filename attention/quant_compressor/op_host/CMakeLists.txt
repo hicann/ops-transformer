@@ -31,6 +31,6 @@ if (NOT BUILD_OPS_RTY_KERNEL)
     target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/quant_compressor_tiling_register.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/arch35/quant_compressor_tiling.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/arch92/quant_compressor_tiling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/arch92/quant_compressor_tiling_arch92.cpp
     )
 endif()

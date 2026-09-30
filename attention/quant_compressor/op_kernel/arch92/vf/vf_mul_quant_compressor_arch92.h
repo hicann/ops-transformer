@@ -18,7 +18,7 @@
 
 #include "kernel_operator.h"
 #include <cstdint>
-#include "../quant_compressor_comm.h"
+#include "../quant_compressor_comm_arch92.h"
 using namespace AscendC;
 using namespace QuantCompressor;
 
@@ -40,7 +40,7 @@ struct ReduceMulRegList {
 };
 
 template <typename T>
-__simd_callee__ void LoadMulAddVFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, ReduceMulRegList<T> &regList,
+__simd_callee__ void LoadMulAddVFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, ReduceMulRegList<T>& regList,
                                       uint64_t offset, uint32_t maskValue)
 {
     Reg::MaskReg mask = Reg::UpdateMask<T>(maskValue);
@@ -51,7 +51,7 @@ __simd_callee__ void LoadMulAddVFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr,
 }
 
 template <typename T>
-__simd_vf__ void MulReduceSumbase8VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, __ubuf__ T *outputAddr,
+__simd_vf__ void MulReduceSumbase8VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, __ubuf__ T* outputAddr,
                                          const uint32_t coff, const uint32_t cmpRatio, const uint32_t scLoopCnt,
                                          const uint32_t baseD)
 {
@@ -71,7 +71,7 @@ __simd_vf__ void MulReduceSumbase8VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAd
 }
 
 template <typename T>
-__simd_vf__ void MulReduceSumbase16VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, __ubuf__ T *outputAddr,
+__simd_vf__ void MulReduceSumbase16VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, __ubuf__ T* outputAddr,
                                           const uint32_t coff, const uint32_t cmpRatio, const uint32_t scLoopCnt,
                                           const uint32_t baseD)
 {
@@ -91,7 +91,7 @@ __simd_vf__ void MulReduceSumbase16VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
 }
 
 template <typename T>
-__simd_vf__ void MulReduceSumbase32VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, __ubuf__ T *outputAddr,
+__simd_vf__ void MulReduceSumbase32VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, __ubuf__ T* outputAddr,
                                           const uint32_t coff, const uint32_t cmpRatio, const uint32_t scLoopCnt,
                                           const uint32_t baseD)
 {
@@ -111,7 +111,7 @@ __simd_vf__ void MulReduceSumbase32VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
 }
 
 template <typename T>
-__simd_vf__ void MulReduceSumbase64VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, __ubuf__ T *outputAddr,
+__simd_vf__ void MulReduceSumbase64VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, __ubuf__ T* outputAddr,
                                           const uint32_t coff, const uint32_t cmpRatio, const uint32_t scLoopCnt,
                                           const uint32_t baseD)
 {
@@ -129,7 +129,7 @@ __simd_vf__ void MulReduceSumbase64VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreA
 }
 
 template <typename T>
-__simd_vf__ void MulReduceSumbase128VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, __ubuf__ T *outputAddr,
+__simd_vf__ void MulReduceSumbase128VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, __ubuf__ T* outputAddr,
                                            const uint32_t coff, const uint32_t cmpRatio, const uint32_t scLoopCnt,
                                            const uint32_t baseD)
 {
@@ -150,7 +150,7 @@ __simd_vf__ void MulReduceSumbase128VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *score
 }
 
 template <typename T>
-__simd_vf__ void MulReduceSumbase256VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, __ubuf__ T *outputAddr,
+__simd_vf__ void MulReduceSumbase256VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, __ubuf__ T* outputAddr,
                                            const uint32_t coff, const uint32_t cmpRatio, const uint32_t scLoopCnt,
                                            const uint32_t baseD)
 {
@@ -177,7 +177,7 @@ __simd_vf__ void MulReduceSumbase256VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *score
 }
 
 template <typename T>
-__simd_vf__ void MulReduceSumbase512VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *scoreAddr, __ubuf__ T *outputAddr,
+__simd_vf__ void MulReduceSumbase512VFImpl(__ubuf__ T* kvAddr, __ubuf__ T* scoreAddr, __ubuf__ T* outputAddr,
                                            const uint32_t coff, const uint32_t cmpRatio, const uint32_t scLoopCnt,
                                            const uint32_t baseD)
 {
@@ -226,13 +226,13 @@ __simd_vf__ void MulReduceSumbase512VFImpl(__ubuf__ T *kvAddr, __ubuf__ T *score
 
 // 当前仅支持coff * cmpRatio为2的幂的情况
 template <typename T>
-__aicore__ inline void MulReduceSumbaseVF(const LocalTensor<T> &kvLocal, const LocalTensor<T> &scoreLocal,
-                                          const LocalTensor<T> &outputLocal, const uint32_t coff,
+__aicore__ inline void MulReduceSumbaseVF(const LocalTensor<T>& kvLocal, const LocalTensor<T>& scoreLocal,
+                                          const LocalTensor<T>& outputLocal, const uint32_t coff,
                                           const uint32_t cmpRatio, const uint32_t baseD, const uint32_t scLoopCnt)
 {
-    __ubuf__ T *kvAddr = (__ubuf__ T *)kvLocal.GetPhyAddr();
-    __ubuf__ T *scoreAddr = (__ubuf__ T *)scoreLocal.GetPhyAddr();
-    __ubuf__ T *outputAddr = (__ubuf__ T *)outputLocal.GetPhyAddr();
+    __ubuf__ T* kvAddr = (__ubuf__ T*)kvLocal.GetPhyAddr();
+    __ubuf__ T* scoreAddr = (__ubuf__ T*)scoreLocal.GetPhyAddr();
+    __ubuf__ T* outputAddr = (__ubuf__ T*)outputLocal.GetPhyAddr();
     if (baseD == VF_D_SIZE_8) {
         MulReduceSumbase8VFImpl(kvAddr, scoreAddr, outputAddr, coff, cmpRatio, scLoopCnt, baseD);
     } else if (baseD == VF_D_SIZE_16) {
@@ -251,7 +251,7 @@ __aicore__ inline void MulReduceSumbaseVF(const LocalTensor<T> &kvLocal, const L
 }
 
 template <typename T>
-__simd_vf__ void MulsVFImpl(__ubuf__ T *dstAddr, __ubuf__ T *srcAddr, float scalarValue, uint32_t cnt,
+__simd_vf__ void MulsVFImpl(__ubuf__ T* dstAddr, __ubuf__ T* srcAddr, float scalarValue, uint32_t cnt,
                             uint16_t repeatTimes)
 {
     Reg::RegTensor<T> srcReg;
@@ -273,13 +273,13 @@ __simd_vf__ void MulsVFImpl(__ubuf__ T *dstAddr, __ubuf__ T *srcAddr, float scal
  * @param baseD     d轴元素个数
  */
 template <typename T>
-__aicore__ inline void MulsVF(const LocalTensor<T> &dstLocal, const LocalTensor<T> &srcLocal, float scalar,
+__aicore__ inline void MulsVF(const LocalTensor<T>& dstLocal, const LocalTensor<T>& srcLocal, float scalar,
                               uint32_t row, uint32_t col)
 {
     uint32_t cnt = row * col;
     uint16_t repeatTimes = static_cast<uint16_t>(SimdCeilDivT(cnt, VF_D_SIZE_64));
-    __ubuf__ T *srcAddr = (__ubuf__ T *)srcLocal.GetPhyAddr();
-    __ubuf__ T *dstAddr = (__ubuf__ T *)dstLocal.GetPhyAddr();
+    __ubuf__ T* srcAddr = (__ubuf__ T*)srcLocal.GetPhyAddr();
+    __ubuf__ T* dstAddr = (__ubuf__ T*)dstLocal.GetPhyAddr();
     MulsVFImpl<T>(dstAddr, srcAddr, scalar, cnt, repeatTimes);
 }
 

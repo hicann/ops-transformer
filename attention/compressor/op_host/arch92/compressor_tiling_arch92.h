@@ -26,8 +26,8 @@
 #include "tiling/tiling_api.h"
 #include "exe_graph/runtime/tiling_context.h"
 #include "register/op_def_registry.h"
-#include "../../op_kernel/arch92/compressor_template_tiling_key.h"
-#include "../../op_kernel/arch92/compressor_tiling_data.h"
+#include "../../op_kernel/arch92/compressor_template_tiling_key_arch92.h"
+#include "../../op_kernel/arch92/compressor_tiling_data_arch92.h"
 #include "platform/platform_info.h"
 
 #ifdef ASCENDC_OP_TEST
@@ -176,14 +176,14 @@ struct CompressorCompileInfo {
 };
 
 struct RequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct OptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
+    const gert::Tensor* tensor;
 };
 
 enum class LayoutType {
@@ -220,9 +220,9 @@ enum class CACHE_MODE : uint8_t {
 };
 
 struct CompressorContext {
-    const char *opName;
-    const char *opType;
-    fe::PlatFormInfos *platformInfo;
+    const char* opName;
+    const char* opType;
+    fe::PlatFormInfos* platformInfo;
     int batchConsistency;
 
     RequiredParaInfo x;
@@ -238,35 +238,35 @@ struct CompressorContext {
     RequiredParaInfo softmaxScore;
     RequiredParaInfo kv;
 
-    const int *coff;
-    const int *cmpRatio;
-    const int *cacheMode;
-    const int *stateCacheStrideDim0;
-    const bool *gradEnabled;
+    const int* coff;
+    const int* cmpRatio;
+    const int* cacheMode;
+    const int* stateCacheStrideDim0;
+    const bool* gradEnabled;
     TemplateId templateId;
 
     ge::DataType dtype = ge::DT_BF16;
     LayoutType layout = LayoutType::LAYOUT_BSH;
 
-    size_t *workSpaces;
+    size_t* workSpaces;
     uint64_t tilingKey;
     uint32_t blockDim;
 };
 
 class CompressorTiling {
 public:
-    explicit CompressorTiling(CompressorContext *context)
+    explicit CompressorTiling(CompressorContext* context)
         : context_(context)
     {}
     ~CompressorTiling() = default;
 
-    static ge::graphStatus ConvertContext(gert::TilingContext &context, CompressorContext &compressorContext);
-    ge::graphStatus RunBigKernelTiling(CompressorTilingData *tilingData);
+    static ge::graphStatus ConvertContext(gert::TilingContext& context, CompressorContext& compressorContext);
+    ge::graphStatus RunBigKernelTiling(CompressorTilingData* tilingData);
 
 private:
-    static ge::graphStatus ConvertRequiredParams(gert::TilingContext &context, CompressorContext &compressorContext);
+    static ge::graphStatus ConvertRequiredParams(gert::TilingContext& context, CompressorContext& compressorContext);
 
-    static void ConvertOptionalParams(gert::TilingContext &context, CompressorContext &compressorContext);
+    static void ConvertOptionalParams(gert::TilingContext& context, CompressorContext& compressorContext);
     NpuArch GetCurNpuArch() const;
     ge::graphStatus GetNpuInfo();
     ge::graphStatus SetBaseInfo();
@@ -281,23 +281,23 @@ private:
     ge::graphStatus CheckSinglePara() const;
     ge::graphStatus GenTilingKey() const;
     template <typename T>
-    ge::graphStatus CheckFeatureValueSupport(const T *featureValue, const std::vector<T> &expectFeatureValList,
-                                             const std::string &name) const;
+    ge::graphStatus CheckFeatureValueSupport(const T* featureValue, const std::vector<T>& expectFeatureValList,
+                                             const std::string& name) const;
     template <typename T>
-    ge::graphStatus CheckAttrValueSupport(const T *attrValue, const std::vector<T> &expectAttrValList,
-                                          const std::string &name) const;
+    ge::graphStatus CheckAttrValueSupport(const T* attrValue, const std::vector<T>& expectAttrValList,
+                                          const std::string& name) const;
     template <typename T>
-    void LogErrorNumberSupport(const std::vector<T> &expectNumberList, const T &actualValue, const std::string &name,
+    void LogErrorNumberSupport(const std::vector<T>& expectNumberList, const T& actualValue, const std::string& name,
                                const std::string subName) const;
-    ge::graphStatus CheckDimNumInLayoutSupport(const std::string &layout, const gert::StorageShape *shape,
-                                               const std::string &name) const;
-    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
-    void LogErrorDtypeSupport(const std::vector<ge::DataType> &expectDtypeList, const ge::DataType &actualDtype,
-                              const std::string &name) const;
-    ge::graphStatus CheckDimNumSupport(const gert::StorageShape *shape, const std::string &name) const;
-    ge::graphStatus LogErrorShapeConsistency(const std::string &name, const gert::StorageShape *shape,
-                                             const uint32_t &dimNum, const std::string &subName,
-                                             const uint32_t &expectNum) const;
+    ge::graphStatus CheckDimNumInLayoutSupport(const std::string& layout, const gert::StorageShape* shape,
+                                               const std::string& name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
+    void LogErrorDtypeSupport(const std::vector<ge::DataType>& expectDtypeList, const ge::DataType& actualDtype,
+                              const std::string& name) const;
+    ge::graphStatus CheckDimNumSupport(const gert::StorageShape* shape, const std::string& name) const;
+    ge::graphStatus LogErrorShapeConsistency(const std::string& name, const gert::StorageShape* shape,
+                                             const uint32_t& dimNum, const std::string& subName,
+                                             const uint32_t& expectNum) const;
     ge::graphStatus CheckSingleParaX() const;
     ge::graphStatus CheckSingleParaWkv() const;
     ge::graphStatus CheckSingleParaWgate() const;
@@ -318,7 +318,7 @@ private:
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckFeature() const;
     ge::graphStatus CheckShapeConsistency() const;
-    ge::graphStatus CheckDtypeConsistencyX(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
+    ge::graphStatus CheckDtypeConsistencyX(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
     ge::graphStatus CheckDtypeConsistency() const;
     ge::graphStatus CheckMultiParaConsistency() const;
     ge::graphStatus CheckDimNumConsistency() const;
@@ -341,16 +341,16 @@ private:
     uint32_t dbaseSize = 0;
 
     CompressorBaseShapeInfo baseShapeInfo_;
-    CompressorContext *context_ = nullptr;
-    CompressorBaseParams *baseParams_ = nullptr;
-    CompressorPageAttentionParams *pageAttentionParams_ = nullptr;
-    CompressorInnerSplitParams *innerSplitParams_ = nullptr;
-    CompressorWorkspaceParams *workspaceParams_ = nullptr;
+    CompressorContext* context_ = nullptr;
+    CompressorBaseParams* baseParams_ = nullptr;
+    CompressorPageAttentionParams* pageAttentionParams_ = nullptr;
+    CompressorInnerSplitParams* innerSplitParams_ = nullptr;
+    CompressorWorkspaceParams* workspaceParams_ = nullptr;
 };
 
 } // namespace
 
-CMP_EXTERN_C ge::graphStatus TilingCompressorArch92(gert::TilingContext *context);
+CMP_EXTERN_C ge::graphStatus TilingCompressorArch92(gert::TilingContext* context);
 } // namespace optiling
 
 #endif

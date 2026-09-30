@@ -17,15 +17,15 @@
 #define VF_DEQUANT_QUANT_COMPRESSOR_H
 
 #include "kernel_operator.h"
-#include "../quant_compressor_comm.h"
+#include "../quant_compressor_comm_arch92.h"
 using namespace AscendC;
 using namespace QuantCompressor;
 
 // ================================ Coff=1 ===================================
 // total = col, descale = col（register一一对应）
 
-__simd_vf__ void DequantVfCoff1BaseImpl(__ubuf__ float *outputAddr, __ubuf__ float *inputAddr,
-                                        __ubuf__ float *descaleAddr, uint32_t row, uint32_t col, uint32_t actualCol)
+__simd_vf__ void DequantVfCoff1BaseImpl(__ubuf__ float* outputAddr, __ubuf__ float* inputAddr,
+                                        __ubuf__ float* descaleAddr, uint32_t row, uint32_t col, uint32_t actualCol)
 {
     Reg::RegTensor<float> vregInput;
     Reg::RegTensor<float> vregDescale;
@@ -42,8 +42,8 @@ __simd_vf__ void DequantVfCoff1BaseImpl(__ubuf__ float *outputAddr, __ubuf__ flo
     }
 }
 
-__simd_vf__ void DequantVfCoff1D128Impl(__ubuf__ float *outputAddr, __ubuf__ float *inputAddr,
-                                        __ubuf__ float *descaleAddr, uint32_t row, uint32_t col, uint32_t actualCol)
+__simd_vf__ void DequantVfCoff1D128Impl(__ubuf__ float* outputAddr, __ubuf__ float* inputAddr,
+                                        __ubuf__ float* descaleAddr, uint32_t row, uint32_t col, uint32_t actualCol)
 {
     Reg::RegTensor<float> vregInput[2];
     Reg::RegTensor<float> vregDescale[2];
@@ -68,8 +68,8 @@ __simd_vf__ void DequantVfCoff1D128Impl(__ubuf__ float *outputAddr, __ubuf__ flo
     }
 }
 
-__simd_vf__ void DequantVfCoff1D256Impl(__ubuf__ float *outputAddr, __ubuf__ float *inputAddr,
-                                        __ubuf__ float *descaleAddr, uint32_t row, uint32_t col, uint32_t actualCol)
+__simd_vf__ void DequantVfCoff1D256Impl(__ubuf__ float* outputAddr, __ubuf__ float* inputAddr,
+                                        __ubuf__ float* descaleAddr, uint32_t row, uint32_t col, uint32_t actualCol)
 {
     Reg::RegTensor<float> vregInput[4];
     Reg::RegTensor<float> vregDescale[4];
@@ -104,8 +104,8 @@ __simd_vf__ void DequantVfCoff1D256Impl(__ubuf__ float *outputAddr, __ubuf__ flo
     }
 }
 
-__simd_vf__ void DequantVfCoff1D512Impl(__ubuf__ float *outputAddr, __ubuf__ float *inputAddr,
-                                        __ubuf__ float *descaleAddr, uint32_t row, uint32_t col, uint32_t actualCol)
+__simd_vf__ void DequantVfCoff1D512Impl(__ubuf__ float* outputAddr, __ubuf__ float* inputAddr,
+                                        __ubuf__ float* descaleAddr, uint32_t row, uint32_t col, uint32_t actualCol)
 {
     Reg::RegTensor<float> vregInput[8];
     Reg::RegTensor<float> vregDescale[8];
@@ -164,8 +164,8 @@ __simd_vf__ void DequantVfCoff1D512Impl(__ubuf__ float *outputAddr, __ubuf__ flo
 // total = 2 * col, 每行 = [coff0_input | coff1_input]，各col个元素
 // descale: coff0_descale 从offset0加载, coff1_descale 从headDim偏移加载
 
-__simd_vf__ void DequantVfCoff2BaseImpl(__ubuf__ float *outputAddr, __ubuf__ float *inputAddr,
-                                        __ubuf__ float *descaleAddr, uint32_t row, uint32_t col, uint32_t headDim,
+__simd_vf__ void DequantVfCoff2BaseImpl(__ubuf__ float* outputAddr, __ubuf__ float* inputAddr,
+                                        __ubuf__ float* descaleAddr, uint32_t row, uint32_t col, uint32_t headDim,
                                         uint32_t actualCol)
 {
     Reg::RegTensor<float> vregInputCoff0;
@@ -195,8 +195,8 @@ __simd_vf__ void DequantVfCoff2BaseImpl(__ubuf__ float *outputAddr, __ubuf__ flo
 }
 
 // total = 256, coff0: 2reg input + 2reg descale, coff1: 2reg input + 2reg descale
-__simd_vf__ void DequantVfCoff2D128Impl(__ubuf__ float *outputAddr, __ubuf__ float *inputAddr,
-                                        __ubuf__ float *descaleAddr, uint32_t row, uint32_t col, uint32_t headDim,
+__simd_vf__ void DequantVfCoff2D128Impl(__ubuf__ float* outputAddr, __ubuf__ float* inputAddr,
+                                        __ubuf__ float* descaleAddr, uint32_t row, uint32_t col, uint32_t headDim,
                                         uint32_t actualCol)
 {
     Reg::RegTensor<float> vregInputCoff0[2];
@@ -237,8 +237,8 @@ __simd_vf__ void DequantVfCoff2D128Impl(__ubuf__ float *outputAddr, __ubuf__ flo
 }
 
 // total = 512, coff0: 4reg input + 4reg descale, coff1: 4reg input + 4reg descale
-__simd_vf__ void DequantVfCoff2D256Impl(__ubuf__ float *outputAddr, __ubuf__ float *inputAddr,
-                                        __ubuf__ float *descaleAddr, uint32_t row, uint32_t col, uint32_t headDim,
+__simd_vf__ void DequantVfCoff2D256Impl(__ubuf__ float* outputAddr, __ubuf__ float* inputAddr,
+                                        __ubuf__ float* descaleAddr, uint32_t row, uint32_t col, uint32_t headDim,
                                         uint32_t actualCol)
 {
     Reg::RegTensor<float> vregInputCoff0[4];
@@ -301,8 +301,8 @@ __simd_vf__ void DequantVfCoff2D256Impl(__ubuf__ float *outputAddr, __ubuf__ flo
 }
 
 // total = 1024, coff0: 8reg input + 8reg descale, coff1: 8reg input + 8reg descale
-__simd_vf__ void DequantVfCoff2D512Impl(__ubuf__ float *outputAddr, __ubuf__ float *inputAddr,
-                                        __ubuf__ float *descaleAddr, uint32_t row, uint32_t col, uint32_t headDim,
+__simd_vf__ void DequantVfCoff2D512Impl(__ubuf__ float* outputAddr, __ubuf__ float* inputAddr,
+                                        __ubuf__ float* descaleAddr, uint32_t row, uint32_t col, uint32_t headDim,
                                         uint32_t actualCol)
 {
     Reg::RegTensor<float> vregInputCoff0[8];
@@ -420,13 +420,13 @@ __simd_vf__ void DequantVfCoff2D512Impl(__ubuf__ float *outputAddr, __ubuf__ flo
  * @param actualCol input/output的行偏移列数（含padding）
  */
 template <COFF Coff>
-__aicore__ inline void DequantVf(const LocalTensor<float> &outputLocal, const LocalTensor<float> &inputLocal,
-                                 const LocalTensor<float> &descale, uint32_t row, uint32_t col, uint32_t headDim,
+__aicore__ inline void DequantVf(const LocalTensor<float>& outputLocal, const LocalTensor<float>& inputLocal,
+                                 const LocalTensor<float>& descale, uint32_t row, uint32_t col, uint32_t headDim,
                                  uint32_t actualCol)
 {
-    __ubuf__ float *inputAddr = (__ubuf__ float *)inputLocal.GetPhyAddr();
-    __ubuf__ float *descaleAddr = (__ubuf__ float *)descale.GetPhyAddr();
-    __ubuf__ float *outputAddr = (__ubuf__ float *)outputLocal.GetPhyAddr();
+    __ubuf__ float* inputAddr = (__ubuf__ float*)inputLocal.GetPhyAddr();
+    __ubuf__ float* descaleAddr = (__ubuf__ float*)descale.GetPhyAddr();
+    __ubuf__ float* outputAddr = (__ubuf__ float*)outputLocal.GetPhyAddr();
 
     if constexpr (Coff == COFF::DISABLE) {
         if (col <= VF_D_SIZE_64) {
