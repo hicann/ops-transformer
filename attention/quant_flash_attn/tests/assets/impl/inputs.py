@@ -665,7 +665,7 @@ def generate_qfa_gqa_fp8_inputs(
         .view(torch.float32)
     )
     _kscale_capacity = fp8_golden_mod.K_SCALE_ROWS * D // 4
-    deq_k_slot = k_f32[:, :, -_kscale_capacity:].contiguous()
+    deq_k_slot = k_f32[:, :, -_kscale_capacity:]
 
     # ----- Step 4: in-place 写入 ttk 分配的 slot -----
     # TTK 在 use_torch=True 时把 numpy slot 转成 torch tensor 传给本函数,

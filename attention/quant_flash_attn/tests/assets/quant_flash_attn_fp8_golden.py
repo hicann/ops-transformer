@@ -612,9 +612,35 @@ def prepare_npu_inputs_gqa_fp8(
     if not ENABLE_PA:
         raise NotImplementedError("GQA FP8 (quant_mode=6) 仅支持 PA 模式")
 
-    k_npu = k_fp8.contiguous().view(FP8_DTYPE).npu()
-    v_npu = v_fp8.contiguous().view(FP8_DTYPE).npu()
+    # 去掉 .contiguous(), 保留 hook set_ 后的 132-row PA stride 布局
+    # k_npu stride: (33792, 16896, 128, 1) — stride[1]=132*D, 反映 PA cache 物理布局
+    k_npu = k_fp8.view(FP8_DTYPE).npu()
+    v_npu = v_fp8.view(FP8_DTYPE).npu()
     deq_v_npu = dequant_scale_v.npu()
+
+    # 从 k_fp8 的 PA cache 存储中派生 k_descale (末 K_SCALE_ROWS 行的 scale 数据)
+    # 先用 as_strided 恢复完整 132 行视图, 再用 view 链提取 scale (参考 qfa_fp8_test 逻辑)
+    # k_fp8 stride 反映 132-row 布局, as_strided 只扩展 dim[2], 不改 stride
+    try:
+        _k_stride = k_fp8.stride()
+        _k_full = k_fp8.as_strided(
+            (
+                k_fp8.shape[0],
+                k_fp8.shape[1],
+                k_fp8.shape[2] + K_SCALE_ROWS,
+                k_fp8.shape[3],
+            ),
+            _k_stride,
+        )
+        k_pa_f32 = (
+            _k_full.view(torch.uint8)
+            .view(_k_full.shape[0], _k_full.shape[1], -1)
+            .view(torch.float32)
+        )
+        deq_k_npu = k_pa_f32[:, :, -128:].npu()
+    except Exception as e:
+        print(f"### k_descale derivation failed: {e}")
+        deq_k_npu = dequant_scale_k.npu()
 
     if not IS_CONTIGUOUS:
         kv_cache = torch.stack([k_fp8, v_fp8], dim=2)
@@ -649,7 +675,7 @@ def prepare_npu_inputs_gqa_fp8(
         max_seqlen_q=max_seqlen_q,
         max_seqlen_kv=max_seqlen_kv,
         dequant_scale_q=deq_q_npu,
-        dequant_scale_k=dequant_scale_k,
+        dequant_scale_k=deq_k_npu,
         dequant_scale_v=deq_v_npu,
         p_scale=p_scale_npu,
         block_table=block_table_npu,

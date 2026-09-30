@@ -109,6 +109,9 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
         layout_kv: str = "BSND",
         layout_out: str = "BSND",
         return_softmax_lse: bool = False,
+        N_q: int = None,
+        N_kv: int = None,
+        D: int = None,
         **kwargs,
     ):
         super().__init__()
@@ -134,13 +137,18 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
 
         q_shape = tuple(int(value) for value in q.shape)
         k_shape = tuple(int(value) for value in k.shape)
-        D = int(kwargs.get("D") or q_shape[-1])
-        N_q = int(
-            kwargs.get("N_q") or (q_shape[2] if layout_q == "BSND" else q_shape[1])
-        )
+        # N_q/N_kv/D 显式参数 (CSV attributes 经 split_params 路由), 缺失时按
+        # layout 兜底: NTD 布局 N 在 dim[0], TND 在 dim[1], BSND 在 dim[2]
+        D = int(D or q_shape[-1])
+        if layout_q == "NTD":
+            _n_idx = 0
+        elif layout_q == "BSND":
+            _n_idx = 2
+        else:  # TND
+            _n_idx = 1
+        N_q = int(N_q or q_shape[_n_idx])
         N_kv = int(
-            kwargs.get("N_kv")
-            or (k_shape[2] if layout_kv in ("PA_BBND", "BSND") else k_shape[1])
+            N_kv or (k_shape[2] if layout_kv in ("PA_BBND", "BSND") else k_shape[1])
         )
         head_dim_v = kwargs.get("head_dim_v")
         enable_pa = bool(kwargs.get("enable_pa")) or layout_kv.startswith("PA_")
