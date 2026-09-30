@@ -257,33 +257,31 @@ def _metadata_batch_size(row, cols):
     return 0
 
 
-def _metadata_num_heads_kv(row, cols):
-    """镜像 npu_preprocess 的 num_heads_kv 派生：num_heads_kv 列优先，
-    空 → 按 layout_kv 从 k_shape 推导（PA_BBND: [Bn, Bs, N, D] → k_shape[2]，
-    其余 layout → k_shape[1]）。推导不出 → None（调用方报错）。
+def _metadata_num_heads_q(row, cols):
+    """镜像 npu_preprocess 的 num_heads_q 派生：num_heads_q 列优先，
+    空 → 按 layout_q 从 q_shape 推导（PA_BBND: [Bn, Bs, N, D] → q_shape[2]，
+    其余 layout → q_shape[1]）。推导不出 → None（调用方报错）。
     """
-    n_kv = _str_to_int(row.get(cols.get("num_heads_kv")))
-    if n_kv is not None:
-        return n_kv
-    layout_kv = _strip_or_none(row.get(cols.get("layout_kv")))
-    k_shape = _str_to_shape(row.get(cols.get("k_shape")))
-    if k_shape is None:
+    n_q = _str_to_int(row.get(cols.get("num_heads_q")))
+    if n_q is not None:
+        return n_q
+    layout_q = _strip_or_none(row.get(cols.get("layout_q")))
+    q_shape = _str_to_shape(row.get(cols.get("q_shape")))
+    if q_shape is None:
         return None
-    if layout_kv == "PA_BBND":
-        return k_shape[2] if len(k_shape) > 2 else None
-    return k_shape[1] if len(k_shape) > 1 else None
+    return q_shape[1] if len(q_shape) > 1 else None
 
 
-def _calculate_max_schedule_size(batch_size, num_heads_kv, aic_num, aiv_num):
+def _calculate_max_schedule_size(batch_size, num_heads_q, aic_num, aiv_num):
     """镜像 torch_extension/quant_flash_attn.py 的同名函数：
-    dim0 按 sectionNum 最坏值 (batch*num_heads_kv) 动态计算并按 4096 对齐；
+    dim0 按 sectionNum 最坏值 (batch*num_heads_q) 动态计算并按 4096 对齐；
     batch_size 为 -1/None/0（未知）时按 1 兜底。
     """
     align_size = 4096
     head_size = METADATA_STRIDE
     batch_size = batch_size if batch_size and batch_size > 0 else 1
-    fa_size = aic_num * METADATA_STRIDE * batch_size * num_heads_kv
-    fd_size = aiv_num * METADATA_STRIDE * batch_size * num_heads_kv
+    fa_size = aic_num * METADATA_STRIDE * batch_size * num_heads_q
+    fd_size = aiv_num * METADATA_STRIDE * batch_size * num_heads_q
 
     schedule_size = head_size + fa_size + fd_size
     return ((schedule_size + align_size - 1) // align_size) * align_size
@@ -294,18 +292,18 @@ def _metadata_slot_shape(row, cols):
     (2, max_schedule_size)。npu_preprocess copy_ 回填前会校验两侧 shape
     一致（不一致报 metadata shape mismatch），因此必须与算子侧同公式推导。
     """
-    num_heads_kv = _metadata_num_heads_kv(row, cols)
-    if num_heads_kv is None:
+    num_heads_q = _metadata_num_heads_q(row, cols)
+    if num_heads_q is None:
         name = _strip_or_none(row.get(cols.get("testcase_name"))) or "<unnamed>"
         raise ValueError(
-            f"[{name}] cannot derive num_heads_kv for metadata shape: "
-            "num_heads_kv column empty and k_shape unusable"
+            f"[{name}] cannot derive num_heads_q for metadata shape: "
+            "num_heads_q column empty and q_shape unusable"
         )
     batch_size = _metadata_batch_size(row, cols)
     aic_num, aiv_num = _get_core_nums()
     return (
         2,
-        _calculate_max_schedule_size(batch_size, num_heads_kv, aic_num, aiv_num),
+        _calculate_max_schedule_size(batch_size, num_heads_q, aic_num, aiv_num),
     )
 
 

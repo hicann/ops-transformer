@@ -16,6 +16,11 @@ import torch
 from common import quant_flash_attn_golden as golden
 from common import golden_cache
 from common import result_compare_method
+from common.precision_compare_v2 import (
+    check_result,
+    compute_cv_report,
+    display_cv_report,
+)
 
 PARAM_MAP = {
     "B": "B",
@@ -41,6 +46,8 @@ PARAM_MAP = {
     "data_range_qr": "DATA_RANGE_QR",
     "data_range_kr": "DATA_RANGE_KR",
     "enable_lse": "ENABLE_LSE",
+    "use_fp64_golden": "USE_FP64_GOLDEN",
+    "use_fp64_compare": "USE_FP64_COMPARE",
     "quant_mode": None,  # quant_mode 用于新接口，golden 中不需要设置全局变量
     "device_id": "DEVICE_ID",
     "is_contiguous": "IS_CONTIGUOUS",
@@ -110,23 +117,69 @@ def execute_test(params, mode, cdir=None):
         return None, None
 
     if "cpu" in mode:
-        cpu_out, cpu_lse = golden.cpu_mxfp8_golden(
-            q_fp8,
-            k_fp8,
-            v_fp8,
-            deq_q,
-            deq_k,
-            deq_v,
-            p_scale,
-            golden.SEQUSED_Q,
-            golden.SEQUSED_KV,
-            softmax_scale=golden.SOFTMAX_SCALE,
-            qr_bf16=qr_bf16,
-            kr_bf16=kr_bf16,
-        )
-        golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
+        if golden.USE_FP64_GOLDEN:
+            # FP64 三方比对模式: cpu_output 缓存 FP64 golden, cpu_output_fp32 缓存 FP32 benchmark
+            cpu_out_fp64, cpu_lse_fp64 = golden.cpu_mxfp8_golden_fp64(
+                q_fp8,
+                k_fp8,
+                v_fp8,
+                deq_q,
+                deq_k,
+                deq_v,
+                p_scale,
+                golden.SEQUSED_Q,
+                golden.SEQUSED_KV,
+                softmax_scale=golden.SOFTMAX_SCALE,
+                qr_bf16=qr_bf16,
+                kr_bf16=kr_bf16,
+            )
+            cpu_out, cpu_lse = golden.cpu_mxfp8_golden(
+                q_fp8,
+                k_fp8,
+                v_fp8,
+                deq_q,
+                deq_k,
+                deq_v,
+                p_scale,
+                golden.SEQUSED_Q,
+                golden.SEQUSED_KV,
+                softmax_scale=golden.SOFTMAX_SCALE,
+                qr_bf16=qr_bf16,
+                kr_bf16=kr_bf16,
+            )
+            # FP32 golden 作为 benchmark 参与三方比对，赋值给 compare 阶段使用的变量
+            cpu_out_fp32, cpu_lse_fp32 = cpu_out, cpu_lse
+            golden_cache.save_cpu_output(
+                case_name, cpu_out_fp64, cpu_lse_fp64, cache_dir=cdir
+            )
+            golden_cache.save_cpu_output_fp32(
+                case_name, cpu_out, cpu_lse, cache_dir=cdir
+            )
+            # 统一语义: cpu_out/lse 恒为 FP64 golden (与非 cpu 模式从缓存加载的语义一致),
+            # USE_FP64_COMPARE=True 取 FP64 golden, False 取 FP32 benchmark
+            cpu_out, cpu_lse = cpu_out_fp64, cpu_lse_fp64
+        else:
+            cpu_out, cpu_lse = golden.cpu_mxfp8_golden(
+                q_fp8,
+                k_fp8,
+                v_fp8,
+                deq_q,
+                deq_k,
+                deq_v,
+                p_scale,
+                golden.SEQUSED_Q,
+                golden.SEQUSED_KV,
+                softmax_scale=golden.SOFTMAX_SCALE,
+                qr_bf16=qr_bf16,
+                kr_bf16=kr_bf16,
+            )
+            golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
     else:
         cpu_out, cpu_lse = golden_cache.load_cpu_output(case_name, cache_dir=cdir)
+        if golden.USE_FP64_GOLDEN:
+            cpu_out_fp32, cpu_lse_fp32 = golden_cache.load_cpu_output_fp32(
+                case_name, cache_dir=cdir
+            )
 
     if "cpu" in mode and "npu" not in mode and "compare" not in mode:
         return None, None
@@ -160,34 +213,60 @@ def execute_test(params, mode, cdir=None):
 
     compare_layout = "TND" if golden.ENABLE_PA else golden.INPUT_LAYOUT
     act_seqused_q = golden._get_seqused_q()
-    if compare_layout == "TND":
-        cpu_cmp = golden.convert_q_bnsd_to_layout(
-            cpu_out, act_seqused_q, compare_layout, cu_seqlens=golden.CU_SEQLENS_Q
-        )
-    else:
-        cpu_cmp = golden.convert_q_bnsd_to_layout(
-            cpu_out, act_seqused_q, compare_layout
-        )
 
-    atten_result = result_compare_method.check_result(cpu_cmp, npu_out)
-
-    lse_result = None
-    if golden.ENABLE_LSE:
+    def _to_cmp(tensor):
         if compare_layout == "TND":
-            lse_cmp = golden.convert_q_bnsd_to_layout(
-                cpu_lse, act_seqused_q, compare_layout, cu_seqlens=golden.CU_SEQLENS_Q
+            return golden.convert_q_bnsd_to_layout(
+                tensor, act_seqused_q, compare_layout, cu_seqlens=golden.CU_SEQLENS_Q
             )
+        return golden.convert_q_bnsd_to_layout(tensor, act_seqused_q, compare_layout)
+
+    def _lse_to_cmp(lse_bnsd):
+        lse_cmp = _to_cmp(lse_bnsd)
+        if compare_layout == "TND":
+            # TND padding 位置填 inf 以匹配 NPU 行为：NPU 对超出实际序列长度的 Q 位置输出 inf LSE
             golden.fill_tnd_padding(
                 lse_cmp, act_seqused_q, golden.CU_SEQLENS_Q, fill_value=float("inf")
             )
-            # NPU LSE 输出为 N-major 排布 (N, T): N 在外, T 在内
-            # CPU golden 经 convert 后是 [T, N, 1] (T-major), 需转成 [N, T] 对齐
+            # NPU LSE 输出为 N-major 排布 (N, T): golden 经 convert 后是 [T, N, 1] (T-major)
             lse_cmp = lse_cmp.squeeze(-1).permute(1, 0).contiguous()
-        else:
-            lse_cmp = golden.convert_q_bnsd_to_layout(
-                cpu_lse, act_seqused_q, compare_layout
+        return lse_cmp
+
+    if golden.USE_FP64_GOLDEN:
+        # 三方比对: golden=FP64(最高精度参考) | benchmark=FP32(量化固有偏差) | actual=NPU
+        golden_cmp = _to_cmp(cpu_out if golden.USE_FP64_COMPARE else cpu_out_fp32)
+        benchmark_cmp = _to_cmp(cpu_out_fp32)
+        cv_report = compute_cv_report(
+            golden=golden_cmp,
+            benchmark=benchmark_cmp,
+            actual=npu_out,
+            test_name=f"qfa_mxfp8_attention_out::{case_name}",
+        )
+        display_cv_report(cv_report)
+        # 简单比对以 FP64 golden 为基准，供 pytest pass/fail 判定
+        atten_result = check_result(golden_cmp, npu_out)
+    else:
+        cpu_cmp = _to_cmp(cpu_out)
+        atten_result = result_compare_method.check_result(cpu_cmp, npu_out)
+
+    lse_result = None
+    if golden.ENABLE_LSE:
+        if golden.USE_FP64_GOLDEN:
+            golden_lse = _lse_to_cmp(
+                cpu_lse if golden.USE_FP64_COMPARE else cpu_lse_fp32
             )
-        lse_result = result_compare_method.check_result(lse_cmp, lse_out)
+            benchmark_lse = _lse_to_cmp(cpu_lse_fp32)
+            cv_lse_report = compute_cv_report(
+                golden=golden_lse,
+                benchmark=benchmark_lse,
+                actual=lse_out,
+                test_name=f"qfa_mxfp8_lse::{case_name}",
+            )
+            display_cv_report(cv_lse_report)
+            lse_result = check_result(golden_lse, lse_out)
+        else:
+            lse_cmp = _lse_to_cmp(cpu_lse)
+            lse_result = result_compare_method.check_result(lse_cmp, lse_out)
 
     return atten_result, lse_result
 

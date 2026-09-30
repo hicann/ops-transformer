@@ -38,6 +38,7 @@ qfa_mxfp8_test/
 │   ├── quant_flash_attn_golden.py              # CPU golden 参考实现 + NPU 算子调用
 │   ├── golden_cache.py                         # .pt 缓存工具模块
 │   ├── result_compare_method.py                # 精度对比工具
+│   ├── precision_compare_v2.py                 # 三方比对工具（method=12 CV 双标杆，见 5.1 节）
 │   ├── perf_parser.py                          # msprof op_summary.csv 解析 + baseline 比较
 │   └── test_runner.py                          # 共享测试执行逻辑（apply_params / execute_test / check_results）
 ├── quant_flash_attn_paramset_common.py         # 参数展开公共逻辑 + 默认值
@@ -198,6 +199,64 @@ python quant_flash_attn_golden.py --mode gen --case-name my_case
 python quant_flash_attn_golden.py --mode npu,compare --case-name my_case
 python quant_flash_attn_golden.py --mode cpu --case-name my_case --cache-dir=/tmp/cache
 ```
+
+### 5.1 三方精度比对（FP64 golden | FP32 benchmark | NPU）
+
+当 case 精度不过（尤其是 QKV 输入范围不是 [-1,1]（`DATA_RANGE_Q/K/V > 1.0`）且开启 FD 的场景）时，
+可用三方比对判定 NPU 输出偏差是否在合理范围：FP64 golden 为最高精度参考，FP32 golden 为 benchmark
+（分母基准），NPU 输出与两者按 method=12 CV 双标杆标准比对（`precision_compare_v2.py`）。
+
+使用方法：编辑 `common/quant_flash_attn_golden.py` 配置区，将 case 参数（B/N_q/N_kv/D、
+`CU_SEQLENS_*`/`SEQUSED_*`、`ENABLE_PA`、`KV_CACHE_LAYOUT`、`BLOCK_SIZE`、`SPARSE_MODE`、
+`Q_SCALE_LAYOUT`、`P_SCALE`、`DATA_RANGE_Q/K/V`、`ENABLE_LSE` 等）与失败 case 对齐，并设置：
+
+```python
+USE_FP64_GOLDEN = True   # 开启 FP64 golden + CV 三方比对
+DATA_RANGE_Q = 8.0       # 示例：非 [-1,1] 输入范围
+DATA_RANGE_K = 4.0
+DATA_RANGE_V = 2.0
+```
+
+然后运行：
+
+```bash
+cd common/
+# 全流程：数据生成 → FP64/FP32 双 golden → NPU → 三方比对
+python quant_flash_attn_golden.py --mode all --case-name my_case
+# 分步运行（NPU 输出与 golden 均缓存为 .pt，可单独重跑比对）
+python quant_flash_attn_golden.py --mode gen,cpu --case-name my_case
+python quant_flash_attn_golden.py --mode npu,compare --case-name my_case
+```
+
+输出说明：
+- `[NPU vs Golden]`：NPU 输出 vs FP64 golden 的误差指标
+- `[Benchmark vs Golden]`：FP32 golden vs FP64 golden 的误差指标（量化引入的固有偏差）
+- 判定：NPU 指标不超过 benchmark 的容忍倍率（max_re_rtol=10, avg_re_rtol=2, rmse_rtol=2）→ Pass；
+  超出但未超 1 倍 → warning；否则 Failed
+- LSE（`ENABLE_LSE=True` 时）：同样三方比对，N-major 排布对齐
+- 附带 `check_result` 简单模式结果（FP64 golden vs NPU）
+
+缓存文件：FP64 golden 存 `{case_name}_cpu_output.pt`，FP32 benchmark 存 `{case_name}_cpu_output_fp32.pt`。
+注意：`USE_FP64_GOLDEN` 切换后需重新跑 `cpu` 模式刷新缓存。
+
+### 5.2 通过 pytest debug 跑三方比对
+
+pytest 路径同样支持三方比对：在 `quant_flash_attn_paramset_debug.py` 的 case 参数里直接加
+`use_fp64_golden: [True]`（可选 `use_fp64_compare`，默认 True），compare 阶段会自动执行 CV
+三方比对并打印报告（含 attention 与 LSE）。case 模板见该文件中的
+`PA_BnNBsD_B1_QS128_KVS1024_Nq64_Nkv8_D128_SP3_FP64CMP` 示例（`data_range_q/k/v` 已展示非
+[-1,1] 用法）。
+
+```bash
+cd attention/quant_flash_attn/tests/pytest/qfa_mxfp8_test/
+# 只跑三方比对 case
+pytest test_quant_flash_attn_debug.py -k FP64CMP -v
+# 失败后分步复跑（缓存 .pt，免重跑 golden/NPU）
+pytest test_quant_flash_attn_debug.py -k FP64CMP -v --golden-mode=npu,compare
+```
+
+pass/fail 判定仍以 `check_result`（FP64 golden vs NPU 简单比对）为准；CV 三方比对报告用于
+人工判定 NPU 偏差是否超出量化固有偏差（benchmark）的容忍倍率。
 
 ---
 
