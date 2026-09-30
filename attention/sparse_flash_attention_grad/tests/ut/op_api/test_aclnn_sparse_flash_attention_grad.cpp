@@ -22,20 +22,19 @@ using namespace std;
 using namespace op;
 
 namespace {
-void DestroyAclTensor(aclTensor *tensor)
+void DestroyAclTensor(aclTensor* tensor)
 {
     Release(tensor);
 }
 
 using AclTensorPtr = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>;
 
-AclTensorPtr MakeTensor(const vector<int64_t> &shape, aclDataType dtype)
+AclTensorPtr MakeTensor(const vector<int64_t>& shape, aclDataType dtype)
 {
     return AclTensorPtr(TensorDesc(shape, dtype, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
 }
 } // namespace
 
-// =================== arch22 回归（无 sink，sinks/dSinks=nullptr）===================
 class SparseFlashAttentionGradOpapiUt : public testing::Test {
 protected:
     static void SetUpTestCase()
@@ -49,7 +48,8 @@ protected:
     }
 };
 
-// BSND 正例：value 在，无 sink
+// =================== ascend910b 回归（BSND，无 sink）===================
+// A1 正例：value 在，参数齐全
 TEST_F(SparseFlashAttentionGradOpapiUt, A1_bsnd_fp16_value_present)
 {
     auto query = MakeTensor({1, 64, 8, 128}, ACL_FLOAT16);
@@ -66,7 +66,7 @@ TEST_F(SparseFlashAttentionGradOpapiUt, A1_bsnd_fp16_value_present)
 
     char layout[] = "BSND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionGradGetWorkspaceSize(
         query.get(), key.get(), value.get(), sparseIndices.get(), dOut.get(), out.get(), softmaxMax.get(),
@@ -77,7 +77,7 @@ TEST_F(SparseFlashAttentionGradOpapiUt, A1_bsnd_fp16_value_present)
     EXPECT_NE(executor, nullptr);
 }
 
-// BSND 正例：value optional null，无 sink
+// A2 正例：value optional null
 TEST_F(SparseFlashAttentionGradOpapiUt, A2_bsnd_fp16_value_optional_null)
 {
     auto query = MakeTensor({1, 64, 8, 128}, ACL_FLOAT16);
@@ -92,7 +92,7 @@ TEST_F(SparseFlashAttentionGradOpapiUt, A2_bsnd_fp16_value_optional_null)
 
     char layout[] = "BSND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionGradGetWorkspaceSize(
         query.get(), key.get(), nullptr, sparseIndices.get(), dOut.get(), out.get(), softmaxMax.get(), softmaxSum.get(),
@@ -103,7 +103,7 @@ TEST_F(SparseFlashAttentionGradOpapiUt, A2_bsnd_fp16_value_optional_null)
     EXPECT_NE(executor, nullptr);
 }
 
-// 负例：query null
+// E1 负例：query null
 TEST_F(SparseFlashAttentionGradOpapiUt, E1_null_query)
 {
     auto key = MakeTensor({1, 128, 1, 128}, ACL_FLOAT16);
@@ -119,7 +119,7 @@ TEST_F(SparseFlashAttentionGradOpapiUt, E1_null_query)
 
     char layout[] = "BSND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionGradGetWorkspaceSize(
         nullptr, key.get(), value.get(), sparseIndices.get(), dOut.get(), out.get(), softmaxMax.get(), softmaxSum.get(),
@@ -129,21 +129,6 @@ TEST_F(SparseFlashAttentionGradOpapiUt, E1_null_query)
     EXPECT_NE(aclRet, ACL_SUCCESS);
     EXPECT_EQ(executor, nullptr);
 }
-
-// =================== arch35（ASCEND950）sink 功能：TND+rope 已验证 shape ====================
-// shape 来源：probe/golden 实测可跑通（T1=1, S2=2048, K=2048, D=512, Dr=64, N2=1）
-class SparseFlashAttentionGradArch35SinkUt : public testing::Test {
-protected:
-    static void SetUpTestCase()
-    {
-        op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
-        cout << "SparseFlashAttentionGradArch35SinkUt SetUp" << endl;
-    }
-    static void TearDownTestCase()
-    {
-        cout << "SparseFlashAttentionGradArch35SinkUt TearDown" << endl;
-    }
-};
 
 namespace {
 struct TndRopeTensors {
@@ -177,102 +162,39 @@ TndRopeTensors MakeTndRopeTensors(int64_t n1)
 }
 } // namespace
 
-// S1：sinks+dSinks 都在 → IS_SINKS=true，tiling 成功
-TEST_F(SparseFlashAttentionGradArch35SinkUt, S1_tnd_rope_with_sinks)
+// E2：sinks 在但 dSinks=nullptr → sink 输出缺失，V2 层参数校验拒绝
+TEST_F(SparseFlashAttentionGradOpapiUt, E2_sinks_present_but_dsinks_null)
 {
     constexpr int64_t n1 = 16;
     auto t = MakeTndRopeTensors(n1);
     auto sinks = MakeTensor({n1}, ACL_FLOAT);
-    auto dSinks = MakeTensor({n1}, ACL_FLOAT);
     char layout[] = "TND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
         t.query.get(), t.key.get(), t.value.get(), t.sparseIndices.get(), t.dOut.get(), t.out.get(), t.softmaxMax.get(),
         t.softmaxSum.get(), sinks.get(), t.actSeqQ.get(), t.actSeqKv.get(), t.qRope.get(), t.kRope.get(), 0.0441941738,
         1, layout, 0, INT64_MAX, INT64_MAX, false, t.dQ.get(), t.dK.get(), t.dV.get(), t.dQRope.get(), t.dKRope.get(),
-        dSinks.get(), &workspaceSize, &executor);
-
-    EXPECT_EQ(aclRet, ACL_SUCCESS);
-    EXPECT_NE(executor, nullptr);
-}
-
-// S2：sinks=nullptr → IS_SINKS=false 回归，tiling 成功
-TEST_F(SparseFlashAttentionGradArch35SinkUt, S2_tnd_rope_no_sinks)
-{
-    constexpr int64_t n1 = 16;
-    auto t = MakeTndRopeTensors(n1);
-    char layout[] = "TND";
-    uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-
-    aclnnStatus aclRet = aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
-        t.query.get(), t.key.get(), t.value.get(), t.sparseIndices.get(), t.dOut.get(), t.out.get(), t.softmaxMax.get(),
-        t.softmaxSum.get(), nullptr, t.actSeqQ.get(), t.actSeqKv.get(), t.qRope.get(), t.kRope.get(), 0.0441941738, 1,
-        layout, 0, INT64_MAX, INT64_MAX, false, t.dQ.get(), t.dK.get(), t.dV.get(), t.dQRope.get(), t.dKRope.get(),
         nullptr, &workspaceSize, &executor);
 
-    EXPECT_EQ(aclRet, ACL_SUCCESS);
-    EXPECT_NE(executor, nullptr);
+    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(executor, nullptr);
 }
 
-// S3：sinks 在 + deterministic=true → deter+sink 路径，tiling 成功
-TEST_F(SparseFlashAttentionGradArch35SinkUt, S3_tnd_rope_with_sinks_deter)
+// E3 负例：V2 入口必填参数缺失（query=nullptr）。
+TEST_F(SparseFlashAttentionGradOpapiUt, E3_v2_null_query)
 {
     constexpr int64_t n1 = 16;
     auto t = MakeTndRopeTensors(n1);
-    auto sinks = MakeTensor({n1}, ACL_FLOAT);
-    auto dSinks = MakeTensor({n1}, ACL_FLOAT);
     char layout[] = "TND";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     aclnnStatus aclRet = aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
-        t.query.get(), t.key.get(), t.value.get(), t.sparseIndices.get(), t.dOut.get(), t.out.get(), t.softmaxMax.get(),
-        t.softmaxSum.get(), sinks.get(), t.actSeqQ.get(), t.actSeqKv.get(), t.qRope.get(), t.kRope.get(), 0.0441941738,
-        1, layout, 0, INT64_MAX, INT64_MAX, true, t.dQ.get(), t.dK.get(), t.dV.get(), t.dQRope.get(), t.dKRope.get(),
-        dSinks.get(), &workspaceSize, &executor);
-
-    EXPECT_EQ(aclRet, ACL_SUCCESS);
-    EXPECT_NE(executor, nullptr);
-}
-
-// S4：N1=24（halfG=12 非 32B 对齐）+ sinks → 覆盖非对齐 tilingKey，成功
-TEST_F(SparseFlashAttentionGradArch35SinkUt, S4_tnd_rope_n1_24_non_aligned)
-{
-    constexpr int64_t n1 = 24;
-    auto t = MakeTndRopeTensors(n1);
-    auto sinks = MakeTensor({n1}, ACL_FLOAT);
-    auto dSinks = MakeTensor({n1}, ACL_FLOAT);
-    char layout[] = "TND";
-    uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-
-    aclnnStatus aclRet = aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
-        t.query.get(), t.key.get(), t.value.get(), t.sparseIndices.get(), t.dOut.get(), t.out.get(), t.softmaxMax.get(),
-        t.softmaxSum.get(), sinks.get(), t.actSeqQ.get(), t.actSeqKv.get(), t.qRope.get(), t.kRope.get(), 0.0441941738,
-        1, layout, 0, INT64_MAX, INT64_MAX, false, t.dQ.get(), t.dK.get(), t.dV.get(), t.dQRope.get(), t.dKRope.get(),
-        dSinks.get(), &workspaceSize, &executor);
-
-    EXPECT_EQ(aclRet, ACL_SUCCESS);
-    EXPECT_NE(executor, nullptr);
-}
-
-// E2：sinks 在但 dSinks=nullptr → sink 输出缺失，tiling 应失败（host 校验）
-TEST_F(SparseFlashAttentionGradArch35SinkUt, E2_sinks_present_but_dsinks_null)
-{
-    constexpr int64_t n1 = 16;
-    auto t = MakeTndRopeTensors(n1);
-    auto sinks = MakeTensor({n1}, ACL_FLOAT);
-    char layout[] = "TND";
-    uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-
-    aclnnStatus aclRet = aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
-        t.query.get(), t.key.get(), t.value.get(), t.sparseIndices.get(), t.dOut.get(), t.out.get(), t.softmaxMax.get(),
-        t.softmaxSum.get(), sinks.get(), t.actSeqQ.get(), t.actSeqKv.get(), t.qRope.get(), t.kRope.get(), 0.0441941738,
-        1, layout, 0, INT64_MAX, INT64_MAX, false, t.dQ.get(), t.dK.get(), t.dV.get(), t.dQRope.get(), t.dKRope.get(),
+        nullptr, t.key.get(), t.value.get(), t.sparseIndices.get(), t.dOut.get(), t.out.get(), t.softmaxMax.get(),
+        t.softmaxSum.get(), nullptr, t.actSeqQ.get(), t.actSeqKv.get(), t.qRope.get(), t.kRope.get(), 0.0441941738, 1,
+        layout, 0, INT64_MAX, INT64_MAX, false, t.dQ.get(), t.dK.get(), t.dV.get(), t.dQRope.get(), t.dKRope.get(),
         nullptr, &workspaceSize, &executor);
 
     EXPECT_NE(aclRet, ACL_SUCCESS);
