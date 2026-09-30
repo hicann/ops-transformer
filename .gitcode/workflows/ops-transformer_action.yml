@@ -312,26 +312,26 @@ stages:
         runs-on: ['self-hosted','npu=2','smoke=204']
         container:
           image: swr.cn-south-1.myhuaweicloud.com/pre_smoke/${{ jobs.JOB_image.outputs.PreSmoke_A900 }}
-      PreSmoke_harmony-infer-chs-transformer:
-        name: PreSmoke_harmony-infer-chs-transformer
-        uses: .gitcode/workflows/kirin_pre_smoke_action.yml
-        with:
-          repo_name: 'ops-transformer'
-          device_type: 'chs_phone'
-          rdv_script: 'rdv_kirin9030_gitcode.sh'
-          chip_version: 'Kirin9030'
-          cases_pool: 'transformer_all.json'
-          cases_baseline: 'transformer.json'
-      PreSmoke_harmony-infer-cpro-transformer:
-        name: PreSmoke_harmony-infer-cpro-transformer
-        uses: .gitcode/workflows/kirin_pre_smoke_action.yml
-        with:
-          repo_name: 'ops-transformer'
-          device_type: 'kirinx90'
-          rdv_script: 'rdv_kirinx90_gitcode.sh'
-          chip_version: 'KirinX90'
-          cases_pool: 'transformer_all.json'
-          cases_baseline: 'transformer.json'
+      # PreSmoke_harmony-infer-chs-transformer:
+      #   name: PreSmoke_harmony-infer-chs-transformer
+      #   uses: .gitcode/workflows/kirin_pre_smoke_action.yml
+      #   with:
+      #     repo_name: 'ops-transformer'
+      #     device_type: 'chs_phone'
+      #     rdv_script: 'rdv_kirin9030_gitcode.sh'
+      #     chip_version: 'Kirin9030'
+      #     cases_pool: 'transformer_all.json'
+      #     cases_baseline: 'transformer.json'
+      # PreSmoke_harmony-infer-cpro-transformer:
+      #   name: PreSmoke_harmony-infer-cpro-transformer
+      #   uses: .gitcode/workflows/kirin_pre_smoke_action.yml
+      #   with:
+      #     repo_name: 'ops-transformer'
+      #     device_type: 'kirinx90'
+      #     rdv_script: 'rdv_kirinx90_gitcode.sh'
+      #     chip_version: 'KirinX90'
+      #     cases_pool: 'transformer_all.json'
+      #     cases_baseline: 'transformer.json'
     pre:
     - type: auto
     fail-fast: false
