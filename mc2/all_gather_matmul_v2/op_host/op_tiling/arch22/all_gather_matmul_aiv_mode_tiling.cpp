@@ -282,6 +282,7 @@ static ge::graphStatus AllGatherMatmulAIVModeCheckAttrAndSetTiling(const gert::T
         return GRAPH_FAILED;
     }
     OP_CHECK_NULL_WITH_CONTEXT(context, isTransposeX2);
+    OP_CHECK_NULL_WITH_CONTEXT(context, isTransposeX1);
 
     info.isTransposeX1 = *isTransposeX1 ? *isTransposeX1 : false;
     info.isTransposeX2 = *isTransposeX2 ? *isTransposeX2 : false;
