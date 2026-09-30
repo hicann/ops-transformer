@@ -14,19 +14,19 @@
 #include <cstdint>
 
 struct StemPrepQTilingData {
-    uint32_t batchSize;
-    uint32_t numQHeads;
-    uint32_t dimQk;
-    uint32_t stemBlockSize;
-    uint32_t stemStride;
-    uint32_t rVal;
-    uint32_t kflatDim;
-    uint32_t maxQb;
-    uint32_t totalTokens;
-    uint32_t usedCoreNum;
-    uint32_t blocksPerCoreBase;
-    uint32_t blocksRemainder;
-    uint32_t ubFactor;
+    int64_t batchSize = 0;
+    int64_t numQHeads = 0;
+    int64_t dimQk = 0;
+    int64_t stemBlockSize = 0;
+    int64_t stemStride = 0;
+    int64_t rVal = 0;
+    int64_t kflatDim = 0;
+    int64_t maxQb = 0;
+    int64_t totalTokens = 0;
+    int64_t usedCoreNum = 0;
+    int64_t blocksPerCoreBase = 0;
+    int64_t blocksRemainder = 0;
+    int64_t ubFactor = 0;
 };
 
 #endif
