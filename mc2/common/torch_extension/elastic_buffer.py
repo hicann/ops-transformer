@@ -55,6 +55,9 @@ def _metadata_buffer_layout(capacity: int, ep_world_size: int, route_slots: int)
         rank_offsets_offset + (ep_world_size + 1 + align - 1) // align * align
     )
     total = local_index_offset + (route_slots + align - 1) // align * align
+    # 每个有效slot至少有一条命中；用已有capacity作为两张紧凑索引的容量。
+    # 只存终点，不存隐含的首个0；旧metadata及其顺序不变。
+    total += 2 * ((capacity + align - 1) // align * align)
     return rank_offsets_offset, local_index_offset, total
 
 

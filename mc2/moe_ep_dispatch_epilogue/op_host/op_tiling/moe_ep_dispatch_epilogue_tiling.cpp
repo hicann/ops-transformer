@@ -85,7 +85,7 @@ constexpr uint32_t NETWORK_DIRECT = 0U;
 constexpr uint32_t NETWORK_HYBRID = 1U;
 constexpr uint32_t TOPK_AND_TOPK_WEIGHT_NUMBER = 2U;
 
-static void PrintTilingDataInfo(const char *nodeName, const MoeEpDispatchEpilogueInfo &info)
+static void PrintTilingDataInfo(const char* nodeName, const MoeEpDispatchEpilogueInfo& info)
 {
     OP_LOGD(nodeName, "epWorldSize=%u, epRankId=%u, numExperts=%u, numLocalExperts=%u", info.cfg.epWorldSize,
             info.cfg.epRankId, info.cfg.numExperts, info.cfg.numLocalExperts);
@@ -97,9 +97,9 @@ static void PrintTilingDataInfo(const char *nodeName, const MoeEpDispatchEpilogu
 // ---------------------------------------------------------------------------
 // 属性合法性
 // ---------------------------------------------------------------------------
-static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, const char *nodeName,
-                                       MoeEpDispatchEpilogueInfo &info, uint32_t &networkMode, uint32_t &serverNum,
-                                       uint32_t &rankNumPerServerOut)
+static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const char* nodeName,
+                                       MoeEpDispatchEpilogueInfo& info, uint32_t& networkMode, uint32_t& serverNum,
+                                       uint32_t& rankNumPerServerOut)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE(nodeName, "attrs is nullptr."), return ge::GRAPH_FAILED);
@@ -169,7 +169,7 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, const
 // ---------------------------------------------------------------------------
 // 输入 dtype（cached 路径才校验 OPTIONAL cachedRecvSrcMetadata）
 // ---------------------------------------------------------------------------
-static ge::graphStatus CheckInputDataType(const gert::TilingContext *context, const char *nodeName, bool cached)
+static ge::graphStatus CheckInputDataType(const gert::TilingContext* context, const char* nodeName, bool cached)
 {
     auto contextDesc = context->GetInputDesc(CONTEXT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, contextDesc);
@@ -225,11 +225,11 @@ static ge::graphStatus CheckInputDataType(const gert::TilingContext *context, co
 // Input shapes; cached packed metadata is checked with the output capacity below.
 // 必须先于本函数完成 attr 校验，依赖 epWorldSize / numLocalExperts / nmt
 // ---------------------------------------------------------------------------
-static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context, const char *nodeName,
-                                             MoeEpDispatchEpilogueInfo &info)
+static ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context, const char* nodeName,
+                                             MoeEpDispatchEpilogueInfo& info)
 {
     // ---- context: dim 必须 = 1 ----
-    const gert::StorageShape *contextStorageShape = context->GetInputShape(CONTEXT_INDEX);
+    const gert::StorageShape* contextStorageShape = context->GetInputShape(CONTEXT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, contextStorageShape);
     OP_TILING_CHECK(
         contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
@@ -237,7 +237,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
         return ge::GRAPH_FAILED);
 
     // ---- x [num_tokens, hidden]，hidden 为 cfg 唯一真值来源 ----
-    const gert::StorageShape *xShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* xShape = context->GetInputShape(X_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
     OP_TILING_CHECK(xShape->GetStorageShape().GetDimNum() != TWO_DIMS,
                     OP_LOGE(nodeName, "x dims must be 2, but got %lu.", xShape->GetStorageShape().GetDimNum()),
@@ -251,7 +251,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
                     return ge::GRAPH_FAILED);
 
     // ---- topkIdx [num_tokens, top_k] int32 ----
-    const gert::StorageShape *topkIdxShape = context->GetInputShape(TOPK_IDX_INDEX);
+    const gert::StorageShape* topkIdxShape = context->GetInputShape(TOPK_IDX_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, topkIdxShape);
     OP_TILING_CHECK(
         topkIdxShape->GetStorageShape().GetDimNum() != TWO_DIMS,
@@ -273,7 +273,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
     // Cached packed shape is checked against recv_x capacity in CheckOutputTensors.
 
     // ---- numRecvPerRank [ep_world_size] int32 ----
-    const gert::StorageShape *numRecvRankShape = context->GetInputShape(NUM_RECV_PER_RANK_INDEX);
+    const gert::StorageShape* numRecvRankShape = context->GetInputShape(NUM_RECV_PER_RANK_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numRecvRankShape);
     OP_TILING_CHECK(numRecvRankShape->GetStorageShape().GetDimNum() != ONE_DIM,
                     OP_LOGE(nodeName, "num_recv_tokens_per_rank dims must be 1, but got %lu.",
@@ -286,7 +286,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
                     return ge::GRAPH_FAILED);
 
     // ---- numRecvPerExpert [num_local_experts] int64 ----
-    const gert::StorageShape *numRecvExpertShape = context->GetInputShape(NUM_RECV_PER_EXPERT_INDEX);
+    const gert::StorageShape* numRecvExpertShape = context->GetInputShape(NUM_RECV_PER_EXPERT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numRecvExpertShape);
     OP_TILING_CHECK(numRecvExpertShape->GetStorageShape().GetDimNum() != ONE_DIM,
                     OP_LOGE(nodeName, "num_recv_tokens_per_expert dims must be 1, but got %lu.",
@@ -300,9 +300,9 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
 
     return ge::GRAPH_SUCCESS;
 }
-static ge::graphStatus CheckRecvScalesTensor(const gert::TilingContext *context, const char *nodeName,
+static ge::graphStatus CheckRecvScalesTensor(const gert::TilingContext* context, const char* nodeName,
                                              ge::DataType recvXDtype, int64_t aAlloc, int64_t hidden,
-                                             MoeEpDispatchEpilogueInfo &info)
+                                             MoeEpDispatchEpilogueInfo& info)
 {
     auto recvScalesDesc = context->GetOutputDesc(OUT_RECV_SCALES_INDEX);
     auto recvScalesShape = context->GetOutputShape(OUT_RECV_SCALES_INDEX);
@@ -343,8 +343,8 @@ static ge::graphStatus CheckRecvScalesTensor(const gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckOutputTensors(const gert::TilingContext *context, const char *nodeName,
-                                          MoeEpDispatchEpilogueInfo &info, int64_t topK, bool hasTopkWeights,
+static ge::graphStatus CheckOutputTensors(const gert::TilingContext* context, const char* nodeName,
+                                          MoeEpDispatchEpilogueInfo& info, int64_t topK, bool hasTopkWeights,
                                           bool cached)
 {
     // ---- recvX [A_alloc, hidden] bf16/fp16 ----
@@ -412,9 +412,12 @@ static ge::graphStatus CheckOutputTensors(const gert::TilingContext *context, co
         AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_FIELDS * METADATA_DTYPE_SIZE);
     info.localRecvIndexOffset = info.metadataRankOffsetsOffset +
                                 AlignMoeEpWin((static_cast<uint64_t>(info.cfg.epWorldSize) + 1U) * METADATA_DTYPE_SIZE);
+    // 旧字段的偏移保持不变；尾部仅追加slot终点和metadata行号。
+    info.slotEndsOffset = info.localRecvIndexOffset + AlignMoeEpWin(static_cast<uint64_t>(info.cfg.numTokens) *
+                                                                    info.cfg.topK * METADATA_DTYPE_SIZE);
+    info.slotRowIdsOffset = info.slotEndsOffset + AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_DTYPE_SIZE);
     const uint64_t packedElements =
-        (info.localRecvIndexOffset +
-         AlignMoeEpWin(static_cast<uint64_t>(info.cfg.numTokens) * info.cfg.topK * METADATA_DTYPE_SIZE)) /
+        (info.slotRowIdsOffset + AlignMoeEpWin(static_cast<uint64_t>(aAlloc) * METADATA_DTYPE_SIZE)) /
         METADATA_DTYPE_SIZE;
     auto recvSrcMetaShape = context->GetOutputShape(OUT_RECV_SRC_METADATA_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvSrcMetaShape);
@@ -442,8 +445,8 @@ static ge::graphStatus CheckOutputTensors(const gert::TilingContext *context, co
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *context, const char *nodeName,
-                                                 MoeEpDispatchEpilogueInfo &info, uint32_t networkMode,
+static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* context, const char* nodeName,
+                                                 MoeEpDispatchEpilogueInfo& info, uint32_t networkMode,
                                                  uint32_t serverNum, uint32_t rankNumPerServer)
 {
     auto attrs = context->GetAttrs();
@@ -473,16 +476,16 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *cont
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext *context)
+static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext* context)
 {
     context->SetScheduleMode(1U);
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_TILING_CHECK(nodeName == nullptr, OP_LOGE("unKnownNodeName", "nodeName is nullptr."), return ge::GRAPH_FAILED);
 
-    MoeEpDispatchEpilogueTilingData *tilingData = context->GetTilingData<MoeEpDispatchEpilogueTilingData>();
+    MoeEpDispatchEpilogueTilingData* tilingData = context->GetTilingData<MoeEpDispatchEpilogueTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE(nodeName, "tilingData is nullptr."), return ge::GRAPH_FAILED);
 
-    MoeEpDispatchEpilogueInfo &info = tilingData->moeEpDispatchEpilogueInfo;
+    MoeEpDispatchEpilogueInfo& info = tilingData->moeEpDispatchEpilogueInfo;
     uint32_t networkMode = NETWORK_DIRECT;
     uint32_t serverNum = 1U;
     uint32_t rankNumPerServer = 1U;
@@ -546,7 +549,7 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext *cont
                         ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Check HCCL Window size failed."), return ge::GRAPH_FAILED);
 
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
 
     // Joint counts replace the old per-core rank matrix; each core derives private metadata cursors ordered by rank,
@@ -570,7 +573,7 @@ static ge::graphStatus MoeEpDispatchEpilogueTilingFunc(gert::TilingContext *cont
 }
 
 struct MoeEpDispatchEpilogueCompileInfo {};
-ge::graphStatus TilingParseForMoeEpDispatchEpilogue(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForMoeEpDispatchEpilogue(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
@@ -581,7 +584,7 @@ IMPL_OP_OPTILING(MoeEpDispatchEpilogue)
     .TilingParse<MoeEpDispatchEpilogueCompileInfo>(TilingParseForMoeEpDispatchEpilogue);
 
 #if RUNTIME_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION && METADEF_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION
-inline void MoeEpDispatchEpilogueExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+inline void MoeEpDispatchEpilogueExceptionImplWrapper(aclrtExceptionInfo* args, void* userdata)
 {
     Mc2Exception::MoeEpExceptionImpl(args, userdata, "MoeEpDispatchEpilogue");
 }

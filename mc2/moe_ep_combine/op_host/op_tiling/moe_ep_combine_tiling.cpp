@@ -66,7 +66,7 @@ constexpr int64_t K_MAX = 32;
 constexpr uint32_t NETWORK_DIRECT = 0U;
 constexpr uint32_t NETWORK_HYBRID = 1U;
 
-static void PrintTilingDataInfo(const char *nodeName, const MoeEpCombineInfo &info)
+static void PrintTilingDataInfo(const char* nodeName, const MoeEpCombineInfo& info)
 {
     OP_LOGD(nodeName, "epWorldSize=%u, epRankId=%u, numExperts=%u, numLocalExperts=%u", info.cfg.epWorldSize,
             info.cfg.epRankId, info.cfg.numExperts, info.cfg.numLocalExperts);
@@ -81,17 +81,17 @@ static void PrintTilingDataInfo(const char *nodeName, const MoeEpCombineInfo &in
             info.totalUbSize);
 }
 
-static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context, const char *nodeName,
-                                             MoeEpCombineInfo &info)
+static ge::graphStatus CheckInputTensorShape(const gert::TilingContext* context, const char* nodeName,
+                                             MoeEpCombineInfo& info)
 {
-    const gert::StorageShape *contextStorageShape = context->GetInputShape(CONTEXT_INDEX);
+    const gert::StorageShape* contextStorageShape = context->GetInputShape(CONTEXT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, contextStorageShape);
     OP_TILING_CHECK(
         contextStorageShape->GetStorageShape().GetDimNum() != 1,
         OP_LOGE(nodeName, "context dims must be 1, but got %lu.", contextStorageShape->GetStorageShape().GetDimNum()),
         return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *recvxShape = context->GetInputShape(RECVX_INDEX);
+    const gert::StorageShape* recvxShape = context->GetInputShape(RECVX_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvxShape);
     OP_TILING_CHECK(recvxShape->GetStorageShape().GetDimNum() != TWO_DIMS,
                     OP_LOGE(nodeName, "x dims must be 2, but got %lu.", recvxShape->GetStorageShape().GetDimNum()),
@@ -105,7 +105,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
         OP_LOGE(nodeName, "x dim1(hidden) is invalid, should be in [%ld, %ld], but got %ld.", H_MIN, H_MAX, recvxDim1),
         return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *topkIdxShape = context->GetInputShape(TOPK_IDX_INDEX);
+    const gert::StorageShape* topkIdxShape = context->GetInputShape(TOPK_IDX_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, topkIdxShape);
     OP_TILING_CHECK(
         topkIdxShape->GetStorageShape().GetDimNum() != TWO_DIMS,
@@ -147,11 +147,12 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
     info.localRecvIndexOffset = info.metadataRankOffsetsOffset +
                                 AlignMoeEpWin((static_cast<uint64_t>(info.cfg.epWorldSize) + 1U) * sizeof(int32_t));
 
-    const gert::StorageShape *recvSrcMetadataShape = context->GetInputShape(RECV_SRC_METADATA_INDEX);
+    const gert::StorageShape* recvSrcMetadataShape = context->GetInputShape(RECV_SRC_METADATA_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, recvSrcMetadataShape);
     const uint64_t packedElements =
         (info.localRecvIndexOffset +
-         AlignMoeEpWin(static_cast<uint64_t>(info.cfg.numTokens) * info.cfg.topK * sizeof(int32_t))) /
+         AlignMoeEpWin(static_cast<uint64_t>(info.cfg.numTokens) * info.cfg.topK * sizeof(int32_t)) +
+         2U * AlignMoeEpWin(info.recvCapacity * sizeof(int32_t))) /
         sizeof(int32_t);
     OP_TILING_CHECK(recvSrcMetadataShape->GetStorageShape().GetDimNum() != ONE_DIMS,
                     OP_LOGE(nodeName, "recv_src_metadata must be a 1D packed tensor."), return ge::GRAPH_FAILED);
@@ -159,7 +160,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
                     OP_LOGE(nodeName, "recv_src_metadata packed length must be %lu.", packedElements),
                     return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *numRecvPerExpertShape = context->GetInputShape(NUM_RECV_PER_EXPERT_INDEX);
+    const gert::StorageShape* numRecvPerExpertShape = context->GetInputShape(NUM_RECV_PER_EXPERT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, numRecvPerExpertShape);
     OP_TILING_CHECK(numRecvPerExpertShape->GetStorageShape().GetDimNum() != ONE_DIMS,
                     OP_LOGE(nodeName, "num_recv_tokens_per_expert dims must be 1, but got %lu.",
@@ -171,7 +172,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
                 info.cfg.numLocalExperts, numRecvPerExpertShape->GetStorageShape().GetDim(0)),
         return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *topkWeightsShape = context->GetInputShape(TOPK_WEIGHTS_INDEX);
+    const gert::StorageShape* topkWeightsShape = context->GetInputShape(TOPK_WEIGHTS_INDEX);
     bool hasTopkWeights = (topkWeightsShape != nullptr);
     if (hasTopkWeights) {
         OP_TILING_CHECK(topkWeightsShape->GetStorageShape().GetDimNum() != ONE_DIMS,
@@ -188,7 +189,7 @@ static ge::graphStatus CheckInputTensorShape(const gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckInputDataType(const gert::TilingContext *context, const char *nodeName)
+static ge::graphStatus CheckInputDataType(const gert::TilingContext* context, const char* nodeName)
 {
     auto contextDesc = context->GetInputDesc(CONTEXT_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, contextDesc);
@@ -236,8 +237,8 @@ static ge::graphStatus CheckInputDataType(const gert::TilingContext *context, co
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, const char *nodeName, MoeEpCombineInfo &info,
-                                       uint32_t &networkMode, uint32_t &serverNum, uint32_t &rankNumPerServerOut)
+static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const char* nodeName, MoeEpCombineInfo& info,
+                                       uint32_t& networkMode, uint32_t& serverNum, uint32_t& rankNumPerServerOut)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE(nodeName, "attrs is nullptr."), return ge::GRAPH_FAILED);
@@ -304,9 +305,9 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext *context, const
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *context, MoeEpCombineInfo &info,
+static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext* context, MoeEpCombineInfo& info,
                                                  uint32_t networkMode, uint32_t serverNum, uint32_t rankNumPerServer,
-                                                 const char *nodeName)
+                                                 const char* nodeName)
 {
     auto attrs = context->GetAttrs();
     auto cclBufferSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_CCL_BUFFER_SIZE_INDEX);
@@ -336,17 +337,17 @@ static ge::graphStatus BuildAndCheckWindowLayout(const gert::TilingContext *cont
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext *context)
+static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext* context)
 {
     context->SetScheduleMode(1U);
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_TILING_CHECK(nodeName == nullptr, OP_LOGE("unKnownNodeName", "nodeName is nullptr."), return ge::GRAPH_FAILED);
 
-    MoeEpCombineTilingData *tilingData = context->GetTilingData<MoeEpCombineTilingData>();
+    MoeEpCombineTilingData* tilingData = context->GetTilingData<MoeEpCombineTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE(nodeName, "tilingData is nullptr."), return ge::GRAPH_FAILED);
     OP_LOGI(nodeName, "Enter MoeEpCombine tiling func.");
 
-    MoeEpCombineInfo &info = tilingData->moeEpCombineInfo;
+    MoeEpCombineInfo& info = tilingData->moeEpCombineInfo;
     uint32_t networkMode = NETWORK_DIRECT;
     uint32_t serverNum = 1U;
     uint32_t rankNumPerServer = 1U;
@@ -377,7 +378,7 @@ static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext *context)
                         ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Check window size failed."), return ge::GRAPH_FAILED);
 
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
     // Metadata provides the addresses and the persistent window holds the flag source.
     // No operator-private address table or per-AIV flag workspace is needed.
@@ -393,7 +394,7 @@ static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext *context)
 }
 
 struct MoeEpCombineCompileInfo {};
-ge::graphStatus TilingParseForMoeEpCombine(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForMoeEpCombine(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
@@ -404,7 +405,7 @@ IMPL_OP_OPTILING(MoeEpCombine)
     .TilingParse<MoeEpCombineCompileInfo>(TilingParseForMoeEpCombine);
 
 #if RUNTIME_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION && METADEF_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION
-inline void MoeEpCombineExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+inline void MoeEpCombineExceptionImplWrapper(aclrtExceptionInfo* args, void* userdata)
 {
     Mc2Exception::MoeEpExceptionImpl(args, userdata, "MoeEpCombine");
 }

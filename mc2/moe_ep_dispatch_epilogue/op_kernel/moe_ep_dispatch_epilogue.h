@@ -36,6 +36,9 @@
 
 #include "moe_ep_dispatch_epilogue_tiling_key.h"
 #include "moe_ep_dispatch_epilogue_tiling.h"
+#if defined(ENABLE_MOE_EP_DISPATCH_EPILOGUE_KERNEL)
+#include "moe_ep_dispatch_epilogue_count.h"
+#endif
 
 #include "../../common/op_kernel/moe_distribute_base.h"
 #include "../../common/op_kernel/mc2_kernel_utils.h"
@@ -56,7 +59,6 @@ static constexpr uint32_t NETWORK_HYBRID = 1U; // 1 = hybrid dispatch, 0 = direc
 // The valid prefix is ordered by (srcRank, recvXIdx); each rank range follows increasing send-source rows.
 // UB staging still uses an aligned stride so that every non-aligned 20-byte copy starts from a 32-byte boundary.
 static constexpr uint32_t RECV_META_FIELDS = 5;
-static constexpr uint8_t BUFFER_NUM = 2;
 static constexpr uint32_t ELEM_ALIGN = 8U;
 static constexpr uint32_t INT32_PER_BLOCK = UB_ALIGN / sizeof(int32_t);
 static constexpr uint32_t META_TOPK_SECTION = 2U;
@@ -69,12 +71,12 @@ static constexpr uint32_t META_RECV_X_IDX_OFFSET = 4U;
 static constexpr uint32_t HIT_ROW_OFFSET = 0U;
 static constexpr uint32_t HIT_TOPK_OFFSET = 1U;
 static constexpr uint32_t HIT_ENTRY_SIZE = 2U;
-// Five-field metadata needs 20 bytes per row. A 4096-row tile keeps this cached staging buffer at 80 KiB.
-static constexpr uint32_t CACHED_META_TILE = 4096U;
 static constexpr uint32_t ALIGNED_LEN_256 = 256U;
 static constexpr uint32_t SLOTS_TILE = 128U;
+static constexpr uint32_t UB_CONTROL_RESERVE = 4096U; // 诊断、通信结束及框架临时空间
+static constexpr uint32_t PLAN_END_EXTRA = 1U;        // UB额外读前一slot终点，GM不存起始0
 
-// 非 cached 路径上三处流水缓冲的份数。都是人工调的旋钮：调大 → 重叠更深、更抗上游抖动；调小 → 省 UB。
+// slot搬运的三处流水缓冲份数。都是人工调的旋钮：调大 → 重叠更深、更抗上游抖动；调小 → 省 UB。
 // 三处互相独立，可以单独调。都是「全局拍号 % 份数」选 buffer，所以份数改动不需要动任何下标表达式。
 //   META_RING  : tile 元数据的 MTE2 → S 环。份数 >= 2 就能把下一个 tile 的 meta 读提前一拍发出去，
 //                让读延迟盖在当前拍的 MTE3 写上，而不是让标量 pipe 干等。
@@ -103,13 +105,20 @@ private:
     __aicore__ inline void CountHits();
     __aicore__ inline void BuildRankRowStarts();
     __aicore__ inline void WaitDispatch();
-    __aicore__ inline void CopyFromWindowByExpert();
+    __aicore__ inline void CopySlots();
+    __aicore__ inline uint32_t BuildSlotHits(uint32_t metaBuf, uint32_t localSlot, uint32_t globalTileSlot);
     // 把 (rank, tile) 两层循环拍平成「取下一个 tile」。预读 meta 必须知道下一拍在哪，而下一拍会跨 rank，
     // 每个 rank 的槽位数又只有标量读得到；epWorldSize_ 很小，逐 rank 扫一遍的代价可以忽略。
     __aicore__ inline bool NextTile(uint32_t rankId, uint32_t tileStart, uint32_t& nextRank, uint32_t& nextTileStart,
                                     uint32_t& nextTileCnt, uint32_t& nextSlotStart);
     __aicore__ inline void IssueMeta(uint32_t rankId, uint32_t slotIdx, uint32_t tileCnt, uint32_t buf);
-    __aicore__ inline void CopyFromWindowByCachedMeta();
+    __aicore__ inline void InitSlotBuffers(uint32_t tokenBytes, uint32_t sharedBytes, uint64_t ubBytes);
+    __aicore__ inline uint32_t GlobalSlot(uint32_t rankId, uint32_t slotId);
+    __aicore__ inline void CopyCachedArray(GlobalTensor<int32_t> src, GlobalTensor<int32_t> dst, uint32_t count);
+    __aicore__ inline void CopyCachedMetadata();
+    __aicore__ inline LocalTensor<XType> IssueTokenRead(GM_ADDR slotAddr, int32_t tokenId, uint32_t sequence,
+                                                        const DataCopyParams& tokenCopyParams,
+                                                        const DataCopyParams& scalesCopyParams);
     __aicore__ inline void CopyCachedRankOffsets();
     __aicore__ inline void InitLocalRecvIndex();
 
@@ -144,6 +153,11 @@ private:
     GlobalTensor<int32_t> recvSrcMetadataGm_;
     GlobalTensor<int32_t> recvRankOffsetsGm_;
     GlobalTensor<int32_t> localRecvIndexGm_;
+    GlobalTensor<int32_t> cachedLocalRecvIndexGm_;
+    GlobalTensor<int32_t> slotEndsGm_;
+    GlobalTensor<int32_t> slotRowIdsGm_;
+    GlobalTensor<int32_t> cachedSlotEndsGm_;
+    GlobalTensor<int32_t> cachedSlotRowIdsGm_;
     GlobalTensor<ScalesType> recvScalesGm_;
     GlobalTensor<int32_t> cachedRecvSrcMetadataGm_; // cached 路径专用：来自上一轮 dispatch 的 recv_src_metadata
     GlobalTensor<int32_t> cachedRecvRankOffsetsGm_; // cached 路径专用：来自上一轮 dispatch 的 rank offsets
@@ -157,21 +171,24 @@ private:
     LocalTensor<int64_t> ubRowStart_;
     LocalTensor<int32_t> ubMeta_;
     LocalTensor<int32_t> ubTopkIds_;
-    LocalTensor<int32_t> ubTargetExpertId_;
     LocalTensor<int32_t> ubRecvCnt_;
     LocalTensor<int64_t> ubExpertPfx_;
     LocalTensor<int64_t> ubHitCountRowI64_;
-    LocalTensor<float> ubStageWeights_;
-    LocalTensor<int32_t> ubStageMeta_;
     LocalTensor<XType> tokenRing_;
     LocalTensor<float> ubStageWeightsRing_;
     LocalTensor<int32_t> ubStageMetaRing_;
     LocalTensor<int32_t> ubStageLocalIndexRing_;
     LocalTensor<int32_t> ubLocalCursor_;
     LocalTensor<int64_t> ubHitList_;
+    LocalTensor<int32_t> ubSlotPlan_;
+    TBuf<QuePosition::VECIN> ubSlotPlanBuf_;
+    uint32_t slotsPerTile_{SLOTS_TILE};
+    uint32_t planEndsElems_{0};
+    uint32_t planRingElems_{0};
+    uint32_t planRowBegin_[META_RING] = {0};
+    int32_t planEvtMte3ToS_[META_RING] = {0};
     LocalTensor<int32_t> ubWaitStatus_;
     LocalTensor<int32_t> ubWaitSum_;
-    LocalTensor<int32_t> ubLocalIndexValue_;
 
     TBuf<QuePosition::VECIN> ubHitCountBuf_;
     TBuf<QuePosition::VECIN> ubRankExpertHitCountBuf_;
@@ -180,16 +197,12 @@ private:
     TBuf<QuePosition::VECIN> ubRowStartBuf_;
     TBuf<QuePosition::VECIN> ubMetaBuf_;
     TBuf<QuePosition::VECIN> ubTopkIdsBuf_;
-    TBuf<QuePosition::VECIN> ubTargetExpertIdBuf_;
     TBuf<QuePosition::VECIN> ubRecvCntBuf_;
     TBuf<QuePosition::VECIN> ubExpertPfxBuf_;
     TBuf<QuePosition::VECIN> ubHitCountRowI64Buf_;
-    TBuf<QuePosition::VECIN> ubStageWeightsBuf_;
-    TBuf<QuePosition::VECIN> ubStageMetaBuf_;
     TBuf<QuePosition::VECIN> ubLocalCursorBuf_;
     TBuf<QuePosition::VECIN> ubHitListBuf_;
-    TQueBind<QuePosition::VECIN, QuePosition::VECOUT, 1> tokenQueue_; // 仅 cached 路径
-    // 非 cached 路径的流水缓冲全部自管，份数见 *_RING 常量。ubMetaBuf_ 同时也是 meta 环的载体。
+    // 两条路径共用token环与路由预取；metadata生成的stage仅首次执行使用。
     TBuf<QuePosition::VECIN> tokenRingBuf_;
     TBuf<QuePosition::VECIN> ubStageWeightsRingBuf_;
     TBuf<QuePosition::VECIN> ubStageMetaRingBuf_;
@@ -197,19 +210,14 @@ private:
     TBuf<> waitStatusBuf_;
     TBuf<> waitSumBuf_;
     TBuf<> sharedTmpBuf_;
-    TBuf<> ubLocalIndexValueBuf_;
 
     uint32_t expertSum_{0};
-    GM_ADDR workspaceGM_{nullptr};
     GM_ADDR localWinAddr_{nullptr};
     GM_ADDR localSlotStateWinAddr_{nullptr};
     uint32_t scalesOffset_{0};
     uint32_t scalesStride_{0}; // token UB 槽内 scales 暂存偏移(32B 对齐, 与 GM slot 紧拼偏移解耦)
-    uint32_t scalesBytes_{0};
-    uint32_t scalesBytesAlign_{0};
     uint32_t scalesElems_{0};
     uint32_t metaOffset_{0};
-    uint32_t tokenQueueBufBytes_{0};
     uint32_t metaBytes_{0};
     // 三处自管环的「一份」有多少个元素，用来做 份号 * 每份元素数 的偏移。
     uint32_t tokenRingElems_{0};
@@ -217,9 +225,8 @@ private:
     uint32_t metaRingElems_{0};
     uint32_t paddedMetaElems_{0};
     uint32_t axisKAlign_{0};
-    uint32_t paddedTopkElems_{0};
     uint32_t numLocalExperts_{0};
-    // [rank][expert] 计数表里每跑一个 rank 的行步长。必须补到 ELEM_ALIGN 的整数倍：CopyFromWindowByExpert 会按
+    // [rank][expert] 计数表里每跑一个 rank 的行步长。必须补到 ELEM_ALIGN 的整数倍：CopySlots 会按
     // prefixRank * rankExpertRowStride_ 切片交给 VEC，而 VEC 访问 UB 要求 32 字节对齐；numLocalExperts_ 本身没有
     // 对齐保证（host 侧就是 numExperts / epWorldSize，例：numExperts=4, epWorldSize=2 → 2）。
     uint32_t rankExpertRowStride_{0};
@@ -271,7 +278,6 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 {
     tpipe_ = pipe;
     aivId_ = GetBlockIdx();
-    workspaceGM_ = workspace;
     numLocalExperts_ = tilingData->cfg.numLocalExperts;
     aivNum_ = tilingData->aivNum;
     networkMode_ = tilingData->networkMode;
@@ -305,6 +311,16 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     if constexpr (IsCached) {
         cachedRecvRankOffsetsGm_.SetGlobalBuffer(
             reinterpret_cast<__gm__ int32_t*>(cachedRecvSrcMetadata + tilingData->metadataRankOffsetsOffset));
+        cachedLocalRecvIndexGm_.SetGlobalBuffer(
+            reinterpret_cast<__gm__ int32_t*>(cachedRecvSrcMetadata + tilingData->localRecvIndexOffset));
+    }
+    slotEndsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(recvSrcMetadata + tilingData->slotEndsOffset));
+    slotRowIdsGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(recvSrcMetadata + tilingData->slotRowIdsOffset));
+    if constexpr (IsCached) {
+        cachedSlotEndsGm_.SetGlobalBuffer(
+            reinterpret_cast<__gm__ int32_t*>(cachedRecvSrcMetadata + tilingData->slotEndsOffset));
+        cachedSlotRowIdsGm_.SetGlobalBuffer(
+            reinterpret_cast<__gm__ int32_t*>(cachedRecvSrcMetadata + tilingData->slotRowIdsOffset));
     }
     xGm_.SetGlobalBuffer((__gm__ XType*)x);
     recvXGm_.SetGlobalBuffer((__gm__ XType*)recvX);
@@ -340,93 +356,17 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     tpipe_->InitBuffer(ubRankOffsetsBuf_, ubRankOffsetsBytes);
     ubRankOffsets_ = ubRankOffsetsBuf_.Get<int32_t>();
 
-    if constexpr (!IsCached) {
-        rankExpertRowStride_ = Ceil(numLocalExperts_, ELEM_ALIGN) * ELEM_ALIGN;
-        rankExpertCountStride_ = rankExpertRowStride_ * epWorldSize_;
-        paddedMetaElems_ = Ceil(META_TOPK_SECTION * axisKAlign_ + META_EXTRA_FIELDS, ELEM_ALIGN) * ELEM_ALIGN;
-        paddedTopkElems_ = axisKAlign_;
-        uint32_t ubHitCountBytes = Ceil((uint32_t)(numLocalExperts_ * sizeof(int32_t)), UB_ALIGN) * UB_ALIGN;
-        uint32_t ubRankExpertCountBytes = rankExpertCountStride_ * sizeof(int32_t);
-        uint32_t ubRowStartBytes = Ceil((uint32_t)(numLocalExperts_ * sizeof(int64_t)), UB_ALIGN) * UB_ALIGN;
-        uint32_t ubMetaBytes = Ceil((uint32_t)(SLOTS_TILE * paddedMetaElems_ * sizeof(int32_t)), UB_ALIGN) * UB_ALIGN;
-        uint32_t ubTopkIdsBytes =
-            Ceil((uint32_t)(SLOTS_TILE * paddedTopkElems_ * sizeof(int32_t)), UB_ALIGN) * UB_ALIGN;
-        uint32_t ubRecvCntBytes = Ceil((uint32_t)(epWorldSize_ * sizeof(int32_t)), UB_ALIGN) * UB_ALIGN;
-        uint32_t ubHitCountRowI64Bytes = Ceil((uint32_t)(numLocalExperts_ * sizeof(int64_t)), UB_ALIGN) * UB_ALIGN;
-        // 一份 stage:最多 axisK_ 个命中，每个占 ELEM_ALIGN 个元素。份数见 STAGE_RING。
-        stageSlotElems_ = axisK_ * ELEM_ALIGN;
-        uint32_t ubStageSlotBytes = stageSlotElems_ * static_cast<uint32_t>(sizeof(int32_t));
-        uint32_t ubStageMetaBytes = ubStageSlotBytes * STAGE_RING;
-        uint32_t ubStageWeightsBytes = ubStageSlotBytes * STAGE_RING;
-        uint32_t ubStageLocalIndexBytes = ubStageSlotBytes * STAGE_RING;
-        metaRingElems_ = ubMetaBytes / static_cast<uint32_t>(sizeof(int32_t));
-        uint32_t ubHitListBytes = Ceil((uint32_t)(axisK_ * HIT_ENTRY_SIZE * sizeof(int64_t)), UB_ALIGN) * UB_ALIGN;
-        uint32_t ubLocalCursorBytes = Ceil((uint32_t)(numLocalExperts_ * sizeof(int32_t)), UB_ALIGN) * UB_ALIGN;
-
-        tpipe_->InitBuffer(ubRecvCntBuf_, ubRecvCntBytes);
-        tpipe_->InitBuffer(ubHitCountBuf_, ubHitCountBytes);
-        tpipe_->InitBuffer(ubRankExpertHitCountBuf_, ubRankExpertCountBytes);
-        tpipe_->InitBuffer(ubRankExpertRowStartBuf_, ubRankExpertCountBytes);
-        tpipe_->InitBuffer(ubRowStartBuf_, ubRowStartBytes);
-        tpipe_->InitBuffer(ubMetaBuf_, ubMetaBytes * META_RING);
-        tpipe_->InitBuffer(ubTopkIdsBuf_, ubTopkIdsBytes);
-        tpipe_->InitBuffer(ubTargetExpertIdBuf_, ubTopkIdsBytes);
-        tpipe_->InitBuffer(ubHitCountRowI64Buf_, ubHitCountRowI64Bytes);
-        tpipe_->InitBuffer(ubStageWeightsRingBuf_, ubStageWeightsBytes);
-        tpipe_->InitBuffer(ubStageMetaRingBuf_, ubStageMetaBytes);
-        tpipe_->InitBuffer(ubStageLocalIndexRingBuf_, ubStageLocalIndexBytes);
-        tpipe_->InitBuffer(ubHitListBuf_, ubHitListBytes);
-        tpipe_->InitBuffer(ubLocalCursorBuf_, ubLocalCursorBytes);
-        ubRecvCnt_ = ubRecvCntBuf_.Get<int32_t>();
-        ubHitCount_ = ubHitCountBuf_.Get<int32_t>();
-        ubRankExpertHitCount_ = ubRankExpertHitCountBuf_.Get<int32_t>();
-        ubRankExpertRowStart_ = ubRankExpertRowStartBuf_.Get<int32_t>();
-        ubRowStart_ = ubRowStartBuf_.Get<int64_t>();
-        ubMeta_ = ubMetaBuf_.Get<int32_t>();
-        ubTopkIds_ = ubTopkIdsBuf_.Get<int32_t>();
-        ubTargetExpertId_ = ubTargetExpertIdBuf_.Get<int32_t>();
-        ubHitCountRowI64_ = ubHitCountRowI64Buf_.Get<int64_t>();
-        ubStageWeightsRing_ = ubStageWeightsRingBuf_.Get<float>();
-        ubStageMetaRing_ = ubStageMetaRingBuf_.Get<int32_t>();
-        ubStageLocalIndexRing_ = ubStageLocalIndexRingBuf_.Get<int32_t>();
-        ubHitList_ = ubHitListBuf_.Get<int64_t>();
-        ubLocalCursor_ = ubLocalCursorBuf_.Get<int32_t>();
-        // 三处环的事件各按份数取，互相不复用。
-        for (uint32_t ringIdx = 0; ringIdx < META_RING; ++ringIdx) {
-            metaEvtMte2ToS_[ringIdx] = static_cast<int32_t>(GetTPipePtr()->AllocEventID<AscendC::HardEvent::MTE2_S>());
-            metaEvtSToMte2_[ringIdx] = static_cast<int32_t>(GetTPipePtr()->AllocEventID<AscendC::HardEvent::S_MTE2>());
-        }
-        for (uint32_t ringIdx = 0; ringIdx < TOKEN_RING; ++ringIdx) {
-            tokenEvtFill_[ringIdx] = static_cast<int32_t>(GetTPipePtr()->AllocEventID<AscendC::HardEvent::MTE2_MTE3>());
-            tokenEvtFree_[ringIdx] = static_cast<int32_t>(GetTPipePtr()->AllocEventID<AscendC::HardEvent::MTE3_MTE2>());
-        }
-        for (uint32_t ringIdx = 0; ringIdx < STAGE_RING; ++ringIdx) {
-            stageEvtMte3ToS_[ringIdx] = static_cast<int32_t>(GetTPipePtr()->AllocEventID<AscendC::HardEvent::MTE3_S>());
-        }
-        stageEvtSToMte3_ = static_cast<int32_t>(GetTPipePtr()->AllocEventID<AscendC::HardEvent::S_MTE3>());
-    } else {
-        tpipe_->InitBuffer(ubLocalIndexValueBuf_, UB_ALIGN);
-        ubLocalIndexValue_ = ubLocalIndexValueBuf_.Get<int32_t>();
-    }
-
+    uint32_t scalesBytesAlign = 0U;
     if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
         scalesOffset_ = slotMetaBase;
-        scalesBytes_ = tilingData->cfg.scalesBytes;
-        scalesElems_ = (scalesBytes_ == 0U) ? 0U : (scalesBytes_ / sizeof(ScalesType));
-        scalesBytesAlign_ = Ceil(scalesBytes_, UB_ALIGN) * UB_ALIGN;
-        metaOffset_ += scalesBytesAlign_;
+        const uint32_t scalesBytes = tilingData->cfg.scalesBytes;
+        scalesElems_ = scalesBytes / sizeof(ScalesType);
+        scalesBytesAlign = Ceil(scalesBytes, UB_ALIGN) * UB_ALIGN;
+        metaOffset_ += scalesBytesAlign;
         recvScalesGm_.SetGlobalBuffer((__gm__ ScalesType*)recvScales);
     }
 
-    tokenQueueBufBytes_ = hAlignSize + scalesBytesAlign_;
-
-    if constexpr (IsCached) {
-        tpipe_->InitBuffer(tokenQueue_, BUFFER_NUM, tokenQueueBufBytes_);
-    } else {
-        tokenRingElems_ = tokenQueueBufBytes_ / static_cast<uint32_t>(sizeof(XType));
-        tpipe_->InitBuffer(tokenRingBuf_, TOKEN_RING * tokenQueueBufBytes_);
-        tokenRing_ = tokenRingBuf_.Get<XType>();
-    }
+    InitSlotBuffers(hAlignSize + scalesBytesAlign, sharedBytes, tilingData->totalUbSize);
 
     DataCopyExtParams expertPfxCopyParams{1U, static_cast<uint32_t>(numLocalExperts_ * sizeof(int64_t)), 0U, 0U, 0U};
     DataCopyPadExtParams<int64_t> expertPfxPadParams{false, 0U, 0U, 0};
@@ -442,21 +382,114 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 }
 
 template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::InitSlotBuffers(
+    uint32_t tokenBytes, uint32_t sharedBytes, uint64_t ubBytes)
+{
+    rankExpertRowStride_ = Ceil(numLocalExperts_, ELEM_ALIGN) * ELEM_ALIGN;
+    rankExpertCountStride_ = rankExpertRowStride_ * epWorldSize_;
+    paddedMetaElems_ = Ceil(META_TOPK_SECTION * axisKAlign_ + META_EXTRA_FIELDS, ELEM_ALIGN) * ELEM_ALIGN;
+    stageSlotElems_ = axisK_ * ELEM_ALIGN;
+    uint32_t expertBytes = Ceil(numLocalExperts_ * sizeof(int64_t), UB_ALIGN) * UB_ALIGN;
+    uint32_t countBytes = Ceil(numLocalExperts_ * sizeof(int32_t), UB_ALIGN) * UB_ALIGN;
+    uint32_t recvCountBytes = Ceil(epWorldSize_ * sizeof(int32_t), UB_ALIGN) * UB_ALIGN;
+    uint32_t rankOffsetBytes = Ceil((epWorldSize_ + 1U) * sizeof(int32_t), UB_ALIGN) * UB_ALIGN;
+    uint32_t hitBytes = Ceil(axisK_ * HIT_ENTRY_SIZE * sizeof(int64_t), UB_ALIGN) * UB_ALIGN;
+    uint32_t stageBytes = stageSlotElems_ * sizeof(int32_t) * STAGE_RING;
+    uint64_t fixedBytes = expertBytes + totalNotifyCnt_ * UB_ALIGN + UB_ALIGN + sharedBytes + rankOffsetBytes +
+                          recvCountBytes + hitBytes + TOKEN_RING * tokenBytes + UB_CONTROL_RESERVE;
+    if constexpr (!IsCached) {
+        fixedBytes +=
+            2U * countBytes + 2U * rankExpertCountStride_ * sizeof(int32_t) + 2U * expertBytes + 2U * stageBytes;
+    }
+    if constexpr (HasTopkWeights) {
+        fixedBytes += stageBytes;
+    }
+    // 按当前tiling全部buffer核算，最大K/专家数/卡数也不能挤出UB。
+    while (true) {
+        metaRingElems_ = slotsPerTile_ * paddedMetaElems_;
+        if constexpr (!IsCached) {
+            metaRingElems_ = metaRingElems_ < rankExpertCountStride_ ? rankExpertCountStride_ : metaRingElems_;
+        }
+        planEndsElems_ = Ceil(slotsPerTile_ + PLAN_END_EXTRA, ELEM_ALIGN) * ELEM_ALIGN;
+        planRingElems_ = planEndsElems_ + Ceil(slotsPerTile_ * axisK_, ELEM_ALIGN) * ELEM_ALIGN;
+        uint64_t routeBytes = META_RING * metaRingElems_ * sizeof(int32_t);
+        uint64_t planBytes = META_RING * planRingElems_ * sizeof(int32_t);
+        uint64_t countTileBytes = IsCached ? 0U : slotsPerTile_ * axisKAlign_ * sizeof(int32_t);
+        if (fixedBytes + routeBytes + planBytes + countTileBytes <= ubBytes || slotsPerTile_ == 1U) {
+            break;
+        }
+        slotsPerTile_ /= 2U;
+    }
+    tokenRingElems_ = tokenBytes / sizeof(XType);
+    tpipe_->InitBuffer(ubRecvCntBuf_, recvCountBytes);
+    tpipe_->InitBuffer(ubMetaBuf_, metaRingElems_ * sizeof(int32_t) * META_RING);
+    tpipe_->InitBuffer(ubHitListBuf_, hitBytes);
+    tpipe_->InitBuffer(ubSlotPlanBuf_, planRingElems_ * sizeof(int32_t) * META_RING);
+    tpipe_->InitBuffer(tokenRingBuf_, tokenBytes * TOKEN_RING);
+    ubRecvCnt_ = ubRecvCntBuf_.Get<int32_t>();
+    ubMeta_ = ubMetaBuf_.Get<int32_t>();
+    ubHitList_ = ubHitListBuf_.Get<int64_t>();
+    ubSlotPlan_ = ubSlotPlanBuf_.Get<int32_t>();
+    tokenRing_ = tokenRingBuf_.Get<XType>();
+    if constexpr (HasTopkWeights) {
+        tpipe_->InitBuffer(ubStageWeightsRingBuf_, stageBytes);
+        ubStageWeightsRing_ = ubStageWeightsRingBuf_.Get<float>();
+    }
+    if constexpr (!IsCached) {
+        tpipe_->InitBuffer(ubHitCountBuf_, countBytes);
+        tpipe_->InitBuffer(ubRankExpertHitCountBuf_, rankExpertCountStride_ * sizeof(int32_t));
+        tpipe_->InitBuffer(ubRankExpertRowStartBuf_, rankExpertCountStride_ * sizeof(int32_t));
+        tpipe_->InitBuffer(ubRowStartBuf_, expertBytes);
+        tpipe_->InitBuffer(ubTopkIdsBuf_, slotsPerTile_ * axisKAlign_ * sizeof(int32_t));
+        tpipe_->InitBuffer(ubHitCountRowI64Buf_, expertBytes);
+        tpipe_->InitBuffer(ubStageMetaRingBuf_, stageBytes);
+        tpipe_->InitBuffer(ubStageLocalIndexRingBuf_, stageBytes);
+        tpipe_->InitBuffer(ubLocalCursorBuf_, countBytes);
+        ubHitCount_ = ubHitCountBuf_.Get<int32_t>();
+        ubRankExpertHitCount_ = ubRankExpertHitCountBuf_.Get<int32_t>();
+        ubRankExpertRowStart_ = ubRankExpertRowStartBuf_.Get<int32_t>();
+        ubRowStart_ = ubRowStartBuf_.Get<int64_t>();
+        ubTopkIds_ = ubTopkIdsBuf_.Get<int32_t>();
+        ubHitCountRowI64_ = ubHitCountRowI64Buf_.Get<int64_t>();
+        ubStageMetaRing_ = ubStageMetaRingBuf_.Get<int32_t>();
+        ubStageLocalIndexRing_ = ubStageLocalIndexRingBuf_.Get<int32_t>();
+        ubLocalCursor_ = ubLocalCursorBuf_.Get<int32_t>();
+    }
+    for (uint32_t i = 0; i < META_RING; ++i) {
+        metaEvtMte2ToS_[i] = tpipe_->AllocEventID<AscendC::HardEvent::MTE2_S>();
+        metaEvtSToMte2_[i] = tpipe_->AllocEventID<AscendC::HardEvent::S_MTE2>();
+        if constexpr (!IsCached) {
+            planEvtMte3ToS_[i] = tpipe_->AllocEventID<AscendC::HardEvent::MTE3_S>();
+        }
+    }
+    for (uint32_t i = 0; i < TOKEN_RING; ++i) {
+        tokenEvtFill_[i] = tpipe_->AllocEventID<AscendC::HardEvent::MTE2_MTE3>();
+        tokenEvtFree_[i] = tpipe_->AllocEventID<AscendC::HardEvent::MTE3_MTE2>();
+    }
+    if constexpr (!IsCached || HasTopkWeights) {
+        for (uint32_t i = 0; i < STAGE_RING; ++i) {
+            stageEvtMte3ToS_[i] = tpipe_->AllocEventID<AscendC::HardEvent::MTE3_S>();
+        }
+        stageEvtSToMte3_ = tpipe_->AllocEventID<AscendC::HardEvent::S_MTE3>();
+    }
+}
+
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
 __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::InitLocalRecvIndex()
 {
-    uint32_t totalElements = numTokens_ * axisK_;
-    uint32_t totalBlocks = Ceil(totalElements, INT32_PER_BLOCK);
-    uint32_t startBlock = 0U;
-    uint32_t endBlock = 0U;
-    uint32_t blockCount = 0U;
-    SplitToCore(totalBlocks, aivNum_, startBlock, endBlock, blockCount);
-    if (startBlock >= endBlock) {
-        return;
+    const uint32_t totalElements = numTokens_ * axisK_;
+    if constexpr (IsCached) {
+        // 路由未变，共用批量搬运函数；此时metadata缓冲尚未用于预取。
+        CopyCachedArray(cachedLocalRecvIndexGm_, localRecvIndexGm_, totalElements);
+    } else {
+        uint32_t startBlock, endBlock, blockCount;
+        SplitToCore(Ceil(totalElements, INT32_PER_BLOCK), aivNum_, startBlock, endBlock, blockCount);
+        const uint32_t start = startBlock * INT32_PER_BLOCK;
+        const uint32_t end = endBlock * INT32_PER_BLOCK > totalElements ? totalElements : endBlock * INT32_PER_BLOCK;
+        if (start < end) {
+            InitOutput<int32_t>(localRecvIndexGm_[start], end - start, -1);
+        }
     }
-    uint32_t start = startBlock * INT32_PER_BLOCK;
-    uint32_t end = endBlock * INT32_PER_BLOCK;
-    end = end > totalElements ? totalElements : end;
-    InitOutput<int32_t>(localRecvIndexGm_[start], end - start, -1);
     SyncFunc<AscendC::HardEvent::MTE3_S>();
 }
 
@@ -466,39 +499,29 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     InitLocalRecvIndex();
     if constexpr (!IsCached) {
         ComputePrefixSums();
-        WaitDispatch();
-        SyncAll<true>();
-        diagWriter_.RunPosRecord(MOE_EP_DISPATCH_EPILOGUE_RUN_POS_WAIT_DONE);
+    }
+    WaitDispatch();
+    SyncAll<true>();
+    diagWriter_.RunPosRecord(MOE_EP_DISPATCH_EPILOGUE_RUN_POS_WAIT_DONE);
+
+    if constexpr (!IsCached) {
         CountHits();
         SyncAll<true>();
-
-        // Every core builds its own [rank][expert] metadata cursors from the shared joint-count matrix.
-        // The starts stay in local UB, so no post-build cross-core synchronization is needed.
+        // 每核根据共享计数生成自己的metadata起点，结果留在UB，无须再次核间同步。
         BuildRankRowStarts();
-
-        uint32_t totalHits = 0;
-        for (uint32_t localExpertIdx = 0; localExpertIdx < numLocalExperts_; ++localExpertIdx) {
-            totalHits += static_cast<uint32_t>(ubHitCount_.GetValue(localExpertIdx));
-        }
-
-        if (totalHits != 0) {
-            CopyFromWindowByExpert();
-        }
-        // recv_x/metadata/weights are consumed immediately by MoeEpCombine in continue mode.  Do not rely on the
-        // diagnostic write below (or on kernel-tail draining) to complete preceding MTE3 writes.
-        SyncFunc<AscendC::HardEvent::MTE3_S>();
-        diagWriter_.RunPosRecord(MOE_EP_DISPATCH_EPILOGUE_RUN_POS_OUTPUT_DONE);
     } else {
-        WaitDispatch();
-        SyncAll<true>();
-        diagWriter_.RunPosRecord(MOE_EP_DISPATCH_EPILOGUE_RUN_POS_WAIT_DONE);
+        DataCopyPad(ubRecvCnt_, numRecvPerRankGm_,
+                    {1U, epWorldSize_ * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U}, {false, 0U, 0U, 0U});
+        SyncFunc<AscendC::HardEvent::MTE2_S>();
         CopyCachedRankOffsets();
-        CopyFromWindowByCachedMeta();
-        // The cached metadata path ends with MTE3_MTE2 for UB reuse.  Add an explicit producer-completion edge for
-        // the following combine kernel, which consumes all five metadata fields and recv_rank_offsets.
-        SyncFunc<AscendC::HardEvent::MTE3_S>();
-        diagWriter_.RunPosRecord(MOE_EP_DISPATCH_EPILOGUE_RUN_POS_OUTPUT_DONE);
+        CopyCachedMetadata();
     }
+
+    // 两条路径共用slot分核与搬运流水，仅命中位置的准备方式不同。
+    CopySlots();
+    // 所有输出在交给Combine前写完，包含metadata及slot索引。
+    SyncFunc<AscendC::HardEvent::MTE3_S>();
+    diagWriter_.RunPosRecord(MOE_EP_DISPATCH_EPILOGUE_RUN_POS_OUTPUT_DONE);
     MoeEpCompletion::DrainChannels(mc2Context_, epWorldSize_, tpipe_);
 }
 
@@ -577,44 +600,32 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
         GlobalTensor<int32_t> srcTopkIdsGm;
 
         uint32_t topkBytes = axisK_ * sizeof(int32_t);
-        LocalTensor<uint8_t> sharedTmpInt8 = ubMetaBuf_.Get<uint8_t>();
-        LocalTensor<uint32_t> sharedTmpInt32 = ubMetaBuf_.Get<uint32_t>();
 
-        for (uint32_t tileStart = 0; tileStart < slotCntPerAiv; tileStart += SLOTS_TILE) {
-            uint32_t tileCnt = (slotCntPerAiv - tileStart > SLOTS_TILE) ? SLOTS_TILE : (slotCntPerAiv - tileStart);
+        for (uint32_t tileStart = 0; tileStart < slotCntPerAiv; tileStart += slotsPerTile_) {
+            uint32_t tileCnt =
+                (slotCntPerAiv - tileStart > slotsPerTile_) ? slotsPerTile_ : (slotCntPerAiv - tileStart);
 
             srcTopkIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(
                 srcRankBase + (int64_t)(slotStart + tileStart) * perSlotBytes_ + metaOffset_));
             DataCopyExtParams topkCopyParams{static_cast<uint16_t>(tileCnt), static_cast<uint32_t>(topkBytes),
                                              static_cast<int64_t>(perSlotBytes_ - topkBytes), 0, 0};
-            DataCopyPadExtParams<int32_t> topkPadParams{true, 0, static_cast<uint8_t>(paddedTopkElems_ - axisK_), -1};
+            DataCopyPadExtParams<int32_t> topkPadParams{true, 0, static_cast<uint8_t>(axisKAlign_ - axisK_), -1};
             DataCopyPad(ubTopkIds_, srcTopkIdsGm, topkCopyParams, topkPadParams);
             SyncFunc<AscendC::HardEvent::MTE2_V>();
 
-            int32_t calCnt = static_cast<int32_t>(tileCnt * paddedTopkElems_);
-            constexpr int32_t CMP_ALIGN = ALIGNED_LEN_256 / sizeof(int32_t);
-            int32_t calCntAlign = Ceil(calCnt, CMP_ALIGN) * CMP_ALIGN;
-            for (uint32_t localExpertId = 0; localExpertId < numLocalExperts_; ++localExpertId) {
-                int32_t targetExpertId = static_cast<int32_t>(epRankId_ * numLocalExperts_ + localExpertId);
-                uint64_t rsvdCnt = 0;
-                CompareScalar(sharedTmpInt8, ubTopkIds_, static_cast<int32_t>(targetExpertId), AscendC::CMPMODE::EQ,
-                              calCntAlign);
-                GatherMask(ubTargetExpertId_, ubTopkIds_, sharedTmpInt32, true, calCnt, {1, 1, 0, 0}, rsvdCnt);
-                SyncFunc<AscendC::HardEvent::V_S>();
-                int32_t curExpertCnt = rsvdCnt;
-                int32_t currentHits = ubHitCount_.GetValue(localExpertId);
-                ubHitCount_.SetValue(localExpertId, currentHits + curExpertCnt);
-                uint32_t rankExpertIndex = rankId * rankExpertRowStride_ + localExpertId;
-                int32_t rankExpertHits = ubRankExpertHitCount_.GetValue(rankExpertIndex);
-                ubRankExpertHitCount_.SetValue(rankExpertIndex, rankExpertHits + curExpertCnt);
-            }
+            // 一次直方图统计整批topk，避免每个专家都扫描和等待V_S。
+            asc_vf_call<MoeEpDispatchEpilogueCount::CountTopkHits>(
+                (__ubuf__ int32_t*)ubTopkIds_.GetPhyAddr(),
+                (__ubuf__ int32_t*)ubRankExpertHitCount_[rankId * rankExpertRowStride_].GetPhyAddr(),
+                tileCnt * axisKAlign_, numLocalExperts_, epRankId_ * numLocalExperts_);
             SyncFunc<AscendC::HardEvent::V_MTE2>();
         }
+        Add(ubHitCount_, ubHitCount_, ubRankExpertHitCount_[rankId * rankExpertRowStride_], numLocalExperts_);
     }
 
     SyncFunc<AscendC::HardEvent::V_MTE3>();
     SyncFunc<AscendC::HardEvent::S_MTE3>();
-    // 每核一份的 hitCount 矩阵不再落 GM：它是 CopyFromWindowByExpert 里唯一的使用者，而那处已经改成
+    // 每核一份的 hitCount 矩阵不再落 GM：它是 CopySlots 里唯一的使用者，而那处已经改成
     // 对 ubRankExpertHitCount_ 的 rank 维求和，不需要再绕一趟 GM。ubHitCount_ 本身还有用（本核累计值）。
     DataCopyExtParams jointCountCopyParams{1U, rankExpertCountStride_ * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U,
                                            0U};
@@ -636,9 +647,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     Duplicate(ubRankExpertHitCount_, (int32_t)0, rankExpertCountStride_);
 
     // Reuse metadata staging for complete core-row tiles; even the maximum 2048-expert row fits.
-    uint32_t ubMetaBytes = Ceil((uint32_t)(SLOTS_TILE * paddedMetaElems_ * sizeof(int32_t)), UB_ALIGN) * UB_ALIGN;
     uint32_t jointRowBytes = rankExpertCountStride_ * sizeof(int32_t);
-    uint32_t coreRowsPerTile = ubMetaBytes / jointRowBytes;
+    uint32_t coreRowsPerTile = metaRingElems_ * sizeof(int32_t) / jointRowBytes;
     coreRowsPerTile = coreRowsPerTile > aivNum_ ? aivNum_ : coreRowsPerTile;
 
     DataCopyPadExtParams<int32_t> jointMatrixPadParams{false, 0U, 0U, 0};
@@ -662,27 +672,16 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 
     // P(c,r,e) = offsets[r] + sum_{e'<e,c'} H[c'][r][e'] + sum_{c'<c} H[c'][r][e].
     // recv_x stays expert/core/rank ordered, so (rank, expert, core, per-group cursor) is (rank, recv_x_idx) order.
-    SyncFunc<AscendC::HardEvent::V_S>();
-    int32_t rankPrefix = 0;
-    for (uint32_t rankId = 0; rankId < epWorldSize_; ++rankId) {
-        if (aivId_ == 0U) {
-            ubRankOffsets_.SetValue(rankId, rankPrefix);
-        }
-        for (uint32_t expertId = 0; expertId < numLocalExperts_; ++expertId) {
-            uint32_t rankExpertIndex = rankId * rankExpertRowStride_ + expertId;
-            int32_t jointTotal = ubRankExpertRowStart_.GetValue(rankExpertIndex);
-            int32_t corePrefix = ubRankExpertHitCount_.GetValue(rankExpertIndex);
-            ubRankExpertRowStart_.SetValue(rankExpertIndex, rankPrefix + corePrefix);
-            rankPrefix += jointTotal;
-        }
-    }
+    // 总计数做整数前缀和，再加此前core的计数；保持原metadata与recvXIdx顺序。
+    asc_vf_call<MoeEpDispatchEpilogueCount::BuildMetadataStarts>(
+        (__ubuf__ int32_t*)ubRankExpertRowStart_.GetPhyAddr(), (__ubuf__ int32_t*)ubRankExpertHitCount_.GetPhyAddr(),
+        (__ubuf__ int32_t*)ubRankOffsets_.GetPhyAddr(), epWorldSize_, rankExpertRowStride_);
     if (aivId_ == 0U) {
-        ubRankOffsets_.SetValue(epWorldSize_, rankPrefix);
-        SyncFunc<AscendC::HardEvent::S_MTE3>();
+        SyncFunc<AscendC::HardEvent::V_MTE3>();
         DataCopyExtParams offsetsCopyParams{1U, static_cast<uint32_t>((epWorldSize_ + 1U) * sizeof(int32_t)), 0U, 0U,
                                             0U};
         DataCopyPad(recvRankOffsetsGm_, ubRankOffsets_, offsetsCopyParams);
-        SyncFunc<AscendC::HardEvent::MTE3_S>();
+        // rankOffsets暂存不再复用，由Process末尾统一等待写出完成。
     }
 }
 
@@ -708,22 +707,16 @@ __aicore__ inline bool MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 {
     for (uint32_t r = rankId; r < epWorldSize_; ++r) {
         int32_t slotCnt = ubRecvCnt_.GetValue(r);
-        if (slotCnt == 0) {
-            continue;
-        }
         uint32_t slotStart, slotEnd, slotCntPerAiv;
         SplitToCore(static_cast<uint32_t>(slotCnt), aivNum_, slotStart, slotEnd, slotCntPerAiv);
-        if (slotStart >= slotEnd) {
-            continue;
-        }
         // 同一个 rank 内接着上一拍往后走；跨到下一个 rank 就从它的第 0 拍开始。TILE_NONE 表示还没发过任何一拍。
-        uint32_t start = (r == rankId && tileStart != TILE_NONE) ? (tileStart + SLOTS_TILE) : 0U;
+        uint32_t start = (r == rankId && tileStart != TILE_NONE) ? (tileStart + slotsPerTile_) : 0U;
         if (start >= slotCntPerAiv) {
             continue;
         }
         nextRank = r;
         nextTileStart = start;
-        nextTileCnt = (slotCntPerAiv - start > SLOTS_TILE) ? SLOTS_TILE : (slotCntPerAiv - start);
+        nextTileCnt = (slotCntPerAiv - start > slotsPerTile_) ? slotsPerTile_ : (slotCntPerAiv - start);
         nextSlotStart = slotStart;
         return true;
     }
@@ -743,36 +736,91 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
                                                                 (int64_t)rankId * numMaxTokensPerRank_ * perSlotBytes_ +
                                                                 (int64_t)slotIdx * perSlotBytes_ + metaOffset_));
     DataCopyPad(ubMeta_[buf * metaRingElems_], srcMetaGm, metaCopyParams, metaPadParams);
+    if constexpr (IsCached) {
+        const uint32_t globalSlot = GlobalSlot(rankId, slotIdx);
+        const uint32_t firstEnd = globalSlot == 0U ? 0U : globalSlot - 1U;
+        const uint32_t prefix = globalSlot == 0U ? 0U : PLAN_END_EXTRA;
+        const uint32_t begin = globalSlot == 0U ? 0U : cachedSlotEndsGm_.GetValue(firstEnd);
+        const uint32_t end = cachedSlotEndsGm_.GetValue(globalSlot + tileCnt - 1U);
+        planRowBegin_[buf] = begin;
+        // 终点与行号连续预取；与窗口meta共用一组就绪/归还事件。
+        DataCopyPad(ubSlotPlan_[buf * planRingElems_], cachedSlotEndsGm_[firstEnd],
+                    {1U, (tileCnt + prefix) * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U}, metaPadParams);
+        if (end > begin) {
+            DataCopyPad(ubSlotPlan_[buf * planRingElems_ + planEndsElems_], cachedSlotRowIdsGm_[begin],
+                        {1U, (end - begin) * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U}, metaPadParams);
+        }
+    }
     SetFlag<AscendC::HardEvent::MTE2_S>(metaEvtMte2ToS_[buf]);
 }
 
 template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CopyFromWindowByExpert()
+__aicore__ inline uint32_t MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::BuildSlotHits(
+    uint32_t metaBuf, uint32_t localSlot, uint32_t globalTileSlot)
 {
-    SyncFunc<AscendC::HardEvent::MTE3_MTE2>();
-    // recv_x 段起点 = 专家前缀 + 本核之前所有核在该专家上的命中数。
-    // BuildRankRowStarts 已经把后者按 [rank][expert] 存进 ubRankExpertHitCount_，而且只累加了 coreId < aivId_
-    // 的核，所以对 rank 求和恰好就是「本核之前所有核在该专家上的命中数」：
-    //     sum_r sum_{c<aivId_} H[c][r][e]  ==  sum_{c<aivId_} H[c][e]
-    // 原来那个循环是 aivId_ 次串行 DMA（每次先把某核的 hitCount 从 GM 搬回来）、每次夹两个 pipe 同步，
-    // 是 CopyExpert 段里最长的一段串行标量；现在换成 epWorldSize_ 次纯向量 Add，标量只剩发指令。
-    Duplicate(ubHitCount_, (int32_t)0, numLocalExperts_);
-    for (uint32_t prefixRank = 0; prefixRank < epWorldSize_; ++prefixRank) {
-        Add(ubHitCount_, ubHitCount_, ubRankExpertHitCount_[prefixRank * rankExpertRowStride_], numLocalExperts_);
+    uint32_t hitCnt = 0U;
+    if constexpr (IsCached) {
+        const uint32_t planBase = metaBuf * planRingElems_;
+        // 索引由首次dispatch生成；cached要求路由不变，无须重复校验每个索引。
+        const uint32_t prefix = globalTileSlot == 0U ? 0U : PLAN_END_EXTRA;
+        const uint32_t end = ubSlotPlan_.GetValue(planBase + localSlot + prefix);
+        const uint32_t begin = localSlot == 0U ?
+                                   planRowBegin_[metaBuf] :
+                                   static_cast<uint32_t>(ubSlotPlan_.GetValue(planBase + localSlot + prefix - 1U));
+        for (uint32_t row = begin; row < end; ++row) {
+            const int32_t metadataRow = ubSlotPlan_.GetValue(planBase + planEndsElems_ + row - planRowBegin_[metaBuf]);
+            // 索引只存行号，原metadata仍是唯一字段来源，不复制五字段大表。
+            const int64_t offset = static_cast<int64_t>(metadataRow) * RECV_META_FIELDS;
+            const int32_t recvRow = cachedRecvSrcMetadataGm_.GetValue(offset + META_RECV_X_IDX_OFFSET);
+            const int32_t topk = cachedRecvSrcMetadataGm_.GetValue(offset + META_TOPK_IDX_OFFSET);
+            ubHitList_.SetValue(hitCnt * HIT_ENTRY_SIZE + HIT_ROW_OFFSET, recvRow);
+            ubHitList_.SetValue(hitCnt * HIT_ENTRY_SIZE + HIT_TOPK_OFFSET, topk);
+            ++hitCnt;
+        }
+    } else {
+        const uint32_t metaBase = metaBuf * metaRingElems_ + localSlot * paddedMetaElems_;
+        const int32_t rankExpertBase = static_cast<int32_t>(epRankId_ * numLocalExperts_);
+        const int32_t rankExpertEnd = rankExpertBase + static_cast<int32_t>(numLocalExperts_);
+        for (uint32_t topkIdx = 0; topkIdx < axisK_; ++topkIdx) {
+            int32_t expertId = ubMeta_.GetValue(metaBase + topkIdx);
+            if (expertId < rankExpertBase || expertId >= rankExpertEnd) {
+                continue;
+            }
+            uint32_t localExpertId = static_cast<uint32_t>(expertId - rankExpertBase);
+            int64_t expertRowStart = ubRowStart_.GetValue(localExpertId);
+            int32_t cursor = ubLocalCursor_.GetValue(localExpertId);
+            ubLocalCursor_.SetValue(localExpertId, cursor + 1);
+            int64_t recvXRow = expertRowStart + cursor;
+            ubHitList_.SetValue(hitCnt * HIT_ENTRY_SIZE + HIT_ROW_OFFSET, recvXRow);
+            ubHitList_.SetValue(hitCnt * HIT_ENTRY_SIZE + HIT_TOPK_OFFSET, static_cast<int64_t>(topkIdx));
+            hitCnt++;
+        }
     }
-    Cast(ubHitCountRowI64_, ubHitCount_, RoundMode::CAST_NONE, numLocalExperts_);
-    Add(ubRowStart_, ubExpertPfx_, ubHitCountRowI64_, numLocalExperts_);
+    return hitCnt;
+}
 
-    Duplicate(ubLocalCursor_, (int32_t)0, numLocalExperts_);
-    SyncFunc<AscendC::HardEvent::V_S>();
-    DataCopyPadExtParams<int32_t> metaPadParams{false, 0, 0, 0};
-    DataCopyParams tokenCopyParams{1U, static_cast<uint16_t>(axisH_ * sizeof(XType)), 0U, 0U};
-    DataCopyPadParams tokenPadParams{false, 0, 0, 0};
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CopySlots()
+{
+    if constexpr (!IsCached) {
+        // 保持原专家输出和Combine metadata顺序，只改变cached的读入分组。
+        Duplicate(ubHitCount_, (int32_t)0, numLocalExperts_);
+        for (uint32_t r = 0; r < epWorldSize_; ++r) {
+            Add(ubHitCount_, ubHitCount_, ubRankExpertHitCount_[r * rankExpertRowStride_], numLocalExperts_);
+        }
+        Cast(ubHitCountRowI64_, ubHitCount_, RoundMode::CAST_NONE, numLocalExperts_);
+        Add(ubRowStart_, ubExpertPfx_, ubHitCountRowI64_, numLocalExperts_);
+        Duplicate(ubLocalCursor_, (int32_t)0, numLocalExperts_);
+        // 专家输出起点已算完，原地归约此前核的计数，省去每rank逐专家的Scalar累加。
+        asc_vf_call<MoeEpDispatchEpilogueCount::ReduceRankCorePrefixes>(
+            (__ubuf__ int32_t*)ubRankExpertHitCount_.GetPhyAddr(), epWorldSize_, rankExpertRowStride_);
+    }
+    // 搬运参数在循环外准备，供每个token及其专家命中的读写复用。
+    const DataCopyParams tokenCopyParams{1U, static_cast<uint16_t>(axisH_ * sizeof(XType)), 0U, 0U};
+    const DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U, 0U};
     DataCopyExtParams metaOutParams{1U, static_cast<uint32_t>(RECV_META_FIELDS * sizeof(int32_t)), 0U, 0U, 0U};
     DataCopyExtParams localIndexOutParams{1U, static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U};
     DataCopyExtParams weightOutParams{1U, static_cast<uint32_t>(sizeof(float)), 0U, 0U, 0U};
-    int32_t rankExpertBase = static_cast<int32_t>(epRankId_ * numLocalExperts_);
-    int32_t rankExpertEnd = rankExpertBase + static_cast<int32_t>(numLocalExperts_);
 
     // 拍平成一个「取下一个 tile」的循环。原来的 (rank, tile) 双层结构没法把 meta 读提前一拍发出去：
     // 预读必须知道下一拍在哪，而下一拍会跨 rank。
@@ -787,11 +835,16 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     uint32_t metaSeq = 0U;
     uint32_t tokenSeq = 0U;
     uint32_t stageSeq = 0U;
+    uint32_t planRowCursor = 0U;
     bool hasTile = NextTile(0U, TILE_NONE, rankId, tileStart, tileCnt, slotStart);
-    if (hasTile) { // 第一拍的 meta 读先发出去，它的延迟盖在下面 aivId_ 次串行前缀累加里
+    if (hasTile) { // 先发首拍路由，后续在处理当前拍时预取下一拍
         IssueMeta(rankId, slotStart + tileStart, tileCnt, 0U);
     }
 
+    // 先发首批metadata读，再等V结果；真正读取行号和游标前完成同步。
+    if constexpr (!IsCached) {
+        SyncFunc<AscendC::HardEvent::V_S>();
+    }
     while (hasTile) {
         // 当前拍的 meta 读是上一拍发出去的，这里只等它到。
         const uint32_t metaBuf = metaSeq % META_RING;
@@ -811,134 +864,129 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
         isDirectSelfRank_ = (networkMode_ != NETWORK_HYBRID) && (rankId == static_cast<uint32_t>(epRankId_));
         GM_ADDR srcRankBase = localWinAddr_ + (int64_t)rankId * numMaxTokensPerRank_ * perSlotBytes_;
         const uint32_t metaRingBase = metaBuf * metaRingElems_;
+        const uint32_t planBase = metaBuf * planRingElems_;
+        const uint32_t globalTileSlot = GlobalSlot(rankId, slotStart + tileStart);
+        uint32_t planRowCount = 0U;
+        if constexpr (!IsCached) {
+            if (metaSeq > META_RING) {
+                WaitFlag<AscendC::HardEvent::MTE3_S>(planEvtMte3ToS_[metaBuf]);
+            }
+            if (tileStart == 0U) {
+                // 每行首元素已由V归约为本rank此前核的命中总数。
+                planRowCursor =
+                    ubRankOffsets_.GetValue(rankId) + ubRankExpertHitCount_.GetValue(rankId * rankExpertRowStride_);
+            }
+        }
 
         for (uint32_t localSlot = 0; localSlot < tileCnt; ++localSlot) {
             uint32_t metaBase = metaRingBase + localSlot * paddedMetaElems_;
-            uint32_t hitCnt = 0;
             int32_t srcRankMeta = ubMeta_.GetValue(metaBase + META_TOPK_SECTION * axisKAlign_);
             int32_t tokenIdxMeta = ubMeta_.GetValue(metaBase + META_TOPK_SECTION * axisKAlign_ + 1);
             GM_ADDR slotAddr = srcRankBase + (int64_t)(slotStart + tileStart + localSlot) * perSlotBytes_;
 
-            // token/scales 的内容只取决于 slot，与命中集合无关，所以在这里就把搬运发出去：MTE2 这一拍的读
-            // 和下面 loop A 的标量收集并行。原来 Alloc/读在 loop A 之后，MTE3 只能干等读完成，两个 pipe 恒不重叠。
             const uint32_t tokenBuf = tokenSeq % TOKEN_RING;
-            const bool tokenReused = (tokenSeq >= TOKEN_RING);
-            ++tokenSeq;
-            LocalTensor<XType> tokenOut = tokenRing_[tokenBuf * tokenRingElems_];
-            if (tokenReused) { // 这一份上一次用于 TOKEN_RING 拍之前，等 MTE3 写完再覆盖
-                WaitFlag<AscendC::HardEvent::MTE3_MTE2>(tokenEvtFree_[tokenBuf]);
-            }
-            GlobalTensor<XType> srcTokenTensor;
-            if (isDirectSelfRank_) { // direct 自段 x 未入窗口，直读输入 x
-                srcTokenTensor = xGm_[static_cast<int64_t>(tokenIdxMeta) * axisH_];
-            } else {
-                srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType*>(slotAddr), axisH_);
-            }
-            DataCopyPad(tokenOut, srcTokenTensor, tokenCopyParams, tokenPadParams);
-            if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
-                GlobalTensor<ScalesType> srcScalesTensor;
-                srcScalesTensor.SetGlobalBuffer(reinterpret_cast<__gm__ ScalesType*>(slotAddr + scalesOffset_),
-                                                scalesElems_);
-                DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U, 0U};
-                DataCopyPadParams scalesPadParams{false, 0, 0, 0};
-                DataCopyPad(tokenOut[scalesStride_].template ReinterpretCast<ScalesType>(), srcScalesTensor,
-                            scalesCopyParams, scalesPadParams);
-            }
-            SetFlag<AscendC::HardEvent::MTE2_MTE3>(tokenEvtFill_[tokenBuf]);
+            LocalTensor<XType> tokenOut =
+                IssueTokenRead(slotAddr, tokenIdxMeta, tokenSeq++, tokenCopyParams, scalesCopyParams);
 
-            for (uint32_t topkIdx = 0; topkIdx < axisK_; ++topkIdx) {
-                int32_t expertId = ubMeta_.GetValue(metaBase + topkIdx);
-                if (expertId < rankExpertBase || expertId >= rankExpertEnd) {
-                    continue;
-                }
-                uint32_t localExpertId = static_cast<uint32_t>(expertId - rankExpertBase);
-                int64_t expertRowStart = ubRowStart_.GetValue(localExpertId);
-                int32_t cursor = ubLocalCursor_.GetValue(localExpertId);
-                ubLocalCursor_.SetValue(localExpertId, cursor + 1);
-                int64_t recvXRow = expertRowStart + cursor;
-                ubHitList_.SetValue(hitCnt * HIT_ENTRY_SIZE + HIT_ROW_OFFSET, recvXRow);
-                ubHitList_.SetValue(hitCnt * HIT_ENTRY_SIZE + HIT_TOPK_OFFSET, static_cast<int64_t>(topkIdx));
-                hitCnt++;
-            }
-            // 命中与否都要等这一拍读：MTE2_MTE3 上每个 slot 恰好一 Set 一 Wait 才配平，少一次 Wait 就会给
-            // 这一份攒下信用，让后面某次等待提前放行（MTE3 会读到还没写完的 buffer）。
+            const uint32_t hitCnt = BuildSlotHits(metaBuf, localSlot, globalTileSlot);
             WaitFlag<AscendC::HardEvent::MTE2_MTE3>(tokenEvtFill_[tokenBuf]);
-
-            if (hitCnt == 0) {
-                // 没有消费者，这一拍的数据作废，直接把这份 buffer 还给 MTE2。
+            if (hitCnt == 0U) {
                 SetFlag<AscendC::HardEvent::MTE3_MTE2>(tokenEvtFree_[tokenBuf]);
+                if constexpr (!IsCached) {
+                    ubSlotPlan_.SetValue(planBase + localSlot, planRowCursor + planRowCount);
+                }
                 continue;
             }
-
-            // stage 环：命中才占一份。份数 STAGE_RING 保证同一份的下一次使用恒在 STAGE_RING 拍之后，
-            // 所以这里稳态的这次等待就顶掉了原来 tile 尾那次「等整条 MTE3 排空」。
-            const uint32_t stageBuf = stageSeq % STAGE_RING;
-            if (stageSeq >= STAGE_RING) {
-                WaitFlag<AscendC::HardEvent::MTE3_S>(stageEvtMte3ToS_[stageBuf]);
+            uint32_t stageBuf = 0U;
+            uint32_t stageOff = 0U;
+            if constexpr (!IsCached || HasTopkWeights) {
+                stageBuf = stageSeq % STAGE_RING;
+                if (stageSeq >= STAGE_RING) {
+                    WaitFlag<AscendC::HardEvent::MTE3_S>(stageEvtMte3ToS_[stageBuf]);
+                }
+                ++stageSeq;
+                stageOff = stageBuf * stageSlotElems_;
             }
-            ++stageSeq;
-            const uint32_t stageOff = stageBuf * stageSlotElems_;
 
-            // loop A'：把这一拍的读发给 MTE3。token 的 MTE3_MTE2 归还放在这里（loop A' 全部发完之后），
-            // 因为 recvXGm_/recvScalesGm_ 的 DataCopyPad 就是从 tokenOut 读的。
-            for (uint32_t i = 0; i < hitCnt; i++) {
-                int64_t recvXRow = ubHitList_.GetValue(i * HIT_ENTRY_SIZE + HIT_ROW_OFFSET);
-                uint32_t topkIdx = static_cast<uint32_t>(ubHitList_.GetValue(i * HIT_ENTRY_SIZE + HIT_TOPK_OFFSET));
-
+            // 同一遍命中循环下发hidden并准备metadata，避免为代码复用额外扫描命中表。
+            for (uint32_t i = 0; i < hitCnt; ++i) {
+                const int64_t recvXRow = ubHitList_.GetValue(i * HIT_ENTRY_SIZE + HIT_ROW_OFFSET);
                 DataCopyPad(recvXGm_[recvXRow * axisH_], tokenOut, tokenCopyParams);
                 if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
-                    DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U,
-                                                    0U};
                     DataCopyPad(recvScalesGm_[recvXRow * scalesElems_],
                                 tokenOut[scalesStride_].template ReinterpretCast<ScalesType>(), scalesCopyParams);
                 }
-
-                if constexpr (HasTopkWeights) {
-                    float weights = ubMeta_.ReinterpretCast<float>().GetValue(metaBase + axisKAlign_ + topkIdx);
-                    ubStageWeightsRing_.SetValue(stageOff + i * ELEM_ALIGN, weights);
-                }
-                ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_SRC_RANK_OFFSET, srcRankMeta);
-                ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_TOKEN_IDX_OFFSET, tokenIdxMeta);
-                ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_TOPK_IDX_OFFSET,
-                                          static_cast<int32_t>(topkIdx));
-                ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_SLOT_IDX_OFFSET,
-                                          static_cast<int32_t>(slotStart + tileStart + localSlot));
-                ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_RECV_X_IDX_OFFSET,
-                                          static_cast<int32_t>(recvXRow));
-                if (srcRankMeta == static_cast<int32_t>(epRankId_)) {
-                    // Keep a second aligned copy for the scattered local-index output.  It shares the stage ring's
-                    // S -> MTE3 submission and MTE3 -> S reuse event with metadata and weights.
-                    ubStageLocalIndexRing_.SetValue(stageOff + i * ELEM_ALIGN, static_cast<int32_t>(recvXRow));
+                if constexpr (!IsCached || HasTopkWeights) {
+                    const uint32_t topkIdx =
+                        static_cast<uint32_t>(ubHitList_.GetValue(i * HIT_ENTRY_SIZE + HIT_TOPK_OFFSET));
+                    if constexpr (HasTopkWeights) {
+                        float weights = ubMeta_.ReinterpretCast<float>().GetValue(metaBase + axisKAlign_ + topkIdx);
+                        ubStageWeightsRing_.SetValue(stageOff + i * ELEM_ALIGN, weights);
+                    }
+                    if constexpr (!IsCached) {
+                        ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_SRC_RANK_OFFSET, srcRankMeta);
+                        ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_TOKEN_IDX_OFFSET, tokenIdxMeta);
+                        ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_TOPK_IDX_OFFSET,
+                                                  static_cast<int32_t>(topkIdx));
+                        ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_SLOT_IDX_OFFSET,
+                                                  static_cast<int32_t>(slotStart + tileStart + localSlot));
+                        ubStageMetaRing_.SetValue(stageOff + i * ELEM_ALIGN + META_RECV_X_IDX_OFFSET,
+                                                  static_cast<int32_t>(recvXRow));
+                        if (srcRankMeta == static_cast<int32_t>(epRankId_)) {
+                            ubStageLocalIndexRing_.SetValue(stageOff + i * ELEM_ALIGN, static_cast<int32_t>(recvXRow));
+                        }
+                    }
                 }
             }
-            // 这一份的 MTE3 写已全部入队，MTE2 可以在 TOKEN_RING 拍后覆盖它。
+            // 全部hidden/scales请求入队后归还token，metadata的stage仍由独立事件保护。
             SetFlag<AscendC::HardEvent::MTE3_MTE2>(tokenEvtFree_[tokenBuf]);
-
-            // stage 的 S → MTE3 握手：Set/Wait 紧邻，任何时刻只有一发在飞，所以一条 id 就够。
-            SetFlag<AscendC::HardEvent::S_MTE3>(stageEvtSToMte3_);
-            WaitFlag<AscendC::HardEvent::S_MTE3>(stageEvtSToMte3_);
-            // loop B：从 ubStage*Ring_ 读，所以归还要压在这个循环的 SetFlag<MTE3_S> 之前。
-            for (uint32_t i = 0; i < hitCnt; i++) {
-                int64_t recvXRow = ubHitList_.GetValue(i * HIT_ENTRY_SIZE + HIT_ROW_OFFSET);
-                if constexpr (HasTopkWeights) {
-                    DataCopyPad(recvTopkWeightsGm_[recvXRow], ubStageWeightsRing_[stageOff + i * ELEM_ALIGN],
-                                weightOutParams);
+            if constexpr (!IsCached || HasTopkWeights) {
+                // stage 的 S → MTE3 握手：Set/Wait 紧邻，任何时刻只有一发在飞，所以一条 id 就够。
+                SetFlag<AscendC::HardEvent::S_MTE3>(stageEvtSToMte3_);
+                WaitFlag<AscendC::HardEvent::S_MTE3>(stageEvtSToMte3_);
+                // loop B：从 ubStage*Ring_ 读，所以归还要压在这个循环的 SetFlag<MTE3_S> 之前。
+                for (uint32_t i = 0; i < hitCnt; i++) {
+                    int64_t recvXRow = ubHitList_.GetValue(i * HIT_ENTRY_SIZE + HIT_ROW_OFFSET);
+                    if constexpr (HasTopkWeights) {
+                        DataCopyPad(recvTopkWeightsGm_[recvXRow], ubStageWeightsRing_[stageOff + i * ELEM_ALIGN],
+                                    weightOutParams);
+                    }
+                    if constexpr (!IsCached) {
+                        // Output metadata in source-row order without changing token/weight/scales placement.
+                        uint32_t topkIdx =
+                            static_cast<uint32_t>(ubHitList_.GetValue(i * HIT_ENTRY_SIZE + HIT_TOPK_OFFSET));
+                        uint32_t localExpertId =
+                            static_cast<uint32_t>(ubMeta_.GetValue(metaBase + topkIdx)) - epRankId_ * numLocalExperts_;
+                        uint32_t rankExpertIndex = rankId * rankExpertRowStride_ + localExpertId;
+                        int32_t metadataRow = ubRankExpertRowStart_.GetValue(rankExpertIndex);
+                        DataCopyPad(recvSrcMetadataGm_[(int64_t)metadataRow * RECV_META_FIELDS],
+                                    ubStageMetaRing_[stageOff + i * ELEM_ALIGN], metaOutParams);
+                        if (srcRankMeta == static_cast<int32_t>(epRankId_)) {
+                            uint32_t lookupIndex = static_cast<uint32_t>(tokenIdxMeta) * axisK_ + topkIdx;
+                            DataCopyPad(localRecvIndexGm_[lookupIndex],
+                                        ubStageLocalIndexRing_[stageOff + i * ELEM_ALIGN], localIndexOutParams);
+                        }
+                        ubRankExpertRowStart_.SetValue(rankExpertIndex, metadataRow + 1);
+                        ubSlotPlan_.SetValue(planBase + planEndsElems_ + planRowCount++, metadataRow);
+                    }
                 }
-                // Output metadata in source-row order without changing token/weight/scales placement.
-                uint32_t topkIdx = static_cast<uint32_t>(ubHitList_.GetValue(i * HIT_ENTRY_SIZE + HIT_TOPK_OFFSET));
-                uint32_t localExpertId = static_cast<uint32_t>(ubMeta_.GetValue(metaBase + topkIdx) - rankExpertBase);
-                uint32_t rankExpertIndex = rankId * rankExpertRowStride_ + localExpertId;
-                int32_t metadataRow = ubRankExpertRowStart_.GetValue(rankExpertIndex);
-                DataCopyPad(recvSrcMetadataGm_[(int64_t)metadataRow * RECV_META_FIELDS],
-                            ubStageMetaRing_[stageOff + i * ELEM_ALIGN], metaOutParams);
-                if (srcRankMeta == static_cast<int32_t>(epRankId_)) {
-                    uint32_t lookupIndex = static_cast<uint32_t>(tokenIdxMeta) * axisK_ + topkIdx;
-                    DataCopyPad(localRecvIndexGm_[lookupIndex], ubStageLocalIndexRing_[stageOff + i * ELEM_ALIGN],
-                                localIndexOutParams);
-                }
-                ubRankExpertRowStart_.SetValue(rankExpertIndex, metadataRow + 1);
+                SetFlag<AscendC::HardEvent::MTE3_S>(stageEvtMte3ToS_[stageBuf]);
             }
-            SetFlag<AscendC::HardEvent::MTE3_S>(stageEvtMte3ToS_[stageBuf]);
+            if constexpr (!IsCached) {
+                ubSlotPlan_.SetValue(planBase + localSlot, planRowCursor + planRowCount);
+            }
+        }
+        if constexpr (!IsCached) {
+            // 每批连续写两个小数组；避免逐slot/命中增加4字节DMA和等待。
+            SyncFunc<AscendC::HardEvent::S_MTE3>();
+            DataCopyPad(slotEndsGm_[globalTileSlot], ubSlotPlan_[planBase],
+                        {1U, tileCnt * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U});
+            if (planRowCount != 0U) {
+                DataCopyPad(slotRowIdsGm_[planRowCursor], ubSlotPlan_[planBase + planEndsElems_],
+                            {1U, planRowCount * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U});
+            }
+            SetFlag<AscendC::HardEvent::MTE3_S>(planEvtMte3ToS_[metaBuf]);
+            planRowCursor += planRowCount;
         }
 
         // 这一拍的 meta 已经被标量全部读完（上面所有 ubMeta_ 的 GetValue），可以还给 MTE2 了。
@@ -956,138 +1004,72 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 }
 
 template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
-__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CopyFromWindowByCachedMeta()
+__aicore__ inline uint32_t MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::GlobalSlot(
+    uint32_t rankId, uint32_t slotId)
 {
-    if (expertSum_ == 0) {
-        return;
+    for (uint32_t r = 0; r < rankId; ++r) {
+        slotId += static_cast<uint32_t>(ubRecvCnt_.GetValue(r));
     }
+    return slotId;
+}
 
-    uint32_t startId, endId, cnt;
-    SplitToCore(expertSum_, aivNum_, startId, endId, cnt);
-    if (startId >= endId) {
-        return;
-    }
-
-    uint32_t ubMetaBytes = Ceil(metaBytes_, UB_ALIGN) * UB_ALIGN;
-    // Cached metadata is rank ordered, while weights remain recv_x ordered. A single aligned staging block is enough
-    // for the optional per-row scatter and avoids reserving one padded block per metadata row.
-    uint32_t ubStageWeightsBytes = UB_ALIGN;
-    uint32_t ubStageMetaBytes =
-        Ceil((uint32_t)(CACHED_META_TILE * RECV_META_FIELDS * sizeof(int32_t)), UB_ALIGN) * UB_ALIGN;
-    tpipe_->InitBuffer(ubMetaBuf_, ubMetaBytes);
-    tpipe_->InitBuffer(ubStageWeightsBuf_, ubStageWeightsBytes);
-    tpipe_->InitBuffer(ubStageMetaBuf_, ubStageMetaBytes);
-    ubMeta_ = ubMetaBuf_.Get<int32_t>();
-    ubStageWeights_ = ubStageWeightsBuf_.Get<float>();
-    ubStageMeta_ = ubStageMetaBuf_.Get<int32_t>();
-
-    DataCopyPadExtParams<int32_t> metaPadParams{false, 0, 0, 0};
-    DataCopyParams tokenCopyParams{1U, static_cast<uint16_t>(axisH_ * sizeof(XType)), 0U, 0U};
-    DataCopyPadParams tokenPadParams{false, 0, 0, 0};
-    DataCopyExtParams localIndexOutParams{1U, static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U};
-
-    uint32_t processed = 0;
-    while (processed < cnt) {
-        uint32_t tileCnt = (cnt - processed > CACHED_META_TILE) ? CACHED_META_TILE : (cnt - processed);
-        uint32_t tileStartGlobal = startId + processed;
-
-        DataCopyExtParams metaInParams{1U, static_cast<uint32_t>(tileCnt * RECV_META_FIELDS * sizeof(int32_t)), 0U, 0U,
-                                       0U};
-        DataCopyPad(ubStageMeta_, cachedRecvSrcMetadataGm_[(int64_t)tileStartGlobal * RECV_META_FIELDS], metaInParams,
-                    metaPadParams);
-        SyncFunc<AscendC::HardEvent::MTE2_S>();
-
-        for (uint32_t i = 0; i < tileCnt; ++i) {
-            uint32_t metaBase = i * RECV_META_FIELDS;
-            int32_t srcRankId = ubStageMeta_.GetValue(metaBase + META_SRC_RANK_OFFSET);
-            int32_t tokenIdx = ubStageMeta_.GetValue(metaBase + META_TOKEN_IDX_OFFSET);
-            int32_t srcTopkIdx = ubStageMeta_.GetValue(metaBase + META_TOPK_IDX_OFFSET);
-            int32_t slotIdx = ubStageMeta_.GetValue(metaBase + META_SLOT_IDX_OFFSET);
-            int32_t recvXIdx = ubStageMeta_.GetValue(metaBase + META_RECV_X_IDX_OFFSET);
-
-            // recvXIdx is produced by the first non-cached Epilogue. Guard it before using a user-visible cached
-            // handle so malformed metadata cannot turn into an out-of-bounds GM write.
-            if (recvXIdx < 0 || recvXIdx >= static_cast<int32_t>(expertSum_)) {
-                continue;
-            }
-
-            GM_ADDR slotAddr = localWinAddr_ + (int64_t)srcRankId * numMaxTokensPerRank_ * perSlotBytes_ +
-                               (int64_t)slotIdx * perSlotBytes_;
-            // direct 自段 x 未入窗口（dispatch 已省略本端拷贝），x 直读输入；hybrid 保持读窗口
-            bool directSelfRank = (networkMode_ != NETWORK_HYBRID) && (srcRankId == static_cast<int32_t>(epRankId_));
-            GlobalTensor<XType> srcTokenTensor;
-            if (directSelfRank) {
-                srcTokenTensor = xGm_[static_cast<int64_t>(tokenIdx) * axisH_];
-            } else {
-                srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType*>(slotAddr), axisH_);
-            }
-            LocalTensor<XType> tokenTensor = tokenQueue_.AllocTensor<XType>();
-            DataCopyPad(tokenTensor, srcTokenTensor, tokenCopyParams, tokenPadParams);
-
-            if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
-                GlobalTensor<ScalesType> srcScalesTensor;
-                srcScalesTensor.SetGlobalBuffer(reinterpret_cast<__gm__ ScalesType*>(slotAddr + scalesOffset_),
-                                                scalesElems_);
-                DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U, 0U};
-                DataCopyPadParams scalesPadParams{false, 0, 0, 0};
-                DataCopyPad(tokenTensor[scalesStride_].template ReinterpretCast<ScalesType>(), srcScalesTensor,
-                            scalesCopyParams, scalesPadParams);
-            }
-
-            if constexpr (HasTopkWeights) {
-                GlobalTensor<int32_t> srcMetaGm;
-                srcMetaGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(slotAddr + metaOffset_));
-                DataCopyExtParams slotMetaParams{1U, metaBytes_, 0U, 0U, 0U};
-                DataCopyPad(ubMeta_, srcMetaGm, slotMetaParams, metaPadParams);
-                SyncFunc<AscendC::HardEvent::MTE2_S>();
-                float weight = ubMeta_.ReinterpretCast<float>().GetValue(axisKAlign_ + srcTopkIdx);
-                ubStageWeights_.SetValue(0, weight);
-                SyncFunc<AscendC::HardEvent::S_MTE2>();
-            }
-
-            tokenQueue_.EnQue(tokenTensor);
-            LocalTensor<XType> tokenOut = tokenQueue_.DeQue<XType>();
-            uint32_t recvXRow = static_cast<uint32_t>(recvXIdx);
-            DataCopyPad(recvXGm_[(int64_t)recvXRow * axisH_], tokenOut, tokenCopyParams);
-            if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
-                DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U, 0U};
-                DataCopyPad(recvScalesGm_[(int64_t)recvXRow * scalesElems_],
-                            tokenOut[scalesStride_].template ReinterpretCast<ScalesType>(), scalesCopyParams);
-            }
-            tokenQueue_.FreeTensor(tokenOut);
-
-            const bool writeLocalIndex = srcRankId == static_cast<int32_t>(epRankId_) && tokenIdx >= 0 &&
-                                         tokenIdx < static_cast<int32_t>(numTokens_) && srcTopkIdx >= 0 &&
-                                         srcTopkIdx < static_cast<int32_t>(axisK_);
-            if (writeLocalIndex) {
-                ubLocalIndexValue_.SetValue(0, recvXIdx);
-            }
-            if constexpr (HasTopkWeights) {
-                SyncFunc<AscendC::HardEvent::S_MTE3>();
-                DataCopyExtParams weightOutParams{1U, static_cast<uint32_t>(sizeof(float)), 0U, 0U, 0U};
-                DataCopyPad(recvTopkWeightsGm_[recvXRow], ubStageWeights_, weightOutParams);
-                if (writeLocalIndex) {
-                    uint32_t lookupIndex = static_cast<uint32_t>(tokenIdx) * axisK_ + static_cast<uint32_t>(srcTopkIdx);
-                    DataCopyPad(localRecvIndexGm_[lookupIndex], ubLocalIndexValue_, localIndexOutParams);
-                }
-                // Both scalar outputs have consumed their aligned staging blocks before the next metadata row.
-                SyncFunc<AscendC::HardEvent::MTE3_S>();
-            } else if (writeLocalIndex) {
-                uint32_t lookupIndex = static_cast<uint32_t>(tokenIdx) * axisK_ + static_cast<uint32_t>(srcTopkIdx);
-                SyncFunc<AscendC::HardEvent::S_MTE3>();
-                DataCopyPad(localRecvIndexGm_[lookupIndex], ubLocalIndexValue_, localIndexOutParams);
-                SyncFunc<AscendC::HardEvent::MTE3_S>();
-            }
-        }
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CopyCachedArray(
+    GlobalTensor<int32_t> src, GlobalTensor<int32_t> dst, uint32_t count)
+{
+    uint32_t start, end, blocks;
+    SplitToCore(Ceil(count, INT32_PER_BLOCK), aivNum_, start, end, blocks);
+    start *= INT32_PER_BLOCK;
+    end = end * INT32_PER_BLOCK > count ? count : end * INT32_PER_BLOCK;
+    // 借用搬运前尚未使用的meta缓冲，按32字节边界分核，避免输出块交叠。
+    for (uint32_t offset = start; offset < end;) {
+        uint32_t elements = end - offset > metaRingElems_ ? metaRingElems_ : end - offset;
+        DataCopyExtParams params{1U, elements * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U};
+        DataCopyPad(ubMeta_, src[offset], params, {false, 0U, 0U, 0});
         SyncFunc<AscendC::HardEvent::MTE2_MTE3>();
-        DataCopyExtParams metaOutParams{1U, static_cast<uint32_t>(tileCnt * RECV_META_FIELDS * sizeof(int32_t)), 0U, 0U,
-                                        0U};
-        DataCopyPad(recvSrcMetadataGm_[(int64_t)tileStartGlobal * RECV_META_FIELDS], ubStageMeta_, metaOutParams);
+        DataCopyPad(dst[offset], ubMeta_, params);
         SyncFunc<AscendC::HardEvent::MTE3_MTE2>();
-
-        processed += tileCnt;
+        offset += elements;
     }
 }
+
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
+__aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::CopyCachedMetadata()
+{
+    CopyCachedArray(cachedRecvSrcMetadataGm_, recvSrcMetadataGm_, expertSum_ * RECV_META_FIELDS);
+    CopyCachedArray(cachedSlotEndsGm_, slotEndsGm_, GlobalSlot(epWorldSize_, 0U));
+    CopyCachedArray(cachedSlotRowIdsGm_, slotRowIdsGm_, expertSum_);
+}
+
+template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
+__aicore__ inline LocalTensor<XType> MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::IssueTokenRead(
+    GM_ADDR slotAddr, int32_t tokenId, uint32_t sequence, const DataCopyParams& tokenCopyParams,
+    const DataCopyParams& scalesCopyParams)
+{
+    const uint32_t buffer = sequence % TOKEN_RING;
+    if (sequence >= TOKEN_RING) {
+        WaitFlag<AscendC::HardEvent::MTE3_MTE2>(tokenEvtFree_[buffer]);
+    }
+    LocalTensor<XType> token = tokenRing_[buffer * tokenRingElems_];
+    GlobalTensor<XType> input;
+    if (isDirectSelfRank_) {
+        input = xGm_[static_cast<int64_t>(tokenId) * axisH_];
+    } else {
+        input.SetGlobalBuffer(reinterpret_cast<__gm__ XType*>(slotAddr), axisH_);
+    }
+    // 输入不经过L2，节省搬运时间。
+    input.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
+    DataCopyPad(token, input, tokenCopyParams, {false, 0U, 0U, 0});
+    if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
+        GlobalTensor<ScalesType> scales;
+        scales.SetGlobalBuffer(reinterpret_cast<__gm__ ScalesType*>(slotAddr + scalesOffset_), scalesElems_);
+        DataCopyPad(token[scalesStride_].template ReinterpretCast<ScalesType>(), scales, scalesCopyParams,
+                    {false, 0U, 0U, 0});
+    }
+    SetFlag<AscendC::HardEvent::MTE2_MTE3>(tokenEvtFill_[buffer]);
+    return token;
+}
+
 #endif
 
 } // namespace MoeEpDispatchEpilogueImpl

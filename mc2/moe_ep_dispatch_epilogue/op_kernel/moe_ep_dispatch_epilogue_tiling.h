@@ -46,6 +46,8 @@ struct MoeEpDispatchEpilogueInfo {
     uint64_t rankExpertHitCountOffsetReserved = 0;
     uint64_t metadataRankOffsetsOffset = 0; // byte offset of the aligned tail in packed metadata
     uint64_t localRecvIndexOffset = 0;      // byte offset of [num_tokens, top_k] local recv_x reverse index
+    uint64_t slotEndsOffset = 0;            // compact slot list ends, capacity entries
+    uint64_t slotRowIdsOffset = 0;          // metadata row ids grouped by slot, capacity entries
 };
 
 struct MoeEpDispatchEpilogueTilingData {
