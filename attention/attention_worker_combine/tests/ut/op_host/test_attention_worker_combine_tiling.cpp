@@ -208,6 +208,23 @@ void CheckMxfpTiling(int64_t h, int64_t scaleCols, int64_t dtype, ge::DataType s
         {1, 1, 1}, {1, 1}, &compileInfo, soc, 8, 256 * 1024, 8192);
     ExecuteTestCase(para, status, status == ge::GRAPH_SUCCESS ? keyBase + dtype : 0, expected);
 }
+
+void CheckNonquantInvalidInputs(const gert::StorageShape &scaleShape, ge::DataType scaleType, int64_t hiddenSize,
+                                ge::graphStatus status)
+{
+    AttentionWorkerCombineCompileInfo compileInfo = {64, 256 * 1024};
+    gert::TilingContextPara para(
+        "AttentionWorkerCombine",
+        {{{{1024}, {1024}}, ge::DT_INT8, ge::FORMAT_ND},
+         {scaleShape, scaleType, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{{32, 8}, {32, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND}, {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"hidden_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(hiddenSize)},
+         {"token_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"need_schedule", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+        &compileInfo);
+    ExecuteTestCase(para, status, 0);
+}
 } // namespace
 
 TEST_F(AttentionWorkerCombineTilingTest, nonquant_reject_output_dtype_mismatch)
@@ -282,4 +299,19 @@ TEST_F(AttentionWorkerCombineTilingTest, mxfp_k_batch_and_tail)
                     "3 3 65 8193 0 1 3 1 1 8224 8193 1 1 1 21 2 3 ");
     CheckMxfpTiling(8193, 258, 4, ge::DT_FLOAT8_E8M0, ge::GRAPH_SUCCESS, 3, 65, "Ascend950", ge::DT_BF16, 11020, 0,
                     "3 3 65 8193 0 1 3 1 1 8224 8193 1 1 1 43 22 1 ");
+}
+
+TEST_F(AttentionWorkerCombineTilingTest, nonquant_reject_invalid_expert_scales)
+{
+    // expert_scales rank must be 2
+    CheckNonquantInvalidInputs({{32}, {32}}, ge::DT_FLOAT, 7168, ge::GRAPH_FAILED);
+    // BS must be positive
+    CheckNonquantInvalidInputs({{0, 8}, {0, 8}}, ge::DT_FLOAT, 7168, ge::GRAPH_FAILED);
+    // K must be in [1, 64]
+    CheckNonquantInvalidInputs({{32, 0}, {32, 0}}, ge::DT_FLOAT, 7168, ge::GRAPH_FAILED);
+    CheckNonquantInvalidInputs({{32, 65}, {32, 65}}, ge::DT_FLOAT, 7168, ge::GRAPH_FAILED);
+    // expert_scales dtype must be FLOAT
+    CheckNonquantInvalidInputs({{32, 8}, {32, 8}}, ge::DT_INT8, 7168, ge::GRAPH_FAILED);
+    // hidden_size must be positive
+    CheckNonquantInvalidInputs({{32, 8}, {32, 8}}, ge::DT_FLOAT, 0, ge::GRAPH_FAILED);
 }

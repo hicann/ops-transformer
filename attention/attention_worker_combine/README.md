@@ -86,12 +86,10 @@
 
 ## 约束说明
 
-* schedule_context为1D的Tensor。
 * 非量化场景expert_scales为FLOAT、2D Tensor，[BatchSize, K]，K范围为[1,64]。
 * MXFP反量化场景expert_scales为 E8M0、3D Tensor，shape 为 [BatchSize, K+1, S]，S = Ceil(H/32)，再将 S 向上取整到偶数。
 * MXFP反量化场景支持 token_dtype=2/3/4；R/H须为正，K范围为[1,64]，need_schedule为0或1。
 * y为2D的Tensor，[BatchSize, HiddenSize]，即第二维由属性hidden_size确定。
-* layer_id和next_layer_id为1D的Tensor。
 
 ## 调用说明
 

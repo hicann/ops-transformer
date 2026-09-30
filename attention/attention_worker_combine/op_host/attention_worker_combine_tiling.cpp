@@ -63,17 +63,6 @@ constexpr int64_t TILING_KEY_DIVIDE_K_BF16 = 10021;
 constexpr int64_t B32_DTYPE_BYTES = 4;
 constexpr int64_t B16_DTYPE_BYTES = 2;
 
-static std::tuple<int64_t, int64_t> GetShapeTuple(const gert::TilingContext *context, const int64_t index = 0)
-{
-    const gert::StorageShape *shapePtr = context->GetInputShape(index);
-    OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context->GetNodeName(), "Shape is nullptr."),
-                return std::make_tuple(0, 0));
-    OP_CHECK_IF(shapePtr->GetStorageShape().GetDimNum() != DIM_SIZE,
-                OP_LOGE(context->GetNodeName(), "Shape must be (BS, K)."), return std::make_tuple(0, 0));
-    return std::make_tuple(shapePtr->GetStorageShape().GetDim(SHAPE_IDX_BS),
-                           shapePtr->GetStorageShape().GetDim(SHAPE_IDX_K));
-}
-
 ge::graphStatus AttentionWorkerCombineTiling::DoGetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
@@ -98,18 +87,41 @@ ge::graphStatus AttentionWorkerCombineTiling::DoGetShapeAttrsInfo()
     OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
                 return ge::GRAPH_FAILED);
 
-    auto expertScalesShapeTuple = GetShapeTuple(context_, EXPERT_SCALES_INDEX);
-    int64_t batchSize = std::get<SHAPE_IDX_BS>(expertScalesShapeTuple);
-    tilingData_.set_BS(batchSize);
-    int64_t k = std::get<SHAPE_IDX_K>(expertScalesShapeTuple);
-    tilingData_.set_K(k);
+    const gert::StorageShape *shapePtr = context_->GetInputShape(EXPERT_SCALES_INDEX);
+    OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context_->GetNodeName(), "expert_scales shape is nullptr."),
+                return ge::GRAPH_FAILED);
+    const auto &shape = shapePtr->GetStorageShape();
+    OP_CHECK_IF(shape.GetDimNum() != DIM_SIZE,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "expert_scales",
+                                                         std::to_string(shape.GetDimNum()).c_str(), "Rank must be 2."),
+                return ge::GRAPH_FAILED);
+    const int64_t batchSize = shape.GetDim(SHAPE_IDX_BS);
+    const int64_t k = shape.GetDim(SHAPE_IDX_K);
+    OP_CHECK_IF(batchSize <= 0 || k <= 0 || k > K_UPPER_BOUND,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "BS,K",
+                                                      (std::to_string(batchSize) + "," + std::to_string(k)).c_str(),
+                                                      "BS must be positive and K must be in [1,64]."),
+                return ge::GRAPH_FAILED);
+    const auto *scaleDesc = context_->GetInputDesc(EXPERT_SCALES_INDEX);
+    OP_CHECK_IF(scaleDesc == nullptr, OP_LOGE(context_->GetNodeName(), "expert_scales desc is nullptr."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT,
+                OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expert_scales",
+                                          Ops::Base::ToString(scaleDesc->GetDataType()).c_str(), "FLOAT"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(k > K_UPPER_BOUND, OP_LOGE(context_->GetNodeName(), "k should <= 64."), return ge::GRAPH_FAILED);
+    tilingData_.set_BS(batchSize);
+    tilingData_.set_K(k);
 
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
     auto hiddenSize = attrs->GetInt(HIDDEN_SIZE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, hiddenSize);
+    OP_CHECK_IF(
+        *hiddenSize <= 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "hidden_size",
+                                              std::to_string(*hiddenSize).c_str(), "hidden_size must be positive."),
+        return ge::GRAPH_FAILED);
     tilingData_.set_H(*hiddenSize);
     auto tokenDtype = attrs->GetInt(TOKEN_DTYPE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, tokenDtype);
