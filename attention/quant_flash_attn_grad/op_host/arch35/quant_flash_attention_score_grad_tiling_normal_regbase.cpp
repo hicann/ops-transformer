@@ -40,12 +40,12 @@ uint32_t GetKernelSparseType(uint32_t deterSparseType)
 ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::GetShapeAttrsInfo()
 {
     fBaseParams.isDeterministic = true;
-    const gert::StorageShape *queryShape = context_->GetInputShape(QUERY_IDX); // [B, N2, G, S1, D]
-    const gert::StorageShape *keyShape = context_->GetInputShape(KEY_IDX);     // [B, N2, 1, S2, D]
-    const gert::StorageShape *valueShape = context_->GetInputShape(VALUE_IDX); // [B, N2, 1, S2, D_V]
+    const gert::StorageShape* queryShape = context_->GetInputShape(QUERY_IDX); // [B, N2, G, S1, D]
+    const gert::StorageShape* keyShape = context_->GetInputShape(KEY_IDX);     // [B, N2, 1, S2, D]
+    const gert::StorageShape* valueShape = context_->GetInputShape(VALUE_IDX); // [B, N2, 1, S2, D_V]
 
-    const char *inputLayoutQ = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_Q));
-    const char *inputLayoutKV = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_KV));
+    const char* inputLayoutQ = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_Q));
+    const char* inputLayoutKV = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_KV));
     if (inputLayoutQ == nullptr && inputLayoutKV == nullptr) {
         inputLayoutQ = "BSND";
     } else if (inputLayoutQ == nullptr || inputLayoutKV == nullptr || strcmp(inputLayoutQ, inputLayoutKV) != 0) {
@@ -126,7 +126,7 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::GetPlatformInfo
 
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
-        auto compileInfoPtr = reinterpret_cast<const QuantFlashAttnGradCompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const QuantFlashAttnGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr,
                     OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "compile_info is null"),
                     return ge::GRAPH_FAILED);
@@ -246,6 +246,9 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::DoSparse()
             const int64_t nTiles = CeilDivideBy(fBaseParams.s2, static_cast<int64_t>(QUANT_BLOCK_S2_SIZE));
             fBaseParams.deterMaxRound = bSize * CeilDivideBy(nTiles * n1, kNum) * mTiles;
         }
+        const int64_t swizzleRows = std::max(s1Outer, std::min(kNum, s2Outer));
+        const int64_t swizzleMaxRound = bSize * CeilDivideBy(s2Outer * n1, kNum) * swizzleRows;
+        fBaseParams.deterMaxRound = std::max(fBaseParams.deterMaxRound, swizzleMaxRound);
         if (fBaseParams.deterMaxRound < 1) {
             fBaseParams.deterMaxRound = 1;
         }
@@ -677,7 +680,7 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::DoLibApiTiling(
 
 ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     size_t workspaceSize = 0;
     workspaceSize = RESERVED_WORKSPACE_SIZE;
     int64_t qSize =
@@ -733,7 +736,7 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSiz
     return ge::GRAPH_SUCCESS;
 }
 
-void QuantFlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSize4Deter(size_t &workspaceSize)
+void QuantFlashAttentionScoreGradTilingNormalRegbase::GetWorkspaceSize4Deter(size_t& workspaceSize)
 {
     if (fBaseParams.deterSparseType == static_cast<uint32_t>(DeterSparseType::DETER_OLD)) {
         workspaceSize += (fBaseParams.s1Inner * S1CV_RATIO_DEFAULT + NUM_TWO * fBaseParams.s2Inner) *
@@ -965,7 +968,7 @@ ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::GetSparsePrefix
 
 ge::graphStatus QuantFlashAttentionScoreGradTilingNormalRegbase::InitTilingData()
 {
-    QuantFlashAttnGradTiling *tilingData = this->context_->GetTilingData<QuantFlashAttnGradTiling>();
+    QuantFlashAttnGradTiling* tilingData = this->context_->GetTilingData<QuantFlashAttnGradTiling>();
     quantFagTilingData_ = tilingData;
     return ge::GRAPH_SUCCESS;
 }
