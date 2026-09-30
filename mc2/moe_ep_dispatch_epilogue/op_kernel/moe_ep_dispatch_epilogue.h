@@ -22,8 +22,7 @@
 #include "version/asc_devkit_version.h"
 #include "version/hcomm_version.h"
 
-#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
-    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#if (ASC_DEVKIT_VERSION_NUM >= 90200000) && (HCOMM_VERSION_NUM >= 90200000)
 #define ENABLE_MOE_EP_DISPATCH_EPILOGUE_KERNEL
 #endif
 
@@ -96,7 +95,7 @@ public:
     __aicore__ inline void Init(GM_ADDR context, GM_ADDR x, GM_ADDR topkIdx, GM_ADDR numRecvPerRank,
                                 GM_ADDR numRecvPerExpert, GM_ADDR cachedRecvSrcMetadata, GM_ADDR recvX,
                                 GM_ADDR recvSrcMetadata, GM_ADDR recvTopkWeights, GM_ADDR recvScales, GM_ADDR workspace,
-                                GM_ADDR tilingGM, TPipe *pipe, const MoeEpDispatchEpilogueInfo *tilingData);
+                                GM_ADDR tilingGM, TPipe* pipe, const MoeEpDispatchEpilogueInfo* tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -107,16 +106,16 @@ private:
     __aicore__ inline void CopyFromWindowByExpert();
     // 把 (rank, tile) 两层循环拍平成「取下一个 tile」。预读 meta 必须知道下一拍在哪，而下一拍会跨 rank，
     // 每个 rank 的槽位数又只有标量读得到；epWorldSize_ 很小，逐 rank 扫一遍的代价可以忽略。
-    __aicore__ inline bool NextTile(uint32_t rankId, uint32_t tileStart, uint32_t &nextRank, uint32_t &nextTileStart,
-                                    uint32_t &nextTileCnt, uint32_t &nextSlotStart);
+    __aicore__ inline bool NextTile(uint32_t rankId, uint32_t tileStart, uint32_t& nextRank, uint32_t& nextTileStart,
+                                    uint32_t& nextTileCnt, uint32_t& nextSlotStart);
     __aicore__ inline void IssueMeta(uint32_t rankId, uint32_t slotIdx, uint32_t tileCnt, uint32_t buf);
     __aicore__ inline void CopyFromWindowByCachedMeta();
     __aicore__ inline void CopyCachedRankOffsets();
     __aicore__ inline void InitLocalRecvIndex();
 
-    __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startId, uint32_t &endId,
-                                       uint32_t &sendNum);
-    __aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *ctx, uint32_t rankId, uint64_t offset)
+    __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startId, uint32_t& endId,
+                                       uint32_t& sendNum);
+    __aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext* ctx, uint32_t rankId, uint64_t offset)
     {
         return (GM_ADDR)ctx->epHcclBuffer[rankId] + offset;
     }
@@ -129,8 +128,8 @@ private:
         return iter1AlignEnd;
     }
 
-    TPipe *tpipe_{nullptr};
-    __gm__ Mc2Aclnn::MoeCommContext *mc2Context_{nullptr};
+    TPipe* tpipe_{nullptr};
+    __gm__ Mc2Aclnn::MoeCommContext* mc2Context_{nullptr};
     MoeEpExceptionDump::MoeEpCoreDiagWriter diagWriter_;
     uint32_t epRankId_{0};
     uint32_t networkMode_{0};      // 0 = direct(自段 x 直读输入), 1 = hybrid(自段 x 读win)
@@ -249,7 +248,7 @@ private:
 
 template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
 __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::SplitToCore(
-    uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startId, uint32_t &endId, uint32_t &sendNum)
+    uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startId, uint32_t& endId, uint32_t& sendNum)
 {
     sendNum = curSendCnt / curUseAivNum;
     uint32_t remainderNum = curSendCnt % curUseAivNum;
@@ -268,7 +267,7 @@ template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWe
 __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::Init(
     GM_ADDR context, GM_ADDR x, GM_ADDR topkIdx, GM_ADDR numRecvPerRank, GM_ADDR numRecvPerExpert,
     GM_ADDR cachedRecvSrcMetadata, GM_ADDR recvX, GM_ADDR recvSrcMetadata, GM_ADDR recvTopkWeights, GM_ADDR recvScales,
-    GM_ADDR workspace, GM_ADDR tilingGM, TPipe *pipe, const MoeEpDispatchEpilogueInfo *tilingData)
+    GM_ADDR workspace, GM_ADDR tilingGM, TPipe* pipe, const MoeEpDispatchEpilogueInfo* tilingData)
 {
     tpipe_ = pipe;
     aivId_ = GetBlockIdx();
@@ -286,7 +285,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     winDataOffset_ = tilingData->winDataOffset;
     slotWinStateOffset_ = tilingData->slotWinStateOffset;
 
-    mc2Context_ = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext *>(context);
+    mc2Context_ = reinterpret_cast<__gm__ Mc2Aclnn::MoeCommContext*>(context);
     epRankId_ = mc2Context_->epRankId;
     constexpr size_t metadataOffset = offsetof(MoeEpDispatchEpilogueTilingData, moeEpDispatchEpilogueInfo) +
                                       offsetof(MoeEpDispatchEpilogueInfo, dumpMetadata);
@@ -300,26 +299,26 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     metaOffset_ = slotMetaBase;
     scalesStride_ = hAlignSize / sizeof(XType);
 
-    numRecvPerRankGm_.SetGlobalBuffer((__gm__ int32_t *)numRecvPerRank);
-    numRecvPerExpertGm_.SetGlobalBuffer((__gm__ int64_t *)numRecvPerExpert);
-    cachedRecvSrcMetadataGm_.SetGlobalBuffer((__gm__ int32_t *)cachedRecvSrcMetadata);
+    numRecvPerRankGm_.SetGlobalBuffer((__gm__ int32_t*)numRecvPerRank);
+    numRecvPerExpertGm_.SetGlobalBuffer((__gm__ int64_t*)numRecvPerExpert);
+    cachedRecvSrcMetadataGm_.SetGlobalBuffer((__gm__ int32_t*)cachedRecvSrcMetadata);
     if constexpr (IsCached) {
         cachedRecvRankOffsetsGm_.SetGlobalBuffer(
-            reinterpret_cast<__gm__ int32_t *>(cachedRecvSrcMetadata + tilingData->metadataRankOffsetsOffset));
+            reinterpret_cast<__gm__ int32_t*>(cachedRecvSrcMetadata + tilingData->metadataRankOffsetsOffset));
     }
-    xGm_.SetGlobalBuffer((__gm__ XType *)x);
-    recvXGm_.SetGlobalBuffer((__gm__ XType *)recvX);
-    recvSrcMetadataGm_.SetGlobalBuffer((__gm__ int32_t *)recvSrcMetadata);
+    xGm_.SetGlobalBuffer((__gm__ XType*)x);
+    recvXGm_.SetGlobalBuffer((__gm__ XType*)recvX);
+    recvSrcMetadataGm_.SetGlobalBuffer((__gm__ int32_t*)recvSrcMetadata);
     recvRankOffsetsGm_.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(recvSrcMetadata + tilingData->metadataRankOffsetsOffset));
+        reinterpret_cast<__gm__ int32_t*>(recvSrcMetadata + tilingData->metadataRankOffsetsOffset));
     localRecvIndexGm_.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(recvSrcMetadata + tilingData->localRecvIndexOffset));
+        reinterpret_cast<__gm__ int32_t*>(recvSrcMetadata + tilingData->localRecvIndexOffset));
     if constexpr (HasTopkWeights) {
-        recvTopkWeightsGm_.SetGlobalBuffer((__gm__ float *)recvTopkWeights);
+        recvTopkWeightsGm_.SetGlobalBuffer((__gm__ float*)recvTopkWeights);
     }
 
     // joint 计数矩阵占本 op 用户 workspace 的最前面一段，所以不需要偏移量，直接绑 workspace 首地址。
-    rankExpertHitCountGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace));
+    rankExpertHitCountGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace));
 
     axisKAlign_ = Ceil(axisK_, ELEM_ALIGN) * ELEM_ALIGN;
     metaBytes_ = (META_TOPK_SECTION * axisKAlign_) * (uint32_t)sizeof(int32_t) + UB_ALIGN;
@@ -416,7 +415,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
         scalesElems_ = (scalesBytes_ == 0U) ? 0U : (scalesBytes_ / sizeof(ScalesType));
         scalesBytesAlign_ = Ceil(scalesBytes_, UB_ALIGN) * UB_ALIGN;
         metaOffset_ += scalesBytesAlign_;
-        recvScalesGm_.SetGlobalBuffer((__gm__ ScalesType *)recvScales);
+        recvScalesGm_.SetGlobalBuffer((__gm__ ScalesType*)recvScales);
     }
 
     tokenQueueBufBytes_ = hAlignSize + scalesBytesAlign_;
@@ -517,7 +516,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     LocalTensor<float> sharedTmp = sharedTmpBuf_.Get<float>();
     LocalTensor<float> ubWaitStatusFp32 = ubWaitStatus_.template ReinterpretCast<float>();
     LocalTensor<float> ubWaitSumFp32 = ubWaitSum_.template ReinterpretCast<float>();
-    statusGMTensor.SetGlobalBuffer((__gm__ int32_t *)localSlotStateWinAddr_);
+    statusGMTensor.SetGlobalBuffer((__gm__ int32_t*)localSlotStateWinAddr_);
     DataCopyParams statusCopyParams = {static_cast<uint16_t>(totalNotifyCnt_), 1U,
                                        static_cast<uint16_t>((WIN_ADDR_ALIGN - UB_ALIGN) / UB_ALIGN), 0U};
     DataCopyParams clearStatusCopyParams = {static_cast<uint16_t>(totalNotifyCnt_), 1U, 0U,
@@ -584,7 +583,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
         for (uint32_t tileStart = 0; tileStart < slotCntPerAiv; tileStart += SLOTS_TILE) {
             uint32_t tileCnt = (slotCntPerAiv - tileStart > SLOTS_TILE) ? SLOTS_TILE : (slotCntPerAiv - tileStart);
 
-            srcTopkIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
+            srcTopkIdsGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(
                 srcRankBase + (int64_t)(slotStart + tileStart) * perSlotBytes_ + metaOffset_));
             DataCopyExtParams topkCopyParams{static_cast<uint16_t>(tileCnt), static_cast<uint32_t>(topkBytes),
                                              static_cast<int64_t>(perSlotBytes_ - topkBytes), 0, 0};
@@ -704,8 +703,8 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 
 template <typename XType, typename ScalesType, uint32_t IsCached, bool HasTopkWeights>
 __aicore__ inline bool MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTopkWeights>::NextTile(
-    uint32_t rankId, uint32_t tileStart, uint32_t &nextRank, uint32_t &nextTileStart, uint32_t &nextTileCnt,
-    uint32_t &nextSlotStart)
+    uint32_t rankId, uint32_t tileStart, uint32_t& nextRank, uint32_t& nextTileStart, uint32_t& nextTileCnt,
+    uint32_t& nextSlotStart)
 {
     for (uint32_t r = rankId; r < epWorldSize_; ++r) {
         int32_t slotCnt = ubRecvCnt_.GetValue(r);
@@ -740,9 +739,9 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
     DataCopyExtParams metaCopyParams{static_cast<uint16_t>(tileCnt), metaBytes_, perSlotBytes_ - metaBytes_, 0, 0};
     DataCopyPadExtParams<int32_t> metaPadParams{false, 0, 0, 0};
     GlobalTensor<int32_t> srcMetaGm;
-    srcMetaGm.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(localWinAddr_ + (int64_t)rankId * numMaxTokensPerRank_ * perSlotBytes_ +
-                                           (int64_t)slotIdx * perSlotBytes_ + metaOffset_));
+    srcMetaGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(localWinAddr_ +
+                                                                (int64_t)rankId * numMaxTokensPerRank_ * perSlotBytes_ +
+                                                                (int64_t)slotIdx * perSlotBytes_ + metaOffset_));
     DataCopyPad(ubMeta_[buf * metaRingElems_], srcMetaGm, metaCopyParams, metaPadParams);
     SetFlag<AscendC::HardEvent::MTE2_S>(metaEvtMte2ToS_[buf]);
 }
@@ -833,12 +832,12 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
             if (isDirectSelfRank_) { // direct 自段 x 未入窗口，直读输入 x
                 srcTokenTensor = xGm_[static_cast<int64_t>(tokenIdxMeta) * axisH_];
             } else {
-                srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType *>(slotAddr), axisH_);
+                srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType*>(slotAddr), axisH_);
             }
             DataCopyPad(tokenOut, srcTokenTensor, tokenCopyParams, tokenPadParams);
             if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
                 GlobalTensor<ScalesType> srcScalesTensor;
-                srcScalesTensor.SetGlobalBuffer(reinterpret_cast<__gm__ ScalesType *>(slotAddr + scalesOffset_),
+                srcScalesTensor.SetGlobalBuffer(reinterpret_cast<__gm__ ScalesType*>(slotAddr + scalesOffset_),
                                                 scalesElems_);
                 DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U, 0U};
                 DataCopyPadParams scalesPadParams{false, 0, 0, 0};
@@ -1020,14 +1019,14 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
             if (directSelfRank) {
                 srcTokenTensor = xGm_[static_cast<int64_t>(tokenIdx) * axisH_];
             } else {
-                srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType *>(slotAddr), axisH_);
+                srcTokenTensor.SetGlobalBuffer(reinterpret_cast<__gm__ XType*>(slotAddr), axisH_);
             }
             LocalTensor<XType> tokenTensor = tokenQueue_.AllocTensor<XType>();
             DataCopyPad(tokenTensor, srcTokenTensor, tokenCopyParams, tokenPadParams);
 
             if constexpr (Std::IsSame<XType, fp8_e5m2_t>::value || Std::IsSame<XType, fp8_e4m3fn_t>::value) {
                 GlobalTensor<ScalesType> srcScalesTensor;
-                srcScalesTensor.SetGlobalBuffer(reinterpret_cast<__gm__ ScalesType *>(slotAddr + scalesOffset_),
+                srcScalesTensor.SetGlobalBuffer(reinterpret_cast<__gm__ ScalesType*>(slotAddr + scalesOffset_),
                                                 scalesElems_);
                 DataCopyParams scalesCopyParams{1U, static_cast<uint16_t>(scalesElems_ * sizeof(ScalesType)), 0U, 0U};
                 DataCopyPadParams scalesPadParams{false, 0, 0, 0};
@@ -1037,7 +1036,7 @@ __aicore__ inline void MoeEpDispatchEpilogue<XType, ScalesType, IsCached, HasTop
 
             if constexpr (HasTopkWeights) {
                 GlobalTensor<int32_t> srcMetaGm;
-                srcMetaGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(slotAddr + metaOffset_));
+                srcMetaGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(slotAddr + metaOffset_));
                 DataCopyExtParams slotMetaParams{1U, metaBytes_, 0U, 0U, 0U};
                 DataCopyPad(ubMeta_, srcMetaGm, slotMetaParams, metaPadParams);
                 SyncFunc<AscendC::HardEvent::MTE2_S>();

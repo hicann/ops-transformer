@@ -26,7 +26,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ResetGmm2
         int32_t coreLen, coreOffset;
         TilingByCore(totalCounters, coreLen, coreOffset);
         GlobalTensor<int32_t> gmm2CombineSyncCounterGm;
-        gmm2CombineSyncCounterGm.SetGlobalBuffer((__gm__ int32_t *)params_.workspaceInfo.gmm2CombineSyncCounterPtr);
+        gmm2CombineSyncCounterGm.SetGlobalBuffer((__gm__ int32_t*)params_.workspaceInfo.gmm2CombineSyncCounterPtr);
         SyncFuncStatic<AscendC::HardEvent::V_MTE3, SYNC_EVENT_ID2>();
         for (int32_t resetElementOffset = 0; resetElementOffset < coreLen;
              resetElementOffset += resetBatchElementCount_) {
@@ -62,8 +62,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::InitCombi
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline bool MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::GetCombineRankRange(uint32_t expertIdx,
                                                                                            uint32_t dstRank,
-                                                                                           uint32_t &rowStart,
-                                                                                           uint32_t &tokenCount)
+                                                                                           uint32_t& rowStart,
+                                                                                           uint32_t& tokenCount)
 {
     uint64_t expertBegin = static_cast<uint64_t>(expertIdx) * worldSize_;
     uint64_t rankEndIndex = expertBegin + dstRank;
@@ -90,8 +90,8 @@ __aicore__ inline bool MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::GetCombin
 
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCombineRank(
-    const GMMAddrInfo &gmmAddrInfo, const ExpertLoopState &gmm2State, uint32_t expertIdx,
-    CombineImpl::LayeredCombineBatchState &batchState)
+    const GMMAddrInfo& gmmAddrInfo, const ExpertLoopState& gmm2State, uint32_t expertIdx,
+    CombineImpl::LayeredCombineBatchState& batchState)
 {
     constexpr bool IsQuantized = CombineQuantMode != COMBINE_NO_QUANT;
     uint32_t rowStart = 0U;
@@ -106,7 +106,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCo
     uint32_t nScale = Ops::Base::CeilDiv(k_, uint32_t(MXFP_SCALE_GROUP_NUM));
     uint32_t quantTokenSizeBytes = Ops::Base::CeilAlign(k_ + nScale, static_cast<uint32_t>(ALIGN_32));
     GroupSyncSlotLayout slotLayout = CalcGroupSyncSlotLayout(mExpert, blockNum_);
-    __gm__ int32_t *expertCounterBase = reinterpret_cast<__gm__ int32_t *>(gmmAddrInfo.gmm2CombineSyncCounter);
+    __gm__ int32_t* expertCounterBase = reinterpret_cast<__gm__ int32_t*>(gmmAddrInfo.gmm2CombineSyncCounter);
 
     uint32_t processedCount = 0U;
     while (processedCount < tokenCount) {
@@ -115,8 +115,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCo
         uint32_t firstSyncSlot = 0;
         uint32_t syncSlotCount = 0;
         GetGroupSyncSlotRange(targetGroup, slotLayout, firstSyncSlot, syncSlotCount);
-        __gm__ int32_t *counterAddr = GetCombineSyncCounterAddress(expertCounterBase, firstSyncSlot);
-        if (AscendC::ReadGmBypassDCache(counterAddr) < static_cast<int32_t>(nTilesPerGroup)) {
+        __gm__ int32_t* counterAddr = GetCombineSyncCounterAddress(expertCounterBase, firstSyncSlot);
+        if (AscendC::ReadGmByPassDCache(counterAddr) < static_cast<int32_t>(nTilesPerGroup)) {
             continue;
         }
 
@@ -130,7 +130,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ProcessCo
         LocalTensor<int32_t> metaInfoTensor(TPosition::VECIN, offset, batchCount * META_INFO_SIZE);
         offset += batchCount * META_INFO_SIZE * sizeof(int32_t);
         AscendC::GlobalTensor<int32_t> metaInfoGm;
-        metaInfoGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(
+        metaInfoGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(
             params_.workspaceInfo.metaInfoPtr +
             static_cast<uint64_t>(gmm2State.expertBeforeCnt + currentRow) * META_INFO_SIZE * sizeof(int32_t)));
         SyncFuncStatic<AscendC::HardEvent::S_MTE2, SYNC_EVENT_ID1>();
@@ -277,7 +277,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
     LocalTensor<float> dataIn0Fp32 = dataResFp32Tensor_[k_];
     LocalTensor<float> dataIn1Fp32 = dataResFp32Tensor_[k_ * 2];
     GlobalTensor<bfloat16_t> sharedResult;
-    sharedResult.SetGlobalBuffer((__gm__ bfloat16_t *)params_.workspaceInfo.sharedExpertResultPtr);
+    sharedResult.SetGlobalBuffer((__gm__ bfloat16_t*)params_.workspaceInfo.sharedExpertResultPtr);
     for (uint32_t sharedIdx = 0; sharedIdx < sharedExpertNum_; sharedIdx++) {
         auto event = (sharedIdx % DOUBLE_BUFFER == 0) ? EVENT_ID0 : EVENT_ID1;
         auto dataInBf16 = (sharedIdx % DOUBLE_BUFFER == 0) ? dataIn0Bf16 : dataIn1Bf16;
@@ -301,7 +301,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadUnper
     if constexpr (!TopkWeightsPrefetch) {
         if constexpr (Std::IsSame<TopkWeightsType, float>::value) {
             GlobalTensor<float> topKWeightsGlobalTensor_;
-            topKWeightsGlobalTensor_.SetGlobalBuffer((__gm__ float *)params_.probsGmAddr);
+            topKWeightsGlobalTensor_.SetGlobalBuffer((__gm__ float*)params_.probsGmAddr);
             DataCopyExtParams copyParams = {1U, static_cast<uint32_t>(chunkTokenCnt * topK_ * sizeof(float)), 0U, 0U,
                                             0U};
             DataCopyPadExtParams<float> copyPadParams{false, 0U, 0U, 0U};
@@ -314,7 +314,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadUnper
             LocalTensor<bfloat16_t> tempLocal(TPosition::VECCALC, topKWeightsTempAddr_,
                                               tempBufAlign / sizeof(bfloat16_t));
             GlobalTensor<bfloat16_t> topkWeightsGlobalTensor;
-            topkWeightsGlobalTensor.SetGlobalBuffer((__gm__ bfloat16_t *)params_.probsGmAddr);
+            topkWeightsGlobalTensor.SetGlobalBuffer((__gm__ bfloat16_t*)params_.probsGmAddr);
             DataCopyExtParams copyParams = {1U, static_cast<uint32_t>(chunkTokenCnt * topK_ * sizeof(bfloat16_t)), 0U,
                                             0U, 0U};
             DataCopyPadExtParams<bfloat16_t> copyPadParams{false, 0U, 0U, 0U};
@@ -328,8 +328,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadUnper
 
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadUnpermuteExpertInput(
-    const GlobalTensor<bfloat16_t> &expandedX, int32_t tokenIdx, int32_t expId, TEventID event,
-    LocalTensor<bfloat16_t> &dataInBf16, LocalTensor<float> &dataInFp32)
+    const GlobalTensor<bfloat16_t>& expandedX, int32_t tokenIdx, int32_t expId, TEventID event,
+    LocalTensor<bfloat16_t>& dataInBf16, LocalTensor<float>& dataInFp32)
 {
     if constexpr (CombineQuantMode == COMBINE_NO_QUANT) {
         WaitFlag<AscendC::HardEvent::V_MTE2>(event);
@@ -358,7 +358,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::LoadUnper
 
 template <TemplateMegaMoeLayeredTypeClass>
 __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::AccumulateUnpermuteExperts(
-    const GlobalTensor<bfloat16_t> &expandedX, int32_t tokenIdx, int32_t localIdx)
+    const GlobalTensor<bfloat16_t>& expandedX, int32_t tokenIdx, int32_t localIdx)
 {
     LocalTensor<bfloat16_t> dataIn0Bf16 = dataResTensor_[k_];
     LocalTensor<bfloat16_t> dataIn1Bf16 = dataResTensor_[k_ * 2];
@@ -397,9 +397,9 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::Unpermute
     int32_t coreLen, coreOffset;
     TilingByCore(m_, coreLen, coreOffset, 1);
     GlobalTensor<bfloat16_t> expandedX;
-    expandedX.SetGlobalBuffer((__gm__ bfloat16_t *)params_.peermemInfo.combineSendPtr);
+    expandedX.SetGlobalBuffer((__gm__ bfloat16_t*)params_.peermemInfo.combineSendPtr);
     GlobalTensor<bfloat16_t> output;
-    output.SetGlobalBuffer((__gm__ bfloat16_t *)params_.y2GmAddr);
+    output.SetGlobalBuffer((__gm__ bfloat16_t*)params_.y2GmAddr);
     SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID0);
     SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID1);
     for (int32_t chunkStart = coreOffset; chunkStart < coreLen + coreOffset;) {

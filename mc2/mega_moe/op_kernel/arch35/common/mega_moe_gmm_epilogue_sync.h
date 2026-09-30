@@ -31,10 +31,10 @@ enum class GmmEventPair : uint16_t {
 };
 
 // 轮询 GM 中的 int32 flag 直至等于期望值，并在两次读取之间加入短暂退避。
-__aicore__ inline void WaitUntilGmFlagEquals(__gm__ int32_t *flagAddr, int32_t expectedValue,
+__aicore__ inline void WaitUntilGmFlagEquals(__gm__ int32_t* flagAddr, int32_t expectedValue,
                                              int64_t pollBackoffCycles = GM_FLAG_POLL_BACKOFF_CYCLES)
 {
-    while (AscendC::ReadGmBypassDCache(flagAddr) != expectedValue) {
+    while (AscendC::ReadGmByPassDCache(flagAddr) != expectedValue) {
         int64_t startCycle = AscendC::GetSystemCycle();
         while (AscendC::GetSystemCycle() - startCycle < pollBackoffCycles) {
         }
@@ -42,9 +42,9 @@ __aicore__ inline void WaitUntilGmFlagEquals(__gm__ int32_t *flagAddr, int32_t e
 }
 
 // 轮询 GM 中的 int32 计数直至不小于目标值，并在两次读取之间加入短暂退避。
-__aicore__ inline void WaitUntilGmFlagAtLeast(__gm__ int32_t *flagAddr, int32_t targetValue)
+__aicore__ inline void WaitUntilGmFlagAtLeast(__gm__ int32_t* flagAddr, int32_t targetValue)
 {
-    while (AscendC::ReadGmBypassDCache(flagAddr) < targetValue) {
+    while (AscendC::ReadGmByPassDCache(flagAddr) < targetValue) {
         int64_t startCycle = AscendC::GetSystemCycle();
         while (AscendC::GetSystemCycle() - startCycle < GM_FLAG_POLL_BACKOFF_CYCLES) {
         }
@@ -75,11 +75,11 @@ __aicore__ inline void WaitForCube(uint16_t value = 0)
 // sites as before and remains alive across expert/wave calls.
 class Gmm1UbActivationSync {
 public:
-    __aicore__ explicit inline Gmm1UbActivationSync(uint16_t &pingpongIdx)
+    __aicore__ explicit inline Gmm1UbActivationSync(uint16_t& pingpongIdx)
         : pingpongIdx_(pingpongIdx)
     {}
 
-    __aicore__ inline Gmm1UbActivationSync(int32_t &submittedTiles, uint16_t &pingpongIdx)
+    __aicore__ inline Gmm1UbActivationSync(int32_t& submittedTiles, uint16_t& pingpongIdx)
         : pingpongIdx_(pingpongIdx),
           submittedTiles_(&submittedTiles)
     {}
@@ -126,8 +126,8 @@ public:
     }
 
 private:
-    uint16_t &pingpongIdx_;
-    int32_t *submittedTiles_ = nullptr; // Required only for AIC submission.
+    uint16_t& pingpongIdx_;
+    int32_t* submittedTiles_ = nullptr; // Required only for AIC submission.
 };
 
 // GMM1 -> Activation：A8W8/A4W4 使用 AIV0，A8W4 使用 AIV1。
@@ -195,7 +195,7 @@ private:
 template <bool TopkWeightsPrefetch, typename AddressInfo>
 class Gmm1GmActivationSync {
 public:
-    __aicore__ explicit inline Gmm1GmActivationSync(const AddressInfo &addresses, int32_t *sequence = nullptr)
+    __aicore__ explicit inline Gmm1GmActivationSync(const AddressInfo& addresses, int32_t* sequence = nullptr)
         : addresses_(addresses),
           sequence_(sequence)
     {}
@@ -218,10 +218,10 @@ public:
             AscendC::SetFlag<AscendC::HardEvent::FIX_S>(0);
             AscendC::WaitFlag<AscendC::HardEvent::FIX_S>(0);
             if constexpr (TopkWeightsPrefetch) {
-                __gm__ int32_t *status = addresses_.gmm1TileStatus + static_cast<uint64_t>(loopIdx) * INT_CACHELINE;
-                AscendC::WriteGmBypassDCache(status, static_cast<int32_t>(expertIdx + 1));
+                __gm__ int32_t* status = addresses_.gmm1TileStatus + static_cast<uint64_t>(loopIdx) * INT_CACHELINE;
+                AscendC::WriteGmByPassDCache(status, static_cast<int32_t>(expertIdx + 1));
             } else {
-                AscendC::WriteGmBypassDCache(addresses_.gmmToEpilogueFlag, ++(*sequence_));
+                AscendC::WriteGmByPassDCache(addresses_.gmmToEpilogueFlag, ++(*sequence_));
             }
         }
     }
@@ -234,7 +234,7 @@ public:
         if (addresses_.gmm1ActivationSync != nullptr) {
             addresses_.gmm1ActivationSync->WaitForGmm1();
         } else if constexpr (TopkWeightsPrefetch) {
-            __gm__ int32_t *status = addresses_.gmm1TileStatus + static_cast<uint64_t>(loopIdx) * INT_CACHELINE;
+            __gm__ int32_t* status = addresses_.gmm1TileStatus + static_cast<uint64_t>(loopIdx) * INT_CACHELINE;
             int32_t roundTag = static_cast<int32_t>(expertIdx + 1);
             WaitUntilGmFlagEquals(status, roundTag);
         } else {
@@ -253,15 +253,15 @@ public:
     }
 
 private:
-    const AddressInfo &addresses_;
-    int32_t *sequence_;
+    const AddressInfo& addresses_;
+    int32_t* sequence_;
     int32_t expectedSequence_ = 0;
 };
 
 // Layered prefetch's existing final GM handshake, separate from per-tile ACKs.
 class Gmm1GmCompletionSync {
 public:
-    __aicore__ inline Gmm1GmCompletionSync(__gm__ int32_t *flag, int32_t tag, uint32_t subBlockIdx,
+    __aicore__ inline Gmm1GmCompletionSync(__gm__ int32_t* flag, int32_t tag, uint32_t subBlockIdx,
                                            uint32_t activationSubBlockIdx)
         : flag_(flag),
           tag_(tag),
@@ -273,7 +273,7 @@ public:
     {
         if constexpr (g_coreType == AscendC::AIV) {
             if (subBlockIdx_ == activationSubBlockIdx_) {
-                AscendC::WriteGmBypassDCache(flag_, tag_);
+                AscendC::WriteGmByPassDCache(flag_, tag_);
             }
         } else {
             WaitUntilGmFlagEquals(flag_, tag_);
@@ -281,7 +281,7 @@ public:
     }
 
 private:
-    __gm__ int32_t *flag_;
+    __gm__ int32_t* flag_;
     int32_t tag_;
     uint32_t subBlockIdx_;
     uint32_t activationSubBlockIdx_;

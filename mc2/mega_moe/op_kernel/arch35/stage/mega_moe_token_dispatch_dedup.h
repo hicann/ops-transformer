@@ -40,7 +40,7 @@ struct DedupDispatchViews {
 
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType>
 __aicore__ inline DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> CreateDedupDispatchViews(
-    const TokenDispatchConfig &context, const Params &params, GM_ADDR *winRankAddr, uint32_t remoteRankIdx,
+    const TokenDispatchConfig& context, const Params& params, GM_ADDR* winRankAddr, uint32_t remoteRankIdx,
     uint32_t dedupUbBaseAddr)
 {
     DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> views;
@@ -52,23 +52,23 @@ __aicore__ inline DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleTy
         LocalTensor<int32_t>(TPosition::VECCALC, dedupUbBaseAddr + DEDUP_DESC_BATCH_UB_BYTES + DEDUP_FAN_META_UB_BYTES,
                              DEDUP_ACTIVE_LIST_UB_BYTES / sizeof(int32_t));
     views.remoteRankGlobalTensor.SetGlobalBuffer(
-        reinterpret_cast<__gm__ ActivationType *>(winRankAddr[remoteRankIdx] + context.quantWinOffset));
+        reinterpret_cast<__gm__ ActivationType*>(winRankAddr[remoteRankIdx] + context.quantWinOffset));
     views.tokenRevAbsTensor.SetGlobalBuffer(
-        reinterpret_cast<__gm__ ActivationType *>(params.workspaceInfo.dispatchRevDataPtr));
+        reinterpret_cast<__gm__ ActivationType*>(params.workspaceInfo.dispatchRevDataPtr));
     views.scaleRevAbsTensor.SetGlobalBuffer(
-        reinterpret_cast<__gm__ QuantScaleType *>(params.workspaceInfo.dispatchRevScalePtr));
-    views.metaInfoAbsTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.metaInfoPtr));
-    views.rowDescGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(context.dedup.rowDescPtr));
+        reinterpret_cast<__gm__ QuantScaleType*>(params.workspaceInfo.dispatchRevScalePtr));
+    views.metaInfoAbsTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(params.workspaceInfo.metaInfoPtr));
+    views.rowDescGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(context.dedup.rowDescPtr));
     return views;
 }
 
 // 组内每个成员写一份数据/scale，并在 UB 拼装各成员的 metaInfo（按成员自己的 topkIndex/权重位）。
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType>
-__aicore__ inline void FanoutDedupDataAndMeta(DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> &views,
-                                              TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
-                                              const LocalTensor<ActivationType> &tokenScaleBuffer,
-                                              const LocalTensor<QuantScaleType> &scaleBuffer,
-                                              const LocalTensor<int32_t> &weightBitsTensor, bool recordHasWeights,
+__aicore__ inline void FanoutDedupDataAndMeta(DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType>& views,
+                                              TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
+                                              const LocalTensor<ActivationType>& tokenScaleBuffer,
+                                              const LocalTensor<QuantScaleType>& scaleBuffer,
+                                              const LocalTensor<int32_t>& weightBitsTensor, bool recordHasWeights,
                                               int32_t topK, uint32_t remoteRankIdx, int32_t selfRow,
                                               int32_t selfTopkIndex, int32_t descBase, int32_t memberCount,
                                               uint32_t fanMetaSlotBase)
@@ -103,8 +103,8 @@ __aicore__ inline void FanoutDedupDataAndMeta(DedupDispatchViews<TopkIndexType, 
 // 判断条件用 GROUP 标志、不用 memberCount>1：被 clamp 裁到只剩 1 个成员的组照样走
 // 合并乘权路径，这里不写权重它就会读到未初始化的内存。
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType>
-__aicore__ inline void StoreDedupGroupWeights(DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> &views,
-                                              const Params &params, const LocalTensor<int32_t> &weightBitsTensor,
+__aicore__ inline void StoreDedupGroupWeights(DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType>& views,
+                                              const Params& params, const LocalTensor<int32_t>& weightBitsTensor,
                                               int32_t topK, int32_t descBase, int32_t memberCount, int32_t flags)
 {
     if ((flags & DEDUP_ROW_FLAG_GROUP) == 0) {
@@ -116,8 +116,8 @@ __aicore__ inline void StoreDedupGroupWeights(DedupDispatchViews<TopkIndexType, 
         static_cast<uint32_t>(descBase) + DEDUP_ROW_DESC_HEADER_INT32 + static_cast<uint32_t>(memberCount - 1) * 3U);
     GlobalTensor<int32_t> revWeightsGm;
     revWeightsGm.SetGlobalBuffer(
-        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.dispatchRevWeightsPtr +
-                                           static_cast<uint64_t>(static_cast<uint32_t>(lastRow)) * weightAlignBytes));
+        reinterpret_cast<__gm__ int32_t*>(params.workspaceInfo.dispatchRevWeightsPtr +
+                                          static_cast<uint64_t>(static_cast<uint32_t>(lastRow)) * weightAlignBytes));
     DataCopyPad(revWeightsGm, weightBitsTensor,
                 {1U, static_cast<uint32_t>(topK) * static_cast<uint32_t>(sizeof(float)), 0U, 0U, 0U});
 }
@@ -128,9 +128,9 @@ __aicore__ inline void StoreDedupGroupWeights(DedupDispatchViews<TopkIndexType, 
  * MTE2_MTE3（以及 prefetch 的 MTE2_S / 非 prefetch 的 S_MTE3），结束时释放 MTE3_MTE2 与 MTE3_S。
  */
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
-__aicore__ inline void StoreDedupEntry(const TokenDispatchConfig &context, const Params &params,
-                                       TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
-                                       DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> &views,
+__aicore__ inline void StoreDedupEntry(const TokenDispatchConfig& context, const Params& params,
+                                       TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
+                                       DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType>& views,
                                        int32_t bufferIdx, uint32_t remoteRankIdx, int32_t selfRow,
                                        int32_t selfTopkIndex, int32_t descBase)
 {
@@ -184,10 +184,10 @@ __aicore__ inline void StoreDedupEntry(const TokenDispatchConfig &context, const
 
 // 本批 desc 覆盖的 prepass 工作项 = (srcRank, [首token,末token] 的 chunk 区间)；只等自己需要的项。
 template <typename TopkIndexType, typename ActivationType>
-__aicore__ inline void WaitDedupPrepassForBatch(const TokenDispatchConfig &context, const Params &params,
-                                                TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
+__aicore__ inline void WaitDedupPrepassForBatch(const TokenDispatchConfig& context, const Params& params,
+                                                TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
                                                 uint32_t localExpertId, uint32_t remoteRankIdx, int32_t batchCount,
-                                                int32_t &confirmedChunkEnd)
+                                                int32_t& confirmedChunkEnd)
 {
     const int32_t topK = static_cast<int32_t>(params.tilingData->topK);
     const int32_t chunkTokens = static_cast<int32_t>(context.dedup.prepassChunkTokens);
@@ -197,7 +197,7 @@ __aicore__ inline void WaitDedupPrepassForBatch(const TokenDispatchConfig &conte
     if (chunkLast <= confirmedChunkEnd) {
         return;
     }
-    __gm__ int32_t *prepassReadyBase = reinterpret_cast<__gm__ int32_t *>(context.dedup.prepassReadyPtr);
+    __gm__ int32_t* prepassReadyBase = reinterpret_cast<__gm__ int32_t*>(context.dedup.prepassReadyPtr);
     int32_t chunkFirst = tokenFirst / chunkTokens;
     chunkFirst = chunkFirst > confirmedChunkEnd + 1 ? chunkFirst : confirmedChunkEnd + 1;
     for (int32_t c = chunkFirst; c <= chunkLast; ++c) {
@@ -211,10 +211,10 @@ __aicore__ inline void WaitDedupPrepassForBatch(const TokenDispatchConfig &conte
 // confirmedChunkEnd 跨批递增：已确认 ready 的 chunk 不再重查。
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType>
 __aicore__ inline void LoadDedupRouteAndDescBatch(
-    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> &views, const TokenDispatchConfig &context,
-    const MoeStageCommonConfig &common, const Params &params,
-    TokenDispatchScratch<ActivationType, TopkIndexType> &scratch, uint32_t localExpertId, uint32_t remoteRankIdx,
-    int32_t routeOrdinal, int32_t batchRowBegin, int32_t batchCount, int32_t &confirmedChunkEnd)
+    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType>& views, const TokenDispatchConfig& context,
+    const MoeStageCommonConfig& common, const Params& params,
+    TokenDispatchScratch<ActivationType, TopkIndexType>& scratch, uint32_t localExpertId, uint32_t remoteRankIdx,
+    int32_t routeOrdinal, int32_t batchRowBegin, int32_t batchCount, int32_t& confirmedChunkEnd)
 {
     const uint32_t strideInt32 = context.dedup.rowDescStrideInt32;
     // 上一批的标量读（desc/activeList）先于本批 MTE2 覆盖完成。
@@ -223,7 +223,7 @@ __aicore__ inline void LoadDedupRouteAndDescBatch(
         (static_cast<uint64_t>(localExpertId) * common.worldSize + remoteRankIdx) * context.routeIndexAlignSize;
     // route 槽元素类型随 numMaxTokensPerRank*topK 在 int16/int32 间切换（UseInt16TopkIndex），与基线同式读取。
     GlobalTensor<TopkIndexType> remoteRouteIndexGlobal;
-    remoteRouteIndexGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ TopkIndexType *>(
+    remoteRouteIndexGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ TopkIndexType*>(
         params.peermemInfo.maskRecvPtr + slotOffset + static_cast<uint64_t>(routeOrdinal) * sizeof(TopkIndexType)));
     DataCopyExtParams routeCopyParams{1U, static_cast<uint32_t>(batchCount * sizeof(TopkIndexType)), 0U, 0U, 0U};
     DataCopyPadExtParams<TopkIndexType> routeCopyPad{false, 0U, 0U, 0U};
@@ -240,7 +240,7 @@ __aicore__ inline void LoadDedupRouteAndDescBatch(
 // 压紧非 SKIP 条目（PLAIN 或 FIRST）的批内序号到活跃表，返回活跃条数。
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType>
 __aicore__ inline int32_t CompactDedupActiveEntries(
-    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> &views, uint32_t strideInt32, int32_t batchCount)
+    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType>& views, uint32_t strideInt32, int32_t batchCount)
 {
     int32_t activeCount = 0;
     for (int32_t batchEntryIdx = 0; batchEntryIdx < batchCount; ++batchEntryIdx) {
@@ -258,9 +258,9 @@ __aicore__ inline int32_t CompactDedupActiveEntries(
 // 落一个旧 store，尾部落最后一个 store 并收割各 buffer 的完成事件。
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, bool TopkWeightsPrefetch>
 __aicore__ inline void RunDedupFetchStorePipeline(
-    const TokenDispatchConfig &context, const Params &params,
-    TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
-    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> &views, uint32_t remoteRankIdx,
+    const TokenDispatchConfig& context, const Params& params,
+    TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
+    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType>& views, uint32_t remoteRankIdx,
     int32_t batchRowBegin, uint32_t strideInt32, int32_t activeCount)
 {
     const int32_t bufferCount = context.bufferConfig.bufferCount;
@@ -303,8 +303,8 @@ __aicore__ inline void RunDedupFetchStorePipeline(
 // GMM1 等值判据不变——每个物理行恒被其写入者发布一次。
 template <uint32_t PipelineTileM, typename TopkIndexType, typename ActivationType, typename QuantScaleType>
 __aicore__ inline void PublishDedupTileReadyRuns(
-    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> &views, const MoeSyncWorkspaceLayout &syncLayout,
-    const Params &params, uint32_t localExpertId, int32_t expertGlobalRowBegin, int32_t batchRowBegin,
+    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType>& views, const MoeSyncWorkspaceLayout& syncLayout,
+    const Params& params, uint32_t localExpertId, int32_t expertGlobalRowBegin, int32_t batchRowBegin,
     uint32_t strideInt32, int32_t batchCount)
 {
     int32_t runBegin = -1;
@@ -332,10 +332,10 @@ __aicore__ inline void PublishDedupTileReadyRuns(
 // 首次发布前插一次 MTE3_S：确保本批全部扇出 GM 写完成后 GMM1 才可能读到 ready。
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType>
 __aicore__ inline void PublishDedupFanoutMembers(
-    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType> &views, const Params &params,
+    DedupDispatchViews<TopkIndexType, ActivationType, QuantScaleType>& views, const Params& params,
     uint32_t strideInt32, int32_t batchCount)
 {
-    __gm__ int32_t *flagBaseAll = reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.flagDispatchToGmm1Ptr);
+    __gm__ int32_t* flagBaseAll = reinterpret_cast<__gm__ int32_t*>(params.workspaceInfo.flagDispatchToGmm1Ptr);
     bool memberSyncDone = false;
     for (int32_t batchEntryIdx = 0; batchEntryIdx < batchCount; ++batchEntryIdx) {
         int32_t flags = views.descBatchTensor.GetValue(static_cast<uint32_t>(batchEntryIdx) * strideInt32);
@@ -363,10 +363,10 @@ __aicore__ inline void PublishDedupFanoutMembers(
  */
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, uint32_t PipelineTileM,
           bool TopkWeightsPrefetch>
-__aicore__ inline void DispatchRankTokensDedup(const TokenDispatchConfig &context, const MoeStageCommonConfig &common,
-                                               const MoeSyncWorkspaceLayout &syncLayout, const Params &params,
-                                               GM_ADDR *winRankAddr,
-                                               TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
+__aicore__ inline void DispatchRankTokensDedup(const TokenDispatchConfig& context, const MoeStageCommonConfig& common,
+                                               const MoeSyncWorkspaceLayout& syncLayout, const Params& params,
+                                               GM_ADDR* winRankAddr,
+                                               TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
                                                uint32_t localExpertId, int32_t expertGlobalRowBegin,
                                                uint32_t remoteRankIdx, int32_t rankSegmentRowBegin,
                                                int32_t segmentMatchOrdinalBegin, int32_t segmentMatchOrdinalEnd)
@@ -407,12 +407,12 @@ __aicore__ inline void DispatchRankTokensDedup(const TokenDispatchConfig &contex
  */
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, uint32_t PipelineTileM,
           bool TopkWeightsPrefetch>
-__aicore__ inline void DispatchOwnedExpertRowsDedup(const TokenDispatchConfig &context,
-                                                    const MoeStageCommonConfig &common,
-                                                    const MoeSyncWorkspaceLayout &syncLayout, const Params &params,
-                                                    GM_ADDR *winRankAddr,
-                                                    TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
-                                                    uint32_t localExpertId, const ExpertDispatchCoreRange &coreRange)
+__aicore__ inline void DispatchOwnedExpertRowsDedup(const TokenDispatchConfig& context,
+                                                    const MoeStageCommonConfig& common,
+                                                    const MoeSyncWorkspaceLayout& syncLayout, const Params& params,
+                                                    GM_ADDR* winRankAddr,
+                                                    TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
+                                                    uint32_t localExpertId, const ExpertDispatchCoreRange& coreRange)
 {
     uint32_t coreGlobalRowBegin = coreRange.expertGlobalRowBegin + coreRange.localExpertRowBegin;
     uint32_t coreGlobalRowEnd = coreRange.expertGlobalRowBegin + coreRange.localExpertRowEnd;
@@ -441,7 +441,7 @@ __aicore__ inline void DispatchOwnedExpertRowsDedup(const TokenDispatchConfig &c
         ++sourceRankIdx;
     }
 }
-__aicore__ inline void WaitDedupPrepassPublishGate(const TokenDispatchConfig &context, const Params &params)
+__aicore__ inline void WaitDedupPrepassPublishGate(const TokenDispatchConfig& context, const Params& params)
 {
     if (context.dedup.dedupMode == 0 || params.tilingData->hiddenDim > DEDUP_AIV0_PREPASS_MAX_HIDDEN_DIM) {
         return;
@@ -450,9 +450,9 @@ __aicore__ inline void WaitDedupPrepassPublishGate(const TokenDispatchConfig &co
     // 全局抢 tile 的——任何一个 AIV1 发布了 tile-ready，任何一张卡的 AIC 都可能开算。
     // 所以每个 AIV1 在发布任何 tile 之前，必须确认全体 AIV0 已经建完表（等 done 计数的
     // 高 16 位到齐）。AIV1 相互之间不等，流水交叠不受影响；首个 wave 之后这里瞬时通过。
-    __gm__ int32_t *dedupDoneSlot = reinterpret_cast<__gm__ int32_t *>(context.dedup.prepassReadyPtr);
+    __gm__ int32_t* dedupDoneSlot = reinterpret_cast<__gm__ int32_t*>(context.dedup.prepassReadyPtr);
     const int32_t expectAiv0Done = static_cast<int32_t>(GetBlockNum());
-    while ((ReadGmBypassDCache(dedupDoneSlot) >> 16) != expectAiv0Done) {
+    while ((ReadGmByPassDCache(dedupDoneSlot) >> 16) != expectAiv0Done) {
         int64_t gateBackoffStart = AscendC::GetSystemCycle();
         while (AscendC::GetSystemCycle() - gateBackoffStart < GM_FLAG_POLL_BACKOFF_CYCLES) {
         }
@@ -462,12 +462,12 @@ __aicore__ inline void WaitDedupPrepassPublishGate(const TokenDispatchConfig &co
 // 按 dispatch 去重开关把一个专家的本核区间路由到去重/基线 dispatch 实现。
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, uint32_t PipelineTileM,
           bool TopkWeightsPrefetch>
-__aicore__ inline void DispatchOwnedExpertRowsRouted(const TokenDispatchConfig &context,
-                                                     const MoeStageCommonConfig &common,
-                                                     const MoeSyncWorkspaceLayout &syncLayout, const Params &params,
-                                                     GM_ADDR *winRankAddr,
-                                                     TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
-                                                     uint32_t expertIdx, const ExpertDispatchCoreRange &expertRange)
+__aicore__ inline void DispatchOwnedExpertRowsRouted(const TokenDispatchConfig& context,
+                                                     const MoeStageCommonConfig& common,
+                                                     const MoeSyncWorkspaceLayout& syncLayout, const Params& params,
+                                                     GM_ADDR* winRankAddr,
+                                                     TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
+                                                     uint32_t expertIdx, const ExpertDispatchCoreRange& expertRange)
 {
     if (IsDispatchDedupOn(context.dedup.dedupMode)) {
         DispatchOwnedExpertRowsDedup<TopkIndexType, ActivationType, QuantScaleType, PipelineTileM, TopkWeightsPrefetch>(
@@ -480,11 +480,11 @@ __aicore__ inline void DispatchOwnedExpertRowsRouted(const TokenDispatchConfig &
 
 template <typename TopkIndexType, typename ActivationType, typename QuantScaleType, uint32_t PipelineTileM,
           bool TopkWeightsPrefetch>
-__aicore__ inline void DispatchTokenRange(const TokenDispatchConfig &context, const MoeStageCommonConfig &common,
-                                          const BlockJobContext &blockJob, const MoeSyncWorkspaceLayout &syncLayout,
-                                          const Params &params, GM_ADDR *winRankAddr,
-                                          TokenDispatchScratch<ActivationType, TopkIndexType> &scratch,
-                                          const ExpertTokenRange &range)
+__aicore__ inline void DispatchTokenRange(const TokenDispatchConfig& context, const MoeStageCommonConfig& common,
+                                          const BlockJobContext& blockJob, const MoeSyncWorkspaceLayout& syncLayout,
+                                          const Params& params, GM_ADDR* winRankAddr,
+                                          TokenDispatchScratch<ActivationType, TopkIndexType>& scratch,
+                                          const ExpertTokenRange& range)
 {
     if constexpr (g_coreType == AIC) {
         return;
@@ -546,9 +546,9 @@ __aicore__ inline void DispatchTokenRange(const TokenDispatchConfig &context, co
  * 全 0 前缀表，消费者死等（多轮连续 launch 场景必现）。
  */
 template <typename ActivationType, typename TopkIndexType>
-__aicore__ inline void PrepareDedupPrepassAiv0Local(const DedupConfig &dedup, const MoeStageCommonConfig &common,
-                                                    const Params &params,
-                                                    TokenDispatchScratch<ActivationType, TopkIndexType> &scratch)
+__aicore__ inline void PrepareDedupPrepassAiv0Local(const DedupConfig& dedup, const MoeStageCommonConfig& common,
+                                                    const Params& params,
+                                                    TokenDispatchScratch<ActivationType, TopkIndexType>& scratch)
 {
     if constexpr (g_coreType == AIC) {
         return;

@@ -959,7 +959,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ProcessInputPreparation
         if (ownedExpertRange.count > 0U) {
             PipeBarrier<PIPE_MTE3>();
             auto* syncCountAddr = GetSyncCountAddress(params_.peermemInfo.rankSyncInWorldPtr, aivCoreIdx_);
-            const int32_t syncCount = ReadGmBypassDCache(syncCountAddr);
+            const int32_t syncCount = ReadGmByPassDCache(syncCountAddr);
             SendTopkIdsCountForExperts(ownedExpertRange, commonConfig_, syncCount, g_winRankAddr_, sendMaskConfig_,
                                        sendMaskScratch_);
         }

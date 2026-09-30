@@ -454,7 +454,7 @@ __aicore__ inline void LoadAndComputeExpertCountTable(const MoeStageCommonConfig
      * 整表搬入 UB 后批量检查本轮标签，包括零 count；失败退避重试，成功快照直接用于 cumsum。
      */
     auto* syncCountAddr = GetSyncCountAddress(params.peermemInfo.rankSyncInWorldPtr, GetBlockIdx());
-    const int32_t syncCount = ReadGmBypassDCache(syncCountAddr);
+    const int32_t syncCount = ReadGmByPassDCache(syncCountAddr);
     const uint32_t expectedSyncRoundTag = GetSyncRoundTag(syncCount);
     GlobalTensor<int32_t> expertCountGlobal;
     expertCountGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(params.peermemInfo.expertCountRecvPtr));
@@ -505,7 +505,7 @@ __aicore__ inline void PrepareMoeExpertTokenCountTable(const MoeStageCommonConfi
     __gm__ int32_t* countTableReady =
         reinterpret_cast<__gm__ int32_t*>(params.workspaceInfo.flagSendCntCalToUpdParamsPtr) +
         static_cast<uint64_t>(countWorkspace.blockIdx) * INT_CACHELINE;
-    WriteGmBypassDCache(countTableReady, static_cast<int32_t>(1));
+    WriteGmByPassDCache(countTableReady, static_cast<int32_t>(1));
 }
 
 /*

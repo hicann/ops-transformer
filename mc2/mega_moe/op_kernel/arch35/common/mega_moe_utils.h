@@ -40,8 +40,8 @@ __aicore__ inline __gm__ int32_t* GetSyncCountAddress(GM_ADDR rankSyncBase, uint
 __aicore__ inline void IncrementSyncCount(GM_ADDR rankSyncBase, uint32_t aivCoreIdx)
 {
     auto* sequenceAddr = GetSyncCountAddress(rankSyncBase, aivCoreIdx);
-    uint32_t nextSequence = static_cast<uint32_t>(ReadGmBypassDCache(sequenceAddr)) + 1U;
-    WriteGmBypassDCache(sequenceAddr, static_cast<int32_t>(nextSequence));
+    uint32_t nextSequence = static_cast<uint32_t>(ReadGmByPassDCache(sequenceAddr)) + 1U;
+    WriteGmByPassDCache(sequenceAddr, static_cast<int32_t>(nextSequence));
 }
 
 __aicore__ inline uint32_t GetSyncRoundTag(int32_t syncCount)
@@ -274,7 +274,7 @@ __aicore__ inline uint64_t GetExpertCountWorkspaceOffset(const BlockWorkspaceCon
 __aicore__ inline void GmSignalWaitBarrier(__gm__ int32_t* sigAddr, int32_t compareValue)
 {
     do {
-        if (ReadGmBypassDCache(sigAddr) == compareValue) {
+        if (ReadGmByPassDCache(sigAddr) == compareValue) {
             return;
         }
     } while (true);
@@ -365,7 +365,7 @@ __aicore__ inline uint32_t AdvanceExpertTokenPositionInWave(uint32_t expertToken
 // 轮询 GM 中的 int32 ready flag，并在两次读取之间加入短暂退避。
 __aicore__ inline void WaitUntilGmFlagIsNonZero(__gm__ int32_t* flagAddr)
 {
-    while (AscendC::ReadGmBypassDCache(flagAddr) == 0) {
+    while (AscendC::ReadGmByPassDCache(flagAddr) == 0) {
         int64_t startCycle = AscendC::GetSystemCycle();
         while (AscendC::GetSystemCycle() - startCycle < GM_FLAG_POLL_BACKOFF_CYCLES) {
         }
@@ -393,7 +393,7 @@ __aicore__ inline uint32_t GetExpertTokenCountFromWorkspace(GM_ADDR expertTokenC
     uint64_t countSlotIndex = GetExpertCountWorkspaceOffset(countWorkspace, expertCount, expertIdx, true);
     __gm__ int32_t* expertTokenCountAddr =
         reinterpret_cast<__gm__ int32_t*>(expertTokenCountWorkspace) + countSlotIndex;
-    return static_cast<uint32_t>(AscendC::ReadGmBypassDCache(expertTokenCountAddr));
+    return static_cast<uint32_t>(AscendC::ReadGmByPassDCache(expertTokenCountAddr));
 }
 
 /*
@@ -432,13 +432,13 @@ __aicore__ inline int32_t CrossRankHandshakeInWorldSize(GM_ADDR rankSyncInWorldP
                                                         const AivJobContext& syncJob, __gm__ int32_t* syncCount)
 {
     auto* syncRank = reinterpret_cast<__gm__ int32_t*>(rankSyncInWorldPtr);
-    const int32_t count = static_cast<int32_t>(static_cast<uint32_t>(ReadGmBypassDCache(syncCount)) + 1U);
+    const int32_t count = static_cast<int32_t>(static_cast<uint32_t>(ReadGmByPassDCache(syncCount)) + 1U);
     for (uint32_t rankIdx = syncJob.jobIndex; rankIdx < worldSize; rankIdx += syncJob.totalJobs) {
         auto* remoteSyncAddr = reinterpret_cast<__gm__ int32_t*>(g_winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
-        WriteGmBypassDCache(remoteSyncAddr, count);
+        WriteGmByPassDCache(remoteSyncAddr, count);
         GmSignalWaitBarrier(syncRank + rankIdx * INT_CACHELINE, count);
     }
-    WriteGmBypassDCache(syncCount, count);
+    WriteGmByPassDCache(syncCount, count);
     return count;
 }
 

@@ -20,8 +20,7 @@
 #include "version/asc_devkit_version.h"
 #include "version/hcomm_version.h"
 
-#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 0)) && \
-    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 0))
+#if (ASC_DEVKIT_VERSION_NUM >= 90200000) && (HCOMM_VERSION_NUM >= 90200000)
 #define ENABLE_MOE_EP_KERNEL
 #endif
 
@@ -44,7 +43,7 @@ using namespace AscendC;
 
 // PerExpertCnt Calculation
 template <Reg::HistogramsType htype, typename T, typename U>
-__simd_vf__ __aicore__ inline void HistogramsVf(__ubuf__ U *dst, __ubuf__ T *src, uint16_t repeatElm,
+__simd_vf__ __aicore__ inline void HistogramsVf(__ubuf__ U* dst, __ubuf__ T* src, uint16_t repeatElm,
                                                 uint16_t halfRepeat, uint32_t totalElm, uint16_t repeatTimes)
 {
     Reg::RegTensor<T> srcReg;
@@ -65,24 +64,24 @@ __simd_vf__ __aicore__ inline void HistogramsVf(__ubuf__ U *dst, __ubuf__ T *src
     Reg::StoreAlign(dst + halfRepeat, dst1Reg, pregOut);
 }
 
-__aicore__ inline void GetExpertFreq(LocalTensor<uint16_t> &dstLocal, LocalTensor<uint8_t> &srcLocal, uint32_t totalElm)
+__aicore__ inline void GetExpertFreq(LocalTensor<uint16_t>& dstLocal, LocalTensor<uint8_t>& srcLocal, uint32_t totalElm)
 {
     uint32_t repeatElm = GetVecLen();
     uint16_t repeatTimes = Ceil(totalElm, repeatElm);
-    __ubuf__ uint8_t *src = (__ubuf__ uint8_t *)srcLocal.GetPhyAddr();
-    __ubuf__ uint16_t *dst = (__ubuf__ uint16_t *)dstLocal.GetPhyAddr();
+    __ubuf__ uint8_t* src = (__ubuf__ uint8_t*)srcLocal.GetPhyAddr();
+    __ubuf__ uint16_t* dst = (__ubuf__ uint16_t*)dstLocal.GetPhyAddr();
     asc_vf_call<HistogramsVf<Reg::HistogramsType::FREQUENCY, uint8_t, uint16_t>>(dst, src, repeatElm, repeatElm >> 1,
                                                                                  totalElm, repeatTimes);
     PipeBarrier<PIPE_V>();
 }
 
-__aicore__ inline GM_ADDR GetWindowAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *context, uint32_t rankId,
+__aicore__ inline GM_ADDR GetWindowAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext* context, uint32_t rankId,
                                                 uint64_t offset)
 {
     return (GM_ADDR)context->epHcclBuffer[rankId] + offset;
 }
 
-__aicore__ inline uint64_t GetCommHandle(__gm__ Mc2Aclnn::MoeCommContext *context, uint32_t rankId,
+__aicore__ inline uint64_t GetCommHandle(__gm__ Mc2Aclnn::MoeCommContext* context, uint32_t rankId,
                                          uint32_t channelIndex = 0U)
 {
     uint32_t channelsPerRank = context->channelsPerRank == 0U ? 1U : context->channelsPerRank;
@@ -117,7 +116,7 @@ namespace Mc2Kernel {
 using MoeEpDispatchBase::GetCommHandle;
 using MoeEpDispatchBase::GetExpertFreq;
 
-__aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext *context, uint32_t rankId, uint64_t offset)
+__aicore__ inline GM_ADDR GetWinAddrByRankId(__gm__ Mc2Aclnn::MoeCommContext* context, uint32_t rankId, uint64_t offset)
 {
     return MoeEpDispatchBase::GetWindowAddrByRankId(context, rankId, offset);
 }
