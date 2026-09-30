@@ -88,12 +88,15 @@ void AlltoAllvTTQuantGmmTiling::SetGMMQuantParams(Mc2GroupedMatmulTilingData::GM
 void AlltoAllvTTQuantGmmTiling::SetTilingArray(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData,
                                                uint64_t M, uint64_t N, uint64_t K, uint32_t groupNum) const
 {
-    constexpr uint32_t MAX_TENSOR_CONT = 128U;
-    OP_TILING_CHECK(groupNum > MAX_TENSOR_CONT,
+    OP_TILING_CHECK(groupNum > GMM_ARRAY_MAX_NUM,
                     OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "groupNum", std::to_string(groupNum).c_str(),
-                                              (std::string("<=") + std::to_string(MAX_TENSOR_CONT)).c_str()),
+                                              (std::string("<=") + std::to_string(GMM_ARRAY_MAX_NUM)).c_str()),
                     return);
-    for (uint32_t i = 0; i < groupNum; i++) {
+    // groupNum由标量传递，kernel按SPLIT_M+singleW仅读取mList[0]/kList[0]/nList[0]，
+    // 每组M实际来自运行时groupList，故填充截断至数组容量
+    const uint32_t mListCap = sizeof(gmmQuantTilingData.gmmArray.mList) / sizeof(gmmQuantTilingData.gmmArray.mList[0]);
+    uint32_t fillNum = (groupNum < mListCap) ? groupNum : mListCap;
+    for (uint32_t i = 0; i < fillNum; i++) {
         gmmQuantTilingData.gmmArray.mList[i] = static_cast<int32_t>(M);
     }
     gmmQuantTilingData.gmmArray.kList[0] = static_cast<int32_t>(K);

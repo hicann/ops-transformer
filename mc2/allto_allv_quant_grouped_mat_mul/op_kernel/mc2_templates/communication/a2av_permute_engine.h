@@ -24,7 +24,7 @@ using namespace AscendC;
 namespace MC2KernelTemplate {
 
 template <bool IsExpertFirst>
-__aicore__ inline void ComputePrefixSum(uint64_t *sumCnt, uint32_t totalPos, const uint64_t *offsetCounts, uint32_t e,
+__aicore__ inline void ComputePrefixSum(uint64_t *sumCnt, uint32_t totalPos, const int32_t *offsetCounts, uint32_t e,
                                         uint32_t startExpertIdx, uint32_t expertNum, uint32_t rankDim)
 {
     for (uint32_t pos = 0; pos < totalPos; pos++) {
@@ -96,7 +96,7 @@ __aicore__ inline void TileDataCopyLoopDoubleBuf(LocalTensor<ElemType> &ubBufA, 
 
 template <typename ElemType, bool SrcIsExpertFirst, bool DstIsExpertFirst>
 __aicore__ inline void PermuteImplParallel(GlobalTensor<ElemType> &srcBuffer, GlobalTensor<ElemType> &dstBuffer,
-                                           const uint64_t *offsetCounts, uint32_t e, uint32_t rankDim,
+                                           const int32_t *offsetCounts, uint32_t e, uint32_t rankDim,
                                            uint32_t startExpertIdx, uint32_t expertNum, uint64_t axis,
                                            uint64_t &permuteBaseOffset, TBuf<QuePosition::VECIN> &permuteTBuf,
                                            TBuf<QuePosition::VECIN> &permuteTBuf2, uint64_t bufferLen, int32_t &eventID,

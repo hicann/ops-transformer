@@ -94,16 +94,16 @@ private:
     GlobalTensor<fp8_e8m0_t> recvScaleGlobalBuffer_;
     GlobalTensor<fp8_e8m0_t> scalePermuteOutBuffer_;
 
-    A2avCommParams dataCommParams_;
-    A2avCommParams scaleCommParams_;
+    // scale与data串行发射且HCCL在AlltoAllV调用时同步消费counts(基线跨轮覆写已证明)，共用一个结构压缩kernel栈
+    A2avCommParams commParams_;
 
     uint64_t dataSendOffsetLastSum_ = 0UL;
     uint64_t dataRecvOffsetLastSum_ = 0UL;
     uint64_t scaleSendOffsetLastSum_ = 0UL;
     uint64_t scaleRecvOffsetLastSum_ = 0UL;
 
-    uint64_t recvCounts_[MAX_EXPERT_SIZE] = {0UL};
-    uint64_t sendCounts_[MAX_EXPERT_SIZE] = {0UL};
+    int32_t recvCounts_[MAX_EXPERT_SIZE] = {0};
+    int32_t sendCounts_[MAX_EXPERT_SIZE] = {0};
 
     HcclHandle alltoAllvHandleId_[MAX_HANDLE_ID_NUM] = {INVALID_HANDLE_ID};
     HcclHandle alltoAllvScaleHandleId_[MAX_HANDLE_ID_NUM] = {INVALID_HANDLE_ID};
@@ -179,12 +179,12 @@ __aicore__ inline void HcclA2avOp<hcclDataType, commBeforeComputeFlag, commMode>
 {
     A2AV_AIV_ONLY();
     uint64_t axis = CeilDiv(H1_, SCALE_ALIGNMENT_BLOCK_SIZE) * 2;
-    CalcA2avCommBeforeParams(scaleCommParams_, sendCounts_, recvCounts_, rankDim_, e_, startExpertIdx, expertNum, axis,
+    CalcA2avCommBeforeParams(commParams_, sendCounts_, recvCounts_, rankDim_, e_, startExpertIdx, expertNum, axis,
                              scaleSendOffsetLastSum_, scaleRecvOffsetLastSum_);
     alltoAllvScaleHandleId_[startExpertIdx] = hccl_.template AlltoAllV<true>(
-        (__gm__ uint8_t *)sendScaleGlobalBuffer_.GetPhyAddr(), scaleCommParams_.sendCnt, scaleCommParams_.sendOffset,
-        HCCL_DATA_TYPE_FP8E8M0, (__gm__ uint8_t *)recvScaleGlobalBuffer_.GetPhyAddr(), scaleCommParams_.recvCnt,
-        scaleCommParams_.recvOffset, HCCL_DATA_TYPE_FP8E8M0);
+        (__gm__ uint8_t *)sendScaleGlobalBuffer_.GetPhyAddr(), commParams_.sendCnt, commParams_.sendOffset,
+        HCCL_DATA_TYPE_FP8E8M0, (__gm__ uint8_t *)recvScaleGlobalBuffer_.GetPhyAddr(), commParams_.recvCnt,
+        commParams_.recvOffset, HCCL_DATA_TYPE_FP8E8M0);
 }
 
 template <typename hcclDataType, bool commBeforeComputeFlag, int commMode>
@@ -194,16 +194,15 @@ __aicore__ inline void HcclA2avOp<hcclDataType, commBeforeComputeFlag, commMode>
     A2AV_AIV_ONLY();
     if constexpr (commBeforeComputeFlag) {
         uint64_t axis = CeilDiv(H1_, PACK_FACTOR);
-        CalcA2avCommBeforeParams(dataCommParams_, sendCounts_, recvCounts_, rankDim_, e_, startExpertIdx, expertNum,
-                                 axis, dataSendOffsetLastSum_, dataRecvOffsetLastSum_);
+        CalcA2avCommBeforeParams(commParams_, sendCounts_, recvCounts_, rankDim_, e_, startExpertIdx, expertNum, axis,
+                                 dataSendOffsetLastSum_, dataRecvOffsetLastSum_);
     } else {
-        CalcA2avCommAfterParams(dataCommParams_, sendCounts_, recvCounts_, rankDim_, e_, startExpertIdx, expertNum, N1_,
+        CalcA2avCommAfterParams(commParams_, sendCounts_, recvCounts_, rankDim_, e_, startExpertIdx, expertNum, N1_,
                                 dataSendOffsetLastSum_, dataRecvOffsetLastSum_);
     }
     alltoAllvHandleId_[startExpertIdx] = hccl_.template AlltoAllV<true>(
-        (__gm__ uint8_t *)sendGlobalBuffer_.GetPhyAddr(), dataCommParams_.sendCnt, dataCommParams_.sendOffset,
-        hcclDataType_, (__gm__ uint8_t *)recvGlobalBuffer_.GetPhyAddr(), dataCommParams_.recvCnt,
-        dataCommParams_.recvOffset, hcclDataType_);
+        (__gm__ uint8_t *)sendGlobalBuffer_.GetPhyAddr(), commParams_.sendCnt, commParams_.sendOffset, hcclDataType_,
+        (__gm__ uint8_t *)recvGlobalBuffer_.GetPhyAddr(), commParams_.recvCnt, commParams_.recvOffset, hcclDataType_);
 }
 
 template <typename hcclDataType, bool commBeforeComputeFlag, int commMode>

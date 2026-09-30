@@ -220,7 +220,7 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulV2GetWorkspaceSize(
         const_cast<char *>(group), epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight, permuteOutFlag,
         str_commMode, gmmY, mmYOptional, permuteOutOptional, workspaceSize, executor);
     OP_LOGD("AlltoAllvGroupedMatmul, aclnnInnerAlltoAllvGroupedMatMulGetWorkspaceSize ret %d.", ret);
-    if (*executor != nullptr) {
+    if (ret == ACLNN_SUCCESS && executor != nullptr && *executor != nullptr) {
         void *args = reinterpret_cast<void *>(static_cast<uintptr_t>(commModeEnum));
         NnopbaseSetUserHandle(*executor, args);
     }

@@ -55,7 +55,7 @@ constexpr uint32_t SCALE_BATCH_THRESHOLD = 32;
 // quant mode offset
 const std::vector<uint32_t> QUANT_MODE_MAP = {0, 0, 1, 2, 4, 5, 3};
 
-constexpr uint32_t GMM_ARRAY_MAX_NUM = 128U;
+constexpr uint32_t GMM_ARRAY_MAX_NUM = 256U;
 constexpr uint32_t MAX_HANDLE_ID_NUM = 64U;
 constexpr uint32_t DEFAULT_MERGED_EXPERT_NUM = 4U;
 constexpr uint64_t PER_RANK_TOTAL_MN_THRESHOLD = 20UL * 1024UL * 1024UL;

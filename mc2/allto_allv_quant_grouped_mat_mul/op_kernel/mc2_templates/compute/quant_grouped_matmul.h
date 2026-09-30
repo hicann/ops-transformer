@@ -77,6 +77,8 @@ private:
     const GmmTilingDataType *gmmTilingData_;
     Mc2TilingType *gmmArrayAddrIn_;
     GM_ADDR ttXScaleRepeatGm_ = nullptr;
+    // a2av建表scratch(GM)：rank维度可达epWorldSize(如ep256)，避免大容量栈数组
+    __gm__ uint64_t *rankScratchGm_ = nullptr;
     GM_ADDR ttWeightScaleRepeatGm_ = nullptr;
 };
 
@@ -141,6 +143,14 @@ QuantGroupedMatmul<TilingDataType, GmmTilingDataType, xType, wType, scaleType, y
         uint32_t expertNumMax = tilingData_->taskTilingInfo.expertNum;
         ttWeightScaleRepeatGm_ = ptrTableBase_ + TENSOR_LIST_SIZE;
         ttXScaleRepeatGm_ = ttWeightScaleRepeatGm_ + sizeof(float) * expertNumMax;
+    }
+    if constexpr (!isLocal && isA2avGmm) {
+        GM_ADDR scratchBase = ptrTableBase_ + TENSOR_LIST_SIZE;
+        if constexpr (PERTENSOR_QUANT_MODE) {
+            uint32_t expertNumMax = tilingData_->taskTilingInfo.expertNum;
+            scratchBase = ptrTableBase_ + TENSOR_LIST_SIZE + 2 * sizeof(float) * expertNumMax;
+        }
+        rankScratchGm_ = reinterpret_cast<__gm__ uint64_t *>(scratchBase);
     }
 
     const auto *opCnt =
@@ -218,15 +228,16 @@ __aicore__ inline void QuantGroupedMatmul<TilingDataType, GmmTilingDataType, xTy
             }
         }
         uint64_t batchBaseOffset = expertTokenOffset_ * h1_ / PACK_FACTOR;
-        uint64_t currentBatchRankSize[MAX_EP_RANK_SIZE] = {0};
+        __gm__ uint64_t *currentBatchRankSize = rankScratchGm_;
+        __gm__ uint64_t *rankStartBase = rankScratchGm_ + epWorldSize_;
         for (uint32_t r = 0; r < epWorldSize_; r++) {
+            currentBatchRankSize[r] = 0UL;
             for (uint32_t e = 0; e < expertNum; e++) {
                 uint32_t absExpertIdx = startExpertIdx + e;
                 currentBatchRankSize[r] +=
                     static_cast<uint64_t>(opCnt[absExpertIdx + r * expertNumInOneRank_]) * h1_ / PACK_FACTOR;
             }
         }
-        uint64_t rankStartBase[MAX_EP_RANK_SIZE] = {0};
         rankStartBase[0] = batchBaseOffset;
         for (uint32_t r = 1; r < epWorldSize_; r++) {
             rankStartBase[r] = rankStartBase[r - 1] + currentBatchRankSize[r - 1];
@@ -246,15 +257,16 @@ __aicore__ inline void QuantGroupedMatmul<TilingDataType, GmmTilingDataType, xTy
             uint64_t scaleK = Mc2QuantUtils::MXFP_MULTI_BASE_SIZE *
                               Mc2QuantUtils::CeilDiv(h1_, static_cast<uint64_t>(Mc2QuantUtils::MXFP_DIVISOR_SIZE));
             uint64_t batchScaleBaseOffset = expertTokenOffset_ * scaleK;
-            uint64_t currentBatchRankScaleSize[MAX_EP_RANK_SIZE] = {0};
+            __gm__ uint64_t *currentBatchRankScaleSize = rankScratchGm_ + 2 * epWorldSize_;
+            __gm__ uint64_t *rankScaleStartBase = rankScratchGm_ + 3 * epWorldSize_;
             for (uint32_t r = 0; r < epWorldSize_; r++) {
+                currentBatchRankScaleSize[r] = 0UL;
                 for (uint32_t e = 0; e < expertNum; e++) {
                     uint32_t absExpertIdx = startExpertIdx + e;
                     currentBatchRankScaleSize[r] +=
                         static_cast<uint64_t>(opCnt[absExpertIdx + r * expertNumInOneRank_]) * scaleK;
                 }
             }
-            uint64_t rankScaleStartBase[MAX_EP_RANK_SIZE] = {0};
             rankScaleStartBase[0] = batchScaleBaseOffset;
             for (uint32_t r = 1; r < epWorldSize_; r++) {
                 rankScaleStartBase[r] = rankScaleStartBase[r - 1] + currentBatchRankScaleSize[r - 1];

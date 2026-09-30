@@ -34,7 +34,7 @@ namespace optiling {
 const std::vector<uint32_t> GroupedMatmulAllToAllvTiling::GMM_X_DTYPE_LIST = {ge::DT_FLOAT16, ge::DT_BF16};
 const std::vector<uint32_t> GroupedMatmulAllToAllvTiling::GMM_WEIGHT_DTYPE_LIST = {ge::DT_FLOAT16, ge::DT_BF16};
 const std::vector<uint32_t> GroupedMatmulAllToAllvTiling::GMM_Y_DTYPE_LIST = {ge::DT_FLOAT16, ge::DT_BF16};
-const std::set<int64_t> GroupedMatmulAllToAllvTiling::A5_SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64};
+const std::set<int64_t> GroupedMatmulAllToAllvTiling::A5_SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64, 128, 256};
 const std::set<int64_t> GroupedMatmulAllToAllvTiling::A3_SUPPORT_RANK_SIZE{8, 16, 32, 64, 128};
 
 ge::graphStatus GroupedMatmulAllToAllvTiling::GetShapeAttrsInfo()

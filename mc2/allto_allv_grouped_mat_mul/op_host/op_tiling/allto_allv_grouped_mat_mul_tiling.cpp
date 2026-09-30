@@ -1189,8 +1189,10 @@ ge::graphStatus AlltoAllvGmmTilingBase::GetWorkspaceSize()
     uint64_t groupListSize = sizeof(int64_t) * e_ * epWorldSize_;
     uint64_t aGroupOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
     uint64_t xScaleOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
+    // kernel侧a2av建表scratch(GM，4数组×ep)，512对齐
+    const uint64_t rankArraySize = ((4 * epWorldSize_ * sizeof(uint64_t)) + 511) / 512 * 512;
     workspaces[0] = libApiWorkSpaceSize_ + commOutSize + groupListSize + aGroupOffsetTableSize + xScaleOffsetTableSize +
-                    tensorListSize;
+                    tensorListSize + rankArraySize;
     return ge::GRAPH_SUCCESS;
 }
 

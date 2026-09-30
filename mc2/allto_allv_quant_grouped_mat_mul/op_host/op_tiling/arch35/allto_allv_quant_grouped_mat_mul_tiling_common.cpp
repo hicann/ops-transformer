@@ -106,8 +106,10 @@ ge::graphStatus AlltoAllvQuantGmmTilingCommon::GetWorkspaceSize()
     uint64_t aGroupOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
     uint64_t xScaleOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
     uint64_t ttScaleRepeatSize = sizeof(float) * e_ * 2;
+    // kernel侧a2av建表scratch(GM，4数组×ep)，512对齐
+    const uint64_t rankArraySize = ((4 * epWorldSize_ * sizeof(uint64_t)) + 511) / 512 * 512;
     workspaces[0] = libApiWorkSpaceSize_ + permuteOutSize_ + permuteScaleOutSize_ + groupListSize +
-                    aGroupOffsetTableSize + xScaleOffsetTableSize + tensorListSize + ttScaleRepeatSize;
+                    aGroupOffsetTableSize + xScaleOffsetTableSize + tensorListSize + ttScaleRepeatSize + rankArraySize;
     OP_LOGD(context_->GetNodeName(), "end GetWorkspaceSize.");
     return ge::GRAPH_SUCCESS;
 }
