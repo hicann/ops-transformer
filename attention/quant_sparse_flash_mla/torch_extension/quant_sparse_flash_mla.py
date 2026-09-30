@@ -38,7 +38,7 @@ class QuantSparseFlashMlaOpBuilder(OpBuilder):
             "int? cmp_ratio=None, int? ori_mask_mode=None, int? cmp_mask_mode=None, int? ori_win_left=None,"
             "int? ori_win_right=None, str? layout_q=None, str? layout_kv=None, bool? has_ori_kv=None,"
             "bool? has_cmp_kv=None) -> Tensor",
-            "quant_sparse_flash_mla(Tensor q, *,"
+            "quant_sparse_flash_mla(Tensor q, int quant_mode, *,"
             "Tensor? ori_kv=None, Tensor? cmp_kv=None, "
             "Tensor? q_descale=None, "
             "Tensor? ori_kv_descale=None, Tensor? cmp_kv_descale=None, "
@@ -50,7 +50,6 @@ class QuantSparseFlashMlaOpBuilder(OpBuilder):
             "Tensor? cmp_residual_kv=None, "
             "Tensor? ori_topk_length=None, Tensor? cmp_topk_length=None, "
             "Tensor? sinks=None, Tensor? metadata=None, "
-            "int quant_mode=None, "
             "float softmax_scale=None, int cmp_ratio=1, "
             "int ori_mask_mode=0, int cmp_mask_mode=0, "
             "int ori_win_left=-1, int ori_win_right=-1, "
@@ -337,6 +336,7 @@ torch.compiler.allow_in_graph(quant_sparse_flash_mla_metadata)
 @impl(get_as_library(), quant_sparse_flash_mla_op_builder.name, "PrivateUse1")
 def quant_sparse_flash_mla(
     q,
+    quant_mode,
     ori_kv=None,
     cmp_kv=None,
     q_descale=None,
@@ -357,7 +357,6 @@ def quant_sparse_flash_mla(
     cmp_topk_length=None,
     sinks=None,
     metadata=None,
-    quant_mode=None,
     softmax_scale=None,
     cmp_ratio=1,
     ori_mask_mode=0,
