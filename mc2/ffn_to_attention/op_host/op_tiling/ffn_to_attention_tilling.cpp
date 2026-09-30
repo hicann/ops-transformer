@@ -55,6 +55,9 @@ constexpr uint64_t TOKEN_INFO_ALIGN_SIZE = 512;
 constexpr uint64_t CCL_BUFFER_ALIGN_SIZE = 2 * MB_SIZE;
 constexpr uint32_t OP_TYPE_ALL_TO_ALL = 8;
 constexpr int64_t BS_UPPER_BOUND = 512;
+constexpr int64_t MICRO_BATCH_NUM_UPPER_BOUND = static_cast<int64_t>(std::numeric_limits<uint32_t>::max());
+// Per-token expert count upper bound: keeps MB * BS * K * HS products inside uint64 in CalWinSize.
+constexpr int64_t EXPERT_NUM_PER_TOKEN_UPPER_BOUND = 256;
 constexpr int64_t H_MIN = 1024;
 constexpr int64_t H_MAX = 8192;
 constexpr int64_t SCALE_SIZE = 128;
@@ -73,7 +76,7 @@ constexpr uint32_t TOKEN_DATA_DIM_NUM = 4;
 constexpr uint32_t TOKEN_DATA_SIZE = 2; // float/bfloat16, 占2字节
 constexpr uint32_t TOKEN_INFO_SIZE = 4; // int32, 占4字节
 
-static void PrintTilingDataInfo(const char *nodeName, FFNToAttentionTilingData &tilingData)
+static void PrintTilingDataInfo(const char* nodeName, FFNToAttentionTilingData& tilingData)
 {
     OP_LOGD(nodeName, "H is %u.", tilingData.ffnToAttentionInfo.H);
     OP_LOGD(nodeName, "A is %u.", tilingData.ffnToAttentionInfo.A);
@@ -90,7 +93,7 @@ static void PrintTilingDataInfo(const char *nodeName, FFNToAttentionTilingData &
 }
 
 template <typename T>
-static bool CheckAttrShapes(const char *nodeName, const T *tokenInfoTable, const T *tokenData)
+static bool CheckAttrShapes(const char* nodeName, const T* tokenInfoTable, const T* tokenData)
 {
     auto tokenInfoTableDimNum = tokenInfoTable->GetSize();
     auto tokenInfoTableShape = tokenInfoTable->GetData();
@@ -127,8 +130,8 @@ static bool CheckAttrShapes(const char *nodeName, const T *tokenInfoTable, const
 }
 
 template <typename T>
-static bool CheckAttrLimits(const char *nodeName, const int64_t worldSize, const T *tokenInfoTableShape,
-                            const T *tokenDataShape)
+static bool CheckAttrLimits(const char* nodeName, const int64_t worldSize, const T* tokenInfoTableShape,
+                            const T* tokenDataShape, const bool allowMultiMicroBatch)
 {
     OP_TILING_CHECK(
         (worldSize < MIN_WORLD_SIZE) || (worldSize > MAX_WORLD_SIZE),
@@ -136,11 +139,33 @@ static bool CheckAttrLimits(const char *nodeName, const int64_t worldSize, const
             nodeName, "worldSize", std::to_string(worldSize).c_str(),
             (std::string("[") + std::to_string(MIN_WORLD_SIZE) + ", " + std::to_string(MAX_WORLD_SIZE) + "]").c_str()),
         return false);
-    OP_TILING_CHECK(tokenInfoTableShape[INDEX_ZERO] != 1,
-                    OP_LOGE_FOR_INVALID_VALUE(
-                        nodeName, "tokenInfoTableShape",
-                        (std::string("dim0=") + std::to_string(tokenInfoTableShape[INDEX_ZERO])).c_str(), "dim0=1"),
-                    return false);
+    if (allowMultiMicroBatch) {
+        // Multi micro-batch mode: microBatchNum (= dim0, shared with tokenDataShape[0] via CheckAttrShapes)
+        // drives the window layout; it must be positive and must survive the int64 -> uint32 narrowing at the
+        // tilingData assignment.
+        OP_TILING_CHECK(
+            (tokenInfoTableShape[INDEX_ZERO] < 1) || (tokenInfoTableShape[INDEX_ZERO] > MICRO_BATCH_NUM_UPPER_BOUND),
+            OP_LOGE_FOR_INVALID_VALUE(
+                nodeName, "tokenInfoTableShape",
+                (std::string("dim0=") + std::to_string(tokenInfoTableShape[INDEX_ZERO])).c_str(),
+                (std::string("[1, ") + std::to_string(MICRO_BATCH_NUM_UPPER_BOUND) + "]").c_str()),
+            return false);
+        OP_TILING_CHECK(
+            (tokenInfoTableShape[TOKEN_INFO_TABLE_SHAPE_EXPERT_NUM_INDEX] < 1) ||
+                (tokenInfoTableShape[TOKEN_INFO_TABLE_SHAPE_EXPERT_NUM_INDEX] > EXPERT_NUM_PER_TOKEN_UPPER_BOUND),
+            OP_LOGE_FOR_INVALID_VALUE(
+                nodeName, "tokenInfoTableShape",
+                (std::string("dim2=") + std::to_string(tokenInfoTableShape[TOKEN_INFO_TABLE_SHAPE_EXPERT_NUM_INDEX]))
+                    .c_str(),
+                (std::string("[1, ") + std::to_string(EXPERT_NUM_PER_TOKEN_UPPER_BOUND) + "]").c_str()),
+            return false);
+    } else {
+        OP_TILING_CHECK(tokenInfoTableShape[INDEX_ZERO] != 1,
+                        OP_LOGE_FOR_INVALID_VALUE(
+                            nodeName, "tokenInfoTableShape",
+                            (std::string("dim0=") + std::to_string(tokenInfoTableShape[INDEX_ZERO])).c_str(), "dim0=1"),
+                        return false);
+    }
     OP_TILING_CHECK((tokenDataShape[TOKEN_DATA_SHAPE_BS_INDEX] > BS_UPPER_BOUND) ||
                         (tokenDataShape[TOKEN_DATA_SHAPE_BS_INDEX] <= 0),
                     OP_LOGE_FOR_INVALID_VALUE(
@@ -159,9 +184,9 @@ static bool CheckAttrLimits(const char *nodeName, const int64_t worldSize, const
     return true;
 }
 
-static bool CheckAndSetAttrs(const gert::TilingContext *context, const char *nodeName,
-                             FFNToAttentionTilingData &tilingData, std::string &group,
-                             const FFNToAttentionTilingConfig &config)
+static bool CheckAndSetAttrs(const gert::TilingContext* context, const char* nodeName,
+                             FFNToAttentionTilingData& tilingData, std::string& group,
+                             const FFNToAttentionTilingConfig& config)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return false);
@@ -186,8 +211,9 @@ static bool CheckAndSetAttrs(const gert::TilingContext *context, const char *nod
     OP_TILING_CHECK(!CheckAttrShapes(nodeName, tokenInfoTable, tokenData), static_cast<void>(0), return false);
     // 判断是否满足其他限制
     int64_t worldSize = *worldSizePtr;
-    OP_TILING_CHECK(!CheckAttrLimits(nodeName, worldSize, tokenInfoTableShape, tokenDataShape), static_cast<void>(0),
-                    return false);
+    OP_TILING_CHECK(
+        !CheckAttrLimits(nodeName, worldSize, tokenInfoTableShape, tokenDataShape, config.allowMultiMicroBatch),
+        static_cast<void>(0), return false);
 
     tilingData.ffnToAttentionInfo.worldSize = *worldSizePtr;
     tilingData.ffnToAttentionInfo.microBatchNum = tokenDataShape[TOKEN_DATA_SHAPE_MICRO_BATCH_NUM_INDEX];
@@ -201,10 +227,10 @@ static bool CheckAndSetAttrs(const gert::TilingContext *context, const char *nod
     return true;
 }
 
-static bool CheckInputDim0Matches(const char *nodeName, const uint64_t xDim0, const gert::StorageShape *sessionIdsShape,
-                                  const gert::StorageShape *microBatchIdsShape, const gert::StorageShape *tokenIdsShape,
-                                  const gert::StorageShape *expertOffsetsShape,
-                                  const gert::StorageShape *actualTokenNumShape)
+static bool CheckInputDim0Matches(const char* nodeName, const uint64_t xDim0, const gert::StorageShape* sessionIdsShape,
+                                  const gert::StorageShape* microBatchIdsShape, const gert::StorageShape* tokenIdsShape,
+                                  const gert::StorageShape* expertOffsetsShape,
+                                  const gert::StorageShape* actualTokenNumShape)
 {
     const int64_t sessionIdsDim0 = sessionIdsShape->GetStorageShape().GetDim(INDEX_ZERO);
     OP_TILING_CHECK(xDim0 != static_cast<uint64_t>(sessionIdsDim0),
@@ -239,15 +265,15 @@ static bool CheckInputDim0Matches(const char *nodeName, const uint64_t xDim0, co
     return true;
 }
 
-static bool CheckInputDim0Dim1(const gert::TilingContext *context, const char *nodeName,
-                               FFNToAttentionTilingData &tilingData, const FFNToAttentionTilingConfig &config)
+static bool CheckInputDim0Dim1(const gert::TilingContext* context, const char* nodeName,
+                               FFNToAttentionTilingData& tilingData, const FFNToAttentionTilingConfig& config)
 {
-    const gert::StorageShape *xShape = context->GetInputShape(config.xIndex);
-    const gert::StorageShape *sessionIdsShape = context->GetInputShape(config.sessionIdsIndex);
-    const gert::StorageShape *microBatchIdsShape = context->GetInputShape(config.microBatchIdsIndex);
-    const gert::StorageShape *tokenIdsShape = context->GetInputShape(config.tokenIdsIndex);
-    const gert::StorageShape *expertOffsetsShape = context->GetInputShape(config.expertOffsetsIndex);
-    const gert::StorageShape *actualTokenNumShape = context->GetInputShape(config.actualTokenNumIndex);
+    const gert::StorageShape* xShape = context->GetInputShape(config.xIndex);
+    const gert::StorageShape* sessionIdsShape = context->GetInputShape(config.sessionIdsIndex);
+    const gert::StorageShape* microBatchIdsShape = context->GetInputShape(config.microBatchIdsIndex);
+    const gert::StorageShape* tokenIdsShape = context->GetInputShape(config.tokenIdsIndex);
+    const gert::StorageShape* expertOffsetsShape = context->GetInputShape(config.expertOffsetsIndex);
+    const gert::StorageShape* actualTokenNumShape = context->GetInputShape(config.actualTokenNumIndex);
     // 校验输入x的维度Y和H
     const uint64_t xDim0 = xShape->GetStorageShape().GetDim(INDEX_ZERO);
     const uint64_t xDim1 = xShape->GetStorageShape().GetDim(INDEX_ONE);
@@ -269,12 +295,12 @@ static bool CheckInputDim0Dim1(const gert::TilingContext *context, const char *n
     return true;
 }
 
-static bool CheckRequiredInputDims(const char *nodeName, const gert::StorageShape *xShape,
-                                   const gert::StorageShape *sessionIdsShape,
-                                   const gert::StorageShape *microBatchIdsShape,
-                                   const gert::StorageShape *tokenIdsShape,
-                                   const gert::StorageShape *expertOffsetsShape,
-                                   const gert::StorageShape *actualTokenNumShape)
+static bool CheckRequiredInputDims(const char* nodeName, const gert::StorageShape* xShape,
+                                   const gert::StorageShape* sessionIdsShape,
+                                   const gert::StorageShape* microBatchIdsShape,
+                                   const gert::StorageShape* tokenIdsShape,
+                                   const gert::StorageShape* expertOffsetsShape,
+                                   const gert::StorageShape* actualTokenNumShape)
 {
     OP_TILING_CHECK(xShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "x"), return false);
     OP_TILING_CHECK(sessionIdsShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "sessionIds"), return false);
@@ -315,19 +341,19 @@ static bool CheckRequiredInputDims(const char *nodeName, const gert::StorageShap
     return true;
 }
 
-static bool CheckInputDim(gert::TilingContext *context, const char *nodeName, FFNToAttentionTilingData &tilingData,
-                          const FFNToAttentionTilingConfig &config)
+static bool CheckInputDim(gert::TilingContext* context, const char* nodeName, FFNToAttentionTilingData& tilingData,
+                          const FFNToAttentionTilingConfig& config)
 {
     auto attrs = context->GetAttrs();
     auto worldSizePtr = attrs->GetAttrPointer<int>(config.attrWorldSizeIndex);
     int64_t worldSize = *worldSizePtr;
-    const gert::StorageShape *xShape = context->GetInputShape(config.xIndex);
-    const gert::StorageShape *sessionIdsShape = context->GetInputShape(config.sessionIdsIndex);
-    const gert::StorageShape *microBatchIdsShape = context->GetInputShape(config.microBatchIdsIndex);
-    const gert::StorageShape *tokenIdsShape = context->GetInputShape(config.tokenIdsIndex);
-    const gert::StorageShape *expertOffsetsShape = context->GetInputShape(config.expertOffsetsIndex);
-    const gert::StorageShape *actualTokenNumShape = context->GetInputShape(config.actualTokenNumIndex);
-    const gert::StorageShape *attnRankTableShape = context->GetOptionalInputShape(config.attnRankTableIndex);
+    const gert::StorageShape* xShape = context->GetInputShape(config.xIndex);
+    const gert::StorageShape* sessionIdsShape = context->GetInputShape(config.sessionIdsIndex);
+    const gert::StorageShape* microBatchIdsShape = context->GetInputShape(config.microBatchIdsIndex);
+    const gert::StorageShape* tokenIdsShape = context->GetInputShape(config.tokenIdsIndex);
+    const gert::StorageShape* expertOffsetsShape = context->GetInputShape(config.expertOffsetsIndex);
+    const gert::StorageShape* actualTokenNumShape = context->GetInputShape(config.actualTokenNumIndex);
+    const gert::StorageShape* attnRankTableShape = context->GetOptionalInputShape(config.attnRankTableIndex);
     bool isInputRankTable = (attnRankTableShape != nullptr);
 
     OP_TILING_CHECK(!CheckRequiredInputDims(nodeName, xShape, sessionIdsShape, microBatchIdsShape, tokenIdsShape,
@@ -356,8 +382,8 @@ static bool CheckInputDim(gert::TilingContext *context, const char *nodeName, FF
     return true;
 }
 
-static bool CheckTokenIdDataTypes(const gert::TilingContext *context, const char *nodeName,
-                                  const FFNToAttentionTilingConfig &config)
+static bool CheckTokenIdDataTypes(const gert::TilingContext* context, const char* nodeName,
+                                  const FFNToAttentionTilingConfig& config)
 {
     auto sessionIdDesc = context->GetInputDesc(config.sessionIdsIndex);
     OP_TILING_CHECK(sessionIdDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "sessionIdDesc"), return false);
@@ -384,10 +410,10 @@ static bool CheckTokenIdDataTypes(const gert::TilingContext *context, const char
     return true;
 }
 
-static bool CheckInputDataType(gert::TilingContext *context, const char *nodeName,
-                               const FFNToAttentionTilingConfig &config)
+static bool CheckInputDataType(gert::TilingContext* context, const char* nodeName,
+                               const FFNToAttentionTilingConfig& config)
 {
-    const gert::StorageShape *attnRankTableShape = context->GetOptionalInputShape(config.attnRankTableIndex);
+    const gert::StorageShape* attnRankTableShape = context->GetOptionalInputShape(config.attnRankTableIndex);
     bool isInputRankTable = (attnRankTableShape != nullptr);
 
     auto xDesc = context->GetInputDesc(config.xIndex);
@@ -431,8 +457,8 @@ static bool CheckInputDataType(gert::TilingContext *context, const char *nodeNam
     return true;
 }
 
-static bool CheckTokenIdFormats(const gert::TilingContext *context, const char *nodeName,
-                                const FFNToAttentionTilingConfig &config)
+static bool CheckTokenIdFormats(const gert::TilingContext* context, const char* nodeName,
+                                const FFNToAttentionTilingConfig& config)
 {
     auto sessionIdDesc = context->GetInputDesc(config.sessionIdsIndex);
     OP_TILING_CHECK(sessionIdDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "sessionIdDesc"), return false);
@@ -470,8 +496,8 @@ static bool CheckTokenIdFormats(const gert::TilingContext *context, const char *
     return true;
 }
 
-static bool CheckExpertMetadataFormats(const gert::TilingContext *context, const char *nodeName,
-                                       const FFNToAttentionTilingConfig &config)
+static bool CheckExpertMetadataFormats(const gert::TilingContext* context, const char* nodeName,
+                                       const FFNToAttentionTilingConfig& config)
 {
     auto expertOffsetDesc = context->GetInputDesc(config.expertOffsetsIndex);
     OP_TILING_CHECK(expertOffsetDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertOffsetDesc"),
@@ -500,10 +526,10 @@ static bool CheckExpertMetadataFormats(const gert::TilingContext *context, const
     return true;
 }
 
-static bool CheckInputFormat(gert::TilingContext *context, const char *nodeName,
-                             const FFNToAttentionTilingConfig &config)
+static bool CheckInputFormat(gert::TilingContext* context, const char* nodeName,
+                             const FFNToAttentionTilingConfig& config)
 {
-    const gert::StorageShape *attnRankTableShape = context->GetOptionalInputShape(config.attnRankTableIndex);
+    const gert::StorageShape* attnRankTableShape = context->GetOptionalInputShape(config.attnRankTableIndex);
     bool isInputRankTable = (attnRankTableShape != nullptr);
 
     auto xDesc = context->GetInputDesc(config.xIndex);
@@ -540,8 +566,8 @@ static bool CheckInputFormat(gert::TilingContext *context, const char *nodeName,
     return true;
 }
 
-static bool CheckInputAndSetTilingData(gert::TilingContext *context, const char *nodeName,
-                                       FFNToAttentionTilingData &tilingData, const FFNToAttentionTilingConfig &config)
+static bool CheckInputAndSetTilingData(gert::TilingContext* context, const char* nodeName,
+                                       FFNToAttentionTilingData& tilingData, const FFNToAttentionTilingConfig& config)
 {
     // 校验输入数据dim、format、dataType
     OP_TILING_CHECK(!CheckInputDim(context, nodeName, tilingData, config),
@@ -554,9 +580,9 @@ static bool CheckInputAndSetTilingData(gert::TilingContext *context, const char 
     return true;
 }
 
-static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const char *nodeName)
+static ge::graphStatus SetWorkSpace(gert::TilingContext* context, const char* nodeName)
 {
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "workSpaces"), return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     workSpaces[0] = ascendcPlatform.GetLibApiWorkSpaceSize();
@@ -568,7 +594,7 @@ static uint64_t AlignUp(uint64_t value, uint64_t alignment)
     return (value + alignment - 1U) / alignment * alignment;
 }
 
-static void CalWinSize(FFNToAttentionTilingData &tilingData, uint64_t &neededSize, uint64_t &viableWindowSize)
+static void CalWinSize(FFNToAttentionTilingData& tilingData, uint64_t& neededSize, uint64_t& viableWindowSize)
 {
     uint64_t microBatchNum = static_cast<uint64_t>(tilingData.ffnToAttentionInfo.microBatchNum);
     uint64_t BS = static_cast<uint64_t>(tilingData.ffnToAttentionInfo.BS);
@@ -586,10 +612,10 @@ static void CalWinSize(FFNToAttentionTilingData &tilingData, uint64_t &neededSiz
     return;
 }
 
-static ge::graphStatus SetHcommCfg(const gert::TilingContext *context, FFNToAttentionTilingData &tilingData,
+static ge::graphStatus SetHcommCfg(const gert::TilingContext* context, FFNToAttentionTilingData& tilingData,
                                    const std::string group)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGD(nodeName, "ffnToAttention group = %s", group.c_str());
     uint32_t opType1 = OP_TYPE_ALL_TO_ALL;
     std::string algConfigAllToAllStr = "AlltoAll=level0:fullmesh;level1:pairwise";
@@ -599,10 +625,10 @@ static ge::graphStatus SetHcommCfg(const gert::TilingContext *context, FFNToAtte
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckMc2Context(const gert::TilingContext *context, const char *nodeName,
-                                       const FFNToAttentionTilingConfig &config)
+static ge::graphStatus CheckMc2Context(const gert::TilingContext* context, const char* nodeName,
+                                       const FFNToAttentionTilingConfig& config)
 {
-    const gert::StorageShape *contextStorageShape = context->GetInputShape(config.contextIndex);
+    const gert::StorageShape* contextStorageShape = context->GetInputShape(config.contextIndex);
     OP_TILING_CHECK(contextStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "contextShape"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
@@ -629,7 +655,7 @@ static ge::graphStatus CheckMc2Context(const gert::TilingContext *context, const
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckCclBufferSize(const gert::TilingContext *context, const char *nodeName,
+static ge::graphStatus CheckCclBufferSize(const gert::TilingContext* context, const char* nodeName,
                                           const uint32_t attrIndex, const uint64_t neededSize)
 {
     if (attrIndex != UINT32_MAX) {
@@ -656,8 +682,8 @@ static ge::graphStatus CheckCclBufferSize(const gert::TilingContext *context, co
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetPlatformTilingData(gert::TilingContext *context, const char *nodeName,
-                                  FFNToAttentionTilingData &tilingData)
+static void SetPlatformTilingData(gert::TilingContext* context, const char* nodeName,
+                                  FFNToAttentionTilingData& tilingData)
 {
     uint32_t numBlocks = 1U;
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
@@ -671,9 +697,9 @@ static void SetPlatformTilingData(gert::TilingContext *context, const char *node
     OP_LOGD(nodeName, "numBlocks=%u, aivNum=%u, ubSize=%lu", numBlocks, aivNum, ubSize);
 }
 
-static ge::graphStatus CheckFFNWindowSize(gert::TilingContext *context, const char *nodeName,
-                                          FFNToAttentionTilingData *tilingData,
-                                          const FFNToAttentionTilingConfig &config)
+static ge::graphStatus CheckFFNWindowSize(gert::TilingContext* context, const char* nodeName,
+                                          FFNToAttentionTilingData* tilingData,
+                                          const FFNToAttentionTilingConfig& config)
 {
     // Check window Size
     uint64_t neededSize = 0;
@@ -693,11 +719,11 @@ static ge::graphStatus CheckFFNWindowSize(gert::TilingContext *context, const ch
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNToAttentionTilingFuncBase(gert::TilingContext *context, const FFNToAttentionTilingConfig &config)
+ge::graphStatus FFNToAttentionTilingFuncBase(gert::TilingContext* context, const FFNToAttentionTilingConfig& config)
 {
-    FFNToAttentionTilingData *tilingData = context->GetTilingData<FFNToAttentionTilingData>();
+    FFNToAttentionTilingData* tilingData = context->GetTilingData<FFNToAttentionTilingData>();
     std::string group = "";
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
 
     if (config.isMc2Context) {
@@ -713,8 +739,21 @@ ge::graphStatus FFNToAttentionTilingFuncBase(gert::TilingContext *context, const
     OP_TILING_CHECK(!CheckInputAndSetTilingData(context, nodeName, *tilingData, config),
                     OP_LOGE(nodeName, "Check Inputs and Outputs failed!"), return ge::GRAPH_FAILED);
 
-    OP_TILING_CHECK(CheckFFNWindowSize(context, nodeName, tilingData, config) != ge::GRAPH_SUCCESS,
-                    static_cast<void>(0), return ge::GRAPH_FAILED);
+    // Check window Size
+    uint64_t neededSize = 0;
+    uint64_t viableWindowSize = 0;
+    CalWinSize(*tilingData, neededSize, viableWindowSize);
+    OP_TILING_CHECK(
+        neededSize > viableWindowSize,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            nodeName, "neededSize", (std::to_string(neededSize) + " > " + std::to_string(viableWindowSize)).c_str(),
+            "The value of neededSize must not be greater than viable window size"),
+        return ge::GRAPH_FAILED);
+
+    // Validate ccl_buffer_size when provided (V2 path)
+    OP_TILING_CHECK(
+        CheckCclBufferSize(context, nodeName, config.attrCclBufferSizeIndex, neededSize) != ge::GRAPH_SUCCESS,
+        static_cast<void>(0), return ge::GRAPH_FAILED);
 
     // Set WorkSpace
     OP_TILING_CHECK(SetWorkSpace(context, nodeName) != ge::GRAPH_SUCCESS,
@@ -738,14 +777,14 @@ ge::graphStatus FFNToAttentionTilingFuncBase(gert::TilingContext *context, const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FFNToAttentionTilingFunc(gert::TilingContext *context)
+ge::graphStatus FFNToAttentionTilingFunc(gert::TilingContext* context)
 {
     const FFNToAttentionTilingConfig config{};
     return FFNToAttentionTilingFuncBase(context, config);
 }
 
 struct FFNToAttentionCompileInfo {};
-ge::graphStatus TilingParseForFFNToAttention(const gert::TilingParseContext *context)
+ge::graphStatus TilingParseForFFNToAttention(const gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
@@ -753,7 +792,7 @@ ge::graphStatus TilingParseForFFNToAttention(const gert::TilingParseContext *con
 
 IMPL_OP_OPTILING(FFNToAttention)
     .Tiling(FFNToAttentionTilingFunc)
-    .TilingParse<FFNToAttentionCompileInfo>([](gert::TilingParseContext *context) {
+    .TilingParse<FFNToAttentionCompileInfo>([](gert::TilingParseContext* context) {
         return TilingParseForFFNToAttention(context);
     });
 } // namespace MC2Tiling

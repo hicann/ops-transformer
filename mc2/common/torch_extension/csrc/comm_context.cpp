@@ -32,6 +32,8 @@ constexpr uint32_t HCCL_COMM_LAYERS_MTE_CCU = 1;
 constexpr uint32_t HCCL_COMM_LAYERS_UB_MEM = 0;
 constexpr uint32_t GET_LOCAL_SERVER_RANK_SIZE_LAYER = 0;
 constexpr int64_t DEFAULT_RANK_NUM_PER_SERVER = 2;
+constexpr uint32_t MOE_CHANNEL_HANDLE_NUM = 64U;
+constexpr uint32_t MOE_CHANNEL_NOTIFY_NUM = 3U;
 
 enum class TopoType : uint32_t {
     INTRA_SUPER_NODE = 0, // 超节点内通信（默认）
@@ -55,6 +57,7 @@ struct CommContext {
     uint64_t kfcContextAddr = 0; // 通信API所需的地址
     uint64_t epHcclBuffer_[HCCL_MAX_RANK_SIZE] = {};
     ChannelHandle hcommHandle_[HCCL_MAX_RANK_SIZE] = {}; // ROCE或者URMA通信所需句柄
+    uint32_t channelsPerRank = 0; // 每个rank的channel数量，0表示未启用多channel（紧凑布局）
 };
 
 // ======================== Common Types and Utilities ========================
@@ -65,13 +68,13 @@ enum class BackendMode : uint8_t {
     CHANNEL
 };
 
-static const char *GetSocName()
+static const char* GetSocName()
 {
-    static const char *socName = aclrtGetSocName();
+    static const char* socName = aclrtGetSocName();
     return socName;
 }
 
-BackendMode ResolveBackend(const py::object &backend)
+BackendMode ResolveBackend(const py::object& backend)
 {
     if (py::isinstance<py::str>(backend)) {
         auto mode = backend.cast<std::string>();
@@ -86,7 +89,7 @@ BackendMode ResolveBackend(const py::object &backend)
         auto dict = backend.cast<py::dict>();
         TORCH_CHECK(dict.size() > 0, "backend dict must not be empty");
 
-        const char *socName = GetSocName();
+        const char* socName = GetSocName();
         TORCH_CHECK(socName != nullptr, "aclrtGetSocName returned nullptr");
 
         for (auto item : dict) {
@@ -109,37 +112,37 @@ BackendMode ResolveBackend(const py::object &backend)
     TORCH_CHECK(false, "backend must be a string ('kfc' or 'channel') or a dict");
 }
 
-static void CopyContextToTensor(const CommContext &context, at::Tensor &tensor)
+static void CopyContextToTensor(const CommContext& context, at::Tensor& tensor)
 {
     at::Tensor hostContext =
-        at::from_blob(const_cast<CommContext *>(&context), {sizeof(CommContext) / sizeof(int32_t)}, at::kInt);
+        at::from_blob(const_cast<CommContext*>(&context), {sizeof(CommContext) / sizeof(int32_t)}, at::kInt);
     tensor.copy_(hostContext);
 }
 
 // ======================== KFC Mode ========================
 class KfcContextBuilder {
 public:
-    void Build(const std::string &group, int64_t worldSize, int64_t &cclBufferSize, at::Tensor &contextTensor,
-               void **localDeviceBuffer)
+    void Build(const std::string& group, int64_t worldSize, int64_t& cclBufferSize, at::Tensor& contextTensor,
+               void** localDeviceBuffer)
     {
         CommContext mc2ContextHost;
         GetMc2Context(mc2ContextHost, worldSize, cclBufferSize, group.c_str());
         TORCH_CHECK(mc2ContextHost.epRankId < HCCL_MAX_RANK_SIZE, "Invalid local rank id: ", mc2ContextHost.epRankId);
-        *localDeviceBuffer = reinterpret_cast<void *>(mc2ContextHost.epHcclBuffer_[mc2ContextHost.epRankId]);
+        *localDeviceBuffer = reinterpret_cast<void*>(mc2ContextHost.epHcclBuffer_[mc2ContextHost.epRankId]);
 
         CopyContextToTensor(mc2ContextHost, contextTensor);
     }
 
 private:
-    void CollectRankBuffers(HcclComm &comm, int64_t worldSize, int64_t &cclBufferSize, CommContext &mc2Context)
+    void CollectRankBuffers(HcclComm& comm, int64_t worldSize, int64_t& cclBufferSize, CommContext& mc2Context)
     {
         uint32_t ctxIndex = 0;
         uint32_t rankId = 0;
         auto hcclRet = HcclGetRankIdFunc(comm, &rankId);
         TORCH_CHECK(hcclRet == HCCL_SUCCESS, "HcclGetRankIdFunc failed, ret: ", hcclRet);
         mc2Context.epRankId = rankId;
-        const char *socName = GetSocName();
-        void *remoteAddr = nullptr;
+        const char* socName = GetSocName();
+        void* remoteAddr = nullptr;
         uint64_t commSize = 0;
         if (socName != nullptr && std::strstr(socName, "Ascend910B") != nullptr && worldSize > 8) {
             HcclResult ret = static_cast<HcclResult>(HcclGetHcclBufferFunc(comm, &remoteAddr, &commSize));
@@ -163,15 +166,15 @@ private:
         }
     }
 
-    void CreateHcclContext(HcclComm &commHandle, void *opArgs, int64_t worldSize, const char *groupName,
-                           std::string algConfig, uint32_t opType, CommContext &mc2Context)
+    void CreateHcclContext(HcclComm& commHandle, void* opArgs, int64_t worldSize, const char* groupName,
+                           std::string algConfig, uint32_t opType, CommContext& mc2Context)
     {
         HcclResult ret =
-            static_cast<HcclResult>(HcclKfcOpArgsSetAlgConfigFunc(opArgs, const_cast<char *>(algConfig.c_str())));
+            static_cast<HcclResult>(HcclKfcOpArgsSetAlgConfigFunc(opArgs, const_cast<char*>(algConfig.c_str())));
         TORCH_CHECK(ret == 0, "HcclKfcOpArgsSetAlgConfig failed, ret:", ret);
         ret = static_cast<HcclResult>(HcclCommGetHandleWithNameFunc(groupName, &commHandle));
         TORCH_CHECK(ret == 0, "HcclGetCommHandle failed, ret:", ret);
-        void *opsResCtx;
+        void* opsResCtx;
         ret = static_cast<HcclResult>(HcclCreateOpResCtxFunc(commHandle, opType, opArgs, &opsResCtx));
         TORCH_CHECK(ret == 0, "HcclCreateOpResCtx failed, ret:", ret);
         mc2Context.kfcContextAddr = (uint64_t)opsResCtx;
@@ -187,17 +190,17 @@ private:
         TORCH_CHECK(worldSize == worldSizeHccl, "worldSize:", worldSize, " != worldSizeHccl:", worldSizeHccl);
     }
 
-    void GetMc2Context(CommContext &mc2ContextHost, int64_t worldSize, int64_t &cclBufferSize, const char *groupStr)
+    void GetMc2Context(CommContext& mc2ContextHost, int64_t worldSize, int64_t& cclBufferSize, const char* groupStr)
     {
         InitHcclFunctions();
-        void *opArgs = nullptr;
+        void* opArgs = nullptr;
         HcclResult ret = static_cast<HcclResult>(HcclKfcAllocOpArgsFunc(&opArgs));
         TORCH_CHECK(ret == 0, "HcclKfcAllocOpArgs failed, ret:", ret);
         uint8_t commEngine = COMM_ENGINE_AIV;
         ret = static_cast<HcclResult>(HcclKfcOpArgsSetCommEngineFunc(opArgs, (uint8_t)commEngine));
         TORCH_CHECK(ret == 0, "HcclKfcOpArgsSetCommEngine failed, ret:", ret);
         HcclComm commHandle;
-        const char *socName = GetSocName();
+        const char* socName = GetSocName();
         const bool is910B = (socName != nullptr && std::strstr(socName, "Ascend910B") != nullptr);
         const bool isMultiServer = worldSize > 8;
         const std::string algConfig =
@@ -214,16 +217,18 @@ private:
 
 class HcclChannelContextBuilder {
 public:
-    void Build(const std::string &group, int64_t worldSize, int64_t &cclBufferSize, at::Tensor &contextTensor,
-               const std::string &commAlg, const std::string &opName, int64_t customCclBufferSize = 0,
-               const py::object &customCclBufferSizeResolver = py::none(), void **customDeviceBuffer = nullptr,
-               HcclMemHandle *customMemHandle = nullptr)
+    void Build(const std::string& group, int64_t worldSize, int64_t& cclBufferSize, at::Tensor& contextTensor,
+               const std::string& commAlg, const std::string& opName, int64_t customCclBufferSize = 0,
+               const py::object& customCclBufferSizeResolver = py::none(), void* userDeviceBuffer = nullptr,
+               void** customDeviceBuffer = nullptr, HcclMemHandle* customMemHandle = nullptr, bool multiChannel = false)
     {
         ASCEND_LOGI("Start to get CommContext Tensor, group: %s", group.c_str());
         InitHcclEngineCtxFunctions();
         customCclBufferSize_ = customCclBufferSize;
+        userDeviceBuffer_ = userDeviceBuffer;
         customDeviceBuffer_ = customDeviceBuffer;
         customMemHandle_ = customMemHandle;
+        multiChannel_ = multiChannel;
 
         HcclComm hcclHandle;
         AcquireHcclHandle(group, hcclHandle);
@@ -246,14 +251,14 @@ public:
         ASCEND_LOGI("Get CommContext Tensor Success, group: %s, ccl_buffer_size: %ld", group.c_str(), cclBufferSize);
     }
 
-    void AcquireHcclHandle(const std::string &group, HcclComm &hcclHandle)
+    void AcquireHcclHandle(const std::string& group, HcclComm& hcclHandle)
     {
         auto aclnnRet = HcomGetCommHandleByGroupFunc(group.c_str(), &hcclHandle);
         TORCH_CHECK(aclnnRet == HCCL_SUCCESS, "Get HCCL handle failed, group: ", group.c_str(), ", ret: ", aclnnRet);
         ASCEND_LOGI("Get HCCL communication handle success hcclHandle is: %p", hcclHandle);
     }
 
-    void ResolveCustomCclBufferSize(int64_t worldSize, const py::object &customCclBufferSizeResolver)
+    void ResolveCustomCclBufferSize(int64_t worldSize, const py::object& customCclBufferSizeResolver)
     {
         if (topoType_ != TopoType::CROSS_SUPER_NODE || customCclBufferSizeResolver.is_none()) {
             return;
@@ -265,15 +270,15 @@ public:
                     serverNum);
     }
 
-    void BuildContext(const HcclComm &hcclHandle, const std::string &group, const std::string &opName,
-                      const CommProtocol &protocol, CommContext &commContextStruct, int64_t &cclBufferSize)
+    void BuildContext(const HcclComm& hcclHandle, const std::string& group, const std::string& opName,
+                      const CommProtocol& protocol, CommContext& commContextStruct, int64_t& cclBufferSize)
     {
         std::string mc2ContextTag = std::string(group) + opName;
         TORCH_CHECK(mc2ContextTag.size() <= HCCL_CONTEXT_TAG_MAX_LEN, "Mc2ContextTag is too long, max size is ",
                     HCCL_CONTEXT_TAG_MAX_LEN, ", got ", mc2ContextTag.size());
 
         CommEngine engine = CommEngine::COMM_ENGINE_AIV;
-        void *ctx = nullptr;
+        void* ctx = nullptr;
         uint64_t hcclBuffSize = 0;
 
         GetOrCreateContext(hcclHandle, mc2ContextTag, engine, protocol, ctx, hcclBuffSize, commContextStruct);
@@ -281,11 +286,11 @@ public:
         cclBufferSize = hcclBuffSize;
     }
 
-    void GetCommProtocol(const HcclComm &commHandle, CommProtocol &protocol)
+    void GetCommProtocol(const HcclComm& commHandle, CommProtocol& protocol)
     {
         ASCEND_LOGI("Start to get HCCL communication protocol");
         uint32_t layerNum = 0;
-        uint32_t *layerList = nullptr;
+        uint32_t* layerList = nullptr;
         auto ret = HcclRankGraphGetLayersFunc(commHandle, &layerList, &layerNum);
         TORCH_CHECK(ret == HCCL_SUCCESS, "Get HCCL layers failed, ret: ", ret);
         TORCH_CHECK(layerList != nullptr && layerNum > 0, "Get HCCL layers returned empty layer list");
@@ -299,10 +304,10 @@ public:
     }
 
     // Protocol discovery may probe layers that do not connect the rank pair; treat those probes as unsupported.
-    bool SupportsProtocol(const HcclComm &commHandle, uint32_t layerId, uint32_t srcRankId, uint32_t dstRankId,
-                          const CommProtocol &protocol) const
+    bool SupportsProtocol(const HcclComm& commHandle, uint32_t layerId, uint32_t srcRankId, uint32_t dstRankId,
+                          const CommProtocol& protocol) const
     {
-        CommLink *linksList = nullptr;
+        CommLink* linksList = nullptr;
         uint32_t netLinkNum = 0;
         auto hcclRet = HcclRankGraphGetLinksFunc(commHandle, layerId, srcRankId, dstRankId, &linksList, &netLinkNum);
         if (hcclRet != HCCL_SUCCESS || linksList == nullptr || netLinkNum == 0) {
@@ -314,8 +319,8 @@ public:
         return HasLinkWithProtocol(linksList, netLinkNum, protocol);
     }
 
-    void CheckProtocolSupport(const HcclComm &commHandle, const uint32_t *layerList, uint32_t layerNum,
-                              const CommProtocol &protocol)
+    void CheckProtocolSupport(const HcclComm& commHandle, const uint32_t* layerList, uint32_t layerNum,
+                              const CommProtocol& protocol)
     {
         uint32_t srcRankId = GetRankId(commHandle);
         uint32_t rankSize = GetRankSize(commHandle);
@@ -359,8 +364,8 @@ public:
     }
 
     // Extend the UB domain through consecutive inner-to-outer layers; record each peer's innermost usable layer.
-    bool FindUbDomain(const HcclComm &commHandle, const uint32_t *layerList, uint32_t layerNum,
-                      const CommProtocol &domainProtocol, uint32_t srcRankId, LayerRanks &ubDomain)
+    bool FindUbDomain(const HcclComm& commHandle, const uint32_t* layerList, uint32_t layerNum,
+                      const CommProtocol& domainProtocol, uint32_t srcRankId, LayerRanks& ubDomain)
     {
         bool hasDomainLayer = false;
         for (uint32_t layerIndex = 0; layerIndex < layerNum; ++layerIndex) {
@@ -376,7 +381,7 @@ public:
     }
 
     // Resolve each recorded UB-domain peer to a layer supporting UBC_CTP and update rankLinkMap_.
-    bool CheckIntraUbDomainProtocol(const HcclComm &commHandle, const uint32_t *layerList, uint32_t layerNum,
+    bool CheckIntraUbDomainProtocol(const HcclComm& commHandle, const uint32_t* layerList, uint32_t layerNum,
                                     uint32_t srcRankId)
     {
         for (uint32_t layerIndex = 0; layerIndex < layerNum; ++layerIndex) {
@@ -393,7 +398,7 @@ public:
                 }
             }
         }
-        for (const auto &linkEntry : rankLinkMap_) {
+        for (const auto& linkEntry : rankLinkMap_) {
             if (linkEntry.second.protocol != CommProtocol::COMM_PROTOCOL_UBC_CTP) {
                 ASCEND_LOGW("Rank %u does not support UBC_CTP with rank %u inside its UB domain", srcRankId,
                             linkEntry.first);
@@ -404,7 +409,7 @@ public:
     }
 
     // Search all layers because the cross-domain protocol may differ from the protocol used to identify the UB domain.
-    bool CheckCrossUbDomainProtocols(const HcclComm &commHandle, const uint32_t *layerList, uint32_t layerNum,
+    bool CheckCrossUbDomainProtocols(const HcclComm& commHandle, const uint32_t* layerList, uint32_t layerNum,
                                      uint32_t srcRankId)
     {
         bool hasCrossDomainUbgLink = false;
@@ -426,18 +431,18 @@ public:
         return hasCrossDomainUbgLink;
     }
 
-    LayerRanks GetLayerRanks(const HcclComm &commHandle, uint32_t layerId) const
+    LayerRanks GetLayerRanks(const HcclComm& commHandle, uint32_t layerId) const
     {
         uint32_t rankNum = 0;
-        uint32_t *rankList = nullptr;
+        uint32_t* rankList = nullptr;
         auto hcclRet = HcclRankGraphGetRanksByLayerFunc(commHandle, layerId, &rankList, &rankNum);
         TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Get rank IDs by layer failed, ret: ", hcclRet);
         TORCH_CHECK(rankList != nullptr && rankNum > 0, "Layer ", layerId, " returned an empty rank list");
         return {layerId, std::vector<uint32_t>(rankList, rankList + rankNum)};
     }
 
-    bool SupportsDomainProtocolWithAllRanks(const HcclComm &commHandle, const LayerRanks &layer,
-                                            const CommProtocol &domainProtocol, uint32_t srcRankId) const
+    bool SupportsDomainProtocolWithAllRanks(const HcclComm& commHandle, const LayerRanks& layer,
+                                            const CommProtocol& domainProtocol, uint32_t srcRankId) const
     {
         for (uint32_t dstRank : layer.ranks) {
             if (dstRank == srcRankId || rankLinkMap_.count(dstRank) > 0) {
@@ -451,7 +456,7 @@ public:
     }
 
     // Record a peer once so its innermost usable layer is retained.
-    void RecordDomainLayerRanks(const CommProtocol &protocol, const LayerRanks &layer, uint32_t srcRankId)
+    void RecordDomainLayerRanks(const CommProtocol& protocol, const LayerRanks& layer, uint32_t srcRankId)
     {
         for (uint32_t dstRank : layer.ranks) {
             if (dstRank != srcRankId && rankLinkMap_.count(dstRank) == 0) {
@@ -460,7 +465,7 @@ public:
         }
     }
 
-    static bool HasLinkWithProtocol(const CommLink *linksList, uint32_t netLinkNum, const CommProtocol &protocol)
+    static bool HasLinkWithProtocol(const CommLink* linksList, uint32_t netLinkNum, const CommProtocol& protocol)
     {
         for (uint32_t linkIdx = 0; linkIdx < netLinkNum; ++linkIdx) {
             if (linksList[linkIdx].linkAttr.linkProtocol == protocol) {
@@ -472,13 +477,13 @@ public:
 
     void ValidateRankLinkMap(uint32_t rankSize, uint32_t srcRankId) const
     {
-        for (const auto &linkEntry : rankLinkMap_) {
+        for (const auto& linkEntry : rankLinkMap_) {
             TORCH_CHECK(linkEntry.first < rankSize && linkEntry.first != srcRankId, "Invalid topology rank ",
                         linkEntry.first, " for local rank ", srcRankId, " and rank size ", rankSize);
         }
     }
 
-    uint32_t GetRankId(const HcclComm &commHandle) const
+    uint32_t GetRankId(const HcclComm& commHandle) const
     {
         uint32_t rankId = 0;
         auto hcclRet = HcclGetRankIdFunc(commHandle, &rankId);
@@ -486,7 +491,7 @@ public:
         return rankId;
     }
 
-    uint32_t GetRankSize(const HcclComm &commHandle) const
+    uint32_t GetRankSize(const HcclComm& commHandle) const
     {
         uint32_t rankSize = 0;
         auto hcclRet = HcclGetRankSizeFunc(commHandle, &rankSize);
@@ -497,8 +502,8 @@ public:
 
     // ---- Channel management helpers ----
 
-    void InitHcclChannel(const HcclComm &commHandle, uint32_t rankDim, uint32_t srcRankId, const CommProtocol &protocol,
-                         std::vector<HcclChannelDesc> &channelDesc)
+    void InitHcclChannel(const HcclComm& commHandle, uint32_t rankDim, uint32_t srcRankId, uint32_t channelsPerRank,
+                         const CommProtocol& protocol, std::vector<HcclChannelDesc>& channelDesc)
     {
         uint32_t channelNum = channelDesc.size();
         auto hcclRet = HcclChannelDescInit(channelDesc.data(), channelNum);
@@ -506,7 +511,7 @@ public:
         ASCEND_LOGI("HCCL channel init success");
 
         uint32_t netLayerNum = 0;
-        uint32_t *netLayerList = nullptr;
+        uint32_t* netLayerList = nullptr;
         GetNetLayers(commHandle, netLayerList, netLayerNum);
         TORCH_CHECK(netLayerNum > 0, "Get HCCL net layers failed, netLayerNum is ", netLayerNum);
 
@@ -514,20 +519,27 @@ public:
             if (dstRank == srcRankId) {
                 continue;
             }
-            uint32_t channelId = (dstRank > srcRankId) ? (dstRank - 1) : dstRank;
+            uint32_t peerIndex = (dstRank > srcRankId) ? (dstRank - 1) : dstRank;
             RankLinkInfo linkInfo = ResolveLinkInfo(dstRank, protocol, netLayerList, netLayerNum);
-            CommLink *links = nullptr;
+            CommLink* links = nullptr;
             GetHcclCommLink(commHandle, linkInfo.layer, srcRankId, dstRank, linkInfo.protocol, links);
-            channelDesc[channelId].channelProtocol = linkInfo.protocol;
-            channelDesc[channelId].remoteRank = dstRank;
-            channelDesc[channelId].localEndpoint = links->srcEndpointDesc;
-            channelDesc[channelId].remoteEndpoint = links->dstEndpointDesc;
-            channelDesc[channelId].memHandles = customMemHandle_;
-            channelDesc[channelId].memHandleNum = 1;
+            for (uint32_t channel = 0; channel < channelsPerRank; ++channel) {
+                // Handles are compact by remote rank because the local rank does not need an HCOMM channel.
+                uint32_t channelId = peerIndex * channelsPerRank + channel;
+                channelDesc[channelId].channelProtocol = linkInfo.protocol;
+                channelDesc[channelId].remoteRank = dstRank;
+                if (channelsPerRank > 1U) {
+                    channelDesc[channelId].notifyNum = MOE_CHANNEL_NOTIFY_NUM;
+                }
+                channelDesc[channelId].localEndpoint = links->srcEndpointDesc;
+                channelDesc[channelId].remoteEndpoint = links->dstEndpointDesc;
+                channelDesc[channelId].memHandles = customMemHandle_;
+                channelDesc[channelId].memHandleNum = 1;
+            }
         }
     }
 
-    RankLinkInfo ResolveLinkInfo(uint32_t dstRank, const CommProtocol &protocol, const uint32_t *netLayerList,
+    RankLinkInfo ResolveLinkInfo(uint32_t dstRank, const CommProtocol& protocol, const uint32_t* netLayerList,
                                  uint32_t netLayerNum) const
     {
         auto linkIter = rankLinkMap_.find(dstRank);
@@ -539,33 +551,70 @@ public:
         return {protocol, netLayerList[HCCL_COMM_LAYERS_UB_MEM]};
     }
 
-    void GetHcclCommChannel(const HcclComm &commHandle, uint32_t rankDim, uint32_t srcRankId,
-                            const CommProtocol &protocol, const CommEngine &engine, CommContext *commContextStruct)
+    void GetHcclCommChannel(const HcclComm& commHandle, uint32_t rankDim, uint32_t srcRankId,
+                            const CommProtocol& protocol, const CommEngine& engine, CommContext* commContextStruct)
     {
         ASCEND_LOGI("Start to get HCCL communication channel");
         TORCH_CHECK(rankDim > 0 && rankDim <= HCCL_MAX_RANK_SIZE, "Invalid HCCL rank size: ", rankDim);
         TORCH_CHECK(srcRankId < rankDim, "Invalid local rank ", srcRankId, " for rank size ", rankDim);
-        uint32_t channelNum = rankDim - 1;
+        if (!multiChannel_) {
+            // Legacy layout: one channel per remote peer, compact (self excluded). Ops that have
+            // not opted into multi-channel keep reading this layout, byte-identical to before.
+            commContextStruct->channelsPerRank = 0U;
+            uint32_t channelNum = rankDim - 1;
+            std::vector<HcclChannelDesc> channelDesc(channelNum);
+
+            InitHcclChannel(commHandle, rankDim, srcRankId, 1U, protocol, channelDesc);
+
+            auto hcclRet = HcclChannelAcquireFunc(commHandle, engine, channelDesc.data(), channelNum,
+                                                  commContextStruct->hcommHandle_);
+            TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Acquire HCCL channel failed, ret: ", hcclRet);
+            return;
+        }
+        commContextStruct->channelsPerRank = 1U;
+        if (rankDim < MOE_CHANNEL_HANDLE_NUM) {
+            commContextStruct->channelsPerRank = MOE_CHANNEL_HANDLE_NUM / rankDim;
+        }
+        uint32_t channelsPerRank = commContextStruct->channelsPerRank;
+        TORCH_CHECK(channelsPerRank > 0 && channelsPerRank <= HCCL_MAX_RANK_SIZE / rankDim,
+                    "HCCL channel handles exceed capacity, rank size ", rankDim, ", channels per rank ",
+                    channelsPerRank);
+        uint32_t remoteRankNum = rankDim - 1;
+        uint32_t channelNum = remoteRankNum * channelsPerRank;
         std::vector<HcclChannelDesc> channelDesc(channelNum);
+        ChannelHandle channelBuf[HCCL_MAX_RANK_SIZE] = {};
 
-        InitHcclChannel(commHandle, rankDim, srcRankId, protocol, channelDesc);
+        InitHcclChannel(commHandle, rankDim, srcRankId, channelsPerRank, protocol, channelDesc);
 
-        auto hcclRet =
-            HcclChannelAcquireFunc(commHandle, engine, channelDesc.data(), channelNum, commContextStruct->hcommHandle_);
+        auto hcclRet = HcclChannelAcquireFunc(commHandle, engine, channelDesc.data(), channelNum, channelBuf);
         TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Acquire HCCL channel failed, ret: ", hcclRet);
+
+        // Scatter to by-rank layout: hcommHandle_[peer * channelsPerRank + channel]; the local
+        // rank's slots stay zero and are never used by the kernels.
+        uint32_t channelIndex = 0;
+        for (uint32_t peer = 0; peer < rankDim; ++peer) {
+            if (peer == srcRankId) {
+                continue;
+            }
+            for (uint32_t channel = 0; channel < channelsPerRank; ++channel) {
+                commContextStruct->hcommHandle_[peer * channelsPerRank + channel] = channelBuf[channelIndex++];
+            }
+        }
     }
 
     // ---- Resource management helpers ----
 
-    void GetHcclCommResource(const HcclComm &commHandle, const CommEngine &engine, const CommProtocol &protocol,
-                             CommContext *commContextStruct, uint32_t rankSize, uint64_t &hcclBuffSize,
-                             const std::string &targetTag)
+    void GetHcclCommResource(const HcclComm& commHandle, const CommEngine& engine, const CommProtocol& protocol,
+                             CommContext* commContextStruct, uint32_t rankSize, uint64_t& hcclBuffSize,
+                             const std::string& targetTag)
     {
         ASCEND_LOGI("Start to get HCCL communication resource");
         uint32_t rankId = commContextStruct->epRankId;
 
         GetHcclCommChannel(commHandle, rankSize, rankId, protocol, engine, commContextStruct);
-        ASCEND_LOGI("Get HCCL communication channel success, channel num is: %u", rankSize - 1);
+        uint32_t channelsPerRank = commContextStruct->channelsPerRank;
+        ASCEND_LOGI("Get HCCL communication channel success, channel num is: %u, channelsPerRank is: %u",
+                    (rankSize - 1) * (channelsPerRank == 0U ? 1U : channelsPerRank), channelsPerRank);
 
         GetRegisteredCommResource(commHandle, commContextStruct, rankSize, targetTag);
         hcclBuffSize = static_cast<uint64_t>(customCclBufferSize_);
@@ -573,7 +622,7 @@ public:
         ASCEND_LOGI("Get HCCL CommResource success");
     }
 
-    void AllocateAndRegisterDeviceBuffer(const HcclComm &commHandle, const std::string &memBufferTag)
+    void AllocateAndRegisterDeviceBuffer(const HcclComm& commHandle, const std::string& memBufferTag)
     {
         TORCH_CHECK(customDeviceBuffer_ != nullptr && customMemHandle_ != nullptr,
                     "custom buffer owner pointers must not be null");
@@ -583,10 +632,16 @@ public:
 
         uint64_t bufferSizeBytes = static_cast<uint64_t>(customCclBufferSize_);
         if (*customDeviceBuffer_ == nullptr) {
-            aclError ar = aclrtMalloc(customDeviceBuffer_, bufferSizeBytes, ACL_MEM_MALLOC_HUGE_FIRST);
-            TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMalloc(", bufferSizeBytes, " ) failed, ret=", ar);
-            ar = aclrtMemset(*customDeviceBuffer_, bufferSizeBytes, 0, bufferSizeBytes);
-            TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMemset(customDeviceBuffer_) failed, ret=", ar);
+            if (userDeviceBuffer_ != nullptr) {
+                aclError ar = aclrtMemset(userDeviceBuffer_, bufferSizeBytes, 0, bufferSizeBytes);
+                TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMemset(customDeviceBuffer_) failed, ret=", ar);
+                *customDeviceBuffer_ = userDeviceBuffer_;
+            } else {
+                aclError ar = aclrtMalloc(customDeviceBuffer_, bufferSizeBytes, ACL_MEM_MALLOC_HUGE_FIRST);
+                TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMalloc(", bufferSizeBytes, " ) failed, ret=", ar);
+                ar = aclrtMemset(*customDeviceBuffer_, bufferSizeBytes, 0, bufferSizeBytes);
+                TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMemset(customDeviceBuffer_) failed, ret=", ar);
+            }
         }
         if (*customMemHandle_ == nullptr) {
             CommMem mem;
@@ -599,8 +654,8 @@ public:
         }
     }
 
-    void GetRegisteredCommResource(const HcclComm &commHandle, CommContext *commContextStruct, uint32_t rankSize,
-                                   const std::string &targetTag)
+    void GetRegisteredCommResource(const HcclComm& commHandle, CommContext* commContextStruct, uint32_t rankSize,
+                                   const std::string& targetTag)
     {
         uint32_t rankId = commContextStruct->epRankId;
         commContextStruct->epHcclBuffer_[rankId] = reinterpret_cast<uint64_t>(*customDeviceBuffer_);
@@ -608,10 +663,11 @@ public:
             if (peer == rankId) {
                 continue;
             }
-            uint32_t idx = (peer < rankId) ? peer : (peer - 1);
+            uint32_t idx = (commContextStruct->channelsPerRank == 0U) ? ((peer < rankId) ? peer : (peer - 1)) :
+                                                                        peer * commContextStruct->channelsPerRank;
             uint32_t memNum = 0;
-            CommMem *remoteMems = nullptr;
-            char **memTags = nullptr;
+            CommMem* remoteMems = nullptr;
+            char** memTags = nullptr;
             auto hcclRet = HcclChannelGetRemoteMemsFunc(commHandle, commContextStruct->hcommHandle_[idx], &memNum,
                                                         &remoteMems, &memTags);
             TORCH_CHECK(hcclRet == HCCL_SUCCESS, "HcclChannelGetRemoteMems(peer=", peer, ") failed, ret=", hcclRet);
@@ -632,8 +688,8 @@ public:
 
     // ---- Context lifecycle helpers ----
 
-    void CreateContext(const HcclComm &commHandle, const std::string &mc2ContextTag, const CommEngine &engine,
-                       const CommProtocol &protocol, void *&ctx, CommContext *commContextStruct, uint64_t &hcclBuffSize)
+    void CreateContext(const HcclComm& commHandle, const std::string& mc2ContextTag, const CommEngine& engine,
+                       const CommProtocol& protocol, void*& ctx, CommContext* commContextStruct, uint64_t& hcclBuffSize)
     {
         ASCEND_LOGI("Start to create HCCL context");
         uint64_t commContextSize = sizeof(CommContext);
@@ -663,9 +719,9 @@ public:
         ASCEND_LOGI("Copy context from host to device success");
     }
 
-    void GetOrCreateContext(const HcclComm &commHandle, const std::string &mc2ContextTag, const CommEngine &engine,
-                            const CommProtocol &protocol, void *&ctx, uint64_t &hcclBuffSize,
-                            CommContext &commContextStruct)
+    void GetOrCreateContext(const HcclComm& commHandle, const std::string& mc2ContextTag, const CommEngine& engine,
+                            const CommProtocol& protocol, void*& ctx, uint64_t& hcclBuffSize,
+                            CommContext& commContextStruct)
     {
         uint64_t ctxSize = 0;
         auto hcclRet = HcclEngineCtxGetFunc(commHandle, mc2ContextTag.c_str(), engine, &ctx, &ctxSize);
@@ -678,14 +734,14 @@ public:
 
     // ---- Static HCCL query helpers ----
 
-    static void GetHcclBufferSize(const HcclComm &commHandle, uint64_t &hcclBuffSize)
+    static void GetHcclBufferSize(const HcclComm& commHandle, uint64_t& hcclBuffSize)
     {
-        void *tempBuffer = nullptr;
+        void* tempBuffer = nullptr;
         auto hcclRet = HcclGetHcclBufferFunc(commHandle, &tempBuffer, &hcclBuffSize);
         TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Get HCCL Buffer Size failed, ret: ", hcclRet);
     }
 
-    static void GetNetLayers(const HcclComm &commHandle, uint32_t *&netLayerList, uint32_t &netLayerNum)
+    static void GetNetLayers(const HcclComm& commHandle, uint32_t*& netLayerList, uint32_t& netLayerNum)
     {
         auto hcclRet = HcclRankGraphGetLayersFunc(commHandle, &netLayerList, &netLayerNum);
         TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Get HCCL layers failed, ret: ", hcclRet);
@@ -693,9 +749,9 @@ public:
         ASCEND_LOGI("Get HCCL layers success, netLayerNum is: %u", netLayerNum);
     }
 
-    static void GetRankSizePerServer(const HcclComm &commHandle, uint32_t &rankSizePerServer)
+    static void GetRankSizePerServer(const HcclComm& commHandle, uint32_t& rankSizePerServer)
     {
-        uint32_t *netLayerList = nullptr;
+        uint32_t* netLayerList = nullptr;
         uint32_t netLayerNum = 0;
         GetNetLayers(commHandle, netLayerList, netLayerNum);
 
@@ -705,10 +761,10 @@ public:
         ASCEND_LOGI("Get HCCL rank size per server success, rankSizePerServer is: %u", rankSizePerServer);
     }
 
-    static void GetHcclCommLink(const HcclComm &commHandle, uint32_t netLayerId, uint32_t srcRankId, uint32_t dstRankId,
-                                const CommProtocol &protocol, CommLink *&links)
+    static void GetHcclCommLink(const HcclComm& commHandle, uint32_t netLayerId, uint32_t srcRankId, uint32_t dstRankId,
+                                const CommProtocol& protocol, CommLink*& links)
     {
-        CommLink *linksList = nullptr;
+        CommLink* linksList = nullptr;
         uint32_t netLinkNum = 0;
         auto hcclRet = HcclRankGraphGetLinksFunc(commHandle, netLayerId, srcRankId, dstRankId, &linksList, &netLinkNum);
         TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Get HCCL Communication link failed, ret: ", hcclRet);
@@ -741,17 +797,20 @@ public:
     TopoType topoType_ = TopoType::INTRA_SUPER_NODE;
     int64_t rankNumPerServer_ = DEFAULT_RANK_NUM_PER_SERVER;
     int64_t customCclBufferSize_ = 0;
-    void **customDeviceBuffer_ = nullptr;
-    HcclMemHandle *customMemHandle_ = nullptr;
+    void* userDeviceBuffer_ = nullptr;
+    void** customDeviceBuffer_ = nullptr;
+    HcclMemHandle* customMemHandle_ = nullptr;
+    bool multiChannel_ = false;
 };
 
 // ======================== CommContextManager ========================
 
 class CommContextManager {
 public:
-    CommContextManager(const std::string &group, int64_t worldSize, const py::object &backend = py::str("kfc"),
-                       const std::string &commAlg = "ub-mem", const std::string &opName = "moe_dispatch_ffn_combine",
-                       int64_t customCclBufferSize = 0, const py::object &customCclBufferSizeResolver = py::none())
+    CommContextManager(const std::string& group, int64_t worldSize, const py::object& backend = py::str("kfc"),
+                       const std::string& commAlg = "ub-mem", const std::string& opName = "moe_dispatch_ffn_combine",
+                       int64_t customCclBufferSize = 0, const py::object& customCclBufferSizeResolver = py::none(),
+                       int64_t customDeviceBufferAddr = 0, bool multiChannel = false)
         : group_(group),
           commAlg_(commAlg),
           opName_(opName),
@@ -762,14 +821,16 @@ public:
           topoType_(TopoType::INTRA_SUPER_NODE),
           rankNumPerServer_(DEFAULT_RANK_NUM_PER_SERVER),
           customCclBufferSize_(customCclBufferSize),
-          customCclBufferSizeResolver_(customCclBufferSizeResolver)
+          customCclBufferSizeResolver_(customCclBufferSizeResolver),
+          customDeviceBufferAddr_(customDeviceBufferAddr),
+          multiChannel_(multiChannel)
     {}
 
     ~CommContextManager()
     {
         try {
             Destroy();
-        } catch (const std::exception &e) {
+        } catch (const std::exception& e) {
             ASCEND_LOGE("CommContextManager destroy failed: %s", e.what());
         }
     }
@@ -785,7 +846,7 @@ public:
         return context;
     }
 
-    void UpdateGroup(const std::string &group, at::Tensor &contextTensor)
+    void UpdateGroup(const std::string& group, at::Tensor& contextTensor)
     {
         TORCH_CHECK(
             customCclBufferSizeResolver_.is_none() || (customMemHandle_ == nullptr && customDeviceBuffer_ == nullptr),
@@ -806,11 +867,11 @@ public:
         if (customMemHandle_ != nullptr) {
             customMemHandle_ = nullptr;
         }
-        if (customDeviceBuffer_ != nullptr) {
+        if (customDeviceBuffer_ != nullptr && ownsDeviceBuffer_) {
             aclError aclRet = aclrtFree(customDeviceBuffer_);
             TORCH_CHECK(aclRet == ACL_SUCCESS, "aclrtFree(customDeviceBuffer_) failed, ret=", aclRet);
-            customDeviceBuffer_ = nullptr;
         }
+        customDeviceBuffer_ = nullptr;
         localDeviceBuffer_ = nullptr;
     }
 
@@ -827,7 +888,7 @@ public:
         return static_cast<int64_t>(rankNumPerServer_);
     }
 
-    at::Tensor GetLocalBufferTensor(const py::object &dtype, int64_t offset) const
+    at::Tensor GetLocalBufferTensor(const py::object& dtype, int64_t offset) const
     {
         TORCH_CHECK(localDeviceBuffer_ != nullptr, "Local CCL buffer is not initialized.");
         TORCH_CHECK(offset >= 0, "offset must be non-negative, got ", offset, ".");
@@ -837,7 +898,7 @@ public:
         int64_t totalElements = cclBufferSize_ / elementBytes;
         TORCH_CHECK(offset <= totalElements, "offset must be in [0, ", totalElements, "], got ", offset, ".");
 
-        void *data = static_cast<void *>(static_cast<uint8_t *>(localDeviceBuffer_) + offset * elementBytes);
+        void* data = static_cast<void*>(static_cast<uint8_t*>(localDeviceBuffer_) + offset * elementBytes);
         auto options = at::TensorOptions()
                            .dtype(scalarType)
                            .device(c10::DeviceType::PrivateUse1)
@@ -858,8 +919,17 @@ private:
         }
     }
 
-    void DispatchBuild(at::Tensor &tensor)
+    void DispatchBuild(at::Tensor& tensor)
     {
+        void* userDeviceBuffer = nullptr;
+        if (customDeviceBufferAddr_ > 0) {
+            TORCH_CHECK(customCclBufferSizeResolver_.is_none(),
+                        "customDeviceBufferAddr and customCclBufferSizeResolver cannot be used together");
+            TORCH_CHECK(mode_ == BackendMode::CHANNEL,
+                        "customDeviceBufferAddr is only supported with the channel backend");
+            userDeviceBuffer = ResolveUserDeviceBuffer();
+        }
+        ownsDeviceBuffer_ = (userDeviceBuffer == nullptr);
         switch (mode_) {
             case BackendMode::KFC: {
                 KfcContextBuilder builder;
@@ -869,7 +939,14 @@ private:
             case BackendMode::CHANNEL: {
                 HcclChannelContextBuilder builder;
                 builder.Build(group_, worldSize_, cclBufferSize_, tensor, commAlg_, opName_, customCclBufferSize_,
-                              customCclBufferSizeResolver_, &customDeviceBuffer_, &customMemHandle_);
+                              customCclBufferSizeResolver_, userDeviceBuffer, &customDeviceBuffer_, &customMemHandle_,
+                              multiChannel_);
+                if (userDeviceBuffer != nullptr) {
+                    TORCH_CHECK(customDeviceBuffer_ == userDeviceBuffer,
+                                "customDeviceBuffer was not adopted: a context for this group/opName already "
+                                "exists in this process; create only one buffer per group and pass window_addr "
+                                "and window_size to that single creation");
+                }
                 localDeviceBuffer_ = customDeviceBuffer_;
                 topoType_ = builder.GetTopoType();
                 rankNumPerServer_ = builder.GetRankNumPerServer();
@@ -878,6 +955,13 @@ private:
             default:
                 TORCH_CHECK(false, "Unknown backend mode: ", static_cast<int>(mode_));
         }
+    }
+
+    void* ResolveUserDeviceBuffer() const
+    {
+        TORCH_CHECK(customDeviceBufferAddr_ > 0, "customDeviceBufferAddr must be a positive device address, got ",
+                    customDeviceBufferAddr_);
+        return reinterpret_cast<void*>(static_cast<uintptr_t>(customDeviceBufferAddr_));
     }
 
     std::string group_;
@@ -891,8 +975,11 @@ private:
     int64_t rankNumPerServer_ = DEFAULT_RANK_NUM_PER_SERVER;
     int64_t customCclBufferSize_ = 0;
     py::object customCclBufferSizeResolver_;
-    void *customDeviceBuffer_ = nullptr;
-    void *localDeviceBuffer_ = nullptr;
+    int64_t customDeviceBufferAddr_ = 0;
+    bool ownsDeviceBuffer_ = true;
+    bool multiChannel_ = false;
+    void* customDeviceBuffer_ = nullptr;
+    void* localDeviceBuffer_ = nullptr;
     HcclMemHandle customMemHandle_ = nullptr;
 };
 
@@ -900,11 +987,12 @@ private:
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     py::class_<CommContextManager>(m, "CommContextManager")
-        .def(py::init<const std::string &, int64_t, const py::object &, const std::string &, const std::string &,
-                      int64_t, const py::object &>(),
+        .def(py::init<const std::string&, int64_t, const py::object&, const std::string&, const std::string&, int64_t,
+                      const py::object&, int64_t, bool>(),
              py::arg("group"), py::arg("worldSize"), py::arg("backend") = std::string("kfc"),
              py::arg("commAlg") = std::string("ub-mem"), py::arg("opName") = std::string("moe_dispatch_ffn_combine"),
-             py::arg("customCclBufferSize") = 0, py::arg("customCclBufferSizeResolver") = py::none())
+             py::arg("customCclBufferSize") = 0, py::arg("customCclBufferSizeResolver") = py::none(),
+             py::arg("customDeviceBufferAddr") = 0, py::arg("multiChannel") = false)
         .def("create_context", &CommContextManager::CreateContext)
         .def("update_group", &CommContextManager::UpdateGroup, py::arg("group"), py::arg("contextTensor").noconvert())
         .def("destroy", &CommContextManager::Destroy)

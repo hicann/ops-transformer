@@ -126,11 +126,11 @@ def _get_hccl_comm_name(group, rank_id):
     return get_backend(torch.device("npu")).get_hccl_comm_name(rank_id, init_comm=False)
 
 
-def _calc_window_size(token_info_table_shape, token_data_shape):
-    """Calculate the required window buffer size in bytes."""
+def _calc_window_size(token_info_table_shape, token_data_shape, world_size):
+    """Calculate the conservative FFN-side window capacity."""
     _op_module = _ffn_to_attention_op_builder.load()
     return _op_module.get_ffn_to_attention_ccl_buffer_size(
-        token_info_table_shape, token_data_shape
+        token_info_table_shape, token_data_shape, world_size
     )
 
 
@@ -139,6 +139,21 @@ class FFNToAttentionBuffer:
 
     Uses the HCCL Channel backend (HcclCommMemReg + HcclChannelGetRemoteMems)
     to allocate and exchange window memory, compatible with Ascend 950.
+
+    When ``window_addr`` and ``window_size`` are provided, the user memory at
+    ``window_addr`` (``window_size`` bytes, the FFN-side window on this card)
+    is used as the local communication window instead of an internally
+    allocated buffer: it is zeroed once, registered into the HCCL
+    communication domain, and never freed by this class. The caller owns the
+    memory and must keep it alive while the buffer is in use. ``ccl_buffer_size``
+    always equals the registered window size: the user-provided ``window_size``
+    when custom memory is used, or the internally computed conservative
+    capacity otherwise (it must host the attention_to_ffn dispatch receiving
+    area for the maximum possible attention worker count plus this op's flag
+    sources and address tables). This class intentionally shares its
+    registration tag with attention_to_ffn so peer ranks can discover this
+    rank's window; create only one buffer per group in this process (attn
+    workers create the attention_to_ffn buffer, FFN workers create this one).
     """
 
     def __init__(
@@ -147,7 +162,11 @@ class FFNToAttentionBuffer:
         world_size: int,
         token_info_table_shape: List[int],
         token_data_shape: List[int],
+        window_addr: Optional[int] = None,
+        window_size: Optional[int] = None,
     ):
+        if world_size != torch.distributed.get_world_size(group):
+            raise ValueError("world_size must match the communication group size")
         self.group = group
         self.rank_id = torch.distributed.get_rank(group)
         self.group_name = _get_hccl_comm_name(group, self.rank_id)
@@ -155,9 +174,43 @@ class FFNToAttentionBuffer:
         self.token_info_table_shape = list(token_info_table_shape)
         self.token_data_shape = list(token_data_shape)
 
-        required_buffer_size = _calc_window_size(
-            token_info_table_shape, token_data_shape
+        torch._check(
+            (window_addr is None) == (window_size is None),
+            lambda: (
+                f"window_addr and window_size must be provided together, but got "
+                f"window_addr={window_addr}, window_size={window_size}, {ops_error(ErrCode.VALUE)}."
+            ),
         )
+        if window_addr is not None:
+            torch._check(
+                window_addr > 0,
+                lambda: (
+                    f"window_addr should be a positive device address, but got {window_addr}, "
+                    f"{ops_error(ErrCode.VALUE)}."
+                ),
+            )
+            torch._check(
+                window_size > 0,
+                lambda: (
+                    f"window_size should be greater than 0, but got {window_size}, "
+                    f"{ops_error(ErrCode.VALUE)}."
+                ),
+            )
+
+        self.ccl_buffer_size = (
+            window_size
+            if window_size is not None
+            else _calc_window_size(token_info_table_shape, token_data_shape, world_size)
+        )
+
+        self._capacity_shapes = (
+            tuple(self.token_info_table_shape),
+            tuple(self.token_data_shape),
+        )
+        # Local FFN-side window: user-provided memory (or internally allocated with the same size).
+        self.window_addr = window_addr
+        self.window_size = self.ccl_buffer_size
+
         self._ctx_manager = CommContextManager(
             self.group_name,
             self.ep_world_size,
@@ -167,14 +220,16 @@ class FFNToAttentionBuffer:
                 "Ascend950": "channel",
             },
             commAlg="urma",
-            opName="ffn_to_attention",
-            customCclBufferSize=required_buffer_size,
+            opName="attention_to_ffn",
+            customCclBufferSize=self.window_size,
+            customDeviceBufferAddr=window_addr if window_addr is not None else 0,
+            multiChannel=True,
         )
         self.context = self._ctx_manager.create_context()
-        self.ccl_buffer_size = self._ctx_manager.ccl_buffer_size
 
     def destroy(self):
         self._ctx_manager.destroy()
+        self.context = None
 
     def get_window_addr(self) -> int:
         """Get the local window memory device address from the context."""
@@ -199,28 +254,54 @@ def get_buffer_for_ffn_to_attention(
     world_size: int,
     token_info_table_shape: List[int],
     token_data_shape: List[int],
+    *,
+    window_addr: Optional[int] = None,
+    window_size: Optional[int] = None,
 ) -> FFNToAttentionBuffer:
     """Create a communication buffer for ffn_to_attention.
 
     This is a thin factory around ``FFNToAttentionBuffer`` that computes the
-    required CCL buffer size, creates the communication context, and returns a
-    buffer object holding all the information ``ffn_to_attention`` needs.
+    required FFN-side CCL buffer size internally, creates the communication
+    context, and returns a buffer object holding all the information
+    ``ffn_to_attention`` needs.
 
     Args:
         group (ProcessGroup): HCCL process group.
         world_size (int): Communication domain size.
         token_info_table_shape (List[int]): 3-element list [microBatchNum, BS, expertNumPerToken].
         token_data_shape (List[int]): 4-element list [microBatchNum, BS, expertNumPerToken, HS].
+        window_addr (int, optional): Device address of the user-provided local
+            (FFN-side) communication window memory on this card. Must be
+            provided together with ``window_size``. The memory is zeroed once,
+            registered into the HCCL communication domain and never freed by
+            the framework; the caller must keep it alive while the buffer is
+            in use. Only supported on the channel backend (Ascend950).
+            Default None, meaning the framework allocates the window
+            internally.
+        window_size (int, optional): Size in bytes of the memory at
+            ``window_addr``, i.e. the FFN-side memory size. It must be no
+            smaller than the FFN-side window size required to host the
+            attention_to_ffn dispatch receiving area plus this op's flag
+            sources and address tables; the op tiling validates it against
+            the session layout (the exact attention worker count when
+            ``attn_rank_table`` is provided at call time, or the conservative
+            maximum count otherwise). When omitted, the framework allocates
+            the window with the internally computed conservative capacity
+            (covering ``world_size - 1`` sessions) and exposes it as
+            ``ccl_buffer_size`` of the returned buffer. Default None.
 
     Returns:
         FFNToAttentionBuffer: Buffer holding the communication context, group
-        name, world size, token table shapes and CCL buffer size.
+        name, world size, token table shapes and CCL buffer size (the
+        registered FFN-side window size).
     """
     return FFNToAttentionBuffer(
         group,
         world_size,
         token_info_table_shape,
         token_data_shape,
+        window_addr=window_addr,
+        window_size=window_size,
     )
 
 
@@ -243,7 +324,8 @@ def ffn_to_attention(
     Args:
         buffer (FFNToAttentionBuffer): Communication buffer created by
             ``get_buffer_for_ffn_to_attention``. Holds the context tensor,
-            group name, world size, token table shapes and CCL buffer size.
+            group name, world size, token table shapes and CCL buffer size
+            (the registered FFN-side window size).
         x (Tensor): Token data to send, shape (Y, H), dtype float16/bfloat16.
         session_ids (Tensor): Per-token attention worker index, shape (Y,), dtype int32.
         micro_batch_ids (Tensor): Per-token micro batch index, shape (Y,), dtype int32.
@@ -256,6 +338,20 @@ def ffn_to_attention(
     Returns:
         None. Data is sent to peer ranks via the HCCL window; no host-visible output.
     """
+    if buffer.context is None:
+        raise RuntimeError("FFNToAttentionBuffer has been destroyed")
+    if (
+        tuple(buffer.token_info_table_shape),
+        tuple(buffer.token_data_shape),
+    ) != buffer._capacity_shapes:
+        raise ValueError(
+            "Window shapes cannot change after buffer creation; create a replacement buffer"
+        )
+    torch._check(x.dim() == 2, lambda: "x must be a 2D tensor")
+    torch._check(
+        x.shape[1] <= buffer.token_data_shape[3],
+        lambda: "x.shape[1] exceeds the window token slot width HS",
+    )
     torch.ops.cann_ops_transformer.npu_ffn_to_attention(
         buffer.context,
         x,

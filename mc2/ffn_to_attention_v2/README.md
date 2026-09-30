@@ -119,7 +119,7 @@
     <tr>
     <td>cclBufferSize</td>
     <td>属性</td>
-    <td>CCL通信缓冲区总大小（Bytes），由 <code>get_ffn_to_attention_ccl_buffer_size</code> 接口计算得到。需 >= token_info_size + token_data_size（按2MB向上对齐）。</td>
+    <td>CCL通信缓冲区总大小（Bytes），由 <code>get_ffn_to_attention_ccl_buffer_size</code> 接口计算得到。需覆盖全部 attention worker 的下发接收区、flag source 区与地址表区（按2MB向上对齐）。</td>
     <td>INT64</td>
     <td>-</td>
     </tr>
@@ -130,6 +130,7 @@
 ## 约束说明
 
 - 所有rank使用的`group`、`worldSize`、`tokenInfoTableShape`、`tokenDataShape`和`cclBufferSize`必须保持一致。
+- 本算子与`attention_to_ffn`共用同一rank通信窗口（注册tag相同），本算子的flag source区与地址表/count行区布局在全部N个会话的下发接收区之后，与对侧会话数据区互不重叠。会话数`N`（即对侧`attentionWorkerNum`/`ffn_token_data_shape[0]`）的确定方式：传入`attnRankTable`时`N`为其dim0（须满足`0 < N < worldSize`），tiling按N精确校验`cclBufferSize`并精确布局；未传入时按`cclBufferSize`所能容纳的最大会话数推导布局，此时`cclBufferSize`须按保守容量（`worldSize - 1`个会话，即`get_ffn_to_attention_ccl_buffer_size`的默认计算结果）分配，以保证推导出的会话数不小于真实值。
 - 所有rank必须先完成MC2 context初始化。FFN Worker执行算子期间，Attention Worker必须保持context、通信window和通信域有效。
 - shape取值需满足以下约束：
     - `Y`表示本rank需要分发的最大token数量。
@@ -143,14 +144,19 @@
 
 - `cclBufferSize`为HBM上分配的通信window总大小，单位为Byte，必须大于0并满足：
 
-$$cclBufferSize \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoSize}, 512) + \mathrm{tokenDataSize},\ 2\,\mathrm{MB})$$
+$$cclBufferSize \ge \mathrm{CeilAlign}\big(\mathrm{CeilAlign}(\mathrm{recvInfoSize} + \mathrm{recvDataSize} + 32\,\mathrm{KiB},\,512) + \mathrm{tableBytes},\ 2\,\mathrm{MB}\big)$$
 
-其中：
+其中（`sessionNum`为布局会话数：传入`attnRankTable`时为其dim0，未传入时为保守上界`worldSize - 1`；`get_ffn_to_attention_ccl_buffer_size`接口默认按`worldSize - 1`计算）：
 
-  - `tokenInfoSize = microBatchNum × BS × expertNumPerToken × 4B`
-  - `tokenDataSize = microBatchNum × BS × expertNumPerToken × HS × 2B`
+  - `recvInfoSize = CeilAlign(sessionNum × microBatchNum × (2 + BS × expertNumPerToken) × 4B, 512)`（`attention_to_ffn` 下发的 N 会话 token 信息表区，镜像其对侧布局公式）
+  - `recvDataSize = CeilAlign(sessionNum × microBatchNum × BS × expertNumPerToken × HS × 2B, 512)`（`attention_to_ffn` 下发的 N 会话 token 数据区；2B 为对侧非量化元素宽度，量化模式下按 1B 下发，此处为保守上界）
+  - `tableBytes = worldSize × rankTableStride + 1025 × countRowStride`（各rank地址表与AIV计数行；1025 = 1条总计数行 + 1024条AIV预留计数行）
+  - `rankTableStride = CeilAlign(worldSize × microBatchNum × BS × expertNumPerToken × 16B, 512)`
+  - `countRowStride = CeilAlign(worldSize × 4B, 512)`
 
-可通过`get_ffn_to_attention_ccl_buffer_size`接口计算所需最小值。
+本算子的 flag source 区与地址表/count 行区布局在上述 N 会话接收区之后，与 `attention_to_ffn` 的会话数据区互不重叠。
+
+可通过`get_ffn_to_attention_ccl_buffer_size`接口计算所需最小值（保守容量）。
 
 - 通信域使用约束：
     - FFNToAttentionV2算子的通信域中不允许有其他算子。

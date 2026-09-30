@@ -61,7 +61,8 @@ TEST_F(AttentionToFfnV2InferShapeTest, Basic)
          {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
          {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"sync_flag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"ffn_start_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
+         {"ffn_start_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1LL << 30)}});
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
 
     std::vector<std::vector<int64_t>> expectOutputShape = {};

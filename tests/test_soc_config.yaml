@@ -120,5 +120,9 @@ ascend950:
     - mc2/quant_reduce_scatter/tests/ut/op_host
     - mc2/allto_allv_quant_grouped_mat_mul/op_host
     - mc2/allto_allv_quant_grouped_mat_mul/tests/ut/op_host
+    - mc2/ffn_to_attention_v2/op_host
+    - mc2/ffn_to_attention_v2/tests/ut/op_host
+    - mc2/attention_to_ffn_v2/op_host
+    - mc2/attention_to_ffn_v2/tests/ut/op_host
   options:
     - ascend950

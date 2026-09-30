@@ -272,8 +272,33 @@ TEST_F(FFNToAttentionArch22TilingTest, RankTableMircoBatchNumInvalid)
         {{{}, ge::DT_INT64, ge::FORMAT_ND}},
         {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("group")},
          {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
-         {"token_info_table_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({2, 16, 9})},
-         {"token_data_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({2, 16, 9, 7168})}},
+         {"token_info_table_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0, 16, 9})},
+         {"token_data_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0, 16, 9, 7168})}},
+        &compileInfo);
+
+    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
+    Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues);
+}
+
+TEST_F(FFNToAttentionArch22TilingTest, RankTableMircoBatchNumOverflowInvalid)
+{
+    struct FFNToAttentionCompileInfo {
+    } compileInfo;
+
+    gert::TilingContextPara tilingContextPara(
+        "FFNToAttention",
+        {{{{1584, 7168}, {1584, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{1584}, {1584}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1584}, {1584}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1584}, {1584}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1584}, {1584}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{1}, {1}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{11}, {11}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{}, ge::DT_INT64, ge::FORMAT_ND}},
+        {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("group")},
+         {"world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+         {"token_info_table_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({4294967296, 16, 9})},
+         {"token_data_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({4294967296, 16, 9, 7168})}},
         &compileInfo);
 
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};

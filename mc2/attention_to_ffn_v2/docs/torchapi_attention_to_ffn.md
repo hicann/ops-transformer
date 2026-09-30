@@ -136,7 +136,7 @@
 先用get_buffer_for_attention_to_ffn接口封装输入参数并创建通信上下文（buffer），再调用attention_to_ffn接口进行数据发送。
 
 ```python
-get_buffer_for_attention_to_ffn(group, world_size, ffn_token_info_table_shape, ffn_token_data_shape, *, quant_mode=0) -> AttentionToFfnBuffer
+get_buffer_for_attention_to_ffn(group, world_size, ffn_token_info_table_shape, ffn_token_data_shape, *, quant_mode=0, window_addr=None, window_size=None) -> AttentionToFfnBuffer
 ```
 
 ```python
@@ -192,10 +192,22 @@ attention_to_ffn(buffer, x, session_id, micro_batch_id, layer_id, expert_ids, ex
         <td>可选</td>
         <td>量化模式。0表示非量化，2表示PERTOKEN+INT8，3表示MX+FP8_E5M2，4表示MX+FP8_E4M3，5表示MX+FP4_E2M1，6表示MX_CLIP+FP8_E5M2，7表示MX_CLIP+FP8_E4M3。默认值为0。</td>
     </tr>
+    <tr>
+        <td>window_addr</td>
+        <td>int</td>
+        <td>可选</td>
+        <td>本卡（attention侧）通信窗口内存的设备地址，与<code>window_size</code>必须成对传入。传入后该内存替代框架内部分配的通信窗口：框架会将其清零一次并注册进通信域，不会分配或释放该内存；调用方需保证该内存在buffer销毁前持续有效。仅channel后端（Ascend950）支持。默认值为None，表示由框架内部分配。</td>
+    </tr>
+    <tr>
+        <td>window_size</td>
+        <td>int</td>
+        <td>可选</td>
+        <td>本卡通信窗口内存大小（Bytes），即attention侧内存大小，需不小于attention侧接收<code>ffn_to_attention</code>回传token数据所需的窗口大小（按<code>[microBatchNum, BS, expertNumPerToken]</code>与<code>[microBatchNum, BS, expertNumPerToken, HS]</code>计算token信息表与token数据大小并按2MB向上对齐）。FFN侧内存大小由本接口内部根据<code>ffn_token_info_table_shape</code>、<code>ffn_token_data_shape</code>及<code>quant_mode</code>自动计算，作为算子<code>ccl_buffer_size</code>（对端FFN卡窗口大小），并可从返回buffer的<code>ccl_buffer_size</code>属性读取。默认值为None，表示由框架内部分配。</td>
+    </tr>
 </tbody>
 </table>
 
-该接口返回<code>AttentionToFfnBuffer</code>对象，内部自动计算CCL通信缓冲区大小并创建通信上下文，供<code>attention_to_ffn</code>使用。
+该接口返回<code>AttentionToFfnBuffer</code>对象，内部根据FFN侧token shape自动计算FFN侧CCL通信缓冲区大小（即对端FFN卡通信窗口大小，作为算子<code>ccl_buffer_size</code>属性），并创建通信上下文，供<code>attention_to_ffn</code>使用；传入<code>window_addr</code>/<code>window_size</code>时，本卡通信窗口以该地址和大小注册。
 
 ### attention_to_ffn
 
@@ -350,7 +362,7 @@ attention_to_ffn(buffer, x, session_id, micro_batch_id, layer_id, expert_ids, ex
 
 - `ccl_buffer_size`为HBM上分配的CCL通信缓冲区**总大小**（Bytes），由`get_buffer_for_attention_to_ffn`内部自动计算，需满足：
 
-$$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{tokenInfoSize} + \mathrm{tokenDataSize},\ 2\,\mathrm{MB})$$
+$$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{CeilAlign}(\mathrm{tokenInfoSize},\ 512) + \mathrm{CeilAlign}(\mathrm{tokenDataSize},\ 512) + \mathrm{CeilAlign}(\mathrm{stagingSize},\ 512) + \mathrm{flagStagingSize},\ 2\,\mathrm{MB})$$
 
 其中：
 
@@ -358,8 +370,18 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{tokenInfoSize} + \mathrm{toke
   - 非量化模式：`tokenDataSize = attnWorkerNum × microBatchNum × BS × (K+shared) × HS × 2B`
   - INT8/FP8量化模式：`tokenDataSize = attnWorkerNum × microBatchNum × BS × (K+shared) × HS × 1B`
   - FP4量化模式：`HS`已按打包字节计算，`tokenDataSize = attnWorkerNum × microBatchNum × BS × (K+shared) × HS × 1B`
+  - `stagingSize = BS × (K+shared) × CeilAlign(HS × bytesPerElem, 32B)`，为窗口内token数据区之后的紧凑连续staging区（每token一个staging槽，槽步长按32B向上对齐；`bytesPerElem`与`tokenDataSize`一致，非量化为2B，量化为1B）
+  - `flagStagingSize = (BS × (K+shared) + 1) × 32B`，为staging区之后的URMA flag常驻区（每token一个32B flag槽 + 1个layer flag槽）
 
-该大小由`get_buffer_for_attention_to_ffn`内部自动计算，用户无需自行计算或设置`ccl_buffer_size`。
+该大小由`get_buffer_for_attention_to_ffn`内部自动计算，用户无需自行计算或设置`ccl_buffer_size`。`ccl_buffer_size`描述对端FFN卡通信窗口大小；本卡（attention侧）通信窗口大小由`window_size`指定。
+
+- 与`ffn_to_attention`共用窗口的交叉约束：`ffn_to_attention`回传数据（单会话、2B元素）落在本卡窗口头部（staging区之前）。非量化模式下N会话数据区恒可覆盖回传区；量化模式下需满足`attnWorkerNum × 1B ≥ 2B`（即`attnWorkerNum ≥ 2`），否则tiling将拒绝该配置（单会话量化下发时数据区无法容纳回传数据区）。
+
+- 自定义通信窗口约束（`window_addr`/`window_size`）：
+    - 两个参数必须成对传入，`window_size`为本卡窗口内存的实际大小（Bytes）。
+    - attention卡上传入的为attention侧内存大小，需不小于attention侧接收`ffn_to_attention`回传数据所需的窗口大小；FFN侧内存大小（FFN卡需注册的窗口大小）由本接口内部计算，可通过返回buffer的`ccl_buffer_size`属性获取。
+    - 窗口内存由调用方管理，需在`buffer.destroy()`之前保持有效；框架仅负责清零一次，不负责分配与释放。
+    - 仅channel后端（Ascend950）支持；同一进程同一group下只应创建一个通信buffer（attn卡创建`attention_to_ffn`的buffer，FFN卡创建`ffn_to_attention`的buffer）。
 
 - 量化模式说明：
 
@@ -383,8 +405,8 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{tokenInfoSize} + \mathrm{toke
     - `BS`：表示batch sequence size（本卡最终输出的token数量），取值范围为0 < `BS` ≤ 512。
     - `K`：表示选取topK个专家，取值范围为0 < `K` ≤ 16且满足0 < `K` ≤ moeExpertNum。
     - `H`：表示hidden size（隐藏层大小），取值范围为1024 ≤ `H` ≤ 8192。
-    - `L`：表示模型层数，当前版本只支持`L` = 1。
-    - `M`：表示expertRankTable最后一维的长度，具体体现为部署在FFN节点上数量最多的专家部署信息列表的长度。
+    - `L`：表示模型层数，取值范围为`L` ≥ 1，且运行时`LayerId`取值需小于`L`。
+    - `M`：表示expertRankTable最后一维的长度，具体体现为部署在FFN节点上数量最多的专家部署信息列表的长度，取值范围为0 < `M` ≤ 2049（每行布局为`[rankCnt, (toRankId, localExpId) × rankCnt]`，rankCnt不超过worldSize）。
     - `moeExpertNum`：表示MoE专家数量，取值范围为0 < `moeExpertNum` ≤ 1024。
     - `sharedExpertNum`：表示共享专家数量，取值范围为0 ≤ `sharedExpertNum` ≤ 4。
     - `worldSize`：通信域大小，取值区间[2, 1024]。
@@ -453,13 +475,25 @@ $$ccl\_buffer\_size \ge \mathrm{CeilAlign}(\mathrm{tokenInfoSize} + \mathrm{toke
       ffn_token_data_shape = [ATTENTION_WORKER_NUM, X, BS, expertNumPerToken, H]
       attn_token_info_table_shape = [X, BS, expertNumPerToken]
 
-      # 步骤1：创建通信buffer
+      # 步骤1：准备本卡（attention侧）通信窗口内存并创建通信buffer。
+      # attention侧窗口大小 = CeilAlign(tokenInfoSize + tokenDataSize, 2MB)，其中
+      #   tokenInfoSize = microBatchNum × BS × expertNumPerToken × 4B
+      #   tokenDataSize = microBatchNum × BS × expertNumPerToken × HS × 2B
+      # FFN侧内存大小由接口内部计算，可从buffer.ccl_buffer_size读取。
+      attn_window_size = X * BS * expertNumPerToken * (4 + H * 2)
+      attn_window_size = (
+          attn_window_size + 2 * 1024 * 1024 - 1
+      ) // (2 * 1024 * 1024) * (2 * 1024 * 1024)
+      # 本卡窗口内存由调用方管理，需在buffer销毁前保持有效
+      window = torch.empty(attn_window_size, dtype=torch.uint8, device="npu")
       buffer = get_buffer_for_attention_to_ffn(
           ep_group,
           WORLD_SIZE,
           ffn_token_info_table_shape,
           ffn_token_data_shape,
           quant_mode=quantMode,
+          window_addr=window.data_ptr(),
+          window_size=attn_window_size,
       )
 
       # 步骤2：构造输入数据

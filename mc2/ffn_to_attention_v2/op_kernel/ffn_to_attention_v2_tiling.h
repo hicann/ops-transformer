@@ -30,7 +30,9 @@ struct FFNToAttentionV2Info {
     bool isInputRankTable;
     uint8_t windowType;
     uint64_t maxTokenNum;
-    uint64_t urmaWorkspaceOffset;
+    uint64_t cclBufferSize;
+    uint64_t addressTableWinOffset;
+    uint64_t addressTableBytes;
 };
 
 struct FFNToAttentionV2TilingData {
