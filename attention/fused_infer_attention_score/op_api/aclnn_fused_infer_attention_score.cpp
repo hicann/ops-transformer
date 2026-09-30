@@ -34,12 +34,20 @@ aclnnStatus aclnnFusedInferAttentionScoreGetWorkspaceSize(
     int64_t sparseMode, int64_t innerPrecise, int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag,
     const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
+    const std::string executorCacheKey =
+        query != nullptr && attentionOut != nullptr && workspaceSize != nullptr && executor != nullptr ?
+            FiaPrepareExecutorCache(key, value,
+                                    {query, pseShift, attenMask, deqScale1, quantScale1, deqScale2, quantScale2,
+                                     quantOffset2, antiquantScale, antiquantOffset, blockTable, queryPaddingSize,
+                                     kvPaddingSize, attentionOut, softmaxLse}) :
+            std::string{};
+
     L2_DFX_PHASE_1(
         aclnnFusedInferAttentionScore,
         DFX_IN(query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKv, deqScale1, quantScale1,
                deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, blockTable, queryPaddingSize,
                kvPaddingSize, numHeads, scaleValue, preTokens, nextTokens, inputLayout, numKeyValueHeads, sparseMode,
-               innerPrecise, blockSize, antiquantMode, softmaxLseFlag),
+               innerPrecise, blockSize, antiquantMode, softmaxLseFlag, executorCacheKey),
         DFX_OUT(attentionOut, softmaxLse));
 
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {

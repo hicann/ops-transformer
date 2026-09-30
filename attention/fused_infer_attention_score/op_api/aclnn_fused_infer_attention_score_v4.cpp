@@ -149,6 +149,45 @@ aclnnStatus aclnnFusedInferAttentionScoreV4GetWorkspaceSize(
     int64_t keyAntiquantMode, int64_t valueAntiquantMode, int64_t queryQuantMode, const aclTensor *attentionOut,
     const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
+    const aclTensorList *tensorListKey = key;
+    const aclTensorList *tensorListValue = value;
+    TensorPreProcess(tensorListKey, tensorListValue);
+
+    const aclTensor *tensorKeySharedPrefixOptional = keySharedPrefixOptional;
+    const aclTensor *tensorValueSharedPrefixOptional = valueSharedPrefixOptional;
+    PrefixTensorPreProcess(tensorKeySharedPrefixOptional, tensorValueSharedPrefixOptional);
+
+    const std::string executorCacheKey =
+        query != nullptr && attentionOut != nullptr && workspaceSize != nullptr && executor != nullptr ?
+            FiaPrepareExecutorCache(key, value,
+                                    {query,
+                                     pseShiftOptional,
+                                     attenMaskOptional,
+                                     deqScale1Optional,
+                                     quantScale1Optional,
+                                     deqScale2Optional,
+                                     quantScale2Optional,
+                                     quantOffset2Optional,
+                                     antiquantScaleOptional,
+                                     antiquantOffsetOptional,
+                                     blockTableOptional,
+                                     queryPaddingSizeOptional,
+                                     kvPaddingSizeOptional,
+                                     keyAntiquantScaleOptional,
+                                     keyAntiquantOffsetOptional,
+                                     valueAntiquantScaleOptional,
+                                     valueAntiquantOffsetOptional,
+                                     keySharedPrefixOptional,
+                                     valueSharedPrefixOptional,
+                                     queryRopeOptional,
+                                     keyRopeOptional,
+                                     keyRopeAntiquantScaleOptional,
+                                     dequantScaleQueryOptional,
+                                     learnableSinkOptional,
+                                     attentionOut,
+                                     softmaxLse}) :
+            std::string{};
+
     L2_DFX_PHASE_1(
         aclnnFusedInferAttentionScoreV4,
         DFX_IN(query, key, value, pseShiftOptional, attenMaskOptional, actualSeqLengthsOptional,
@@ -159,7 +198,8 @@ aclnnStatus aclnnFusedInferAttentionScoreV4GetWorkspaceSize(
                keySharedPrefixOptional, valueSharedPrefixOptional, actualSharedPrefixLenOptional, queryRopeOptional,
                keyRopeOptional, keyRopeAntiquantScaleOptional, dequantScaleQueryOptional, learnableSinkOptional,
                numHeads, scaleValue, preTokens, nextTokens, inputLayout, numKeyValueHeads, sparseMode, innerPrecise,
-               blockSize, antiquantMode, softmaxLseFlag, keyAntiquantMode, valueAntiquantMode, queryQuantMode),
+               blockSize, antiquantMode, softmaxLseFlag, keyAntiquantMode, valueAntiquantMode, queryQuantMode,
+               executorCacheKey),
         DFX_OUT(attentionOut, softmaxLse));
 
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
@@ -167,13 +207,6 @@ aclnnStatus aclnnFusedInferAttentionScoreV4GetWorkspaceSize(
                 "Interface aclnnFusedInferAttentionScore versions V1 to V4 are no longer supported on Ascend950.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
-    const aclTensorList *tensorListKey = key;
-    const aclTensorList *tensorListValue = value;
-    TensorPreProcess(tensorListKey, tensorListValue);
-
-    const aclTensor *tensorKeySharedPrefixOptional = keySharedPrefixOptional;
-    const aclTensor *tensorValueSharedPrefixOptional = valueSharedPrefixOptional;
-    PrefixTensorPreProcess(tensorKeySharedPrefixOptional, tensorValueSharedPrefixOptional);
 
     const aclTensor *placeHolder = nullptr;
     const aclTensor *tempTensor = nullptr;
