@@ -239,7 +239,7 @@
     <tr>
       <td>topk_value_mode</td>
       <td>可选属性</td>
-      <td>表示TopK索引取值模式。</td>
+      <td>表示TopK索引取值模式，默认值为1。取值1时稀疏索引表示逻辑token索引；取值2时，PA_BBND布局的稀疏索引表示物理token offset，即physical_block_id * block_size + offset_in_block。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
@@ -281,8 +281,8 @@
   - `layout_q`和`layout_kv`组合仅支持"BSND"/"BSND"、"TND"/"TND"、"BSND"/"PA_BBND"、"TND"/"PA_BBND"；非PA_BBND场景下`layout_q`和`layout_kv`必须一致。
   - SWA稀疏ori_kv场景下，`ori_topk_length`必须传入，配套Metadata接口的`ori_topk`为`ori_sparse_indices`最后一维K，且`ori_topk_length`的元素取值应在[0, K]范围内；其他场景`ori_topk_length`传入nullptr或空Tensor。
 - 产品型号约束如下：
-  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：Q\_N支持1、2、4、8、16、32、64、128，KV\_N只支持1；SWA不传入`cmp_kv`，cmp_ratio不参与计算，CSA支持传入1、2或4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏ori_kv场景支持`ori_sparse_indices`和`ori_topk_length`，`ori_mask_mode`为0，`ori_win_left`和`ori_win_right`为非负数；非SWA稀疏ori_kv场景的`ori_mask_mode`为4、`ori_win_left`为127、`ori_win_right`为0，`cmp_sparse_indices`的最后一维K2支持[1, 8192]内的任意整数，`cmp_mask_mode`仅支持3。
-  - <term>Ascend 950PR&950DT系列产品</term>：Q\_N支持1-128，KV\_N只支持1。仅传入`ori_kv`时，`cmp_ratio`须为1；CSA/HCA场景支持1到128。`ori_mask_mode`支持0、3、4，`cmp_mask_mode`支持0、3；`ori_win_left`和`ori_win_right`支持-1或非负数，-1表示对应方向不受限。只有`ori_mask_mode`为4时，`ori_win_left`和`ori_win_right`可以>=0。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：Q\_N支持1、2、4、8、16、32、64、128，KV\_N只支持1；SWA不传入`cmp_kv`，cmp_ratio不参与计算，CSA支持传入1、2或4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏ori_kv场景支持`ori_sparse_indices`和`ori_topk_length`，`ori_mask_mode`为0，`ori_win_left`和`ori_win_right`为非负数；非SWA稀疏ori_kv场景的`ori_mask_mode`为4、`ori_win_left`为127、`ori_win_right`为0，`cmp_sparse_indices`的最后一维K2支持[1, 8192]内的任意整数，`cmp_mask_mode`仅支持3，topk_value_mode只支持1。
+  - <term>Ascend 950PR&950DT系列产品</term>：Q\_N支持1-128，KV\_N只支持1。仅传入`ori_kv`时，`cmp_ratio`须为1；CSA/HCA场景支持1到128。`ori_mask_mode`支持0、3、4，`cmp_mask_mode`支持0、3；`ori_win_left`和`ori_win_right`支持-1或非负数，-1表示对应方向不受限。只有`ori_mask_mode`为4时，`ori_win_left`和`ori_win_right`可以>=0，topk_value_mode支持1和2。
 
 - 当`layout_q`为TND时，功能使用限制如下：
   - `q`的shape需要为[Q\_T, Q\_N, D]。

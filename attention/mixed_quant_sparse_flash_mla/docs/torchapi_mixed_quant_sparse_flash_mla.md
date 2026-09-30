@@ -213,7 +213,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | ori_win_right | int | 可选 | 表示q和ori_kv计算中q对未来token计算的数量，-1表示无穷大，即全部参与运算。默认值为-1 | int32 | - | -
 | layout_q | string | 可选 | 表示输入q的布局格式，默认值为BSND | string | - | -
 | layout_kv | string | 可选 | 表示输入ori_kv/cmp_kv的布局格式，默认值为BSND | string | - | -
-| topk_value_mode | int | 可选 | 表示topK索引取值模式。默认值为1 | int32 | - | -
+| topk_value_mode | int | 可选 | 表示topK索引取值模式，默认值为1 | int32 | - | -
 | return_softmax_lse | bool | 可选 | 表示是否返回softmax的lse结果。默认值为False | bool | - | -
 
 ## 返回值说明
@@ -251,6 +251,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 - <term>Ascend 950PR&950DT系列产品</term>：
   - 仅支持`quant_mode=1/2`。q、attention_out的数据类型为bfloat16，ori_kv、cmp_kv的数据类型为fp8_e4m3。
   - 下文参数组约束适用于`quant_mode=1/2`场景。
+  - topk_value_mode默认值为1，支持1和2。
 <!-- end id7 -->
 
 <!-- npu="A3" id8 -->
@@ -261,6 +262,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
   - 稀疏与PA参数：cmp_sparse_indices、ori_block_table、cmp_block_table必须传入；cmp_sparse_indices的shape为(q_t, 1, 512)或(q_t, 1, 1024)。ori_sparse_indices、ori_topk_length、cmp_topk_length不支持传入。
   - 序列参数：cu_seqlens_q、seqused_ori_kv必须传入；cu_seqlens_ori_kv、cu_seqlens_cmp_kv、seqused_q、seqused_cmp_kv不支持传入。
   - Mask与压缩参数：`ori_mask_mode=4`、`cmp_mask_mode=3`、`ori_win_left>=0`、`ori_win_right=0`，`cmp_ratio`仅支持4或128；cmp_residual_kv不支持传入。
+  - topk_value_mode只支持1。
 <!-- end id8 -->
 
 <!-- npu="910b" id9 -->
@@ -271,6 +273,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
   - 稀疏与PA参数：cmp_sparse_indices、ori_block_table、cmp_block_table必须传入；cmp_sparse_indices的shape为(q_t, 1, 512)或(q_t, 1, 1024)。ori_sparse_indices、ori_topk_length、cmp_topk_length不支持传入。
   - 序列参数：cu_seqlens_q、seqused_ori_kv必须传入；cu_seqlens_ori_kv、cu_seqlens_cmp_kv、seqused_q、seqused_cmp_kv不支持传入。
   - Mask与压缩参数：`ori_mask_mode=4`、`cmp_mask_mode=3`、`ori_win_left>=0`、`ori_win_right=0`，`cmp_ratio`仅支持4或128；cmp_residual_kv不支持传入。
+  - topk_value_mode只支持1。
 <!-- end id9 -->
 
 ### 特性参数组
@@ -863,7 +866,7 @@ metadata校验
             <td>
                 <ul>
                     <li>data_type支持int32</li>
-                    <li>topK索引取值模式，默认值为1</li>
+                    <li>topK索引取值模式</li>
                 </ul>
             </td>
             <td>可选属性，默认值为1</td>

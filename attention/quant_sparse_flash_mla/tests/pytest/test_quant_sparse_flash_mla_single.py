@@ -100,6 +100,7 @@ for params in ENABLED_PARAMS:
         "cmp_sparse_indices_mode": params.get("cmp_sparse_indices_mode", ["full"]),
         "ori_topk_length": params.get("ori_topk_length", [None]),
         "cmp_topk_length": params.get("cmp_topk_length", [None]),
+        "topk_value_mode": params.get("topk_value_mode", [1]),
         "return_softmax_lse": params.get("return_softmax_lse", [False]),
         "q_datarange": params.get("q_datarange", [[-5, 5]]),
         "ori_kv_datarange": params.get("ori_kv_datarange", [[-5, 5]]),

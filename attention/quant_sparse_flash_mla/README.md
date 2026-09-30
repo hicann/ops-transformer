@@ -268,7 +268,7 @@
     <tr>
       <td>topk_value_mode</td>
       <td>可选属性</td>
-      <td>表示TopK索引取值模式。</td>
+      <td>表示TopK索引取值模式，默认值为1，支持1和2。取值1时稀疏索引表示逻辑token索引；取值2时，PA_BBND布局的稀疏索引表示物理token offset，即physical_block_id * block_size + offset_in_block。</td>
       <td>INT</td>
       <td>-</td>
     </tr>

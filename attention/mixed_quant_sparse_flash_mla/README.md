@@ -256,7 +256,7 @@
     <tr>
       <td>topk_value_mode</td>
       <td>可选属性</td>
-      <td>表示topK索引取值模式，默认值为1。</td>
+      <td>表示topK索引取值模式，默认值为1。取值1时，稀疏索引表示逻辑token索引，取值2时PA_BBND布局的稀疏索引表示物理token offset，即physical_block_id * block_size + offset_in_block，其中physical_block_id表示实际物理块号，offset_in_block表示实际物理块内的偏移。</td>
       <td>INT</td>
       <td>-</td>
     </tr>
@@ -287,15 +287,15 @@
 ## 约束说明
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT系列产品</term>：仅支持`quant_mode=1/2`，q和attn_out仅支持BFLOAT16，ori_kv和cmp_kv仅支持FLOAT8_E4M3FN；quant_mode为1和2时kv_d分别为608和584，quant_mode为2时layout_kv仅支持PA_BBND。
+- <term>Ascend 950PR&950DT系列产品</term>：仅支持`quant_mode=1/2`，q和attn_out仅支持BFLOAT16，ori_kv和cmp_kv仅支持FLOAT8_E4M3FN；quant_mode为1和2时kv_d分别为608和584，quant_mode为2时layout_kv仅支持PA_BBND，topk_value_mode支持1和2。
 <!-- end id1 -->
 
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：仅支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258。
+- <term>Atlas A3系列产品</term>：仅支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258，topk_value_mode只支持1。
 <!-- end id2 -->
 
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：仅支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258。
+- <term>Atlas A2系列产品</term>：仅支持`quant_mode=3`的TurboQuant CSA场景，q、ori_kv和attn_out支持FLOAT16、BFLOAT16且数据类型一致，ori_kv的尾维为512，cmp_kv仅支持UINT8且尾维为258，topk_value_mode只支持1。
 <!-- end id3 -->
 
 - 该接口支持推理场景下使用。

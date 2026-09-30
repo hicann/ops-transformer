@@ -15,12 +15,12 @@ namespace optiling {
 namespace sparse_mla_checker {
 constexpr int64_t TURBO_QUANT_MODE = 3;
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
 }
 
-bool IsTurboQuantEmptyTndIndex(const CheckContext &context, const TensorParam &param, const char *name)
+bool IsTurboQuantEmptyTndIndex(const CheckContext& context, const TensorParam& param, const char* name)
 {
     return context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE &&
            context.qLayout == Layout::TND && std::string(name) == "cmp_sparse_indices" && param.shape != nullptr &&
@@ -28,8 +28,8 @@ bool IsTurboQuantEmptyTndIndex(const CheckContext &context, const TensorParam &p
 }
 } // namespace
 
-ge::graphStatus SparseCompressionChecker::CheckIndex(const CheckContext &context, const TensorParam &param,
-                                                     const char *name) const
+ge::graphStatus SparseCompressionChecker::CheckIndex(const CheckContext& context, const TensorParam& param,
+                                                     const char* name) const
 {
     if (!param.present) {
         return ge::GRAPH_SUCCESS;
@@ -44,8 +44,8 @@ ge::graphStatus SparseCompressionChecker::CheckIndex(const CheckContext &context
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SparseCompressionChecker::CheckTopkLength(const CheckContext &context, const TensorParam &param,
-                                                          const char *name) const
+ge::graphStatus SparseCompressionChecker::CheckTopkLength(const CheckContext& context, const TensorParam& param,
+                                                          const char* name) const
 {
     if (!param.present) {
         return ge::GRAPH_SUCCESS;
@@ -59,17 +59,17 @@ ge::graphStatus SparseCompressionChecker::CheckTopkLength(const CheckContext &co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SparseCompressionChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus SparseCompressionChecker::CheckSinglePara(const CheckContext& context) const
 {
     OP_CHECK_IF(
         context.cmpRatio < 1 || context.cmpRatio > 128,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(Op(context), "cmp_ratio", std::to_string(context.cmpRatio).c_str(),
                                               "Cmp_ratio must be in range [1, 128]"),
         return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        context.topkValueMode != 1,
-        OP_LOGE_FOR_INVALID_VALUE(Op(context), "topk_value_mode", std::to_string(context.topkValueMode).c_str(), "1"),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(context.topkValueMode != 1 && context.topkValueMode != 2,
+                OP_LOGE_FOR_INVALID_VALUE(Op(context), "topk_value_mode", std::to_string(context.topkValueMode).c_str(),
+                                          "1 or 2"),
+                return ge::GRAPH_FAILED);
     if (CheckIndex(context, context.oriSparseIndices, "ori_sparse_indices") != ge::GRAPH_SUCCESS ||
         CheckIndex(context, context.cmpSparseIndices, "cmp_sparse_indices") != ge::GRAPH_SUCCESS ||
         CheckTopkLength(context, context.oriTopkLength, "ori_topk_length") != ge::GRAPH_SUCCESS ||
@@ -79,7 +79,7 @@ ge::graphStatus SparseCompressionChecker::CheckSinglePara(const CheckContext &co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SparseCompressionChecker::CheckParaExistence(const CheckContext &context) const
+ge::graphStatus SparseCompressionChecker::CheckParaExistence(const CheckContext& context) const
 {
     if (context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE) {
         OP_CHECK_IF(!context.cmpKv.present || !context.cmpSparseIndices.present,
@@ -152,8 +152,20 @@ ge::graphStatus SparseCompressionChecker::CheckParaExistence(const CheckContext 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SparseCompressionChecker::CheckFeature(const CheckContext &context) const
+ge::graphStatus SparseCompressionChecker::CheckFeature(const CheckContext& context) const
 {
+    if (context.topkValueMode == 2) {
+        OP_CHECK_IF(context.kvLayout != Layout::PA_BBND,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        Op(context), "topk_value_mode", std::to_string(static_cast<uint32_t>(context.kvLayout)).c_str(),
+                        "Topk_value_mode 2 is only supported when layout_kv is PA_BBND"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!context.oriSparseIndices.present && !context.cmpSparseIndices.present,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        Op(context), "ori_sparse_indices/cmp_sparse_indices",
+                        "At least one sparse_indices input is required when topk_value_mode is 2"),
+                    return ge::GRAPH_FAILED);
+    }
     OP_CHECK_IF(context.cmpSparseIndices.present && !context.cmpKv.present,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Op(context), "cmp_sparse_indices",
                                                          "Cmp_sparse_indices requires cmp_kv"),
@@ -168,8 +180,8 @@ ge::graphStatus SparseCompressionChecker::CheckFeature(const CheckContext &conte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SparseCompressionChecker::CheckIndexShape(const CheckContext &context, const TensorParam &param,
-                                                          const char *name) const
+ge::graphStatus SparseCompressionChecker::CheckIndexShape(const CheckContext& context, const TensorParam& param,
+                                                          const char* name) const
 {
     if (!param.present) {
         return ge::GRAPH_SUCCESS;
@@ -193,8 +205,8 @@ ge::graphStatus SparseCompressionChecker::CheckIndexShape(const CheckContext &co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SparseCompressionChecker::CheckTopkLengthShape(const CheckContext &context, const TensorParam &param,
-                                                               const char *name) const
+ge::graphStatus SparseCompressionChecker::CheckTopkLengthShape(const CheckContext& context, const TensorParam& param,
+                                                               const char* name) const
 {
     if (!param.present) {
         return ge::GRAPH_SUCCESS;
@@ -217,7 +229,7 @@ ge::graphStatus SparseCompressionChecker::CheckTopkLengthShape(const CheckContex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SparseCompressionChecker::CheckMultiPara(const CheckContext &context) const
+ge::graphStatus SparseCompressionChecker::CheckMultiPara(const CheckContext& context) const
 {
     if (CheckIndexShape(context, context.oriSparseIndices, "ori_sparse_indices") != ge::GRAPH_SUCCESS ||
         CheckIndexShape(context, context.cmpSparseIndices, "cmp_sparse_indices") != ge::GRAPH_SUCCESS ||

@@ -60,11 +60,11 @@ using AttentionCommon::Align64Func;
 #define TEMPLATE_INTF \
     template <typename Q_T, typename KV_T, typename T, typename OUTPUT_T, bool IS_FD, SMLA_LAYOUT LAYOUT_T, \
               SMLA_LAYOUT KV_LAYOUT_T, SMLATemplateMode TEMPLATE_MODE, bool IS_SPLIT_G, bool IS_BATCH_CONSISTENCY, \
-              bool IS_VEC_S2PHYADDR>
+              bool IS_VEC_S2PHYADDR, TopkValueMode TOPK_VALUE_MODE>
 
 #define TEMPLATE_INTF_ARGS \
     Q_T, KV_T, T, OUTPUT_T, IS_FD, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G, IS_BATCH_CONSISTENCY, \
-        IS_VEC_S2PHYADDR
+        IS_VEC_S2PHYADDR, TOPK_VALUE_MODE
 
 #define SMLA_CUBE_TRAIT_TYPES(X) \
     X(Q_T) \
@@ -79,7 +79,8 @@ using AttentionCommon::Align64Func;
     X(TEMPLATE_MODE, SMLATemplateMode, SMLATemplateMode::CSA_TEMPLATE_MODE) \
     X(IS_SPLIT_G, bool, false) \
     X(IS_BATCH_CONSISTENCY, bool, false) \
-    X(IS_VEC_S2PHYADDR, bool, false)
+    X(IS_VEC_S2PHYADDR, bool, false) \
+    X(TOPK_VALUE_MODE, TopkValueMode, TopkValueMode::TOPK_INDEX_MODE)
 
 /* 1. 生成带默认值的模版Template */
 #define SMLA_TEMPLATE_TYPE(name) typename name,

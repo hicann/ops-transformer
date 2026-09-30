@@ -17,7 +17,7 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 
-ge::graphStatus MixedQuantSparseFlashMlaTiling::DoTurboQuantTiling(MQSMLATilingInfo *tilingInfo)
+ge::graphStatus MixedQuantSparseFlashMlaTiling::DoTurboQuantTiling(MQSMLATilingInfo* tilingInfo)
 {
     constexpr uint32_t S2_BASE_SIZE = 512;
     constexpr uint32_t BYTE_BLOCK = 32;
@@ -48,12 +48,12 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoTurboQuantTiling(MQSMLATilingI
         static_cast<size_t>(PRELOAD_NUM) * bmm2ResUbSize * (MM2_RES_ELEM_SIZE + VEC2_RES_ELEM_SIZE) * aicNum;
     workspaceSize += static_cast<size_t>(MERGE_CACHE_GM_BUF_NUM) * S2_BASE_SIZE * tilingInfo->qkHeadDim *
                      MERGE_CACHE_ELEM_SIZE * aicNum;
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_IF(workspaces == nullptr, OP_LOGE(tilingInfo->opName, "workspace sizes is nullptr"),
                 return ge::GRAPH_FAILED);
     workspaces[0] = workspaceSize;
 
-    auto *tqTilingData = context_->GetTilingData<MixedQuantSparseFlashMlaTqTilingData>();
+    auto* tqTilingData = context_->GetTilingData<MixedQuantSparseFlashMlaTqTilingData>();
     OP_CHECK_IF(tqTilingData == nullptr, OP_LOGE(tilingInfo->opName, "tiling data is nullptr"),
                 return ge::GRAPH_FAILED);
     tqTilingData->tqBaseParams.batchSize = tilingInfo->bSize;
@@ -86,9 +86,10 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoTurboQuantTiling(MQSMLATilingI
     tqTilingData->tqCmpParams.cmpMaskMode = tilingInfo->cmpMaskMode;
     tqTilingData->tqCmpParams.cmpKvStride0 = tilingInfo->cmpKvStride;
 
-    const uint64_t tilingKey = GET_TPL_TILING_KEY(
-        0U, static_cast<uint32_t>(tilingInfo->qLayout), static_cast<uint32_t>(tilingInfo->kvLayout), CSA_TEMPLATE, 0U,
-        static_cast<uint32_t>(tilingInfo->quantMode), DTYPE_FP8_E4M3FN, 0U, 0U, 0U);
+    const uint64_t tilingKey =
+        GET_TPL_TILING_KEY(0U, static_cast<uint32_t>(tilingInfo->qLayout), static_cast<uint32_t>(tilingInfo->kvLayout),
+                           CSA_TEMPLATE, 0U, static_cast<uint32_t>(tilingInfo->quantMode), DTYPE_FP8_E4M3FN, 0U, 0U, 0U,
+                           static_cast<uint32_t>(tilingInfo->topkValueMode));
     context_->SetTilingKey(tilingKey);
     context_->SetScheduleMode(1);
     return ge::GRAPH_SUCCESS;

@@ -54,6 +54,7 @@ TEST_PARAMS = {
         "ori_win_right": [0],
         "quant_mode": [1],
         "template_run_mode": ["CSA"],
+        "topk_value_mode": [2],
         "actlen_mode": ["full"],
         "S1EQS2": [False],
         "isSink": [True],

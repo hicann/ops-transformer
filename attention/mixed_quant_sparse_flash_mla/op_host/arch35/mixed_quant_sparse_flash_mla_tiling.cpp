@@ -16,7 +16,7 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 
-ge::graphStatus MixedQuantSparseFlashMlaTiling::DoCsaTiling(MQSMLATilingInfo *tilingInfo)
+ge::graphStatus MixedQuantSparseFlashMlaTiling::DoCsaTiling(MQSMLATilingInfo* tilingInfo)
 {
     if (tilingInfo->opParamInfo.cmpKv.tensor == nullptr) {
         OP_CHECK_IF(
@@ -40,8 +40,8 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoCsaTiling(MQSMLATilingInfo *ti
     }
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
-    uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
+    uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
     context_->SetBlockDim(blockDim);
     OP_LOGI(tilingInfo->opName, "QSMLA block dim: %u aiv Num: %u aic Num: %u.", blockDim, aivNum, aicNum);
@@ -80,12 +80,12 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoCsaTiling(MQSMLATilingInfo *ti
         (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE) ?
             cmpUbSize :
             ((perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE) ? oriUbSize : std::max(oriUbSize, cmpUbSize));
-    uint32_t vectorizeFlag = static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
-                                                    perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
-                                                    perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
-                                                   tilingInfo->quantMode == QUANT_CONTIGUOUS_MODE &&
-                                                   tilingInfo->kvLayout == MQSMLALayout::PA_BBND &&
-                                                   blockSizeSupported && vectorizeUbSize <= UB_SIZE);
+    uint32_t vectorizeFlag = static_cast<uint32_t>(
+        (perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
+         perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+         perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+        tilingInfo->quantMode == QUANT_CONTIGUOUS_MODE && tilingInfo->kvLayout == MQSMLALayout::PA_BBND &&
+        tilingInfo->topkValueMode == 1 && blockSizeSupported && vectorizeUbSize <= UB_SIZE);
 
     size_t workspaceSize = static_cast<size_t>(ascendcPlatform.GetLibApiWorkSpaceSize());
     bool isSplitG = tilingInfo->gSize > 64; // gSize超过64时采用Split-G
@@ -120,7 +120,7 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoCsaTiling(MQSMLATilingInfo *ti
                 FD_MAX_SUM_REGION_NUM;
         workspaceSize += s2SplitStagingPerSlot * fdStagingSlotNum;
     }
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
+    size_t* workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
     // -------------set tilingdata-----------------
@@ -165,11 +165,12 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoCsaTiling(MQSMLATilingInfo *ti
     bool highPerf = (tilingInfo->oriMaskMode == 4 && tilingInfo->cmpMaskMode == 3) &&
                     tilingInfo->opParamInfo.oriTopkLength.tensor == nullptr &&
                     tilingInfo->opParamInfo.cmpTopkLength.tensor == nullptr && !tilingInfo->returnSoftmaxLse;
-    uint64_t tilingKey = GET_TPL_TILING_KEY(
-        0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_), static_cast<uint32_t>(isSplitG),
-        static_cast<uint32_t>(tilingInfo->quantMode),
-        ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8),
-        static_cast<uint32_t>(tilingInfo->batchConsistency), vectorizeFlag, static_cast<uint32_t>(highPerf));
+    uint64_t tilingKey =
+        GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_),
+                           static_cast<uint32_t>(isSplitG), static_cast<uint32_t>(tilingInfo->quantMode),
+                           ((oriKvType == ge::DT_FLOAT8_E4M3FN) ? DTYPE_FP8_E4M3FN : DTYPE_HIF8),
+                           static_cast<uint32_t>(tilingInfo->batchConsistency), vectorizeFlag,
+                           static_cast<uint32_t>(highPerf), static_cast<uint32_t>(tilingInfo->topkValueMode));
     context_->SetTilingKey(tilingKey);
     context_->SetScheduleMode(1);
 

@@ -37,6 +37,11 @@ enum class SMLA_LAYOUT {
     PA_BBND = 2
 };
 
+enum class TopkValueMode {
+    TOPK_INDEX_MODE = 1,
+    TOPK_OFFSET_MODE = 2
+};
+
 #if (__CCE_AICORE__ != 310)
 // 将isCheckTiling设置为false, 输入输出的max&sum&exp的shape为(m, 1)
 constexpr SoftmaxConfig SMLA_SOFTMAX_FLASHV2_CFG_WITHOUT_BRC = {false, 0, 0, SoftmaxMode::SOFTMAX_OUTPUT_WITHOUT_BRC};
@@ -113,7 +118,7 @@ struct Position {
 // L1按NZ格式存储
 // GM的行、列、列的stride
 template <typename T>
-__aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T> &gmTensor, uint32_t rowAct,
+__aicore__ inline void DataCopyGmNDToL1(LocalTensor<T>& l1Tensor, GlobalTensor<T>& gmTensor, uint32_t rowAct,
                                         uint32_t rowAlign,
                                         uint32_t col,       // D
                                         uint32_t colStride) // D or N*D
@@ -138,11 +143,11 @@ __aicore__ inline void DataCopyGmNDToL1(LocalTensor<T> &l1Tensor, GlobalTensor<T
     shape.copyRowNumAlign 需要16字节对齐，如拷贝k矩阵，一次拷贝128*512，遇到尾块 10*512 需对齐到16*512
 */
 template <typename T, SMLA_LAYOUT SRC_LAYOUT>
-__aicore__ inline void DataCopyPA(LocalTensor<T> &dstTensor,  // l1
-                                  GlobalTensor<T> &srcTensor, // gm
-                                  GlobalTensor<int32_t> &blockTableGm,
-                                  const PAShape &shape,     // blockSize, headNum, headDim
-                                  const Position &startPos) // bacthIdx nIdx curSeqIdx
+__aicore__ inline void DataCopyPA(LocalTensor<T>& dstTensor,  // l1
+                                  GlobalTensor<T>& srcTensor, // gm
+                                  GlobalTensor<int32_t>& blockTableGm,
+                                  const PAShape& shape,     // blockSize, headNum, headDim
+                                  const Position& startPos) // bacthIdx nIdx curSeqIdx
 {
     uint32_t copyFinishRowCnt = 0;
     uint64_t blockTableBaseOffset = startPos.bIdx * shape.maxblockNumPerBatch;

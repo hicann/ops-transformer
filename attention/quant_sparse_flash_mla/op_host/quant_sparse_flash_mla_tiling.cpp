@@ -230,33 +230,33 @@ ge::graphStatus QSMLAInfoParser::GetKvLayout()
 
 // =============Parser function====================
 
-bool QSMLAInfoParser::HasAxis(const QSMLAAxis &axis, const QSMLALayout &layout, const gert::Shape &shape) const
+bool QSMLAInfoParser::HasAxis(const QSMLAAxis& axis, const QSMLALayout& layout, const gert::Shape& shape) const
 {
-    const auto &layoutIt = QSMLA_LAYOUT_AXIS_MAP.find(layout);
+    const auto& layoutIt = QSMLA_LAYOUT_AXIS_MAP.find(layout);
     if (layoutIt == QSMLA_LAYOUT_AXIS_MAP.end()) {
         return false;
     }
 
-    const std::vector<QSMLAAxis> &axes = layoutIt->second;
-    const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
+    const std::vector<QSMLAAxis>& axes = layoutIt->second;
+    const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
     if (axisIt == axes.end()) {
         return false;
     }
-    const auto &dimIt = QSMLA_LAYOUT_DIM_MAP.find(layout);
+    const auto& dimIt = QSMLA_LAYOUT_DIM_MAP.find(layout);
     if (dimIt == QSMLA_LAYOUT_DIM_MAP.end() || dimIt->second != shape.GetDimNum()) {
         return false;
     }
     return true;
 }
 
-size_t QSMLAInfoParser::GetAxisIdx(const QSMLAAxis &axis, const QSMLALayout &layout) const
+size_t QSMLAInfoParser::GetAxisIdx(const QSMLAAxis& axis, const QSMLALayout& layout) const
 {
-    const std::vector<QSMLAAxis> &axes = QSMLA_LAYOUT_AXIS_MAP.find(layout)->second;
-    const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
+    const std::vector<QSMLAAxis>& axes = QSMLA_LAYOUT_AXIS_MAP.find(layout)->second;
+    const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
     return std::distance(axes.begin(), axisIt);
 }
 
-int64_t QSMLAInfoParser::GetAxisNum(const gert::Shape &shape, const QSMLAAxis &axis, const QSMLALayout &layout) const
+int64_t QSMLAInfoParser::GetAxisNum(const gert::Shape& shape, const QSMLAAxis& axis, const QSMLALayout& layout) const
 {
     return HasAxis(axis, layout, shape) ? shape.GetDim(GetAxisIdx(axis, layout)) : invalidDimValue_;
 }
@@ -302,8 +302,8 @@ ge::graphStatus QSMLAInfoParser::GetGSize()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(int64_t &size, const gert::Tensor *tensor, QSMLALayout &layout,
-                                                     const std::string &name) const
+ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(int64_t& size, const gert::Tensor* tensor, QSMLALayout& layout,
+                                                     const std::string& name) const
 {
     if ((tensor == nullptr)) {
         OP_LOGE(qsmlaOpName_, "when layout of q is %s, %s must be provided.", QSMLALayoutToSerialString(layout).c_str(),
@@ -318,7 +318,7 @@ ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(int64_t &size, const gert::
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSMLAInfoParser::GetActualSeqLenQSize(int64_t &size)
+ge::graphStatus QSMLAInfoParser::GetActualSeqLenQSize(int64_t& size)
 {
     if (qsmlaParams_.cuSeqLensQ.tensor != nullptr) {
         int64_t shapeSize = qsmlaParams_.cuSeqLensQ.tensor->GetShapeSize();
@@ -514,7 +514,7 @@ ge::graphStatus QSMLAInfoParser::GetKvstride()
     return ge::GRAPH_SUCCESS;
 }
 
-void QSMLAInfoParser::GenerateInfo(QSMLATilingInfo &qsmlaInfo)
+void QSMLAInfoParser::GenerateInfo(QSMLATilingInfo& qsmlaInfo)
 {
     qsmlaInfo.opName = qsmlaOpName_;
     qsmlaInfo.platformInfo = qsmlaPlatformInfo_;
@@ -575,7 +575,7 @@ void QSMLAInfoParser::GenerateInfo(QSMLATilingInfo &qsmlaInfo)
     qsmlaInfo.returnSoftmaxLse = (qsmlaParams_.returnSoftmaxLse != nullptr) ? *qsmlaParams_.returnSoftmaxLse : false;
 }
 
-ge::graphStatus QSMLAInfoParser::Parse(QSMLATilingInfo &qsmlaInfo)
+ge::graphStatus QSMLAInfoParser::Parse(QSMLATilingInfo& qsmlaInfo)
 {
     if (context_ == nullptr) {
         OP_LOGE("SparseFlashAttention", "tiling context is nullptr!");
@@ -610,13 +610,13 @@ ge::graphStatus QSMLAInfoParser::Parse(QSMLATilingInfo &qsmlaInfo)
 }
 
 // --------------------------TilingPrepare函数定义-------------------------------------
-static ge::graphStatus TilingPrepareForQuantSparseFlashMla(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForQuantSparseFlashMla(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
 // --------------------------QuantSparseFlashMlaTiling类成员函数定义-----------------------
-ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInfo)
+ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo* tilingInfo)
 {
     if (tilingInfo->opParamInfo.cmpKv.tensor == nullptr) {
         OP_CHECK_IF(tilingInfo->opParamInfo.cmpSparseIndices.tensor != nullptr,
@@ -681,11 +681,12 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInf
                          static_cast<uint64_t>(alignedOriSparseBlockCount) * sizeof(int64_t);
     uint64_t vectorizeUbSize = std::max(cmpUbSize, oriUbSize);
 
-    uint32_t vectorizeFlag = static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
-                                                    perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
-                                                    perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
-                                                   (vectorizeUbSize <= UB_SIZE) && blocksizeFlag != 0 &&
-                                                   (tilingInfo->kvLayout == QSMLALayout::PA_BBND));
+    uint32_t vectorizeFlag =
+        static_cast<uint32_t>((perfMode_ == QSMLATemplateMode::CSA_TEMPLATE_MODE ||
+                               perfMode_ == QSMLATemplateMode::ORI_SPARSE_TEMPLATE_MODE ||
+                               perfMode_ == QSMLATemplateMode::ORI_CMP_SPARSE_TEMPLATE_MODE) &&
+                              tilingInfo->topkValueMode == 1 && (vectorizeUbSize <= UB_SIZE) && blocksizeFlag != 0 &&
+                              (tilingInfo->kvLayout == QSMLALayout::PA_BBND));
     uint64_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     if (tilingInfo->gSize > 64) { // 64：当前gSize大于64时，使用半精度计算，需要将aic数量减半
         workspaceSize += (S2_BASE_SIZE * D_SIZE * VEC_RES_ELEM_SIZE * TRIPLE_BUFFER_NUM * (aicNum >> 1));
@@ -713,7 +714,7 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInf
     } else {
         workspaceSize += static_cast<uint64_t>(fdStagingSlotNum) * MAX_S2_SPLIT_NUM * combineElemSize * FLOAT_ELEM_SIZE;
     }
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
+    size_t* workSpaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workSpaces);
     workSpaces[0] = workspaceSize;
 
@@ -753,9 +754,10 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInf
     uint32_t outputType = static_cast<uint32_t>(tilingInfo->outputType);
     uint32_t qLayout = static_cast<uint32_t>(tilingInfo->qLayout);
     uint32_t inputKvLayout = static_cast<uint32_t>(tilingInfo->kvLayout);
-    uint64_t tilingKey = GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_),
+    uint32_t tilingKey = GET_TPL_TILING_KEY(0U, qLayout, inputKvLayout, static_cast<uint32_t>(perfMode_),
                                             static_cast<uint32_t>(tilingInfo->gSize > 64), DTYPE_HIF8, vectorizeFlag,
-                                            static_cast<uint32_t>(tilingInfo->batchConsistency));
+                                            static_cast<uint32_t>(tilingInfo->batchConsistency),
+                                            static_cast<uint32_t>(tilingInfo->topkValueMode));
     context_->SetTilingKey(tilingKey);
     context_->SetScheduleMode(1);
 
@@ -763,7 +765,7 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInf
 }
 
 // --------------------------Tiling函数定义---------------------------
-ge::graphStatus TilingQuantSparseFlashMla(gert::TilingContext *context)
+ge::graphStatus TilingQuantSparseFlashMla(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("QuantSparseFlashMla", "Tiling context is null."),
                 return ge::GRAPH_FAILED);

@@ -15,13 +15,13 @@ namespace optiling {
 namespace sparse_mla_checker {
 constexpr int64_t TURBO_QUANT_MODE = 3;
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "MixedQuantSparseFlashMla" : context.opName;
 }
 } // namespace
 
-ge::graphStatus MixedQuantVariantChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus MixedQuantVariantChecker::CheckSinglePara(const CheckContext& context) const
 {
     OP_CHECK_IF(
         context.quantMode != 1 && context.quantMode != 2 && context.quantMode != TURBO_QUANT_MODE,
@@ -34,6 +34,10 @@ ge::graphStatus MixedQuantVariantChecker::CheckSinglePara(const CheckContext &co
             Op(context), "quant_mode", std::to_string(context.quantMode).c_str(),
             "quant_mode 3 is supported only on arch22; quant_mode 1/2 are supported only on arch35"),
         return ge::GRAPH_FAILED);
+    OP_CHECK_IF(turboQuant && context.topkValueMode != 1,
+                OP_LOGE_FOR_INVALID_VALUE(Op(context), "topk_value_mode", std::to_string(context.topkValueMode).c_str(),
+                                          "1 on A2/A3"),
+                return ge::GRAPH_FAILED);
     // The RoPE part of the TurboQuant layout has a fixed 64-dimensional head.
     OP_CHECK_IF(
         context.ropeHeadDim != 64,

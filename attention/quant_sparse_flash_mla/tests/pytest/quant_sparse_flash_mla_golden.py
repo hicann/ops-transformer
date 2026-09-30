@@ -1633,6 +1633,44 @@ def gen_sparse_indices_tnd(
     return sparse_data, topk_length
 
 
+def convert_sparse_indices_to_pa_offsets(
+    sparse_indices, block_table, block_size, layout_q, cu_seqlens_q
+):
+    """Convert logical sparse indices to physical PA token offsets for mode 2."""
+    if sparse_indices is None or block_table is None:
+        return sparse_indices
+
+    physical_offsets = sparse_indices.clone()
+    for batch_idx in range(block_table.shape[0]):
+        if layout_q == "BSND":
+            logical_slice = sparse_indices[batch_idx]
+            physical_slice = physical_offsets[batch_idx]
+        elif layout_q == "TND":
+            q_start = int(cu_seqlens_q[batch_idx])
+            q_end = int(cu_seqlens_q[batch_idx + 1])
+            logical_slice = sparse_indices[q_start:q_end]
+            physical_slice = physical_offsets[q_start:q_end]
+        else:
+            raise ValueError(f"unsupported layout_q for sparse indices: {layout_q}")
+
+        valid_mask = logical_slice >= 0
+        if not valid_mask.any().item():
+            continue
+        logical_values = logical_slice[valid_mask].to(torch.int64)
+        logical_block_ids = torch.div(logical_values, block_size, rounding_mode="floor")
+        in_block_offsets = logical_values % block_size
+        physical_block_ids = block_table[
+            batch_idx, logical_block_ids.to(torch.long)
+        ].to(torch.int64)
+        if (physical_block_ids < 0).any().item():
+            raise ValueError("sparse index maps to an invalid PA block table entry")
+        physical_slice[valid_mask] = (
+            physical_block_ids * block_size + in_block_offsets
+        ).to(physical_offsets.dtype)
+
+    return physical_offsets
+
+
 def trans_kv_bnsd_to_tnd(kv_bnsd_npu, cu_seqlens_kv, seqused_kv, B, N2, D, kv_type):
     total_t = int(cu_seqlens_kv[-1])
     kv_tnd = torch.zeros((total_t, N2, D), dtype=kv_type)
@@ -2174,6 +2212,25 @@ def gen_data(params, generate_golden=True):
         cmp_kv_descale = None
         cmp_topk_length = None
 
+    # Keep logical indices for CPU Golden, and convert only the operator inputs.
+    ori_sparse_indices_for_op = ori_sparse_indices
+    cmp_sparse_indices_for_op = cmp_sparse_indices
+    if topk_value_mode == 2 and layout_kv == "PA_BBND":
+        ori_sparse_indices_for_op = convert_sparse_indices_to_pa_offsets(
+            ori_sparse_indices,
+            ori_block_table,
+            block_size1,
+            layout_q,
+            cu_seqlens_q,
+        )
+        cmp_sparse_indices_for_op = convert_sparse_indices_to_pa_offsets(
+            cmp_sparse_indices,
+            cmp_block_table,
+            block_size2,
+            layout_q,
+            cu_seqlens_q,
+        )
+
     if cmp_k_bnsd is None:  # 如果cmp_k_bnsd为None
         cmp_mask_mode = 0  # cmp_mask_mode 设置为0，防止拦截
     if (
@@ -2343,8 +2400,8 @@ def gen_data(params, generate_golden=True):
             "q": q_npu,
             "ori_kv": ori_k_in_pa_shape,
             "cmp_kv": cmp_k_in_pa_shape,
-            "ori_sparse_indices": ori_sparse_indices,
-            "cmp_sparse_indices": cmp_sparse_indices,
+            "ori_sparse_indices": ori_sparse_indices_for_op,
+            "cmp_sparse_indices": cmp_sparse_indices_for_op,
             "ori_topk_length": ori_topk_length,
             "cmp_topk_length": cmp_topk_length,
             "ori_block_table": ori_block_table,

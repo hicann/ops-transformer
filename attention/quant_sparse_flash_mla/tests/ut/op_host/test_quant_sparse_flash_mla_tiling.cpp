@@ -32,6 +32,7 @@ protected:
 
 namespace {
 constexpr uint64_t SKIP_TILING_KEY = UINT64_MAX;
+constexpr uint64_t TOPK_OFFSET_ORI_CMP_SPARSE_TILING_KEY = 1050626U;
 constexpr int64_t kBatchSize = 4;
 constexpr int64_t kNumHeadsKv = 1;
 constexpr int64_t kMetadataSize = optiling::SMLA_META_SIZE;
@@ -71,9 +72,10 @@ struct QSmlaCase {
     int64_t cmpMaskMode = 0;
     int64_t oriWinLeft = 127;
     int64_t oriWinRight = 0;
+    int64_t topkValueMode = 1;
 };
 
-gert::StorageShape ToStorageShape(const std::vector<int64_t> &dims)
+gert::StorageShape ToStorageShape(const std::vector<int64_t>& dims)
 {
     gert::StorageShape shape;
     if (dims.empty()) {
@@ -88,12 +90,12 @@ gert::StorageShape ToStorageShape(const std::vector<int64_t> &dims)
     return shape;
 }
 
-gert::TilingContextPara::TensorDescription Desc(const std::vector<int64_t> &dims, ge::DataType dtype)
+gert::TilingContextPara::TensorDescription Desc(const std::vector<int64_t>& dims, ge::DataType dtype)
 {
     return gert::TilingContextPara::TensorDescription(ToStorageShape(dims), dtype, ge::FORMAT_ND);
 }
 
-void RunQSmlaTilingCase(const QSmlaCase &c, ge::graphStatus expect, uint64_t expectTilingKey = SKIP_TILING_KEY)
+void RunQSmlaTilingCase(const QSmlaCase& c, ge::graphStatus expect, uint64_t expectTilingKey = SKIP_TILING_KEY)
 {
     struct QSMLACompileInfo {
     } compileInfo;
@@ -102,7 +104,7 @@ void RunQSmlaTilingCase(const QSmlaCase &c, ge::graphStatus expect, uint64_t exp
     int64_t seqUsedCmpKvData[] = {4096, 4096, 4096, 4096};
     int64_t cmpResidualKvData[] = {0, 0, 0, 0};
     int64_t metadataData[kMetadataSize] = {0};
-    smla_ut::InitMetadataGm(reinterpret_cast<int32_t *>(metadataData), static_cast<uint32_t>(kBatchSize),
+    smla_ut::InitMetadataGm(reinterpret_cast<int32_t*>(metadataData), static_cast<uint32_t>(kBatchSize),
                             static_cast<uint32_t>(kNumHeadsKv));
     gert::TilingContextPara tilingContextPara(
         "QuantSparseFlashMla",
@@ -142,7 +144,7 @@ void RunQSmlaTilingCase(const QSmlaCase &c, ge::graphStatus expect, uint64_t exp
          {"ori_win_right", Ops::Transformer::AnyValue::CreateFrom<int64_t>(c.oriWinRight)},
          {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>(c.layoutQ)},
          {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>(c.layoutKv)},
-         {"topk_value_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"topk_value_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(c.topkValueMode)},
          {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
         &compileInfo, "Ascend950", 56, 262144);
     ExecuteTestCase(tilingContextPara, expect, expectTilingKey);
@@ -183,6 +185,27 @@ TEST_F(QuantSparseFlashMlaTiling, test_tiling_csa_with_sparse_indices_tnd_pa_nd_
     c.cmpRatio = 4;
     c.cmpMaskMode = 3;
     RunQSmlaTilingCase(c, ge::GRAPH_SUCCESS);
+}
+
+// topk_value_mode=2 is only supported for PA_BBND KV layout.
+TEST_F(QuantSparseFlashMlaTiling, test_tiling_topk_offset_non_pa_failed)
+{
+    QSmlaCase c;
+    c.oriKvShape = {512, 1, 512};
+    c.oriSparseIndicesShape = {512, 1, 512};
+    c.oriBlockTableShape = {};
+    c.cuSeqLensOriKvShape = {5};
+    c.layoutKv = "TND";
+    c.topkValueMode = 2;
+    RunQSmlaTilingCase(c, ge::GRAPH_FAILED);
+}
+
+// At least one KV path must be sparse when topk_value_mode=2.
+TEST_F(QuantSparseFlashMlaTiling, test_tiling_topk_offset_without_sparse_indices_failed)
+{
+    QSmlaCase c;
+    c.topkValueMode = 2;
+    RunQSmlaTilingCase(c, ge::GRAPH_FAILED);
 }
 
 // TND q + TND ori_kv success

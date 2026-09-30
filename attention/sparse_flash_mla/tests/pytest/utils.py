@@ -363,6 +363,7 @@ def generate_param_combinations(ENABLED_PARAMS, is_save_pt=False):
             "cmp_kv_datarange": params.get("cmp_kv_datarange", ["[-2, 2]"]),
             "random_seq": params.get("random_seq", [False]),
             "return_softmax_lse": params.get("return_softmax_lse", [False]),
+            "topk_value_mode": params.get("topk_value_mode", [1]),
             "ori_topk_length": params.get("ori_topk_length", [None]),
             "cmp_topk_length": params.get("cmp_topk_length", [None]),
             "batch_consistency": params.get("batch_consistency", [False]),

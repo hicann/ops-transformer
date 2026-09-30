@@ -89,6 +89,7 @@ for params in ENABLED_PARAMS:
         "template_run_mode": params.get("template_run_mode"),
         "actlen_mode": params.get("actlen_mode"),
         "S1EQS2": params.get("S1EQS2", [False]),
+        "topk_value_mode": params.get("topk_value_mode", [1]),
         "return_softmax_lse": params.get("return_softmax_lse", [False]),
         "ori_kv_topk_mode": params.get("ori_kv_topk_mode", [None]),
         "cmp_kv_topk_mode": params.get("cmp_kv_topk_mode", [None]),

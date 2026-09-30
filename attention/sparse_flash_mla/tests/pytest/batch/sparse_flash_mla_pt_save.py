@@ -49,6 +49,7 @@ def record_failed_case(param_combinations, error_msg):
         "K": param_combinations.get("K"),
         "K1": param_combinations.get("K1"),
         "cmp_ratio": param_combinations.get("cmp_ratio"),
+        "topk_value_mode": param_combinations.get("topk_value_mode", 1),
         "ori_mask_mode": param_combinations.get("ori_mask_mode"),
         "cmp_mask_mode": param_combinations.get("cmp_mask_mode"),
         "error_msg": str(error_msg),

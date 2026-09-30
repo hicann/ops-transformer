@@ -48,6 +48,7 @@ TEST_PARAMS = {
         "tile_size": [64],
         "rope_head_dim": [64],
         "template_run_mode": ["CSA"],
+        "topk_value_mode": [2],
         "actlen_mode": ["full"],
         "S1EQS2": [False],
         "return_softmax_lse": [True],

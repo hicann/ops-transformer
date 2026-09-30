@@ -15,14 +15,14 @@ namespace optiling {
 namespace sparse_mla_checker {
 constexpr int64_t TURBO_QUANT_MODE = 3;
 namespace {
-const char *Op(const CheckContext &context)
+const char* Op(const CheckContext& context)
 {
     return context.opName == nullptr ? "SparseMla" : context.opName;
 }
 } // namespace
 
-ge::graphStatus PagedAttentionChecker::CheckBlockTable(const CheckContext &context, const TensorParam &param,
-                                                       const char *name) const
+ge::graphStatus PagedAttentionChecker::CheckBlockTable(const CheckContext& context, const TensorParam& param,
+                                                       const char* name) const
 {
     if (!param.present) {
         return ge::GRAPH_SUCCESS;
@@ -35,7 +35,7 @@ ge::graphStatus PagedAttentionChecker::CheckBlockTable(const CheckContext &conte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckSinglePara(const CheckContext &context) const
+ge::graphStatus PagedAttentionChecker::CheckSinglePara(const CheckContext& context) const
 {
     if (CheckBlockTable(context, context.oriBlockTable, "ori_block_table") != ge::GRAPH_SUCCESS ||
         CheckBlockTable(context, context.cmpBlockTable, "cmp_block_table") != ge::GRAPH_SUCCESS) {
@@ -44,7 +44,7 @@ ge::graphStatus PagedAttentionChecker::CheckSinglePara(const CheckContext &conte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckParaExistence(const CheckContext &context) const
+ge::graphStatus PagedAttentionChecker::CheckParaExistence(const CheckContext& context) const
 {
     if (context.variant == OperatorVariant::MIXED_QUANT && context.quantMode == TURBO_QUANT_MODE) {
         OP_CHECK_IF(!context.oriBlockTable.present || !context.cmpBlockTable.present,
@@ -86,7 +86,7 @@ ge::graphStatus PagedAttentionChecker::CheckParaExistence(const CheckContext &co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckMultiPara(const CheckContext &context) const
+ge::graphStatus PagedAttentionChecker::CheckMultiPara(const CheckContext& context) const
 {
     if (context.oriBlockTable.present) {
         OP_CHECK_IF(GetDim(context.oriBlockTable, 0) != context.bSize,

@@ -44,7 +44,7 @@ using namespace SMLAKernel;
                                       SMLAKernel::SmlaCsaBlockVector<__VA_ARGS__>>::type; \
         templateClass<CubeBlockType, VecBlockType> op; \
         GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tilingDataIn, tiling); \
-        const tilingdataClass *__restrict tilingData = &tilingDataIn; \
+        const tilingdataClass* __restrict tilingData = &tilingDataIn; \
         op.Init(query, oriKV, cmpKV, oriSparseIndices, cmpSparseIndices, oriBlockTable, cmpBlockTable, cuSeqlensQ, \
                 cuSeqlensOriKv, cuSeqlensCmpKv, seqUsedQ, seqUsedOriKV, seqUsedCmpKV, cmpResidualKV, oriTopkLength, \
                 cmpTopkLength, sinks, metadata, attentionOut, softmaxLse, user, tilingData); \
@@ -55,7 +55,7 @@ using namespace SMLAKernel;
     do { \
         templateClass<SMLAType<__VA_ARGS__>> op; \
         GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tiling_data_in, tiling); \
-        const tilingdataClass *__restrict tiling_data = &tiling_data_in; \
+        const tilingdataClass* __restrict tiling_data = &tiling_data_in; \
         op.Init(query, oriKV, cmpKV, oriSparseIndices, cmpSparseIndices, oriBlockTable, cmpBlockTable, cuSeqlensQ, \
                 cuSeqlensOriKv, cuSeqlensCmpKv, seqUsedQ, seqUsedOriKV, seqUsedCmpKV, cmpResidualKV, oriTopkLength, \
                 cmpTopkLength, sinks, metadata, attentionOut, softmaxLse, user, tiling_data, tiling, &tPipe); \
@@ -64,17 +64,17 @@ using namespace SMLAKernel;
 #endif
 
 template <int FLASH_DECODE, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int SPLIT_G, int HEAD_RATIO_ONE,
-          int BATCH_CONSISTENCY, int IS_VEC_S2PHYADDR, int IS_DSPARK>
+          int BATCH_CONSISTENCY, int IS_VEC_S2PHYADDR, int TOPK_VALUE_MODE, int IS_DSPARK>
 __global__ __aicore__ void sparse_flash_mla(
-    __gm__ uint8_t *query, __gm__ uint8_t *oriKV, __gm__ uint8_t *cmpKV, __gm__ uint8_t *oriSparseIndices,
-    __gm__ uint8_t *cmpSparseIndices, __gm__ uint8_t *oriBlockTable, __gm__ uint8_t *cmpBlockTable,
-    __gm__ uint8_t *cuSeqlensQ, __gm__ uint8_t *cuSeqlensOriKv, __gm__ uint8_t *cuSeqlensCmpKv,
-    __gm__ uint8_t *seqUsedQ, __gm__ uint8_t *seqUsedOriKV, __gm__ uint8_t *seqUsedCmpKV, __gm__ uint8_t *cmpResidualKV,
-    __gm__ uint8_t *oriTopkLength, __gm__ uint8_t *cmpTopkLength, __gm__ uint8_t *sinks, __gm__ uint8_t *metadata,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* oriKV, __gm__ uint8_t* cmpKV, __gm__ uint8_t* oriSparseIndices,
+    __gm__ uint8_t* cmpSparseIndices, __gm__ uint8_t* oriBlockTable, __gm__ uint8_t* cmpBlockTable,
+    __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensOriKv, __gm__ uint8_t* cuSeqlensCmpKv,
+    __gm__ uint8_t* seqUsedQ, __gm__ uint8_t* seqUsedOriKV, __gm__ uint8_t* seqUsedCmpKV, __gm__ uint8_t* cmpResidualKV,
+    __gm__ uint8_t* oriTopkLength, __gm__ uint8_t* cmpTopkLength, __gm__ uint8_t* sinks, __gm__ uint8_t* metadata,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
 
 #if (__CCE_AICORE__ == 310)
     if constexpr (ORIG_DTYPE_Q == DT_FLOAT16 && ORIG_DTYPE_ORI_KV == DT_FLOAT16 && ORIG_DTYPE_ATTN_OUT == DT_FLOAT16) {
@@ -82,11 +82,13 @@ __global__ __aicore__ void sparse_flash_mla(
                       TEMPLATE_MODE == ORI_CMP_SPARSE_TEMPLATE) {
             SMLA_OP_IMPL(SMLAKernel::SparseFlashMlaCsaKernel, SparseFlashMlaTilingData, half, half, float, half,
                          FLASH_DECODE, static_cast<SMLA_LAYOUT>(LAYOUT_T), static_cast<SMLA_LAYOUT>(KV_LAYOUT_T),
-                         static_cast<SMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, BATCH_CONSISTENCY, IS_VEC_S2PHYADDR);
+                         static_cast<SMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, BATCH_CONSISTENCY, IS_VEC_S2PHYADDR,
+                         static_cast<TopkValueMode>(TOPK_VALUE_MODE));
         } else {
             SMLA_OP_IMPL(SMLAKernel::SparseFlashMlaSwaKernel, SparseFlashMlaTilingData, half, half, float, half,
                          FLASH_DECODE, static_cast<SMLA_LAYOUT>(LAYOUT_T), static_cast<SMLA_LAYOUT>(KV_LAYOUT_T),
-                         static_cast<SMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, BATCH_CONSISTENCY, IS_VEC_S2PHYADDR);
+                         static_cast<SMLATemplateMode>(TEMPLATE_MODE), SPLIT_G, BATCH_CONSISTENCY, IS_VEC_S2PHYADDR,
+                         static_cast<TopkValueMode>(TOPK_VALUE_MODE));
         }
     }
     if constexpr (ORIG_DTYPE_Q == DT_BF16 && ORIG_DTYPE_ORI_KV == DT_BF16 && ORIG_DTYPE_ATTN_OUT == DT_BF16) {
@@ -95,12 +97,12 @@ __global__ __aicore__ void sparse_flash_mla(
             SMLA_OP_IMPL(SMLAKernel::SparseFlashMlaCsaKernel, SparseFlashMlaTilingData, bfloat16_t, bfloat16_t, float,
                          bfloat16_t, FLASH_DECODE, static_cast<SMLA_LAYOUT>(LAYOUT_T),
                          static_cast<SMLA_LAYOUT>(KV_LAYOUT_T), static_cast<SMLATemplateMode>(TEMPLATE_MODE), SPLIT_G,
-                         BATCH_CONSISTENCY, IS_VEC_S2PHYADDR);
+                         BATCH_CONSISTENCY, IS_VEC_S2PHYADDR, static_cast<TopkValueMode>(TOPK_VALUE_MODE));
         } else {
             SMLA_OP_IMPL(SMLAKernel::SparseFlashMlaSwaKernel, SparseFlashMlaTilingData, bfloat16_t, bfloat16_t, float,
                          bfloat16_t, FLASH_DECODE, static_cast<SMLA_LAYOUT>(LAYOUT_T),
                          static_cast<SMLA_LAYOUT>(KV_LAYOUT_T), static_cast<SMLATemplateMode>(TEMPLATE_MODE), SPLIT_G,
-                         BATCH_CONSISTENCY, IS_VEC_S2PHYADDR);
+                         BATCH_CONSISTENCY, IS_VEC_S2PHYADDR, static_cast<TopkValueMode>(TOPK_VALUE_MODE));
         }
     }
 #else

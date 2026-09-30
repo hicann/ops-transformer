@@ -468,6 +468,7 @@ TEST_PARAMS = {
         "ori_win_left": [-1],
         "ori_win_right": [-1],
         "template_mode": ["ORI_SPARSE"],
+        "topk_value_mode": [2],
         "ori_kv_topk_mode": ["fullK"],
         "cmp_kv_topk_mode": ["fullK"],
         "ori_sparse_indices_mode": ["full"],

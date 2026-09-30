@@ -245,6 +245,7 @@ cann_ops_transformer.quant_sparse_flash_mla(
   - return_softmax_lse=False时返回shape为[0]的空tensor；return_softmax_lse=True时返回float32的log-sum-exp结果。
   - cu_seqlens_q、cu_seqlens_ori_kv、cu_seqlens_cmp_kv须满足首元素为0，且序列整体呈非递减排列，即任一元素不小于其前一个元素。
   - 当layout_kv为PA_BBND时，ori_kv和cmp_kv支持0轴非连续。
+  - topk_value_mode在A2A3上只支持1，在A5上支持1和2。
   - 各参数shape中以相同符号表示的维度，其对应轴的实际数值需保持一致。
 
 ### 特性参数组
@@ -876,7 +877,7 @@ metadata校验
             <td>
                 <ul>
                     <li>data_type支持int32</li>
-                    <li>topK索引取值模式，默认值为1</li>
+                    <li>topK索引取值模式</li>
                 </ul>
             </td>
             <td>可选属性，默认值为1</td>

@@ -70,11 +70,12 @@ using AttentionCommon::Align64Func;
 #define TEMPLATE_INTF \
     template <typename Q_T, typename KV_T, typename T, typename OUTPUT_T, bool isFd, bool isPa, QSMLA_LAYOUT LAYOUT_T, \
               QSMLA_LAYOUT KV_LAYOUT_T, QSMLATemplateMode TEMPLATE_MODE, bool IS_SPLIT_G, \
-              SCALE_CONTIGUOUS_MODE QUANT_MODE, bool IS_BATCH_CONSISTENCY, bool IS_VEC_S2PHYADDR, bool HIGH_PERF>
+              SCALE_CONTIGUOUS_MODE QUANT_MODE, bool IS_BATCH_CONSISTENCY, bool IS_VEC_S2PHYADDR, bool HIGH_PERF, \
+              TopkValueMode TOPK_VALUE_MODE>
 
 #define TEMPLATE_INTF_ARGS \
     Q_T, KV_T, T, OUTPUT_T, isFd, isPa, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G, QUANT_MODE, \
-        IS_BATCH_CONSISTENCY, IS_VEC_S2PHYADDR, HIGH_PERF
+        IS_BATCH_CONSISTENCY, IS_VEC_S2PHYADDR, HIGH_PERF, TOPK_VALUE_MODE
 
 #define MQSMLA_CUBE_TRAIT_TYPES(X) \
     X(Q_T) \
@@ -92,7 +93,8 @@ using AttentionCommon::Align64Func;
     X(QUANT_MODE, SCALE_CONTIGUOUS_MODE, SCALE_CONTIGUOUS_MODE::CONTIGUOUS) \
     X(IS_BATCH_CONSISTENCY, bool, false) \
     X(IS_VEC_S2PHYADDR, bool, false) \
-    X(HIGH_PERF, bool, false)
+    X(HIGH_PERF, bool, false) \
+    X(TOPK_VALUE_MODE, TopkValueMode, TopkValueMode::TOPK_INDEX_MODE)
 
 /* 1. 生成带默认值的模版Template */
 #define MQSMLA_TEMPLATE_TYPE(name) typename name,
