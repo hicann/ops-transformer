@@ -27,6 +27,7 @@ class Network(torch.nn.Module):
     def forward(
         self,
         q,
+        quant_mode,
         ori_kv,
         cmp_kv,
         q_descale,
@@ -47,7 +48,6 @@ class Network(torch.nn.Module):
         cmp_topk_length,
         sinks,
         metadata,
-        quant_mode,
         softmax_scale,
         cmp_ratio,
         ori_mask_mode,
@@ -66,6 +66,7 @@ class Network(torch.nn.Module):
             win_kwargs["ori_win_right"] = ori_win_right
         npu_result, npu_lse = torch.ops.cann_ops_transformer.quant_sparse_flash_mla(
             q=q,
+            quant_mode=quant_mode,
             ori_kv=ori_kv,
             cmp_kv=cmp_kv,
             q_descale=q_descale,
@@ -86,7 +87,6 @@ class Network(torch.nn.Module):
             cmp_topk_length=cmp_topk_length,
             sinks=sinks,
             metadata=metadata,
-            quant_mode=quant_mode,
             softmax_scale=softmax_scale,
             cmp_ratio=cmp_ratio,
             ori_mask_mode=ori_mask_mode,

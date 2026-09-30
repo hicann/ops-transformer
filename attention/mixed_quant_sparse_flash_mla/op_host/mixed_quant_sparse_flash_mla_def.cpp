@@ -118,7 +118,7 @@ public:
             .ParamType(OPTIONAL)
             .DataTypeList({ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND});
-        this->Attr("quant_mode").AttrType(OPTIONAL).Int();
+        this->Attr("quant_mode").AttrType(REQUIRED).Int();
         this->Attr("rope_head_dim").AttrType(OPTIONAL).Int();
         this->Attr("softmax_scale").AttrType(OPTIONAL).Float();
         this->Attr("cmp_ratio").AttrType(OPTIONAL).Int();
