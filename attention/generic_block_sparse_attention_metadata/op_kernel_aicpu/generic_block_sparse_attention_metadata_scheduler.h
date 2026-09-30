@@ -293,8 +293,7 @@ inline bool ShouldBuildDecodeSchedule(const ScheduleInput &input, const Schedule
         input.headDim == 128 && input.blockShapeY == 128 && input.blockIndexStride >= 12 &&
         input.blockIndexStride <=
             static_cast<int64_t>(optiling::generic_block_sparse_attention_metadata::MAX_SPARSE_BLOCK_CAPACITY) &&
-        result.groupSize > 0 && result.groupSize <= 128 &&
-        (input.maxQSeqLen <= 0 || input.maxQSeqLen >= result.totalQTokenNum) && result.saTotalTaskNum > 0 &&
+        result.groupSize > 0 && result.groupSize <= 128 && result.saTotalTaskNum > 0 &&
         static_cast<uint64_t>(result.saTotalTaskNum) * 10U < static_cast<uint64_t>(input.aicCoreNum) * 3U;
     return fdShapeSupported && totalSplitTaskNum > result.saUsedCoreNum && totalCost > 0U && totalValidBlockNum > 0U;
 }
