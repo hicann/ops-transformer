@@ -19,7 +19,7 @@
 #   bash run.sh 2-4                    # 运行 CSV 第 2~4 行
 #   bash run.sh all                    # 运行 CSV 全部行
 #   bash run.sh --csv <file> 1 3       # 指定 csv 文件 + 行号
-#   bash run.sh --cli m k n r          # 命令行模式(绕过 csv)
+#   bash run.sh --cli m k n r [b]      # 命令行模式(绕过 csv, b=bufferCount, 0=不复用)
 #   bash run.sh --skip-build ...       # 跳过编译
 #   bash run.sh --gen-only ...         # 仅生成 CPU golden
 #   bash run.sh --verify-only ...      # 仅精度比对
@@ -104,11 +104,11 @@ print_perf_hint() {
 
 # ---- 单 case 执行函数 ----
 run_single() {
-    local M=$1 K=$2 N=$3 RANK_NUM=$4
+    local M=$1 K=$2 N=$3 RANK_NUM=$4 BUFFER_COUNT=$5
     echo ""
     echo "=========================================="
     echo "apace AllGatherQuantMatmul Prefill ST"
-    echo "  M=$M K=$K N=$N rankNum=$RANK_NUM"
+    echo "  M=$M K=$K N=$N rankNum=$RANK_NUM bufferCount=$BUFFER_COUNT"
     echo "=========================================="
 
     cd "$SCRIPT_DIR"
@@ -165,17 +165,17 @@ run_single() {
                 local before_dirs after_dirs new_dirs
                 before_dirs=$(get_prof_dirs)
 
-                echo "  [msprof] Running $EXE_PATH $M $K $N $RANK_NUM $MODE ..."
+                echo "  [msprof] Running $EXE_PATH $M $K $N $RANK_NUM $MODE $BUFFER_COUNT ..."
                 if command -v timeout >/dev/null 2>&1; then
                     set +e
                     timeout ${KERNEL_TIMEOUT}s msprof --output="$PROF_DIR" \
-                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE" 2>&1
+                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE $BUFFER_COUNT" 2>&1
                     local MSPROF_RC=$?
                     set -e
                 else
                     set +e
                     msprof --output="$PROF_DIR" \
-                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE" 2>&1
+                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE $BUFFER_COUNT" 2>&1
                     local MSPROF_RC=$?
                     set -e
                 fi
@@ -202,7 +202,7 @@ run_single() {
                 fi
 
                 for d in $new_dirs; do
-                    echo "M=$M K=$K N=$N" > "$PROF_DIR/$d/case_info.txt"
+                    echo "M=$M K=$K N=$N bufferCount=$BUFFER_COUNT" > "$PROF_DIR/$d/case_info.txt"
                 done
 
                 # ---- 校验 PROF 数据有效性（op_summary CSV 是否能解析出 latency）----
@@ -254,12 +254,12 @@ run_single() {
                 # ---- precision 模式: 直接调 exe ----
                 if command -v timeout >/dev/null 2>&1; then
                     set +e
-                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s "$EXE_PATH" $M $K $N $RANK_NUM "$MODE" 2>&1)
+                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s "$EXE_PATH" $M $K $N $RANK_NUM "$MODE" "$BUFFER_COUNT" 2>&1)
                     KERNEL_RC=$?
                     set -e
                 else
                     set +e
-                    KERNEL_OUT=$("$EXE_PATH" $M $K $N $RANK_NUM "$MODE" 2>&1)
+                    KERNEL_OUT=$("$EXE_PATH" $M $K $N $RANK_NUM "$MODE" "$BUFFER_COUNT" 2>&1)
                     KERNEL_RC=$?
                     set -e
                 fi
@@ -313,13 +313,14 @@ run_single() {
 
 # ---- 选择参数来源 ----
 if [ "${CLI_MODE:-0}" -eq 1 ]; then
-    M=2048; K=3584; N=4096; RANK_NUM=4
+    M=2048; K=4096; N=2560; RANK_NUM=4; BUFFER_COUNT=0
     idx=0
     [ $idx -lt ${#ARGS[@]} ] && { M=${ARGS[$idx]}; idx=$((idx+1)); }
     [ $idx -lt ${#ARGS[@]} ] && { K=${ARGS[$idx]}; idx=$((idx+1)); }
     [ $idx -lt ${#ARGS[@]} ] && { N=${ARGS[$idx]}; idx=$((idx+1)); }
     [ $idx -lt ${#ARGS[@]} ] && { RANK_NUM=${ARGS[$idx]}; idx=$((idx+1)); }
-    run_single "$M" "$K" "$N" "$RANK_NUM"
+    [ $idx -lt ${#ARGS[@]} ] && { BUFFER_COUNT=${ARGS[$idx]}; idx=$((idx+1)); }
+    run_single "$M" "$K" "$N" "$RANK_NUM" "$BUFFER_COUNT"
     rc=$?
     print_perf_hint
     exit $rc
@@ -336,11 +337,11 @@ TOTAL_LINES=$(echo "$DATA_LINES" | grep -c .)
 # 无参数: 列出全部 case 并全部运行
 if [ ${#ARGS[@]} -eq 0 ]; then
     echo "==== cases.csv ($TOTAL_LINES cases) ===="
-    echo "Row  M      K     N     rank"
+    echo "Row  M      K     N     rank  bufferCnt"
     local_idx=0
     while IFS= read -r line; do
         local_idx=$((local_idx + 1))
-        printf "%-5s %s\n" "$local_idx" "$(echo "$line" | awk -F, '{printf "%-6s %-5s %-5s %s", $1,$2,$3,$4}')"
+        printf "%-5s %s\n" "$local_idx" "$(echo "$line" | awk -F, '{printf "%-6s %-5s %-5s %-5s %s", $1,$2,$3,$4,$5}')"
     done <<< "$DATA_LINES"
     echo ""
     echo "Running all $TOTAL_LINES cases..."
@@ -368,16 +369,18 @@ for row in "${SELECTED_ROWS[@]}"; do
     K=$(echo "$SELECTED" | awk -F, '{print $2}')
     N=$(echo "$SELECTED" | awk -F, '{print $3}')
     RANK_NUM=$(echo "$SELECTED" | awk -F, '{print $4}')
+    BUFFER_COUNT=$(echo "$SELECTED" | awk -F, '{print $5}')
+    BUFFER_COUNT=${BUFFER_COUNT:-0}
 
     echo ""
     echo "########## CSV row ${row}/${TOTAL_LINES} ##########"
 
-    if run_single "$M" "$K" "$N" "$RANK_NUM"; then
+    if run_single "$M" "$K" "$N" "$RANK_NUM" "$BUFFER_COUNT"; then
         PASS_CNT=$((PASS_CNT + 1))
-        RESULTS+=("PASS  row$row  M=$M K=$K N=$N rank=$RANK_NUM")
+        RESULTS+=("PASS  row$row  M=$M K=$K N=$N rank=$RANK_NUM bufferCnt=$BUFFER_COUNT")
     else
         FAIL_CNT=$((FAIL_CNT + 1))
-        RESULTS+=("FAIL  row$row  M=$M K=$K N=$N rank=$RANK_NUM")
+        RESULTS+=("FAIL  row$row  M=$M K=$K N=$N rank=$RANK_NUM bufferCnt=$BUFFER_COUNT")
     fi
     # 首次编译后，后续 case 跳过编译
     SKIP_BUILD=1

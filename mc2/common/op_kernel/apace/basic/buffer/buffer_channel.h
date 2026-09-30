@@ -58,6 +58,13 @@ public:
         return static_cast<uint64_t>(slotNum_) * slotSize_;
     }
 
+    // 读取任意 round 的槽位 slotIdx（不推进游标），与 GetNextSlot 第 roundIdx+1 次调用的 slotIdx 一致；
+    // 用于回溯已消费 round 的 flagId。调用方的偏移约定自行叠加（如 agmm +1 避开 HEAD 预触发的 0）。
+    __aicore__ inline uint32_t GetRoundSlotIdx(uint32_t roundIdx) const
+    {
+        return roundIdx % slotNum_ % FLAG_ID_MODULO;
+    }
+
     // 返回当前 buffer 的逻辑偏移与 flagId(slotIdx)，并让游标回环前进一格
     __aicore__ inline Slot GetNextSlot()
     {

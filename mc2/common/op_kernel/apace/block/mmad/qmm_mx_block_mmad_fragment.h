@@ -37,6 +37,18 @@ template <uint64_t A_FULL_LOAD_MODE, bool ATOMIC_ADD, class AType_, class Layout
           class CType_, class LayoutC_, class BiasType_, class LayoutBias_>
 class QmmMxBlockMmadFragment;
 
+// 用于区分 FragmentTensor 与普通连续 tensor，从而在 GM2L1 拷贝时分流：
+//   - FragmentTensor → FragmentSliceCopy（跨 GM 段拼装）
+//   - 普通 tensor   → asc::te::copy（单段连续）
+template <typename T>
+struct IsFragmentTensor {
+    static constexpr bool value = false;
+};
+template <uint32_t Dims, uint32_t MaxFragments, typename LayoutFactory, typename ElementType>
+struct IsFragmentTensor<Apace::Basic::FragmentTensor<Dims, MaxFragments, LayoutFactory, ElementType>> {
+    static constexpr bool value = true;
+};
+
 #if (defined(__NPU_ARCH__) && __NPU_ARCH__ == 3510)
 
 template <uint64_t A_FULL_LOAD_MODE, bool ATOMIC_ADD, class AType_, class LayoutA_, class BType_, class LayoutB_,
@@ -149,8 +161,8 @@ public:
     }
 
 public:
-    __aicore__ inline void Init(const ProblemShape &problemShape, const BlockShape &l0TileShape,
-                                const L1Params &l1Params, bool isBias, bool dbL0C, uint64_t splitKNum = 1)
+    __aicore__ inline void Init(const ProblemShape& problemShape, const BlockShape& l0TileShape,
+                                const L1Params& l1Params, bool isBias, bool dbL0C, uint64_t splitKNum = 1)
     {
         k_ = asc::te::get<IDX_K_IDX>(problemShape);
         kL1_ = l1Params.kL1;
@@ -205,9 +217,20 @@ public:
         kL1Iter_ = CeilDiv(k_, kL1_);
     }
 
+    // GM → L1 分段/连续 统一入口：FragmentTensor 走 FragmentSliceCopy，普通 tensor 走单段 asc::te::copy。
+    template <typename CopyHandleT, typename TensorDstT, typename GmSrcT>
+    __aicore__ inline void CopyGmToL1(CopyHandleT& handle, TensorDstT& dst, GmSrcT const& src)
+    {
+        if constexpr (IsFragmentTensor<GmSrcT>::value) {
+            Apace::Basic::FragmentSliceCopy<false>(handle, dst, src);
+        } else {
+            asc::te::copy(handle, dst, src);
+        }
+    }
+
     template <typename TensorScaleA, typename TensorScaleB>
-    __aicore__ inline auto CopyScalesInL1(TensorScaleA const &gmScaleA, TensorScaleB const &gmScaleB,
-                                          TileL1L0Param &tileL1L0Param, uint64_t scaleL1BufId, uint64_t iter0)
+    __aicore__ inline auto CopyScalesInL1(TensorScaleA const& gmScaleA, TensorScaleB const& gmScaleB,
+                                          TileL1L0Param& tileL1L0Param, uint64_t scaleL1BufId, uint64_t iter0)
     {
         uint64_t kL1Offset = iter0 * kL1_;
         auto layoutScaleBL1 = asc::te::make_frame_layout<asc::te::nn_layout_ptn, AscendC::Std::Int<SCALE_C0>>(
@@ -230,9 +253,9 @@ public:
                 }
                 uint64_t scaleKStart = iter0 * Blaze::Gemm::CeilDiv(kL1_, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
                 uint64_t scaleKLength = Blaze::Gemm::CeilDiv(curScaleKL1, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
-                auto blockScaleA = gmScaleA.Slice(asc::te::make_coord(0, scaleKStart),
+                auto blockScaleA = gmScaleA.slice(asc::te::make_coord(0, scaleKStart),
                                                   asc::te::make_shape(tileL1L0Param.curM, scaleKLength));
-                FragmentSliceCopy<false>(CopyScaleGM2L1, tensorScaleAL1, blockScaleA);
+                CopyGmToL1(CopyScaleGM2L1, tensorScaleAL1, blockScaleA);
 
                 auto gmBlockScaleB = gmScaleB.slice(asc::te::make_coord(scaleKStart, 0),
                                                     asc::te::make_shape(scaleKLength, tileL1L0Param.curN));
@@ -257,24 +280,24 @@ public:
                 asc::te::copy(CopyScaleGM2L1, tensorScaleBL1, gmBlockScaleB);
             }
             if (abL1LoopCnt_ == 0) {
-                FragmentSliceCopy<false>(CopyScaleGM2L1, tensorScaleAL1, gmScaleA);
+                CopyGmToL1(CopyScaleGM2L1, tensorScaleAL1, gmScaleA);
             }
             return ScalePair<decltype(tensorScaleAL1), decltype(tensorScaleBL1)>{tensorScaleAL1, tensorScaleBL1};
         }
     }
 
     template <typename TensorA>
-    __aicore__ inline auto CopyAInL1(TensorA const &gmA, TileL1L0Param &tileL1L0Param, uint64_t l1BufId, uint64_t iter0)
+    __aicore__ inline auto CopyAInL1(TensorA const& gmA, TileL1L0Param& tileL1L0Param, uint64_t l1BufId, uint64_t iter0)
     {
         auto copyGM2L1 = asc::te::make_copy(asc::te::copy_gm_to_l1{});
         if constexpr (DispatchPolicy::FULL_LOAD_MODE == 0) {
             auto layoutAL1 = MakeLayoutAL1{}(tileL1L0Param.curM, tileL1L0Param.curPadAKL1);
             auto tensorAL1 = asc::te::make_tensor(
                 asc::te::make_mem_ptr<asc::te::location::l1, AType>(l1BufferAOffset_[l1BufId]), layoutAL1);
-            auto blockA = gmA.Slice(asc::te::make_coord(0, iter0 * kL1_),
+            auto blockA = gmA.slice(asc::te::make_coord(0, iter0 * kL1_),
                                     asc::te::make_shape(tileL1L0Param.curM, tileL1L0Param.curGmAKL1));
             Apace::Basic::PadMxKAL1Zero(tensorAL1, tileL1L0Param.curGmAKL1);
-            FragmentSliceCopy<false>(copyGM2L1, tensorAL1, blockA);
+            CopyGmToL1(copyGM2L1, tensorAL1, blockA);
             return tensorAL1;
         } else {
             auto layoutAL1 = MakeLayoutAL1{}(tileL1L0Param.curM, Blaze::Gemm::CeilAlign(k_, MXFP_DIVISOR_SIZE));
@@ -283,10 +306,10 @@ public:
             auto tensorAL1 = tensorTotalAL1.slice(asc::te::make_coord(0, iter0 * kL1_),
                                                   asc::te::make_shape(tileL1L0Param.curM, tileL1L0Param.curPadAKL1));
             if (abL1LoopCnt_ < kL1Iter_) {
-                auto blockA = gmA.Slice(asc::te::make_coord(0, iter0 * kL1_),
+                auto blockA = gmA.slice(asc::te::make_coord(0, iter0 * kL1_),
                                         asc::te::make_shape(tileL1L0Param.curM, tileL1L0Param.curGmAKL1));
                 Apace::Basic::PadMxKAL1Zero(tensorAL1, tileL1L0Param.curGmAKL1);
-                FragmentSliceCopy<false>(copyGM2L1, tensorAL1, blockA);
+                CopyGmToL1(copyGM2L1, tensorAL1, blockA);
             }
             return tensorAL1;
         }
@@ -294,9 +317,9 @@ public:
 
     template <typename TensorScaleAL1, typename TensorScaleBL1, typename TensorAL1, typename TensorBL1,
               typename TensorBiasL1, typename TensorL0C>
-    __aicore__ inline void Iterate(TileL1L0Param &tileL1L0Param, uint64_t iter0, TensorScaleAL1 &tensorScaleAL1,
-                                   TensorScaleBL1 &tensorScaleBL1, TensorAL1 &tensorAL1, TensorBL1 &tensorBL1,
-                                   TensorBiasL1 &tensorBiasL1, TensorL0C &tensorL0C, uint64_t splitKIdx)
+    __aicore__ inline void Iterate(TileL1L0Param& tileL1L0Param, uint64_t iter0, TensorScaleAL1& tensorScaleAL1,
+                                   TensorScaleBL1& tensorScaleBL1, TensorAL1& tensorAL1, TensorBL1& tensorBL1,
+                                   TensorBiasL1& tensorBiasL1, TensorL0C& tensorL0C, uint64_t splitKIdx)
     {
         // 从scaleKL1中切出kL1_对应的部分
         auto scaleKL1Len = Blaze::Gemm::CeilDiv(kL1_, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
@@ -385,12 +408,12 @@ public:
 
     template <typename TensorA, typename TensorB, typename TensorScaleA, typename TensorScaleB, typename TensorBias,
               typename TensorC = int>
-    __aicore__ inline void operator()(TensorA const &gmA, TensorB const &gmB, TensorScaleA const &gmScaleA,
-                                      TensorScaleB const &gmScaleB, TensorBias const &gmBias, GM_ADDR *cFragAddrs,
+    __aicore__ inline void operator()(TensorA const& gmA, TensorB const& gmB, TensorScaleA const& gmScaleA,
+                                      TensorScaleB const& gmScaleB, TensorBias const& gmBias, GM_ADDR* cFragAddrs,
                                       uint64_t mPerRank, uint64_t tileM, uint64_t tileCnt, uint64_t tailM,
-                                      uint64_t remoteRankCnt, int64_t cRowStride, BlockShape const &singleShape,
+                                      uint64_t remoteRankCnt, int64_t cRowStride, BlockShape const& singleShape,
                                       int64_t mPosGlobal, int64_t nPosGlobal, uint64_t splitKIdx = 0,
-                                      TensorC const &gmC = 0)
+                                      TensorC const& gmC = 0)
     {
         TileL1L0Param tileL1L0Param;
         tileL1L0Param.curM = asc::te::get<IDX_M_TILEIDX>(singleShape);
@@ -406,8 +429,8 @@ public:
 
             // scaleA, scaleB GM->L1
             auto scalePair = CopyScalesInL1(gmScaleA, gmScaleB, tileL1L0Param, scaleL1BufId, iter0);
-            auto &tensorScaleAL1 = scalePair.scaleA;
-            auto &tensorScaleBL1 = scalePair.scaleB;
+            auto& tensorScaleAL1 = scalePair.scaleA;
+            auto& tensorScaleBL1 = scalePair.scaleB;
 
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BufId);
             biasBufId_ = scaleL1BufId;
@@ -458,7 +481,7 @@ public:
     }
 
     template <typename TensorC, typename TensorL0C>
-    __aicore__ inline void ScatterL0C2GM(TensorC const &gmC, TensorL0C &tensorL0C)
+    __aicore__ inline void ScatterL0C2GM(TensorC const& gmC, TensorL0C& tensorL0C)
     {
         auto copyL0C2GM = asc::te::make_copy(asc::te::copy_l0c_to_gm{});
         FragmentSliceCopy<true>(copyL0C2GM.with(asc::te::l0c_to_gm_params(asc::te::unit_flag_mode::enable_update)),
@@ -475,9 +498,9 @@ private:
     }
 
     template <typename TensorL0CType, typename TensorAL0, typename TensorBL0, typename TensorBT>
-    __aicore__ inline void Mmad(TileL1L0Param &tileL1L0Param, uint64_t iter0, uint64_t iter1, uint64_t kL0Iter,
-                                uint64_t curKL0, TensorL0CType &tensorL0C, TensorAL0 const &tensorAL0,
-                                TensorBL0 const &tensorBL0, TensorBT const &tensorBt, uint64_t splitKIdx)
+    __aicore__ inline void Mmad(TileL1L0Param& tileL1L0Param, uint64_t iter0, uint64_t iter1, uint64_t kL0Iter,
+                                uint64_t curKL0, TensorL0CType& tensorL0C, TensorAL0 const& tensorAL0,
+                                TensorBL0 const& tensorBL0, TensorBT const& tensorBt, uint64_t splitKIdx)
     {
         asc::te::mmad_params params;
         params.m = static_cast<uint16_t>(tileL1L0Param.curM);

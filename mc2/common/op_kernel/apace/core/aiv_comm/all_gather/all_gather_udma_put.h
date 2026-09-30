@@ -42,14 +42,18 @@ private:
     template <uint8_t BarrierMode>
     __aicore__ inline void DoCommit(uint32_t targetRankId, uint64_t tileByteSize, uint64_t bufferOffset)
     {
-        (void)bufferOffset;
         if (targetRankId == this->udmaCtx_->rankId) {
             return;
         }
         GM_ADDR srcAddr = this->localAddr_ + this->tileByteOffset_;
 
+        // win buffer 复用：remote 紧凑排布，每轮连续放置 (rankSize-1) 个 remote tile 段，
+        // 跳过对端本卡（targetRankId），src rank 按升序映射到 compact 序号。
+        // bufferOffset 由写端 BufferChannel 提供 = slotIdxRaw * (rankSize-1) * tileMaxByteSize_
+        uint32_t srcRank = this->udmaCtx_->rankId;
+        uint32_t remoteIdx = (srcRank > targetRankId) ? (srcRank - 1) : srcRank;
         GM_ADDR dstAddr = reinterpret_cast<GM_ADDR>(this->udmaCtx_->commBufferAddrs[targetRankId] + this->winOffset_) +
-                          this->udmaCtx_->rankId * this->chunkBytes_ + this->tileByteOffset_;
+                          bufferOffset + remoteIdx * this->tileMaxByteSize_;
 
         int32_t ret = this->comm_.WriteNbi(static_cast<ChannelHandle>(this->udmaCtx_->channelHandles[targetRankId]),
                                            dstAddr, srcAddr, tileByteSize);

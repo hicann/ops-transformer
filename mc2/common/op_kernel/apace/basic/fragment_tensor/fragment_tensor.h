@@ -10,7 +10,7 @@
 
 /*!
  * \file fragment_tensor.h
- * \brief FragmentTensor：FragmentTensor：多个 GM fragment 的统一抽象，支持 Slice / Copy / Scatter。
+ * \brief FragmentTensor：FragmentTensor：多个 GM fragment 的统一抽象，支持 slice / Copy / Scatter。
  */
 
 #pragma once
@@ -96,7 +96,7 @@ public:
      * \note addrList 必须在 FragmentTensor 整个生命周期内保持有效，
      *       本类只保存指针，不拷贝数组内容。调用方须保证 addrList 非空。
      */
-    __aicore__ inline FragmentTensor(const FragmentParam<Dims> &fragParam, GM_ADDR const *addrList)
+    __aicore__ inline FragmentTensor(const FragmentParam<Dims>& fragParam, GM_ADDR const* addrList)
         : fragParam_(fragParam)
     {
         if (addrList != nullptr) {
@@ -108,7 +108,7 @@ public:
 
     __aicore__ inline auto GetFragment(uint32_t idx) const
     {
-        auto fragmentAddr = reinterpret_cast<__gm__ ElementType *>(addrList_[idx]);
+        auto fragmentAddr = reinterpret_cast<__gm__ ElementType*>(addrList_[idx]);
 
         uint64_t fragmentShape[Dims];
         ArrayCopy(fragmentShape, fragParam_.assembledShape, AscendC::Std::make_index_sequence<Dims>{});
@@ -143,14 +143,14 @@ public:
         return addrList_[idx];
     }
 
-    __aicore__ inline void UpdateAddrList(GM_ADDR const *addrList)
+    __aicore__ inline void UpdateAddrList(GM_ADDR const* addrList)
     {
         if (addrList != nullptr) {
             addrList_ = addrList;
         }
     }
 
-    __aicore__ inline const FragmentParam<Dims> &GetFragParam() const
+    __aicore__ inline const FragmentParam<Dims>& GetFragParam() const
     {
         return fragParam_;
     }
@@ -164,8 +164,9 @@ public:
         return sliceShape_[d];
     }
 
+    // 逻辑切片（记录 coord/shape，不做地址解析），与 asc::te::tensor::slice 同名同义，支持泛型代码统一调用
     template <typename CoordType, typename ShapeType>
-    __aicore__ inline auto Slice(const CoordType &coord, const ShapeType &shape) const
+    __aicore__ inline auto slice(const CoordType& coord, const ShapeType& shape) const
     {
         FragmentTensor result(*this);
         SliceImpl(result.sliceCoord_, result.sliceShape_, coord, shape, AscendC::Std::make_index_sequence<Dims>{});
@@ -242,7 +243,7 @@ public:
     /*!
      * \brief 获取Fragment信息（按槽位填充，this 的 sliceCoord/sliceShape 提供非 assembleAxis 值）
      */
-    __aicore__ inline FragmentInfo GetFragmentInfo(uint32_t localIdx, const FragmentComposition &comp) const
+    __aicore__ inline FragmentInfo GetFragmentInfo(uint32_t localIdx, const FragmentComposition& comp) const
     {
         FragmentInfo info;
 
@@ -287,8 +288,8 @@ private:
     }
 
     template <typename CoordType, typename ShapeType, size_t... Is>
-    __aicore__ inline void SliceImpl(uint64_t (&coord)[Dims], uint64_t (&shape)[Dims], const CoordType &inCoord,
-                                     const ShapeType &inShape, AscendC::Std::index_sequence<Is...>) const
+    __aicore__ inline void SliceImpl(uint64_t (&coord)[Dims], uint64_t (&shape)[Dims], const CoordType& inCoord,
+                                     const ShapeType& inShape, AscendC::Std::index_sequence<Is...>) const
     {
         ((coord[Is] = sliceCoord_[Is] + asc::te::get<Is>(inCoord)), ...);
         ((shape[Is] = asc::te::get<Is>(inShape)), ...);
@@ -306,15 +307,15 @@ private:
     }
 
     FragmentParam<Dims> fragParam_;
-    GM_ADDR const *addrList_{nullptr};
+    GM_ADDR const* addrList_{nullptr};
     uint64_t sliceCoord_[Dims]{};
     uint64_t sliceShape_[Dims]{};
 };
 
 template <bool isScatter, typename CopyHandle, typename TensorType, uint32_t Dims, uint32_t MaxF, typename GmLayoutF,
           typename ElemT>
-__aicore__ inline void FragmentSliceCopy(CopyHandle copyHandle, TensorType &tensor,
-                                         const FragmentTensor<Dims, MaxF, GmLayoutF, ElemT> &fragmentTensor)
+__aicore__ inline void FragmentSliceCopy(CopyHandle copyHandle, TensorType& tensor,
+                                         const FragmentTensor<Dims, MaxF, GmLayoutF, ElemT>& fragmentTensor)
 {
     const auto assembleAxis = fragmentTensor.GetSplitAxis();
     auto composition = fragmentTensor.ComputeFragmentComposition(fragmentTensor.GetSliceCoord(assembleAxis),
@@ -347,7 +348,7 @@ __aicore__ inline void FragmentSliceCopy(CopyHandle copyHandle, TensorType &tens
 
 // L1 tensor K 轴补零，复用 Blaze PadZero 底层 API。
 template <typename TensorL1>
-__aicore__ inline void PadMxKAL1Zero(TensorL1 &tensorL1, uint64_t kAxis)
+__aicore__ inline void PadMxKAL1Zero(TensorL1& tensorL1, uint64_t kAxis)
 {
     using type = typename TensorL1::element_type;
     auto layoutL1 = tensorL1.layout();
