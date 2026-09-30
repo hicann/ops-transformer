@@ -34,7 +34,7 @@ namespace optiling {
 const std::vector<uint32_t> GroupedMatmulAllToAllvTiling::GMM_X_DTYPE_LIST = {ge::DT_FLOAT16, ge::DT_BF16};
 const std::vector<uint32_t> GroupedMatmulAllToAllvTiling::GMM_WEIGHT_DTYPE_LIST = {ge::DT_FLOAT16, ge::DT_BF16};
 const std::vector<uint32_t> GroupedMatmulAllToAllvTiling::GMM_Y_DTYPE_LIST = {ge::DT_FLOAT16, ge::DT_BF16};
-const std::set<int64_t> GroupedMatmulAllToAllvTiling::A5_SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64};
+const std::set<int64_t> GroupedMatmulAllToAllvTiling::A5_SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64, 128, 256};
 const std::set<int64_t> GroupedMatmulAllToAllvTiling::A3_SUPPORT_RANK_SIZE{8, 16, 32, 64, 128};
 
 ge::graphStatus GroupedMatmulAllToAllvTiling::GetShapeAttrsInfo()
@@ -101,7 +101,7 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsGmm()
                                               "DT_FLOAT16 or DT_BF16"),
                     return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *gmmWeightStorageShape = context_->GetInputShape(GMM_WEIGHT_INDEX);
+    const gert::StorageShape* gmmWeightStorageShape = context_->GetInputShape(GMM_WEIGHT_INDEX);
     OP_TILING_CHECK(gmmWeightStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmWeight"),
                     return ge::GRAPH_FAILED);
     auto gmmWeightDesc = context_->GetInputDesc(GMM_WEIGHT_INDEX);
@@ -133,8 +133,8 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsGmm()
         return ge::GRAPH_FAILED);
     localParams_.gmmYDtype = localParams_.yDtype;
 
-    const gert::StorageShape *gmmXStorageShape = context_->GetInputShape(GMM_X_INDEX);
-    const gert::StorageShape *yStorageShape = context_->GetOutputShape(OUTPUT_Y_INDEX);
+    const gert::StorageShape* gmmXStorageShape = context_->GetInputShape(GMM_X_INDEX);
+    const gert::StorageShape* yStorageShape = context_->GetOutputShape(OUTPUT_Y_INDEX);
     OP_TILING_CHECK(gmmXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmX"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(yStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "y"), return ge::GRAPH_FAILED);
 
@@ -190,9 +190,9 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsMm()
     OP_TILING_CHECK(mmYDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "mmY"), return ge::GRAPH_FAILED);
     localParams_.mmYDtype = mmYDesc->GetDataType();
 
-    const gert::StorageShape *mmXStorageShape = context_->GetOptionalInputShape(MM_X_OPTIONAL_INDEX);
-    const gert::StorageShape *mmWeightStorageShape = context_->GetOptionalInputShape(MM_WEIGHT_OPTIONAL_INDEX);
-    const gert::StorageShape *mmYStorageShape = context_->GetOutputShape(OUTPUT_MM_Y_OPTIONAL_INDEX);
+    const gert::StorageShape* mmXStorageShape = context_->GetOptionalInputShape(MM_X_OPTIONAL_INDEX);
+    const gert::StorageShape* mmWeightStorageShape = context_->GetOptionalInputShape(MM_WEIGHT_OPTIONAL_INDEX);
+    const gert::StorageShape* mmYStorageShape = context_->GetOutputShape(OUTPUT_MM_Y_OPTIONAL_INDEX);
     OP_TILING_CHECK(mmXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "mmX"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(mmWeightStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "mmWeight"),
                     return ge::GRAPH_FAILED);
@@ -222,7 +222,7 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsMm()
 
 ge::graphStatus GroupedMatmulAllToAllvTiling::CheckAndSetLocalParamsAttr()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return ge::GRAPH_FAILED);
 
     auto transGmmWeightPtr = attrs->GetAttrPointer<bool>(ATTR_TRANS_GMM_WEIGHT_INDEX);
@@ -271,8 +271,8 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckParamsRelationMm()
 
 ge::graphStatus GroupedMatmulAllToAllvTiling::CheckParamsAttrEpAndSetLocalParams()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
-    const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
+    const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "group"), return ge::GRAPH_FAILED);
 
     int64_t rankDim = 0;
@@ -287,9 +287,9 @@ ge::graphStatus GroupedMatmulAllToAllvTiling::CheckParamsAttrEpAndSetLocalParams
     }
 
     std::string supportRankSizeRange;
-    const std::set<int64_t> &supportRankSize =
+    const std::set<int64_t>& supportRankSize =
         (npuArch_ == Ops::Base::DAV_3510) ? A5_SUPPORT_RANK_SIZE : A3_SUPPORT_RANK_SIZE;
-    for (const auto &v : supportRankSize) {
+    for (const auto& v : supportRankSize) {
         supportRankSizeRange += (std::to_string(v) + " ");
     }
     OP_TILING_CHECK(
@@ -337,13 +337,13 @@ uint32_t GroupedMatmulAllToAllvTiling::GetCommModeIndex() const
     return ATTR_COMM_MODE;
 }
 
-ge::graphStatus GroupedMatmulAllToAllvTiling::GetAndConvertCommMode(gert::TilingContext *context,
-                                                                    uint8_t &commMode) const
+ge::graphStatus GroupedMatmulAllToAllvTiling::GetAndConvertCommMode(gert::TilingContext* context,
+                                                                    uint8_t& commMode) const
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attrs"),
                     return ge::GRAPH_FAILED);
-    const char *commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE);
+    const char* commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE);
     OP_TILING_CHECK(commModeStr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "comm_mode"),
                     return ge::GRAPH_FAILED);
     const size_t maxLength = 7UL;
@@ -381,13 +381,13 @@ uint64_t GroupedMatmulAllToAllvTiling::GetTilingKey() const
     return tilingKey;
 }
 
-static ge::graphStatus GroupedMatMulAlltoAllvTilingFunc(gert::TilingContext *context)
+static ge::graphStatus GroupedMatMulAlltoAllvTilingFunc(gert::TilingContext* context)
 {
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
 struct GroupedMatMulAlltoAllvCompileInfo {};
-static ge::graphStatus TilingParseForGroupedMatMulAlltoAllv(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForGroupedMatMulAlltoAllv(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

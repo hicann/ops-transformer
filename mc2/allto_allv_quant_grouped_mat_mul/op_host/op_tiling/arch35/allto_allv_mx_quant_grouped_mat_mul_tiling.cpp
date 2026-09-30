@@ -582,12 +582,16 @@ ge::graphStatus AlltoAllvMXQuantGmmTilingHelper::SetInputParams(uint64_t M, uint
     inputParams_.scaleDtype = ge::DT_FLOAT8_E8M0;
     inputParams_.perTokenScaleDtype = ge::DT_FLOAT8_E8M0;
 
-    OP_TILING_CHECK(gmmGroupNum_ > optiling::Mc2GroupedMatmul::MAX_TENSOR_CONT,
-                    OP_LOGE_FOR_INVALID_VALUE(
-                        inputParams_.opName, "gmmGroupNum_", std::to_string(gmmGroupNum_).c_str(),
-                        (std::string("<=") + std::to_string(optiling::Mc2GroupedMatmul::MAX_TENSOR_CONT)).c_str()),
+    OP_TILING_CHECK(gmmGroupNum_ > GMM_ARRAY_MAX_NUM,
+                    OP_LOGE_FOR_INVALID_VALUE(inputParams_.opName, "gmmGroupNum_", std::to_string(gmmGroupNum_).c_str(),
+                                              (std::string("<=") + std::to_string(GMM_ARRAY_MAX_NUM)).c_str()),
                     return ge::GRAPH_FAILED);
-    for (uint32_t i = 0; i < gmmGroupNum_; i++) {
+    // groupNum由标量传递，kernel按SPLIT_M+singleW仅读取mList[0]/kList[0]/nList[0]，
+    // 每组M实际来自运行时groupList，故填充截断至数组容量MAX_TENSOR_CONT
+    uint32_t fillNum = (gmmGroupNum_ < static_cast<uint32_t>(optiling::Mc2GroupedMatmul::MAX_TENSOR_CONT)) ?
+                           gmmGroupNum_ :
+                           static_cast<uint32_t>(optiling::Mc2GroupedMatmul::MAX_TENSOR_CONT);
+    for (uint32_t i = 0; i < fillNum; i++) {
         mList_[i] = static_cast<int32_t>(M);
     }
     kList_[0] = static_cast<int32_t>(K);

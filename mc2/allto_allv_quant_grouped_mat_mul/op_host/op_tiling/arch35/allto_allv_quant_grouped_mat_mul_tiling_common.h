@@ -55,7 +55,7 @@ constexpr uint32_t SCALE_BATCH_THRESHOLD = 32;
 // quant mode offset
 const std::vector<uint32_t> QUANT_MODE_MAP = {0, 0, 1, 2, 4, 5, 3};
 
-constexpr uint32_t GMM_ARRAY_MAX_NUM = 128U;
+constexpr uint32_t GMM_ARRAY_MAX_NUM = 256U;
 constexpr uint32_t MAX_HANDLE_ID_NUM = 64U;
 constexpr uint32_t DEFAULT_MERGED_EXPERT_NUM = 4U;
 constexpr uint64_t PER_RANK_TOTAL_MN_THRESHOLD = 20UL * 1024UL * 1024UL;
@@ -65,12 +65,12 @@ constexpr uint32_t MIN_LOOP_COUNT = 2U;
 
 class AlltoAllvQuantGmmTilingCommon : public AlltoAllvQuantGmmTilingBase {
 public:
-    explicit AlltoAllvQuantGmmTilingCommon(gert::TilingContext *context)
+    explicit AlltoAllvQuantGmmTilingCommon(gert::TilingContext* context)
         : AlltoAllvQuantGmmTilingBase(context)
     {
         tilingData = context_->GetTilingData<QuantAlltoAllvGroupedMatmulTilingData>();
     };
-    QuantAlltoAllvGroupedMatmulTilingData *tilingData;
+    QuantAlltoAllvGroupedMatmulTilingData* tilingData;
 
     static uint32_t CalcExpertNum(uint64_t e, uint64_t epWorldSize, uint64_t bsk, uint64_t n1, uint32_t packFactor = 1U)
     {
@@ -132,9 +132,9 @@ protected:
     virtual void GetPermuteOutSize() {};
     ge::graphStatus CheckInputNotNull() const;
     ge::graphStatus SetHcclTiling() const;
-    ge::graphStatus QuantGetAndConvertCommMode(gert::TilingContext *context, uint8_t &commMode) const;
-    void PrintGMMQuantTilingData(const Mc2GroupedMatmulTilingData::GMMQuantTilingData &data) const;
-    void PrintTaskTilingInfo(const MC2KernelTemplate::TaskTilingInfo &taskTilingInfo) const;
+    ge::graphStatus QuantGetAndConvertCommMode(gert::TilingContext* context, uint8_t& commMode) const;
+    void PrintGMMQuantTilingData(const Mc2GroupedMatmulTilingData::GMMQuantTilingData& data) const;
+    void PrintTaskTilingInfo(const MC2KernelTemplate::TaskTilingInfo& taskTilingInfo) const;
     uint64_t permuteScaleOutSize_{0};
     uint64_t permuteOutSize_{0};
 };

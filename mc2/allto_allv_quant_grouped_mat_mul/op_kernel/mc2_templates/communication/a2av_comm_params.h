@@ -18,6 +18,7 @@ namespace MC2KernelTemplate {
 static constexpr uint8_t SEND_OFFSET_BY_RAW_ARRAY = 0;
 static constexpr uint8_t SEND_OFFSET_ACCUMULATIVE = 1;
 
+// HCCL AlltoAllV的counts/offsets必须为泛型(栈)指针(AlltoAllVParamExt为uint64_t*)，不可用__gm__；
 struct A2avCommParams {
     uint64_t sendCnt[MAX_EP_RANK_SIZE] = {0UL};
     uint64_t sendOffset[MAX_EP_RANK_SIZE] = {0UL};
@@ -25,10 +26,10 @@ struct A2avCommParams {
     uint64_t recvOffset[MAX_EP_RANK_SIZE] = {0UL};
 };
 
-__aicore__ inline void CalcA2avCommBeforeParams(A2avCommParams &params, const uint64_t *rawSendCounts,
-                                                const uint64_t *rawRecvCounts, uint32_t rankDim, uint32_t e,
+__aicore__ inline void CalcA2avCommBeforeParams(A2avCommParams& params, const int32_t* rawSendCounts,
+                                                const int32_t* rawRecvCounts, uint32_t rankDim, uint32_t e,
                                                 uint32_t startExpertIdx, uint32_t expertNum, uint64_t axis,
-                                                uint64_t &sendOffsetLastSum, uint64_t &recvOffsetLastSum)
+                                                uint64_t& sendOffsetLastSum, uint64_t& recvOffsetLastSum)
 {
     for (uint64_t i = 0UL; i < rankDim; i++) {
         params.sendCnt[i] = 0UL;
@@ -65,10 +66,10 @@ __aicore__ inline void CalcA2avCommBeforeParams(A2avCommParams &params, const ui
     }
 }
 
-__aicore__ inline void CalcA2avCommAfterParams(A2avCommParams &params, const uint64_t *rawSendCounts,
-                                               const uint64_t *rawRecvCounts, uint32_t rankDim, uint32_t e,
+__aicore__ inline void CalcA2avCommAfterParams(A2avCommParams& params, const int32_t* rawSendCounts,
+                                               const int32_t* rawRecvCounts, uint32_t rankDim, uint32_t e,
                                                uint32_t startExpertIdx, uint32_t expertNum, uint64_t axis,
-                                               uint64_t &sendOffsetLastSum, uint64_t &recvOffsetLastSum)
+                                               uint64_t& sendOffsetLastSum, uint64_t& recvOffsetLastSum)
 {
     for (uint64_t i = 0UL; i < rankDim; i++) {
         params.sendCnt[i] = 0UL;

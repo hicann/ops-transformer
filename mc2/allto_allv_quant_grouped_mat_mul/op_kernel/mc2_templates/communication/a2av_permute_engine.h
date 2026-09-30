@@ -24,7 +24,7 @@ using namespace AscendC;
 namespace MC2KernelTemplate {
 
 template <bool IsExpertFirst>
-__aicore__ inline void ComputePrefixSum(uint64_t *sumCnt, uint32_t totalPos, const uint64_t *offsetCounts, uint32_t e,
+__aicore__ inline void ComputePrefixSum(uint64_t* sumCnt, uint32_t totalPos, const int32_t* offsetCounts, uint32_t e,
                                         uint32_t startExpertIdx, uint32_t expertNum, uint32_t rankDim)
 {
     for (uint32_t pos = 0; pos < totalPos; pos++) {
@@ -45,10 +45,10 @@ __aicore__ inline void ComputePrefixSum(uint64_t *sumCnt, uint32_t totalPos, con
 }
 
 template <typename ElemType>
-__aicore__ inline void TileDataCopyLoopDoubleBuf(LocalTensor<ElemType> &ubBufA, LocalTensor<ElemType> &ubBufB,
-                                                 GlobalTensor<ElemType> &srcBuffer, GlobalTensor<ElemType> &dstBuffer,
+__aicore__ inline void TileDataCopyLoopDoubleBuf(LocalTensor<ElemType>& ubBufA, LocalTensor<ElemType>& ubBufB,
+                                                 GlobalTensor<ElemType>& srcBuffer, GlobalTensor<ElemType>& dstBuffer,
                                                  uint64_t srcBaseOffset, uint64_t dstBaseOffset, uint64_t totalCnt,
-                                                 uint64_t bufferLen, TPipe *pipe)
+                                                 uint64_t bufferLen, TPipe* pipe)
 {
     uint64_t tileNum = CeilDiv(totalCnt, bufferLen);
     if (tileNum == 0UL) {
@@ -68,7 +68,7 @@ __aicore__ inline void TileDataCopyLoopDoubleBuf(LocalTensor<ElemType> &ubBufA, 
         uint64_t elemOffset = CeilDiv(tile * bufferLen, sizeof(ElemType));
         dataCopyParams.blockLen = static_cast<uint16_t>(realLength);
 
-        LocalTensor<ElemType> &curBuf = (tile % 2UL == 0UL) ? ubBufA : ubBufB;
+        LocalTensor<ElemType>& curBuf = (tile % 2UL == 0UL) ? ubBufA : ubBufB;
 
         DataCopyPad(curBuf, srcBuffer[srcBaseOffset + elemOffset], dataCopyParams, dataCopyPadParams);
 
@@ -95,16 +95,16 @@ __aicore__ inline void TileDataCopyLoopDoubleBuf(LocalTensor<ElemType> &ubBufA, 
 }
 
 template <typename ElemType, bool SrcIsExpertFirst, bool DstIsExpertFirst>
-__aicore__ inline void PermuteImplParallel(GlobalTensor<ElemType> &srcBuffer, GlobalTensor<ElemType> &dstBuffer,
-                                           const uint64_t *offsetCounts, uint32_t e, uint32_t rankDim,
+__aicore__ inline void PermuteImplParallel(GlobalTensor<ElemType>& srcBuffer, GlobalTensor<ElemType>& dstBuffer,
+                                           const int32_t* offsetCounts, uint32_t e, uint32_t rankDim,
                                            uint32_t startExpertIdx, uint32_t expertNum, uint64_t axis,
-                                           uint64_t &permuteBaseOffset, TBuf<QuePosition::VECIN> &permuteTBuf,
-                                           TBuf<QuePosition::VECIN> &permuteTBuf2, uint64_t bufferLen, int32_t &eventID,
+                                           uint64_t& permuteBaseOffset, TBuf<QuePosition::VECIN>& permuteTBuf,
+                                           TBuf<QuePosition::VECIN>& permuteTBuf2, uint64_t bufferLen, int32_t& eventID,
                                            uint32_t aivCoreNum)
 {
     LocalTensor<ElemType> ubBufA = permuteTBuf.Get<ElemType>();
     LocalTensor<ElemType> ubBufB = permuteTBuf2.Get<ElemType>();
-    TPipe *pipe = GetTPipePtr();
+    TPipe* pipe = GetTPipePtr();
 
     uint32_t totalPos = rankDim * expertNum;
     uint64_t sumCntSrc[MAX_EXPERT_SIZE] = {0UL};

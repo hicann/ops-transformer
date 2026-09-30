@@ -133,11 +133,11 @@ constexpr int64_t MAX_BSK_VALUE = 52428800;
 constexpr int64_t RECV_SEND_MIN = static_cast<int64_t>((2 * 1024 * 1024) / 2); // 2M / sizeof(gmmX)
 constexpr uint32_t MAX_HCCL_HANDLE_NUM = 63;
 inline constexpr int64_t RANK_DEFAULT_NUM = -1;
-inline const std::set<int64_t> SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64, 128};
+inline const std::set<int64_t> SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64, 128, 256};
 
 class QuantGroupedMatmulAllToAllvTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit QuantGroupedMatmulAllToAllvTilingBase(gert::TilingContext *context)
+    explicit QuantGroupedMatmulAllToAllvTilingBase(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
 
 protected:
@@ -147,8 +147,8 @@ protected:
     ge::graphStatus GetWorkspaceSize() override;
     uint64_t GetTilingKey() const override;
     ge::graphStatus PostTiling() override;
-    QuantModePair GetQuantMode(const gert::TilingContext *context, const char *opName) const;
-    const char *opName_{nullptr};
+    QuantModePair GetQuantMode(const gert::TilingContext* context, const char* opName) const;
+    const char* opName_{nullptr};
 
     NpuArch npuArch_;
 };

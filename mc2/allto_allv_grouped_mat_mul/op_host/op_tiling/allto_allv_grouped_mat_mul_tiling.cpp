@@ -72,16 +72,16 @@ constexpr uint32_t MAX_BSK = 52428800;
 constexpr uint32_t MAX_SHAPE_SIZE = 65536;
 static const size_t ATTR_COMM_MODE_INDEX = 7;
 
-static inline bool IsShapePresent(const gert::StorageShape *shape)
+static inline bool IsShapePresent(const gert::StorageShape* shape)
 {
     if (shape == nullptr) {
         return false;
     }
-    const auto &storageShape = shape->GetStorageShape();
+    const auto& storageShape = shape->GetStorageShape();
     return storageShape.GetDimNum() > 0;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::GetContextAttr(const gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTiling::GetContextAttr(const gert::TilingContext* context)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "attrs"),
@@ -137,13 +137,13 @@ ge::graphStatus AlltoAllvGmmTiling::GetContextAttr(const gert::TilingContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::GetShapeAndFormat(const gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTiling::GetShapeAndFormat(const gert::TilingContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::CheckMKN(const gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTiling::CheckMKN(const gert::TilingContext* context)
 {
     (void)context;
     OP_TILING_CHECK(mmDataTypeSize == 0,
@@ -175,7 +175,7 @@ ge::graphStatus AlltoAllvGmmTiling::CheckMKN(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::CheckSendRecvDataVolumn(const gert::TilingContext *context) const
+ge::graphStatus AlltoAllvGmmTiling::CheckSendRecvDataVolumn(const gert::TilingContext* context) const
 {
     uint64_t eExpert = tilingData->taskTilingInfo.e;
     uint64_t epWorldSize = tilingData->taskTilingInfo.epWorldSize;
@@ -190,8 +190,8 @@ ge::graphStatus AlltoAllvGmmTiling::CheckSendRecvDataVolumn(const gert::TilingCo
                     OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "sendCounts or recvCounts"),
                     return ge::GRAPH_FAILED);
 
-    const int64_t *sendCountsLocal = static_cast<const int64_t *>(sendCountsPtr->GetData());
-    const int64_t *recvCountsLocal = static_cast<const int64_t *>(recvCountsPtr->GetData());
+    const int64_t* sendCountsLocal = static_cast<const int64_t*>(sendCountsPtr->GetData());
+    const int64_t* recvCountsLocal = static_cast<const int64_t*>(recvCountsPtr->GetData());
     uint64_t recvSum = 0U;
     uint64_t sendSum = 0U;
     uint64_t H1 = tilingData->taskTilingInfo.H1;
@@ -244,7 +244,7 @@ ge::graphStatus AlltoAllvGmmTiling::CheckSendRecvDataVolumn(const gert::TilingCo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::CheckShapeSize(const gert::TilingContext *context) const
+ge::graphStatus AlltoAllvGmmTiling::CheckShapeSize(const gert::TilingContext* context) const
 {
     OP_TILING_CHECK(
         (context->GetInputShape(GMM_X_INDEX) == nullptr) || (context->GetInputShape(GMM_WEIGHT_INDEX) == nullptr),
@@ -296,7 +296,7 @@ ge::graphStatus AlltoAllvGmmTiling::CheckShapeSize(const gert::TilingContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::CheckAttrsShapeSize(const gert::TilingContext *context) const
+ge::graphStatus AlltoAllvGmmTiling::CheckAttrsShapeSize(const gert::TilingContext* context) const
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "attrs"),
@@ -330,7 +330,7 @@ ge::graphStatus AlltoAllvGmmTiling::CheckAttrsShapeSize(const gert::TilingContex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::CheckAttrsShapeRelation(const gert::TilingContext *context) const
+ge::graphStatus AlltoAllvGmmTiling::CheckAttrsShapeRelation(const gert::TilingContext* context) const
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "attrs"),
@@ -344,7 +344,7 @@ ge::graphStatus AlltoAllvGmmTiling::CheckAttrsShapeRelation(const gert::TilingCo
     OP_TILING_CHECK(sendCountsPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "sendCounts"),
                     return ge::GRAPH_FAILED);
 
-    const int64_t *sendCountsAttr = static_cast<const int64_t *>(sendCountsPtr->GetData());
+    const int64_t* sendCountsAttr = static_cast<const int64_t*>(sendCountsPtr->GetData());
     OP_TILING_CHECK(sendCountsAttr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "sendCounts data"),
                     return ge::GRAPH_FAILED);
     uint64_t sendCountsSize = sendCountsPtr->GetSize();
@@ -376,7 +376,7 @@ ge::graphStatus AlltoAllvGmmTiling::CheckAttrsShapeRelation(const gert::TilingCo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::CheckShapeRelation(const gert::TilingContext *context) const
+ge::graphStatus AlltoAllvGmmTiling::CheckShapeRelation(const gert::TilingContext* context) const
 {
     auto gmmXShape = context->GetInputShape(GMM_X_INDEX)->GetStorageShape();
     auto gmmWeightShape = context->GetInputShape(GMM_WEIGHT_INDEX)->GetStorageShape();
@@ -511,7 +511,7 @@ ge::graphStatus AlltoAllvGmmTiling::CheckShapeRelation(const gert::TilingContext
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::CheckShapeDims(const gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTiling::CheckShapeDims(const gert::TilingContext* context)
 {
     auto gmmXShape = context->GetInputShape(GMM_X_INDEX)->GetStorageShape();
     OP_TILING_CHECK(gmmXShape.GetDimNum() != DIM_TWO,
@@ -588,7 +588,7 @@ ge::graphStatus AlltoAllvGmmTiling::CheckShapeDims(const gert::TilingContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::CheckDType(const gert::TilingContext *context) const
+ge::graphStatus AlltoAllvGmmTiling::CheckDType(const gert::TilingContext* context) const
 {
     ge::DataType gmmXDtype = context->GetInputDesc(GMM_X_INDEX)->GetDataType();
     ge::DataType gmmWeightDtype = context->GetInputDesc(GMM_WEIGHT_INDEX)->GetDataType();
@@ -635,18 +635,18 @@ ge::graphStatus AlltoAllvGmmTiling::CheckDType(const gert::TilingContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::CheckMmShapeDims(const gert::TilingContext *context) const
+ge::graphStatus AlltoAllvGmmTiling::CheckMmShapeDims(const gert::TilingContext* context) const
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::GetAndConvertCommMode(gert::TilingContext *context, uint8_t &commMode) const
+ge::graphStatus AlltoAllvGmmTiling::GetAndConvertCommMode(gert::TilingContext* context, uint8_t& commMode) const
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attrs"),
                     return ge::GRAPH_FAILED);
-    const char *commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
+    const char* commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
     OP_TILING_CHECK(commModeStr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "comm_mode"),
                     return ge::GRAPH_FAILED);
     const size_t maxLength = 7UL;
@@ -676,7 +676,7 @@ ge::graphStatus AlltoAllvGmmTiling::GetAndConvertCommMode(gert::TilingContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::SetHcclTiling(const gert::TilingContext *context) const
+ge::graphStatus AlltoAllvGmmTiling::SetHcclTiling(const gert::TilingContext* context) const
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "attrs"),
@@ -722,7 +722,7 @@ ge::graphStatus AlltoAllvGmmTiling::SetHcclTiling(const gert::TilingContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::setNumBlocks(gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTiling::setNumBlocks(gert::TilingContext* context)
 {
     if (GetCommonPlatformInfo() != ge::GRAPH_SUCCESS) {
         OP_LOGE(context_->GetNodeName(), "Failed to get common platform info.");
@@ -747,7 +747,7 @@ ge::graphStatus AlltoAllvGmmTiling::setNumBlocks(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::Init(gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTiling::Init(gert::TilingContext* context)
 {
     context_ = context;
     tilingData = context_->GetTilingData<AlltoAllvGmmTilingData>();
@@ -796,7 +796,7 @@ uint64_t AlltoAllvGmmTiling::GetTilingKey() const
     return tilingKey;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::RunFusionKernelTiling(gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTiling::RunFusionKernelTiling(gert::TilingContext* context)
 {
     OP_TILING_CHECK(SetHcclTiling(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context_->GetNodeName(), "HCCL tiling config failed."), return ge::GRAPH_FAILED);
@@ -822,10 +822,10 @@ ge::graphStatus AlltoAllvGmmTiling::RunFusionKernelTiling(gert::TilingContext *c
                     OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "sendCounts or recvCounts"),
                     return ge::GRAPH_FAILED);
 
-    sendCounts = static_cast<const int64_t *>(sendCountsPtr->GetData());
+    sendCounts = static_cast<const int64_t*>(sendCountsPtr->GetData());
     OP_TILING_CHECK(sendCounts == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "sendCounts data"),
                     return ge::GRAPH_FAILED);
-    recvCounts = static_cast<const int64_t *>(recvCountsPtr->GetData());
+    recvCounts = static_cast<const int64_t*>(recvCountsPtr->GetData());
     OP_TILING_CHECK(recvCounts == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "recvCounts data"),
                     return ge::GRAPH_FAILED);
     uint64_t sendCountsSize = sendCountsPtr->GetSize();
@@ -870,13 +870,13 @@ ge::graphStatus AlltoAllvGmmTiling::RunFusionKernelTiling(gert::TilingContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllvGmmTiling::DoAiCoreTiling(const gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTiling::DoAiCoreTiling(const gert::TilingContext* context)
 {
     auto attrs = context->GetAttrs();
     auto recvCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_RECV_COUNTS_INDEX);
     OP_TILING_CHECK(recvCountsPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "recvCounts"),
                     return ge::GRAPH_FAILED);
-    recvCounts = static_cast<const int64_t *>(recvCountsPtr->GetData());
+    recvCounts = static_cast<const int64_t*>(recvCountsPtr->GetData());
     OP_TILING_CHECK(recvCounts == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "recvCounts data"),
                     return ge::GRAPH_FAILED);
     uint64_t recvCountsSize = recvCountsPtr->GetSize();
@@ -1029,13 +1029,13 @@ ge::graphStatus AlltoAllvGmmTilingBase::GetShapeAttrsInfo()
     sendCountsPtr_ = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_SEND_COUNTS_INDEX);
     OP_TILING_CHECK(sendCountsPtr_ == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "sendCounts"),
                     return ge::GRAPH_FAILED);
-    sendCounts = static_cast<const int64_t *>(sendCountsPtr_->GetData());
+    sendCounts = static_cast<const int64_t*>(sendCountsPtr_->GetData());
     OP_TILING_CHECK(sendCounts == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "sendCounts data"),
                     return ge::GRAPH_FAILED);
     recvCountsPtr_ = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_RECV_COUNTS_INDEX);
     OP_TILING_CHECK(recvCountsPtr_ == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "recvCounts"),
                     return ge::GRAPH_FAILED);
-    recvCounts = static_cast<const int64_t *>(recvCountsPtr_->GetData());
+    recvCounts = static_cast<const int64_t*>(recvCountsPtr_->GetData());
     OP_TILING_CHECK(recvCounts == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "recvCounts data"),
                     return ge::GRAPH_FAILED);
     transGmmWeightPtr_ = attrs->GetAttrPointer<bool>(NON_QUANT_ATTR_TRANS_GMM_WEIGHT_INDEX);
@@ -1180,7 +1180,7 @@ ge::graphStatus AlltoAllvGmmTilingBase::DoLibApiTiling()
 
 ge::graphStatus AlltoAllvGmmTilingBase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "workspace"),
                     return ge::GRAPH_FAILED);
     const uint64_t tensorListSize = 512;
@@ -1189,8 +1189,10 @@ ge::graphStatus AlltoAllvGmmTilingBase::GetWorkspaceSize()
     uint64_t groupListSize = sizeof(int64_t) * e_ * epWorldSize_;
     uint64_t aGroupOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
     uint64_t xScaleOffsetTableSize = sizeof(uint64_t) * e_ * epWorldSize_;
+    // kernel侧a2av建表scratch(GM，4数组×ep)，512对齐
+    const uint64_t rankArraySize = ((4 * epWorldSize_ * sizeof(uint64_t)) + 511) / 512 * 512;
     workspaces[0] = libApiWorkSpaceSize_ + commOutSize + groupListSize + aGroupOffsetTableSize + xScaleOffsetTableSize +
-                    tensorListSize;
+                    tensorListSize + rankArraySize;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1226,10 +1228,10 @@ ge::graphStatus AlltoAllvGmmTilingBase::PostTiling()
     auto recvCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_RECV_COUNTS_INDEX);
     OP_TILING_CHECK(recvCountsPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "recvCounts"),
                     return ge::GRAPH_FAILED);
-    const int64_t *sendCountsData = static_cast<const int64_t *>(sendCountsPtr->GetData());
+    const int64_t* sendCountsData = static_cast<const int64_t*>(sendCountsPtr->GetData());
     OP_TILING_CHECK(sendCountsData == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "sendCounts data"),
                     return ge::GRAPH_FAILED);
-    const int64_t *recvCountsData = static_cast<const int64_t *>(recvCountsPtr->GetData());
+    const int64_t* recvCountsData = static_cast<const int64_t*>(recvCountsPtr->GetData());
     OP_TILING_CHECK(recvCountsData == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "recvCounts data"),
                     return ge::GRAPH_FAILED);
 
@@ -1244,13 +1246,13 @@ ge::graphStatus AlltoAllvGmmTilingBase::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus AlltoAllvGmmTilingFunc(gert::TilingContext *context)
+static ge::graphStatus AlltoAllvGmmTilingFunc(gert::TilingContext* context)
 {
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
 struct AlltoAllvGmmCompileInfo {};
-static ge::graphStatus TilingParseForAlltoAllvGmm(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForAlltoAllvGmm(gert::TilingParseContext* context)
 {
     auto compileInfo = context->GetCompiledInfo<AlltoAllvGmmCompileInfo>();
     OPS_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
