@@ -519,6 +519,7 @@ aclnnStatus aclnnSparseFlashAttention(
 - <term>Ascend 950PR&950DT系列产品</term>：
   - N1支持1~128。
   - 仅支持sparseBlockSize为1。
+  - 当layoutKv为PA_BBND时，key、value和key_rope支持0轴非连续，非连续Tensor的每一维的stride均不能为0。不支持其他非连续。
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - N1支持1/2/4/8/16/32/64/128。
   - sparseBlockSize支持[1,128]，且要求是2的幂次方，在PageAttention场景下要求sparseBlockSize整除blockSize。
