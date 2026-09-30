@@ -36,12 +36,12 @@ public:
                                       CubeBlockType, VecBlockType>;
     /* =====================UB变量==================== */
     __aicore__ inline void InitUniqueConstInfo();
-    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer> &runParam, RunInfo<isInfer> &runInfo);
+    __aicore__ inline void InitUniqueRunInfo(const RunParamStr<isInfer>& runParam, RunInfo<isInfer>& runInfo);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessMainLoop();
 
 private:
-    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer> &runParam);
+    __aicore__ inline void ComputeAxisIdxByBnAndGs1(int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer>& runParam);
 };
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -78,7 +78,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, Ve
 
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, VecBlockType>::InitUniqueRunInfo(
-    const RunParamStr<isInfer> &runParam, RunInfo<isInfer> &runInfo)
+    const RunParamStr<isInfer>& runParam, RunInfo<isInfer>& runInfo)
 {
     InitTaskParamByRun<CHILD_SPEC_TEMPLATE_ARGS, BaseClass::useDn>(runParam, runInfo);
     ComputeOffset<CHILD_SPEC_TEMPLATE_ARGS, BaseClass::useDn>(
@@ -127,10 +127,10 @@ __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, Ve
     RunInfo<isInfer> runInfo[4];
     RunParamStr<isInfer> runParam;
 
-    SetFlag<HardEvent::V_FIX>(SYNC_C1_V1_FLAG[0]);
-    SetFlag<HardEvent::V_FIX>(SYNC_C1_V1_FLAG[1]);
-    SetFlag<HardEvent::V_FIX>(SYNC_C2_V2_FLAG[0]);
-    SetFlag<HardEvent::V_FIX>(SYNC_C2_V2_FLAG[1]);
+    SetFlag<HardEvent::V_FIX>(this->cvSync.syncC1V1VFix[0]);
+    SetFlag<HardEvent::V_FIX>(this->cvSync.syncC1V1VFix[1]);
+    SetFlag<HardEvent::V_FIX>(this->cvSync.syncC2V2VFix[0]);
+    SetFlag<HardEvent::V_FIX>(this->cvSync.syncC2V2VFix[1]);
 
     if constexpr (isFd) {
         runParam.boIdx = this->aicIdx / (this->constInfo.n2Size * this->constInfo.splitKVNum);
@@ -208,7 +208,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, Ve
                 bool oneLoop = (bnEndIdx - bnStartIdx == 1) && (runParam.s1LoopTimes - gS1StartIdx == 1) &&
                                (runParam.s2LoopEndIdx == 1);
                 if (notLastThreeLoop) {
-                    RunInfo<isInfer> &runInfo1 = runInfo[taskId & 3];
+                    RunInfo<isInfer>& runInfo1 = runInfo[taskId & 3];
                     this->SetRunInfo(runInfo1, runParam, taskId, s2LoopCount, s2LoopLimit, multiCoreInnerIdx);
                     if (taskId >= 2) {
                         this->cubeBlock.IterateBmm1(this->bmm1Buffers.GetPre(), runInfo1, this->constInfo);
@@ -217,7 +217,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, Ve
                     }
                 }
                 if (taskId > 0 && notLastTwoLoop) {
-                    auto &runInfo3 = runInfo[(taskId + 3) & 3];
+                    auto& runInfo3 = runInfo[(taskId + 3) & 3];
                     if (oneLoop) {
                         this->vecBlock.ProcessVec1(this->l1PBuffers.GetVec(), this->bmm1Buffers.GetPre(), runInfo3,
                                                    this->constInfo);
@@ -227,7 +227,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, Ve
                     }
                 }
                 if (taskId > 1 && notLast) {
-                    RunInfo<isInfer> &runInfo2 = runInfo[(taskId + 2) & 3];
+                    RunInfo<isInfer>& runInfo2 = runInfo[(taskId + 2) & 3];
                     if (taskId >= 4) {
                         this->cubeBlock.IterateBmm2(this->bmm2Buffers.GetPre(), this->l1PBuffers, runInfo2,
                                                     this->constInfo);
@@ -237,7 +237,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, Ve
                     }
                 }
                 if (taskId > 2) {
-                    RunInfo<isInfer> &runInfo3 = runInfo[(taskId + 1) & 3];
+                    RunInfo<isInfer>& runInfo3 = runInfo[(taskId + 1) & 3];
                     if (oneLoop) {
                         this->vecBlock.ProcessVec2(this->bmm2Buffers.GetPre(), runInfo3, this->constInfo);
                     } else {
@@ -250,6 +250,10 @@ __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, Ve
         }
         gS1StartIdx = 0;
     }
+    WaitFlag<HardEvent::V_FIX>(this->cvSync.syncC1V1VFix[0]);
+    WaitFlag<HardEvent::V_FIX>(this->cvSync.syncC1V1VFix[1]);
+    WaitFlag<HardEvent::V_FIX>(this->cvSync.syncC2V2VFix[0]);
+    WaitFlag<HardEvent::V_FIX>(this->cvSync.syncC2V2VFix[1]);
 }
 
 template <typename CubeBlockType, typename VecBlockType>
@@ -270,7 +274,7 @@ __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, Ve
 // =========================================== private functions ===========================================
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void FlashAttentionScoreKernelInferRegbaseV2<CubeBlockType, VecBlockType>::ComputeAxisIdxByBnAndGs1(
-    int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer> &runParam)
+    int64_t bnIndex, int64_t gS1Index, RunParamStr<isInfer>& runParam)
 {
     // GS1合轴时，g轴信息包含在gS1中；GS1不合轴时，g轴信息包含在bn2g中；
     if (this->constInfo.isGqa) {

@@ -32,25 +32,25 @@ constexpr uint32_t blockBytesU8 = 32;
 
 template <typename T, typename T2, uint8_t mode = 0, uint32_t sOuter = 0, uint32_t sInner = 0, bool hasAtten = false>
 __aicore__ inline void SoftmaxFlashV510NoUpdateImpl128(
-    const LocalTensor<T2> &dstTensor, const LocalTensor<float> &expSumTensor, const LocalTensor<T> &maxTensor,
-    const LocalTensor<float> &expMaxTensor, const LocalTensor<T> &inSrcTensor, const LocalTensor<float> &inExpSumTensor,
-    const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &inMaskTensor, const LocalTensor<T> &inPseTensor,
-    const LocalTensor<uint8_t> &sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<float>& expSumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<float>& expMaxTensor, const LocalTensor<T>& inSrcTensor, const LocalTensor<float>& inExpSumTensor,
+    const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& inMaskTensor, const LocalTensor<T>& inPseTensor,
+    const LocalTensor<uint8_t>& sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
     const T minValue, const uint16_t blockStride, float quantScaleP)
 {
     const uint16_t rows = static_cast<uint16_t>(m);
     constexpr uint16_t repeatStride = 1;
 
-    __ubuf__ T2 *expUb = (__ubuf__ T2 *)dstTensor.GetPhyAddr();
-    __ubuf__ float *expSumUb = (__ubuf__ float *)expSumTensor.GetPhyAddr();
-    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
-    __ubuf__ T *maxUbStart = (__ubuf__ T *)maxTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)inSrcTensor.GetPhyAddr();
-    __ubuf__ uint8_t *maskUb = nullptr;
+    __ubuf__ T2* expUb = (__ubuf__ T2*)dstTensor.GetPhyAddr();
+    __ubuf__ float* expSumUb = (__ubuf__ float*)expSumTensor.GetPhyAddr();
+    __ubuf__ T* maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* maxUbStart = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)inSrcTensor.GetPhyAddr();
+    __ubuf__ uint8_t* maskUb = nullptr;
     if constexpr (hasAtten) {
-        maskUb = (__ubuf__ uint8_t *)inMaskTensor.GetPhyAddr();
+        maskUb = (__ubuf__ uint8_t*)inMaskTensor.GetPhyAddr();
     }
-
+    uint32_t maskLen = originN;
     __VEC_SCOPE__
     {
         Reg::RegTensor<T> vreg_input_x;
@@ -75,21 +75,21 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl128(
         Reg::RegTensor<half> vreg_muls_res;
         Reg::RegTensor<int8_t> vreg_res;
 
-        if constexpr (hasAtten) {
-            Reg::Duplicate(vreg_min, minValue);
-        }
+        Reg::Duplicate(vreg_min, minValue);
+        Reg::MaskReg preg_ori_tail_n = Reg::UpdateMask<T>(maskLen);
 
         for (uint16_t i = 0; i < rows; ++i) {
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
             Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x, vreg_input_x, scale, preg_all_b16);
+            Reg::Select(vreg_input_x, vreg_input_x, vreg_min, preg_ori_tail_n);
             if constexpr (hasAtten) {
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t> &)vreg_atten_mask,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask,
                                                                       maskUb + i * sInner);
                 Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask, vreg_atten_mask, static_cast<uint16_t>(0),
                                                           preg_all_b16);
                 Reg::Select(vreg_input_x, vreg_min, vreg_input_x, preg_mask);
             }
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x, preg_all_b16);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x, preg_ori_tail_n);
             Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_x, preg_all_b16);
             Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, vreg_input_max, ureg_max, 1);
         }
@@ -101,7 +101,7 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl128(
             Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max_brc, maxUbStart + i);
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
             Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_input_x,
-                                                                                     vreg_max_brc, preg_all_b16);
+                                                                                     vreg_max_brc, preg_ori_tail_n);
 
             static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
@@ -113,13 +113,13 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl128(
                 Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vreg_muls_res, vreg_exp_res, (half)quantScaleP,
                                                                    preg_all_b16);
                 Reg::Cast<int8_t, half, castTrait>(vreg_res, vreg_muls_res, preg_all_b16);
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t> &)vreg_res,
-                                                                       (Reg::RegTensor<uint16_t> &)vreg_res);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res,
+                                                                       (Reg::RegTensor<uint16_t>&)vreg_res);
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t *&)expUb, vreg_res, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb, vreg_res, blockStride, repeatStride, preg_s8);
             } else {
                 Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2 *&)expUb, vreg_exp_res, blockStride, repeatStride, preg_all_b16);
+                    (__ubuf__ T2*&)expUb, vreg_exp_res, blockStride, repeatStride, preg_all_b16);
             }
 
             Reg::Cast<float, half, castTrait0>(vreg_exp_even, vreg_exp_res, preg_all_b16);
@@ -134,25 +134,27 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl128(
 
 template <typename T, typename T2, uint8_t mode = 0, uint32_t sOuter = 0, uint32_t sInner = 0, bool hasAtten = false>
 __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
-    const LocalTensor<T2> &dstTensor, const LocalTensor<float> &expSumTensor, const LocalTensor<T> &maxTensor,
-    const LocalTensor<float> &expMaxTensor, const LocalTensor<T> &inSrcTensor, const LocalTensor<float> &inExpSumTensor,
-    const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &inMaskTensor, const LocalTensor<T> &inPseTensor,
-    const LocalTensor<uint8_t> &sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<float>& expSumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<float>& expMaxTensor, const LocalTensor<T>& inSrcTensor, const LocalTensor<float>& inExpSumTensor,
+    const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& inMaskTensor, const LocalTensor<T>& inPseTensor,
+    const LocalTensor<uint8_t>& sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
     const T minValue, const uint16_t blockStride, float quantScaleP)
 {
     const uint16_t rows = static_cast<uint16_t>(m);
     constexpr uint16_t repeatStride = 1;
 
-    __ubuf__ T2 *expUb1 = (__ubuf__ T2 *)dstTensor.GetPhyAddr();
-    __ubuf__ T2 *expUb2 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + blockStride * 128;
-    __ubuf__ float *expSumUb = (__ubuf__ float *)expSumTensor.GetPhyAddr();
-    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
-    __ubuf__ T *maxUbStart = (__ubuf__ T *)maxTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)inSrcTensor.GetPhyAddr();
-    __ubuf__ uint8_t *maskUb = nullptr;
+    __ubuf__ T2* expUb1 = (__ubuf__ T2*)dstTensor.GetPhyAddr();
+    __ubuf__ T2* expUb2 = (__ubuf__ T2*)dstTensor.GetPhyAddr() + blockStride * 128;
+    __ubuf__ float* expSumUb = (__ubuf__ float*)expSumTensor.GetPhyAddr();
+    __ubuf__ T* maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* maxUbStart = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)inSrcTensor.GetPhyAddr();
+    __ubuf__ uint8_t* maskUb = nullptr;
     if constexpr (hasAtten) {
-        maskUb = (__ubuf__ uint8_t *)inMaskTensor.GetPhyAddr();
+        maskUb = (__ubuf__ uint8_t*)inMaskTensor.GetPhyAddr();
     }
+    uint32_t maskLen1 = originN;
+    uint32_t maskLen2 = originN > halfRepSize ? originN - halfRepSize : 0;
 
     __VEC_SCOPE__
     {
@@ -185,20 +187,22 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
         Reg::RegTensor<T> vreg_muls_res_2;
         Reg::RegTensor<int8_t> vreg_res_1;
         Reg::RegTensor<int8_t> vreg_res_2;
+        Reg::MaskReg preg_ori_tail_n_1 = Reg::UpdateMask<T>(maskLen1);
+        Reg::MaskReg preg_ori_tail_n_2 = Reg::UpdateMask<T>(maskLen2);
 
-        if constexpr (hasAtten) {
-            Reg::Duplicate(vreg_min, minValue);
-        }
+        Reg::Duplicate(vreg_min, minValue);
 
         for (uint16_t i = 0; i < rows; ++i) {
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
             Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_1, vreg_input_x_1, scale, preg_all_b16);
             Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_2, vreg_input_x_2, scale, preg_all_b16);
+            Reg::Select(vreg_input_x_1, vreg_input_x_1, vreg_min, preg_ori_tail_n_1);
+            Reg::Select(vreg_input_x_2, vreg_input_x_2, vreg_min, preg_ori_tail_n_2);
             if constexpr (hasAtten) {
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t> &)vreg_atten_mask_1,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask_1,
                                                                       maskUb + i * sInner);
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t> &)vreg_atten_mask_2,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask_2,
                                                                       maskUb + i * sInner + halfRepSize);
 
                 Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask_1, vreg_atten_mask_1, static_cast<uint16_t>(0),
@@ -209,9 +213,9 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
                 Reg::Select(vreg_input_x_1, vreg_min, vreg_input_x_1, preg_mask_1);
                 Reg::Select(vreg_input_x_2, vreg_min, vreg_input_x_2, preg_mask_2);
             }
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_all_b16);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_ori_tail_n_1);
             Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vreg_input_x_2,
-                                                            preg_all_b16);
+                                                            preg_ori_tail_n_2);
             Reg::Max(vreg_input_max_tmp, vreg_input_x_1, vreg_input_x_2, preg_all_b16);
             Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_max_tmp, preg_all_b16);
             Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(maxUb, vreg_input_max, ureg_max, 1);
@@ -225,9 +229,9 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
             Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_1, vreg_input_x_1,
-                                                                                     vreg_max_brc, preg_all_b16);
+                                                                                     vreg_max_brc, preg_ori_tail_n_1);
             Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_2, vreg_input_x_2,
-                                                                                     vreg_max_brc, preg_all_b16);
+                                                                                     vreg_max_brc, preg_ori_tail_n_2);
             static constexpr Reg::CastTrait castTrait = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
             static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN,
@@ -244,20 +248,20 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
                 Reg::Cast<int8_t, half, castTrait>(vreg_res_1, vreg_muls_res_1, preg_all_b16);
                 Reg::Cast<int8_t, half, castTrait>(vreg_res_2, vreg_muls_res_2, preg_all_b16);
 
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t> &)vreg_res_1,
-                                                                       (Reg::RegTensor<uint16_t> &)vreg_res_1);
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t> &)vreg_res_2,
-                                                                       (Reg::RegTensor<uint16_t> &)vreg_res_2);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res_1,
+                                                                       (Reg::RegTensor<uint16_t>&)vreg_res_1);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res_2,
+                                                                       (Reg::RegTensor<uint16_t>&)vreg_res_2);
 
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t *&)expUb1, vreg_res_1, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb1, vreg_res_1, blockStride, repeatStride, preg_s8);
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t *&)expUb2, vreg_res_2, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb2, vreg_res_2, blockStride, repeatStride, preg_s8);
             } else {
                 Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2 *&)expUb1, vreg_exp_res_1, blockStride, repeatStride, preg_all_b16);
+                    (__ubuf__ T2*&)expUb1, vreg_exp_res_1, blockStride, repeatStride, preg_all_b16);
                 Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2 *&)expUb2, vreg_exp_res_2, blockStride, repeatStride, preg_all_b16);
+                    (__ubuf__ T2*&)expUb2, vreg_exp_res_2, blockStride, repeatStride, preg_all_b16);
             }
 
             Reg::Add<half, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_exp_res_1, vreg_exp_res_2, preg_all_b16);
@@ -273,10 +277,10 @@ __aicore__ inline void SoftmaxFlashV510NoUpdateImpl256(
 
 template <typename T, typename T2, uint8_t mode = 0, uint32_t sOuter = 0, uint32_t sInner = 0, bool hasAtten = false>
 __aicore__ inline void SoftmaxFlashV510NoUpdate8(
-    const LocalTensor<T2> &dstTensor, const LocalTensor<float> &expSumTensor, const LocalTensor<T> &maxTensor,
-    const LocalTensor<float> &expMaxTensor, const LocalTensor<T> &inSrcTensor, const LocalTensor<float> &inExpSumTensor,
-    const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &inMaskTensor, const LocalTensor<T> &inPseTensor,
-    const LocalTensor<uint8_t> &sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<float>& expSumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<float>& expMaxTensor, const LocalTensor<T>& inSrcTensor, const LocalTensor<float>& inExpSumTensor,
+    const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& inMaskTensor, const LocalTensor<T>& inPseTensor,
+    const LocalTensor<uint8_t>& sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
     const T minValue, const uint16_t blockStride, float quantScaleP)
 {
     // mode 1: originN = 128
@@ -294,31 +298,32 @@ __aicore__ inline void SoftmaxFlashV510NoUpdate8(
 // originN = 128, Update
 template <typename T, typename T2, uint8_t mode = 0, uint32_t sOuter = 0, uint32_t sInner = 0, bool hasAtten = false>
 __aicore__ inline void SoftmaxFlashV510UpdateImpl128(
-    const LocalTensor<T2> &dstTensor, const LocalTensor<float> &expSumTensor, const LocalTensor<T> &maxTensor,
-    const LocalTensor<float> &expMaxTensor, const LocalTensor<T> &inSrcTensor, const LocalTensor<float> &inExpSumTensor,
-    const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &inMaskTensor, const LocalTensor<T> &inPseTensor,
-    const LocalTensor<uint8_t> &sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<float>& expSumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<float>& expMaxTensor, const LocalTensor<T>& inSrcTensor, const LocalTensor<float>& inExpSumTensor,
+    const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& inMaskTensor, const LocalTensor<T>& inPseTensor,
+    const LocalTensor<uint8_t>& sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
     const T minValue, const uint16_t blockStride, float quantScaleP)
 {
     constexpr uint32_t reduceN = 1;
     const uint16_t rows = static_cast<uint16_t>(m);
     constexpr uint16_t repeatStride = 1;
 
-    __ubuf__ T2 *expUb = (__ubuf__ T2 *)dstTensor.GetPhyAddr();
-    __ubuf__ float *expSumUb = (__ubuf__ float *)expSumTensor.GetPhyAddr();
-    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)inSrcTensor.GetPhyAddr();
-    __ubuf__ float *expMaxUb = (__ubuf__ float *)expMaxTensor.GetPhyAddr();
-    __ubuf__ float *inExpSumUb = (__ubuf__ float *)inExpSumTensor.GetPhyAddr();
-    __ubuf__ T *inMaxUb = (__ubuf__ T *)inMaxTensor.GetPhyAddr();
-    __ubuf__ float *tmpExpSumUb = (__ubuf__ float *)sharedTmpBuffer.GetPhyAddr();
-    __ubuf__ float *tmpExpSumUbStart = (__ubuf__ float *)sharedTmpBuffer.GetPhyAddr();
-    __ubuf__ T *tmpMaxUb = (__ubuf__ T *)((__ubuf__ float *)sharedTmpBuffer.GetPhyAddr() + 64);
-    __ubuf__ T *tmpMaxUbStart = (__ubuf__ T *)((__ubuf__ float *)sharedTmpBuffer.GetPhyAddr() + 64);
-    __ubuf__ uint8_t *maskUb = nullptr;
+    __ubuf__ T2* expUb = (__ubuf__ T2*)dstTensor.GetPhyAddr();
+    __ubuf__ float* expSumUb = (__ubuf__ float*)expSumTensor.GetPhyAddr();
+    __ubuf__ T* maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)inSrcTensor.GetPhyAddr();
+    __ubuf__ float* expMaxUb = (__ubuf__ float*)expMaxTensor.GetPhyAddr();
+    __ubuf__ float* inExpSumUb = (__ubuf__ float*)inExpSumTensor.GetPhyAddr();
+    __ubuf__ T* inMaxUb = (__ubuf__ T*)inMaxTensor.GetPhyAddr();
+    __ubuf__ float* tmpExpSumUb = (__ubuf__ float*)sharedTmpBuffer.GetPhyAddr();
+    __ubuf__ float* tmpExpSumUbStart = (__ubuf__ float*)sharedTmpBuffer.GetPhyAddr();
+    __ubuf__ T* tmpMaxUb = (__ubuf__ T*)((__ubuf__ float*)sharedTmpBuffer.GetPhyAddr() + 64);
+    __ubuf__ T* tmpMaxUbStart = (__ubuf__ T*)((__ubuf__ float*)sharedTmpBuffer.GetPhyAddr() + 64);
+    __ubuf__ uint8_t* maskUb = nullptr;
     if constexpr (hasAtten) {
-        maskUb = (__ubuf__ uint8_t *)inMaskTensor.GetPhyAddr();
+        maskUb = (__ubuf__ uint8_t*)inMaskTensor.GetPhyAddr();
     }
+    uint32_t maskLen = originN;
 
     __VEC_SCOPE__
     {
@@ -360,22 +365,20 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl128(
                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
         static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
-
-        if constexpr (hasAtten) {
-            Reg::Duplicate(vreg_min, minValue);
-        }
-
+        Reg::MaskReg preg_ori_tail_n = Reg::UpdateMask<T>(maskLen);
+        Reg::Duplicate(vreg_min, minValue);
         for (uint16_t i = 0; i < rows; ++i) {
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
             Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x, vreg_input_x, scale, preg_all_b16);
+            Reg::Select(vreg_input_x, vreg_input_x, vreg_min, preg_ori_tail_n);
             if constexpr (hasAtten) {
-                Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t> &)vreg_atten_mask,
+                Reg::LoadAlign<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask,
                                                                        maskUb + i * sInner);
                 Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask, vreg_atten_mask, static_cast<uint16_t>(0),
                                                           preg_all_b16);
                 Reg::Select(vreg_input_x, vreg_min, vreg_input_x, preg_mask);
             }
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x, preg_all_b16);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x, preg_ori_tail_n);
             Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_x, preg_all_b16);
             Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vreg_input_max, ureg_max, 1);
         }
@@ -400,7 +403,7 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl128(
             Reg::DataCopy<T, Reg::LoadDist::DIST_BRC_B16>(vreg_max, maxUb + i);
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x, srcUb + i * sInner);
             Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_input_x,
-                                                                                     vreg_max, preg_all_b16);
+                                                                                     vreg_max, preg_ori_tail_n);
 
             static constexpr Reg::CastTrait castTrait0 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
                                                           Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
@@ -412,14 +415,14 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl128(
                                                                    preg_all_b16);
 
                 Reg::Cast<int8_t, half, castTrait0>(vreg_res, vreg_muls_res, preg_all_b16);
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t> &)vreg_res,
-                                                                       (Reg::RegTensor<uint16_t> &)vreg_res);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res,
+                                                                       (Reg::RegTensor<uint16_t>&)vreg_res);
 
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    ((__ubuf__ int8_t *&)expUb), vreg_res, blockStride, repeatStride, preg_s8);
+                    ((__ubuf__ int8_t*&)expUb), vreg_res, blockStride, repeatStride, preg_s8);
             } else {
                 Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2 *&)expUb, vreg_exp_res, blockStride, repeatStride, preg_all_b16);
+                    (__ubuf__ T2*&)expUb, vreg_exp_res, blockStride, repeatStride, preg_all_b16);
             }
 
             // x_sum = sum(x_exp, axis=-1, keepdims=True)
@@ -451,32 +454,34 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl128(
 
 template <typename T, typename T2, uint8_t mode = 0, uint32_t sOuter = 0, uint32_t sInner = 0, bool hasAtten = false>
 __aicore__ inline void SoftmaxFlashV510UpdateImpl256(
-    const LocalTensor<T2> &dstTensor, const LocalTensor<float> &expSumTensor, const LocalTensor<T> &maxTensor,
-    const LocalTensor<float> &expMaxTensor, const LocalTensor<T> &inSrcTensor, const LocalTensor<float> &inExpSumTensor,
-    const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &inMaskTensor, const LocalTensor<T> &inPseTensor,
-    const LocalTensor<uint8_t> &sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<float>& expSumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<float>& expMaxTensor, const LocalTensor<T>& inSrcTensor, const LocalTensor<float>& inExpSumTensor,
+    const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& inMaskTensor, const LocalTensor<T>& inPseTensor,
+    const LocalTensor<uint8_t>& sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
     const T minValue, const uint16_t blockStride, float quantScaleP)
 {
     constexpr uint32_t reduceN = 1;
     const uint16_t rows = static_cast<uint16_t>(m);
     constexpr uint16_t repeatStride = 1;
 
-    __ubuf__ T2 *expUb1 = (__ubuf__ T2 *)dstTensor.GetPhyAddr();
-    __ubuf__ T2 *expUb2 = (__ubuf__ T2 *)dstTensor.GetPhyAddr() + blockStride * 128;
-    __ubuf__ float *expSumUb = (__ubuf__ float *)expSumTensor.GetPhyAddr();
-    __ubuf__ T *maxUb = (__ubuf__ T *)maxTensor.GetPhyAddr();
-    __ubuf__ T *srcUb = (__ubuf__ T *)inSrcTensor.GetPhyAddr();
-    __ubuf__ float *expMaxUb = (__ubuf__ float *)expMaxTensor.GetPhyAddr();
-    __ubuf__ float *inExpSumUb = (__ubuf__ float *)inExpSumTensor.GetPhyAddr();
-    __ubuf__ T *inMaxUb = (__ubuf__ T *)inMaxTensor.GetPhyAddr();
-    __ubuf__ float *tmpExpSumUb = (__ubuf__ float *)sharedTmpBuffer.GetPhyAddr();
-    __ubuf__ float *tmpExpSumUbStart = (__ubuf__ float *)sharedTmpBuffer.GetPhyAddr();
-    __ubuf__ T *tmpMaxUb = (__ubuf__ T *)((__ubuf__ float *)sharedTmpBuffer.GetPhyAddr() + 64);
-    __ubuf__ T *tmpMaxUbStart = (__ubuf__ T *)((__ubuf__ float *)sharedTmpBuffer.GetPhyAddr() + 64);
-    __ubuf__ uint8_t *maskUb = nullptr;
+    __ubuf__ T2* expUb1 = (__ubuf__ T2*)dstTensor.GetPhyAddr();
+    __ubuf__ T2* expUb2 = (__ubuf__ T2*)dstTensor.GetPhyAddr() + blockStride * 128;
+    __ubuf__ float* expSumUb = (__ubuf__ float*)expSumTensor.GetPhyAddr();
+    __ubuf__ T* maxUb = (__ubuf__ T*)maxTensor.GetPhyAddr();
+    __ubuf__ T* srcUb = (__ubuf__ T*)inSrcTensor.GetPhyAddr();
+    __ubuf__ float* expMaxUb = (__ubuf__ float*)expMaxTensor.GetPhyAddr();
+    __ubuf__ float* inExpSumUb = (__ubuf__ float*)inExpSumTensor.GetPhyAddr();
+    __ubuf__ T* inMaxUb = (__ubuf__ T*)inMaxTensor.GetPhyAddr();
+    __ubuf__ float* tmpExpSumUb = (__ubuf__ float*)sharedTmpBuffer.GetPhyAddr();
+    __ubuf__ float* tmpExpSumUbStart = (__ubuf__ float*)sharedTmpBuffer.GetPhyAddr();
+    __ubuf__ T* tmpMaxUb = (__ubuf__ T*)((__ubuf__ float*)sharedTmpBuffer.GetPhyAddr() + 64);
+    __ubuf__ T* tmpMaxUbStart = (__ubuf__ T*)((__ubuf__ float*)sharedTmpBuffer.GetPhyAddr() + 64);
+    __ubuf__ uint8_t* maskUb = nullptr;
     if constexpr (hasAtten) {
-        maskUb = (__ubuf__ uint8_t *)inMaskTensor.GetPhyAddr();
+        maskUb = (__ubuf__ uint8_t*)inMaskTensor.GetPhyAddr();
     }
+    uint32_t maskLen1 = originN;
+    uint32_t maskLen2 = originN > halfRepSize ? originN - halfRepSize : 0;
 
     __VEC_SCOPE__
     {
@@ -527,19 +532,22 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl256(
         static constexpr Reg::CastTrait castTrait1 = {Reg::RegLayout::ONE, Reg::SatMode::UNKNOWN,
                                                       Reg::MaskMergeMode::ZEROING, RoundMode::UNKNOWN};
 
-        if constexpr (hasAtten) {
-            Reg::Duplicate(vreg_min, minValue);
-        }
+        Reg::MaskReg preg_ori_tail_n_1 = Reg::UpdateMask<T>(maskLen1);
+        Reg::MaskReg preg_ori_tail_n_2 = Reg::UpdateMask<T>(maskLen2);
+
+        Reg::Duplicate(vreg_min, minValue);
 
         for (uint16_t i = 0; i < rows; ++i) {
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
             Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_1, vreg_input_x_1, scale, preg_all_b16);
             Reg::Muls<T, T, Reg::MaskMergeMode::ZEROING>(vreg_input_x_2, vreg_input_x_2, scale, preg_all_b16);
+            Reg::Select(vreg_input_x_1, vreg_input_x_1, vreg_min, preg_ori_tail_n_1);
+            Reg::Select(vreg_input_x_2, vreg_input_x_2, vreg_min, preg_ori_tail_n_2);
             if constexpr (hasAtten) {
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t> &)vreg_atten_mask_1,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask_1,
                                                                       maskUb + i * sInner);
-                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t> &)vreg_atten_mask_2,
+                Reg::DataCopy<uint8_t, Reg::LoadDist::DIST_UNPACK_B8>((Reg::RegTensor<uint8_t>&)vreg_atten_mask_2,
                                                                       maskUb + i * sInner + halfRepSize);
 
                 Reg::CompareScalar<uint16_t, CMPMODE::NE>(preg_mask_1, vreg_atten_mask_1, static_cast<uint16_t>(0),
@@ -550,9 +558,9 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl256(
                 Reg::Select(vreg_input_x_1, vreg_min, vreg_input_x_1, preg_mask_1);
                 Reg::Select(vreg_input_x_2, vreg_min, vreg_input_x_2, preg_mask_2);
             }
-            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_all_b16);
+            Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner, vreg_input_x_1, preg_ori_tail_n_1);
             Reg::DataCopy<T, Reg::StoreDist::DIST_NORM_B16>(srcUb + i * sInner + halfRepSize, vreg_input_x_2,
-                                                            preg_all_b16);
+                                                            preg_ori_tail_n_2);
             Reg::Max(vreg_input_max_tmp, vreg_input_x_1, vreg_input_x_2, preg_all_b16);
             Reg::ReduceMax<T, Reg::MaskMergeMode::ZEROING>(vreg_input_max, vreg_input_max_tmp, preg_all_b16);
             Reg::DataCopyUnAlign<T, Reg::PostLiteral::POST_MODE_UPDATE>(tmpMaxUb, vreg_input_max, ureg_max, 1);
@@ -580,9 +588,9 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl256(
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_1, srcUb + i * sInner);
             Reg::DataCopy<T, Reg::LoadDist::DIST_NORM>(vreg_input_x_2, srcUb + i * sInner + halfRepSize);
             Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_1, vreg_input_x_1,
-                                                                                     vreg_max, preg_all_b16);
+                                                                                     vreg_max, preg_ori_tail_n_1);
             Reg::FusedExpSub<T, T, Reg::RegLayout::ONE, Reg::MaskMergeMode::ZEROING>(vreg_exp_res_2, vreg_input_x_2,
-                                                                                     vreg_max, preg_all_b16);
+                                                                                     vreg_max, preg_ori_tail_n_2);
 
             if constexpr (IsSameType<T2, int8_t>::value) {
                 Reg::Muls<half, half, Reg::MaskMergeMode::ZEROING>(vreg_muls_res_1, vreg_exp_res_1, (half)quantScaleP,
@@ -593,20 +601,20 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl256(
                 Reg::Cast<int8_t, half, castTrait>(vreg_res_1, vreg_muls_res_1, preg_all_b16);
                 Reg::Cast<int8_t, half, castTrait>(vreg_res_2, vreg_muls_res_2, preg_all_b16);
 
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t> &)vreg_res_1,
-                                                                       (Reg::RegTensor<uint16_t> &)vreg_res_1);
-                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t> &)vreg_res_2,
-                                                                       (Reg::RegTensor<uint16_t> &)vreg_res_2);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res_1,
+                                                                       (Reg::RegTensor<uint16_t>&)vreg_res_1);
+                Reg::Pack<uint8_t, uint16_t, Reg::HighLowPart::LOWEST>((Reg::RegTensor<uint8_t>&)vreg_res_2,
+                                                                       (Reg::RegTensor<uint16_t>&)vreg_res_2);
 
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t *&)expUb1, vreg_res_1, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb1, vreg_res_1, blockStride, repeatStride, preg_s8);
                 Reg::DataCopy<int8_t, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ int8_t *&)expUb2, vreg_res_2, blockStride, repeatStride, preg_s8);
+                    (__ubuf__ int8_t*&)expUb2, vreg_res_2, blockStride, repeatStride, preg_s8);
             } else {
                 Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2 *&)expUb1, vreg_exp_res_1, blockStride, repeatStride, preg_all_b16);
+                    (__ubuf__ T2*&)expUb1, vreg_exp_res_1, blockStride, repeatStride, preg_all_b16);
                 Reg::DataCopy<T2, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
-                    (__ubuf__ T2 *&)expUb2, vreg_exp_res_2, blockStride, repeatStride, preg_all_b16);
+                    (__ubuf__ T2*&)expUb2, vreg_exp_res_2, blockStride, repeatStride, preg_all_b16);
             }
 
             Reg::Add<half, Reg::MaskMergeMode::ZEROING>(vreg_exp_res, vreg_exp_res_1, vreg_exp_res_2, preg_all_b16);
@@ -637,10 +645,10 @@ __aicore__ inline void SoftmaxFlashV510UpdateImpl256(
 
 template <typename T, typename T2, uint8_t mode = 0, uint32_t sOuter = 0, uint32_t sInner = 0, bool hasAtten = false>
 __aicore__ inline void SoftmaxFlashV510Update8(
-    const LocalTensor<T2> &dstTensor, const LocalTensor<float> &expSumTensor, const LocalTensor<T> &maxTensor,
-    const LocalTensor<float> &expMaxTensor, const LocalTensor<T> &inSrcTensor, const LocalTensor<float> &inExpSumTensor,
-    const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &inMaskTensor, const LocalTensor<T> &inPseTensor,
-    const LocalTensor<uint8_t> &sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
+    const LocalTensor<T2>& dstTensor, const LocalTensor<float>& expSumTensor, const LocalTensor<T>& maxTensor,
+    const LocalTensor<float>& expMaxTensor, const LocalTensor<T>& inSrcTensor, const LocalTensor<float>& inExpSumTensor,
+    const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& inMaskTensor, const LocalTensor<T>& inPseTensor,
+    const LocalTensor<uint8_t>& sharedTmpBuffer, const uint32_t m, const uint32_t originN, const T scale,
     const T minValue, const uint16_t blockStride, float quantScaleP)
 {
     // mode 1: originN = 128
@@ -683,12 +691,12 @@ __aicore__ inline void SoftmaxFlashV510Update8(
  */
 template <typename T, typename T2, bool isUpdate = false, uint8_t mode = 0, uint32_t sOuter = 0, uint32_t sInner = 0,
           bool hasAtten = false>
-__aicore__ inline void SoftmaxFlashV510_VF(const LocalTensor<T2> &dstTensor, const LocalTensor<float> &expSumTensor,
-                                           const LocalTensor<T> &maxTensor, const LocalTensor<float> &expMaxTensor,
-                                           const LocalTensor<T> &inSrcTensor, const LocalTensor<float> &inExpSumTensor,
-                                           const LocalTensor<T> &inMaxTensor, const LocalTensor<uint8_t> &inMaskTensor,
-                                           const LocalTensor<T> &inPseTensor,
-                                           const LocalTensor<uint8_t> &sharedTmpBuffer, const uint32_t m,
+__aicore__ inline void SoftmaxFlashV510_VF(const LocalTensor<T2>& dstTensor, const LocalTensor<float>& expSumTensor,
+                                           const LocalTensor<T>& maxTensor, const LocalTensor<float>& expMaxTensor,
+                                           const LocalTensor<T>& inSrcTensor, const LocalTensor<float>& inExpSumTensor,
+                                           const LocalTensor<T>& inMaxTensor, const LocalTensor<uint8_t>& inMaskTensor,
+                                           const LocalTensor<T>& inPseTensor,
+                                           const LocalTensor<uint8_t>& sharedTmpBuffer, const uint32_t m,
                                            const uint32_t originN, const T scale, const T minValue, float quantScaleP)
 {
     constexpr uint32_t blockU8 = 32;
