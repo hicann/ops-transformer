@@ -497,7 +497,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>topkValueMode（int64_t）</td>
       <td>输入</td>
       <td>topk索引取值模式。取值1时稀疏索引表示逻辑token索引；取值2时，PA_BBND布局的稀疏索引表示物理token offset，即physical_block_id * block_size + offset_in_block。</td>
-      <td>Atlas A2/A3当前只支持1；Ascend 950支持1和2。</td>
+      <td>支持1和2。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -1290,7 +1290,7 @@ metadataOptional校验
             <td>
                 <ul>
                     <li>data_type支持INT32</li>
-                    <li>topK索引取值模式，默认值为1，A2A3只支持1，A5支持1和2</li>
+                    <li>支持1和2</li>
                 </ul>
             </td>
             <td>可选属性，默认值为1</td>
