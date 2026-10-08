@@ -22,13 +22,13 @@ template <typename T1, typename T2, class TILING_TYPE, const bool INIT_OUTPUT = 
 class FlashAttentionScoreGradPre {
 public:
     __aicore__ inline FlashAttentionScoreGradPre(){};
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dqRope, __gm__ uint8_t *dk, __gm__ uint8_t *dkRope,
-                                __gm__ uint8_t *dv, __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace,
-                                const TILING_TYPE *ordTilingData, TPipe *pipe_in);
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dqRope, __gm__ uint8_t* dk, __gm__ uint8_t* dkRope,
+                                __gm__ uint8_t* dv, __gm__ uint8_t* drop_mask, __gm__ uint8_t* workspace,
+                                const TILING_TYPE* ordTilingData, TPipe* pipe_in);
     __aicore__ inline void Process();
     __aicore__ inline void SyncALLCores();
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> helpQue;
     TQue<QuePosition::VECIN, 1> inputQue;
     TQue<QuePosition::VECIN, 1> castQue;
@@ -40,7 +40,7 @@ public:
     GlobalTensor<float> dqRopeWorkSpaceGm;
     GlobalTensor<float> dkRopeWorkSpaceGm;
 
-    const TILING_TYPE *TilingData;
+    const TILING_TYPE* TilingData;
     constexpr static uint32_t HELP_LEN = 256;
     constexpr static uint32_t BIT8 = 8;
     constexpr static uint32_t NUMBER_8 = 8;
@@ -89,8 +89,8 @@ public:
 
 template <typename T1, typename T2, class TILING_TYPE, const bool INIT_OUTPUT, const uint32_t HAS_ROPE>
 __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTPUT, HAS_ROPE>::Init(
-    __gm__ uint8_t *dq, __gm__ uint8_t *dqRope, __gm__ uint8_t *dk, __gm__ uint8_t *dkRope, __gm__ uint8_t *dv,
-    __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace, const TILING_TYPE *ordTilingData, TPipe *pipe_in)
+    __gm__ uint8_t* dq, __gm__ uint8_t* dqRope, __gm__ uint8_t* dk, __gm__ uint8_t* dkRope, __gm__ uint8_t* dv,
+    __gm__ uint8_t* drop_mask, __gm__ uint8_t* workspace, const TILING_TYPE* ordTilingData, TPipe* pipe_in)
 {
     cBlockIdx = GetBlockIdx();
 
@@ -99,8 +99,8 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
 
     maskUsedCoreNum = TilingData->preTilingData.maskCoreNum;
 
-    drop_maskGm.SetGlobalBuffer((__gm__ uint8_t *)drop_mask);
-    dvGm.SetGlobalBuffer((__gm__ float *)dv);
+    drop_maskGm.SetGlobalBuffer((__gm__ uint8_t*)drop_mask);
+    dvGm.SetGlobalBuffer((__gm__ float*)dv);
 
     if constexpr (INIT_OUTPUT) {
         // tiling_data
@@ -122,21 +122,21 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
             kRopePreBlockTail = TilingData->preTilingData.kRopePreBlockTail;
             kRopeSizeAlign = TilingData->postTilingData.kRopeSizeAlign;
         }
-        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                       TilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
         if constexpr (HAS_ROPE == ENABLE) {
-            dqRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dqRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                               TilingData->postTilingData.dqRopeWorkSpaceOffset / sizeof(float));
         }
-        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                       TilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
         if constexpr (HAS_ROPE == ENABLE) {
-            dkRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dkRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                               TilingData->postTilingData.dkRopeWorkSpaceOffset / sizeof(float));
         }
-        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                       TilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
-        dsinksumWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+        dsinksumWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                             TilingData->postTilingData.dsinksumWorkSpaceOffset / sizeof(float));
 
         initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;
@@ -153,7 +153,7 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
     isDropBoolMode = TilingData->preTilingData.dropoutIsDivisibleBy8 == 0 ? true : false;
 
     if (isDropBoolMode) {
-        maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t *)workspace + TilingData->preTilingData.dropBeginAddr);
+        maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t*)workspace + TilingData->preTilingData.dropBeginAddr);
 
         pipe->InitBuffer(helpQue, 1, HELP_LEN);
         pipe->InitBuffer(inputQue, 1, TilingData->preTilingData.inputBufferLen);
@@ -229,6 +229,8 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
 
         int64_t outputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum;
         int64_t inputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum / BIT8;
+        // drop mask is bit-packed, the real length of the input is ceil(maskPreBlockTotal / 8) bytes
+        int64_t maskPackTotal = static_cast<int64_t>((TilingData->preTilingData.maskPreBlockTotal + BIT8 - 1) / BIT8);
 
         // process
         for (int64_t idx = 0; idx < maskUBLoop; idx++) {
@@ -240,8 +242,15 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
             }
 
             // copyIn
+            int64_t maskReadNum = static_cast<int64_t>(maskUBProcessNum / BIT8);
+            if (maskPackTotal > 0 && inputAddr + inputOffset + maskReadNum > maskPackTotal) {
+                maskReadNum = maskPackTotal - inputAddr - inputOffset;
+            }
+            if (maskReadNum <= 0) {
+                break;
+            }
             auto inputTensor = inputQue.AllocTensor<uint8_t>();
-            copyParams.blockLen = maskUBProcessNum / BIT8;
+            copyParams.blockLen = static_cast<uint32_t>(maskReadNum);
             DataCopyPad(inputTensor, drop_maskGm[inputAddr + inputOffset], copyParams, {false, 0, 0, 0});
             inputQue.EnQue(inputTensor);
             inputQue.DeQue<uint8_t>();
@@ -281,10 +290,10 @@ template <typename T1, typename T2, const bool INIT_OUTPUT, const uint32_t HAS_R
 class FlashAttentionScoreGradPre<T1, T2, FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb, INIT_OUTPUT, HAS_ROPE> {
 public:
     __aicore__ inline FlashAttentionScoreGradPre() {}
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dqRope, __gm__ uint8_t *dk, __gm__ uint8_t *dkRope,
-                                __gm__ uint8_t *dv, __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace,
-                                const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb *ordTilingData,
-                                TPipe *pipe_in)
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dqRope, __gm__ uint8_t* dk, __gm__ uint8_t* dkRope,
+                                __gm__ uint8_t* dv, __gm__ uint8_t* drop_mask, __gm__ uint8_t* workspace,
+                                const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb* ordTilingData,
+                                TPipe* pipe_in)
     {
         cBlockIdx = GetBlockIdx();
 
@@ -293,8 +302,8 @@ public:
 
         maskUsedCoreNum = TilingData->preTilingData.maskCoreNum;
 
-        drop_maskGm.SetGlobalBuffer((__gm__ uint8_t *)drop_mask);
-        dvGm.SetGlobalBuffer((__gm__ float *)dv);
+        drop_maskGm.SetGlobalBuffer((__gm__ uint8_t*)drop_mask);
+        dvGm.SetGlobalBuffer((__gm__ float*)dv);
 
         if constexpr (INIT_OUTPUT) {
             // tiling_data
@@ -323,21 +332,21 @@ public:
             vPreBlockTail = TilingData->preTilingData.vPreBlockTail;
             vSizeAlign = TilingData->postTilingData.vSizeAlign;
 
-            dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
             if constexpr (HAS_ROPE == ENABLE) {
-                dqRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                dqRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                                   TilingData->postTilingData.dqRopeWorkSpaceOffset / sizeof(float));
             }
-            dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
             if constexpr (HAS_ROPE == ENABLE) {
-                dkRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                dkRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                                   TilingData->postTilingData.dkRopeWorkSpaceOffset / sizeof(float));
             }
-            dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
-            dsinksumWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dsinksumWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                                 TilingData->postTilingData.dsinksumWorkSpaceOffset / sizeof(float));
 
             initdqRopeSize = cBlockIdx == qRopePreBlockTotal - 1 ? qRopePreBlockTail : qRopePreBlockFactor;
@@ -357,7 +366,7 @@ public:
         isDropBoolMode = TilingData->preTilingData.dropoutIsDivisibleBy8 == 0 ? true : false;
 
         if (isDropBoolMode) {
-            maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t *)workspace + TilingData->preTilingData.dropBeginAddr);
+            maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t*)workspace + TilingData->preTilingData.dropBeginAddr);
 
             pipe->InitBuffer(helpQue, 1, HELP_LEN);
             pipe->InitBuffer(inputQue, 1, TilingData->preTilingData.inputBufferLen);
@@ -443,6 +452,9 @@ public:
 
             int64_t outputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum;
             int64_t inputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum / BIT8;
+            // drop mask is bit-packed, the real length of the input is ceil(maskPreBlockTotal / 8) bytes
+            int64_t maskPackTotal =
+                static_cast<int64_t>((TilingData->preTilingData.maskPreBlockTotal + BIT8 - 1) / BIT8);
 
             // process
             for (int64_t idx = 0; idx < maskUBLoop; idx++) {
@@ -454,8 +466,15 @@ public:
                 }
 
                 // copyIn
+                int64_t maskReadNum = static_cast<int64_t>(maskUBProcessNum / BIT8);
+                if (maskPackTotal > 0 && inputAddr + inputOffset + maskReadNum > maskPackTotal) {
+                    maskReadNum = maskPackTotal - inputAddr - inputOffset;
+                }
+                if (maskReadNum <= 0) {
+                    break;
+                }
                 auto inputTensor = inputQue.AllocTensor<uint8_t>();
-                copyParams.blockLen = maskUBProcessNum / BIT8;
+                copyParams.blockLen = static_cast<uint32_t>(maskReadNum);
                 DataCopyPad(inputTensor, drop_maskGm[inputAddr + inputOffset], copyParams, {false, 0, 0, 0});
                 inputQue.EnQue(inputTensor);
                 inputQue.DeQue<uint8_t>();
@@ -488,7 +507,7 @@ public:
         SyncAll();
     }
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> helpQue;
     TQue<QuePosition::VECIN, 1> inputQue;
     TQue<QuePosition::VECIN, 1> castQue;
@@ -499,7 +518,7 @@ public:
     GlobalTensor<uint8_t> drop_maskGm;
     GlobalTensor<float> dqRopeWorkSpaceGm, dkRopeWorkSpaceGm;
 
-    const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb *TilingData;
+    const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2SameAb* TilingData;
     constexpr static uint32_t HELP_LEN = 256;
     constexpr static uint32_t BIT8 = 8;
     constexpr static uint32_t NUMBER_8 = 8;
@@ -560,9 +579,9 @@ template <typename T1, typename T2, const bool INIT_OUTPUT, const uint32_t HAS_R
 class FlashAttentionScoreGradPre<T1, T2, FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2, INIT_OUTPUT, HAS_ROPE> {
 public:
     __aicore__ inline FlashAttentionScoreGradPre() {}
-    __aicore__ inline void Init(__gm__ uint8_t *dq, __gm__ uint8_t *dqRope, __gm__ uint8_t *dk, __gm__ uint8_t *dkRope,
-                                __gm__ uint8_t *dv, __gm__ uint8_t *drop_mask, __gm__ uint8_t *workspace,
-                                const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2 *ordTilingData, TPipe *pipe_in)
+    __aicore__ inline void Init(__gm__ uint8_t* dq, __gm__ uint8_t* dqRope, __gm__ uint8_t* dk, __gm__ uint8_t* dkRope,
+                                __gm__ uint8_t* dv, __gm__ uint8_t* drop_mask, __gm__ uint8_t* workspace,
+                                const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2* ordTilingData, TPipe* pipe_in)
     {
         cBlockIdx = GetBlockIdx();
 
@@ -571,8 +590,8 @@ public:
 
         maskUsedCoreNum = TilingData->preTilingData.maskCoreNum;
 
-        drop_maskGm.SetGlobalBuffer((__gm__ uint8_t *)drop_mask);
-        dvGm.SetGlobalBuffer((__gm__ float *)dv);
+        drop_maskGm.SetGlobalBuffer((__gm__ uint8_t*)drop_mask);
+        dvGm.SetGlobalBuffer((__gm__ float*)dv);
 
         if constexpr (INIT_OUTPUT) {
             // tiling_data
@@ -601,22 +620,22 @@ public:
             vPreBlockTail = TilingData->preTilingData.vPreBlockTail;
             vSizeAlign = TilingData->postTilingData.vSizeAlign;
 
-            dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dqWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
             if constexpr (HAS_ROPE == ENABLE) {
-                dqRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                dqRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                                   TilingData->postTilingData.dqRopeWorkSpaceOffset / sizeof(float));
             }
-            dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dkWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
             if constexpr (HAS_ROPE == ENABLE) {
-                dkRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                dkRopeWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                                   TilingData->postTilingData.dkRopeWorkSpaceOffset / sizeof(float));
             }
-            dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dvWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                           TilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
 
-            dsinksumWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+            dsinksumWorkSpaceGm.SetGlobalBuffer((__gm__ float*)workspace +
                                                 TilingData->postTilingData.dsinksumWorkSpaceOffset / sizeof(float));
 
             initdqRopeSize = cBlockIdx == qRopePreBlockTotal - 1 ? qRopePreBlockTail : qRopePreBlockFactor;
@@ -636,7 +655,7 @@ public:
         isDropBoolMode = TilingData->preTilingData.dropoutIsDivisibleBy8 == 0 ? true : false;
 
         if (isDropBoolMode) {
-            maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t *)workspace + TilingData->preTilingData.dropBeginAddr);
+            maskWorkSpaceGm.SetGlobalBuffer((__gm__ uint8_t*)workspace + TilingData->preTilingData.dropBeginAddr);
 
             pipe->InitBuffer(helpQue, 1, HELP_LEN);
             pipe->InitBuffer(inputQue, 1, TilingData->preTilingData.inputBufferLen);
@@ -715,6 +734,9 @@ public:
 
             int64_t outputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum;
             int64_t inputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum / BIT8;
+            // drop mask is bit-packed, the real length of the input is ceil(maskPreBlockTotal / 8) bytes
+            int64_t maskPackTotal =
+                static_cast<int64_t>((TilingData->preTilingData.maskPreBlockTotal + BIT8 - 1) / BIT8);
 
             // process
             for (int64_t idx = 0; idx < maskUBLoop; idx++) {
@@ -726,8 +748,15 @@ public:
                 }
 
                 // copyIn
+                int64_t maskReadNum = static_cast<int64_t>(maskUBProcessNum / BIT8);
+                if (maskPackTotal > 0 && inputAddr + inputOffset + maskReadNum > maskPackTotal) {
+                    maskReadNum = maskPackTotal - inputAddr - inputOffset;
+                }
+                if (maskReadNum <= 0) {
+                    break;
+                }
                 auto inputTensor = inputQue.AllocTensor<uint8_t>();
-                copyParams.blockLen = maskUBProcessNum / BIT8;
+                copyParams.blockLen = static_cast<uint32_t>(maskReadNum);
                 DataCopyPad(inputTensor, drop_maskGm[inputAddr + inputOffset], copyParams, {false, 0, 0, 0});
                 inputQue.EnQue(inputTensor);
                 inputQue.DeQue<uint8_t>();
@@ -760,7 +789,7 @@ public:
         SyncAll();
     }
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> helpQue;
     TQue<QuePosition::VECIN, 1> inputQue;
     TQue<QuePosition::VECIN, 1> castQue;
@@ -771,7 +800,7 @@ public:
     GlobalTensor<uint8_t> drop_maskGm;
     GlobalTensor<float> dqRopeWorkSpaceGm, dkRopeWorkSpaceGm;
 
-    const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2 *TilingData;
+    const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2* TilingData;
     constexpr static uint32_t HELP_LEN = 256;
     constexpr static uint32_t BIT8 = 8;
     constexpr static uint32_t NUMBER_8 = 8;
