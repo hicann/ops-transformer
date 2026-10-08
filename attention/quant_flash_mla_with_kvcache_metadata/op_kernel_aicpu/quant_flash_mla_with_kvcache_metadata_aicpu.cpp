@@ -210,7 +210,7 @@ bool QuantFlashMlaWithKvcacheMetadataCpuKernel::ParamsInit()
     // param.fdTolerance = 300;
     param.fdOn = true;
     // MLA的M轴为GS1合轴(n2=1, g=numHeadsQ), 与FA kernel的M轴遍历方式一致
-    param.outputLayout = load_balance::OutputLayout::BN2_S1G;
+    param.kernelSplitMode = load_balance::KernelSplitMode::BN2_S1G_S2;
 
     // 防御: 分核需要有效的Q/KV长度, 无任何varlen信息且max_seqlen未传时报错
     if (baseInfo.querySeqSize == 0U || baseInfo.kvSeqSize == 0U) {
