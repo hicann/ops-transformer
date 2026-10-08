@@ -165,7 +165,7 @@ void FreeResource(aclTensor *query, aclTensor *key, aclTensor *value, aclTensor 
         aclrtFree(workspaceAddr);
     }
 
-    aclrtDestroyStream(stream);
+    aclrtDestroyStream(*stream);
     aclrtResetDevice(deviceId);
     aclFinalize();
 }

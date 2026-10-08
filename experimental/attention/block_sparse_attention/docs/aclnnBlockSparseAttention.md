@@ -513,7 +513,7 @@ aclnnStatus aclnnBlockSparseAttention(
 - query、key、value的D轴当前仅支持配置为64或128
 - blockShapeOptional如果传入，则必须包含至少两个元素[blockShapeX, blockShapeY]，且值必须大于0，blockShapeY在<term>Ascend 950PR&950DT系列产品</term>上须为16的倍数，在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上须为128的倍数。
 - blockSparseMaskOptional当前必须传入，且shape必须为[batch, headNum, ceilDiv(maxQS, blockShapeX), ceilDiv(maxKVS, blockShapeY)]。
-- attentionMaskOptional当前只支持传入nullptr。
+- attenMaskOptional当前只支持传入nullptr。
 - actualSeqLengthsOptional在qInputLayout为“TND”时必选；actualSeqLengthsKvOptional在kvInputLayout为“TND”时必选。
 - actualSeqLengthsOptional与actualSeqLengthsKvOptional当前必须同时配置或同时不配置，仅配置其中之一的行为将被算子拦截。
 - blockTableOptional当前只支持传入nullptr，表示不开启PagedAttention特性。
@@ -679,7 +679,7 @@ void FreeResource(aclTensor *query, aclTensor *key, aclTensor *value, aclTensor 
         aclrtFree(workspaceAddr);
     }
 
-    aclrtDestroyStream(stream);
+    aclrtDestroyStream(*stream);
     aclrtResetDevice(deviceId);
     aclFinalize();
 }
