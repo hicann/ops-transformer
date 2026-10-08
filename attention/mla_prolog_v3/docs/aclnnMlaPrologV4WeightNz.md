@@ -29,7 +29,7 @@
     - 新增可选参数doRope：控制是否对queryRopeOut与krCache执行旋转位置编码；默认true；doRope=true时ropeSin/ropeCos必须传入非空有效Tensor，doRope=false时跳过RoPE并写直通结果，此时ropeSin/ropeCos必须同时为空（nullptr或空Tensor）。
     - N:Head-Num（多头数）范围调整为1-128
 - **接口功能**：推理场景，Multi-Head Latent Attention前处理的计算。主要计算过程分为七路:
-    - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后，再乘以Query尺度矫正因子$\alpha_q$得到$q^N$；第二路乘以$W^{QR}$后，在doRope=true时经过旋转位置编码得到$q^R$，doRope=false时对$c^Q \cdot W^{QR}$直通写出。
+    - 首先对输入$x$乘以$W^{DQ}$进行下采样和RmsNorm后，乘以Query尺度矫正因子$\alpha_q$得到$c^Q$，再分为两路，第一路乘以$W^{UQ}$和$W^{UK}$经过两次上采样后得到$q^N$；第二路乘以$W^{QR}$后，在doRope=true时经过旋转位置编码得到$q^R$，doRope=false时对$c^Q \cdot W^{QR}$直通写出。
     - 第三路是输入$x$乘以$W^{DKV}$进行下采样和RmsNorm后，乘以Key尺度矫正因子$\alpha_{kv}$传入Cache中得到$k^C$；
     - 第四路是输入$x$乘以$W^{KR}$后，在doRope=true时经过旋转位置编码再写入Cache得到$k^R$，doRope=false时对$x \cdot W^{KR}$直通写入Cache；
     - 第五路是输出$q^N$经过DynamicQuant后得到的量化参数。
