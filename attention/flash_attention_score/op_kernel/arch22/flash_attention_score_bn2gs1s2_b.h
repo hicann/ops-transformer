@@ -785,9 +785,7 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
     event_t eventIdPseDropVToMte2B;
     if constexpr (hasPse == true && hasDrop == true && !IsSameType<INPUT_T, T>::value) {
         eventIdPseDropVToMte2A = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
-        if (!this->pseInfo.pseEndogenous) {
-            eventIdPseDropVToMte2B = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
-        }
+        eventIdPseDropVToMte2B = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
     }
     uint32_t loopIdxNew = 0;
     for (uint32_t biN2GoIdx = 0; biN2GoIdx < this->biN2G; biN2GoIdx++) {
@@ -838,9 +836,9 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
                         AscendC::SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
                         AscendC::WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
                     }
-                    if constexpr (hasDrop == true && !IsSameType<INPUT_T, T>::value) {
-                        AscendC::SetFlag<HardEvent::V_MTE2>(eventIdPseDropVToMte2B);
-                    }
+                }
+                if constexpr (hasDrop == true && !IsSameType<INPUT_T, T>::value) {
+                    AscendC::SetFlag<HardEvent::V_MTE2>(eventIdPseDropVToMte2B);
                 }
             }
             this->GetBmm1Result(extraInfo, stage1PongTensor, loopIdx);
@@ -919,9 +917,7 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
                 this->dropMaskInfo.s2TotalSize = static_cast<int64_t>(this->s2Size);
                 this->dropMaskInfo.boolMode = this->dropMaskUnAligned;
                 if constexpr (hasPse == true && !IsSameType<INPUT_T, T>::value) {
-                    if (!this->pseInfo.pseEndogenous) {
-                        AscendC::WaitFlag<HardEvent::V_MTE2>(eventIdPseDropVToMte2B);
-                    }
+                    AscendC::WaitFlag<HardEvent::V_MTE2>(eventIdPseDropVToMte2B);
                 }
                 CopyInDropMask<hasDrop>(dropMaskUb, dropoutWorkspaceGm, this->dropMaskGm, this->dropMaskInfo);
             }
@@ -1008,9 +1004,7 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<FA_BN2GS1S2B_FUNCTION_PARAMS
     GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(eventIdVToMte2B);
     if constexpr (hasPse == true && hasDrop == true && !IsSameType<INPUT_T, T>::value) {
         GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(eventIdPseDropVToMte2A);
-        if (!this->pseInfo.pseEndogenous) {
-            GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(eventIdPseDropVToMte2B);
-        }
+        GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(eventIdPseDropVToMte2B);
     }
     return;
 }
