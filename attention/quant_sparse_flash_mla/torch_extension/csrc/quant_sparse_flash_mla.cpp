@@ -148,19 +148,19 @@ std::tuple<at::Tensor, at::Tensor> ConstructQuantSparseFlashMlaAttenOutTensor(co
 }
 
 std::tuple<at::Tensor, at::Tensor> QuantSparseFlashMla(
-    const at::Tensor &q, const c10::optional<at::Tensor> &oriKv, const c10::optional<at::Tensor> &cmpKv,
-    const c10::optional<at::Tensor> &qDescale, const c10::optional<at::Tensor> &oriKvDescale,
-    const c10::optional<at::Tensor> &cmpKvDescale, const c10::optional<at::Tensor> &oriSparseIndices,
-    const c10::optional<at::Tensor> &cmpSparseIndices, const c10::optional<at::Tensor> &oriBlockTable,
-    const c10::optional<at::Tensor> &cmpBlockTable, const c10::optional<at::Tensor> &cuSeqlensQ,
-    const c10::optional<at::Tensor> &cuSeqlensOriKv, const c10::optional<at::Tensor> &cuSeqlensCmpKv,
-    const c10::optional<at::Tensor> &sequsedQ, const c10::optional<at::Tensor> &sequsedOriKv,
-    const c10::optional<at::Tensor> &sequsedCmpKv, const c10::optional<at::Tensor> &cmpResidualKv,
-    const c10::optional<at::Tensor> &oriTopkLength, const c10::optional<at::Tensor> &cmpTopkLength,
-    const c10::optional<at::Tensor> &sinks, const c10::optional<at::Tensor> &metadata, int64_t quantMode,
-    double softmaxScale, int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft,
-    int64_t oriWinRight, c10::string_view layoutQ, c10::string_view layoutKv, int64_t topkValueMode,
-    bool returnSoftmaxLse)
+    const at::Tensor &q, int64_t quantMode, const c10::optional<at::Tensor> &oriKv,
+    const c10::optional<at::Tensor> &cmpKv, const c10::optional<at::Tensor> &qDescale,
+    const c10::optional<at::Tensor> &oriKvDescale, const c10::optional<at::Tensor> &cmpKvDescale,
+    const c10::optional<at::Tensor> &oriSparseIndices, const c10::optional<at::Tensor> &cmpSparseIndices,
+    const c10::optional<at::Tensor> &oriBlockTable, const c10::optional<at::Tensor> &cmpBlockTable,
+    const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensOriKv,
+    const c10::optional<at::Tensor> &cuSeqlensCmpKv, const c10::optional<at::Tensor> &sequsedQ,
+    const c10::optional<at::Tensor> &sequsedOriKv, const c10::optional<at::Tensor> &sequsedCmpKv,
+    const c10::optional<at::Tensor> &cmpResidualKv, const c10::optional<at::Tensor> &oriTopkLength,
+    const c10::optional<at::Tensor> &cmpTopkLength, const c10::optional<at::Tensor> &sinks,
+    const c10::optional<at::Tensor> &metadata, double softmaxScale, int64_t cmpRatio, int64_t oriMaskMode,
+    int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight, c10::string_view layoutQ, c10::string_view layoutKv,
+    int64_t topkValueMode, bool returnSoftmaxLse)
 {
     TORCH_CHECK(q.numel() > 0, "Tensor query is empty.")
     TORCH_CHECK(quantMode == 1, "quant_mode only support 1.")

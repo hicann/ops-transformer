@@ -99,6 +99,7 @@ class QuantSparseFlashMlaOpBuilder(OpBuilder):
         @impl(get_as_library(), self.name, "Meta")
         def quant_sparse_flash_mla_meta(
             q,
+            quant_mode,
             ori_kv=None,
             cmp_kv=None,
             q_descale=None,
@@ -119,7 +120,6 @@ class QuantSparseFlashMlaOpBuilder(OpBuilder):
             cmp_topk_length=None,
             sinks=None,
             metadata=None,
-            quant_mode=None,
             softmax_scale=None,
             cmp_ratio=1,
             ori_mask_mode=0,
@@ -375,6 +375,7 @@ def quant_sparse_flash_mla(
     op_module = quant_sparse_flash_mla_op_builder.load()
     return op_module.quant_sparse_flash_mla(
         q,
+        quant_mode,
         ori_kv,
         cmp_kv,
         q_descale,
@@ -395,7 +396,6 @@ def quant_sparse_flash_mla(
         cmp_topk_length,
         sinks,
         metadata,
-        quant_mode,
         softmax_scale,
         cmp_ratio,
         ori_mask_mode,
