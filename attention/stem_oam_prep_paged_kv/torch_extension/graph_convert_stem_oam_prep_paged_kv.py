@@ -14,7 +14,7 @@ try:
     import torch_npu
     import torchair
     from typing import List, Optional
-    from torchair.ge._ge_graph import Tensor, TensorSpec, Const, DataType
+    from torchair.ge._ge_graph import Tensor, TensorSpec, Const, DataType, Cast
     from torchair.ge._ge_graph import auto_convert_to_tensor
     from torchair.ge._ge_graph import TensorType
     from torchair._ge_concrete_graph.compat_ir import ge_op, IrDef
@@ -75,6 +75,8 @@ if _TORCHAIR_AVAILABLE:
 
         if not isinstance(kvSeqLens, Tensor):
             kvSeqLens = Const(kvSeqLens, dtype=DataType.DT_INT32)
+        elif kvSeqLens.dtype != DataType.DT_INT32:
+            kvSeqLens = Cast(kvSeqLens, dst_type=DataType.DT_INT32)
 
         inputs = {
             "k_cache": kCache,
