@@ -116,25 +116,22 @@ constexpr uint64_t SYNC_REGION_FROM_TAIL = CCL_TAIL_SAFETY_BYTES;
 constexpr uint64_t SYNC_SLOT_BYTES = 64UL;
 constexpr uint32_t MAX_RANK_SIZE = GMMA2AV_MTE_MAX_RANK_SIZE;
 constexpr uint32_t MAX_COUNT_NUM = GMMA2AV_MTE_MAX_COUNT_NUM;
-// Version 2 keeps the byte offsets but stores an int64_t epoch in each slot.
-constexpr uint32_t FIXED_SYNC_LAYOUT_VERSION = 2U;
-constexpr int64_t MAX_SYNC_EPOCH = 0x7ffffffffffffffeLL;
+// Version 4 combines count/expert readiness into a per-source progress slot.
+constexpr uint32_t FIXED_SYNC_LAYOUT_VERSION = 4U;
+constexpr int64_t SYNC_READY = 1;
 
 // Byte offsets within the fixed synchronization region.  Region bases do not
 // depend on the current rank size or expert count, so persistent HCCL windows
 // can safely be reused by cases with different shapes.
-constexpr uint64_t EPOCH_BASE = 0UL;
-constexpr uint64_t COUNT_READY_BASE = EPOCH_BASE + SYNC_SLOT_BYTES;
-constexpr uint64_t EXPERT_READY_BASE = COUNT_READY_BASE + static_cast<uint64_t>(MAX_RANK_SIZE) * SYNC_SLOT_BYTES;
-constexpr uint64_t COMPLETION_BASE = EXPERT_READY_BASE + static_cast<uint64_t>(MAX_COUNT_NUM) * SYNC_SLOT_BYTES;
-constexpr uint64_t ACK_BASE = COMPLETION_BASE + static_cast<uint64_t>(MAX_RANK_SIZE) * SYNC_SLOT_BYTES;
-constexpr uint64_t FIXED_SYNC_BYTES = ACK_BASE + static_cast<uint64_t>(MAX_RANK_SIZE) * SYNC_SLOT_BYTES;
+// Ready: 0 = reset, 1 = count-ready, endExpert + 1 = completed prefix.
+// Progress is bounded by this invocation's expert count; it never spans cases.
+constexpr uint64_t READY_BASE = 0UL;
+constexpr uint64_t COMPLETION_BASE = READY_BASE + static_cast<uint64_t>(MAX_RANK_SIZE) * SYNC_SLOT_BYTES;
+constexpr uint64_t FIXED_SYNC_BYTES = COMPLETION_BASE + static_cast<uint64_t>(MAX_RANK_SIZE) * SYNC_SLOT_BYTES;
 
 static_assert(SYNC_SLOT_BYTES == 64UL, "Every synchronization slot must occupy one cache line");
-static_assert(COUNT_READY_BASE % SYNC_SLOT_BYTES == 0UL, "Count-ready region must be slot aligned");
-static_assert(EXPERT_READY_BASE % SYNC_SLOT_BYTES == 0UL, "Expert-ready region must be slot aligned");
+static_assert(READY_BASE % SYNC_SLOT_BYTES == 0UL, "Ready region must be slot aligned");
 static_assert(COMPLETION_BASE % SYNC_SLOT_BYTES == 0UL, "Completion region must be slot aligned");
-static_assert(ACK_BASE % SYNC_SLOT_BYTES == 0UL, "Acknowledgement region must be slot aligned");
 static_assert(FIXED_SYNC_BYTES <= SYNC_REGION_FROM_TAIL,
               "Fixed synchronization layout must fit in the reserved CCL tail region");
 } // namespace Gmma2avMteTiling

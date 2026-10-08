@@ -74,35 +74,35 @@ static std::vector<int64_t> MakeCounts(size_t countNum, int64_t totalCount)
     return counts;
 }
 
-std::unordered_map<string, std::function<void(TilingParams &tilingParams, const string &valueStr)>>
+std::unordered_map<string, std::function<void(TilingParams& tilingParams, const string& valueStr)>>
     g_tilingParamsStrHandlers = {
-        {"BSK", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.BSK = std::stoi(valueStr); }},
-        {"BS", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.BS = std::stoi(valueStr); }},
-        {"K", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.K = std::stoi(valueStr); }},
-        {"H1", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.H1 = std::stoi(valueStr); }},
-        {"H2", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.H2 = std::stoi(valueStr); }},
-        {"A", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.A = std::stoi(valueStr); }},
-        {"N1", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.N1 = std::stoi(valueStr); }},
-        {"N2", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.N2 = std::stoi(valueStr); }},
+        {"BSK", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.BSK = std::stoi(valueStr); }},
+        {"BS", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.BS = std::stoi(valueStr); }},
+        {"K", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.K = std::stoi(valueStr); }},
+        {"H1", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.H1 = std::stoi(valueStr); }},
+        {"H2", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.H2 = std::stoi(valueStr); }},
+        {"A", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.A = std::stoi(valueStr); }},
+        {"N1", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.N1 = std::stoi(valueStr); }},
+        {"N2", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.N2 = std::stoi(valueStr); }},
         {"epWorldSize",
-         [](TilingParams &tilingParams, const string &valueStr) { tilingParams.epWorldSize = std::stoi(valueStr); }},
-        {"e", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.e = std::stoi(valueStr); }},
+         [](TilingParams& tilingParams, const string& valueStr) { tilingParams.epWorldSize = std::stoi(valueStr); }},
+        {"e", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.e = std::stoi(valueStr); }},
         {"gmmWeightDim1",
-         [](TilingParams &tilingParams, const string &valueStr) { tilingParams.gmmWeightDim1 = std::stoi(valueStr); }},
-        {"yDim1", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.yDim1 = std::stoi(valueStr); }},
+         [](TilingParams& tilingParams, const string& valueStr) { tilingParams.gmmWeightDim1 = std::stoi(valueStr); }},
+        {"yDim1", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.yDim1 = std::stoi(valueStr); }},
         {"mmWeightDim0",
-         [](TilingParams &tilingParams, const string &valueStr) { tilingParams.mmWeightDim0 = std::stoi(valueStr); }},
+         [](TilingParams& tilingParams, const string& valueStr) { tilingParams.mmWeightDim0 = std::stoi(valueStr); }},
         {"transGmmWeight",
-         [](TilingParams &tilingParams, const string &valueStr) { tilingParams.transGmmWeight = valueStr == "true"; }},
+         [](TilingParams& tilingParams, const string& valueStr) { tilingParams.transGmmWeight = valueStr == "true"; }},
         {"transMmWeight",
-         [](TilingParams &tilingParams, const string &valueStr) { tilingParams.transMmWeight = valueStr == "true"; }}};
+         [](TilingParams& tilingParams, const string& valueStr) { tilingParams.transMmWeight = valueStr == "true"; }}};
 
-std::unordered_map<string, std::function<void(TilingParams &tilingParams, const std::vector<int64_t> valueVec)>>
+std::unordered_map<string, std::function<void(TilingParams& tilingParams, const std::vector<int64_t> valueVec)>>
     g_tilingParamsVecHandlers = {
         {"sendCounts",
-         [](TilingParams &tilingParams, const std::vector<int64_t> valueVec) { tilingParams.sendCounts = valueVec; }},
+         [](TilingParams& tilingParams, const std::vector<int64_t> valueVec) { tilingParams.sendCounts = valueVec; }},
         {"recvCounts",
-         [](TilingParams &tilingParams, const std::vector<int64_t> valueVec) { tilingParams.recvCounts = valueVec; }}};
+         [](TilingParams& tilingParams, const std::vector<int64_t> valueVec) { tilingParams.recvCounts = valueVec; }}};
 
 class GroupedMatMulAlltoAllvMteArch22TilingTest : public testing::TestWithParam<TestParam> {
 protected:
@@ -120,12 +120,10 @@ protected:
 TEST_F(GroupedMatMulAlltoAllvMteArch22TilingTest, FixedSyncLayout)
 {
     using namespace MC2KernelTemplate::Gmma2avMteTiling;
-    EXPECT_EQ(EPOCH_BASE, 0UL);
-    EXPECT_EQ(COUNT_READY_BASE, SYNC_SLOT_BYTES);
-    EXPECT_EQ(EXPERT_READY_BASE, COUNT_READY_BASE + static_cast<uint64_t>(MAX_RANK_SIZE) * SYNC_SLOT_BYTES);
-    EXPECT_EQ(COMPLETION_BASE, EXPERT_READY_BASE + static_cast<uint64_t>(MAX_COUNT_NUM) * SYNC_SLOT_BYTES);
-    EXPECT_EQ(ACK_BASE, COMPLETION_BASE + static_cast<uint64_t>(MAX_RANK_SIZE) * SYNC_SLOT_BYTES);
-    EXPECT_EQ(FIXED_SYNC_BYTES, (1UL + 3UL * MAX_RANK_SIZE + MAX_COUNT_NUM) * SYNC_SLOT_BYTES);
+    EXPECT_EQ(READY_BASE, 0UL);
+    EXPECT_EQ(COMPLETION_BASE, READY_BASE + static_cast<uint64_t>(MAX_RANK_SIZE) * SYNC_SLOT_BYTES);
+    EXPECT_EQ(FIXED_SYNC_BYTES, COMPLETION_BASE + static_cast<uint64_t>(MAX_RANK_SIZE) * SYNC_SLOT_BYTES);
+    EXPECT_EQ(FIXED_SYNC_BYTES, 2UL * MAX_RANK_SIZE * SYNC_SLOT_BYTES);
     EXPECT_LE(FIXED_SYNC_BYTES, SYNC_REGION_FROM_TAIL);
 }
 
@@ -139,12 +137,12 @@ TEST_P(GroupedMatMulAlltoAllvMteArch22TilingTest, ShapeSize)
     uint64_t ubSize = 196608;
     uint64_t tilingData = sizeof(MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData);
     auto tilingParams = TilingParams{};
-    for (auto &kv : testParam.tilingParamsStrPair) {
+    for (auto& kv : testParam.tilingParamsStrPair) {
         if (g_tilingParamsStrHandlers.count(kv.first) != 0) {
             g_tilingParamsStrHandlers[kv.first](tilingParams, kv.second);
         }
     }
-    for (auto &kv : testParam.tilingParamsVecPair) {
+    for (auto& kv : testParam.tilingParamsVecPair) {
         if (g_tilingParamsVecHandlers.count(kv.first) != 0) {
             g_tilingParamsVecHandlers[kv.first](tilingParams, kv.second);
         }
@@ -152,7 +150,7 @@ TEST_P(GroupedMatMulAlltoAllvMteArch22TilingTest, ShapeSize)
 
     // Slots 0..5 are inputs; slots 6..7 are GMM/shared-MM outputs.
     std::vector<ge::DataType> dtypes(8, testParam.dtype);
-    for (const auto &item : testParam.tilingDTypesPair) {
+    for (const auto& item : testParam.tilingDTypesPair) {
         dtypes.at(item.first) = item.second;
     }
 
@@ -485,7 +483,7 @@ static TestParam g_testParams[] = {
 
 INSTANTIATE_TEST_SUITE_P(GroupedMatMulAlltoAllvMte, GroupedMatMulAlltoAllvMteArch22TilingTest,
                          testing::ValuesIn(g_testParams),
-                         [](const testing::TestParamInfo<GroupedMatMulAlltoAllvMteArch22TilingTest::ParamType> &info) {
+                         [](const testing::TestParamInfo<GroupedMatMulAlltoAllvMteArch22TilingTest::ParamType>& info) {
                              return info.param.testName;
                          });
 

@@ -32,13 +32,6 @@ constexpr uint32_t PONG_UB_OFFSET_BYTES = 96U * 1024U;
 constexpr uint32_t CONTROL_MTE_BYTES = 32U;
 constexpr uint32_t CONTROL_MTE_ELEMENTS = CONTROL_MTE_BYTES / sizeof(int32_t);
 constexpr uint32_t SYNC_MTE_ELEMENTS = CONTROL_MTE_BYTES / sizeof(int64_t);
-// The control scratch spans [CONTROL_UB_OFFSET_BYTES, DESTINATION_OFFSET_UB_
-// OFFSET_BYTES) = 8 KiB. Expert-ready staging reuses it in a disjoint phase
-// from the peer-count staging, so the full region is available; one batched
-// flag transaction may cover up to 128 consecutive 64-byte slots.
-constexpr uint32_t FLAG_STAGING_ELEMENTS =
-    (DESTINATION_OFFSET_UB_OFFSET_BYTES - CONTROL_UB_OFFSET_BYTES) / sizeof(int64_t);
-constexpr uint32_t SYNC_SLOT_ELEMENTS = Gmma2avMteTiling::SYNC_SLOT_BYTES / sizeof(int64_t);
 static_assert(CONTROL_MTE_BYTES % sizeof(int64_t) == 0U,
               "The synchronization transaction must contain complete int64 elements");
 constexpr uint32_t INVALID_TOKEN_OFFSET = 0xffffffffU;
@@ -68,14 +61,14 @@ class GmmA2avMteOp {
 public:
     __aicore__ inline GmmA2avMteOp() {}
 
-    __aicore__ inline void Init(const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo, GM_ADDR sendBuffer,
-                                GM_ADDR recvBuffer, GM_ADDR cumsumBuffer, AscendC::TPipe *pipe,
-                                const GmmA2avCoCTiling *cocTiling = nullptr, uint64_t commBufferSize = 0UL,
+    __aicore__ inline void Init(const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo, GM_ADDR sendBuffer,
+                                GM_ADDR recvBuffer, GM_ADDR cumsumBuffer, AscendC::TPipe* pipe,
+                                const GmmA2avCoCTiling* cocTiling = nullptr, uint64_t commBufferSize = 0UL,
                                 uint32_t isA3 = 0U)
     {
         taskTilingInfo_ = taskTilingInfo;
-        sendBuffer_ = reinterpret_cast<__gm__ T *>(sendBuffer);
-        recvBuffer_ = reinterpret_cast<__gm__ T *>(recvBuffer);
+        sendBuffer_ = reinterpret_cast<__gm__ T*>(sendBuffer);
+        recvBuffer_ = reinterpret_cast<__gm__ T*>(recvBuffer);
         // Kept in the common MTE Init signature for serialized-tiling ABI
         // compatibility. Expert-overlap offsets are owner-local in UB.
         (void)cumsumBuffer;
@@ -88,14 +81,14 @@ public:
         if (isA3_) {
             // The established A3 package uses the full MC2 resource context.
             // Its peer windows are referenced by remoteRes[].
-            a3WinContext_ = reinterpret_cast<__gm__ HcclOpResParam *>(context);
+            a3WinContext_ = reinterpret_cast<__gm__ HcclOpResParam*>(context);
             rank_ = a3WinContext_->localUsrRankId;
             rankSize_ = a3WinContext_->rankSize;
             winSize_ = a3WinContext_->winSize == 0UL ? commBufferSize : a3WinContext_->winSize;
         } else {
             // Ascend 910B MultiPut exposes HcclCombineOpParam. For larger
             // communication domains HCCL supplies the dynamic data[] table.
-            a2WinContext_ = reinterpret_cast<__gm__ AscendC::HcclCombineOpParam *>(context);
+            a2WinContext_ = reinterpret_cast<__gm__ AscendC::HcclCombineOpParam*>(context);
             rank_ = a2WinContext_->rankId;
             rankSize_ = a2WinContext_->rankNum;
             winSize_ = a2WinContext_->winSize == 0UL ? commBufferSize : a2WinContext_->winSize;
@@ -120,14 +113,12 @@ public:
         if ASCEND_IS_AIC {
             return;
         }
-        BeginInvocation();
 
-        // Counts do not depend on GMM output. Publish/acquire them while AIC
-        // computes the first chunk. This rank phase protects the count table
-        // independently of masked per-expert payload-ready flags. A local compute chunk can have no incoming
-        // rows, so masked expert-ready waits cannot protect the count table.
+        // Progress 1 publishes counts before any GMM output is needed. Later
+        // progress values also imply count readiness; a fast source may have
+        // advanced beyond 1 before a slow receiver first observes its slot.
         PublishLocalCountTable();
-        PublishAndWaitRankPhase(Gmma2avMteTiling::COUNT_READY_BASE);
+        PublishCountReady();
         BuildDestinationOffsets();
         LocalAivSync();
         localExpertBaseRows_ = 0UL;
@@ -152,33 +143,35 @@ public:
 
     __aicore__ inline void PublishChunkReady(uint32_t startExpertIdx, uint32_t endExpertIdx)
     {
-        // Match mega_moe/combine A3's destination-local mailbox protocol. All
-        // payload writers drain before the leading barrier, then source rank
-        // S writes ExpertReady(D, S, E) into every destination D's local
-        // window. A destination only polls its own window through the valid
-        // L2-bypass alias; it never polls an encoded peer VA.
+        // Experts are staged in increasing order, although each rank may
+        // choose different chunk boundaries. One source-owned slot per peer
+        // therefore represents the whole completed prefix, not a chunk ID.
+        (void)startExpertIdx;
         LocalAivSync();
         if (subBlockIdx_ == 0U && rankWorkerCount_ != 0U) {
             for (uint32_t dstRank = logicalCoreIdx_; dstRank < rankSize_; dstRank += rankWorkerCount_) {
-                if (PublishExpertReadyRange(dstRank, startExpertIdx, endExpertIdx, syncEpoch_)) {
-                    continue;
-                }
-                PublishExpertReadyPerFlag(dstRank, startExpertIdx, endExpertIdx, syncEpoch_);
+                StoreSyncFlag(GetPhaseSlot(dstRank, Gmma2avMteTiling::READY_BASE, rank_),
+                              static_cast<int64_t>(endExpertIdx) + Gmma2avMteTiling::SYNC_READY);
             }
         }
     }
 
     __aicore__ inline void WaitChunkReady(uint32_t startExpertIdx, uint32_t endExpertIdx)
     {
-        // Finish every outbound publication before allowing any worker to
-        // wait, preventing a rank-level publish/wait cycle.
+        // Publish every outbound progress value before any worker waits.
         LocalAivSync();
         if (subBlockIdx_ == 0U && rankWorkerCount_ != 0U) {
+            const uint32_t expertNum = static_cast<uint32_t>(taskTilingInfo_->e);
             for (uint32_t srcRank = logicalCoreIdx_; srcRank < rankSize_; srcRank += rankWorkerCount_) {
-                if (WaitExpertReadyRange(srcRank, startExpertIdx, endExpertIdx, syncEpoch_)) {
-                    continue;
+                // Only the last nonempty received expert needs a wait. Empty
+                // routes must not impose a dependency on unrelated peer work.
+                for (uint32_t end = endExpertIdx; end > startExpertIdx; --end) {
+                    if (taskTilingInfo_->recvCnt[static_cast<uint64_t>(srcRank) * expertNum + end - 1U] > 0) {
+                        WaitSyncFlag<true>(GetPhaseSlot(rank_, Gmma2avMteTiling::READY_BASE, srcRank),
+                                           static_cast<int64_t>(end) + Gmma2avMteTiling::SYNC_READY);
+                        break;
+                    }
                 }
-                WaitExpertReadyPerFlag(srcRank, startExpertIdx, endExpertIdx, syncEpoch_);
             }
         }
         LocalAivSync();
@@ -249,13 +242,10 @@ public:
     __aicore__ inline void End()
     {
         if ASCEND_IS_AIV {
-            // Every payload-pull worker has drained its MTE2/MTE3 pipeline
-            // before the entry barrier below. Completion protects source
-            // windows; acknowledgement protects all persistent phase slots
-            // against reuse by the next invocation.
-            AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
-            PublishAndWaitRankPhase(Gmma2avMteTiling::COMPLETION_BASE);
-            PublishAndWaitRankPhase(Gmma2avMteTiling::ACK_BASE);
+            // PullExpertChunk's final AIV barrier already drains all local
+            // payload readers. The final mixed barrier also joins the AIVs
+            // after the last completion-zero acquire; no duplicate is needed.
+            FinishInvocation();
         }
         AscendC::SyncAll<false>();
     }
@@ -268,7 +258,7 @@ private:
                 return (GM_ADDR)(a3WinContext_->localWindowsIn);
             }
             auto relation =
-                reinterpret_cast<__gm__ HcclRankRelationResV2 *>(a3WinContext_->remoteRes[rank].nextDevicePtr);
+                reinterpret_cast<__gm__ HcclRankRelationResV2*>(a3WinContext_->remoteRes[rank].nextDevicePtr);
             return (GM_ADDR)(relation->windowsIn);
         }
         if (a2WinContext_->multiFlag == 0U) {
@@ -278,39 +268,54 @@ private:
                                (GM_ADDR)(a2WinContext_->data[rank].remoteInput.addr);
     }
 
-    __aicore__ inline __gm__ int32_t *GetCountTable(uint32_t rank) const
+    __aicore__ inline __gm__ int32_t* GetCountTable(uint32_t rank) const
     {
-        return reinterpret_cast<__gm__ int32_t *>(GetWindow(rank) + winSize_ -
-                                                  Gmma2avMteTiling::SEND_COUNT_STAGING_FROM_TAIL);
+        return reinterpret_cast<__gm__ int32_t*>(GetWindow(rank) + winSize_ -
+                                                 Gmma2avMteTiling::SEND_COUNT_STAGING_FROM_TAIL);
     }
 
-    __aicore__ inline __gm__ T *GetOutputData(uint32_t rank) const
+    __aicore__ inline __gm__ T* GetOutputData(uint32_t rank) const
     {
-        return reinterpret_cast<__gm__ T *>(GetWindow(rank));
+        return reinterpret_cast<__gm__ T*>(GetWindow(rank));
     }
 
-    __aicore__ inline void BeginInvocation()
+    __aicore__ inline void FinishInvocation()
     {
-        // HCCL windows persist across cases. The control plane must provide a
-        // zero-initialized fixed-layout region on first use and serialize all
-        // invocations on this communicator. Under that contract the complete
-        // acknowledgement vector is the ownership proof for advancing epoch.
-        LocalAivSync();
-        if (IsPrimaryAiv()) {
-            const int64_t previousEpoch = AscendC::ReadGmByPassDCache(GetEpochSlot(rank_));
-            for (uint32_t participant = 0U; participant < rankSize_; ++participant) {
-                WaitSyncFlag(GetAckSlot(rank_, participant), previousEpoch);
+        // First use requires zero-initialized slots, and invocations on this
+        // communicator must be serialized. Each worker owns the same peer
+        // slots throughout all three phases. Poll only local GM (also on A3).
+        if (subBlockIdx_ == 0U && rankWorkerCount_ != 0U) {
+            for (uint32_t peer = logicalCoreIdx_; peer < rankSize_; peer += rankWorkerCount_) {
+                StoreSyncFlag(GetPhaseSlot(peer, Gmma2avMteTiling::COMPLETION_BASE, rank_), 1);
             }
-            // Admission guarantees 0 <= previousEpoch < MAX_SYNC_EPOCH. This
-            // hot kernel intentionally has no unilateral wrap/recovery path;
-            // the executor must quiesce and reinitialize before exhaustion.
-            syncEpoch_ = previousEpoch == 0 ? 1 : previousEpoch + 1;
-            StoreSyncFlag(GetEpochSlot(rank_), syncEpoch_);
         }
         LocalAivSync();
-        if (!IsPrimaryAiv()) {
-            syncEpoch_ = AscendC::ReadGmByPassDCache(GetEpochSlot(rank_));
-            AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+        if (subBlockIdx_ == 0U && rankWorkerCount_ != 0U) {
+            for (uint32_t peer = logicalCoreIdx_; peer < rankSize_; peer += rankWorkerCount_) {
+                // This peer has consumed our payload and progress. It is now
+                // safe to reset our slot in its window, without waiting for
+                // unrelated peers to finish reading their source windows.
+                WaitSyncFlag(GetPhaseSlot(rank_, Gmma2avMteTiling::COMPLETION_BASE, peer), 1);
+                StoreSyncFlag(GetPhaseSlot(peer, Gmma2avMteTiling::READY_BASE, rank_), 0);
+            }
+        }
+        LocalAivSync();
+        if (subBlockIdx_ == 0U && rankWorkerCount_ != 0U) {
+            for (uint32_t peer = logicalCoreIdx_; peer < rankSize_; peer += rankWorkerCount_) {
+                // Completion stays asserted until this peer's ready reset is
+                // observed, preventing next-call ready from overtaking zero.
+                WaitSyncFlag(GetPhaseSlot(rank_, Gmma2avMteTiling::READY_BASE, peer), 0);
+                StoreSyncFlag(GetPhaseSlot(peer, Gmma2avMteTiling::COMPLETION_BASE, rank_), 0);
+            }
+        }
+        LocalAivSync();
+        if (subBlockIdx_ == 0U && rankWorkerCount_ != 0U) {
+            for (uint32_t peer = logicalCoreIdx_; peer < rankSize_; peer += rankWorkerCount_) {
+                // Acquire every reset before reuse or communicator teardown.
+                // Next-call completion requires our next-call count-ready,
+                // so it cannot overwrite zero before this wait observes it.
+                WaitSyncFlag(GetPhaseSlot(rank_, Gmma2avMteTiling::COMPLETION_BASE, peer), 0);
+            }
         }
     }
 
@@ -497,7 +502,7 @@ private:
         return ubBuffer_.template Get<uint32_t>()[GmmA2avMteDetail::SOURCE_OFFSET_UB_OFFSET_BYTES / sizeof(uint32_t)];
     }
 
-    __aicore__ static inline bool SafeAdd(uint64_t lhs, uint64_t rhs, uint64_t &result)
+    __aicore__ static inline bool SafeAdd(uint64_t lhs, uint64_t rhs, uint64_t& result)
     {
         constexpr uint64_t maxValue = ~static_cast<uint64_t>(0U);
         if (lhs > maxValue - rhs) {
@@ -507,7 +512,7 @@ private:
         return true;
     }
 
-    __aicore__ static inline bool SafeMulU32(uint64_t lhs, uint64_t rhs, uint64_t &result)
+    __aicore__ static inline bool SafeMulU32(uint64_t lhs, uint64_t rhs, uint64_t& result)
     {
         constexpr uint64_t maxU32 = 0xffffffffUL;
         if (lhs > maxU32 || rhs > maxU32) {
@@ -529,7 +534,7 @@ private:
         return true;
     }
 
-    __aicore__ inline void LoadInt32Row(__gm__ int32_t *source, const AscendC::LocalTensor<int32_t> &local,
+    __aicore__ inline void LoadInt32Row(__gm__ int32_t* source, const AscendC::LocalTensor<int32_t>& local,
                                         uint32_t elementCount)
     {
         const uint32_t alignedElementCount = AlignControlElements(elementCount);
@@ -543,7 +548,7 @@ private:
         AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
     }
 
-    __aicore__ inline void StoreInt32Row(__gm__ int32_t *destination, const AscendC::LocalTensor<int32_t> &local,
+    __aicore__ inline void StoreInt32Row(__gm__ int32_t* destination, const AscendC::LocalTensor<int32_t>& local,
                                          uint32_t elementCount)
     {
         AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID2);
@@ -564,12 +569,12 @@ private:
         AscendC::SyncAll<true>();
     }
 
-    __aicore__ inline void PublishAndWaitRankPhase(uint64_t phaseBase)
+    __aicore__ inline void PublishCountReady()
     {
         LocalAivSync();
         if (subBlockIdx_ == 0U && rankWorkerCount_ != 0U) {
             for (uint32_t dstRank = logicalCoreIdx_; dstRank < rankSize_; dstRank += rankWorkerCount_) {
-                StoreSyncFlag(GetPhaseSlot(dstRank, phaseBase, rank_), syncEpoch_);
+                StoreSyncFlag(GetPhaseSlot(dstRank, Gmma2avMteTiling::READY_BASE, rank_), Gmma2avMteTiling::SYNC_READY);
             }
         }
         // Do not allow a worker to wait until every outbound slot from this
@@ -577,167 +582,27 @@ private:
         LocalAivSync();
         if (subBlockIdx_ == 0U && rankWorkerCount_ != 0U) {
             for (uint32_t srcRank = logicalCoreIdx_; srcRank < rankSize_; srcRank += rankWorkerCount_) {
-                WaitSyncFlag(GetPhaseSlot(rank_, phaseBase, srcRank), syncEpoch_);
+                WaitSyncFlag<true>(GetPhaseSlot(rank_, Gmma2avMteTiling::READY_BASE, srcRank),
+                                   Gmma2avMteTiling::SYNC_READY);
             }
         }
         LocalAivSync();
     }
 
-    __aicore__ inline __gm__ int64_t *GetFixedSyncSlot(uint32_t windowRank, uint64_t phaseBase, uint64_t index) const
+    __aicore__ inline __gm__ int64_t* GetFixedSyncSlot(uint32_t windowRank, uint64_t phaseBase, uint64_t index) const
     {
         const uint64_t syncOffset =
             winSize_ - Gmma2avMteTiling::SYNC_REGION_FROM_TAIL + phaseBase + index * Gmma2avMteTiling::SYNC_SLOT_BYTES;
-        return reinterpret_cast<__gm__ int64_t *>(GetWindow(windowRank) + syncOffset);
+        return reinterpret_cast<__gm__ int64_t*>(GetWindow(windowRank) + syncOffset);
     }
 
-    __aicore__ inline __gm__ int64_t *GetEpochSlot(uint32_t windowRank) const
-    {
-        return GetFixedSyncSlot(windowRank, Gmma2avMteTiling::EPOCH_BASE, 0UL);
-    }
-
-    __aicore__ inline __gm__ int64_t *GetPhaseSlot(uint32_t windowRank, uint64_t phaseBase,
+    __aicore__ inline __gm__ int64_t* GetPhaseSlot(uint32_t windowRank, uint64_t phaseBase,
                                                    uint32_t participantRank) const
     {
         return GetFixedSyncSlot(windowRank, phaseBase, participantRank);
     }
 
-    __aicore__ inline __gm__ int64_t *GetExpertReadySlot(uint32_t windowRank, uint32_t sourceRank,
-                                                         uint32_t expertIdx) const
-    {
-        const uint64_t expertSlot = static_cast<uint64_t>(sourceRank) * taskTilingInfo_->e + expertIdx;
-        return GetFixedSyncSlot(windowRank, Gmma2avMteTiling::EXPERT_READY_BASE, expertSlot);
-    }
-
-    __aicore__ inline __gm__ int64_t *GetAckSlot(uint32_t windowRank, uint32_t participantRank) const
-    {
-        return GetPhaseSlot(windowRank, Gmma2avMteTiling::ACK_BASE, participantRank);
-    }
-
-    // sendCnt/recvCnt come from the same tiling computation on both ends, so
-    // a skipped publish slot is exactly the slot the peer skips waiting on:
-    // publish is needed only when this rank actually sends expert e to D, and
-    // waiting is needed only when this rank actually receives expert e from
-    // S. Expert 0 is always kept unmasked on both sides: its flag is the
-    // release/acquire handshake for this rank's count table, which
-    // BuildPeerSourceOffsets loads even when no expert-0 rows are exchanged.
-    // The self slot is always kept because the local wait doubles as the
-    // all-AIV rendezvous for this expert.
-    __aicore__ inline bool IsExpertSlotActive(const int32_t *countTable, uint32_t peerRank, uint32_t expertIdx,
-                                              uint32_t expertNum) const
-    {
-        if (expertIdx == 0U || peerRank == rank_) {
-            return true;
-        }
-        return countTable[static_cast<uint64_t>(peerRank) * expertNum + expertIdx] > 0;
-    }
-
-    // One batched MTE3 transaction publishes every expert slot of one chunk
-    // for one destination rank, replacing one 32-byte store plus DDR barrier
-    // per active expert. Inactive slots are written as zero; they are never
-    // polled this epoch (the peer's wait mask is identical), and the next
-    // epoch's publisher overwrites them before any waiter can observe them.
-    __aicore__ inline bool PublishExpertReadyRange(uint32_t dstRank, uint32_t startExpertIdx, uint32_t endExpertIdx,
-                                                   int64_t flag)
-    {
-        const uint32_t slotCount = endExpertIdx - startExpertIdx;
-        const uint32_t totalElements = slotCount * GmmA2avMteDetail::SYNC_SLOT_ELEMENTS;
-        if (totalElements > GmmA2avMteDetail::FLAG_STAGING_ELEMENTS) {
-            return false;
-        }
-        const uint32_t expertNum = static_cast<uint32_t>(taskTilingInfo_->e);
-        AscendC::LocalTensor<int64_t> staging = GetSyncTensor();
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID2);
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID2);
-        // The batched copy transfers complete 64-byte slots, including padding
-        // and inactive flags. Initialize every element read by that transfer.
-        for (uint32_t index = 0U; index < totalElements; ++index) {
-            staging.SetValue(index, 0);
-        }
-        for (uint32_t expertIdx = startExpertIdx; expertIdx < endExpertIdx; ++expertIdx) {
-            if (!IsExpertSlotActive(taskTilingInfo_->sendCnt, dstRank, expertIdx, expertNum)) {
-                continue;
-            }
-            staging.SetValue((expertIdx - startExpertIdx) * GmmA2avMteDetail::SYNC_SLOT_ELEMENTS, flag);
-        }
-        AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID2);
-        AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID2);
-        AscendC::GlobalTensor<int64_t> global;
-        global.SetGlobalBuffer(GetExpertReadySlot(dstRank, rank_, startExpertIdx));
-        AscendC::DataCopy(global, staging, totalElements);
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID2);
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID2);
-        AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
-        return true;
-    }
-
-    __aicore__ inline void PublishExpertReadyPerFlag(uint32_t dstRank, uint32_t startExpertIdx, uint32_t endExpertIdx,
-                                                     int64_t flag)
-    {
-        const uint32_t expertNum = static_cast<uint32_t>(taskTilingInfo_->e);
-        for (uint32_t expertIdx = startExpertIdx; expertIdx < endExpertIdx; ++expertIdx) {
-            if (!IsExpertSlotActive(taskTilingInfo_->sendCnt, dstRank, expertIdx, expertNum)) {
-                continue;
-            }
-            StoreSyncFlag(GetExpertReadySlot(dstRank, rank_, expertIdx), flag);
-        }
-    }
-
-    // One batched MTE2 transaction polls every expert slot of one chunk from
-    // one source rank. A single DDR barrier after all active slots hold the
-    // expected epoch replaces the per-flag barrier, so a ready chunk costs
-    // one MTE round trip instead of one per active (expert, source) pair.
-    __aicore__ inline bool WaitExpertReadyRange(uint32_t srcRank, uint32_t startExpertIdx, uint32_t endExpertIdx,
-                                                int64_t expected)
-    {
-        const uint32_t slotCount = endExpertIdx - startExpertIdx;
-        const uint32_t totalElements = slotCount * GmmA2avMteDetail::SYNC_SLOT_ELEMENTS;
-        if (totalElements > GmmA2avMteDetail::FLAG_STAGING_ELEMENTS) {
-            return false;
-        }
-        const uint32_t expertNum = static_cast<uint32_t>(taskTilingInfo_->e);
-        AscendC::LocalTensor<int64_t> staging = GetSyncTensor();
-        AscendC::GlobalTensor<int64_t> global;
-        // Sync slots are always polled through this rank's local window. The
-        // bypass alias is valid for local GM and prevents a stale cache line
-        // after a peer updates the slot; never apply it to encoded peer VAs.
-        global.SetGlobalBuffer(GetExpertReadySlot(rank_, srcRank, startExpertIdx));
-        global.SetL2CacheHint(AscendC::CacheMode::CACHE_MODE_DISABLE);
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
-        while (true) {
-            AscendC::DataCopy(staging, global, totalElements);
-            AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(EVENT_ID3);
-            AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(EVENT_ID3);
-            bool allReady = true;
-            for (uint32_t expertIdx = startExpertIdx; expertIdx < endExpertIdx; ++expertIdx) {
-                if (!IsExpertSlotActive(taskTilingInfo_->recvCnt, srcRank, expertIdx, expertNum)) {
-                    continue;
-                }
-                if (staging.GetValue((expertIdx - startExpertIdx) * GmmA2avMteDetail::SYNC_SLOT_ELEMENTS) != expected) {
-                    allReady = false;
-                    break;
-                }
-            }
-            if (allReady) {
-                AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
-                return true;
-            }
-        }
-    }
-
-    __aicore__ inline void WaitExpertReadyPerFlag(uint32_t srcRank, uint32_t startExpertIdx, uint32_t endExpertIdx,
-                                                  int64_t expected)
-    {
-        const uint32_t expertNum = static_cast<uint32_t>(taskTilingInfo_->e);
-        for (uint32_t expertIdx = startExpertIdx; expertIdx < endExpertIdx; ++expertIdx) {
-            if (!IsExpertSlotActive(taskTilingInfo_->recvCnt, srcRank, expertIdx, expertNum)) {
-                continue;
-            }
-            WaitSyncFlag(GetExpertReadySlot(rank_, srcRank, expertIdx), expected);
-        }
-    }
-
-    __aicore__ inline void StoreSyncFlag(__gm__ int64_t *destination, int64_t flag)
+    __aicore__ inline void StoreSyncFlag(__gm__ int64_t* destination, int64_t flag)
     {
         AscendC::LocalTensor<int64_t> local = GetSyncTensor();
         AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID2);
@@ -764,7 +629,8 @@ private:
         return logicalCoreIdx_ == 0U && subBlockIdx_ == 0U;
     }
 
-    __aicore__ inline void WaitSyncFlag(__gm__ int64_t *source, int64_t expected)
+    template <bool AtLeast = false>
+    __aicore__ inline void WaitSyncFlag(__gm__ int64_t* source, int64_t expected)
     {
         AscendC::LocalTensor<int64_t> local = GetSyncTensor();
         AscendC::GlobalTensor<int64_t> global;
@@ -779,7 +645,8 @@ private:
             AscendC::DataCopy(local, global, GmmA2avMteDetail::SYNC_MTE_ELEMENTS);
             AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(EVENT_ID3);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(EVENT_ID3);
-            if (local.GetValue(0U) == expected) {
+            const int64_t observed = local.GetValue(0U);
+            if (AtLeast ? observed >= expected : observed == expected) {
                 AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
                 break;
             }
@@ -792,7 +659,7 @@ private:
         return (elementCount + alignment - 1U) / alignment * alignment;
     }
 
-    __aicore__ inline void CopyGmToGm(__gm__ T *source, __gm__ T *destination, uint64_t elementCount)
+    __aicore__ inline void CopyGmToGm(__gm__ T* source, __gm__ T* destination, uint64_t elementCount)
     {
         uint32_t moveIdx = 0U;
         BeginGmToGmCopy();
@@ -806,8 +673,8 @@ private:
         AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID1);
     }
 
-    __aicore__ inline void CopyGmToGmSegment(__gm__ T *source, __gm__ T *destination, uint64_t elementCount,
-                                             uint32_t &moveIdx)
+    __aicore__ inline void CopyGmToGmSegment(__gm__ T* source, __gm__ T* destination, uint64_t elementCount,
+                                             uint32_t& moveIdx)
     {
         AscendC::LocalTensor<T> local = ubBuffer_.template Get<T>();
         AscendC::LocalTensor<T> ping = local;
@@ -843,11 +710,11 @@ private:
     }
 
 private:
-    const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo_{nullptr};
-    __gm__ HcclOpResParam *a3WinContext_{nullptr};
-    __gm__ AscendC::HcclCombineOpParam *a2WinContext_{nullptr};
-    __gm__ T *sendBuffer_{nullptr};
-    __gm__ T *recvBuffer_{nullptr};
+    const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo_{nullptr};
+    __gm__ HcclOpResParam* a3WinContext_{nullptr};
+    __gm__ AscendC::HcclCombineOpParam* a2WinContext_{nullptr};
+    __gm__ T* sendBuffer_{nullptr};
+    __gm__ T* recvBuffer_{nullptr};
     uint64_t winSize_{0UL};
     uint64_t localExpertBaseRows_{0UL};
     uint32_t rank_{0U};
@@ -855,7 +722,6 @@ private:
     bool isA3_{false};
     uint32_t coreIdx_{0U};
     uint32_t subBlockIdx_{0U};
-    int64_t syncEpoch_{1};
     uint32_t logicalCoreIdx_{0U};
     uint32_t rankWorkerCount_{0U};
     uint32_t ubMoveElements_{GmmA2avMteDetail::DEFAULT_UB_MOVE_ELEMENTS};
@@ -870,8 +736,8 @@ private:
     using ExpertReadyFlag = Catlass::Arch::CrossCoreFlagWithReverse<15U>;
 
     struct AicExpertChunkReadyCallback {
-        __aicore__ inline AicExpertChunkReadyCallback(ExpertReadyFlag &readyFlag,
-                                                      const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo,
+        __aicore__ inline AicExpertChunkReadyCallback(ExpertReadyFlag& readyFlag,
+                                                      const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo,
                                                       uint32_t expertChunkRows)
             : readyFlag_(readyFlag),
               taskTilingInfo_(taskTilingInfo),
@@ -904,15 +770,15 @@ private:
             Catlass::Arch::CrossCoreSetFlagWithReverse<0x2, PIPE_FIX>(readyFlag_);
         }
 
-        ExpertReadyFlag &readyFlag_;
-        const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo_;
+        ExpertReadyFlag& readyFlag_;
+        const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo_;
         uint32_t expertChunkRows_;
         uint64_t chunkRows_{0UL};
     };
 
 public:
-    static __aicore__ inline void ProcessAic(ComputationOpType &computeOp, SharedComputationOpType &sharedComputeOp,
-                                             const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo,
+    static __aicore__ inline void ProcessAic(ComputationOpType& computeOp, SharedComputationOpType& sharedComputeOp,
+                                             const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo,
                                              uint32_t expertChunkRows)
     {
         if ASCEND_IS_AIC {
@@ -928,8 +794,8 @@ public:
         }
     }
 
-    static __aicore__ inline void ProcessAiv(CommOpType &commOp,
-                                             const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo,
+    static __aicore__ inline void ProcessAiv(CommOpType& commOp,
+                                             const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo,
                                              uint32_t expertChunkRows)
     {
         if ASCEND_IS_AIV {
@@ -945,9 +811,8 @@ public:
                 // the output routing and can concentrate all rows on one
                 // expert, delaying publication of unrelated local work.
                 // Different ranks may still disagree, which is safe
-                // because ExpertReady flags stay
-                // expert-granular and per-rank chunks are monotone in
-                // expert order.
+                // because progress represents a completed expert prefix,
+                // not the rank-local chunk number.
                 const uint32_t chunkEnd = GetExpertChunkEnd(taskTilingInfo, expertIdx, expertChunkRows);
                 // The AIC notifies only at chunk boundaries, so a single
                 // C2V wait (plus its reverse-credit release) covers every
@@ -966,7 +831,7 @@ public:
 
 private:
     static __aicore__ inline uint64_t GetExpertComputeRows(
-        const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo, uint32_t expertIdx)
+        const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo, uint32_t expertIdx)
     {
         const uint32_t expertNum = static_cast<uint32_t>(taskTilingInfo->e);
         const uint32_t rankSize = static_cast<uint32_t>(taskTilingInfo->epWorldSize);
@@ -980,7 +845,7 @@ private:
         return rows;
     }
 
-    static __aicore__ inline uint32_t GetExpertChunkEnd(const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo,
+    static __aicore__ inline uint32_t GetExpertChunkEnd(const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo,
                                                         uint32_t startExpertIdx, uint32_t expertChunkRows)
     {
         const uint32_t expertNum = static_cast<uint32_t>(taskTilingInfo->e);
