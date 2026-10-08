@@ -122,8 +122,8 @@
   <tr>
     <td>deScale0</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，输入首次做矩阵乘的降维矩阵中的系数，shape为[qLoraDim + keyTotalDim]。input输入dtype为FLOAT16支持INT64，输入BFLOAT16时支持FLOAT</td>
-    <td>INT32, FLOAT</td>
+    <td>Device侧的aclTensor，输入首次做矩阵乘的降维矩阵中的系数，shape为[qLoraDim + keyTotalDim]。input的dtype为FLOAT16时支持INT64，输入BFLOAT16时支持FLOAT</td>
+    <td>INT64, FLOAT</td>
     <td>ND</td>
   </tr>
   <tr>
@@ -171,7 +171,7 @@
   <tr>
     <td>deScale1</td>
     <td>输入</td>
-    <td>Device侧的aclTensor，参与wuq矩阵乘的系数，shape为[headNum * (qNoRopeDim + qRopeDim)]。input输入dtype为FLOAT16支持INT64，输入BFLOAT16时支持FLOAT</td>
+    <td>Device侧的aclTensor，参与wuq矩阵乘的系数，shape为[headNum * (qNoRopeDim + qRopeDim)]。input的dtype为FLOAT16时支持INT64，输入BFLOAT16时支持FLOAT</td>
     <td>INT64, FLOAT</td>
     <td>ND</td>
   </tr>
@@ -370,16 +370,16 @@
 
 - shape格式字段含义及约束
     - tokenNum：tokenNum表示输入样本批量大小，取值范围：0~256
-    - hiddenSize：hiddenSize表示隐藏层的大小，取值固定为：2048~10240，为256的倍数
+    - hiddenSize：hiddenSize表示隐藏层的大小，取值范围：2048~10240，为256的倍数
     - headNum：表示多头数，取值范围：1~128
-    - blockNum：PagedAttention场景下的块数，取值范围：192
-    - blockSize：PagedAttention场景下的块大小，取值范围：128
+    - blockNum：PagedAttention场景下的块数，取值固定为：192
+    - blockSize：PagedAttention场景下的块大小，取值固定为：128
     - qloraDim：表示Q矩阵的LoRA输入维度，取值范围：32~4096，为32的倍数
     - keyTotalDim：表示Key部分的总维度，取值固定为：576（512主维度+64 rope维度）
     - qRopeDim：表示Q矩阵中旋转编码部分的维度，取值固定为：64
     - qNoRopeDim：表示Q矩阵中无旋转编码部分的维度，取值范围：16~256，为16的倍数
 - rope模式约束
-    - mla_preprocess算子中的Rotary Embedding（RoPE）操作采用half模式，暂不支持interleave模式
+    - mla_preprocess_v2算子中的Rotary Position Embedding（RoPE）操作采用half模式，暂不支持interleave模式
 
 ## 调用说明
 
