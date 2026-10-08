@@ -20,6 +20,8 @@ if("${CONDITION_UNIT}" STREQUAL "ascend950")
     set(rotary_position_embedding_grad_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for rotary_position_embedding_grad")
 elseif("${CONDITION_UNIT}" STREQUAL "ascend350")
     set(rotary_position_embedding_grad_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for rotary_position_embedding_grad")
+elseif("${CONDITION_UNIT}" STREQUAL "ascend960dt")
+    set(rotary_position_embedding_grad_apt_depends posembedding/apply_rotary_pos_emb CACHE INTERNAL "Dependencies for rotary_position_embedding_grad")
 endif()
 
 if (BUILD_OPS_RTY_KERNEL)

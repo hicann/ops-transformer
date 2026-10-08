@@ -1,0 +1,464 @@
+{
+    "op_type": "InplacePartialRotaryMulGrad",
+    "op_list": [
+        {
+            "bin_filename": "InplacePartialRotaryMulGrad_fp16_fp16_a431b172c64a720f415bf9412006d624",
+            "inputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "cos",
+                    "index": 1,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "sin",
+                    "index": 2,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "rotary_mode",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "partial_slice",
+                    "dtype": "listInt",
+                    "value": [0, 0]
+                }
+            ]
+        },
+        {
+            "bin_filename": "InplacePartialRotaryMulGrad_fp16_fp32_3b2100d750ff36dea5d548600f496409",
+            "inputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "cos",
+                    "index": 1,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "sin",
+                    "index": 2,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "rotary_mode",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "partial_slice",
+                    "dtype": "listInt",
+                    "value": [0, 0]
+                }
+            ]
+        },
+        {
+            "bin_filename": "InplacePartialRotaryMulGrad_fp16_bf16_fab80e552d2fb01dc1cfbd79769973ac",
+            "inputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "cos",
+                    "index": 1,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "sin",
+                    "index": 2,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "rotary_mode",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "partial_slice",
+                    "dtype": "listInt",
+                    "value": [0, 0]
+                }
+            ]
+        },
+        {
+            "bin_filename": "InplacePartialRotaryMulGrad_fp32_fp16_83e634653b7413b9b65f3cc68b2d9389",
+            "inputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "cos",
+                    "index": 1,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "sin",
+                    "index": 2,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "rotary_mode",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "partial_slice",
+                    "dtype": "listInt",
+                    "value": [0, 0]
+                }
+            ]
+        },
+        {
+            "bin_filename": "InplacePartialRotaryMulGrad_fp32_fp32_20928f043fcd5087a58be042e9cdb613",
+            "inputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "cos",
+                    "index": 1,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "sin",
+                    "index": 2,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "rotary_mode",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "partial_slice",
+                    "dtype": "listInt",
+                    "value": [0, 0]
+                }
+            ]
+        },
+        {
+            "bin_filename": "InplacePartialRotaryMulGrad_fp32_bf16_555844a937e1649031deb13103c243a5",
+            "inputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "cos",
+                    "index": 1,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "sin",
+                    "index": 2,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "rotary_mode",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "partial_slice",
+                    "dtype": "listInt",
+                    "value": [0, 0]
+                }
+            ]
+        },
+        {
+            "bin_filename": "InplacePartialRotaryMulGrad_bf16_fp16_f94e2557489c1b28e583ea799033cf32",
+            "inputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "cos",
+                    "index": 1,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "sin",
+                    "index": 2,
+                    "dtype": "float16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "rotary_mode",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "partial_slice",
+                    "dtype": "listInt",
+                    "value": [0, 0]
+                }
+            ]
+        },
+        {
+            "bin_filename": "InplacePartialRotaryMulGrad_bf16_fp32_a6669211629fefbf913c9e5e3ec000d2",
+            "inputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "cos",
+                    "index": 1,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "sin",
+                    "index": 2,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "rotary_mode",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "partial_slice",
+                    "dtype": "listInt",
+                    "value": [0, 0]
+                }
+            ]
+        },
+        {
+            "bin_filename": "InplacePartialRotaryMulGrad_bf16_bf16_9866ceef5fca86f186c438d3799f565f",
+            "inputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "cos",
+                    "index": 1,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                },
+                {
+                    "name": "sin",
+                    "index": 2,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "dy",
+                    "index": 0,
+                    "dtype": "bfloat16",
+                    "format": "ND",
+                    "paramType": "required",
+                    "shape": [-2]
+                }
+            ],
+            "attrs": [
+                {
+                    "name": "rotary_mode",
+                    "dtype": "int",
+                    "value": 0
+                },
+                {
+                    "name": "partial_slice",
+                    "dtype": "listInt",
+                    "value": [0, 0]
+                }
+            ]
+        }
+    ]
+}

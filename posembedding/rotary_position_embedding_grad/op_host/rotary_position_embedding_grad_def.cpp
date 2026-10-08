@@ -76,6 +76,7 @@ public:
             .DynamicShapeSupportFlag(true)
             .ExtendCfgInfo("opFile.value", "rotary_position_embedding_grad_apt");
         this->AICore().AddConfig("ascend950", regbaseCfg);
+        this->AICore().AddConfig("ascend960dt", regbaseCfg);
         this->AICore().AddConfig("ascend350", regbaseCfg);
     }
 };

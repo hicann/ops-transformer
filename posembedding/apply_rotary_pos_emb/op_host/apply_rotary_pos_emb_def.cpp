@@ -67,6 +67,7 @@ public:
             .DynamicShapeSupportFlag(true)
             .ExtendCfgInfo("opFile.value", "apply_rotary_pos_emb_apt");
         this->AICore().AddConfig("ascend950", regbaseCfg);
+        this->AICore().AddConfig("ascend960dt", regbaseCfg);
         this->AICore().AddConfig("ascend350", regbaseCfg);
         this->AICore().AddConfig("mc62", regbaseCfg);
         OpAICoreConfig aicore_config;
