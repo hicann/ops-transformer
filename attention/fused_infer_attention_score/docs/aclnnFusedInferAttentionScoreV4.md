@@ -206,7 +206,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
             <li>如果Q_S、KV_S非16或32对齐，可以向上取到对齐的S。</li>
             <li>当attenMask数据类型取INT8、UINT8时，其tensor中的值需要为0或1。</li>
             <li>如不使用该功能时可传入nullptr。</li>
-            <li>其它约束请见<a href="#Mask">Mask</a>。</li>
+            <li>其他约束请见<a href="#Mask">Mask</a>。</li>
         </ul>
         </td>
         <td>BOOL、INT8、UINT8</td>
@@ -331,7 +331,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <li>支持per-tensor、per-channel、per-token。</li>
             <li>建议使用KV伪量化参数分离模式。</li>
             </ul></td>
-        <td>Q_S=1：FLOAT16、BFLOAT16、FLOAT32Q_S&gt;1：FLOAT16</td>
+        <td>Q_S=1：FLOAT16、BFLOAT16、FLOAT32<br>Q_S&gt;1：FLOAT16</td>
         <td>ND</td>
         <td>见<a href="#AntiQuant">伪量化参数</a></td>
         <td>×</td>
@@ -413,7 +413,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
     <tr>
         <td>keyAntiquantOffsetOptional</td>
         <td>可选输入</td>
-        <td>表示对key进行反量化的偏移，配置此项为非对称量化，反之为非对称量化</td>
+        <td>表示对key进行反量化的偏移，配置此项为非对称量化，反之为对称量化</td>
         <td>
         <ul>
             <li>不支持空Tensor。</li>
@@ -445,7 +445,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
     <tr>
         <td>valueAntiquantOffsetOptional</td>
         <td>可选输入</td>
-        <td>表示对value进行反量化的偏移，配置此项为非对称量化，反之为非对称量化</td>
+        <td>表示对value进行反量化的偏移，配置此项为非对称量化，反之为对称量化</td>
         <td>
         <ul>
             <li>不支持空Tensor。</li>
@@ -650,7 +650,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>表示key/value的head个数</td>
         <td>
         <ul>
-            <li>需要满足numHeads整除numKeyValueHeads，GQA非量化场景和Prefill MLA场景下，numHeads与numKeyValueHeads的比值无限制; Decode MLA场景下，非量化场景numHeads与numKeyValueHeads的比值无限制，全量化场景仅支持numHeads与numKeyValueHeads的比值为1、2、4、8、16、32、64、128。</li>
+            <li>需要满足numKeyValueHeads整除numHeads，即numHeads % numKeyValueHeads == 0。GQA非量化场景和Prefill MLA场景下，numHeads与numKeyValueHeads的比值无限制; Decode MLA场景下，非量化场景numHeads与numKeyValueHeads的比值无限制，全量化场景仅支持numHeads与numKeyValueHeads的比值为1、2、4、8、16、32、64、128。</li>
             <li>在BSND、TND、BNSD、NTD、BSND_BNSD、BNSD_BSND、NTD_TND场景下，还需要与shape中的key/value的N轴shape值相同，否则执行异常。</li>
         </ul>
         </td>
@@ -1948,7 +1948,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                         </ul>
                     </li>
                     <li>N和D：支持N轴小于等于256，支持D轴小于等于512。inputLayout为BSH或者BSND时，建议N*D小于65535。</li>
-                    <li>S：支持小于等于20971520（20M）。部分长序列场景下，如果计算量过大可能会导致pfa算子执行超时（aicore error类型报错，errorStr为：timeout or trap error），此场景下建议做S切分处理，注：这里计算量会受B、S、N、D等的影响，值越大计算量越大。典型的会超时的长序列（即B、S、N、D的乘积较大）场景包括但不限于：
+                    <li>S：支持小于等于20971520（20M）。部分长序列场景下，如果计算量过大可能会导致pfa算子执行超时（AI Core error类型报错，errorStr为：timeout or trap error），此场景下建议做S切分处理，注：这里计算量会受B、S、N、D等的影响，值越大计算量越大。典型的会超时的长序列（即B、S、N、D的乘积较大）场景包括但不限于：
                         <ol>
                         <li>B=1, Q_N=20, Q_S=2097152, D = 256, KV_N=1, KV_S=2097152;</li>
                         <li>B=1, Q_N=2, Q_S=20971520, D = 256, KV_N=2, KV_S=20971520;</li>
@@ -2004,7 +2004,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                 <li>sparseMode = 2、3、4时，attenMaskOptional的shape需要为（2048,2048）或（1,2048,2048）或（1,1,2048,2048），且需要用户保证传入的attenMaskOptional为下三角，attenMaskOptional为nullptr或者传入的shape不正确报错。</li>
                 <li>sparseMode = 1、2、3的场景忽略入参preTokens、nextTokens并按照相关规则赋值。</li>
                 <li>sparseMode = 9时，非量化支持GQA和MLA场景，全量化仅支持MLA场景。attenMaskOptional不能为空。inputLayout为BSH/BSND/BNSD时shape为(B,Q_S,Q_S)；inputLayout为TND时shape为(∑Q_Si²,)。不支持左padding、pseShift、sharedPrefix。输出dtype不支持INT8。每个batch需满足Q_S≤KV_S。</li>
-                <li>sparseMode取其它值时会报错</li>
+                <li>sparseMode取其他值时会报错</li>
                 </ul>
                 </td>
             </tr>
@@ -2026,7 +2026,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             </tr>
             <tr>
                 <td colspan="2">
-                其它约束见 <a href="#PagedAttention">PagedAttention约束说明。</a>
+                其他约束见 <a href="#PagedAttention">PagedAttention约束说明。</a>
                 </td>
             </tr>
             <tr>
@@ -2139,7 +2139,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             </tr>
             <tr>
                 <td colspan="2">
-                其它约束见 <a href="#PagedAttention">PagedAttention约束说明。</a>
+                其他约束见 <a href="#PagedAttention">PagedAttention约束说明。</a>
                 </td>
             </tr>
             <tr>
