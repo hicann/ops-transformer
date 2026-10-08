@@ -283,29 +283,27 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::InitBuffers(TP
     pipe->InitBuffer(v0ValidSizeBuff, ConstInfo::MQ_BUFFER_BYTES_8K);
     if (mqVecConstInfo.kvQuantMode == 3) {
         pipe->InitBuffer(tqCentBuff, ConstInfo::MQ_BUFFER_BYTES_256);
-        LoadTq4Centroids(tqCentBuff.Get<float>());
         if constexpr (TQ4_FAST_BF16) {
             pipe->InitBuffer(tqByteLutBuff, ConstInfo::MQ_BUFFER_BYTES_1K);
-            LocalTensor<float> centroids = tqCentBuff.Get<float>();
             LocalTensor<uint32_t> byteLut = tqByteLutBuff.Get<uint32_t>();
-            // Physical nibble n maps to signed-code centroid n^8. Low 16 bits preserve low-nibble-first storage.
-            for (uint32_t high = 0; high < 16U; ++high) {
-                union {
-                    float value;
-                    uint32_t bits;
-                } highCentroid;
-                highCentroid.value = centroids.GetValue(high ^ 8U);
-                uint32_t highBits = (highCentroid.bits + 0x7FFFU + ((highCentroid.bits >> 16U) & 1U)) >> 16U;
-                for (uint32_t low = 0; low < 16U; ++low) {
-                    union {
-                        float value;
-                        uint32_t bits;
-                    } lowCentroid;
-                    lowCentroid.value = centroids.GetValue(low ^ 8U);
-                    uint32_t lowBits = (lowCentroid.bits + 0x7FFFU + ((lowCentroid.bits >> 16U) & 1U)) >> 16U;
-                    byteLut.SetValue(high * 16U + low, (highBits << 16U) | lowBits);
-                }
+            // RNE BF16 bits in physical nibble order; identical to LoadTq4Centroids()[n ^ 8].
+            constexpr uint32_t centroidBits[TQ4_CENTROID_COUNT] = {0xBDF8U, 0xBDBBU, 0xBD92U, 0xBD62U, 0xBD29U, 0xBCECU,
+                                                                   0xBC8BU, 0xBBBAU, 0x3BB3U, 0x3C8AU, 0x3CEAU, 0x3D28U,
+                                                                   0x3D61U, 0x3D91U, 0x3DBBU, 0x3DF7U};
+            LocalTensor<int32_t> lowBits = tqCentBuff.Get<int32_t>();
+#pragma unroll
+            for (uint32_t low = 0; low < TQ4_CENTROID_COUNT; ++low) {
+                lowBits.SetValue(low, static_cast<int32_t>(centroidBits[low]));
             }
+            PipeBarrier<PIPE_ALL>();
+            LocalTensor<int32_t> pairs = byteLut.ReinterpretCast<int32_t>();
+#pragma unroll
+            for (uint32_t high = 0; high < TQ4_CENTROID_COUNT; ++high) {
+                Adds(pairs[high * TQ4_CENTROID_COUNT], lowBits, static_cast<int32_t>(centroidBits[high] << 16U),
+                     TQ4_CENTROID_COUNT);
+            }
+        } else {
+            LoadTq4Centroids(tqCentBuff.Get<float>());
         }
         LocalTensor<uint32_t> scaleGatherIndices =
             tqCentBuff.Get<uint32_t>()[TQ4_SCALE_GATHER_INDEX_OFFSET / sizeof(uint32_t)];
