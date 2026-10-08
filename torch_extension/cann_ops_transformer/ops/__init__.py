@@ -178,6 +178,7 @@ _legacy_map = {
     "apply_rotary_pos_emb": "posembedding.apply_rotary_pos_emb",
     "apply_rotary_pos_emb_grad": "posembedding.apply_rotary_pos_emb_grad",
     "mla_prolog": "attention.mla_prolog_v3",
+    "quant_flash_mla_with_kvcache": "attention.quant_flash_mla_with_kvcache",
 }
 
 if __name__ == "cann_ops_transformer.ops":

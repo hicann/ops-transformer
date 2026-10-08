@@ -1,0 +1,5 @@
+# 运行产物与编译缓存, 勿提交
+results/
+.torch_ext/
+qmla_smoke/
+*.log
