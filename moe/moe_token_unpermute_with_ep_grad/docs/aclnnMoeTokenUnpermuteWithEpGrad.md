@@ -345,7 +345,6 @@ aclnnStatus aclnnMoeTokenUnpermuteWithEpGrad(
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_moe_token_unpermute_with_ep_grad.h"
-#include <iostream>
 
 #define CHECK_RET(cond, return_expr)                                           \
   do {                                                                         \
@@ -492,7 +491,7 @@ int main() {
   aclOpExecutor *executor;
 
   // 调用aclnnMoeTokenUnpermuteWithEpGrad第一段接口
-  ret = aclnnMoeTokenUnpermuteWithEpGradGetWorkspaceSize(unpermutedTokensGrad, sortedIndices,permutedTokens, probs, paddedMode, nullptr, nullptr, 3, permutedTokensGrad, probsGrad, &workspaceSize, &executor);
+  ret = aclnnMoeTokenUnpermuteWithEpGradGetWorkspaceSize(unpermutedTokensGrad, sortedIndices, permutedTokens, probs, paddedMode, nullptr, nullptr, 3, permutedTokensGrad, probsGrad, &workspaceSize, &executor);
   CHECK_RET(
       ret == ACL_SUCCESS,
       LOG_PRINT("aclnnMoeTokenUnpermuteWithEpGradGetWorkspaceSize failed. ERROR: %d\n", ret);
