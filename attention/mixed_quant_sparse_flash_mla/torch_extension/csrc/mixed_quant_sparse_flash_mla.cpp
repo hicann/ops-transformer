@@ -27,18 +27,18 @@ const int DIM_4 = 4;
 
 constexpr int64_t MQSMLA_METADATA_SIZE = 1024;
 
-inline TensorWrapper MqsmlaMakeWrapper(const at::Tensor &tensor, aclDataType tensorAcltype)
+inline TensorWrapper MqsmlaMakeWrapper(const at::Tensor& tensor, aclDataType tensorAcltype)
 {
     return {tensor, tensorAcltype};
 }
 
 at::Tensor MixedQuantSparseFlashMlaMetadata(
     int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t quantMode,
-    const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensOriKv,
-    const c10::optional<at::Tensor> &cuSeqlensCmpKv, const c10::optional<at::Tensor> &sequsedQ,
-    const c10::optional<at::Tensor> &sequsedOriKv, const c10::optional<at::Tensor> &sequsedCmpKv,
-    const c10::optional<at::Tensor> &cmpResidualKv, const c10::optional<at::Tensor> &oriTopkLength,
-    const c10::optional<at::Tensor> &cmpTopkLength, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenOriKv,
+    const c10::optional<at::Tensor>& cuSeqlensQ, const c10::optional<at::Tensor>& cuSeqlensOriKv,
+    const c10::optional<at::Tensor>& cuSeqlensCmpKv, const c10::optional<at::Tensor>& sequsedQ,
+    const c10::optional<at::Tensor>& sequsedOriKv, const c10::optional<at::Tensor>& sequsedCmpKv,
+    const c10::optional<at::Tensor>& cmpResidualKv, const c10::optional<at::Tensor>& oriTopkLength,
+    const c10::optional<at::Tensor>& cmpTopkLength, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenOriKv,
     int64_t maxSeqlenCmpKv, int64_t oriTopk, int64_t cmpTopk, int64_t ropeHeadDim, int64_t cmpRatio,
     int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight, c10::string_view layoutQ,
     c10::string_view layoutKv, bool hasOriKv, bool hasCmpKv)
@@ -78,8 +78,8 @@ at::Tensor MixedQuantSparseFlashMlaMetadata(
     // convert str
     std::string layoutQStr = std::string(layoutQ);
     std::string layoutKvStr = std::string(layoutKv);
-    char *layoutQPtr = const_cast<char *>(layoutQStr.c_str());
-    char *layoutKvPtr = const_cast<char *>(layoutKvStr.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQStr.c_str());
+    char* layoutKvPtr = const_cast<char*>(layoutKvStr.c_str());
 
     ACLNN_CMD(aclnnMixedQuantSparseFlashMlaMetadata, cuSeqlensQVal, cuSeqlensOriKvVal, cuSeqlensCmpKvVal, sequsedQVal,
               sequsedOriKvVal, sequsedCmpKvVal, cmpResidualKvVal, oriTopkLengthVal, cmpTopkLengthVal, numHeadsQ,
@@ -90,8 +90,8 @@ at::Tensor MixedQuantSparseFlashMlaMetadata(
 }
 
 std::tuple<at::Tensor, at::Tensor> ConstructMixedQuantSparseFlashMlaAttenOutTensor(
-    const at::Tensor &q, const at::Tensor &oriKv, std::string layoutQStr, std::string layoutKvStr,
-    const uint64_t &ropeHeadDim, bool returnSoftmaxLse, int64_t quantMode)
+    const at::Tensor& q, const at::Tensor& oriKv, std::string layoutQStr, std::string layoutKvStr,
+    const uint64_t& ropeHeadDim, bool returnSoftmaxLse, int64_t quantMode)
 {
     TORCH_CHECK(layoutQStr == "BSND" || layoutQStr == "TND", "The layout of query only support BSND and TND, but got ",
                 layoutQStr);
@@ -149,28 +149,28 @@ std::tuple<at::Tensor, at::Tensor> ConstructMixedQuantSparseFlashMlaAttenOutTens
 }
 
 std::tuple<at::Tensor, at::Tensor> MixedQuantSparseFlashMla(
-    const at::Tensor &q, const c10::optional<at::Tensor> &oriKv, const c10::optional<at::Tensor> &cmpKv,
-    const c10::optional<at::Tensor> &oriSparseIndices, const c10::optional<at::Tensor> &cmpSparseIndices,
-    const c10::optional<at::Tensor> &oriBlockTable, const c10::optional<at::Tensor> &cmpBlockTable,
-    const c10::optional<at::Tensor> &cuSeqlensQ, const c10::optional<at::Tensor> &cuSeqlensOriKv,
-    const c10::optional<at::Tensor> &cuSeqlensCmpKv, const c10::optional<at::Tensor> &sequsedQ,
-    const c10::optional<at::Tensor> &sequsedOriKv, const c10::optional<at::Tensor> &sequsedCmpKv,
-    const c10::optional<at::Tensor> &cmpResidualKv, const c10::optional<at::Tensor> &oriTopkLength,
-    const c10::optional<at::Tensor> &cmpTopkLength, const c10::optional<at::Tensor> &sinks,
-    const c10::optional<at::Tensor> &metadata, int64_t quantMode, int64_t ropeHeadDim, double softmaxScale,
-    int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight,
-    c10::string_view layoutQ, c10::string_view layoutKv, int64_t topkValueMode, bool returnSoftmaxLse,
-    c10::optional<int64_t> keyDtype, c10::optional<int64_t> valueDtype)
+    const at::Tensor& q, int64_t quantMode, const c10::optional<at::Tensor>& oriKv,
+    const c10::optional<at::Tensor>& cmpKv, const c10::optional<at::Tensor>& oriSparseIndices,
+    const c10::optional<at::Tensor>& cmpSparseIndices, const c10::optional<at::Tensor>& oriBlockTable,
+    const c10::optional<at::Tensor>& cmpBlockTable, const c10::optional<at::Tensor>& cuSeqlensQ,
+    const c10::optional<at::Tensor>& cuSeqlensOriKv, const c10::optional<at::Tensor>& cuSeqlensCmpKv,
+    const c10::optional<at::Tensor>& sequsedQ, const c10::optional<at::Tensor>& sequsedOriKv,
+    const c10::optional<at::Tensor>& sequsedCmpKv, const c10::optional<at::Tensor>& cmpResidualKv,
+    const c10::optional<at::Tensor>& oriTopkLength, const c10::optional<at::Tensor>& cmpTopkLength,
+    const c10::optional<at::Tensor>& sinks, const c10::optional<at::Tensor>& metadata, int64_t ropeHeadDim,
+    double softmaxScale, int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft,
+    int64_t oriWinRight, c10::string_view layoutQ, c10::string_view layoutKv, int64_t topkValueMode,
+    bool returnSoftmaxLse, c10::optional<int64_t> keyDtype, c10::optional<int64_t> valueDtype)
 {
     std::string layoutQStr = std::string(layoutQ);
     std::string layoutKvStr = std::string(layoutKv);
     const bool turboQuantEmptyQuery = quantMode == 3 && layoutQStr == "TND" && q.dim() == DIM_3 && q.size(DIM_0) == 0;
     TORCH_CHECK(q.numel() > 0 || turboQuantEmptyQuery, "Tensor query is empty.");
     TORCH_CHECK(oriKv.has_value(), "ori_kv must be provided.");
-    const at::Tensor &oriKvVal = *oriKv;
+    const at::Tensor& oriKvVal = *oriKv;
     // convert str
-    char *layoutQPtr = const_cast<char *>(layoutQStr.c_str());
-    char *layoutKvPtr = const_cast<char *>(layoutKvStr.c_str());
+    char* layoutQPtr = const_cast<char*>(layoutQStr.c_str());
+    char* layoutKvPtr = const_cast<char*>(layoutKvStr.c_str());
 
     // construct the atten_out tensor
     std::tuple<at::Tensor, at::Tensor> mixedQuantSparseFlashMlaAttenOut =

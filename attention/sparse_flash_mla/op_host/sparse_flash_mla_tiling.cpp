@@ -54,17 +54,6 @@ constexpr uint32_t BATCH_CONSISTENCY_MAX_REDUCE_BLOCK_NUM = 33U;
 constexpr uint32_t FD_BROADCAST_ELEMS = 8U;
 constexpr int64_t BATCH_CONSISTENCY_LEVEL = 3;
 
-static std::vector<int64_t> ToVector(const gert::Shape& shape)
-{
-    size_t shapeSize = shape.GetDimNum();
-    std::vector<int64_t> shapeVec(shapeSize, 0);
-
-    for (size_t i = 0; i < shapeSize; i++) {
-        shapeVec[i] = shape.GetDim(i);
-    }
-    return shapeVec;
-}
-
 static std::string ToStringRaw(const gert::Shape& shape)
 {
     std::ostringstream oss;
