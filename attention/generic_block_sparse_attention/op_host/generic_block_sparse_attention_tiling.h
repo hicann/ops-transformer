@@ -125,6 +125,9 @@ private:
     uint32_t blockShapeX_ = 1;
     uint32_t blockShapeY_ = 128;
     uint32_t blockSize_ = 128;
+    // key PA_BBND origin [blockNum, blockSize, Nkv, D] dim BLOCKED_KV_DIM_KV_HEAD (Nkv); cross-checked against
+    // sparseBlockIdx dim0 in ParseSparseTensors.
+    uint32_t keyKvHeads_ = 0;
     uint32_t topK_ = 16;
     uint32_t qBlockNum_ = 0;
     uint32_t maxBlocksPerBatch_ = 0;
