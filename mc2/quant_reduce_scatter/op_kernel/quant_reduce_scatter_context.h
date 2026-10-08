@@ -17,12 +17,12 @@
 
 constexpr uint32_t HCCL_MAX_RANK_SIZE = 1024U;
 
+// 低比特量化通信算子（quant_reduce_scatter / quant_all_reduce）公共 context 布局，
+// 由 torch_extension 侧 CommChannelBuilderManager 创建并填充，kernel 侧只读
 struct QuantReduceScatterContext {
-    uint32_t epRankId = 0;
-    uint32_t rankSizePerServer = 0;
-    uint64_t kfcContextAddr = 0; // 通信API所需的地址
-    uint64_t epHcclBuffer_[HCCL_MAX_RANK_SIZE] = {};
-    uint64_t hcommHandle_[HCCL_MAX_RANK_SIZE] = {}; // ROCE或者URMA通信所需句柄
+    uint32_t rankId = 0;                           // 本 rank 在通信组内的 rank id
+    uint32_t rankSizePerServer = 0;                // 单服务器内 rank 数
+    uint64_t hcclBuffer_[HCCL_MAX_RANK_SIZE] = {}; // 各 rank 内置 HCCL buffer 的映射地址
 };
 
 #endif // QUANT_REDUCE_SCATTER_CONTEXT_H

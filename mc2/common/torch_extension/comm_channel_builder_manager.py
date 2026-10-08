@@ -58,6 +58,14 @@ class CommChannelBuilderManagerOpBuilder(OpBuilder):
 
 comm_channel_builder_manager_op_builder = CommChannelBuilderManagerOpBuilder()
 
+# 低比特 MTE 算子族公共 context 的固定 tag，保证 eager/静态图/动态图共享同一份 context
+QUANT_MTE_CONTEXT_TAG = "quant_lowbit_mte"
+
+# context 的 int32 元素数 = sizeof(QuantMteContext) / sizeof(int32_t) = 8200 / 4，
+# 与 csrc/comm_channel_builder_manager.cpp 中 QuantMteContext 布局一一对应，
+# 修改结构体时需同步更新（含 static_assert 校验的 device 侧布局）
+QUANT_MTE_CONTEXT_ELEM_NUM = 2050
+
 
 class _LazyClassProxy:
     def __init__(self, name, builder):
@@ -83,3 +91,26 @@ def __getattr__(name):
             "CommChannelBuilderManager", comm_channel_builder_manager_op_builder
         )
     raise AttributeError(f"module '{__name__}' has no attribute {name}")
+
+
+class QuantMteContextManager:
+    """低比特量化通信算子族（quant_all_reduce / quant_reduce_scatter）公共 context 管理类。"""
+
+    def __init__(self, group: str):
+        self._group = group
+
+    def get_context(self):
+        """获取幂等共享 context，返回 (NPU tensor, hccl buffer size)，eager 路径使用。"""
+        module = comm_channel_builder_manager_op_builder.load()
+        manager = module.CommChannelBuilderManager(self._group)
+        return manager.create_quant_mte_context(QUANT_MTE_CONTEXT_TAG)
+
+    def get_context_data(self):
+        """获取幂等共享 context 的 host int32 内容，返回 (int32 列表, hccl buffer size)。
+
+        FakeTensorMode 安全（不产生任何经过 dispatcher 的 tensor op），供 torchair
+        GE converter 在 AOT 编译期（fake mode）构造 ge.Const 使用。
+        """
+        module = comm_channel_builder_manager_op_builder.load()
+        manager = module.CommChannelBuilderManager(self._group)
+        return manager.get_quant_mte_context_data(QUANT_MTE_CONTEXT_TAG)

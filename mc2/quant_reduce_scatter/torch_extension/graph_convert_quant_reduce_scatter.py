@@ -11,38 +11,21 @@
 
 try:
     import torch
-    import torch_npu
     import torchair
-    from torch.library import impl
+    from typing import Optional
     from torchair._ge_concrete_graph import ge_apis as ge
-    from torchair.ge._ge_graph import Tensor, TensorSpec
     from torchair._ge_concrete_graph.fx2ge_converter import (
-        declare_supported,
         register_fx_node_ge_converter,
     )
-    from torchair._ge_concrete_graph.supported_declaration import Support
-    from typing import Any, Dict, List, Tuple, Union, Callable, Optional
-    from torchair._ge_concrete_graph.ge_ir_pb2 import (
-        GraphDef,
-        OpDef,
-        TensorDescriptor,
-        TensorDef,
-    )
-    from torchair.ge._ge_graph import get_default_ge_graph, next_unique_name
     from torchair.ge._ge_graph import auto_convert_to_tensor
     from torchair.ge._ge_graph import (
         Tensor,
         TensorSpec,
         DataType,
-        TensorType,
         torch_dtype_value_to_ge_type,
         torch_dtype_value_to_ge_proto_type,
-        _ge_dtype_to_ge_proto_dtype,
         _ge_proto_dtype_to_ge_dtype,
     )
-    from torchair.ge._ge_graph import compat_as_bytes, compat_as_bytes_list
-    from torchair.ge._ge_graph import trans_to_list_list_int, trans_to_list_list_float
-    from torchair.ge._ge_graph import get_invalid_desc
     from torchair._ge_concrete_graph.compat_ir import ge_op, IrDef
     from torchair.ge import attr
     from torchair._ge_concrete_graph.ge_converter.converter_utils import *
@@ -51,8 +34,9 @@ try:
 except ImportError:
     _TORCHAIR_AVAILABLE = False
 
+# 触发算子 schema/Meta/PrivateUse1 注册，确保 converter 注册时 torch.ops 符号已存在
 from .quant_reduce_scatter import *
-import logging
+from ..common import QuantMteContextManager
 
 if _TORCHAIR_AVAILABLE:
     # x valid dtype list
@@ -119,35 +103,6 @@ if _TORCHAIR_AVAILABLE:
             .output("out_put", "DT_FLOAT16, DT_BF16, DT_FLOAT"),
         )
 
-    def _debug_print_ge_op_attrs():
-        _graph = get_default_ge_graph()
-        for _op in _graph.op:
-            if _op.type == "QuantReduceScatter":
-                _ws = (
-                    _op.attr["world_size"].i
-                    if "world_size" in _op.attr
-                    else "NOT_FOUND"
-                )
-                _hbs = (
-                    _op.attr["hccl_buffer_size"].i
-                    if "hccl_buffer_size" in _op.attr
-                    else "NOT_FOUND"
-                )
-                logging.info(
-                    f"[DEBUG-GE-OP] OpName={_op.name}, world_size_attr={_ws}, hccl_buffer_size_attr={_hbs}"
-                )
-                for _k, _v in _op.attr.items():
-                    logging.info(
-                        f"[DEBUG-GE-OP] attr {_k}: has_i={_v.HasField('i')}, "
-                        f"i={_v.i if _v.HasField('i') else 'N/A'}"
-                    )
-                for _idx, _inp in enumerate(_op.input_desc):
-                    logging.info(
-                        f"[DEBUG-GE-OP] input[{_idx}] name={_inp.name}, dtype={_inp.dtype}, "
-                        f"shape={list(_inp.shape.dim)}, layout={_inp.layout}"
-                    )
-                logging.info(f"[DEBUG-GE-OP] input list: {list(_op.input)}")
-
     @register_fx_node_ge_converter(
         torch.ops.cann_ops_transformer.npu_quant_reduce_scatter.default
     )
@@ -157,34 +112,24 @@ if _TORCHAIR_AVAILABLE:
         scales: Tensor,
         hccl_buffer_size: int,
         world_size: int,
+        hcom: str,
         reduce_op: Optional[str] = "sum",
         output_dtype: Optional[int] = None,
         x_dtype: Optional[int] = None,
         scales_dtype: Optional[int] = None,
         meta_outputs: TensorSpec = None,
     ):
-        # 补充SymInt处理，添加hasattr(x, 'node')的校验，
-        # 支持graph_type=2动态shape模式下hccl_buffer_size/world_size可能是SymInt的情况
-        if hasattr(hccl_buffer_size, "node"):
-            hccl_buffer_size = int(hccl_buffer_size.node)
+        # graph_type=2 动态 shape 模式下 world_size 仍可能是 SymInt；
+        # hccl_buffer_size 来自环境内置 buffer，与 shape 无关。
         if hasattr(world_size, "node"):
             world_size = int(world_size.node)
 
-        # 图模式下context张量被捕获为图输入占位符(arg)，编译期tiling读nPerServer读到野指针，
-        # 改用wrapper缓存的CommContext int32数据构建ge.Const注入，保证tiling/运行期数据可用
-        cached_ctx = get_cached_context_data(world_size, hccl_buffer_size)
-        if cached_ctx is None:
-            # 缓存未命中时context仍是图占位符，tiling会读到野指针，引发不可定位的kernel卡死，此处直接让其快速失败
-            # 经wrapper调用时缓存必定已在其trace前写入，正常流程不会走到这里
-            raise RuntimeError(
-                "QuantReduceScatter graph mode: CommContext cache miss "
-                f"(world_size={world_size}, hccl_buffer_size={hccl_buffer_size}). "
-                "The context tensor would be captured as a graph placeholder and tiling "
-                "would read a wild pointer. Please invoke the op through the "
-                "cann_ops_transformer.ops.quant_reduce_scatter() wrapper so the "
-                "CommContext cache is populated before graph tracing."
-            )
-        context = ge.Const(cached_ctx, dtype=int(DataType.DT_INT32))
+        # trace 阶段 context 是占位 tensor、hccl_buffer_size 是 0；
+        # converter 在 GE 序列化/tiling 前创建幂等 context，并固化真实查询值。
+        # 注意：converter 运行于 AOT 编译期的 FakeTensorMode 下，必须使用不做
+        # tensor op 的 data 接口，直接以 host int32 列表构造 ge.Const。
+        ctx_data, hccl_buffer_size = QuantMteContextManager(hcom).get_context_data()
+        context = ge.Const(ctx_data, dtype=int(DataType.DT_INT32))
 
         if x_dtype is not None:
             if x_dtype == 296 or x_dtype == 297:
@@ -214,7 +159,6 @@ if _TORCHAIR_AVAILABLE:
             reduce_op=reduce_op,
             output_dtype=output_dtype,
         )
-        _debug_print_ge_op_attrs()
         return result
 
     def check_dtype(x: Tensor, scales: Tensor):
