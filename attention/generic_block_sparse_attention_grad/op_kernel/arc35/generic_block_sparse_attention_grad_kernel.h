@@ -76,14 +76,12 @@ private:
         if (!curr.need_compute) {
             return;
         }
-        const int32_t aivHalfIdx = static_cast<int32_t>(GetSubBlockIdx());
         if (loopTaskId > 0) {
             CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE_2, PIPE_MTE3>(FLAG_C_GATHER_ARM);
         }
         CopyQAndDoutToL1(curr, currIdx);
         const uint32_t gatherFlagBase = currIdx == 0 ? FLAG_V_GATHER_C_PING : FLAG_V_GATHER_C_PONG;
-        const uint32_t gatherFlag = gatherFlagBase + static_cast<uint32_t>(aivHalfIdx) * AIV0_AIV1_FLAG_OFFSET;
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(gatherFlag);
+        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(gatherFlagBase);
     }
 
     __aicore__ inline void ProcessNotFirstVec(VecOp<GSAG_TYPE> &vecOp, uint32_t lastIdx)
@@ -113,9 +111,7 @@ private:
         if (!last.need_compute) {
             return;
         }
-        const uint32_t mm345DoneFlag =
-            FLAG_C_MM345_DONE + static_cast<uint32_t>(GetSubBlockIdx()) * AIV0_AIV1_FLAG_OFFSET;
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(mm345DoneFlag);
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(FLAG_C_MM345_DONE);
         vecOp.ScatterDqSel(last, ubBuffer, lastIdx);
     }
 
@@ -465,7 +461,7 @@ public:
         vecOp.WaitFlag();
         PipeBarrier<PIPE_ALL>();
 
-        CrossCoreWaitFlag(FLAG_CUBE_POST);
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE_2, PIPE_FIX>(FLAG_CUBE_POST);
         SyncAll();
         vecOp.SendVecPost(dq_gm_, dk_gm_, dv_gm_, dq_workspace_, dk_workspace_, dv_workspace_, tilingData, ub_buffer_);
     }
