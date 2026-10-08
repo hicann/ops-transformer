@@ -384,7 +384,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
          <tr>
        <td>valueAntiquantOffsetOptional</td>
         <td>输入</td>
-        <td>kv伪量化参数分离时表示value的反量化因子。</td>
+        <td>kv伪量化参数分离时表示value的反量化偏移。</td>
         <td><ul><li>不支持空Tensor。</li>
         <li>使用时，shape必须与valueAntiquantScaleOptional保持一致。</li>
             <li>不使用该功能时可传入nullptr。</li>
@@ -857,7 +857,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV3(
 
     <!-- end id9 -->
 
-- numKeyValueHeads使用限制：需要满足numHeads整除numKeyValueHeads。在BSND、BNSD、BNSD_BSND、TND场景下，还需要与shape中的key/value的N轴shape值相同，否则执行异常。
+- numKeyValueHeads使用限制：需要满足numKeyValueHeads整除numHeads，即numHeads % numKeyValueHeads == 0。在BSND、BNSD、BNSD_BSND、TND场景下，还需要与shape中的key/value的N轴shape值相同，否则执行异常。
 
   <!-- npu="950" id10 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
