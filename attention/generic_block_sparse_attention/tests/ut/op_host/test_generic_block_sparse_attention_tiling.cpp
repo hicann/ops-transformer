@@ -98,9 +98,9 @@ std::vector<gert::TilingContextPara::TensorDescription> MakeOutputs(ge::DataType
 
 std::vector<gert::TilingContextPara::OpAttr> MakeAttrs(
     int64_t maskType, int64_t quantType, int64_t softmaxPrec, int64_t returnLse, float dstTypeMax = 0.0f,
-    int64_t winLeft = -1, int64_t winRight = -1, int64_t layoutSparsePattern = 4, const std::string &layoutQ = "TND",
-    const std::string &layoutKv = "PA_BBND", int64_t residualBlockMode = 0, bool isConsistentTopk = false,
-    const std::vector<int64_t> &blockShape = kBlockShape, float scaleValue = kScale)
+    int64_t winLeft = -1, int64_t winRight = -1, int64_t layoutSparsePattern = 4, const std::string& layoutQ = "TND",
+    const std::string& layoutKv = "PA_BBND", int64_t residualBlockMode = 0, bool isConsistentTopk = false,
+    const std::vector<int64_t>& blockShape = kBlockShape, float scaleValue = kScale)
 {
     return {
         {"block_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(blockShape)},
@@ -384,4 +384,176 @@ TEST_F(generic_block_sparse_attention_tiling_ut, unsupported_fp8_with_lse_950)
                                               MakeOutputs(ge::DT_FLOAT16, true), MakeAttrs(1, 5, 1, 1), &compileInfo,
                                               "Ascend950", 56, 262144);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_block_table_dims)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    inputs[15] = {{{kBatch, kMaxBlocks, 2}, {kBatch, kMaxBlocks, 2}}, ge::DT_INT32, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_block_table_dtype)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    inputs[15] = {{{kBatch, kMaxBlocks}, {kBatch, kMaxBlocks}}, ge::DT_INT64, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_cu_seq_lengths_q_dtype)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    inputs[11] = {{{kBatch + 1}, {kBatch + 1}}, ge::DT_INT32, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_cu_seq_lengths_q_size)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // Missing the trailing +1 prefix-sum entry (size B instead of B+1) must be rejected.
+    inputs[11] = {{{kBatch}, {kBatch}}, ge::DT_INT64, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_seqused_kv_dtype)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    inputs[14] = {{{kBatch}, {kBatch}}, ge::DT_INT64, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_seqused_kv_size)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    inputs[14] = {{{kBatch + 1}, {kBatch + 1}}, ge::DT_INT32, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, key_kv_heads_mismatch)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // key Nkv=2 while sparseBlockIdx dim0 (N_kv)=1 must be rejected.
+    inputs[1] = {
+        {{kMaxBlocks, kBlockSize, kN2 + 1, kD}, {kMaxBlocks, kBlockSize, kN2 + 1, kD}}, ge::DT_FLOAT16, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_block_table_batch_zero)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // blockTable with batch=0 must be rejected instead of silently passing batch_+1 size checks.
+    inputs[15] = {{{0, kMaxBlocks}, {0, kMaxBlocks}}, ge::DT_INT32, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_cu_seq_lengths_q_dims)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // 2D cuSeqLengthsQ with the same element count must still be rejected: only 1D is valid.
+    inputs[11] = {{{1, kBatch + 1}, {1, kBatch + 1}}, ge::DT_INT64, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_seqused_kv_dims)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // 2D sequsedKv with the same element count must still be rejected: only 1D is valid.
+    inputs[14] = {{{1, kBatch}, {1, kBatch}}, ge::DT_INT32, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_sparse_idx_dtype)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // Kernel reads sparseBlockIdx as int32; INT64 indices would be misread as garbage block ids.
+    inputs[3] = {{{kN2, kTotalQBlocks, kTopK}, {kN2, kTotalQBlocks, kTopK}}, ge::DT_INT64, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_sparse_count_dtype)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // Kernel reads sparseBlockCount as int32; INT64 counts would be misread as garbage block counts.
+    inputs[4] = {{{kN2, kTotalQBlocks}, {kN2, kTotalQBlocks}}, ge::DT_INT64, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_seqused_q_dtype)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // sequsedQ is optional, but when present the kernel reads it as int32 [batch].
+    inputs[13] = {{{kBatch}, {kBatch}}, ge::DT_INT64, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_seqused_q_size)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // sequsedQ present with wrong element count must be rejected.
+    inputs[13] = {{{kBatch + 1}, {kBatch + 1}}, ge::DT_INT32, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, invalid_block_table_batch_negative)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // Dynamic-shape -1 must be rejected on int64_t: after uint32_t narrowing it wraps to 4294967295.
+    inputs[15] = {{{-1, kMaxBlocks}, {-1, kMaxBlocks}}, ge::DT_INT32, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+}
+
+TEST_F(generic_block_sparse_attention_tiling_ut, seqused_q_present_valid_910b)
+{
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    auto inputs = MakeInputs(ge::DT_FLOAT16);
+    // sequsedQ optional-present happy path: int32 1D [batch] must keep tiling successful.
+    inputs[13] = {{{kBatch}, {kBatch}}, ge::DT_INT32, ge::FORMAT_ND};
+    gert::TilingContextPara tilingContextPara("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false),
+                                              MakeAttrs(1, 0, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, kFp16Tiling910B);
 }
