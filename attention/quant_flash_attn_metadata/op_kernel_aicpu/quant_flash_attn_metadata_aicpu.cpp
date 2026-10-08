@@ -26,7 +26,7 @@
 #define KERNEL_STATUS_PARAM_INVALID 1
 
 namespace aicpu {
-uint32_t QuantFlashAttnMetadataCpuKernel::Compute(CpuKernelContext &ctx)
+uint32_t QuantFlashAttnMetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
     if (!success) {
@@ -40,14 +40,14 @@ uint32_t QuantFlashAttnMetadataCpuKernel::Compute(CpuKernelContext &ctx)
     return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
 }
 
-bool QuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
+bool QuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
 {
     cuSeqlensQ_ = ctx.Input(static_cast<uint32_t>(ParamId::cuSeqlensQ));
     cuSeqlensKv_ = ctx.Input(static_cast<uint32_t>(ParamId::cuSeqlensKv));
     sequsedQ_ = ctx.Input(static_cast<uint32_t>(ParamId::sequsedQ));
     sequsedKv_ = ctx.Input(static_cast<uint32_t>(ParamId::sequsedKv));
-    for (Tensor **slot : {&sequsedQ_, &sequsedKv_}) {
-        Tensor *tensor = *slot;
+    for (Tensor** slot : {&sequsedQ_, &sequsedKv_}) {
+        Tensor* tensor = *slot;
         if (tensor == nullptr) {
             continue;
         }
@@ -89,7 +89,7 @@ bool QuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     return ParamsInit();
 }
 
-std::vector<int64_t> QuantFlashAttnMetadataCpuKernel::GetTensorDataAsInt64(Tensor *tensor, size_t size)
+std::vector<int64_t> QuantFlashAttnMetadataCpuKernel::GetTensorDataAsInt64(Tensor* tensor, size_t size)
 {
     std::vector<int64_t> result(size);
     if (tensor == nullptr || tensor->GetData() == nullptr || size == 0) {
@@ -97,46 +97,46 @@ std::vector<int64_t> QuantFlashAttnMetadataCpuKernel::GetTensorDataAsInt64(Tenso
     }
 
     DataType dataType = tensor->GetDataType();
-    void *data = tensor->GetData();
+    void* data = tensor->GetData();
 
     switch (dataType) {
         case DT_INT32: {
-            int32_t *ptr = static_cast<int32_t *>(data);
+            int32_t* ptr = static_cast<int32_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
             break;
         }
         case DT_INT64: {
-            int64_t *ptr = static_cast<int64_t *>(data);
+            int64_t* ptr = static_cast<int64_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = ptr[i];
             }
             break;
         }
         case DT_INT16: {
-            int16_t *ptr = static_cast<int16_t *>(data);
+            int16_t* ptr = static_cast<int16_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
             break;
         }
         case DT_UINT32: {
-            uint32_t *ptr = static_cast<uint32_t *>(data);
+            uint32_t* ptr = static_cast<uint32_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
             break;
         }
         case DT_UINT64: {
-            uint64_t *ptr = static_cast<uint64_t *>(data);
+            uint64_t* ptr = static_cast<uint64_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
             break;
         }
         case DT_UINT16: {
-            uint16_t *ptr = static_cast<uint16_t *>(data);
+            uint16_t* ptr = static_cast<uint16_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
@@ -198,10 +198,10 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
         for (int64_t i = 0; i < count - 1; ++i) {
             const int64_t qUsed = sequsedQ_ == nullptr || sequsedQ_->GetData() == nullptr ?
                                       qSeq[i + 1] - qSeq[i] :
-                                      static_cast<const int32_t *>(sequsedQ_->GetData())[i];
+                                      static_cast<const int32_t*>(sequsedQ_->GetData())[i];
             const int64_t kvUsed = sequsedKv_ == nullptr || sequsedKv_->GetData() == nullptr ?
                                        kvSeq[i + 1] - kvSeq[i] :
-                                       static_cast<const int32_t *>(sequsedKv_->GetData())[i];
+                                       static_cast<const int32_t*>(sequsedKv_->GetData())[i];
             if (qUsed < 0 || qUsed > qSeq[i + 1] - qSeq[i] || kvUsed < 0 || kvUsed > kvSeq[i + 1] - kvSeq[i]) {
                 KERNEL_LOG_ERROR("QuantFAG TND seqused must be nonnegative and within each cu_seqlens segment");
                 return false;
@@ -324,7 +324,7 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInit()
         param.fdTolerance = 300;
         param.fdOn = false;
     }
-    param.outputLayout = load_balance::OutputLayout::BN2_S1G;
+    param.kernelSplitMode = load_balance::KernelSplitMode::BN2_S1G_S2;
 
     if (isGradEnabled_) {
         // 等长场景的 deterMaxRound, 由 GenMetaData 在 Clear 之后写入第二行槽位 0。
@@ -386,7 +386,7 @@ inline int64_t GetRightDownRowShift(int64_t m, int64_t n)
     return std::max(static_cast<int64_t>(0), m - n - 1);
 }
 
-inline void GetRightDownVirt(int64_t m, int64_t n, int64_t &virtM, int64_t &virtN)
+inline void GetRightDownVirt(int64_t m, int64_t n, int64_t& virtM, int64_t& virtN)
 {
     m -= GetRightDownRowShift(m, n);
     if (m < 1 || n < 1) {
@@ -430,7 +430,7 @@ inline int64_t CalBandNarrowRounds(int64_t k, int64_t n1, int64_t m, int64_t n, 
     return seg * TndLineCeilDiv((nNew - overlap) * n1 + overlap, k);
 }
 
-inline bool TndLineRunEmpty(const TndLineRunShape &shape, bool isBand)
+inline bool TndLineRunEmpty(const TndLineRunShape& shape, bool isBand)
 {
     return shape.m < 1 || shape.n < 1 || (isBand && shape.p + shape.q < 2);
 }
@@ -441,7 +441,7 @@ bool QuantFlashAttnMetadataCpuKernel::IsTndLineBandMode() const
     return maskMode_ == MASK_MODE_BAND;
 }
 
-void QuantFlashAttnMetadataCpuKernel::CalTndLineActualToken(uint32_t bIdx, int64_t &s1Token, int64_t &s2Token)
+void QuantFlashAttnMetadataCpuKernel::CalTndLineActualToken(uint32_t bIdx, int64_t& s1Token, int64_t& s2Token)
 {
     if (IsTndLineBandMode()) {
         s1Token = (winLeft_ == -1) ? TND_LINE_TOKEN_UNLIMITED : static_cast<int64_t>(winLeft_);
@@ -456,7 +456,7 @@ void QuantFlashAttnMetadataCpuKernel::CalTndLineActualToken(uint32_t bIdx, int64
     s2Token = s2Token - s1Len + s2Len;
 }
 
-void QuantFlashAttnMetadataCpuKernel::GetTndLineOuterMN(uint32_t bIdx, int64_t &m, int64_t &n)
+void QuantFlashAttnMetadataCpuKernel::GetTndLineOuterMN(uint32_t bIdx, int64_t& m, int64_t& n)
 {
     const int64_t s1Len = static_cast<int64_t>(GetS1SeqSize(bIdx));
     const int64_t s2Len = static_cast<int64_t>(GetS2SeqSize(bIdx));
@@ -520,7 +520,7 @@ TndLineRunShape QuantFlashAttnMetadataCpuKernel::MakeTndLineRunShape(uint32_t bI
     return shape;
 }
 
-int64_t QuantFlashAttnMetadataCpuKernel::CountTndLineSameShapeRun(uint32_t start, TndLineRunShape &shape)
+int64_t QuantFlashAttnMetadataCpuKernel::CountTndLineSameShapeRun(uint32_t start, TndLineRunShape& shape)
 {
     shape = MakeTndLineRunShape(start);
     uint32_t end = start;
@@ -535,7 +535,7 @@ int64_t QuantFlashAttnMetadataCpuKernel::CountTndLineSameShapeRun(uint32_t start
     return static_cast<int64_t>(end - start) + 1;
 }
 
-int64_t QuantFlashAttnMetadataCpuKernel::CalTndLineRunRounds(const TndLineRunShape &shape, int64_t total)
+int64_t QuantFlashAttnMetadataCpuKernel::CalTndLineRunRounds(const TndLineRunShape& shape, int64_t total)
 {
     const int64_t k = static_cast<int64_t>(aicCoreNum_);
     const bool isBand = IsTndLineBandMode();
@@ -618,7 +618,7 @@ bool QuantFlashAttnMetadataCpuKernel::PreferTndLineSwizzle()
     return hasWork;
 }
 
-bool QuantFlashAttnMetadataCpuKernel::CalTndLineSwizzleSchedule(TndLineSchedule &sched)
+bool QuantFlashAttnMetadataCpuKernel::CalTndLineSwizzleSchedule(TndLineSchedule& sched)
 {
     const int64_t bSize = static_cast<int64_t>(batchSize_);
     const int64_t n1 = static_cast<int64_t>(baseInfo.kvHeadNum);
@@ -665,7 +665,7 @@ bool QuantFlashAttnMetadataCpuKernel::CalTndLineSwizzleSchedule(TndLineSchedule 
     return sched.roundPrefix[bSize] > 0;
 }
 
-bool QuantFlashAttnMetadataCpuKernel::GenQuantFagTndLineSchedule(optiling::detail::QuantFAGMetaData &gradMetaData)
+bool QuantFlashAttnMetadataCpuKernel::GenQuantFagTndLineSchedule(optiling::detail::QuantFAGMetaData& gradMetaData)
 {
     TndLineSchedule sched;
     if (!CalTndLineSwizzleSchedule(sched)) {
@@ -727,10 +727,10 @@ bool QuantFlashAttnMetadataCpuKernel::GenQuantFagTndLineSchedule(optiling::detai
 //   prefix[b+1] = prefix[b] + ceil(n_b * n1 / k) * m_b
 // 对标 FAG flash_attention_score_grad_tiling_varlen_regbase.cpp 的 CalcTNDSwizzleParam dense 分支,
 // kernel 端解码见 deter.h 的 CalTNDDenseSwizzleIndex。
-bool QuantFlashAttnMetadataCpuKernel::CalDeterSwizzleSchedule(std::vector<int64_t> &roundPrefix,
-                                                              std::vector<int64_t> &s1OuterList,
-                                                              std::vector<int64_t> &s2OuterList,
-                                                              std::vector<std::vector<int64_t>> &sparseData)
+bool QuantFlashAttnMetadataCpuKernel::CalDeterSwizzleSchedule(std::vector<int64_t>& roundPrefix,
+                                                              std::vector<int64_t>& s1OuterList,
+                                                              std::vector<int64_t>& s2OuterList,
+                                                              std::vector<std::vector<int64_t>>& sparseData)
 {
     const int64_t k = static_cast<int64_t>(aicCoreNum_);
     const int64_t n1 = static_cast<int64_t>(baseInfo.kvHeadNum);
@@ -904,13 +904,13 @@ bool QuantFlashAttnMetadataCpuKernel::GenQuantFagGradMetaData()
 uint32_t QuantFlashAttnMetadataCpuKernel::GetS1SeqSize(uint32_t bIdx)
 {
     if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
-        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedQ_->GetData());
+        const int32_t* seqUsedPtr = static_cast<const int32_t*>(sequsedQ_->GetData());
         return static_cast<uint32_t>(seqUsedPtr[bIdx]);
     }
 
     if (layoutQ_ == "TND") {
         if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
-            const int32_t *s1Ptr = static_cast<const int32_t *>(cuSeqlensQ_->GetData());
+            const int32_t* s1Ptr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
             return static_cast<uint32_t>(s1Ptr[bIdx + 1U] - s1Ptr[bIdx]);
         }
     }
@@ -920,20 +920,20 @@ uint32_t QuantFlashAttnMetadataCpuKernel::GetS1SeqSize(uint32_t bIdx)
 uint32_t QuantFlashAttnMetadataCpuKernel::GetS2SeqSize(uint32_t bIdx)
 {
     if (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
-        const int32_t *seqUsedPtr = static_cast<const int32_t *>(sequsedKv_->GetData());
+        const int32_t* seqUsedPtr = static_cast<const int32_t*>(sequsedKv_->GetData());
         return static_cast<uint32_t>(seqUsedPtr[bIdx]);
     }
 
     if (layoutKv_ == "TND") {
         if (cuSeqlensKv_ != nullptr && cuSeqlensKv_->GetData() != nullptr) {
-            const int32_t *s1Ptr = static_cast<const int32_t *>(cuSeqlensKv_->GetData());
+            const int32_t* s1Ptr = static_cast<const int32_t*>(cuSeqlensKv_->GetData());
             return static_cast<uint32_t>(s1Ptr[bIdx + 1U] - s1Ptr[bIdx]);
         }
     }
     return static_cast<uint32_t>(maxSeqlenKv_);
 }
 
-bool QuantFlashAttnMetadataCpuKernel::BalanceSchedule(SectionStreamKResult &splitRes)
+bool QuantFlashAttnMetadataCpuKernel::BalanceSchedule(SectionStreamKResult& splitRes)
 {
     return load_balance::SectionStreamK::Compute(deviceInfo, baseInfo, param, splitRes) == SECTION_STREAM_K_SUCCESS;
 }
@@ -1000,7 +1000,7 @@ bool QuantFlashAttnMetadataCpuKernel::CheckNeedInitOutput()
     return false;
 }
 
-bool QuantFlashAttnMetadataCpuKernel::GenMetaData(SectionStreamKResult &splitRes)
+bool QuantFlashAttnMetadataCpuKernel::GenMetaData(SectionStreamKResult& splitRes)
 {
     if (metaData_ == nullptr || metaData_->GetData() == nullptr) {
         KERNEL_LOG_ERROR("metadata is empty");
@@ -1044,7 +1044,7 @@ bool QuantFlashAttnMetadataCpuKernel::GenMetaData(SectionStreamKResult &splitRes
 
 // 第二行(反向 FAG 区)起点。优先使用宿主侧经 attr 下发的 shape(aclnn 层读取, 可靠),
 // attr 缺失时回退 AICPU 侧 TensorShape(部分平台不填充, 可能得到 -1/0)。
-void QuantFlashAttnMetadataCpuKernel::GetMetadataRowInfo(int32_t &dimNum, int64_t &rowSize)
+void QuantFlashAttnMetadataCpuKernel::GetMetadataRowInfo(int32_t& dimNum, int64_t& rowSize)
 {
     dimNum = static_cast<int32_t>(metadataDimNum_);
     rowSize = metadataRowSize_;
@@ -1064,8 +1064,8 @@ uint32_t QuantFlashAttnMetadataCpuKernel::GetFagOffset()
     GetMetadataRowInfo(dimNum, rowSize);
     return (dimNum >= 2 && rowSize > 0) ? static_cast<uint32_t>(rowSize) : optiling::QUANT_FAG_METADATA_SIZE;
 }
-void QuantFlashAttnMetadataCpuKernel::SetMetadataHead(const SectionStreamKResult &splitRes,
-                                                      optiling::detail::FaMetaData &faMetadata)
+void QuantFlashAttnMetadataCpuKernel::SetMetadataHead(const SectionStreamKResult& splitRes,
+                                                      optiling::detail::FaMetaData& faMetadata)
 {
     faMetadata.SetHeadMedata(optiling::HEAD_SECTION_NUM_INDEX, splitRes.sectionNum);
 
@@ -1084,8 +1084,8 @@ void QuantFlashAttnMetadataCpuKernel::SetMetadataHead(const SectionStreamKResult
     faMetadata.SetHeadMedata(optiling::HEAD_NEED_INIT_OUTPUT_INDEX, needInitOutput_ ? 1U : 0U);
 }
 
-void QuantFlashAttnMetadataCpuKernel::SetMetadataFa(const SectionStreamKResult &splitRes,
-                                                    optiling::detail::FaMetaData &faMetadata)
+void QuantFlashAttnMetadataCpuKernel::SetMetadataFa(const SectionStreamKResult& splitRes,
+                                                    optiling::detail::FaMetaData& faMetadata)
 {
     for (uint32_t sectionId = 0; sectionId < splitRes.sectionNum; ++sectionId) {
         auto faSplitRes = splitRes.sectionFaResult[sectionId];
@@ -1112,8 +1112,8 @@ void QuantFlashAttnMetadataCpuKernel::SetMetadataFa(const SectionStreamKResult &
     }
 }
 
-void QuantFlashAttnMetadataCpuKernel::SetMetadataFd(const SectionStreamKResult &splitRes,
-                                                    optiling::detail::FaMetaData &faMetadata)
+void QuantFlashAttnMetadataCpuKernel::SetMetadataFd(const SectionStreamKResult& splitRes,
+                                                    optiling::detail::FaMetaData& faMetadata)
 {
     for (uint32_t sectionId = 0; sectionId < splitRes.sectionNum; ++sectionId) {
         auto fdSplitRes = splitRes.sectionFdResult[sectionId];
@@ -1131,7 +1131,7 @@ void QuantFlashAttnMetadataCpuKernel::SetMetadataFd(const SectionStreamKResult &
 }
 
 namespace {
-static const char *kernelType = "QuantFlashAttnMetadata";
+static const char* kernelType = "QuantFlashAttnMetadata";
 REGISTER_CPU_KERNEL(kernelType, QuantFlashAttnMetadataCpuKernel);
 } // namespace
 

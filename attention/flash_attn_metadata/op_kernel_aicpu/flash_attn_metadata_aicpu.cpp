@@ -30,7 +30,7 @@ constexpr uint32_t FA_KERNEL_STATUS_PARAM_INVALID = 1;
 using namespace optiling;
 
 namespace aicpu {
-uint32_t FlashAttnMetadataCpuKernel::Compute(CpuKernelContext &ctx)
+uint32_t FlashAttnMetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
     KERNEL_CHECK_FALSE(success, FA_KERNEL_STATUS_PARAM_INVALID, "Prepare data failed!");
@@ -54,7 +54,7 @@ uint32_t FlashAttnMetadataCpuKernel::Compute(CpuKernelContext &ctx)
     return FA_KERNEL_STATUS_OK;
 }
 
-bool FlashAttnMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
+bool FlashAttnMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
 {
     // input
     cuSeqlensQ_ = ctx.Input(static_cast<uint32_t>(ParamId::cuSeqlensQ));
@@ -251,7 +251,8 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
     param.fdLeastBlock = 3;             // 3: least block
     param.fdOn = true;
     param.costFunc = FlashAttnMetadataCpuKernel::CostFunc;
-    param.outputLayout = dnUnmergedRouted ? load_balance::OutputLayout::BN1_S1 : load_balance::OutputLayout::BN2_S1G;
+    param.kernelSplitMode =
+        dnUnmergedRouted ? load_balance::KernelSplitMode::BN1_S1_S2 : load_balance::KernelSplitMode::BN2_S1G_S2;
 }
 
 void FlashAttnMetadataCpuKernel::InitBaseInfo()
@@ -281,12 +282,12 @@ void FlashAttnMetadataCpuKernel::InitBaseInfo()
     baseInfo.actualQuerySeqSize = actualSeqlenQ_;
 }
 
-bool FlashAttnMetadataCpuKernel::BalanceSchedule(load_balance::SectionStreamKResult &splitRes)
+bool FlashAttnMetadataCpuKernel::BalanceSchedule(load_balance::SectionStreamKResult& splitRes)
 {
     return load_balance::SectionStreamK::Compute(deviceInfo, baseInfo, param, splitRes) == SECTION_STREAM_K_SUCCESS;
 }
 
-bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult &splitRes)
+bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult& splitRes)
 {
     detail::FaMetadata faMetadata(aicCoreNum_, aivCoreNum_, splitRes.sectionNum, metadata_->GetData());
     faMetadata.Clear(); // set to all 0
@@ -297,8 +298,8 @@ bool FlashAttnMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult 
     return true;
 }
 
-void FlashAttnMetadataCpuKernel::SetMetadataHead(const load_balance::SectionStreamKResult &splitRes,
-                                                 optiling::detail::FaMetadata &faMetadata)
+void FlashAttnMetadataCpuKernel::SetMetadataHead(const load_balance::SectionStreamKResult& splitRes,
+                                                 optiling::detail::FaMetadata& faMetadata)
 {
     faMetadata.SetHeadMetadata(HEAD_SECTION_NUM_INDEX, splitRes.sectionNum);
     faMetadata.SetHeadMetadata(HEAD_M_BASE_SIZE_INDEX, mBaseSize_);
@@ -309,17 +310,17 @@ void FlashAttnMetadataCpuKernel::SetMetadataHead(const load_balance::SectionStre
     }
     faMetadata.SetHeadMetadata(HEAD_AIC_NUM_INDEX, aicCoreNum_);
     faMetadata.SetHeadMetadata(HEAD_AIV_NUM_INDEX, aivCoreNum_);
-    faMetadata.SetHeadMetadata(HEAD_OUTPUT_LAYOUT_INDEX, static_cast<FA_METADATA_T>(param.outputLayout));
+    faMetadata.SetHeadMetadata(HEAD_OUTPUT_LAYOUT_INDEX, static_cast<FA_METADATA_T>(param.kernelSplitMode));
 }
 
-void FlashAttnMetadataCpuKernel::SetMetadataFa(const load_balance::SectionStreamKResult &splitRes,
-                                               optiling::detail::FaMetadata &faMetadata)
+void FlashAttnMetadataCpuKernel::SetMetadataFa(const load_balance::SectionStreamKResult& splitRes,
+                                               optiling::detail::FaMetadata& faMetadata)
 {
     load_balance::SectionStreamKFaResult dummyHead{static_cast<uint32_t>(aicCoreNum_)}; // all zeror dummy head
     for (uint32_t secIdx = 0; secIdx < splitRes.sectionNum; ++secIdx) {
-        auto &faRes = splitRes.sectionFaResult[secIdx];
+        auto& faRes = splitRes.sectionFaResult[secIdx];
         for (uint32_t aicIdx = 0; aicIdx < faRes.usedCoreNum; ++aicIdx) {
-            auto &prevFaRes = (secIdx == 0U) ? dummyHead : splitRes.sectionFaResult[secIdx - 1U];
+            auto& prevFaRes = (secIdx == 0U) ? dummyHead : splitRes.sectionFaResult[secIdx - 1U];
             auto prevLastCore = (secIdx == 0U) ? 0U : prevFaRes.usedCoreNum - 1U;
             FA_METADATA_T bnStart = (aicIdx == 0) ? prevFaRes.bNEnd[prevLastCore] : faRes.bNEnd[aicIdx - 1U];
             FA_METADATA_T mStart = (aicIdx == 0) ? prevFaRes.mEnd[prevLastCore] : faRes.mEnd[aicIdx - 1U];
@@ -337,11 +338,11 @@ void FlashAttnMetadataCpuKernel::SetMetadataFa(const load_balance::SectionStream
     }
 }
 
-void FlashAttnMetadataCpuKernel::SetMetadataFd(const load_balance::SectionStreamKResult &splitRes,
-                                               optiling::detail::FaMetadata &faMetadata)
+void FlashAttnMetadataCpuKernel::SetMetadataFd(const load_balance::SectionStreamKResult& splitRes,
+                                               optiling::detail::FaMetadata& faMetadata)
 {
     for (uint32_t secIdx = 0; secIdx < splitRes.sectionNum; ++secIdx) {
-        auto &fdRes = splitRes.sectionFdResult[secIdx];
+        auto& fdRes = splitRes.sectionFdResult[secIdx];
         for (uint32_t aivIdx = 0; aivIdx < fdRes.usedVecNum; ++aivIdx) {
             uint32_t t = fdRes.taskIdx[aivIdx];
             faMetadata.SetFdMetadata(secIdx, aivIdx, FD_BN_IDX_INDEX, fdRes.bNIdx[t]);
@@ -355,7 +356,7 @@ void FlashAttnMetadataCpuKernel::SetMetadataFd(const load_balance::SectionStream
 }
 
 namespace {
-static const char *kernelType = "FlashAttnMetadata";
+static const char* kernelType = "FlashAttnMetadata";
 REGISTER_CPU_KERNEL(kernelType, FlashAttnMetadataCpuKernel);
 } // namespace
 

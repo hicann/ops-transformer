@@ -28,7 +28,7 @@ constexpr uint32_t STEM_M_BASE_SIZE = 64U;
 constexpr uint32_t STEM_S2_BASE_SIZE = 256U;
 } // namespace
 
-uint32_t StemIndexerMetadataCpuKernel::Compute(CpuKernelContext &ctx)
+uint32_t StemIndexerMetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
     if (!success) {
@@ -45,7 +45,7 @@ uint32_t StemIndexerMetadataCpuKernel::Compute(CpuKernelContext &ctx)
     return success ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
 }
 
-bool StemIndexerMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
+bool StemIndexerMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
 {
     // input
     qSeqLens_ = ctx.Input(static_cast<uint32_t>(ParamId::qSeqLens));
@@ -67,7 +67,7 @@ bool StemIndexerMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
     return true;
 }
 
-std::vector<int64_t> StemIndexerMetadataCpuKernel::GetTensorDataAsInt64(Tensor *tensor, size_t size)
+std::vector<int64_t> StemIndexerMetadataCpuKernel::GetTensorDataAsInt64(Tensor* tensor, size_t size)
 {
     std::vector<int64_t> result(size);
     if (tensor == nullptr || tensor->GetData() == nullptr || size == 0) {
@@ -75,46 +75,46 @@ std::vector<int64_t> StemIndexerMetadataCpuKernel::GetTensorDataAsInt64(Tensor *
     }
 
     DataType dataType = tensor->GetDataType();
-    void *data = tensor->GetData();
+    void* data = tensor->GetData();
 
     switch (dataType) {
         case DT_INT32: {
-            int32_t *ptr = static_cast<int32_t *>(data);
+            int32_t* ptr = static_cast<int32_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
             break;
         }
         case DT_INT64: {
-            int64_t *ptr = static_cast<int64_t *>(data);
+            int64_t* ptr = static_cast<int64_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = ptr[i];
             }
             break;
         }
         case DT_INT16: {
-            int16_t *ptr = static_cast<int16_t *>(data);
+            int16_t* ptr = static_cast<int16_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
             break;
         }
         case DT_UINT32: {
-            uint32_t *ptr = static_cast<uint32_t *>(data);
+            uint32_t* ptr = static_cast<uint32_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
             break;
         }
         case DT_UINT64: {
-            uint64_t *ptr = static_cast<uint64_t *>(data);
+            uint64_t* ptr = static_cast<uint64_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
             break;
         }
         case DT_UINT16: {
-            uint16_t *ptr = static_cast<uint16_t *>(data);
+            uint16_t* ptr = static_cast<uint16_t*>(data);
             for (size_t i = 0; i < size; ++i) {
                 result[i] = static_cast<int64_t>(ptr[i]);
             }
@@ -126,7 +126,7 @@ std::vector<int64_t> StemIndexerMetadataCpuKernel::GetTensorDataAsInt64(Tensor *
     return result;
 }
 
-bool StemIndexerMetadataCpuKernel::BalanceSchedule(SectionStreamKResult &result)
+bool StemIndexerMetadataCpuKernel::BalanceSchedule(SectionStreamKResult& result)
 {
     DeviceInfo deviceInfo{};
     StemIndexerBaseInfo baseInfo{};
@@ -138,7 +138,7 @@ bool StemIndexerMetadataCpuKernel::BalanceSchedule(SectionStreamKResult &result)
     return load_balance::SectionStreamK::Compute(deviceInfo, baseInfo, param, result) == SECTION_STREAM_K_SUCCESS;
 }
 
-bool StemIndexerMetadataCpuKernel::GenerateDeviceInfo(DeviceInfo &deviceInfo)
+bool StemIndexerMetadataCpuKernel::GenerateDeviceInfo(DeviceInfo& deviceInfo)
 {
     deviceInfo.aicCoreMaxNum = aicCoreNum_;
     deviceInfo.aivCoreMaxNum = aivCoreNum_;
@@ -147,7 +147,7 @@ bool StemIndexerMetadataCpuKernel::GenerateDeviceInfo(DeviceInfo &deviceInfo)
     return true;
 }
 
-bool StemIndexerMetadataCpuKernel::GenerateBaseInfo(StemIndexerBaseInfo &baseInfo)
+bool StemIndexerMetadataCpuKernel::GenerateBaseInfo(StemIndexerBaseInfo& baseInfo)
 {
     KERNEL_CHECK_NULLPTR(qSeqLens_, false, "q_seq_len is nullptr!");
     KERNEL_CHECK_NULLPTR(kvSeqLens_, false, "kv_seq_len is nullptr!");
@@ -187,17 +187,17 @@ bool StemIndexerMetadataCpuKernel::GenerateBaseInfo(StemIndexerBaseInfo &baseInf
     return true;
 }
 
-bool StemIndexerMetadataCpuKernel::GenerateSectionStreamKParam(load_balance::SectionStreamKParam &param)
+bool StemIndexerMetadataCpuKernel::GenerateSectionStreamKParam(load_balance::SectionStreamKParam& param)
 {
     param.l2Byte = 96U * 1024U * 1024U;
     param.mBaseSize = STEM_M_BASE_SIZE;
     param.s2BaseSize = STEM_S2_BASE_SIZE;
     param.fdOn = false;
-    param.outputLayout = load_balance::OutputLayout::BN2_S1G;
+    param.kernelSplitMode = load_balance::KernelSplitMode::BN2_S1G_S2;
     return true;
 }
 
-bool StemIndexerMetadataCpuKernel::GenMetadata(SectionStreamKResult &result)
+bool StemIndexerMetadataCpuKernel::GenMetadata(SectionStreamKResult& result)
 {
     if (metadata_ == nullptr || metadata_->GetData() == nullptr) {
         KERNEL_LOG_ERROR("metadata is empty");
@@ -217,9 +217,9 @@ bool StemIndexerMetadataCpuKernel::GenMetadata(SectionStreamKResult &result)
 
     load_balance::SectionStreamKFaResult dummyHead{static_cast<uint32_t>(aicCoreNum_)};
     for (uint32_t secIdx = 0; secIdx < result.sectionNum; ++secIdx) {
-        auto &faRes = result.sectionFaResult[secIdx];
+        auto& faRes = result.sectionFaResult[secIdx];
         for (uint32_t aicIdx = 0; aicIdx < faRes.usedCoreNum; ++aicIdx) {
-            auto &prevFaRes = (secIdx == 0U) ? dummyHead : result.sectionFaResult[secIdx - 1U];
+            auto& prevFaRes = (secIdx == 0U) ? dummyHead : result.sectionFaResult[secIdx - 1U];
             auto prevLastCore = (secIdx == 0U) ? 0U : prevFaRes.usedCoreNum - 1U;
             SLI_METADATA_T bn2Start = (aicIdx == 0) ? prevFaRes.bNEnd[prevLastCore] : faRes.bNEnd[aicIdx - 1U];
             SLI_METADATA_T mStart = (aicIdx == 0) ? prevFaRes.mEnd[prevLastCore] : faRes.mEnd[aicIdx - 1U];
@@ -237,7 +237,7 @@ bool StemIndexerMetadataCpuKernel::GenMetadata(SectionStreamKResult &result)
 }
 
 namespace {
-static const char *kernelType = "StemIndexerMetadata";
+static const char* kernelType = "StemIndexerMetadata";
 REGISTER_CPU_KERNEL(kernelType, StemIndexerMetadataCpuKernel);
 } // namespace
 

@@ -38,9 +38,9 @@ enum class SocVersion : uint32_t {
     BUTT
 };
 
-enum class OutputLayout : uint8_t {
-    BN2_S1G = 0,
-    BN1_S1,
+enum class KernelSplitMode : uint8_t {
+    BN2_S1G_S2 = 0,
+    BN1_S1_S2,
     BUTT
 };
 
@@ -61,7 +61,7 @@ struct GeneralBalanceParam {
                                   // full_block_cost is costFunc(mBaseSize, s2BaseSize)
     int64_t fdLeastBlock{0U};     // if noFd <= full_block_cost * {val}, then choose no fd
     CostFunc costFunc{nullptr};   // Customize cost func. Set nullptr to use default cost func
-    OutputLayout outputLayout{OutputLayout::BN2_S1G};
+    KernelSplitMode kernelSplitMode{KernelSplitMode::BN2_S1G_S2};
 };
 
 enum class SparseMode : uint8_t {
@@ -183,7 +183,7 @@ inline bool IsWithinTolerance(T limit, T tolerance, T value)
     return limit + tolerance >= value;
 }
 
-static inline Layout ConvertToLayout(const std::string &layoutStr)
+static inline Layout ConvertToLayout(const std::string& layoutStr)
 {
     static std::unordered_map<std::string, Layout> layoutTable{
         {"BSND", Layout::BSND}, {"BNSD", Layout::BNSD}, {"BSH", Layout::BSH},    {"NBSD", Layout::NBSD},

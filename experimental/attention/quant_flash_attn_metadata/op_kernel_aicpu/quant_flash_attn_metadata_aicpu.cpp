@@ -337,7 +337,7 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInitMxfp8SoftmaxFp16()
     param.l2Byte = 0;
     param.fdTolerance = 300;
     param.fdOn = 0;
-    param.outputLayout = load_balance::OutputLayout::BN2_S1G;
+    param.kernelSplitMode = load_balance::KernelSplitMode::BN2_S1G_S2;
 
     if (isGradEnabled_) {
         fagDeterMaxRound_ = CalDeterMaxRound();

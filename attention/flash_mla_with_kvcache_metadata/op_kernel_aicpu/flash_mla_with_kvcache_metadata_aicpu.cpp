@@ -29,7 +29,7 @@ constexpr uint32_t FA_KERNEL_STATUS_PARAM_INVALID = 1;
 using namespace optiling;
 
 namespace aicpu {
-uint32_t FlashMlaWithKvcacheMetadataCpuKernel::Compute(CpuKernelContext &ctx)
+uint32_t FlashMlaWithKvcacheMetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
     KERNEL_CHECK_FALSE(success, FA_KERNEL_STATUS_PARAM_INVALID, "Prepare data failed!");
@@ -47,7 +47,7 @@ uint32_t FlashMlaWithKvcacheMetadataCpuKernel::Compute(CpuKernelContext &ctx)
     return FA_KERNEL_STATUS_OK;
 }
 
-bool FlashMlaWithKvcacheMetadataCpuKernel::Prepare(CpuKernelContext &ctx)
+bool FlashMlaWithKvcacheMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
 {
     // input
     cuSeqlensQ_ = ctx.Input(static_cast<uint32_t>(ParamId::cuSeqlensQ));
@@ -278,12 +278,12 @@ void FlashMlaWithKvcacheMetadataCpuKernel::InitBaseInfo()
     baseInfo.actualQuerySeqSize = actualSeqlenQ_;
 }
 
-bool FlashMlaWithKvcacheMetadataCpuKernel::BalanceSchedule(load_balance::SectionStreamKResult &splitRes)
+bool FlashMlaWithKvcacheMetadataCpuKernel::BalanceSchedule(load_balance::SectionStreamKResult& splitRes)
 {
     return load_balance::SectionStreamK::Compute(deviceInfo, baseInfo, param, splitRes) == SECTION_STREAM_K_SUCCESS;
 }
 
-bool FlashMlaWithKvcacheMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult &splitRes)
+bool FlashMlaWithKvcacheMetadataCpuKernel::GenMetadata(load_balance::SectionStreamKResult& splitRes)
 {
     detail::FaMetadata faMetadata(metadata_->GetData(), splitRes.sectionNum, static_cast<uint32_t>(aicCoreNum_),
                                   static_cast<uint32_t>(aivCoreNum_));
@@ -296,7 +296,7 @@ bool FlashMlaWithKvcacheMetadataCpuKernel::GenMetadata(load_balance::SectionStre
     faMetadata.SetHeadMetadata(HEAD_AIC_NUM_INDEX, static_cast<FA_METADATA_T>(aicCoreNum_));
     faMetadata.SetHeadMetadata(HEAD_AIV_NUM_INDEX, static_cast<FA_METADATA_T>(aivCoreNum_));
     faMetadata.SetHeadMetadata(HEAD_OUTPUT_LAYOUT_INDEX,
-                               static_cast<FA_METADATA_T>(load_balance::OutputLayout::BN2_S1G));
+                               static_cast<FA_METADATA_T>(load_balance::KernelSplitMode::BN2_S1G_S2));
     if (std::any_of(splitRes.sectionFdResult.begin(), splitRes.sectionFdResult.end(),
                     [](load_balance::SectionStreamKFdResult result) { return result.usedVecNum > 0U; })) {
         faMetadata.SetHeadMetadata(HEAD_IS_FD_INDEX, 1U);
@@ -304,9 +304,9 @@ bool FlashMlaWithKvcacheMetadataCpuKernel::GenMetadata(load_balance::SectionStre
 
     load_balance::SectionStreamKFaResult dummyHead{static_cast<uint32_t>(aicCoreNum_)}; // all zeror dummy head
     for (uint32_t secIdx = 0; secIdx < splitRes.sectionNum; ++secIdx) {
-        auto &faRes = splitRes.sectionFaResult[secIdx];
+        auto& faRes = splitRes.sectionFaResult[secIdx];
         for (uint32_t aicIdx = 0; aicIdx < faRes.usedCoreNum; ++aicIdx) {
-            auto &prevFaRes = (secIdx == 0U) ? dummyHead : splitRes.sectionFaResult[secIdx - 1U];
+            auto& prevFaRes = (secIdx == 0U) ? dummyHead : splitRes.sectionFaResult[secIdx - 1U];
             auto prevLastCore = (secIdx == 0U) ? 0U : prevFaRes.usedCoreNum - 1U;
             FA_METADATA_T bn2Start = (aicIdx == 0) ? prevFaRes.bNEnd[prevLastCore] : faRes.bNEnd[aicIdx - 1U];
             FA_METADATA_T mStart = (aicIdx == 0) ? prevFaRes.mEnd[prevLastCore] : faRes.mEnd[aicIdx - 1U];
@@ -322,7 +322,7 @@ bool FlashMlaWithKvcacheMetadataCpuKernel::GenMetadata(load_balance::SectionStre
                                      faRes.firstFdDataWorkspaceIdx[aicIdx]);
         }
 
-        auto &fdRes = splitRes.sectionFdResult[secIdx];
+        auto& fdRes = splitRes.sectionFdResult[secIdx];
         for (uint32_t aivIdx = 0; aivIdx < fdRes.usedVecNum; ++aivIdx) {
             uint32_t t = fdRes.taskIdx[aivIdx];
             faMetadata.SetFdMetadata(secIdx, aivIdx, FD_BN2_IDX_INDEX, fdRes.bNIdx[t]);
@@ -337,7 +337,7 @@ bool FlashMlaWithKvcacheMetadataCpuKernel::GenMetadata(load_balance::SectionStre
 }
 
 namespace {
-static const char *kernelType = "FlashMlaWithKvcacheMetadata";
+static const char* kernelType = "FlashMlaWithKvcacheMetadata";
 REGISTER_CPU_KERNEL(kernelType, FlashMlaWithKvcacheMetadataCpuKernel);
 } // namespace
 
