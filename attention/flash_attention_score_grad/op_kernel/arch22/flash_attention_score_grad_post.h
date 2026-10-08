@@ -531,7 +531,7 @@ FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT
         uint64_t dataSize = i + qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
         NZVecClc(dqWorkSpaceGm, dqGm, dataSize, actual_seq_qlen_addr, g, s1, true, 0, d, dAlign);
         uint64_t dataSize1 = i + 2 * qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
-        dataSize1 = i + qPostBaseNum >= qPostBlockTotal ? 0 : dataSize1;
+        dataSize1 = i + qPostBaseNum >= qEnd ? 0 : dataSize1;
         NZVecClc(dqWorkSpaceGm, dqGm, dataSize1, actual_seq_qlen_addr, g, s1, true, 1, d, dAlign);
     }
 
@@ -548,7 +548,7 @@ FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT
             uint64_t dataSize = i + qRopePostBaseNum < qRopePostBlockTotal ? qRopePostBaseNum : qRopePostTailNum;
             NZVecClc(dqRopeWorkSpaceGm, dqRopeGm, dataSize, actual_seq_qlen_addr, g, s1, true, 0, rope_d, rope_dAlign);
             uint64_t dataSize1 = i + 2 * qRopePostBaseNum < qRopePostBlockTotal ? qRopePostBaseNum : qRopePostTailNum;
-            dataSize1 = i + qRopePostBaseNum >= qRopePostBlockTotal ? 0 : dataSize1;
+            dataSize1 = i + qRopePostBaseNum >= qRopeEnd ? 0 : dataSize1;
             NZVecClc(dqRopeWorkSpaceGm, dqRopeGm, dataSize1, actual_seq_qlen_addr, g, s1, true, 1, rope_d, rope_dAlign);
         }
     }
@@ -563,7 +563,7 @@ FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT
         uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
         NZVecClc(dkWorkSpaceGm, dkGm, dataSize, actual_seq_kvlen_addr, 1, s2, true, 0, d, dAlign);
         uint64_t dataSize1 = i + 2 * kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
-        dataSize1 = i + kvPostBaseNum >= kvPostBlockTotal ? 0 : dataSize1;
+        dataSize1 = i + kvPostBaseNum >= kvEnd ? 0 : dataSize1;
         NZVecClc(dkWorkSpaceGm, dkGm, dataSize1, actual_seq_kvlen_addr, 1, s2, true, 1, d, dAlign);
     }
 
@@ -579,7 +579,7 @@ FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT
             uint64_t dataSize = i + kRopePostBaseNum < kRopePostBlockTotal ? kRopePostBaseNum : kRopePostTailNum;
             NZVecClc(dkRopeWorkSpaceGm, dkRopeGm, dataSize, actual_seq_kvlen_addr, 1, s2, true, 0, rope_d, rope_dAlign);
             uint64_t dataSize1 = i + 2 * kRopePostBaseNum < kRopePostBlockTotal ? kRopePostBaseNum : kRopePostTailNum;
-            dataSize1 = i + kRopePostBaseNum >= kRopePostBlockTotal ? 0 : dataSize1;
+            dataSize1 = i + kRopePostBaseNum >= kRopeEnd ? 0 : dataSize1;
             NZVecClc(dkRopeWorkSpaceGm, dkRopeGm, dataSize1, actual_seq_kvlen_addr, 1, s2, true, 1, rope_d,
                      rope_dAlign);
         }
@@ -592,7 +592,7 @@ FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT
             uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
             NZVecClc(dvWorkSpaceGm, dvGm, dataSize, actual_seq_kvlen_addr, 1, s2, false, 0, d, dAlign);
             uint64_t dataSize1 = i + 2 * kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
-            dataSize1 = i + kvPostBaseNum >= kvPostBlockTotal ? 0 : dataSize1;
+            dataSize1 = i + kvPostBaseNum >= kvEnd ? 0 : dataSize1;
             NZVecClc(dvWorkSpaceGm, dvGm, dataSize1, actual_seq_kvlen_addr, 1, s2, false, 1, d, dAlign);
         }
         AscendC::PipeBarrier<PIPE_ALL>();
@@ -1335,7 +1335,7 @@ public:
             uint64_t dataSize = i + qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
             NZVecClc(dqWorkSpaceGm, dqGm, dataSize, actual_seq_qlen_addr, g, s1, true, 0, d, dAlign);
             uint64_t dataSize1 = i + 2 * qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
-            dataSize1 = i + qPostBaseNum >= qPostBlockTotal ? 0 : dataSize1;
+            dataSize1 = i + qPostBaseNum >= qEnd ? 0 : dataSize1;
             NZVecClc(dqWorkSpaceGm, dqGm, dataSize1, actual_seq_qlen_addr, g, s1, true, 1, d, dAlign);
         }
 
@@ -1354,7 +1354,7 @@ public:
                          rope_dAlign);
                 uint64_t dataSize1 =
                     i + 2 * qRopePostBaseNum < qRopePostBlockTotal ? qRopePostBaseNum : qRopePostTailNum;
-                dataSize1 = i + qRopePostBaseNum >= qRopePostBlockTotal ? 0 : dataSize1;
+                dataSize1 = i + qRopePostBaseNum >= qRopeEnd ? 0 : dataSize1;
                 NZVecClc(dqRopeWorkSpaceGm, dqRopeGm, dataSize1, actual_seq_qlen_addr, g, s1, true, 1, rope_d,
                          rope_dAlign);
             }
@@ -1371,7 +1371,7 @@ public:
             uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
             NZVecClc(dkWorkSpaceGm, dkGm, dataSize, actual_seq_kvlen_addr, 1, s2, true, 0, d, dAlign);
             uint64_t dataSize1 = i + 2 * kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
-            dataSize1 = i + kvPostBaseNum >= kvPostBlockTotal ? 0 : dataSize1;
+            dataSize1 = i + kvPostBaseNum >= kvEnd ? 0 : dataSize1;
             NZVecClc(dkWorkSpaceGm, dkGm, dataSize1, actual_seq_kvlen_addr, 1, s2, true, 1, d, dAlign);
         }
 
@@ -1389,7 +1389,7 @@ public:
                          rope_dAlign);
                 uint64_t dataSize1 =
                     i + 2 * kRopePostBaseNum < kRopePostBlockTotal ? kRopePostBaseNum : kRopePostTailNum;
-                dataSize1 = i + kRopePostBaseNum >= kRopePostBlockTotal ? 0 : dataSize1;
+                dataSize1 = i + kRopePostBaseNum >= kRopeEnd ? 0 : dataSize1;
                 NZVecClc(dkRopeWorkSpaceGm, dkRopeGm, dataSize1, actual_seq_kvlen_addr, 1, s2, true, 1, rope_d,
                          rope_dAlign);
             }
@@ -1407,7 +1407,7 @@ public:
                 uint64_t dataSize = i + vPostBaseNum < vPostBlockTotal ? vPostBaseNum : vPostTailNum;
                 NZVecClc(dvWorkSpaceGm, dvGm, dataSize, actual_seq_kvlen_addr, 1, s2, false, 0, value_d, value_dAlign);
                 uint64_t dataSize1 = i + 2 * vPostBaseNum < vPostBlockTotal ? vPostBaseNum : vPostTailNum;
-                dataSize1 = i + vPostBaseNum >= vPostBlockTotal ? 0 : dataSize1;
+                dataSize1 = i + vPostBaseNum >= vEnd ? 0 : dataSize1;
                 NZVecClc(dvWorkSpaceGm, dvGm, dataSize1, actual_seq_kvlen_addr, 1, s2, false, 1, value_d, value_dAlign);
             }
             AscendC::PipeBarrier<PIPE_ALL>();
@@ -2051,7 +2051,7 @@ public:
             uint64_t dataSize = i + qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
             NZVecClc(dqWorkSpaceGm, dqGm, dataSize, actual_seq_qlen_addr, g, s1, true, 0, d, dAlign);
             uint64_t dataSize1 = i + 2 * qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
-            dataSize1 = i + qPostBaseNum >= qPostBlockTotal ? 0 : dataSize1;
+            dataSize1 = i + qPostBaseNum >= qEnd ? 0 : dataSize1;
             NZVecClc(dqWorkSpaceGm, dqGm, dataSize1, actual_seq_qlen_addr, g, s1, true, 1, d, dAlign);
         }
 
@@ -2070,7 +2070,7 @@ public:
                          rope_dAlign);
                 uint64_t dataSize1 =
                     i + 2 * qRopePostBaseNum < qRopePostBlockTotal ? qRopePostBaseNum : qRopePostTailNum;
-                dataSize1 = i + qRopePostBaseNum >= qRopePostBlockTotal ? 0 : dataSize1;
+                dataSize1 = i + qRopePostBaseNum >= qRopeEnd ? 0 : dataSize1;
                 NZVecClc(dqRopeWorkSpaceGm, dqRopeGm, dataSize1, actual_seq_qlen_addr, g, s1, true, 1, rope_d,
                          rope_dAlign);
             }
@@ -2087,7 +2087,7 @@ public:
             uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
             NZVecClc(dkWorkSpaceGm, dkGm, dataSize, actual_seq_kvlen_addr, 1, s2, true, 0, d, dAlign);
             uint64_t dataSize1 = i + 2 * kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
-            dataSize1 = i + kvPostBaseNum >= kvPostBlockTotal ? 0 : dataSize1;
+            dataSize1 = i + kvPostBaseNum >= kvEnd ? 0 : dataSize1;
             NZVecClc(dkWorkSpaceGm, dkGm, dataSize1, actual_seq_kvlen_addr, 1, s2, true, 1, d, dAlign);
         }
 
@@ -2105,7 +2105,7 @@ public:
                          rope_dAlign);
                 uint64_t dataSize1 =
                     i + 2 * kRopePostBaseNum < kRopePostBlockTotal ? kRopePostBaseNum : kRopePostTailNum;
-                dataSize1 = i + kRopePostBaseNum >= kRopePostBlockTotal ? 0 : dataSize1;
+                dataSize1 = i + kRopePostBaseNum >= kRopeEnd ? 0 : dataSize1;
                 NZVecClc(dkRopeWorkSpaceGm, dkRopeGm, dataSize1, actual_seq_kvlen_addr, 1, s2, true, 1, rope_d,
                          rope_dAlign);
             }
@@ -2123,7 +2123,7 @@ public:
                 uint64_t dataSize = i + vPostBaseNum < vPostBlockTotal ? vPostBaseNum : vPostTailNum;
                 NZVecClc(dvWorkSpaceGm, dvGm, dataSize, actual_seq_kvlen_addr, 1, s2, false, 0, value_d, value_dAlign);
                 uint64_t dataSize1 = i + 2 * vPostBaseNum < vPostBlockTotal ? vPostBaseNum : vPostTailNum;
-                dataSize1 = i + vPostBaseNum >= vPostBlockTotal ? 0 : dataSize1;
+                dataSize1 = i + vPostBaseNum >= vEnd ? 0 : dataSize1;
                 NZVecClc(dvWorkSpaceGm, dvGm, dataSize1, actual_seq_kvlen_addr, 1, s2, false, 1, value_d, value_dAlign);
             }
             AscendC::PipeBarrier<PIPE_ALL>();

@@ -229,6 +229,8 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
 
         int64_t outputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum;
         int64_t inputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum / BIT8;
+        // drop mask is bit-packed, the real length of the input is ceil(maskPreBlockTotal / 8) bytes
+        int64_t maskPackTotal = static_cast<int64_t>((TilingData->preTilingData.maskPreBlockTotal + BIT8 - 1) / BIT8);
 
         // process
         for (int64_t idx = 0; idx < maskUBLoop; idx++) {
@@ -240,8 +242,15 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
             }
 
             // copyIn
+            int64_t maskReadNum = static_cast<int64_t>(maskUBProcessNum / BIT8);
+            if (maskPackTotal > 0 && inputAddr + inputOffset + maskReadNum > maskPackTotal) {
+                maskReadNum = maskPackTotal - inputAddr - inputOffset;
+            }
+            if (maskReadNum <= 0) {
+                break;
+            }
             auto inputTensor = inputQue.AllocTensor<uint8_t>();
-            copyParams.blockLen = maskUBProcessNum / BIT8;
+            copyParams.blockLen = static_cast<uint32_t>(maskReadNum);
             DataCopyPad(inputTensor, drop_maskGm[inputAddr + inputOffset], copyParams, {false, 0, 0, 0});
             inputQue.EnQue(inputTensor);
             inputQue.DeQue<uint8_t>();
@@ -443,6 +452,9 @@ public:
 
             int64_t outputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum;
             int64_t inputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum / BIT8;
+            // drop mask is bit-packed, the real length of the input is ceil(maskPreBlockTotal / 8) bytes
+            int64_t maskPackTotal =
+                static_cast<int64_t>((TilingData->preTilingData.maskPreBlockTotal + BIT8 - 1) / BIT8);
 
             // process
             for (int64_t idx = 0; idx < maskUBLoop; idx++) {
@@ -454,8 +466,15 @@ public:
                 }
 
                 // copyIn
+                int64_t maskReadNum = static_cast<int64_t>(maskUBProcessNum / BIT8);
+                if (maskPackTotal > 0 && inputAddr + inputOffset + maskReadNum > maskPackTotal) {
+                    maskReadNum = maskPackTotal - inputAddr - inputOffset;
+                }
+                if (maskReadNum <= 0) {
+                    break;
+                }
                 auto inputTensor = inputQue.AllocTensor<uint8_t>();
-                copyParams.blockLen = maskUBProcessNum / BIT8;
+                copyParams.blockLen = static_cast<uint32_t>(maskReadNum);
                 DataCopyPad(inputTensor, drop_maskGm[inputAddr + inputOffset], copyParams, {false, 0, 0, 0});
                 inputQue.EnQue(inputTensor);
                 inputQue.DeQue<uint8_t>();
@@ -715,6 +734,9 @@ public:
 
             int64_t outputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum;
             int64_t inputAddr = cBlockIdx * TilingData->preTilingData.maskSingleCoreNum / BIT8;
+            // drop mask is bit-packed, the real length of the input is ceil(maskPreBlockTotal / 8) bytes
+            int64_t maskPackTotal =
+                static_cast<int64_t>((TilingData->preTilingData.maskPreBlockTotal + BIT8 - 1) / BIT8);
 
             // process
             for (int64_t idx = 0; idx < maskUBLoop; idx++) {
@@ -726,8 +748,15 @@ public:
                 }
 
                 // copyIn
+                int64_t maskReadNum = static_cast<int64_t>(maskUBProcessNum / BIT8);
+                if (maskPackTotal > 0 && inputAddr + inputOffset + maskReadNum > maskPackTotal) {
+                    maskReadNum = maskPackTotal - inputAddr - inputOffset;
+                }
+                if (maskReadNum <= 0) {
+                    break;
+                }
                 auto inputTensor = inputQue.AllocTensor<uint8_t>();
-                copyParams.blockLen = maskUBProcessNum / BIT8;
+                copyParams.blockLen = static_cast<uint32_t>(maskReadNum);
                 DataCopyPad(inputTensor, drop_maskGm[inputAddr + inputOffset], copyParams, {false, 0, 0, 0});
                 inputQue.EnQue(inputTensor);
                 inputQue.DeQue<uint8_t>();
