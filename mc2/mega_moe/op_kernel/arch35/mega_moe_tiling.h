@@ -232,5 +232,8 @@ struct MegaMoeTilingData {
     // 判断统一用 IsDispatchDedupOn/IsCombineDedupOn（mega_moe_peermem.h）。
     // 0 时所有路径与无该字段时逐字等价；dispatch 去重数值恒等，combine 去重为生产卡预加权合并。
     int32_t dedupMode;
+    // 预量化输入搬运 tile 配置。动态量化路径保持旧的 scratch 布局，这两个字段为 0。
+    uint32_t preQuantTileTokens;
+    uint32_t preQuantStageBytes;
 };
 #endif
