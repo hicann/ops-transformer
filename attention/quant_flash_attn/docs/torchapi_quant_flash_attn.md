@@ -47,7 +47,7 @@
   - MxFP8场景：Q/K/V 均采用 MXFP8 量化。
   - FP8场景：Q/K 采用 FP8_E4M3 per-token-head 量化，V 采用 FP8_E4M3 per-head 量化。
 
-  `quant_flash_attn_metadata`是`quant_flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AICore/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
+  `quant_flash_attn_metadata`是`quant_flash_attn`的元数据生成接口，用于在主算子执行前生成metadata。metadata记录AI Core/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
 
   1. 准备`q`、`k`、`v`等输入。
   2. 调用`quant_flash_attn_metadata`生成`metadata`。

@@ -413,7 +413,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
     <tr>
         <td>keyAntiquantOffsetOptional</td>
         <td>可选输入</td>
-        <td>表示对key进行反量化的偏移，配置此项为非对称量化，反之为非对称量化</td>
+        <td>表示对key进行反量化的偏移，配置此项为非对称量化，反之为对称量化</td>
         <td>
         <ul>
             <li>不支持空Tensor。</li>
@@ -445,7 +445,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
     <tr>
         <td>valueAntiquantOffsetOptional</td>
         <td>可选输入</td>
-        <td>表示对value进行反量化的偏移，配置此项为非对称量化，反之为非对称量化</td>
+        <td>表示对value进行反量化的偏移，配置此项为非对称量化，反之为对称量化</td>
         <td>
         <ul>
             <li>不支持空Tensor。</li>
@@ -2146,7 +2146,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             <tr>
                 <td rowspan="2">kv左padding场景</td>
                 <td>attenMaskOptional</td>
-                <td>kv左padding场景与attenMaskOptional参数一起开启时，需要保证attenMaskOptional含义正确，即能够正确的对无效数据进行隐藏。否则将引入精度问题。</td>
+                <td>kv左padding场景与attenMaskOptional参数一起开启时，需要保证attenMaskOptional含义正确，即能够正确地对无效数据进行隐藏。否则将引入精度问题。</td>
             </tr>
             <tr>
                 <td colspan="2">kv左padding场景不支持PagedAttention、tensorlist，否则默认为kv右padding场景。</td>

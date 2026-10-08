@@ -33,7 +33,7 @@
 
   输出metadata tensor的shape为(1024,)，数据类型为INT32，内部结构如下：
 
-  - FA Metadata区域（AIC_CORE_NUM × 9个INT32），每个AICore的FA阶段任务信息：
+  - FA Metadata区域（AIC_CORE_NUM × 9个INT32），每个AI Core的FA阶段任务信息：
 
     | 索引 | 含义 |
     | :--- | :--- |

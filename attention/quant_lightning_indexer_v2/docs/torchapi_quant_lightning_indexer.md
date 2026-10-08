@@ -25,7 +25,7 @@
 
 - **接口功能**：
 
-  `quant_lightning_indexer_metadata`接口用于生成一个任务列表，包含每个AIcore的Attention计算任务的起止点的batch、head、以及Q和K的分块的索引，供后续`quant_lightning_indexer`算子使用。
+  `quant_lightning_indexer_metadata`接口用于生成一个任务列表，包含每个AI Core的Attention计算任务的起止点的batch、head、以及Q和K的分块的索引，供后续`quant_lightning_indexer`算子使用。
 
   `quant_lightning_indexer`接口基于一系列操作得到每一个token对应的top-k个位置。主要计算过程为：
 
@@ -153,7 +153,7 @@ cann_ops_transformer.quant_lightning_indexer(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
-| metadata | Tensor | 必选 | 每个AIcore的Attention计算任务的batch、head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。 | int32 | (1024, )  |
+| metadata | Tensor | 必选 | 每个AI Core的Attention计算任务的batch、head、以及Q和K的分块的索引。数据格式为ND，不支持非连续的Tensor。 | int32 | (1024, )  |
 
 ### quant_lightning_indexer
 

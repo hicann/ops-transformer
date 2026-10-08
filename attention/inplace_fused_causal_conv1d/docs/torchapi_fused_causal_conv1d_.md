@@ -193,7 +193,7 @@ cann_ops_transformer.fused_causal_conv1d_(
 | cache_indices | Tensor | 可选 | 缓存索引，指定每个序列对应的缓存状态在conv_states中的索引。默认None使用恒等映射。 | int32 | [batch] |
 | initial_state_mode | Tensor | 可选 | 初始状态标志。1=使用缓存历史，0=零初始化（冷启动）。默认None全部零初始化。 | int32 | [batch] |
 | bias | Tensor | 必选 | 卷积偏置，None表示不使用。 | 同x | [dim] |
-| num_accepted_tokens | Tensor | 可选 | 当前batch的随机投机数。 | int32 | [batch] |
+| num_accepted_tokens | Tensor | 可选 | 当前batch的投机数。 | int32 | [batch] |
 | num_computed_tokens | Tensor | 可选 | 当前batch已经处理的token总数，用于判断初始状态。 | int32 | [batch] |
 | block_idx_first_scheduled_token | Tensor | 可选 | 当前batch的起始位置对应的block索引。 | int32 | [batch] |
 | block_idx_last_scheduled_token | Tensor | 可选 | 当前batch的seq_len - 1处对应的block索引。 | int32 | [batch] |
@@ -202,7 +202,7 @@ cann_ops_transformer.fused_causal_conv1d_(
 | pad_slot_id | int | 可选 | padding slot id。默认值为-1。 | - | - |
 | max_query_len | int | 可选 | 所有batch中最大的seq_len，仅decode场景（固定batch）支持为-1。 | - | - |
 | residual_connection | int | 可选 | 是否做残差连接，1=做残差连接，0=不做残差连接。 | - | - |
-| block_size | int | 可选 | block块的大小。取值范围大于等于2，典型值128、256。 | - | - |
+| block_size | int | 可选 | block的大小。取值范围大于等于2，典型值128、256。 | - | - |
 | conv_mode | int | 可选 | 卷积模式，支持0和1，0=Qwen3-Next社区版本实现，1=Pangu V2实现。 | - | - |
 | max_draft_tokens | int | 可选 | 最大投机个数，支持范围[0, 16]。默认值为7。 | - | - |
 

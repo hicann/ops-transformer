@@ -26,7 +26,7 @@
 - **接口功能**:
 
   `quant_flash_attn_grad`是基于`torch_npu`的`cann_ops_transformer`扩展接口，用于调用`QuantFlashAttnGrad`算子完成HIFLOAT8量化场景下的注意力反向梯度计算。该接口为`quant_flash_attn`正向算子的配套反向接口，用于计算Query、Key、Value的梯度（dq、dk、dv）以及sink梯度（dsink）。当前支持HIFLOAT8量化数据类型，支持BSND、BNSD两种数据排布格式。
-   `quant_flash_attn_grad`的元数据生成接口复用`quant_flash_attn_metadata`，用于在主算子执行前生成metadata。metadata记录AICore/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
+   `quant_flash_attn_grad`的元数据生成接口复用`quant_flash_attn_metadata`，用于在主算子执行前生成metadata。metadata记录AI Core/AIVCore的任务切分结果，主算子可选择传入该metadata以优化调度。典型调用流程如下：
 
   1. 准备`q`、`k`、`v`等输入。
   2. 调用`quant_flash_attn_metadata`生成`metadata`。

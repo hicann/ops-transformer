@@ -410,7 +410,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
     <tr>
       <td>numAcceptedTokens（aclTensor*）</td>
       <td>可选输入</td>
-      <td>公式中的numAcceptedTokens，表示每个batch的随机投机数。</td>
+      <td>公式中的numAcceptedTokens，表示每个batch的投机数。</td>
       <td><ul><li>prefile对应的元素值为0, decode时，1<=numAcceptedTokens中的值<=seqlen -1，seqlen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
@@ -511,7 +511,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
       <td>blockSize（int64_t）</td>
       <td>属性</td>
       <td>block的大小。</td>
-      <td><ul><li>>取值范围大于等于2或等于0（非APC场景可传0），典型值128/256。</li></ul></td>
+      <td><ul><li>取值范围大于等于2或等于0（非APC场景可传0），典型值128/256。</li></ul></td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>

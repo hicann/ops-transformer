@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 算子功能：该算子为AICPU算子，是aclnnDenseLightningIndexerSoftmaxLseV2算子的前置算子。根据aclnnDenseLightningIndexerSoftmaxLseV2算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata。输出结果可作为aclnnDenseLightningIndexerSoftmaxLseV2算子的metadataOptional输入，减少主算子tiling阶段对host array的访问。
+- 算子功能：该算子为AI CPU算子，是aclnnDenseLightningIndexerSoftmaxLseV2算子的前置算子。根据aclnnDenseLightningIndexerSoftmaxLseV2算子的输入shape、layout、mask和压缩比例信息，计算并输出分核切分metadata。输出结果可作为aclnnDenseLightningIndexerSoftmaxLseV2算子的metadataOptional输入，减少主算子tiling阶段对host array的访问。
 
   **该算子不建议单独使用，建议与aclnnDenseLightningIndexerSoftmaxLseV2算子配合使用，形成完整的工作流。**
     1. 接收主算子的shape信息，包括batchSize、maxSeqLenQ、maxSeqLenK、numHeadsQ、numHeadsK、headDim、layout和mask信息。

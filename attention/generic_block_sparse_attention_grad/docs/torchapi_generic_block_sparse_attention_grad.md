@@ -44,7 +44,7 @@
 
   `generic_block_sparse_attention_grad`是基于`TorchNPU`的`cann_ops_transformer`扩展接口，用于调用`GenericBlockSparseAttentionGrad`算子完成通用块稀疏注意力的反向梯度计算。通过`sparse_block_idx`指定每个KV块选择的Q块/token索引，`sparse_block_count`指定每个KV块实际保留的Q数量，仅在被选中的稀疏块上计算并回传`dq`/`dk`/`dv`。
 
-  `generic_block_sparse_attention_grad_metadata`是`generic_block_sparse_attention_grad`的元数据生成接口，用于在主算子执行前生成`metadata`。`metadata`记录AICore任务切分与负载均衡结果，主算子须传入该`metadata`以优化调度。典型调用流程如下：
+  `generic_block_sparse_attention_grad_metadata`是`generic_block_sparse_attention_grad`的元数据生成接口，用于在主算子执行前生成`metadata`。`metadata`记录AI Core任务切分与负载均衡结果，主算子须传入该`metadata`以优化调度。典型调用流程如下：
 
   1. 准备`q`、`k`、`v`、`dout`、`attn_out`、`softmax_lse`、`sparse_block_idx`、`sparse_block_count`、`cu_seqlens_q`、`cu_seqlens_kv`等输入。
   2. 调用`generic_block_sparse_attention_grad_metadata`生成`metadata`。

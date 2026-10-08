@@ -348,7 +348,7 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV5(
         <td>sparseMode</td>
         <td>可选输入</td>
         <td>表示sparse的模式。</td>
-        <td>支持配置值为支持配置0~8，不支持5。传入rope时，不支持6。</td>
+        <td>支持配置值为0~8，不支持5。传入rope时，不支持6。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>

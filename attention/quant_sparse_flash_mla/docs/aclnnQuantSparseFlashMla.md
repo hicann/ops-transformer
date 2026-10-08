@@ -400,7 +400,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>cmpTopkLengthOptional（aclTensor*）</td>
       <td>输入</td>
       <td>用于标识cmpSparseIndicesOptional实际参与计算的长度。</td>
-      <td>cmpMaskMode=0且传入cmpSparseIndicesOptional时必传传；其他场景不支持传入。</td>
+      <td>cmpMaskMode=0且传入cmpSparseIndicesOptional时必传；其他场景不支持传入。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>

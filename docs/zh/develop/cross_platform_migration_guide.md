@@ -368,7 +368,7 @@ __aicore__ inline void CrossCoreWaitFlag(uint16_t flagId);
 
 #### 核间同步信号量匹配
 
-`CrossCoreSetFlag`和`CrossCoreWaitFlag`是核间同步信号量接口，广泛用于多核间的数据依赖与协同控制。本质上以“信号量”的方式实现不同AICore之间的数据处理阶段解耦与有序推进，常用于流水线控制、双缓冲切换、跨核协作等场景。
+`CrossCoreSetFlag`和`CrossCoreWaitFlag`是核间同步信号量接口，广泛用于多核间的数据依赖与协同控制。本质上以“信号量”的方式实现不同AI Core之间的数据处理阶段解耦与有序推进，常用于流水线控制、双缓冲切换、跨核协作等场景。
 
 - `CrossCoreSetFlag`：当前核（或线程）在完成某个阶段的数据处理后，主动设置指定的flag信号，告知依赖方（一般是其它核或下游流水线阶段）本阶段已完成，可以继续执行后续流程。
 - `CrossCoreWaitFlag`：当前核（或线程）需等待某个flag信号被设置（即依赖的数据或事件完成），检测flag后才会继续向下执行。

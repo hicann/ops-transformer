@@ -413,7 +413,7 @@ aclnnStatus aclnnFusedCausalConv1dV2(
     <tr>
       <td>numAcceptedTokensOptional（aclTensor*）</td>
       <td>输入</td>
-      <td>公式中的numAcceptedTokens，表示每个batch的随机投机数。</td>
+      <td>公式中的numAcceptedTokens，表示每个batch的投机个数。</td>
       <td><ul><li>prefile对应的元素值为0, decode时，1<=numAcceptedTokens中的值<=seqlen -1，seqlen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>

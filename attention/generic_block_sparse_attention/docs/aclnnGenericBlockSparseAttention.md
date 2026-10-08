@@ -867,7 +867,7 @@ key、value的shape由layoutKv及是否使能Paged Cache决定，见<a href="#pa
       <td rowspan="2">FLOAT8_E4M3</td>
       <td rowspan="4">对称</td>
       <td>静态</td>
-      <td>perGroup，QKV均沿S维度分组，group大小和稀疏块尺寸必须相同；<br>特别的，当KV为paged cache时，blockSize需要为blockShapeY的整数倍</td>
+      <td>perGroup，QKV均沿S维度分组，group大小和稀疏块尺寸必须相同；<br>特别地，当KV为paged cache时，blockSize需要为blockShapeY的整数倍</td>
       <td>
         qDequantScaleOptional(必选)：
         <ul>
@@ -902,7 +902,7 @@ key、value的shape由layoutKv及是否使能Paged Cache决定，见<a href="#pa
     <tr>
       <td>2</td>
       <td>动态</td>
-      <td rowspan="3">micro scaling，QKV沿着矩阵乘累加轴，按固定大小32进行分组；<br>特别的，当KV为paged cache时，blockSize需要为64的整数倍</td>
+      <td rowspan="3">micro scaling，QKV沿着矩阵乘累加轴，按固定大小32进行分组；<br>特别地，当KV为paged cache时，blockSize需要为64的整数倍</td>
       <td rowspan="3">
         qDequantScaleOptional(必选)：
         <ul>

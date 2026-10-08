@@ -59,7 +59,7 @@ Metadata 算子是与主算子配套的 AICPU 前置算子（命名以 `_metadat
 典型调用流程为两段式，Metadata 算子先行执行生成分核方案，主算子随后消费 metadata 执行注意力计算：
 
 ```
-步骤1: 调用 Metadata 算子 (AICPU)          步骤2: 调用主算子 (AICore)
+步骤1: 调用 Metadata 算子 (AICPU)          步骤2: 调用主算子 (AI Core)
 
   输入: 序列元信息                            输入: Q, K, V + metadata
   (cu_seqlens, seqused, ...)                        |
@@ -96,7 +96,7 @@ Metadata 算子是与主算子配套的 AICPU 前置算子（命名以 `_metadat
 
 Metadata 算子的输出 tensor 直接作为主算子的输入 tensor（`metadataOptional` 参数），是 device 侧的运行时数据依赖，而非 host 侧属性依赖。主算子 tiling 阶段读取 metadata tensor 填充分核结构，kernel 阶段按分核结果执行计算。两者分工如下：
 
-| 维度 | Metadata 算子（AICPU） | 主算子（AICore） |
+| 维度 | Metadata 算子（AICPU） | 主算子（AI Core） |
 | :--- | :--- | :--- |
 | 执行位置 | Device 侧 AI CPU | Device 侧 AI Core / Vector |
 | 功能 | 负载均衡分核、任务划分 | Attention 数值计算 |

@@ -1300,7 +1300,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
 | :---------: | :---------------------------------------------------------: |
 |     GQA     |           在资料约束中，泛指不传入ROPE的所有场景，包含G=1和G>1的场景           |
 | Prefill MLA | 传入ROPE（包含合并和分离2种模式，headdim为64）：分离模式下，输入Q/K/V headdim为128，ROPE单独传入；合并模式下，输入Q/K headdim为192（与ROPE合并），V headdim为128，ROPE不单独传入 |
-| Decode MLA |             输入Q/K/V headdim为512，key/value复用，其中value的不生效，且ROPE单独传入             |
+| Decode MLA |             输入Q/K/V headdim为512，key/value复用，其中value不生效，且ROPE单独传入             |
 | GQA全量化 | query/key/value数据类型为FLOAT8_E4M3FN的GQA全量化场景，queryQuantMode为3（per-token叠加per-head模式），keyAntiquantMode为3（per-token叠加per-head模式），valueAntiquantMode为2（per-tensor叠加per-head模式） |
 |      B      |                Batch,表示输入样本批量大小                |
 |     Q_N     |        输入query tensor的头数，对应query shape中的N        |
@@ -1385,7 +1385,7 @@ FusedInferAttentionScore算子约束分为4个档位，按约束复杂程度递�
             </tr>
             <tr>
                 <td>query,attentionOut的tensor的shapeSize为0</td>
-                <td>attentionOut为返回空tensor</td>
+                <td>attentionOut返回空tensor</td>
             </tr>
             <tr>
                 <td>query,attentionOut的tensor的shapeSize不为0,且key,value的tensor的shapeSize为0</td>

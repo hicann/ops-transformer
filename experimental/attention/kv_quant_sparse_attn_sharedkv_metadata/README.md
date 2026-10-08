@@ -43,7 +43,7 @@
 |has_ori_kv|可选属性|用于标识是否含有ori_kv，默认值为true。|BOOL|-|
 |has_cmp_kv|可选属性|用于标识是否含有cmp_kv，默认值为true。|BOOL|-|
 |device|可选属性|用于获取设备信息，默认值为None。|STRING|-|
-|metadata|输出|包含每个AIcore的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引的列表，shape固定为1024。|INT32|-|
+|metadata|输出|包含每个AI Core的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引的列表，shape固定为1024。|INT32|-|
 
 ## 约束说明
 

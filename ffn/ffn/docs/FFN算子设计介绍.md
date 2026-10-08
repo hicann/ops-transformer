@@ -66,14 +66,14 @@ FFN算子核心计算过程如上图所示，计算主要由matmul1 -> 激活函
 
 为直观体现tiling计算的核心思路，以具体平台参数和典型输入shape为例：
 
-* 以如下硬件信息为例：20个AICore，L0A/L0B buffer大小为64kb，L0C buffer大小为128kb；
+* 以如下硬件信息为例：20个AI Core，L0A/L0B buffer大小为64kb，L0C buffer大小为128kb；
 * x/weight数据类型为float16，x[128, 5120]，weight1[8, 5120, 2560]，weight2[8, 2560, 5120]，取expert_token=[16, 16, 16, 16, 16, 16, 16, 16]。此时需要循环8个专家，每个循环需要计算matmul1：A[16, 5120] \* B[5120, 2560]，激活函数：[16, 2560]，matmul2：A[16, 2560] \* B[2560, 5120]。
 
 FFN算子的计算过程主要为matmul1 + 激活函数 + matmul2，因此tiling参数也分为这3个部分，其中matmul计算是调用高阶api完成，对应的tiling参数主体也由对应的接口完成，FFN会根据实际算子优化效果对部分参数进行调整。
 
 ## 3.1 matmul tiling
 
-matmul tiling分为两个部分，分核和单核内的切分，这两部分相互耦合，一般是优先考虑单核内的切分，再考虑分核。为了更高性能，AICore的一般切分计算原则是尽可能将L0(L0A/L0B/L0C) buffer用满，以减少指令数量和指令头尾开销（特殊shape另做分析）。
+matmul tiling分为两个部分，分核和单核内的切分，这两部分相互耦合，一般是优先考虑单核内的切分，再考虑分核。为了更高性能，AI Core的一般切分计算原则是尽可能将L0(L0A/L0B/L0C) buffer用满，以减少指令数量和指令头尾开销（特殊shape另做分析）。
 
 * 单核切分
 
@@ -109,7 +109,7 @@ matmul tiling分为两个部分，分核和单核内的切分，这两部分相�
   <img src="../../../docs/zh/figures/ffn_expert_parallel_diagram.png" alt="FFN专家并行示意图" style="zoom:67%;" />
 
   1. 当某一个专家对应的matmul不够分满AiCore核时，空闲的那部分核用来计算第二组专家，此时workspace中同时存在两个专家的中间结果。
-  2. matmul2的n足够分慢AICore核，因此采用串行的方式计算（不采用并行是考虑到m和n分核更容易造成算力分配不均从而影响性能，如下文混合并行中所述）；
+  2. matmul2的n足够分慢AI Core核，因此采用串行的方式计算（不采用并行是考虑到m和n分核更容易造成算力分配不均从而影响性能，如下文混合并行中所述）；
 
 * 混合并行
 

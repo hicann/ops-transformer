@@ -42,7 +42,7 @@
    y_{t,:}=\operatorname{Softmax}(I_{t,:})
    $$
 
-   本接口将$y$写出到softmaxOut。目标分布$p$由attnSoftmaxL1Norm输入提供，等价于旧版kernel内部由main attention score经head求和和L1归一化得到的结果。若后续继续计算KL Loss，其形式与旧版保持一致：
+   本接口将$y$写出到softmaxOut。目标分布$p$由attnSoftmaxL1Norm输入提供，等价于旧版kernel内部由main attention score经head求和L1归一化得到的结果。若后续继续计算KL Loss，其形式与旧版保持一致：
 
    $$
    L(I){=}\sum_tD_{KL}(p_{t,:}||\operatorname{Softmax}(I_{t,:}))

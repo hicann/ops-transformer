@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-- 算子功能：`SparseFlashMlaGradMetadata`算子旨在生成一个任务列表，包含每个AIcore的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引，供后续`SparseFlashMlaGrad`算子使用。
+- 算子功能：`SparseFlashMlaGradMetadata`算子旨在生成一个任务列表，包含每个AI Core的Attention计算任务的起止点的Batch、Head、以及Q和K的分块的索引，供后续`SparseFlashMlaGrad`算子使用。
 
 ## 参数说明
 

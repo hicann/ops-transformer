@@ -700,7 +700,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV2(
   - aclnnFusedInferAttentionScoreV2默认确定性实现。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 
-- 入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空tensor（即S2为0），则attentionOut填充为全零。attentionOut为空Tensor时，AscendCLNN框架会处理。其余在上述参数说明中标注了“可传入nullptr”的入参为空指针时，不进行处理。
+- 入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空tensor（即S2为0），则attentionOut填充为全零。attentionOut为空Tensor时，AscendCL框架会处理。其余在上述参数说明中标注了“可传入nullptr”的入参为空指针时，不进行处理。
 
 - 参数key、value中对应tensor的shape需要完全一致；非连续场景下key、value的tensorlist中的batch只能为1，个数等于query的B，N和D需要相等。由于tensorlist限制，非连续场景下B不能大于256。
 
@@ -1266,7 +1266,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV2(
     - kvPaddingSize小于0时将被置为0。
     - 需要与actualSeqLengthsKv参数一起开启，否则默认为kv右padding场景。
     - 不支持PageAttention、tensorlist，否则默认为kv右padding场景。
-    - 与attenMask参数一起开启时，需要保证attenMask含义正确，即能够正确的对无效数据进行隐藏。否则将引入精度问题。
+    - 与attenMask参数一起开启时，需要保证attenMask含义正确，即能够正确地对无效数据进行隐藏。否则将引入精度问题。
   - pseShift功能使用限制如下：
     - pseShift数据类型需与query数据类型保持一致。
   - kv伪量化参数分离：

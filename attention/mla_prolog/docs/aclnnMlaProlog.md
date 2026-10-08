@@ -561,12 +561,12 @@ aclnnStatus aclnnMlaProlog(
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
           <td>361001</td>
-          <td>API内存调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
+          <td>API调用NPU Runtime接口时发生异常（如Runtime服务未启动、内存申请失败等）。</td>
         </tr>
         <tr>
           <td>ACLNN_ERR_INNER_TILING_ERROR</td>
           <td>561002</td>
-          <td>tiling发生异常，入参的dtype类型或者shape错误。</td>
+          <td>tiling发生异常，入参的dtype或者shape错误。</td>
         </tr>
       </tbody>
     </table>

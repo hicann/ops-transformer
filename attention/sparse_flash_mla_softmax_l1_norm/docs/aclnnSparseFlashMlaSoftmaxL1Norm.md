@@ -483,7 +483,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
         <tr>
             <td>S1、S2</td>
             <td>支持泛化</td>
-            <td>支持S1、S2支持不等长</td>
+            <td>支持S1、S2不等长</td>
         </tr>
         <tr>
             <td>N1</td>

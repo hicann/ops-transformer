@@ -417,7 +417,7 @@ aclnnStatus aclnnNsaSelectedAttentionInfer(
         <tr>
           <td>workspace</td>
           <td>输入</td>
-          <td>在DevicenumHeads申请的workspace内存地址。</td>
+          <td>在Device侧申请的workspace内存地址。</td>
         </tr>
         <tr>
           <td>workspaceSize</td>
