@@ -69,26 +69,24 @@ private:
     static constexpr int32_t UB_SIZE = 247 * 1024;
     static constexpr int32_t L1_SIZE = 512 * 1024;
 
-    __aicore__ inline void ProcessPreloadVec(VecOp<GSAG_TYPE> &vecOp, uint32_t currIdx, uint32_t loopTaskId)
+    __aicore__ inline void ProcessPreloadVec(VecOp<GSAG_TYPE>& vecOp, uint32_t currIdx, uint32_t loopTaskId)
     {
         (void)vecOp;
-        const RunTimeInfo &curr = runTimeInfo_[currIdx];
+        const RunTimeInfo& curr = runTimeInfo_[currIdx];
         if (!curr.need_compute) {
             return;
         }
-        const int32_t aivHalfIdx = static_cast<int32_t>(GetSubBlockIdx());
         if (loopTaskId > 0) {
             CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE_2, PIPE_MTE3>(FLAG_C_GATHER_ARM);
         }
         CopyQAndDoutToL1(curr, currIdx);
         const uint32_t gatherFlagBase = currIdx == 0 ? FLAG_V_GATHER_C_PING : FLAG_V_GATHER_C_PONG;
-        const uint32_t gatherFlag = gatherFlagBase + static_cast<uint32_t>(aivHalfIdx) * AIV0_AIV1_FLAG_OFFSET;
-        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(gatherFlag);
+        CrossCoreSetFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(gatherFlagBase);
     }
 
-    __aicore__ inline void ProcessNotFirstVec(VecOp<GSAG_TYPE> &vecOp, uint32_t lastIdx)
+    __aicore__ inline void ProcessNotFirstVec(VecOp<GSAG_TYPE>& vecOp, uint32_t lastIdx)
     {
-        const RunTimeInfo &last = runTimeInfo_[lastIdx];
+        const RunTimeInfo& last = runTimeInfo_[lastIdx];
         if (!last.need_compute) {
             return;
         }
@@ -107,22 +105,20 @@ private:
         CrossCoreSetFlag<CROSS_CORE_SYNC_MODE_2, PIPE_MTE3>(FLAG_V2_C45);
     }
 
-    __aicore__ inline void ScatterLastVec(VecOp<GSAG_TYPE> &vecOp, uint32_t lastIdx, TBuf<TPosition::VECCALC> &ubBuffer)
+    __aicore__ inline void ScatterLastVec(VecOp<GSAG_TYPE>& vecOp, uint32_t lastIdx, TBuf<TPosition::VECCALC>& ubBuffer)
     {
-        const RunTimeInfo &last = runTimeInfo_[lastIdx];
+        const RunTimeInfo& last = runTimeInfo_[lastIdx];
         if (!last.need_compute) {
             return;
         }
-        const uint32_t mm345DoneFlag =
-            FLAG_C_MM345_DONE + static_cast<uint32_t>(GetSubBlockIdx()) * AIV0_AIV1_FLAG_OFFSET;
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(mm345DoneFlag);
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_MTE3>(FLAG_C_MM345_DONE);
         vecOp.ScatterDqSel(last, ubBuffer, lastIdx);
     }
 
-    __aicore__ inline void ProcessPreloadCube(CubeOp<GSAG_TYPE> &cubeOp, GM_ADDR query, GM_ADDR key, GM_ADDR value,
+    __aicore__ inline void ProcessPreloadCube(CubeOp<GSAG_TYPE>& cubeOp, GM_ADDR query, GM_ADDR key, GM_ADDR value,
                                               GM_ADDR dout, uint32_t currIdx, uint32_t loopTaskId)
     {
-        const RunTimeInfo &curr = runTimeInfo_[currIdx];
+        const RunTimeInfo& curr = runTimeInfo_[currIdx];
         if (!curr.need_compute) {
             return;
         }
@@ -145,9 +141,9 @@ private:
         (void)dout;
     }
 
-    __aicore__ inline void ProcessNotFirstCube(CubeOp<GSAG_TYPE> &cubeOp, uint32_t lastIdx)
+    __aicore__ inline void ProcessNotFirstCube(CubeOp<GSAG_TYPE>& cubeOp, uint32_t lastIdx)
     {
-        const RunTimeInfo &last = runTimeInfo_[lastIdx];
+        const RunTimeInfo& last = runTimeInfo_[lastIdx];
         if (!last.need_compute) {
             return;
         }
@@ -172,33 +168,33 @@ public:
                                    GM_ADDR softmaxLse, GM_ADDR sparseBlockIdx, GM_ADDR sparseBlockCount,
                                    GM_ADDR metadata, GM_ADDR attenMask, GM_ADDR cuSeqLengthsQ, GM_ADDR cuSeqLengthsKv,
                                    GM_ADDR sequsedQ, GM_ADDR sequsedKv, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-                                   GM_ADDR workspace, const TILING_CLASS *tilingData, TPipe *tPipe)
+                                   GM_ADDR workspace, const TILING_CLASS* tilingData, TPipe* tPipe)
     {
         uint32_t base_m = tilingData->baseM;
         uint32_t base_n = tilingData->baseN;
         uint32_t vec_base_m = base_m / 2;
         uint32_t vec_base_n = base_n;
 
-        query_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)query, tilingData->dqSize);
-        key_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)key, tilingData->dkSize);
-        val_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)value, tilingData->dkSize);
-        dout_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)dout, tilingData->dqSize);
-        attention_out_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)attention_out, tilingData->dqSize);
-        dq_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)dq, tilingData->dqSize);
-        dk_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)dk, tilingData->dkSize);
-        dv_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE *)dv, tilingData->dkSize);
-        dq_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->dqWorkspaceOffset), tilingData->dqSize);
-        dk_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->dkWorkspaceOffset), tilingData->dkSize);
-        dv_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->dvWorkspaceOffset), tilingData->dkSize);
+        query_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)query, tilingData->dqSize);
+        key_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)key, tilingData->dkSize);
+        val_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)value, tilingData->dkSize);
+        dout_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)dout, tilingData->dqSize);
+        attention_out_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)attention_out, tilingData->dqSize);
+        dq_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)dq, tilingData->dqSize);
+        dk_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)dk, tilingData->dkSize);
+        dv_gm_.SetGlobalBuffer((__gm__ INPUT_TYPE*)dv, tilingData->dkSize);
+        dq_workspace_.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->dqWorkspaceOffset), tilingData->dqSize);
+        dk_workspace_.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->dkWorkspaceOffset), tilingData->dkSize);
+        dv_workspace_.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->dvWorkspaceOffset), tilingData->dkSize);
         const int64_t lseElems =
             (INPUT_LAYOUT == TND) ?
                 static_cast<int64_t>(tilingData->qSeqLen) * tilingData->qHeadNum :
                 static_cast<int64_t>(tilingData->batchNum) * tilingData->qHeadNum * tilingData->qSeqLen;
         const int64_t sftgElems = ((lseElems * 8) + 255) / 256 * 256;
-        sftg_workspace_.SetGlobalBuffer((__gm__ float *)(workspace + tilingData->sftgWorkspaceOffset), sftgElems);
+        sftg_workspace_.SetGlobalBuffer((__gm__ float*)(workspace + tilingData->sftgWorkspaceOffset), sftgElems);
         const int64_t sparseIdxElems =
             static_cast<int64_t>(tilingData->batchNum) * tilingData->kvHeadNum * tilingData->numJ * tilingData->maxS1;
-        sparse_idx_gm_.SetGlobalBuffer((__gm__ int32_t *)sparseBlockIdx, sparseIdxElems);
+        sparse_idx_gm_.SetGlobalBuffer((__gm__ int32_t*)sparseBlockIdx, sparseIdxElems);
         q_head_num_ = static_cast<int32_t>(tilingData->qHeadNum);
         head_dim_ = static_cast<int32_t>(tilingData->headDim);
         vec_ub_matrix_elements_ = vec_base_m * vec_base_n;
@@ -263,7 +259,7 @@ public:
         }
     }
 
-    __aicore__ inline int64_t GetSparseTokenGmOffset(const RunTimeInfo &runTimeInfo, const int32_t qTok) const
+    __aicore__ inline int64_t GetSparseTokenGmOffset(const RunTimeInfo& runTimeInfo, const int32_t qTok) const
     {
         if constexpr (INPUT_LAYOUT == TND) {
             return (static_cast<int64_t>(runTimeInfo.last_q_seq_sum) + qTok) * q_head_num_ * head_dim_ +
@@ -279,7 +275,7 @@ public:
         }
     }
 
-    __aicore__ inline void CopyQAndDoutToL1(const RunTimeInfo &runTimeInfo, const uint32_t pingPongIdx)
+    __aicore__ inline void CopyQAndDoutToL1(const RunTimeInfo& runTimeInfo, const uint32_t pingPongIdx)
     {
         const int32_t m = static_cast<int32_t>(runTimeInfo.s1Len);
         const int32_t mAlign = static_cast<int32_t>(runTimeInfo.s1LenAlign);
@@ -357,7 +353,7 @@ public:
                                        GM_ADDR softmaxLse, GM_ADDR sparseBlockIdx, GM_ADDR sparseBlockCount,
                                        GM_ADDR metadata, GM_ADDR cuSeqLengthsQ, GM_ADDR cuSeqLengthsKv,
                                        GM_ADDR sequsedQ, GM_ADDR sequsedKv, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-                                       GM_ADDR workspace, const TILING_CLASS *tilingData, TPipe *tPipe)
+                                       GM_ADDR workspace, const TILING_CLASS* tilingData, TPipe* tPipe)
     {
         CubeOp<GSAG_TYPE> cubeOp;
         cubeOp.Init(tilingData, tPipe, l1_buffer_, l1_offset_, query_l1_tensor_ping_, query_l1_tensor_pong_,
@@ -410,7 +406,7 @@ public:
                                          GM_ADDR softmaxLse, GM_ADDR sparseBlockIdx, GM_ADDR sparseBlockCount,
                                          GM_ADDR metadata, GM_ADDR cuSeqLengthsQ, GM_ADDR cuSeqLengthsKv,
                                          GM_ADDR sequsedQ, GM_ADDR sequsedKv, GM_ADDR dq, GM_ADDR dk, GM_ADDR dv,
-                                         GM_ADDR workspace, const TILING_CLASS *tilingData, TPipe *tPipe)
+                                         GM_ADDR workspace, const TILING_CLASS* tilingData, TPipe* tPipe)
     {
         VecOp<GSAG_TYPE> vecOp;
         vecOp.Init(softmaxLse, sparseBlockIdx, cuSeqLengthsQ, workspace, tilingData, ub_buffer_, ub_offset_);
@@ -465,7 +461,7 @@ public:
         vecOp.WaitFlag();
         PipeBarrier<PIPE_ALL>();
 
-        CrossCoreWaitFlag(FLAG_CUBE_POST);
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE_2, PIPE_FIX>(FLAG_CUBE_POST);
         SyncAll();
         vecOp.SendVecPost(dq_gm_, dk_gm_, dv_gm_, dq_workspace_, dk_workspace_, dv_workspace_, tilingData, ub_buffer_);
     }
