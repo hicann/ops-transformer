@@ -69,7 +69,8 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
       2. 注入 golden 全局变量 (B/N_q/.../ENABLE_PA/INPUT_LAYOUT/...)
       3. prepare_npu_inputs
       4. cu_seqlens/seqused 直接用入参 _t (slot 8-11, inputs.py 已写入真实值), 空→None
-      5. quant_flash_attn_metadata 构建 (capture 之前, metadata 是 int32 tensor)
+      5. 消费 npu_preprocess 在 capture 之前生成的 metadata (动态槽位由 hook
+         返回 {"metadata": generated} 后经 ttk 回填, 静态槽位原地回填), 不重复生成
       6. 所有运行时入参存为 self. 属性, forward 直接读
 
     入参对齐 15 位置 tensor (与 CSV tensor_view_shapes (直调 op 顺序) 一致):
@@ -389,36 +390,24 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
 
         torch.npu.synchronize()
 
-        # ---- 5. metadata 构建 (capture 之前) ----
-        # metadata 是 int32 tensor (4096,), 不含可微参数, 在 __init__ 构建.
-        # 参数名与传参方式严格对齐 golden_mod._call_npu_fa_op (line 1222-1239):
-        #   - batch_size 透传 CSV 原始值 (可为 -1)
-        #   - 不传 win_left/win_right (用 schema 默认, 与 golden 一致)
-        logger.info("[GRAPH] 构建 metadata (quant_flash_attn_metadata)")
-        self.metadata = torch.ops.cann_ops_transformer.quant_flash_attn_metadata(
-            int(inputs["q_n"]),
-            int(inputs["kv_n"]),
-            int(D),
-            int(quant_mode),
-            cu_seqlens_q=cu_seqlens_q_t if is_varlen_q else None,
-            cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
-            seqused_q=seqused_q_t,
-            seqused_kv=seqused_kv_t,
-            batch_size=None
-            if is_varlen_q
-            else (batch_size if batch_size is not None else q_shape[0]),
-            max_seqlen_q=int(inputs["max_seqlen_q"]),
-            max_seqlen_kv=int(inputs["max_seqlen_kv"]),
-            head_dim_v=head_dim_v,
-            mask_mode=int(inputs["sparse_mode"]),
-            layout_q=layout_q,
-            layout_q_descale=inputs["layout_q_descale"],
-            layout_kv=layout_kv,
-            layout_out=inputs["layout_out"],
-        )
+        # ---- 5. metadata 由 npu_preprocess 在 capture 之前生成, 此处只消费 ----
+        # 动态槽位 (CSV tensor_view_shapes 含 -1): ttk 在 invoke/apply
+        # npu_preprocess 后把 {"metadata": generated} 回填到主算子参数, 再按
+        # split_params 传进本模块 __init__; 静态槽位: hook 已原地回填占位 tensor。
+        # 参考 flash_mla_with_kvcache 资产的 graph.py: 只消费, 不重复生成,
+        # metadata 生成位于图捕获与主算子计时之外。
+        if (
+            metadata is None
+            or not isinstance(metadata, torch.Tensor)
+            or metadata.numel() == 0
+        ):
+            raise ValueError(
+                "QuantFlashAttn graph requires metadata prepared by npu_preprocess"
+            )
         # metadata 可能建在错误的 device 上, 对齐 q.device
-        if self.metadata.device != inputs["q"].device:
-            self.metadata = self.metadata.to(inputs["q"].device)
+        if metadata.device != inputs["q"].device:
+            metadata = metadata.to(inputs["q"].device)
+        self.metadata = metadata
 
         # ---- 6. 存所有 forward 需要的入参为 self. 属性 ----
         # GQA FP8: k/v cache 末 K_SCALE_ROWS(=4) 行 scale 的剥离统一由

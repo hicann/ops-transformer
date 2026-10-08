@@ -262,14 +262,17 @@ def run(
     return_softmax_lse=False,
     **kwargs,
 ):
-    """Generate and copy metadata for a main QuantFlashAttn invocation.
+    """Materialize metadata after H2D, before timing and graph capture.
 
     Signature mirrors ``torch.ops.cann_ops_transformer.quant_flash_attn`` so TTK
     delivers the op-schema-ordered positional args; extra sidecar attributes
     (batch_size / N_q / N_kv / D / head_dim_v / *_values ...) arrive via kwargs.
+
+    动态槽位 (CSV tensor_view_shapes 含 -1, ttk 传 metadata=None): 按参数名返回
+    ``{"metadata": generated}``, 由 ttk 回填主算子 args/kwargs (参考
+    flash_mla_with_kvcache 资产); 静态槽位 (旧 (0,) 占位或已有 Tensor):
+    原地 resize_/copy_ 回填并隐式返回 None。
     """
-    if metadata is None:
-        raise ValueError("QuantFlashAttn npu_preprocess requires metadata")
     if quant_mode is None:
         quant_mode = get_attribute(kwargs, "quant_mode", 1)
     # 位置标量参数桥接进 kwargs, 供 build_metadata_arguments 统一读取。
@@ -351,7 +354,23 @@ def run(
         seqused_kv,
         hook_kwargs,
     )
+    # 动态槽位 (CSV tensor_view_shapes 含 -1, ttk 传入 None): 按参数名物化并返回,
+    # 由 ttk 回填主算子调用 (参考 flash_mla_with_kvcache 资产: 返回
+    # {"metadata": generated}, 键必须是 API 参数名);
+    # 静态槽位 (旧 (0,) 占位或已有 Tensor): 原地 copy_ 回填并返回 None。
+    # run_metadata 需要设备锚点 tensor, 动态槽位下用 q 提供 device。
+    if metadata is None:
+        generated = run_metadata(arguments, q)
+        logging.info(
+            "[%s] materialize dynamic metadata slot: shape=%s",
+            testcase_name,
+            tuple(generated.shape),
+        )
+        return {"metadata": generated}
+
     generated = run_metadata(arguments, metadata)
+    if tuple(metadata.shape) == (0,):
+        metadata.resize_(generated.shape)
     if tuple(metadata.shape) != tuple(generated.shape):
         raise ValueError(
             "QuantFlashAttn metadata shape mismatch: "
