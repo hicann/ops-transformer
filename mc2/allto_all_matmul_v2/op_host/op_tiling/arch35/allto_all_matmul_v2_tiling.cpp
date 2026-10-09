@@ -19,7 +19,7 @@ bool AlltoAllMatmulV2TilingClass::IsCapable()
 
 ge::graphStatus AlltoAllMatmulV2TilingClass::GetPlatformInfo()
 {
-    fe::PlatFormInfos *platformInfo = context_->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "platformInfo");
         return ge::GRAPH_FAILED;
@@ -44,7 +44,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::GetPlatformInfo()
 
 ge::graphStatus AlltoAllMatmulV2TilingClass::CheckTensorAttrs()
 {
-    const char *opName = context_->GetNodeName();
+    const char* opName = context_->GetNodeName();
     if (context_->GetAttrs() == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "attrs");
         return ge::GRAPH_FAILED;
@@ -57,11 +57,11 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::CheckTensorAttrs()
     return ge::GRAPH_SUCCESS;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckInputDescs(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckInputDescs(const char* opName)
 {
-    auto *x1Desc = context_->GetInputDesc(IDX_INPUT_X1);
-    auto *x2Desc = context_->GetInputDesc(IDX_INPUT_X2);
-    auto *yDesc = context_->GetOutputDesc(IDX_OUTPUT_Y);
+    auto* x1Desc = context_->GetInputDesc(IDX_INPUT_X1);
+    auto* x2Desc = context_->GetInputDesc(IDX_INPUT_X2);
+    auto* yDesc = context_->GetOutputDesc(IDX_OUTPUT_Y);
     if (!x1Desc || !x2Desc || !yDesc) {
         if (!x1Desc)
             OP_LOGE_WITH_INVALID_INPUT(opName, "x1");
@@ -74,9 +74,9 @@ bool AlltoAllMatmulV2TilingClass::CheckInputDescs(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckWorldSizeAttr(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckWorldSizeAttr(const char* opName)
 {
-    auto *wsPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_WORLD_SIZE);
+    auto* wsPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_WORLD_SIZE);
     if (!wsPtr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "world_size");
         return false;
@@ -94,9 +94,9 @@ bool AlltoAllMatmulV2TilingClass::CheckWorldSizeAttr(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckGroupAttr(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckGroupAttr(const char* opName)
 {
-    auto *groupPtr = context_->GetAttrs()->GetAttrPointer<char>(IDX_ATTR_GROUP);
+    auto* groupPtr = context_->GetAttrs()->GetAttrPointer<char>(IDX_ATTR_GROUP);
     if (!groupPtr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "group");
         return false;
@@ -110,11 +110,11 @@ bool AlltoAllMatmulV2TilingClass::CheckGroupAttr(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckTensorFormats(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckTensorFormats(const char* opName)
 {
-    auto *x1Desc = context_->GetInputDesc(IDX_INPUT_X1);
-    auto *x2Desc = context_->GetInputDesc(IDX_INPUT_X2);
-    auto *yDesc = context_->GetOutputDesc(IDX_OUTPUT_Y);
+    auto* x1Desc = context_->GetInputDesc(IDX_INPUT_X1);
+    auto* x2Desc = context_->GetInputDesc(IDX_INPUT_X2);
+    auto* yDesc = context_->GetOutputDesc(IDX_OUTPUT_Y);
     auto x1Fmt = static_cast<ge::Format>(ge::GetPrimaryFormat(x1Desc->GetStorageFormat()));
     auto x2Fmt = static_cast<ge::Format>(ge::GetPrimaryFormat(x2Desc->GetStorageFormat()));
     auto yFmt = static_cast<ge::Format>(ge::GetPrimaryFormat(yDesc->GetStorageFormat()));
@@ -131,11 +131,11 @@ bool AlltoAllMatmulV2TilingClass::CheckTensorFormats(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckTensorDtypes(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckTensorDtypes(const char* opName)
 {
-    auto *x1Desc = context_->GetInputDesc(IDX_INPUT_X1);
-    auto *x2Desc = context_->GetInputDesc(IDX_INPUT_X2);
-    auto *yDesc = context_->GetOutputDesc(IDX_OUTPUT_Y);
+    auto* x1Desc = context_->GetInputDesc(IDX_INPUT_X1);
+    auto* x2Desc = context_->GetInputDesc(IDX_INPUT_X2);
+    auto* yDesc = context_->GetOutputDesc(IDX_OUTPUT_Y);
     auto x1Dtype = x1Desc->GetDataType();
     auto x2Dtype = x2Desc->GetDataType();
     if ((x1Dtype != ge::DT_FLOAT8_E4M3FN && x1Dtype != ge::DT_FLOAT8_E5M2 && x1Dtype != ge::DT_FLOAT4_E2M1) ||
@@ -159,10 +159,10 @@ bool AlltoAllMatmulV2TilingClass::CheckTensorDtypes(const char *opName)
     return CheckScaleDesc(opName) && CheckBiasDesc(opName);
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckScaleDesc(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckScaleDesc(const char* opName)
 {
-    auto *x1ScaleDesc = context_->GetOptionalInputDesc(IDX_INPUT_X1_SCALE);
-    auto *x2ScaleDesc = context_->GetOptionalInputDesc(IDX_INPUT_X2_SCALE);
+    auto* x1ScaleDesc = context_->GetOptionalInputDesc(IDX_INPUT_X1_SCALE);
+    auto* x2ScaleDesc = context_->GetOptionalInputDesc(IDX_INPUT_X2_SCALE);
     if (!x1ScaleDesc || !x2ScaleDesc) {
         if (!x1ScaleDesc)
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -194,9 +194,9 @@ bool AlltoAllMatmulV2TilingClass::CheckScaleDesc(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckBiasDesc(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckBiasDesc(const char* opName)
 {
-    auto *biasDesc = context_->GetOptionalInputDesc(IDX_INPUT_BIAS);
+    auto* biasDesc = context_->GetOptionalInputDesc(IDX_INPUT_BIAS);
     if (biasDesc == nullptr) {
         return true;
     }
@@ -213,10 +213,10 @@ bool AlltoAllMatmulV2TilingClass::CheckBiasDesc(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckQuantAndYDtypeAttr(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckQuantAndYDtypeAttr(const char* opName)
 {
-    auto *x1QmPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_X1_QUANT_MODE);
-    auto *x2QmPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_X2_QUANT_MODE);
+    auto* x1QmPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_X1_QUANT_MODE);
+    auto* x2QmPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_X2_QUANT_MODE);
     int64_t x1QuantMode = x1QmPtr ? *x1QmPtr : static_cast<int64_t>(MX_QUANT_MODE);
     int64_t x2QuantMode = x2QmPtr ? *x2QmPtr : static_cast<int64_t>(MX_QUANT_MODE);
     if (x1QuantMode != static_cast<int64_t>(MX_QUANT_MODE) || x2QuantMode != static_cast<int64_t>(MX_QUANT_MODE)) {
@@ -225,7 +225,7 @@ bool AlltoAllMatmulV2TilingClass::CheckQuantAndYDtypeAttr(const char *opName)
                                               "x1_quant_mode and x2_quant_mode must be MX_QUANT(6)");
         return false;
     }
-    auto *yDtypePtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_Y_DTYPE);
+    auto* yDtypePtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_Y_DTYPE);
     if (yDtypePtr != nullptr && *yDtypePtr != static_cast<int64_t>(ge::DT_BF16) &&
         *yDtypePtr != static_cast<int64_t>(ge::DT_FLOAT16)) {
         OP_LOGE_WITH_INVALID_ATTR(opName, "y_dtype", std::to_string(*yDtypePtr).c_str(), "BF16/FP16");
@@ -234,26 +234,26 @@ bool AlltoAllMatmulV2TilingClass::CheckQuantAndYDtypeAttr(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckOtherAttrs(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckOtherAttrs(const char* opName)
 {
-    auto *tx1 = context_->GetAttrs()->GetAttrPointer<bool>(IDX_ATTR_TRANSPOSE_X1);
+    auto* tx1 = context_->GetAttrs()->GetAttrPointer<bool>(IDX_ATTR_TRANSPOSE_X1);
     if (tx1 != nullptr && *tx1) {
         OP_LOGE_WITH_INVALID_ATTR(opName, "transpose_x1", "true", "false");
         return false;
     }
-    auto *tx2 = context_->GetAttrs()->GetAttrPointer<bool>(IDX_ATTR_TRANSPOSE_X2);
+    auto* tx2 = context_->GetAttrs()->GetAttrPointer<bool>(IDX_ATTR_TRANSPOSE_X2);
     if (!tx2 || !(*tx2)) {
         OP_LOGE_WITH_INVALID_ATTR(opName, "transpose_x2", tx2 ? std::to_string(static_cast<int>(*tx2)).c_str() : "nil",
                                   "true");
         return false;
     }
-    auto *x1QdPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_X1_QUANT_DTYPE);
+    auto* x1QdPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_X1_QUANT_DTYPE);
     if (x1QdPtr != nullptr && *x1QdPtr != static_cast<int64_t>(ge::DT_UNDEFINED) &&
         *x1QdPtr != static_cast<int64_t>(ge::DT_FLOAT8_E8M0)) {
         OP_LOGE_WITH_INVALID_ATTR(opName, "x1_quant_dtype", std::to_string(*x1QdPtr).c_str(), "fp8_e8m0");
         return false;
     }
-    auto *pmPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_PRECISION_MODE);
+    auto* pmPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_PRECISION_MODE);
     if (pmPtr != nullptr && (*pmPtr < 0 || *pmPtr > 2)) {
         OP_LOGE_WITH_INVALID_ATTR(opName, "precision_mode", std::to_string(*pmPtr).c_str(), "0/1/2");
         return false;
@@ -261,9 +261,9 @@ bool AlltoAllMatmulV2TilingClass::CheckOtherAttrs(const char *opName)
     return CheckGroupSizeAttr(opName);
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckGroupSizeAttr(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckGroupSizeAttr(const char* opName)
 {
-    auto *gsPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_GROUP_SIZE);
+    auto* gsPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_GROUP_SIZE);
     if (!gsPtr) {
         return true;
     }
@@ -299,11 +299,11 @@ bool AlltoAllMatmulV2TilingClass::CheckGroupSizeAttr(const char *opName)
 
 ge::graphStatus AlltoAllMatmulV2TilingClass::CheckTensorShapes()
 {
-    const char *opName = context_->GetNodeName();
+    const char* opName = context_->GetNodeName();
 
-    auto *x1Shape = context_->GetInputShape(IDX_INPUT_X1);
-    auto *x2Shape = context_->GetInputShape(IDX_INPUT_X2);
-    auto *yShape = context_->GetOutputShape(IDX_OUTPUT_Y);
+    auto* x1Shape = context_->GetInputShape(IDX_INPUT_X1);
+    auto* x2Shape = context_->GetInputShape(IDX_INPUT_X2);
+    auto* yShape = context_->GetOutputShape(IDX_OUTPUT_Y);
     if (!x1Shape || !x2Shape || !yShape) {
         if (!x1Shape)
             OP_LOGE_WITH_INVALID_INPUT(opName, "x1");
@@ -321,11 +321,11 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::CheckTensorShapes()
     return ge::GRAPH_SUCCESS;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckMatmulDimsAndBounds(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckMatmulDimsAndBounds(const char* opName)
 {
-    auto *x1Shape = context_->GetInputShape(IDX_INPUT_X1);
-    auto *x2Shape = context_->GetInputShape(IDX_INPUT_X2);
-    auto *yShape = context_->GetOutputShape(IDX_OUTPUT_Y);
+    auto* x1Shape = context_->GetInputShape(IDX_INPUT_X1);
+    auto* x2Shape = context_->GetInputShape(IDX_INPUT_X2);
+    auto* yShape = context_->GetOutputShape(IDX_OUTPUT_Y);
     uint64_t x1DimNum = x1Shape->GetStorageShape().GetDimNum();
     uint64_t x2DimNum = x2Shape->GetStorageShape().GetDimNum();
     uint64_t yDimNum = yShape->GetStorageShape().GetDimNum();
@@ -368,12 +368,12 @@ bool AlltoAllMatmulV2TilingClass::CheckMatmulDimsAndBounds(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckMatmulDivisibility(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckMatmulDivisibility(const char* opName)
 {
-    auto *x1Shape = context_->GetInputShape(IDX_INPUT_X1);
-    auto *x2Shape = context_->GetInputShape(IDX_INPUT_X2);
-    auto *yShape = context_->GetOutputShape(IDX_OUTPUT_Y);
-    auto *wsPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_WORLD_SIZE);
+    auto* x1Shape = context_->GetInputShape(IDX_INPUT_X1);
+    auto* x2Shape = context_->GetInputShape(IDX_INPUT_X2);
+    auto* yShape = context_->GetOutputShape(IDX_OUTPUT_Y);
+    auto* wsPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_WORLD_SIZE);
     uint64_t worldSize = static_cast<uint64_t>(wsPtr ? *wsPtr : 1);
 
     uint64_t x1M = x1Shape->GetStorageShape().GetDim(0U);
@@ -408,9 +408,9 @@ bool AlltoAllMatmulV2TilingClass::CheckMatmulDivisibility(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckBiasShape(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckBiasShape(const char* opName)
 {
-    auto *biasShape = context_->GetOptionalInputShape(IDX_INPUT_BIAS);
+    auto* biasShape = context_->GetOptionalInputShape(IDX_INPUT_BIAS);
     if (biasShape == nullptr) {
         return true;
     }
@@ -429,10 +429,10 @@ bool AlltoAllMatmulV2TilingClass::CheckBiasShape(const char *opName)
     return true;
 }
 
-bool AlltoAllMatmulV2TilingClass::CheckScaleShapes(const char *opName)
+bool AlltoAllMatmulV2TilingClass::CheckScaleShapes(const char* opName)
 {
-    auto *x1ScaleShape = context_->GetOptionalInputShape(IDX_INPUT_X1_SCALE);
-    auto *x2ScaleShape = context_->GetOptionalInputShape(IDX_INPUT_X2_SCALE);
+    auto* x1ScaleShape = context_->GetOptionalInputShape(IDX_INPUT_X1_SCALE);
+    auto* x2ScaleShape = context_->GetOptionalInputShape(IDX_INPUT_X2_SCALE);
     if (!x1ScaleShape || !x2ScaleShape) {
         if (!x1ScaleShape)
             OP_LOGE_WITH_INVALID_INPUT(opName, "x1_scale");
@@ -499,9 +499,9 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::CheckOpInputInfo()
 
 ge::graphStatus AlltoAllMatmulV2TilingClass::GetShapeAttrsInfo()
 {
-    const char *opName = context_->GetNodeName();
-    auto *x1sh = context_->GetInputShape(IDX_INPUT_X1);
-    auto *x2sh = context_->GetInputShape(IDX_INPUT_X2);
+    const char* opName = context_->GetNodeName();
+    auto* x1sh = context_->GetInputShape(IDX_INPUT_X1);
+    auto* x2sh = context_->GetInputShape(IDX_INPUT_X2);
     if (!x1sh || !x2sh) {
         if (!x1sh)
             OP_LOGE_WITH_INVALID_INPUT(opName, "x1");
@@ -509,10 +509,10 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::GetShapeAttrsInfo()
             OP_LOGE_WITH_INVALID_INPUT(opName, "x2");
         return ge::GRAPH_FAILED;
     }
-    auto &x1ss = x1sh->GetStorageShape();
-    auto &x2ss = x2sh->GetStorageShape();
+    auto& x1ss = x1sh->GetStorageShape();
+    auto& x2ss = x2sh->GetStorageShape();
     // x1 shape: [M_total, Ka]; kernel expects M_per_rank = M_total / world_size
-    auto *wsPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_WORLD_SIZE);
+    auto* wsPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_WORLD_SIZE);
     if (!wsPtr || *wsPtr <= 0) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "world_size");
         return ge::GRAPH_FAILED;
@@ -522,26 +522,26 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::GetShapeAttrsInfo()
     k_ = x1ss.GetDim(1U); // Ka (per-rank K)
     n_ = x2ss.GetDim(0U); // N (always dim0, x2 shape = [N, K_total])
 
-    auto *pm = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_PRECISION_MODE);
+    auto* pm = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_PRECISION_MODE);
     precisionMode_ = pm ? static_cast<uint32_t>(*pm) : 0;
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
 {
-    const char *opName = context_->GetNodeName();
+    const char* opName = context_->GetNodeName();
     if (CheckOpInputInfo() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     uint64_t ka = k_; // Ka = per-rank K
 
-    auto *hccBufPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_HCCL_BUFFER_SIZE);
+    auto* hccBufPtr = context_->GetAttrs()->GetAttrPointer<int64_t>(IDX_ATTR_HCCL_BUFFER_SIZE);
     OP_LOGI(opName, "[hcclBufferSize] builder-assigned hcclBufferSize = %ld",
             hccBufPtr ? static_cast<long>(*hccBufPtr) : -1L);
 
     {
-        auto *x1sh = context_->GetInputShape(IDX_INPUT_X1);
-        auto *x1Desc = context_->GetInputDesc(IDX_INPUT_X1);
+        auto* x1sh = context_->GetInputShape(IDX_INPUT_X1);
+        auto* x1Desc = context_->GetInputDesc(IDX_INPUT_X1);
         if (x1Desc == nullptr) {
             OP_LOGE_WITH_INVALID_INPUT(opName, "x1 desc");
             return ge::GRAPH_FAILED;
@@ -575,7 +575,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
         }
     }
 
-    auto *rt = context_->GetRawTilingData();
+    auto* rt = context_->GetRawTilingData();
     if (rt == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "rawTilingData");
         return ge::GRAPH_FAILED;
@@ -587,11 +587,11 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
     }
     memset_s(rt->GetData(), cap, 0, cap);
 
-    auto *td = reinterpret_cast<allToAllMatmulTilingData *>(rt->GetData());
+    auto* td = reinterpret_cast<allToAllMatmulTilingData*>(rt->GetData());
 
     // MXFP4 使用打包存储(2 个 fp4 占 1 字节)，tiling 引擎需要按 fp4 数据类型
     // 推导 baseK 块大小(256 vs 128)与 L1 布局，其余 dtype 均按 fp8 处理。
-    auto *x1DescTiling = context_->GetInputDesc(IDX_INPUT_X1);
+    auto* x1DescTiling = context_->GetInputDesc(IDX_INPUT_X1);
     if (x1DescTiling == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "x1 desc");
         return ge::GRAPH_FAILED;
@@ -617,7 +617,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::DoOpTiling()
         tilingEngine.GetTilingData(m_, n_, k_, false, true, td->tileQbmmTilingData);
     }
 
-    auto &mm = td->tileQbmmTilingData;
+    auto& mm = td->tileQbmmTilingData;
     usedCoreNum_ = mm.usedCoreNum;
 
     // matmul 实际分配核数必须 >= rankSize（kernel 侧通信切分依赖每 rank 至少一个核，
@@ -735,7 +735,7 @@ uint64_t AlltoAllMatmulV2TilingClass::GetTilingKey() const
 
 ge::graphStatus AlltoAllMatmulV2TilingClass::GetWorkspaceSize()
 {
-    auto *platformInfo = context_->GetPlatformInfo();
+    auto* platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "platformInfo");
         return ge::GRAPH_FAILED;
@@ -748,7 +748,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::GetWorkspaceSize()
     OP_LOGI(context_->GetNodeName(), "AAMV2 workspace: libApiWorkSpaceSize=%lu, stateDumpSize=%lu, workspaceSize=%lu",
             workspaceSize_ - Utils::STATE_DUMP_TOTAL_SIZE, Utils::STATE_DUMP_TOTAL_SIZE, workspaceSize_);
 #endif
-    auto *wsBuf = context_->GetWorkspaceSizes(1);
+    auto* wsBuf = context_->GetWorkspaceSizes(1);
     if (wsBuf != nullptr) {
         wsBuf[0] = workspaceSize_;
     }
@@ -760,6 +760,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::PostTiling()
     // tiling 数据只声明结构体大小（capacity-8），尾部 8 字节留给框架写入 DFX 指针（atomicIndex），
     // 否则异常 dump 时 IDEDD 从 opParaSize-8 处读到 0，导致 exception_info 解析中止
     context_->GetRawTilingData()->SetDataSize(sizeof(allToAllMatmulTilingData));
+    context_->SetScheduleMode(1);
     context_->SetBlockDim(usedCoreNum_);
     return ge::GRAPH_SUCCESS;
 }
