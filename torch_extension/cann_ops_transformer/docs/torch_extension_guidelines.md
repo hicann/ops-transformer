@@ -137,6 +137,8 @@ ops-transformer/
 
 ## 3. 各层实现规范
 
+<a id="cpp-backend"></a>
+
 ### 3.1 C++ 后端（`<category>/<op>/torch_extension/csrc/${op_api}.cpp`）
 
 负责把PyTorch张量桥接到aclnn C-API，规范要点：
@@ -191,6 +193,8 @@ ops-transformer/
        return std::make_tuple(/* ... */);
    }
    ```
+
+<a id="python-frontend"></a>
 
 ### 3.2 Python 前端（`<category>/<op>/torch_extension/${op_api}.py`）
 
@@ -277,8 +281,8 @@ ops-transformer/
 ## 5. 编码通用约束
 
 - **许可证头**：所有新增源文件（`.py`/`.cpp`/`.h`）必须包含Huawei版权与CANN Open Software License Agreement Version 2.0许可证头，年份填当年。Python/脚本用`#`注释，C++用`//`或`/* */`。
-- **接口注释**：对外api接口必须书写docstring（功能、参数、返回值），见[3.2](#32-python-前端opsop_apipy)；C++ wrapper关键逻辑（校验、DeviceGuard、aclnn调用）也应有简要注释。
-- **C++层DeviceGuard（关键）**：调用aclnn的C++ wrapper中，必须在申请输出张量之前用`c10::OptionalDeviceGuard`（构造自`c10::Device(输入张量.device())`）把设备切到输入张量所在设备，详见[3.1](#31-c-后端opscsrcop_apicpp)。
+- **接口注释**：对外api接口必须书写docstring（功能、参数、返回值），见[3.2](#python-frontend)；C++ wrapper关键逻辑（校验、DeviceGuard、aclnn调用）也应有简要注释。
+- **C++层DeviceGuard（关键）**：调用aclnn的C++ wrapper中，必须在申请输出张量之前用`c10::OptionalDeviceGuard`（构造自`c10::Device(输入张量.device())`）把设备切到输入张量所在设备，详见[3.1](#cpp-backend)。
 - **参数校验前置**：Python侧用`torch._check(cond, lambda: f"...{var=}...")`，C++侧用`TORCH_CHECK(cond, msg...)`；错误信息需包含变量实际值，便于定位。
 - **错误码**：Python侧可结合`torch_npu.utils._error_code`的`ErrCode`/`ops_error`输出规范错误码，如`f"... {ops_error(ErrCode.VALUE)}."`。
 - **避免魔数**：维度数、dtype枚举值等以具名常量表达，并在文档/注释中说明枚举含义（如`23 → float8_e5m2`、`24 → float8_e4m3fn`）。
