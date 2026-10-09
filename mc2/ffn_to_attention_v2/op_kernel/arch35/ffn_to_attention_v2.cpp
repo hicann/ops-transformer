@@ -17,8 +17,7 @@
 #include "version/asc_devkit_version.h"
 #include "version/hcomm_version.h"
 
-#if (ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR > 1)) && \
-    (HCOMM_MAJOR > 9 || (HCOMM_MAJOR == 9 && HCOMM_MINOR > 1))
+#if (ASC_DEVKIT_VERSION_NUM >= 90200000) && (HCOMM_VERSION_NUM >= 90200000)
 #define ENABLE_FFN_TO_ATTENTION_V2_KERNEL
 #endif
 
