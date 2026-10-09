@@ -51,7 +51,8 @@ jobs:
         identifier: process_checkout
         uses: checkout
         with:
-          ref: ${{ atomgit.event.pull_request.merge_commit_sha || atomgit.sha }}
+          ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+          allow-unsafe-pr-checkout: true
       -
         name: download_pr_filelist
         uses: obs-download
