@@ -392,9 +392,10 @@ def _derive_vtail_slots(attrs, quant_mode):
     layout_kv = str(attrs.get("kv_cache_layout") or "").upper()
 
     # B: 与 wrapper 推导链一致 (cu_seqlens_q → batch_size → seqused_q → 1)
-    cu_q = attrs.get("cu_seqlens_q")
+    # attrs key 为 *_values (避免与算子 schema 同名 Tensor 参数撞名)
+    cu_q = attrs.get("cu_seqlens_q_values")
     batch_size = attrs.get("batch_size")
-    seq_q = attrs.get("seqused_q")
+    seq_q = attrs.get("seqused_q_values")
     if cu_q and len(cu_q) >= 2:
         B = len(cu_q) - 1
     elif isinstance(batch_size, int) and batch_size > 0:
@@ -496,39 +497,58 @@ def _build_tensor_lists(row, cols, quant_mode, attrs=None):
         dtypes.append(dtype)
         data_ranges.append(drange)
 
-    # slot 15-17: v_tail 三件套 (enable_v_tail 时按 checker 契约推导, 否则空 slot)
-    vt_shapes, vt_dtypes, vt_dranges = _derive_vtail_slots(attrs or {}, quant_mode)
-    # 交叉校验: Excel v_tail_shape 列(契约前撰写, dtype误标fp8/NZ内径32)与推导值
-    # 不一致时仅告警 — 以契约推导为准
+    # slot 15-17: 直接读取 Excel 的 VTAIL 三件套；推导值仅用于告警，不覆盖 Excel。
+    vt_shapes = []
+    vt_dtypes = []
+    vt_dranges = []
+    for _shape_col, _dtype_col, _drange_col, _default_dtype in (
+        ("v_tail_shape", "v_tail_dtype", "v_tail_datarange", "bfloat16"),
+        (
+            "block_table_tail_shape",
+            "block_table_tail_dtype",
+            "block_table_tail_datarange",
+            "int32",
+        ),
+        (
+            "seqused_v_tail_shape",
+            "seqused_v_tail_dtype",
+            "seqused_v_tail_datarange",
+            "int32",
+        ),
+    ):
+        _shape = (
+            _str_to_shape(row.get(cols.get(_shape_col)))
+            if cols.get(_shape_col) is not None
+            else None
+        )
+        _dtype = (
+            _map_dtype(row.get(cols.get(_dtype_col)))
+            if cols.get(_dtype_col) is not None
+            else None
+        )
+        _drange = (
+            _str_to_datarange(row.get(cols.get(_drange_col)))
+            if cols.get(_drange_col) is not None
+            else None
+        )
+        vt_shapes.append(_shape if _shape is not None else (0,))
+        vt_dtypes.append(_dtype or _default_dtype)
+        vt_dranges.append(_drange if _drange is not None else _DRANGE_PLACEHOLDER)
+
     if attrs and attrs.get("enable_v_tail"):
-        excel_vt = _str_to_shape(row.get(cols.get("v_tail_shape")))
-        if excel_vt is not None and tuple(excel_vt) != tuple(vt_shapes[0]):
+        _d = None
+        _layout = str(attrs.get("kv_cache_layout") or "").upper()
+        _head_dim = int(attrs.get("D") or 0)
+        if (
+            quant_mode in (1, None)
+            and attrs.get("enable_pa")
+            and (_layout != "PA_NZ" or _head_dim % 16 == 0)
+        ):
+            _d = _derive_vtail_slots(attrs, quant_mode)
+        if _d is not None and (tuple(vt_shapes) != tuple(_d[0]) or vt_dtypes != _d[1]):
             print(
-                f"[excel_to_csv] WARN {attrs.get('_tcname', '')}: Excel v_tail_shape "
-                f"{excel_vt} != 契约推导 {vt_shapes[0]} (以推导为准, dtype固定bfloat16)"
+                "[excel_to_csv] WARN: VTAIL Excel shape/dtype differs from derived value; Excel value kept"
             )
-        # [vtail契约覆盖] slot7 block_table: Excel按"尾块剥离"语义少给块数
-        # (如1025/64=17写16), 按pytest语义(主cache全量KV, K完整+V尾置零,
-        # ceil(kv/bs))覆盖 — kernel尾task的C1(Q×K^T)尾列K来自主cache末块
-        _bs = attrs.get("block_size") or 0
-        _kv = attrs.get("seqused_kv")
-        if (not _kv) and attrs.get("cu_seqlens_kv"):
-            _cu = attrs["cu_seqlens_kv"]
-            _kv = [_cu[i + 1] - _cu[i] for i in range(len(_cu) - 1)]
-        if _bs and _kv:
-            _need = (
-                max(-(-int(k) // int(_bs)) for k in _kv if int(k) > 0)
-                if any(int(k) > 0 for k in _kv)
-                else 1
-            )
-            _B = vt_shapes[0][0]  # v_tail推导的B
-            _excel_bt = shapes[7]
-            if tuple(_excel_bt) != (_B, _need):
-                print(
-                    f"[excel_to_csv] WARN: Excel block_table_shape {_excel_bt} "
-                    f"-> 覆盖为 pytest 全量语义 {_B, _need} (主cache含K尾块)"
-                )
-                shapes[7] = (_B, _need)
     shapes.extend(vt_shapes)
     dtypes.extend(vt_dtypes)
     data_ranges.extend(vt_dranges)
@@ -709,24 +729,8 @@ def _row_to_csv(excel_row, api_name, testcase_suffix, cols, quant_mode):
     # attrs 先建: v_tail 三件套 slot (15-17) 的形状推导依赖 attributes
     # (enable_v_tail/enable_pa/kv_cache_layout/block_size/N_kv/D/cu_seqlens_q)
     attrs = _build_attributes(excel_row, cols)
-    # [无效v_tail组合] 对齐 pytest SKIP_CASES 语义: 整行跳过 + 告警
-    # (PA_NZ+D%16!=0 结构性不成立 / 非PA / quant_mode!=1 — checker 同款拒绝)
-    if attrs.get("enable_v_tail"):
-        _lay = str(attrs.get("kv_cache_layout") or "").upper()
-        _D = attrs.get("D") or 0
-        _invalid = (
-            (not attrs.get("enable_pa"))
-            or (quant_mode not in (1, None))
-            or (_lay == "PA_NZ" and _D % 16 != 0)
-        )
-        if _invalid:
-            print(
-                f"[excel_to_csv] SKIP {testcase_name}: 无效v_tail组合 "
-                f"(pa={attrs.get('enable_pa')}, layout_kv={_lay}, D={_D}, "
-                f"quant_mode={quant_mode}) — 与 pytest SKIP_CASES 同款"
-            )
-            return None
-
+    attrs["_tcname"] = testcase_name
+    # VTAIL values come from Excel; runtime validates them.
     # data_range极端值(|v|>1e30, 如k/v=-3.39e38=bf16 min)时
     # CPU golden的fp32中间值溢出→全NaN, 不可用于精度对比 — 跳过
     # 极端data_range跳过暂时禁用(用户要求20条全量)
