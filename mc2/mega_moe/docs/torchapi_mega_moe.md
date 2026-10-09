@@ -1458,7 +1458,7 @@ sym_buffer.update_group(group) -> None
     - `activation`支持"swiglu"、"swiglustep"、"swigluoai"和"situglu"。`activation_clamp`用于配置前三种激活的截断值；`activation_params`用于配置"swigluoai"的`alpha`、`beta`以及"situglu"的`beta`、`linear_beta`。
     - num_tokens（x.dim0）范围[1, +∞)，每次调用必须不大于创建`sym_buffer`时配置的`num_max_tokens_per_rank`。不同Rank的实际num_tokens可以不同，同一个`sym_buffer`也可以用于多次不同num_tokens的调用。
     - `num_max_tokens_per_rank`必须大于等于1，所有Rank取值必须一致，建议设置为`sym_buffer`复用期间所有Rank可能出现的最大单卡token数。超过原上界时需使用更大的上界重新创建`sym_buffer`。
-    - hidden为逻辑隐藏维，范围[1024, 8192]；非打包类型下hidden = x.dim1，float4_e2m1以uint8打包传入时x.dim1 = hidden / 2。A8W8-FP场景要求hidden为32的倍数；A8W4-FP场景要求hidden为64的倍数；A4W4-FP场景仅支持l1_weights为FRACTAL_NZ格式，要求hidden为64的倍数。
+    - hidden为逻辑隐藏维，范围[1024, 8192]；topo_type = 0（MTE拓扑）下各量化场景均要求hidden为64的倍数，topo_type = 1（URMA跨超拓扑）要求hidden为1024的倍数。非打包类型下hidden = x.dim1，float4_e2m1以uint8打包传入时x.dim1 = hidden / 2。A4W4-FP场景仅支持l1_weights为FRACTAL_NZ格式。
     - num_topk（topk_ids.dim1）支持[1, 32]。
     - local_moe_expert_num（= num_experts / ep_world_size）范围 [1, 1024]；shared_expert_num_per_rank 另按 [0, 4] 单独约束，不计入该上限。
     - intermediate_hidden表示激活后的中间特征维度，范围[256, 4096]且128对齐；Linear1的完整输出宽度为2 × intermediate_hidden。

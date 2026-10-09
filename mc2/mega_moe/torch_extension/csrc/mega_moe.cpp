@@ -21,13 +21,13 @@ const int DIM_TWO = 2;
 const int64_t PACKED_FLOAT4_ELEMENTS_PER_BYTE = 2;
 constexpr int64_t GE_DTYPE_UNDEFINED = 28;
 
-static void CheckNpuInput(const at::Tensor &tensor, const std::string &name, const char *socName)
+static void CheckNpuInput(const at::Tensor& tensor, const std::string& name, const char* socName)
 {
     TORCH_CHECK(tensor.defined(), name, " must not be None on ", socName, ".");
     TORCH_CHECK(torch_npu::utils::is_npu(tensor), name, " must be on NPU on ", socName, ", but got ", tensor.device());
 }
 
-static void CheckNpuInput(const std::vector<at::Tensor> &tensors, const std::string &name, const char *socName)
+static void CheckNpuInput(const std::vector<at::Tensor>& tensors, const std::string& name, const char* socName)
 {
     for (size_t i = 0; i < tensors.size(); ++i) {
         CheckNpuInput(tensors[i], name + "[" + std::to_string(i) + "]", socName);
@@ -35,7 +35,7 @@ static void CheckNpuInput(const std::vector<at::Tensor> &tensors, const std::str
 }
 
 template <typename T>
-static void CheckNpuInput(const c10::optional<T> &input, const std::string &name, const char *socName)
+static void CheckNpuInput(const c10::optional<T>& input, const std::string& name, const char* socName)
 {
     if (input.has_value()) {
         CheckNpuInput(input.value(), name, socName);
@@ -43,12 +43,12 @@ static void CheckNpuInput(const c10::optional<T> &input, const std::string &name
 }
 
 template <typename T>
-static void CheckInputAbsent(const c10::optional<T> &input, const std::string &name, const char *socName)
+static void CheckInputAbsent(const c10::optional<T>& input, const std::string& name, const char* socName)
 {
     TORCH_CHECK(!input.has_value(), name, " must be None on ", socName, ".");
 }
 
-static void CheckWeightType(const c10::optional<int64_t> &weightType, const char *name, const char *socName)
+static void CheckWeightType(const c10::optional<int64_t>& weightType, const char* name, const char* socName)
 {
     if (!weightType.has_value()) {
         return;
@@ -62,12 +62,12 @@ static void CheckWeightType(const c10::optional<int64_t> &weightType, const char
                 static_cast<int64_t>(DType::FLOAT4_E2M1), ") on ", socName, ", but got ", value, ".");
 }
 
-static void CheckWeightDtype(at::TensorList weights, aclDataType expectedDtype, const char *name, const char *socName)
+static void CheckWeightDtype(at::TensorList weights, aclDataType expectedDtype, const char* name, const char* socName)
 {
     if (weights.empty()) {
         return;
     }
-    const char *expectedName = nullptr;
+    const char* expectedName = nullptr;
     switch (expectedDtype) {
         case aclDataType::ACL_FLOAT8_E5M2:
             expectedName = "float8_e5m2";
@@ -95,29 +95,29 @@ static void CheckWeightDtype(at::TensorList weights, aclDataType expectedDtype, 
 }
 
 struct MegaMoeTensorInputs {
-    const at::Tensor &context;
-    const at::Tensor &x;
-    const at::Tensor &topkIds;
-    const at::Tensor &topkWeights;
-    const std::vector<at::Tensor> &weight1;
-    const std::vector<at::Tensor> &weight2;
-    const c10::optional<std::vector<at::Tensor>> &weightScales1;
-    const c10::optional<std::vector<at::Tensor>> &weightScales2;
-    const c10::optional<std::vector<at::Tensor>> &bias1;
-    const c10::optional<std::vector<at::Tensor>> &bias2;
-    const c10::optional<std::vector<at::Tensor>> &sharedWeight1;
-    const c10::optional<std::vector<at::Tensor>> &sharedWeight2;
-    const c10::optional<std::vector<at::Tensor>> &sharedWeightScales1;
-    const c10::optional<std::vector<at::Tensor>> &sharedWeightScales2;
-    const c10::optional<std::vector<at::Tensor>> &sharedBias1;
-    const c10::optional<std::vector<at::Tensor>> &sharedBias2;
-    const c10::optional<at::Tensor> &xActiveMask;
-    const c10::optional<at::Tensor> &scales;
-    const c10::optional<at::Tensor> &maskBuffer;
+    const at::Tensor& context;
+    const at::Tensor& x;
+    const at::Tensor& topkIds;
+    const at::Tensor& topkWeights;
+    const std::vector<at::Tensor>& weight1;
+    const std::vector<at::Tensor>& weight2;
+    const c10::optional<std::vector<at::Tensor>>& weightScales1;
+    const c10::optional<std::vector<at::Tensor>>& weightScales2;
+    const c10::optional<std::vector<at::Tensor>>& bias1;
+    const c10::optional<std::vector<at::Tensor>>& bias2;
+    const c10::optional<std::vector<at::Tensor>>& sharedWeight1;
+    const c10::optional<std::vector<at::Tensor>>& sharedWeight2;
+    const c10::optional<std::vector<at::Tensor>>& sharedWeightScales1;
+    const c10::optional<std::vector<at::Tensor>>& sharedWeightScales2;
+    const c10::optional<std::vector<at::Tensor>>& sharedBias1;
+    const c10::optional<std::vector<at::Tensor>>& sharedBias2;
+    const c10::optional<at::Tensor>& xActiveMask;
+    const c10::optional<at::Tensor>& scales;
+    const c10::optional<at::Tensor>& maskBuffer;
 };
 
 // 950 的 x 物理存储类型校验，量化模式和类型组合仍由 tiling 校验。
-static void CheckMegaMoeXInput950(const at::Tensor &x, const char *socName)
+static void CheckMegaMoeXInput950(const at::Tensor& x, const char* socName)
 {
     CheckNpuInput(x, "x", socName);
     const auto xScalarType = x.scalar_type();
@@ -128,8 +128,8 @@ static void CheckMegaMoeXInput950(const at::Tensor &x, const char *socName)
                 socName, ", but got ", xScalarType, ".");
 }
 
-static void CheckMegaMoeInputsA5(const MegaMoeTensorInputs &inputs, int64_t epWorldSize, int64_t moeExpertNum,
-                                 const char *socName)
+static void CheckMegaMoeInputsA5(const MegaMoeTensorInputs& inputs, int64_t epWorldSize, int64_t moeExpertNum,
+                                 const char* socName)
 {
     TORCH_CHECK(moeExpertNum >= epWorldSize && moeExpertNum <= 2048 && moeExpertNum % epWorldSize == 0,
                 "num_experts must be in [ep_world_size, 2048] and divisible by ep_world_size on ", socName,
@@ -159,7 +159,7 @@ static void CheckMegaMoeInputsA5(const MegaMoeTensorInputs &inputs, int64_t epWo
     CheckNpuInput(inputs.sharedWeightScales2, "shared_l2_weights_sf", socName);
     CheckNpuInput(inputs.scales, "scales", socName);
     CheckNpuInput(inputs.maskBuffer, "mask_buffer", socName);
-    const auto checkScaleDtype = [socName](const c10::optional<std::vector<at::Tensor>> &scales, const char *name) {
+    const auto checkScaleDtype = [socName](const c10::optional<std::vector<at::Tensor>>& scales, const char* name) {
         if (!scales.has_value()) {
             return;
         }
@@ -175,8 +175,8 @@ static void CheckMegaMoeInputsA5(const MegaMoeTensorInputs &inputs, int64_t epWo
     checkScaleDtype(inputs.sharedWeightScales2, "shared_l2_weights_sf");
 }
 
-static void CheckMegaMoeInputs(const MegaMoeTensorInputs &inputs, int64_t epWorldSize, int64_t moeExpertNum,
-                               const char *socName, bool isAscend950)
+static void CheckMegaMoeInputs(const MegaMoeTensorInputs& inputs, int64_t epWorldSize, int64_t moeExpertNum,
+                               const char* socName, bool isAscend950)
 {
     TORCH_CHECK((epWorldSize > 0), "The ep_world_sizes should be greater than 0, current is: ", epWorldSize);
     if (isAscend950) {
@@ -189,7 +189,7 @@ static void CheckMegaMoeInputs(const MegaMoeTensorInputs &inputs, int64_t epWorl
     }
     TORCH_CHECK(inputs.topkIds.scalar_type() == at::kInt, "dtype of topk_ids should be int.");
     if (inputs.maskBuffer.has_value()) {
-        const at::Tensor &mask = inputs.maskBuffer.value();
+        const at::Tensor& mask = inputs.maskBuffer.value();
         TORCH_CHECK(mask.scalar_type() == at::kInt, "mask_buffer dtype must be int32.");
         TORCH_CHECK(mask.dim() == 1 && mask.numel() == epWorldSize, "mask_buffer shape must be [ep_world_size].");
         TORCH_CHECK(mask.device() == inputs.x.device(), "mask_buffer must be on the same device as x.");
@@ -198,17 +198,17 @@ static void CheckMegaMoeInputs(const MegaMoeTensorInputs &inputs, int64_t epWorl
 }
 
 std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
-    const at::Tensor &context, const at::Tensor &x, const at::Tensor &topkIds, const at::Tensor &topkWeights,
-    const std::vector<at::Tensor> &weight1, const std::vector<at::Tensor> &weight2, int64_t moeExpertNum,
-    int64_t epWorldSize, int64_t cclBufferSize, const c10::optional<std::vector<at::Tensor>> &weightScales1,
-    const c10::optional<std::vector<at::Tensor>> &weightScales2, const c10::optional<std::vector<at::Tensor>> &bias1,
-    const c10::optional<std::vector<at::Tensor>> &bias2, const c10::optional<at::Tensor> &xActiveMask,
-    const c10::optional<at::Tensor> &scales, const c10::optional<std::vector<at::Tensor>> &sharedWeight1,
-    const c10::optional<std::vector<at::Tensor>> &sharedWeight2,
-    const c10::optional<std::vector<at::Tensor>> &sharedWeightScales1,
-    const c10::optional<std::vector<at::Tensor>> &sharedWeightScales2,
-    const c10::optional<std::vector<at::Tensor>> &sharedBias1,
-    const c10::optional<std::vector<at::Tensor>> &sharedBias2, const c10::optional<at::Tensor> &maskBuffer,
+    const at::Tensor& context, const at::Tensor& x, const at::Tensor& topkIds, const at::Tensor& topkWeights,
+    const std::vector<at::Tensor>& weight1, const std::vector<at::Tensor>& weight2, int64_t moeExpertNum,
+    int64_t epWorldSize, int64_t cclBufferSize, const c10::optional<std::vector<at::Tensor>>& weightScales1,
+    const c10::optional<std::vector<at::Tensor>>& weightScales2, const c10::optional<std::vector<at::Tensor>>& bias1,
+    const c10::optional<std::vector<at::Tensor>>& bias2, const c10::optional<at::Tensor>& xActiveMask,
+    const c10::optional<at::Tensor>& scales, const c10::optional<std::vector<at::Tensor>>& sharedWeight1,
+    const c10::optional<std::vector<at::Tensor>>& sharedWeight2,
+    const c10::optional<std::vector<at::Tensor>>& sharedWeightScales1,
+    const c10::optional<std::vector<at::Tensor>>& sharedWeightScales2,
+    const c10::optional<std::vector<at::Tensor>>& sharedBias1,
+    const c10::optional<std::vector<at::Tensor>>& sharedBias2, const c10::optional<at::Tensor>& maskBuffer,
     int64_t maxRecvTokenNum, int64_t dispatchQuantMode, int64_t combineQuantMode, std::string commAlg,
     int64_t numMaxTokensPerRank, std::string activation, std::vector<float> activationParams,
     c10::optional<int64_t> dispatchQuantOutDtype, c10::optional<int64_t> sharedExpertQuantOutDtype,
@@ -235,7 +235,7 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
                                      xActiveMask,
                                      scales,
                                      maskBuffer};
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     const bool isAscend950 = socName != nullptr && std::strstr(socName, "Ascend950") != nullptr;
     CheckMegaMoeInputs(inputs, epWorldSize, moeExpertNum, socName, isAscend950);
     if (isAscend950) {
@@ -260,7 +260,7 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     at::TensorList weight1Ref = weight1;
     at::TensorList weight2Ref = weight2;
 
-    auto toTensorList = [](const c10::optional<std::vector<at::Tensor>> &opt) -> at::TensorList {
+    auto toTensorList = [](const c10::optional<std::vector<at::Tensor>>& opt) -> at::TensorList {
         return opt.has_value() ? at::TensorList(opt.value()) : at::TensorList();
     };
     at::TensorList weightScales1Ref = toTensorList(weightScales1);
@@ -308,10 +308,10 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     expertTokenNums = at::empty({localMoeExpertNum}, x.options().dtype(at::kInt));
 
     std::string commAlgStr = std::string(commAlg);
-    char *commAlgPtr = const_cast<char *>(commAlg.c_str());
+    char* commAlgPtr = const_cast<char*>(commAlg.c_str());
 
     std::string activationStr = std::string(activation);
-    char *activationPtr = const_cast<char *>(activationStr.c_str());
+    char* activationPtr = const_cast<char*>(activationStr.c_str());
 
     int64_t topoTypeValue = topoType.value_or(0);
     int64_t rankNumPerServerValue = rankNumPerServer.value_or(2);
@@ -405,6 +405,7 @@ constexpr int64_t MXFP_SCALE_GROUP_NUM = 32LL;
 constexpr int64_t MXFP_MULTI_BASE_SIZE = 2LL;
 constexpr int64_t Y_DTYPE_SIZE = 2LL;
 constexpr int64_t URMA_H_ALIGN = 1024LL;
+constexpr int64_t MTE_H_ALIGN = 64LL;
 constexpr int64_t MOE_PERMUTE_CHUNK = 1024LL;
 // 异常 Dump 区
 constexpr int64_t EXCEPTION_DUMP_REGION_SIZE = 60LL * 1024LL;
@@ -468,7 +469,7 @@ int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRou
 
 int64_t CalcTokenScaleBytesA5(int64_t hidden, int64_t numTopk, int64_t topkWeightsType)
 {
-    int64_t mxScaleNum = (hidden + ALIGN_32 - 1) / ALIGN_32;
+    int64_t mxScaleNum = (hidden + MXFP_SCALE_GROUP_NUM - 1) / MXFP_SCALE_GROUP_NUM;
     int64_t dataBytes = CeilAlign(hidden, ALIGN_256);
     int64_t tokenBytes = CeilAlign(dataBytes + mxScaleNum, ALIGN_32);
     if (topkWeightsType == 1) {
@@ -552,7 +553,7 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
                                 int64_t serverNum)
 {
     TORCH_CHECK(serverNum >= 0, "server_num must be non-negative, but got ", serverNum);
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     bool isA2 = (socName != nullptr && std::strstr(socName, "Ascend910B") != nullptr);
     bool isA3 = (socName != nullptr && std::strstr(socName, "Ascend910_93") != nullptr);
     if (isA2 || isA3) {
@@ -587,7 +588,7 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
     TORCH_CHECK(epWorldSize >= 2 && epWorldSize <= 1024, "ep_world_size only support in [2, 1024], but got ",
                 epWorldSize);
     TORCH_CHECK(hidden >= 1024 && hidden <= 8192, "hidden only support in [1024, 8192], but got ", hidden);
-    int64_t hiddenAlignment = serverNum > 0 ? URMA_H_ALIGN : ALIGN_32;
+    int64_t hiddenAlignment = serverNum > 0 ? URMA_H_ALIGN : MTE_H_ALIGN;
     TORCH_CHECK(hidden % hiddenAlignment == 0, "hidden must be a multiple of ", hiddenAlignment,
                 " for the selected communication topology, but got ", hidden);
     TORCH_CHECK(
