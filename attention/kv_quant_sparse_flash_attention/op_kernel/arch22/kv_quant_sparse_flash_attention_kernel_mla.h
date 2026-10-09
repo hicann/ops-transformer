@@ -530,9 +530,12 @@ __aicore__ inline void KvQuantSparseFlashAttentionMla<QSFAT>::InitWorkspaceGloba
         kvMergeGm_.SetGlobalBuffer((__gm__ K_ROPE_T *)(workspace + qsfaOffset + aiCoreIdx * kvMergeBytesPerCore));
         qsfaOffset += GetBlockNum() * kvMergeBytesPerCore;
 
-        // 每核 4 份：2 份 AIV 有效 size 分区 + 等大的 TQ4 逐 token FP16 scale 区
+        // 每核分区数：TQ4 需要 4 份（2 份 AIV 有效 size 分区 + 等大的 TQ4 逐 token FP16 scale 区），
+        // 其余量化模式只需 2 份 —— 与 host 侧 GetWorkspaceSize() 的预留保持一致。
+        uint32_t qsfaValidSizeRingUnits = (kvSfaKernelConstInfo.keyQuantMode == QUANT_MODE::TQ4) ? 4U : 2U;
         kvValidSizeGm_.SetGlobalBuffer(
-            (__gm__ int32_t *)(workspace + qsfaOffset + (aiCoreIdx * 4) * 128 * 4 * sizeof(int32_t)));
+            (__gm__ int32_t *)(workspace + qsfaOffset +
+                               (aiCoreIdx * qsfaValidSizeRingUnits) * 128 * 4 * sizeof(int32_t)));
     }
 
     if constexpr (FLASH_DECODE) {
