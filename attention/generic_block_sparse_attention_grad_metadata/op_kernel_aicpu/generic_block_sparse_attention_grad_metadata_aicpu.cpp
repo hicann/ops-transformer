@@ -86,6 +86,10 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ParamsCheck()
         KERNEL_LOG_ERROR("sparse_block_count must be a valid 3D tensor");
         return false;
     }
+    if (maxQSeqlen_ <= 0 || maxKvSeqlen_ <= 0) {
+        KERNEL_LOG_ERROR("max_q_seqlen=%d and max_kv_seqlen=%d must be > 0", maxQSeqlen_, maxKvSeqlen_);
+        return false;
+    }
     if (layoutQ_ == "TND") {
         if (cuSeqLengthsQ_ == nullptr || cuSeqLengthsQ_->GetData() == nullptr) {
             KERNEL_LOG_ERROR("cu_seq_lengths_q is required when layout_q is TND");
@@ -109,6 +113,11 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ParamsInit()
     jSize_ = static_cast<uint32_t>(idxShape->GetDimSize(2));
     maxS1_ = static_cast<uint32_t>(idxShape->GetDimSize(3));
 
+    if (batchSize_ == 0U || n2Size_ == 0U || jSize_ == 0U || maxS1_ == 0U) {
+        KERNEL_LOG_ERROR("sparse_block_idx dims must all be > 0, got [%u,%u,%u,%u]", batchSize_, n2Size_, jSize_,
+                         maxS1_);
+        return false;
+    }
     if (static_cast<uint32_t>(cntShape->GetDimSize(0)) != batchSize_ ||
         static_cast<uint32_t>(cntShape->GetDimSize(1)) != n2Size_ ||
         static_cast<uint32_t>(cntShape->GetDimSize(2)) != jSize_) {
@@ -140,8 +149,21 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ParamsInit()
         return false;
     }
 
+    if (layoutQ_ == "TND") {
+        const int64_t *cuQ = static_cast<const int64_t *>(cuSeqLengthsQ_->GetData());
+        const int64_t *cuKv = static_cast<const int64_t *>(cuSeqLengthsKv_->GetData());
+        for (uint32_t bIdx = 0U; bIdx < batchSize_; ++bIdx) {
+            const int64_t qLen = cuQ[bIdx + 1U] - cuQ[bIdx];
+            const int64_t kvLen = cuKv[bIdx + 1U] - cuKv[bIdx];
+            if (qLen <= 0 || kvLen <= 0) {
+                KERNEL_LOG_ERROR("batch %u has empty TND sequence qLen=%ld kvLen=%ld", bIdx, static_cast<long>(qLen),
+                                 static_cast<long>(kvLen));
+                return false;
+            }
+        }
+    }
+
     baseM_ = GSAG_DEFAULT_BASE_M;
-    // Cube/Softmax tile size (decoupled from sparse BlockY).
     baseN_ = GSAG_DEFAULT_BASE_N;
     coreGroupStart_.assign(aicCoreNum_, 0U);
     coreGroupEnd_.assign(aicCoreNum_, 0U);
@@ -150,8 +172,6 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ParamsInit()
 
 uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch35::GetKvSeqLen(uint32_t bIdx) const
 {
-    // seqused_kv is only meaningful for TND (same contract as Grad kernel).
-    // BNSD/BSND must use max_kv_seqlen (aligned with dense Q/K S dims).
     if (layoutKv_ == "TND") {
         if (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
             const int32_t *sequsedPtr = static_cast<const int32_t *>(sequsedKv_->GetData());
