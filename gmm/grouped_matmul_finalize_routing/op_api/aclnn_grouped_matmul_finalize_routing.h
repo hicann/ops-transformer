@@ -28,13 +28,13 @@ extern "C" {
  * @param [in] biasOptional: 偏置，数据类型支持：float32。
  * @param [in] pertokenScaleOptional: 反量化参数，数据类型支持：float32。
  * @param [in] groupListOptional: 代表输入和输出分组轴方向的matmul大小分布，数据类型支持：int64。
- * @param [in] sharedInputOptional: 
+ * @param [in] sharedInputOptional:
  * moe计算中共享专家的输出，需要与moe专家的输出进行combine操作，数据类型支持：bfloat16、float16。
- * @param [in] logitOptional: 
+ * @param [in] logitOptional:
  * moe专家对各个token的logit大小，矩阵乘的计算输出与该logit做乘法，然后索引进行combine，数据类型支持：float32。
- * @param [in] rowIndexOptional: 
+ * @param [in] rowIndexOptional:
  * moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引，数据类型支持：int64。
- * @param [in] sharedInputWeight: 
+ * @param [in] sharedInputWeight:
  * 共享专家与moe专家进行combine的系数，shareInput先于该参数乘，然后在和moe专家结果累加，数据类型支持：float32。
  * @param [in] sharedInputOffset: 共享专家输出的在总输出中的偏移，数据类型支持：int64。
  * @param [in] transposeX: 左矩阵是否转置，默认值：false。
@@ -45,26 +45,27 @@ extern "C" {
  * @param [out] executor: 返回op执行器，包含了算子计算流程。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize(const aclTensor *x, aclTensor *w, const aclTensor *scaleOptional,
-                                                     const aclTensor* biasOptional, const aclTensor *pertokenScaleOptional, 
-                                                     const aclTensor *groupListOptional, const aclTensor *sharedInputOptional, const aclTensor* logitOptional,
-                                                     const aclTensor *rowIndexOptional, int64_t dtype, float sharedInputWeight,  
-                                                     int64_t sharedInputOffset, bool transposeX, bool transposeW, int64_t groupListType, aclTensor *y,
-                                                     uint64_t *workspaceSize, aclOpExecutor **executor);
+ACLNN_API aclnnStatus aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize(
+    const aclTensor* x, aclTensor* w, const aclTensor* scaleOptional, const aclTensor* biasOptional,
+    const aclTensor* pertokenScaleOptional, const aclTensor* groupListOptional, const aclTensor* sharedInputOptional,
+    const aclTensor* logitOptional, const aclTensor* rowIndexOptional, int64_t dtype, float sharedInputWeight,
+    int64_t sharedInputOffset, bool transposeX, bool transposeW, int64_t groupListType, aclTensor* y,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnGroupedMatmulFinalizeRouting的第二段接口，用于执行计算。
  * @param [in] workspace: 在npu device侧申请的workspace内存起址。
- * @param [in] workspace_size: 在npu device侧申请的workspace大小，由第一段接口aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize获取。
- * @param [in] exector: op执行器，包含了算子计算流程。
+ * @param [in] workspace_size: 在npu
+ * device侧申请的workspace大小，由第一段接口aclnnGroupedMatmulFinalizeRoutingGetWorkspaceSize获取。
+ * @param [in] executor: op执行器，包含了算子计算流程。
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnGroupedMatmulFinalizeRouting(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
-                                                        aclrtStream stream);
+ACLNN_API aclnnStatus aclnnGroupedMatmulFinalizeRouting(void* workspace, uint64_t workspaceSize,
+                                                        aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // OP_API_INC_QUANT_MATMUL_NZ
+#endif // OP_API_INC_QUANT_MATMUL_NZ

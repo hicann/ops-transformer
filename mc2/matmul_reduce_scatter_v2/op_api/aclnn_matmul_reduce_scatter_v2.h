@@ -49,21 +49,21 @@ extern "C" {
  * @return aclnnStatus: 返回状态码
  */
 ACLNN_API aclnnStatus aclnnMatmulReduceScatterV2GetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *x1Scale, const aclTensor *x2Scale,
-    const aclTensor *quantScale, int64_t blockSize, const char *group, const char *reduceOp, int64_t commTurn,
-    int64_t streamMode, int64_t groupSize, const char *commMode, aclTensor *output, aclTensor *amaxOutOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* x1Scale, const aclTensor* x2Scale,
+    const aclTensor* quantScale, int64_t blockSize, const char* group, const char* reduceOp, int64_t commTurn,
+    int64_t streamMode, int64_t groupSize, const char* commMode, aclTensor* output, aclTensor* amaxOutOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMatmulReduceScatter的第二段接口，用于执行计算。
  * @param [in] workspace: 在npu device侧申请的workspace内存起址。
  * @param [in] workspace_size: 在npu
  * device侧申请的workspace大小，由第一段接口aclnnMatmulReduceScatterV2GetWorkspaceSize获取。
- * @param [in] exector: op执行器，包含了算子计算流程。
+ * @param [in] executor: op执行器，包含了算子计算流程。
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnMatmulReduceScatterV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMatmulReduceScatterV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                  aclrtStream stream);
 
 #ifdef __cplusplus

@@ -54,24 +54,24 @@ extern "C" {
  *
  */
 ACLNN_API aclnnStatus aclnnMoeDistributeDispatchTeardownGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *y, const aclTensor *expertIds, const aclTensor *commCmdInfo,
-    const char *groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType,
+    const aclTensor* x, const aclTensor* y, const aclTensor* expertIds, const aclTensor* commCmdInfo,
+    const char* groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType,
     int64_t sharedExpertNum, int64_t sharedExpertRankNum, int64_t quantMode, int64_t globalBs,
-    int64_t expertTokenNumsType, int64_t commType, char *commAlg, aclTensor *expandXOut, aclTensor *dynamicScalesOut,
-    aclTensor *assistInfoForCombineOut, aclTensor *expertTokenNumsOut, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    int64_t expertTokenNumsType, int64_t commType, char* commAlg, aclTensor* expandXOut, aclTensor* dynamicScalesOut,
+    aclTensor* assistInfoForCombineOut, aclTensor* expertTokenNumsOut, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
 /**
  * @brief aclnnMoeDistributeDispatchTeardown的第二段接口，用于执行计算。
  * @param [in] workspace: 在npu device侧申请的workspace内存起址。
  * @param [in] workspaceSize: 在npu device侧申请的workspace大小，
     由第一段接口aclnnMoeDistributeDispatchTeardownGetWorkspaceSize获取。
- * @param [in] exector: op执行器，包含了算子计算流程。
+ * @param [in] executor: op执行器，包含了算子计算流程。
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnMoeDistributeDispatchTeardown(void *workspace, uint64_t workspaceSize,
-                                                         aclOpExecutor *executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnMoeDistributeDispatchTeardown(void* workspace, uint64_t workspaceSize,
+                                                         aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }
