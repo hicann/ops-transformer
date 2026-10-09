@@ -79,7 +79,6 @@ uint32_t GatherPaKvCacheGetBlockDim(gert::TilingContext *context)
     return blockDim;
 }
 
-
 bool CommonGatherPaKvCacheTiling(gert::TilingContext *context)
 {
     auto kCacheShape = context->GetInputShape(DIM_0);
@@ -98,13 +97,16 @@ bool CommonGatherPaKvCacheTiling(gert::TilingContext *context)
     int32_t tokenSizeV;
     auto inDtype = context->GetInputDesc(DIM_0)->GetDataType();
     uint32_t typeByte = static_cast<uint32_t>(GetTensorElementSizes(inDtype));
+    bool isViewKCache = context->InputIsView(DIM_0);
+    bool isViewVCache = context->InputIsView(DIM_1);
     if (strcmp(mode, "PA_NZ") == 0) {
         blockSize = static_cast<int32_t>(kCacheShape->GetStorageShape().GetDim(DIM_2));
         tokenSizeK = static_cast<int32_t>(kShape->GetStorageShape().GetDim(DIM_1));
         tokenSizeV = static_cast<int32_t>(vShape->GetStorageShape().GetDim(DIM_1));
         context->SetTilingKey(TILING_KEY_NZ);
     } else if (strcmp(mode, "Norm") == 0) {
-        blockSize = static_cast<int32_t>(kCacheShape->GetStorageShape().GetDim(DIM_1));
+        blockSize = isViewKCache ? static_cast<int32_t>(kCacheShape->GetOriginShape().GetDim(DIM_1)) :
+                                   static_cast<int32_t>(kCacheShape->GetStorageShape().GetDim(DIM_1));
         tokenSizeK =
             static_cast<int32_t>(kShape->GetStorageShape().GetDim(DIM_1) * kShape->GetStorageShape().GetDim(DIM_2));
         tokenSizeV =
@@ -140,8 +142,6 @@ bool CommonGatherPaKvCacheTiling(gert::TilingContext *context)
     bool isSeqLensCumsum = (isSeqLensCumsumPtr == nullptr) ? true : *isSeqLensCumsumPtr;
     int64_t kCacheBlockStride = 0;
     int64_t vCacheBlockStride = 0;
-    bool isViewKCache = context->InputIsView(DIM_0);
-    bool isViewVCache = context->InputIsView(DIM_1);
     if (isViewKCache) {
         auto *kCacheStride = context->GetInputStride(DIM_0);
         if (kCacheStride != nullptr) {
