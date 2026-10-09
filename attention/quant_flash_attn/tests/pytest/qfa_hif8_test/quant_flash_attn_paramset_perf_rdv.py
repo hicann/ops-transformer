@@ -61,4 +61,24 @@ TEST_PARAMS = {
     },
 }
 
+# Long-sequence GQA performance cases share all parameters except sequence length.
+for seq_len in (10240, 16384, 20480, 32768, 65536):
+    TEST_PARAMS[f"TND_B1_QS{seq_len}_KVS{seq_len}_Nq20_Nkv2_D128_SP0"] = {
+        "B": [1],
+        "N_q": [20],
+        "N_kv": [2],
+        "D": [128],
+        "cu_seqlens_q": [[0, seq_len]],
+        "cu_seqlens_kv": [[0, seq_len]],
+        "seqused_q": [[seq_len]],
+        "seqused_kv": [[seq_len]],
+        "max_seqlen_q": [seq_len],
+        "max_seqlen_kv": [seq_len],
+        "mask_mode": [0],
+        "q_scale_layout": ["BSND"],
+        "p_scale": [1.0],
+        "enable_lse": [False],
+        "input_layout": ["TND"],
+    }
+
 CASES = expand_paramset_to_cases(TEST_PARAMS)

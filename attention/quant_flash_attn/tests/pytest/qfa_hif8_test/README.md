@@ -51,8 +51,8 @@ qfa_hif8_test/
 │   └── test_runner.py                          # 共享测试执行逻辑（apply_params / execute_test / check_results）
 ├── quant_flash_attn_paramset_common.py         # 参数展开公共逻辑 + 默认值
 ├── quant_flash_attn_paramset_debug.py          # debug 参数集（少量用例，快速验证）
-├── quant_flash_attn_paramset_func_rdv.py       # 功能正确性参数集（50 条）
-├── quant_flash_attn_paramset_perf_rdv.py       # 性能/压力参数集（3 条）
+├── quant_flash_attn_paramset_func_rdv.py       # 功能正确性参数集（100 条）
+├── quant_flash_attn_paramset_perf_rdv.py       # 性能/压力参数集（8 条）
 ├── test_quant_flash_attn_debug.py              # debug 测试入口
 ├── test_quant_flash_attn_func_rdv.py           # 功能正确性测试入口
 └── test_quant_flash_attn_perf_rdv.py           # 性能/压力测试入口
@@ -65,8 +65,8 @@ qfa_hif8_test/
 | 测试文件 | Marker | 参数集 | 用途 |
 |----------|--------|--------|------|
 | `test_quant_flash_attn_debug.py` | `@pytest.mark.debug` | debug（2 条） | 快速验证基本功能 |
-| `test_quant_flash_attn_func_rdv.py` | `@pytest.mark.func_rdv` `@pytest.mark.ci` | func_rdv（50 条） | 功能正确性全覆盖 |
-| `test_quant_flash_attn_perf_rdv.py` | `@pytest.mark.perf_rdv` | perf_rdv（3 条） | 性能/压力验证 |
+| `test_quant_flash_attn_func_rdv.py` | `@pytest.mark.func_rdv` `@pytest.mark.ci` | func_rdv（100 条） | 功能正确性全覆盖 |
+| `test_quant_flash_attn_perf_rdv.py` | `@pytest.mark.perf_rdv` | perf_rdv（8 条） | 性能/压力验证 |
 
 ### 4.2 基本执行
 
@@ -84,6 +84,47 @@ pytest test_quant_flash_attn_perf_rdv.py -v
 pytest -m debug -v
 pytest -m func_rdv -v
 pytest -m ci -v
+```
+
+### 性能快速模式与精度开关
+
+`perf_rdv` 用例默认只跑性能：优先复用 `--cache-dir` 中的输入，缺失时仅生成并缓存输入；执行 NPU 并同步等待完成。此模式不生成或加载 CPU golden，不做精度比对，也不将 NPU 输出搬回 CPU 或保存到磁盘。
+首次输入准备、扩展加载和 profiler 启动仍需时间；算子性能应看 msprof 的 kernel Duration。
+
+```bash
+# 快速采集性能：无需提前生成 golden，支持空缓存目录。
+pytest test_quant_flash_attn_perf_rdv.py -v --msprof
+
+# 最终精度验收：生成输入、CPU golden，执行 NPU 并比对。
+pytest test_quant_flash_attn_perf_rdv.py -v --check-accuracy
+
+# 对 debug/功能用例显式使用快速模式。
+pytest test_quant_flash_attn_debug.py -v --golden-mode=perf --msprof
+
+# 已有匹配的输入和 golden 缓存时，仅重跑 NPU 并比对。
+pytest test_quant_flash_attn_perf_rdv.py -v --golden-mode=npu,compare
+```
+
+功能/debug 用例默认仍执行完整精度验证。显式 `--golden-mode` 保留原有手动阶段选择；`perf` 必须单独使用，`--check-accuracy` 与 `--golden-mode` 不可同时指定。
+性能模式的 passed 仅表示 NPU 执行成功，不代表精度通过。pytest 会汇总提示未做精度比对，并在报告属性中记录 `accuracy_checked=False`。
+仅在参数和输入生成逻辑一致时复用缓存，否则请指定新的缓存目录。
+
+性能 RDV 共 8 条，其中以下 5 条长序列用例使用相同参数：B=1、Nq=20、Nkv=2、D=128、TND、SP0、LSE=false、p_scale=1.0；Q/KV 长度相同。
+
+| 场景 | Q 长度 | KV 长度 |
+| --- | ---: | ---: |
+| 10K | 10240 | 10240 |
+| 16K | 16384 | 16384 |
+| 20K | 20480 | 20480 |
+| 32K | 32768 | 32768 |
+| 64K | 65536 | 65536 |
+
+```bash
+# 仅采集这 5 条长序列用例。
+pytest test_quant_flash_attn_perf_rdv.py -k "Nq20_Nkv2_D128_SP0" --msprof -v
+
+# 仅采集 64K 用例。
+pytest test_quant_flash_attn_perf_rdv.py -k QS65536 --msprof -v
 ```
 
 ### 4.3 过滤用例（-k）
@@ -115,7 +156,8 @@ pytest -v -k "not BSND"
 
 | 模式 | 作用 |
 |------|------|
-| `all` | 全流程：生成数据 → CPU → NPU → 精度对比（**默认值**） |
+| `all` | 全流程：生成数据 → CPU → NPU → 精度对比（功能/debug 用例默认值） |
+| `perf` | 性能用例默认：复用/生成输入 → NPU → 同步；无 golden、比对、输出落盘 |
 | `gen` | 仅生成并保存输入数据 |
 | `cpu` | 加载输入缓存 → 跑 CPU 并保存输出 |
 | `npu` | 加载输入缓存 → 跑 NPU 并保存输出 |
@@ -133,7 +175,7 @@ pytest test_quant_flash_attn_func_rdv.py -v --golden-mode=npu,compare
 pytest test_quant_flash_attn_func_rdv.py -v --cache-dir=/tmp/my_cache
 ```
 
-每个 case 生成 3 个 `.pt` 文件：
+完整流程为每个 case 生成以下 3 个 `.pt` 文件；`perf` 模式仅生成或复用输入文件：
 
 ```
 golden_cache/

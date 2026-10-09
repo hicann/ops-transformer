@@ -583,8 +583,8 @@ def _call_npu_fa_op(
         else None
     )
 
-    is_tnd_q = layout_q == "TND"
-    is_tnd_kv = layout_kv == "TND"
+    is_varlen_q = layout_q in ("TND", "NTD")
+    is_varlen_kv = layout_kv in ("TND", "NTD")
 
     torch.npu.synchronize()
 
@@ -593,11 +593,11 @@ def _call_npu_fa_op(
         num_heads_kv=kv_n,
         head_dim=q.shape[-1],
         quant_mode=0,
-        cu_seqlens_q=cu_seqlens_q_t if is_tnd_q else None,
-        cu_seqlens_kv=cu_seqlens_kv_t if is_tnd_kv else None,
+        cu_seqlens_q=cu_seqlens_q_t if is_varlen_q else None,
+        cu_seqlens_kv=cu_seqlens_kv_t if is_varlen_kv else None,
         seqused_q=seqused_q_t,
         seqused_kv=seqused_kv_t,
-        batch_size=B if not is_tnd_q else None,
+        batch_size=B if not is_varlen_q else None,
         mask_mode=sparse_mode,
         layout_q=layout_q,
         layout_q_descale=layout_q_descale,
@@ -617,8 +617,8 @@ def _call_npu_fa_op(
         "quant_mode": 0,
         "block_table": block_table,
         "p_scale": p_scale,
-        "cu_seqlens_q": cu_seqlens_q_t if is_tnd_q else None,
-        "cu_seqlens_kv": cu_seqlens_kv_t if is_tnd_kv else None,
+        "cu_seqlens_q": cu_seqlens_q_t if is_varlen_q else None,
+        "cu_seqlens_kv": cu_seqlens_kv_t if is_varlen_kv else None,
         "seqused_q": seqused_q_t,
         "seqused_kv": seqused_kv_t,
         "attn_mask": mask,
@@ -675,13 +675,15 @@ class Network(nn.Module):
         max_seqlen_kv,
         batch_size,
     ):
+        is_varlen_q = layout_q in ("TND", "NTD")
+        is_varlen_kv = layout_kv in ("TND", "NTD")
         metadata = quant_flash_attn_metadata(
             num_heads_q=q_n,
             num_heads_kv=kv_n,
             head_dim=q.shape[-1],
             quant_mode=0,
-            cu_seqlens_q=cu_seqlens_q,
-            cu_seqlens_kv=cu_seqlens_kv,
+            cu_seqlens_q=cu_seqlens_q if is_varlen_q else None,
+            cu_seqlens_kv=cu_seqlens_kv if is_varlen_kv else None,
             seqused_q=seqused_q,
             seqused_kv=seqused_kv,
             head_dim_v=None,
@@ -704,8 +706,8 @@ class Network(nn.Module):
             "quant_mode": 0,
             "block_table": block_table,
             "p_scale": p_scale,
-            "cu_seqlens_q": cu_seqlens_q,
-            "cu_seqlens_kv": cu_seqlens_kv,
+            "cu_seqlens_q": cu_seqlens_q if is_varlen_q else None,
+            "cu_seqlens_kv": cu_seqlens_kv if is_varlen_kv else None,
             "seqused_q": seqused_q,
             "seqused_kv": seqused_kv,
             "attn_mask": mask,
@@ -1036,7 +1038,7 @@ def hif8_fa_torch_npu(
             out_dtype,
             max_seqlen_q,
             max_seqlen_kv,
-            q.shape[0] if layout_q != "TND" else None,
+            q.shape[0] if layout_q not in ("TND", "NTD") else None,
         )
 
         logger.info("[NPU] 调用 aclgraph (npugraph_ex)...")

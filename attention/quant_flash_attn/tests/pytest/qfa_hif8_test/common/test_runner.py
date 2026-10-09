@@ -52,8 +52,12 @@ def apply_params(params):
 def execute_test(params, mode, cdir=None):
     apply_params(params)
     case_name = params["name"]
+    perf_only = "perf" in mode
 
-    if "gen" in mode:
+    generate_input = "gen" in mode or (
+        perf_only and not golden_cache.has_input(case_name, cache_dir=cdir)
+    )
+    if generate_input:
         data = golden.generate_data()
         (
             q_fp8,
@@ -121,13 +125,13 @@ def execute_test(params, mode, cdir=None):
             kr_bf16=kr_bf16,
         )
         golden_cache.save_cpu_output(case_name, cpu_out, cpu_lse, cache_dir=cdir)
-    else:
+    elif "compare" in mode:
         cpu_out, cpu_lse = golden_cache.load_cpu_output(case_name, cache_dir=cdir)
 
     if "cpu" in mode and "npu" not in mode and "compare" not in mode:
         return None, None
 
-    if "npu" in mode:
+    if "npu" in mode or perf_only:
         with torch.profiler.record_function(f"hif8_fa::{case_name}"):
             npu_out, lse_out = golden.npu_hif8_fa(
                 q_fp8,
@@ -147,6 +151,10 @@ def execute_test(params, mode, cdir=None):
                 qr_bf16,
                 kr_bf16,
             )
+        if perf_only:
+            # Surface asynchronous device failures without copying outputs to CPU.
+            torch.npu.synchronize()
+            return None, None
         golden_cache.save_npu_output(case_name, npu_out, lse_out, cache_dir=cdir)
     else:
         npu_out, lse_out = golden_cache.load_npu_output(case_name, cache_dir=cdir)

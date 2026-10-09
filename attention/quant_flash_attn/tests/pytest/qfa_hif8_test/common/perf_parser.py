@@ -17,7 +17,7 @@ from pathlib import Path
 
 
 def parse_op_summary(
-    csv_path: str, operator_name: str = "FusedInferAttentionScore"
+    csv_path: str, operator_name: str = "QuantFlashAttn"
 ) -> list[dict]:
     with open(csv_path) as f:
         rows = list(csv.DictReader(f))
@@ -72,7 +72,7 @@ def find_op_summary_csv(prof_dir: str) -> Path | None:
 
 
 def parse_prof_directory(
-    prof_dir: str, operator_name: str = "FusedInferAttentionScore"
+    prof_dir: str, operator_name: str = "QuantFlashAttn"
 ) -> tuple[list[dict], Path | None]:
     csv_path = find_op_summary_csv(prof_dir)
     if csv_path is None:

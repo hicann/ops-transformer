@@ -16,11 +16,15 @@ from pathlib import Path
 
 import pytest
 
-_VALID_MODES = {"all", "gen", "cpu", "npu", "compare"}
+_VALID_MODES = {"all", "gen", "cpu", "npu", "compare", "perf"}
 
 
 def _parse_golden_mode(raw):
     parts = {m.strip() for m in raw.split(",") if m.strip()}
+    if not parts:
+        raise pytest.UsageError("golden-mode must not be empty")
+    if "perf" in parts and len(parts) != 1:
+        raise pytest.UsageError("golden-mode=perf cannot be combined with other modes")
     invalid = parts - _VALID_MODES
     if invalid:
         raise pytest.UsageError(
@@ -34,12 +38,18 @@ def _parse_golden_mode(raw):
 def pytest_addoption(parser):
     parser.addoption(
         "--golden-mode",
-        default="all",
+        default=None,
         help=(
-            "Golden 执行模式，支持逗号组合: "
-            "all=全流程, gen=生成数据, cpu=跑CPU, npu=跑NPU, compare=精度对比. "
-            "例: --golden-mode=npu,compare"
+            "Execution stages: all, gen, cpu, npu, compare (comma-separated), "
+            "or perf (standalone: cached/generated inputs + NPU only). "
+            "Default: perf for perf_rdv, all for other cases."
         ),
+    )
+    parser.addoption(
+        "--check-accuracy",
+        action="store_true",
+        default=False,
+        help="Run CPU golden and accuracy comparison for perf_rdv cases (off by default).",
     )
     parser.addoption(
         "--cache-dir",
@@ -148,6 +158,16 @@ def _run_msprof_and_parse(config):
 
 
 def pytest_configure(config):
+    if (
+        config.getoption("--check-accuracy")
+        and config.getoption("--golden-mode") is not None
+    ):
+        raise pytest.UsageError(
+            "Use either --check-accuracy or --golden-mode, not both"
+        )
+    raw_mode = config.getoption("--golden-mode")
+    if raw_mode is not None:
+        _parse_golden_mode(raw_mode)
     if config.getoption("--msprof", default=False):
         _run_msprof_and_parse(config)
         return
@@ -169,9 +189,36 @@ def pytest_configure(config):
     pytest.exit("profiling report complete", returncode=0)
 
 
-@pytest.fixture(scope="session")
+def _resolve_golden_mode(raw_mode, is_perf, check_accuracy):
+    if raw_mode is not None:
+        return _parse_golden_mode(raw_mode)
+    if is_perf and not check_accuracy:
+        return {"perf"}
+    return _parse_golden_mode("all")
+
+
+@pytest.fixture
 def golden_mode(request):
-    return _parse_golden_mode(request.config.getoption("--golden-mode"))
+    mode = _resolve_golden_mode(
+        request.config.getoption("--golden-mode"),
+        request.node.get_closest_marker("perf_rdv") is not None,
+        request.config.getoption("--check-accuracy"),
+    )
+    request.node.user_properties.append(("accuracy_checked", "compare" in mode))
+    return mode
+
+
+def pytest_terminal_summary(terminalreporter):
+    reports = terminalreporter.stats.get("passed", [])
+    count = sum(
+        dict(report.user_properties).get("accuracy_checked") is False
+        for report in reports
+    )
+    if count:
+        terminalreporter.write_line(
+            f"{count} passed case(s) ran without accuracy comparison; "
+            "use --check-accuracy for perf_rdv correctness checks."
+        )
 
 
 @pytest.fixture(scope="session")

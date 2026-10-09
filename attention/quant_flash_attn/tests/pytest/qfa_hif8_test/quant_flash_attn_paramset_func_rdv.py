@@ -842,5 +842,105 @@ TEST_PARAMS = {
     },
 }
 
+
+# Add fifty small correctness cases that cover HIF8 supported layouts,
+# masks, LSE, batch forms, GQA ratios, P scales and tile-boundary tails.
+_SMALL_QKV_SHAPES = [
+    (1, 1),
+    (1, 16),
+    (3, 33),
+    (7, 64),
+    (15, 17),
+    (16, 32),
+    (17, 63),
+    (31, 33),
+    (32, 64),
+    (33, 127),
+    (63, 65),
+    (64, 128),
+    (65, 31),
+    (96, 64),
+    (127, 128),
+    (128, 127),
+    (128, 128),
+]
+_SMALL_HEAD_PAIRS = [
+    (1, 1),
+    (2, 1),
+    (4, 1),
+    (8, 1),
+    (4, 2),
+    (8, 2),
+    (16, 4),
+    (16, 8),
+    (32, 8),
+    (32, 16),
+    (2, 2),
+    (8, 4),
+    (16, 2),
+    (16, 8),
+    (16, 4),
+    (4, 4),
+    (8, 8),
+]
+
+
+def _prefix_lengths(lengths):
+    offsets = [0]
+    for length in lengths:
+        offsets.append(offsets[-1] + length)
+    return offsets
+
+
+def _add_small_correctness_case(index, layout, local_index):
+    q_size, kv_size = _SMALL_QKV_SHAPES[local_index]
+    n_q, n_kv = _SMALL_HEAD_PAIRS[local_index]
+    batch_size = (1, 2, 1, 3)[local_index % 4]
+    if n_q >= 16:
+        batch_size = 1
+
+    if layout == "TND" and batch_size > 1:
+        q_lens = [max(1, q_size - (b % 2)) for b in range(batch_size)]
+        kv_lens = [max(1, kv_size - (b % 2)) for b in range(batch_size)]
+    else:
+        q_lens = [q_size] * batch_size
+        kv_lens = [kv_size] * batch_size
+
+    mask_mode = local_index % 2 * 3
+    enable_lse = (local_index // 2) % 2 == 1
+    p_scale = (1.0, 15.0, 128.0)[local_index % 3]
+    data_range = (0.5, 1.0, 2.0)[local_index % 3]
+    softmax_scale = (None, 0.125, 0.0625)[local_index % 3]
+    name = (
+        f"{layout}_extra{index:02d}_B{batch_size}_Q{max(q_lens)}"
+        f"_KV{max(kv_lens)}_Nq{n_q}_Nkv{n_kv}_SP{mask_mode}"
+    )
+    TEST_PARAMS[name] = {
+        "B": [batch_size],
+        "N_q": [n_q],
+        "N_kv": [n_kv],
+        "D": [128],
+        "cu_seqlens_q": [_prefix_lengths(q_lens)],
+        "cu_seqlens_kv": [_prefix_lengths(kv_lens)],
+        "seqused_q": [q_lens],
+        "seqused_kv": [kv_lens],
+        "max_seqlen_q": [max(q_lens)],
+        "max_seqlen_kv": [max(kv_lens)],
+        "mask_mode": [mask_mode],
+        "q_scale_layout": ["BSND"],
+        "p_scale": [p_scale],
+        "softmax_scale": [softmax_scale],
+        "data_range_q": [data_range],
+        "data_range_k": [data_range],
+        "data_range_v": [data_range],
+        "enable_lse": [enable_lse],
+        "input_layout": [layout],
+    }
+
+
+for _layout, _count in (("TND", 17), ("BSND", 17), ("BNSD", 16)):
+    for _local_index in range(_count):
+        _add_small_correctness_case(len(TEST_PARAMS) - 50, _layout, _local_index)
+
 CASES = expand_paramset_to_cases(TEST_PARAMS)
 SKIP_CASES = set()
