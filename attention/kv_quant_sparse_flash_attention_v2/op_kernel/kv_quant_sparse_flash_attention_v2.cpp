@@ -22,7 +22,12 @@
 #endif
 
 #include "../../kv_quant_sparse_flash_attention/op_kernel/kv_quant_sparse_flash_attention_template_tiling_key.h"
+
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
+#include "../../kv_quant_sparse_flash_attention/op_kernel/arch92/kv_quant_sparse_flash_attention_kernel_mla_arch92.h"
+#elif (__CCE_AICORE__ == 310)
 #include "../../kv_quant_sparse_flash_attention/op_kernel/arch35/kv_quant_sparse_flash_attention_kernel_mla_arch35.h"
+#endif
 
 using namespace AscendC;
 
@@ -51,7 +56,7 @@ using namespace AscendC;
                                       BaseApi::QSFAVectorService<__VA_ARGS__>>::type; \
         templateClass<CubeBlockType, VecBlockTypeV2> opV2; \
         GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tilingDataInV2, tiling); \
-        const tilingdataClass *__restrict tilingDataV2 = &tilingDataInV2; \
+        const tilingdataClass* __restrict tilingDataV2 = &tilingDataInV2; \
         opV2.Init(query, key, value, sparseIndices, keyScale, valueScale, blocktable, actualSeqLengthsQuery, \
                   actualSeqLengthsKV, sinks, attentionOut, softmaxMax, softmaxSum, user, tilingDataV2, &tPipe); \
         opV2.Process(); \
@@ -60,14 +65,14 @@ using namespace AscendC;
 
 template <int FLASH_DECODE, int PAGE_ATTENTION, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int IS_SPLIT_G,
           int IS_VEC_S2PHYADDR>
-__aicore__ inline void DispatchKernelDtype310V2(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
-                                                __gm__ uint8_t *sparseIndices, __gm__ uint8_t *keyScale,
-                                                __gm__ uint8_t *valueScale, __gm__ uint8_t *blocktable,
-                                                __gm__ uint8_t *actualSeqLengthsQuery,
-                                                __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *sinks,
-                                                __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxMax,
-                                                __gm__ uint8_t *softmaxSum, __gm__ uint8_t *user,
-                                                __gm__ uint8_t *tiling, TPipe &tPipe)
+__aicore__ inline void DispatchKernelDtype310V2(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
+                                                __gm__ uint8_t* sparseIndices, __gm__ uint8_t* keyScale,
+                                                __gm__ uint8_t* valueScale, __gm__ uint8_t* blocktable,
+                                                __gm__ uint8_t* actualSeqLengthsQuery,
+                                                __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* sinks,
+                                                __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxMax,
+                                                __gm__ uint8_t* softmaxSum, __gm__ uint8_t* user,
+                                                __gm__ uint8_t* tiling, TPipe& tPipe)
 {
     if constexpr (ORIG_DTYPE_QUERY == DT_BF16 && ORIG_DTYPE_KEY == DT_FLOAT8_E4M3FN &&
                   ORIG_DTYPE_ATTENTION_OUT == DT_BF16) {
@@ -111,16 +116,20 @@ __aicore__ inline void DispatchKernelDtype310V2(__gm__ uint8_t *query, __gm__ ui
 template <int FLASH_DECODE, int PAGE_ATTENTION, int LAYOUT_T, int KV_LAYOUT_T, int TEMPLATE_MODE, int IS_SPLIT_G,
           int IS_VEC_S2PHYADDR>
 __global__ __aicore__ void kv_quant_sparse_flash_attention_v2(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *sparseIndices,
-    __gm__ uint8_t *keyScale, __gm__ uint8_t *valueScale, __gm__ uint8_t *blocktable,
-    __gm__ uint8_t *actualSeqLengthsQuery, __gm__ uint8_t *actualSeqLengthsKV, __gm__ uint8_t *sinks,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *workspace,
-    __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* sparseIndices,
+    __gm__ uint8_t* keyScale, __gm__ uint8_t* valueScale, __gm__ uint8_t* blocktable,
+    __gm__ uint8_t* actualSeqLengthsQuery, __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* sinks,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxSum, __gm__ uint8_t* workspace,
+    __gm__ uint8_t* tiling)
 {
+#if (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202)
+    KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+#else
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+#endif
 
     TPipe tPipe;
-    __gm__ uint8_t *user = GetUserWorkspace(workspace);
+    __gm__ uint8_t* user = GetUserWorkspace(workspace);
     DispatchKernelDtype310V2<FLASH_DECODE, PAGE_ATTENTION, LAYOUT_T, KV_LAYOUT_T, TEMPLATE_MODE, IS_SPLIT_G,
                              IS_VEC_S2PHYADDR>(query, key, value, sparseIndices, keyScale, valueScale, blocktable,
                                                actualSeqLengthsQuery, actualSeqLengthsKV, sinks, attentionOut,

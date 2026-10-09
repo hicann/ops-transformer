@@ -1032,7 +1032,7 @@ def _t_increattention_bnsd(fa_param):
                     q_curr[..., :nope_dim].to(torch.float64),
                     k_sparse[..., :nope_dim].to(torch.float64).T,
                 )
-                nope_quant = torch.ceil(nope_sum * 16.0) / 16.0
+                nope_quant = nope_sum
                 acc = nope_quant.float()
                 q_rope_f64 = q_curr[..., nope_dim:].to(torch.float64)
                 k_rope_f64 = k_sparse[..., nope_dim:].to(torch.float64)
