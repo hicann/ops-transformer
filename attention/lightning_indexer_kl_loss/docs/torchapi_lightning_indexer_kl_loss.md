@@ -29,7 +29,7 @@
   $$
 
   $$
-  \log\_P = \log(\text{clamp\_min}(\tilde{y}, \varepsilon))
+  \log\_P = \log(\text{clamp\_min}(P, \varepsilon))
   $$
 
   $$
