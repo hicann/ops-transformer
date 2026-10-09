@@ -27,9 +27,9 @@ extern "C" {
 
 namespace {
 
-static constexpr const char *GSAG_ACLNN_OP_NAME = "aclnnGenericBlockSparseAttentionGradMetadata";
+static constexpr const char* GSAG_ACLNN_OP_NAME = "aclnnGenericBlockSparseAttentionGradMetadata";
 
-inline bool IsTensorExist(const aclTensor *tensor)
+inline bool IsTensorExist(const aclTensor* tensor)
 {
     return (tensor != nullptr) && (tensor->GetViewShape().GetDimNum() > 0) && (tensor->GetViewShape().GetDim(0) > 0);
 }
@@ -49,19 +49,19 @@ static constexpr size_t DIM_J = 2;
 static constexpr size_t DIM_MAX_S1 = 3;
 
 aclnnStatus CheckSingleParam(int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads,
-                             int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, const char *layoutQ,
-                             const char *layoutKv, int64_t layoutSparsePattern, int64_t maskType,
+                             int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, const char* layoutQ,
+                             const char* layoutKv, int64_t layoutSparsePattern, int64_t maskType,
                              int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
                              bool isConsistentTopk, uint32_t aicCoreNum, uint32_t aivCoreNum)
 {
-    if (maxQSeqlen < 0) {
+    if (maxQSeqlen <= 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GSAG_ACLNN_OP_NAME, "max_q_seqlen", std::to_string(maxQSeqlen),
-                                              "The value of max_q_seqlen must be greater than or equal to 0");
+                                              "The value of max_q_seqlen must be greater than 0");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (maxKvSeqlen < 0) {
+    if (maxKvSeqlen <= 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(GSAG_ACLNN_OP_NAME, "max_kv_seqlen", std::to_string(maxKvSeqlen),
-                                              "The value of max_kv_seqlen must be greater than or equal to 0");
+                                              "The value of max_kv_seqlen must be greater than 0");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (numQHeads <= 0 || numQHeads > GSAG_MAX_HEAD_NUM) {
@@ -107,7 +107,6 @@ aclnnStatus CheckSingleParam(int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t nu
                 layoutSparsePattern, residualBlockMode);
         return ACLNN_ERR_PARAM_INVALID;
     }
-    // TopK consistency is a forward-selection hint, not equality of inverse counts.
     (void)isConsistentTopk;
     if (layoutQ == nullptr || layoutKv == nullptr) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GSAG_ACLNN_OP_NAME, "layout_q/layout_kv",
@@ -143,9 +142,9 @@ aclnnStatus CheckSingleParam(int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t nu
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckExistence(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-                           const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional,
-                           const char *layoutQ, const char *layoutKv, const aclTensor *metadata)
+aclnnStatus CheckExistence(const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
+                           const aclTensor* cuSeqLengthsQOptional, const aclTensor* cuSeqLengthsKvOptional,
+                           const char* layoutQ, const char* layoutKv, const aclTensor* metadata)
 {
     if (!IsTensorExist(sparseBlockIdx)) {
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_idx",
@@ -176,9 +175,9 @@ aclnnStatus CheckExistence(const aclTensor *sparseBlockIdx, const aclTensor *spa
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CheckConsistency(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount, int64_t maxQSeqlen,
+aclnnStatus CheckConsistency(const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount, int64_t maxQSeqlen,
                              int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads, int64_t blockShapeY,
-                             const aclTensor *metadata)
+                             const aclTensor* metadata)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     if (sparseBlockIdx->GetViewShape().GetDimNum() != SPARSE_BLOCK_IDX_DIM_NUM) {
@@ -192,8 +191,8 @@ aclnnStatus CheckConsistency(const aclTensor *sparseBlockIdx, const aclTensor *s
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    const auto &idxShape = sparseBlockIdx->GetViewShape();
-    const auto &cntShape = sparseBlockCount->GetViewShape();
+    const auto& idxShape = sparseBlockIdx->GetViewShape();
+    const auto& cntShape = sparseBlockCount->GetViewShape();
     int64_t batchSize = idxShape.GetDim(DIM_B);
     int64_t n2 = idxShape.GetDim(DIM_N2);
     int64_t j = idxShape.GetDim(DIM_J);
@@ -210,6 +209,13 @@ aclnnStatus CheckConsistency(const aclTensor *sparseBlockIdx, const aclTensor *s
     if (n2 != numKvHeads) {
         OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_idx N2", std::to_string(n2),
                                                   "N2 must equal num_kv_heads");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (batchSize <= 0 || n2 <= 0 || j <= 0 || maxS1 <= 0) {
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(GSAG_ACLNN_OP_NAME, "sparse_block_idx",
+                                              std::to_string(batchSize) + ", " + std::to_string(n2) + ", " +
+                                                  std::to_string(j) + ", " + std::to_string(maxS1),
+                                              "sparse_block_idx dims [B, N2, J, maxS1] must all be > 0");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (maxS1 < maxQSeqlen) {
@@ -267,15 +273,15 @@ aclnnStatus CheckConsistency(const aclTensor *sparseBlockIdx, const aclTensor *s
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus ParamsCheck(const aclTensor *sparseBlockIdx, const aclTensor *sparseBlockCount,
-                               const aclTensor *cuSeqLengthsQOptional, const aclTensor *cuSeqLengthsKvOptional,
-                               const aclTensor *sequsedQOptional, const aclTensor *sequsedKvOptional,
+static aclnnStatus ParamsCheck(const aclTensor* sparseBlockIdx, const aclTensor* sparseBlockCount,
+                               const aclTensor* cuSeqLengthsQOptional, const aclTensor* cuSeqLengthsKvOptional,
+                               const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
                                int64_t maxQSeqlen, int64_t maxKvSeqlen, int64_t numQHeads, int64_t numKvHeads,
-                               int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, const char *layoutQ,
-                               const char *layoutKv, int64_t layoutSparsePattern, int64_t maskType,
+                               int64_t headDim, int64_t blockShapeX, int64_t blockShapeY, const char* layoutQ,
+                               const char* layoutKv, int64_t layoutSparsePattern, int64_t maskType,
                                int64_t softmaxPrecision, int64_t winLeft, int64_t winRight, int64_t residualBlockMode,
-                               bool isConsistentTopk, uint32_t aicCoreNum, uint32_t aivCoreNum, const char *socVersion,
-                               const aclTensor *metadata)
+                               bool isConsistentTopk, uint32_t aicCoreNum, uint32_t aivCoreNum, const char* socVersion,
+                               const aclTensor* metadata)
 {
     (void)sequsedQOptional;
     (void)sequsedKvOptional;

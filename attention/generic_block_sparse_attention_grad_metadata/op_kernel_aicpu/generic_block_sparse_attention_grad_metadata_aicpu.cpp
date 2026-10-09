@@ -19,7 +19,7 @@
 using namespace optiling;
 
 namespace aicpu {
-uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch35::Compute(CpuKernelContext &ctx)
+uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch35::Compute(CpuKernelContext& ctx)
 {
     bool success = Prepare(ctx);
     if (!success) {
@@ -30,7 +30,7 @@ uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch35::Compute(CpuKern
 }
 
 // 从 CpuKernelContext 取输入输出与属性，并进行参数检查和初始化
-bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::Prepare(CpuKernelContext &ctx)
+bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::Prepare(CpuKernelContext& ctx)
 {
     sparseBlockIdx_ = ctx.Input(static_cast<uint32_t>(ParamId::sparseBlockIdx));
     sparseBlockCount_ = ctx.Input(static_cast<uint32_t>(ParamId::sparseBlockCount));
@@ -86,6 +86,10 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ParamsCheck()
         KERNEL_LOG_ERROR("sparse_block_count must be a valid 3D tensor");
         return false;
     }
+    if (maxQSeqlen_ <= 0 || maxKvSeqlen_ <= 0) {
+        KERNEL_LOG_ERROR("max_q_seqlen=%d and max_kv_seqlen=%d must be > 0", maxQSeqlen_, maxKvSeqlen_);
+        return false;
+    }
     if (layoutQ_ == "TND") {
         if (cuSeqLengthsQ_ == nullptr || cuSeqLengthsQ_->GetData() == nullptr) {
             KERNEL_LOG_ERROR("cu_seq_lengths_q is required when layout_q is TND");
@@ -109,6 +113,11 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ParamsInit()
     jSize_ = static_cast<uint32_t>(idxShape->GetDimSize(2));
     maxS1_ = static_cast<uint32_t>(idxShape->GetDimSize(3));
 
+    if (batchSize_ == 0U || n2Size_ == 0U || jSize_ == 0U || maxS1_ == 0U) {
+        KERNEL_LOG_ERROR("sparse_block_idx dims must all be > 0, got [%u,%u,%u,%u]", batchSize_, n2Size_, jSize_,
+                         maxS1_);
+        return false;
+    }
     if (static_cast<uint32_t>(cntShape->GetDimSize(0)) != batchSize_ ||
         static_cast<uint32_t>(cntShape->GetDimSize(1)) != n2Size_ ||
         static_cast<uint32_t>(cntShape->GetDimSize(2)) != jSize_) {
@@ -140,8 +149,21 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ParamsInit()
         return false;
     }
 
+    if (layoutQ_ == "TND") {
+        const int64_t* cuQ = static_cast<const int64_t*>(cuSeqLengthsQ_->GetData());
+        const int64_t* cuKv = static_cast<const int64_t*>(cuSeqLengthsKv_->GetData());
+        for (uint32_t bIdx = 0U; bIdx < batchSize_; ++bIdx) {
+            const int64_t qLen = cuQ[bIdx + 1U] - cuQ[bIdx];
+            const int64_t kvLen = cuKv[bIdx + 1U] - cuKv[bIdx];
+            if (qLen <= 0 || kvLen <= 0) {
+                KERNEL_LOG_ERROR("batch %u has empty TND sequence qLen=%ld kvLen=%ld", bIdx, static_cast<long>(qLen),
+                                 static_cast<long>(kvLen));
+                return false;
+            }
+        }
+    }
+
     baseM_ = GSAG_DEFAULT_BASE_M;
-    // Cube/Softmax tile size (decoupled from sparse BlockY).
     baseN_ = GSAG_DEFAULT_BASE_N;
     coreGroupStart_.assign(aicCoreNum_, 0U);
     coreGroupEnd_.assign(aicCoreNum_, 0U);
@@ -150,15 +172,13 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ParamsInit()
 
 uint32_t GenericBlockSparseAttentionGradMetadataCpuKernelArch35::GetKvSeqLen(uint32_t bIdx) const
 {
-    // seqused_kv is only meaningful for TND (same contract as Grad kernel).
-    // BNSD/BSND must use max_kv_seqlen (aligned with dense Q/K S dims).
     if (layoutKv_ == "TND") {
         if (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
-            const int32_t *sequsedPtr = static_cast<const int32_t *>(sequsedKv_->GetData());
+            const int32_t* sequsedPtr = static_cast<const int32_t*>(sequsedKv_->GetData());
             return static_cast<uint32_t>(sequsedPtr[bIdx]);
         }
         if (cuSeqLengthsKv_ != nullptr && cuSeqLengthsKv_->GetData() != nullptr) {
-            const int64_t *cuPtr = static_cast<const int64_t *>(cuSeqLengthsKv_->GetData());
+            const int64_t* cuPtr = static_cast<const int64_t*>(cuSeqLengthsKv_->GetData());
             return static_cast<uint32_t>(cuPtr[bIdx + 1U] - cuPtr[bIdx]);
         }
     }
@@ -192,7 +212,7 @@ uint64_t GenericBlockSparseAttentionGradMetadataCpuKernelArch35::CalcGroupBlockC
 // cost = mTiles * nTiles * G，nTiles = CeilDiv(kvBlockLen, baseN)，baseN 为 Cube tile(128)。
 bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::BuildKvBlockGroups()
 {
-    const int32_t *countPtr = static_cast<const int32_t *>(sparseBlockCount_->GetData());
+    const int32_t* countPtr = static_cast<const int32_t*>(sparseBlockCount_->GetData());
     kvBlockGroups_.clear();
     totalBlockCost_ = 0U;
     maxTaskCount_ = 0;
@@ -299,7 +319,7 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::BalanceKvBlockGroup
 bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ExpandTaskList()
 {
     taskList_.clear();
-    for (const GsagKvBlockGroup &group : kvBlockGroups_) {
+    for (const GsagKvBlockGroup& group : kvBlockGroups_) {
         for (uint32_t gIdx = 0U; gIdx < groupSize_; ++gIdx) {
             GsagTask task;
             task.b = group.b;
@@ -323,7 +343,7 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::ExpandTaskList()
 // 生成元数据，将任务列表、块成本、核心数量等信息写入到 metadata 中
 bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::GenMetadata()
 {
-    int32_t *metadataPtr = static_cast<int32_t *>(metadata_->GetData());
+    int32_t* metadataPtr = static_cast<int32_t*>(metadata_->GetData());
     for (uint32_t i = 0U; i < metadataCapacity_; ++i) {
         metadataPtr[i] = 0;
     }
@@ -352,7 +372,7 @@ bool GenericBlockSparseAttentionGradMetadataCpuKernelArch35::GenMetadata()
     }
 
     for (uint32_t i = 0U; i < totalNum_; ++i) {
-        const GsagTask &task = taskList_[i];
+        const GsagTask& task = taskList_[i];
         const uint32_t base = TASK_LIST_OFFSET + i * TASK_ENTRY_SIZE;
         metadataPtr[base + TASK_B] = static_cast<int32_t>(task.b);
         metadataPtr[base + TASK_N2] = static_cast<int32_t>(task.n2);
@@ -380,7 +400,7 @@ class GenericBlockSparseAttentionGradMetadataCpuKernel : public CpuKernel {
 public:
     GenericBlockSparseAttentionGradMetadataCpuKernel() = default;
     ~GenericBlockSparseAttentionGradMetadataCpuKernel() override = default;
-    uint32_t Compute(CpuKernelContext &ctx) override
+    uint32_t Compute(CpuKernelContext& ctx) override
     {
         std::string socVersion;
         if (!GetAttrValue(ctx, "soc_version", socVersion)) {
@@ -401,7 +421,7 @@ private:
 };
 
 namespace {
-static const char *kernelType = "GenericBlockSparseAttentionGradMetadata";
+static const char* kernelType = "GenericBlockSparseAttentionGradMetadata";
 REGISTER_CPU_KERNEL(kernelType, GenericBlockSparseAttentionGradMetadataCpuKernel);
 } // namespace
 
