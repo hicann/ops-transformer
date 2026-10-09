@@ -489,6 +489,20 @@ bool IsFAIRoutingCandidate(const aclTensor *query, const aclTensorList *key, con
                queryHeadDim == keyHeadDim && queryHeadDim == valueHeadDim && blockSize % BLOCK_SIZE_ALIGNMENT == 0 &&
                blockSize <= MAX_BLOCK_SIZE;
     }
+    if (keyShape.GetDimNum() == DIM_NUM_4) {
+        if (valueShape.GetDimNum() != DIM_NUM_4) {
+            return false;
+        }
+        // BNBD: keep this predicate aligned with CheckFAIDSizePA4Dim.
+        // SplitFuse kernel accepts headDim without 16-alignment (e.g. D=37), only blockSize stays 16-aligned.
+        const int64_t blockSize = keyShape.GetDim(DIM_2);
+        const int64_t keyHeadDim = keyShape.GetDim(DIM_3);
+        const int64_t valueHeadDim = valueShape.GetDim(DIM_3);
+        const bool headDimSupported = queryHeadDim > 0 && queryHeadDim <= MAX_HEAD_DIM && queryHeadDim == keyHeadDim &&
+                                      queryHeadDim == valueHeadDim;
+        return headDimSupported && blockSize > 0 && blockSize % BLOCK_SIZE_ALIGNMENT == 0 &&
+               blockSize <= MAX_BLOCK_SIZE;
+    }
     if (keyShape.GetDimNum() == DIM_NUM_5) {
         if (valueShape.GetDimNum() <= DIM_NUM_3) {
             return false;
