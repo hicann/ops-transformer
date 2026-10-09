@@ -84,6 +84,7 @@ public:
             ubDList[i] = ubAllocator.template Allocate<ElementD>(TileShape::COUNT);
 
             eventUbCVMTE2List[i] = eventAllocator.NextVMte2();
+            eventUbScaleVMTE2List[i] = eventAllocator.NextVMte2();
             eventUbCMTE2VList[i] = eventAllocator.NextMte2V();
             eventUbScaleMTE2VList[i] = eventAllocator.NextMte2V();
             eventUbPerTokenScaleMTE2VList[i] = eventAllocator.NextMte2V();
@@ -101,6 +102,7 @@ public:
     {
         for (uint32_t i = 0; i < UB_STAGES; ++i) {
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[i]);
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[i]);
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventUbDMTE3VList[i]);
         }
     }
@@ -110,6 +112,7 @@ public:
     {
         for (uint32_t i = 0; i < UB_STAGES; ++i) {
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[i]);
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[i]);
             AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(eventUbDMTE3VList[i]);
         }
     }
@@ -197,6 +200,9 @@ private:
             AscendC::PipeBarrier<PIPE_V>();
         }
 
+        // Both scale buffers in this stage are no longer read by V and may be reused by MTE2.
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[ubListId]);
+
         // 将乘法结果从UB cast到D
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventUbDMTE3VList[ubListId]);
         if constexpr (EnablePerToken) {
@@ -252,6 +258,9 @@ private:
             }
             AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[ubListId]);
 
+            // Wait before overwriting either the per-channel or per-token scale buffer.
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[ubListId]);
+
             if constexpr (EnableScale) {
                 auto scaleTileOffset = tileOffset.template GetCoordByAxis<1>();
                 auto scaleTileShape = actualTileShape.template GetCoordByAxis<1>();
@@ -301,6 +310,7 @@ private:
     AscendC::LocalTensor<ElementD> ubDList[UB_STAGES];
 
     int32_t eventUbCVMTE2List[UB_STAGES];
+    int32_t eventUbScaleVMTE2List[UB_STAGES];
     int32_t eventUbCMTE2VList[UB_STAGES];
     int32_t eventUbScaleMTE2VList[UB_STAGES];
     int32_t eventUbPerTokenScaleMTE2VList[UB_STAGES];
