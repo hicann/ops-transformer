@@ -150,6 +150,8 @@ _legacy_map = {
     "mhc_post_backward": "mhc.mhc_post_backward",
     "mhc_pre_sinkhorn": "mhc.mhc_pre_sinkhorn",
     "mhc_pre_sinkhorn_backward": "mhc.mhc_pre_sinkhorn_backward",
+    "mixed_quant_flash_attn": "attention.mixed_quant_flash_attn",
+    "mixed_quant_flash_attn_metadata": "attention.mixed_quant_flash_attn",
     "mixed_quant_sparse_flash_mla": "attention.mixed_quant_sparse_flash_mla",
     "moe_finalize_routing": "moe.moe_finalize_routing_v2",
     "moe_init_routing": "moe.moe_init_routing_v4",

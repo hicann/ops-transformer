@@ -1,0 +1,86 @@
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+/*!
+ * \file aclnn_mixed_quant_flash_attn_metadata.cpp
+ * \brief
+ */
+
+#include "aclnn_mixed_quant_flash_attn_metadata.h"
+#include "l0_mixed_quant_flash_attn_metadata.h"
+#include "aclnn_kernels/contiguous.h"
+#include "aclnn_kernels/reshape.h"
+#include "aclnn/aclnn_base.h"
+#include "aclnn_kernels/common/op_error_check.h"
+#include "opdev/common_types.h"
+#include "opdev/data_type_utils.h"
+#include "opdev/format_utils.h"
+#include "opdev/op_dfx.h"
+#include "opdev/op_executor.h"
+#include "opdev/op_log.h"
+#include "opdev/tensor_view_utils.h"
+#include "opdev/make_op_executor.h"
+
+#include "../mixed_quant_flash_attn_metadata_check.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+aclnnStatus aclnnMixedQuantFlashAttnMetadataGetWorkspaceSize(
+    const aclTensor* cuSeqlensQOptional, const aclTensor* sequsedQOptional, const aclTensor* sequsedKvOptional,
+    int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim,
+    int64_t quantComputeMode, int64_t maskMode, int64_t winLeft, int64_t winRight, const char* layoutQ,
+    const char* layoutKv, const char* layoutAttnOut, const aclTensor* metaData, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
+{
+    L2_DFX_PHASE_1(
+        aclnnMixedQuantFlashAttnMetadata,
+        DFX_IN(cuSeqlensQOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ,
+               numHeadsKv, headDim, quantComputeMode, maskMode, winLeft, winRight, layoutQ, layoutKv, layoutAttnOut),
+        DFX_OUT(metaData));
+
+    auto uniqueExecutor = CREATE_EXECUTOR();
+    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+
+    auto ret = ParamsCheck(cuSeqlensQOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv,
+                           numHeadsQ, numHeadsKv, headDim, quantComputeMode, maskMode, winLeft, winRight, layoutQ,
+                           layoutKv, layoutAttnOut, metaData);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+
+    const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
+    uint32_t aicCoreNum = npuInfo.GetCubeCoreNum();
+    uint32_t aivCoreNum = npuInfo.GetVectorCoreNum();
+    const std::string socVersionStr = npuInfo.GetSocLongVersion();
+    const char* socVersion = socVersionStr.c_str();
+
+    auto output = l0op::MixedQuantFlashAttnMetadata(
+        cuSeqlensQOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ,
+        numHeadsKv, headDim, quantComputeMode, maskMode, winLeft, winRight, layoutQ, layoutKv, layoutAttnOut,
+        socVersion, aicCoreNum, aivCoreNum, metaData, uniqueExecutor.get());
+    CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
+
+    *workspaceSize = uniqueExecutor->GetWorkspaceSize();
+    uniqueExecutor.ReleaseTo(executor);
+    return ACLNN_SUCCESS;
+}
+
+__attribute__((visibility("default"))) aclnnStatus aclnnMixedQuantFlashAttnMetadata(void* workspace,
+                                                                                    uint64_t workspaceSize,
+                                                                                    aclOpExecutor* executor,
+                                                                                    aclrtStream stream)
+{
+    L2_DFX_PHASE_2(aclnnMixedQuantFlashAttnMetadata);
+    return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
+}
+
+#ifdef __cplusplus
+}
+#endif

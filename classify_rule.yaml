@@ -138,6 +138,9 @@ transformer-2@ops-transformer:
                 - ops/ops-transformer/attention/quant_lightning_indexer/op_kernel/arch35/
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention/op_host/
                 - ops/ops-transformer/attention/kv_quant_sparse_flash_attention/op_kernel/
+                - ops/ops-transformer/attention/mixed_quant_flash_attn/op_host/
+                - ops/ops-transformer/attention/mixed_quant_flash_attn/op_kernel/
+                - ops/ops-transformer/attention/mixed_quant_flash_attn/op_api/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/op_host/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/op_kernel/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/op_api/
@@ -174,6 +177,9 @@ transformer-2@ops-transformer:
                 - ops/ops-transformer/attention/quant_sparse_flash_mla/tests/
                 - ops/ops-transformer/attention/quant_sparse_flash_mla/docs/
                 - ops/ops-transformer/attention/quant_sparse_flash_mla/examples/
+                - ops/ops-transformer/attention/mixed_quant_flash_attn/tests/
+                - ops/ops-transformer/attention/mixed_quant_flash_attn/docs/
+                - ops/ops-transformer/attention/mixed_quant_flash_attn/examples/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/tests/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/docs/
                 - ops/ops-transformer/attention/mixed_quant_sparse_flash_mla/examples/

@@ -1,0 +1,90 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# ======================================================================================================================
+
+TestCases = {
+    "Decode_FP16_FP4e2m1_FP16_L0_35_64_8_2_1110_128_128_BNSD_PA_Mask_000017": {
+        "B": [35],
+        "N1": [64],
+        "N2": [8],
+        "S1": [2],
+        "S2": [1110],
+        "D": [128],
+        "layout_q": ["BNSD"],
+        "layout_kv": ["PA_NZ"],
+        "block_size": [256],
+        "q_dtype": ["fp16"],
+        "max_seqlen_q": [2],
+        "max_seqlen_kv": [-1],
+        "quant_compute_mode": [1],
+        "softmax_scale": 0.08838834764831843,
+        "mask_mode": [3],
+        "seqused_kv": [
+            [
+                987,
+                668,
+                483,
+                523,
+                1098,
+                595,
+                918,
+                396,
+                245,
+                605,
+                769,
+                495,
+                1110,
+                996,
+                759,
+                948,
+                885,
+                760,
+                942,
+                475,
+                342,
+                143,
+                1055,
+                378,
+                952,
+                7,
+                185,
+                295,
+                843,
+                1019,
+                71,
+                244,
+                237,
+                919,
+                100,
+            ]
+        ],
+        "q_range": [(-1000, 1000)],
+    },
+    "Decode_FP16_FP4e2m1_FP16_L0_4_63_21_3_795_128_128_BNSD_PA_Mask_000018": {
+        "B": [4],
+        "N1": [63],
+        "N2": [21],
+        "S1": [3],
+        "S2": [795],
+        "D": [128],
+        "layout_q": ["BNSD"],
+        "layout_kv": ["PA_NZ"],
+        "block_size": [256],
+        "q_dtype": ["fp16"],
+        "max_seqlen_q": [3],
+        "max_seqlen_kv": [-1],
+        "quant_compute_mode": [1],
+        "softmax_scale": 0.08838834764831843,
+        "mask_mode": [3],
+        "seqused_q": [[3, 1, 0, 1]],
+        "seqused_kv": [[493, 795, 493, 493]],
+        "q_range": [(0, 0.1)],
+    },
+}
