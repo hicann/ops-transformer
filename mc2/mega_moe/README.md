@@ -913,7 +913,7 @@
     - `activation`支持"swiglu"、"swiglustep"、"swigluoai"和"situglu"，各激活的参数配套关系见参数说明。
     - `BS`为本Rank本次调用的`x`.dim0，支持[1, +∞)，且不得超过创建`sym_buffer`时设置的`numMaxTokensPerRank`。不同Rank的实际`BS`可以不同，同一`sym_buffer`可以复用于多次不同`BS`的调用。
     - `numMaxTokensPerRank`必须大于等于1且所有Rank配置一致，建议设置为`sym_buffer`复用期间所有Rank可能出现的最大单卡`BS`。设置越大，内部申请的通信内存越多。
-    - `H`（`x`.dim1）范围[1024, 8192]。A8W8-FP场景要求`H`为32的倍数；A8W4-FP场景要求`H`为64的倍数；A4W4-FP场景仅支持`weight1`为FRACTAL_NZ格式，要求`H`为64的倍数。
+    - `H`（`x`.dim1）范围[1024, 8192]。`topoType` = 0（MTE拓扑）下各量化场景均要求`H`为64的倍数；`topoType` = 1（URMA跨超拓扑）要求`H`为1024的倍数。A4W4-FP场景仅支持`weight1`为FRACTAL_NZ格式。
     - `topK`（`topkIds`.dim1）支持[1, 32]。
     - `expertPerRank` 范围 [1, 1024]。
     - `intermediateHidden`表示激活后的中间特征维度，范围[256, 4096]且128对齐；`weight1`的完整输出宽度为2 × `intermediateHidden`。

@@ -347,6 +347,7 @@ constexpr int64_t MXFP_SCALE_GROUP_NUM = 32LL;
 constexpr int64_t MXFP_MULTI_BASE_SIZE = 2LL;
 constexpr int64_t Y_DTYPE_SIZE = 2LL;
 constexpr int64_t URMA_H_ALIGN = 1024LL;
+constexpr int64_t MTE_H_ALIGN = 64LL;
 constexpr int64_t MOE_PERMUTE_CHUNK = 1024LL;
 // 异常 Dump 区
 constexpr int64_t EXCEPTION_DUMP_REGION_SIZE = 60LL * 1024LL;
@@ -426,7 +427,7 @@ int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRou
 // mc2/mega_moe/op_kernel/arch35/common/mega_moe_peermem.h, which remains the host/device layout source of truth.
 int64_t CalcTokenScaleBytesA5(int64_t hidden, int64_t numTopk, int64_t topkWeightsType)
 {
-    int64_t mxScaleNum = (hidden + ALIGN_32 - 1) / ALIGN_32;
+    int64_t mxScaleNum = (hidden + MXFP_SCALE_GROUP_NUM - 1) / MXFP_SCALE_GROUP_NUM;
     int64_t dataBytes = CeilAlign(hidden, ALIGN_256);
     int64_t tokenBytes = CeilAlign(dataBytes + mxScaleNum, ALIGN_32);
     if (topkWeightsType == 1) {
@@ -545,7 +546,7 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
     TORCH_CHECK(epWorldSize >= 2 && epWorldSize <= 1024, "ep_world_size only support in [2, 1024], but got ",
                 epWorldSize);
     TORCH_CHECK(hidden >= 1024 && hidden <= 8192, "hidden only support in [1024, 8192], but got ", hidden);
-    int64_t hiddenAlignment = serverNum > 0 ? URMA_H_ALIGN : ALIGN_32;
+    int64_t hiddenAlignment = serverNum > 0 ? URMA_H_ALIGN : MTE_H_ALIGN;
     TORCH_CHECK(hidden % hiddenAlignment == 0, "hidden must be a multiple of ", hiddenAlignment,
                 " for the selected communication topology, but got ", hidden);
     TORCH_CHECK(

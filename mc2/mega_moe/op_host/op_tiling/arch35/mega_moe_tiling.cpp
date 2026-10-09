@@ -60,8 +60,7 @@ const static int64_t MIN_EXPERT_PER_RANK = 1LL;
 const static int64_t MAX_EXPERT_PER_RANK = 1024LL;
 const static int64_t MIN_H = 1024LL;
 const static int64_t MAX_H = 8LL * 1024LL; // 8K
-const static int64_t H_ALIGN = 32LL;
-const static int64_t W4_K_ALIGN = 64LL;
+const static int64_t MTE_H_ALIGN = 64LL;
 const static int64_t URMA_H_ALIGN = 1024LL;
 const static int64_t MAX_HIDDEN_DIM = 8LL * 1024LL; // 8K
 // hiddenDim 是 GMM1 含 gate/up 两路的完整输出宽度；MTE 与 URMA 共用支持尾 tile 的激活 epilogue。
@@ -2317,7 +2316,7 @@ static ge::graphStatus TilingCheckMegaMoe(const gert::TilingContext *context, Me
 }
 
 /*
- * 校验 topK 与 token 隐藏维 H：取值范围，以及按拓扑和权重分形确定的 H 对齐要求。
+ * 校验 topK 与 token 隐藏维 H：取值范围，以及按拓扑确定的 H 对齐要求。
  */
 static ge::graphStatus CheckTopKAndHParam(const gert::TilingContext *context, MegaMoeConfig &config,
                                           const char *nodeName)
@@ -2343,13 +2342,9 @@ static ge::graphStatus CheckTopKAndHParam(const gert::TilingContext *context, Me
         return ge::GRAPH_FAILED);
     auto attrs = context->GetAttrs();
     auto topoTypePtr = attrs->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
-    auto weightOneDesc = context->GetDynamicInputDesc(config.weight1Index, 0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, weightOneDesc);
-    bool isW4Nz =
-        weightOneDesc->GetDataType() == ge::DT_FLOAT4_E2M1 &&
-        static_cast<ge::Format>(ge::GetPrimaryFormat(weightOneDesc->GetStorageFormat())) == ge::FORMAT_FRACTAL_NZ;
-    // URMA/Layered 保持 1K 对齐；W4 的 NZ_C0_32 分形要求 GMM K 按 64 对齐；其余 MTE 路径按 32 对齐。
-    int64_t requiredHAlignment = *topoTypePtr == TOPO_TYPE_URMA ? URMA_H_ALIGN : (isW4Nz ? W4_K_ALIGN : H_ALIGN);
+    // URMA/Layered 保持 1K 对齐；其余 MTE 路径统一按 64 对齐——W4 的 NZ_C0_32 分形硬性要求
+    // GMM K 按 64 对齐，A8W8 的 ND/NZ 路径按需求对齐到同一口径（原为 32）。
+    int64_t requiredHAlignment = *topoTypePtr == TOPO_TYPE_URMA ? URMA_H_ALIGN : MTE_H_ALIGN;
     OP_TILING_CHECK(
         xDim1 % requiredHAlignment != 0,
         OP_LOGE_FOR_INVALID_VALUE(nodeName, "H", std::to_string(xDim1).c_str(),
