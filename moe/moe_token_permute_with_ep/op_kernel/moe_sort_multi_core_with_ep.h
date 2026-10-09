@@ -26,7 +26,7 @@ class MoeSortMultiCore : public MoeSortBase {
 public:
     __aicore__ inline MoeSortMultiCore(){};
     __aicore__ inline void Init(GM_ADDR expertForSourceRow, GM_ADDR sortedExpertForSourceRow, GM_ADDR workspace,
-                                const MoeTokenPermuteWithEpTilingData *tilingData, TPipe *tPipe);
+                                const MoeTokenPermuteWithEpTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -38,16 +38,16 @@ private:
     __aicore__ inline void VBSCopyIn(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void UBSortCompute(int64_t progress, int64_t size, int64_t sortNum);
     __aicore__ inline void VBSCopyOut(int64_t progress, int64_t size, int64_t sortNum);
-    __aicore__ inline void InitMoeMrgSort(MoeMrgsort *sorter, int64_t listNum, int64_t coreOffset, int64_t loopOffset);
-    __aicore__ inline void InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t> *sorter, int64_t listNum,
+    __aicore__ inline void InitMoeMrgSort(MoeMrgsort* sorter, int64_t listNum, int64_t coreOffset, int64_t loopOffset);
+    __aicore__ inline void InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t>* sorter, int64_t listNum,
                                              int64_t coreOffset);
 
 private:
     GlobalTensor<float> workspaceGms[2];
 
-    const PermuteVBSComputeTilingEPData *vbsTilingData;
-    const PermuteVMSMiddleComputeTilingEPData *vmsTilingData;
-    const PermuteSortOutComputeTilingEPData *sortOutTilingData;
+    const PermuteVBSComputeTilingEPData* vbsTilingData;
+    const PermuteVMSMiddleComputeTilingEPData* vmsTilingData;
+    const PermuteSortOutComputeTilingEPData* sortOutTilingData;
 
     // for MoeMrgsort
     MoeMrgsort mrgsorter;
@@ -153,7 +153,7 @@ __aicore__ inline void MoeSortMultiCore<T>::VBSCopyOut(int64_t progress, int64_t
 }
 
 template <typename T>
-__aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSort(MoeMrgsort *sorter, int64_t listNum, int64_t coreOffset,
+__aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSort(MoeMrgsort* sorter, int64_t listNum, int64_t coreOffset,
                                                            int64_t loopOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex][blockIdx * coreOffset + loopOffset];
@@ -170,7 +170,7 @@ __aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSort(MoeMrgsort *sorter, i
 }
 
 template <typename T>
-__aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t> *sorter, int64_t listNum,
+__aicore__ inline void MoeSortMultiCore<T>::InitMoeMrgSortOut(MoeMrgsortOut<int32_t, int32_t>* sorter, int64_t listNum,
                                                               int64_t coreOffset)
 {
     GlobalTensor<float> srcWsGm = workspaceGms[srcWsIndex];
@@ -253,10 +253,18 @@ __aicore__ inline void MoeSortMultiCore<T>::VBSProcess()
 
         sortNum = Ceil(sortCoreLastLoopElements, ONE_REPEAT_SORT_NUM) * ONE_REPEAT_SORT_NUM;
         UBSortProcess(sortCoreLoops - 1, sortCoreLastLoopElements, sortNum);
+    }
 
+    // Every core writes its VBS result to GM before any core starts the
+    // cross-core merge.  Without this rendezvous, a fast core can issue the
+    // MTE2 reads in OneCoreVMSProcess while another core is still issuing its
+    // MTE3 write to the same workspace stage (GM WAR hazard).
+    PipeBarrier<PIPE_ALL>();
+    AscendC::SyncAll();
+
+    if (this->blockIdx < this->vbsTilingData->needCoreNum) {
         OneCoreVMSProcess(sortCoreLoops, sortCoreLoopElements, sortCoreLastLoopElements);
     }
-    AscendC::SyncAll();
 }
 
 template <typename T>
@@ -315,8 +323,8 @@ __aicore__ inline void MoeSortMultiCore<T>::SortOutProcess()
 
 template <typename T>
 __aicore__ inline void MoeSortMultiCore<T>::Init(GM_ADDR expertForSourceRow, GM_ADDR sortedExpertForSourceRow,
-                                                 GM_ADDR workspace, const MoeTokenPermuteWithEpTilingData *tilingData,
-                                                 TPipe *tPipe)
+                                                 GM_ADDR workspace, const MoeTokenPermuteWithEpTilingData* tilingData,
+                                                 TPipe* tPipe)
 {
     expertForSourceRow1 = expertForSourceRow;
     this->totalLength = tilingData->n * tilingData->topK;
@@ -345,16 +353,16 @@ __aicore__ inline void MoeSortMultiCore<T>::Init(GM_ADDR expertForSourceRow, GM_
     int64_t coreNum = GetBlockNum();
     blockFactor = tilingData->vbsComputeParamsOp.perCoreElements;
     expertForSourceRowGm.SetGlobalBuffer(
-        (__gm__ T *)expertForSourceRow + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
+        (__gm__ T*)expertForSourceRow + this->blockIdx * tilingData->vbsComputeParamsOp.perCoreElements,
         this->sortTotalLength);
-    sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t *)sortedExpertForSourceRow, this->totalLength);
+    sortedExpertForSourceRowGm.SetGlobalBuffer((__gm__ int32_t*)sortedExpertForSourceRow, this->totalLength);
     // for sort: expandDstToSrcRowGm.SetGlobalBuffer((__gm__ int32_t*)workspace, Align(this->totalLength,
     // sizeof(int32_t)));
 
     int64_t kvFactor = 2;
 
-    workspaceGms[0].SetGlobalBuffer((__gm__ float *)workspace, Align(this->totalLength, sizeof(int32_t)) * kvFactor);
-    workspaceGms[1].SetGlobalBuffer((__gm__ float *)workspace + Align(this->totalLength, sizeof(int32_t)) * kvFactor,
+    workspaceGms[0].SetGlobalBuffer((__gm__ float*)workspace, Align(this->totalLength, sizeof(int32_t)) * kvFactor);
+    workspaceGms[1].SetGlobalBuffer((__gm__ float*)workspace + Align(this->totalLength, sizeof(int32_t)) * kvFactor,
                                     Align(this->totalLength, sizeof(int32_t)) * kvFactor);
 
     int64_t indexNum = Ceil(Max(this->sortOutTilingData->oneLoopMaxElements * MAX_MRGSORT_LIST, sortCoreLoopElements),
