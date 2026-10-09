@@ -44,6 +44,7 @@ function(gen_turboquant_aicpu_symbol)
   add_custom_command(
     OUTPUT ${kernel_output}
     COMMAND ${arm_compiler} -shared $<TARGET_OBJECTS:${metadata_target}>
+      -Wl,-z,relro,-z,now,-z,noexecstack
       -Wl,--whole-archive ${kernel_libraries} -Wl,--no-whole-archive
       -Wl,-Bsymbolic -Wl,--exclude-libs=libbase_ascend_protobuf.a -s
       -o ${kernel_output}
