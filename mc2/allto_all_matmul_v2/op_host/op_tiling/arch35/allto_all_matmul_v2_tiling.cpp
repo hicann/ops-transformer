@@ -760,6 +760,7 @@ ge::graphStatus AlltoAllMatmulV2TilingClass::PostTiling()
     // tiling 数据只声明结构体大小（capacity-8），尾部 8 字节留给框架写入 DFX 指针（atomicIndex），
     // 否则异常 dump 时 IDEDD 从 opParaSize-8 处读到 0，导致 exception_info 解析中止
     context_->GetRawTilingData()->SetDataSize(sizeof(allToAllMatmulTilingData));
+    context_->SetScheduleMode(1);
     context_->SetBlockDim(usedCoreNum_);
     return ge::GRAPH_SUCCESS;
 }
