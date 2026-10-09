@@ -87,7 +87,7 @@ LAYOUT_KV = "PA_BNBD"
 LAYOUT_OUT = "TND"
 
 # PA KV Cache Layout (数据排布，对应 LAYOUT_KV="PA_BNBD")
-KV_CACHE_LAYOUT = "BnNBsD"
+KV_CACHE_LAYOUT = "PA_BNBD"
 
 # Data Range (lo, hi)
 Q_DATA_RANGE = (-1.0, 1.0)

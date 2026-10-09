@@ -54,7 +54,7 @@ def load_input(case_name, cache_dir=None):
         data["p_scale"],
         data.get("block_table_torch"),
         data.get("num_blocks", 0),
-        data.get("kv_cache_layout", "BnNBsD"),
+        data.get("kv_cache_layout", "PA_BNBD"),
     )
 
 
@@ -110,7 +110,7 @@ def build_input_dict(
     p_scale,
     block_table_torch=None,
     num_blocks=0,
-    kv_cache_layout="BnNBsD",
+    kv_cache_layout="PA_BNBD",
 ):
     return {
         "q_fp8": q_fp8,

@@ -131,9 +131,9 @@ INV_LN2 = 1.4426950409
 SOFTMAX_SCALE = None
 
 # PA KV Cache Layout
-# BnNBsD: [BlockNum, N, BlockSize, D]
+# PA_BNBD: [BlockNum, N, BlockSize, D]
 # PA_NZ: fp8=[Bn,N,D//32,Bs,32], Kscale=[Bn,N,Bs//16,D//64,16,2], Vscale=[Bn,N,D//16,Bs//64,16,2]
-KV_CACHE_LAYOUT = "BnNBsD"
+KV_CACHE_LAYOUT = "PA_BNBD"
 
 IS_CONTIGUOUS = True
 
@@ -644,7 +644,7 @@ def mxfp8_pa_preprocessing(
     is_vscale=False,
     is_scale=False,
     is_rope=False,
-    kv_layout="BnNBsD",
+    kv_layout="PA_BNBD",
     group_size=32,
 ):
     """
@@ -656,8 +656,8 @@ def mxfp8_pa_preprocessing(
     输出 (is_scale=True, is_vscale=True): [BlockNum, N, BlockSize//64, D, 2] (V scale)
 
     kv_layout:
-      - BnNBsD: fp8=[Bn,N,Bs,D], Kscale=[Bn,N,Bs,D//64,2], Vscale=[Bn,N,Bs//64,D,2]
-      - BnBsND: fp8=[Bn,Bs,N,D], Kscale=[Bn,Bs,N,D//64,2], Vscale=[Bn,Bs//64,N,D,2]
+      - PA_BNBD: fp8=[Bn,N,Bs,D], Kscale=[Bn,N,Bs,D//64,2], Vscale=[Bn,N,Bs//64,D,2]
+      - PA_BBND: fp8=[Bn,Bs,N,D], Kscale=[Bn,Bs,N,D//64,2], Vscale=[Bn,Bs//64,N,D,2]
       - PA_NZ: fp8=[Bn,N,D//32,Bs,32], Kscale=[Bn,N,Bs//16,D//64,16,2], Vscale=[Bn,N,D//16,Bs//64,16,2]
     """
     tensor_bnsd = (
@@ -732,9 +732,9 @@ def mxfp8_pa_preprocessing(
                 b, :, block_offset : block_offset + valid_len
             ]
 
-    if kv_layout == "BnNBsD":
+    if kv_layout == "PA_BNBD":
         return out_cache
-    elif kv_layout == "BnBsND":
+    elif kv_layout == "PA_BBND":
         return out_cache.transpose(1, 2).contiguous()
     elif kv_layout == "PA_NZ":
         Bn, KV_N, Bs, KV_D = out_cache.shape[:4]
@@ -792,7 +792,7 @@ def convert_v_scale_to_pa(scale_bnsd, seq_lens, group_size=32):
     return result
 
 
-def bnsd_to_pa_kv(tensor_bnsd, seq_lens, block_size, block_table, kv_layout="BnNBsD"):
+def bnsd_to_pa_kv(tensor_bnsd, seq_lens, block_size, block_table, kv_layout="PA_BNBD"):
     return mxfp8_pa_preprocessing(
         tensor_bnsd,
         seq_lens,
@@ -804,7 +804,7 @@ def bnsd_to_pa_kv(tensor_bnsd, seq_lens, block_size, block_table, kv_layout="BnN
 
 
 def bnsd_to_pa_kv_scale_token_group(
-    scale_bnsd, seq_lens, block_size, block_table, kv_layout="BnNBsD", group_size=32
+    scale_bnsd, seq_lens, block_size, block_table, kv_layout="PA_BNBD", group_size=32
 ):
     return mxfp8_pa_preprocessing(
         scale_bnsd,
@@ -819,7 +819,7 @@ def bnsd_to_pa_kv_scale_token_group(
 
 
 def bnsd_to_pa_v_scale_channel_group(
-    scale_bnsd, seq_lens, block_size, block_table, kv_layout="BnNBsD", group_size=32
+    scale_bnsd, seq_lens, block_size, block_table, kv_layout="PA_BNBD", group_size=32
 ):
     return mxfp8_pa_preprocessing(
         scale_bnsd,
@@ -958,12 +958,12 @@ def generate_data():
         block_table_tail = (
             torch.arange(B, dtype=torch.int32).view(B, 1) if ENABLE_PA else None
         )
-        # v_tail与主KV cache同布局: BnNBsD=(Bn,N2,Bs,D) / BnBsND=(Bn,Bs,N2,D)
+        # v_tail与主KV cache同布局: PA_BNBD=(Bn,N2,Bs,D) / PA_BBND=(Bn,Bs,N2,D)
         # / PA_NZ=(Bn,N2,D/16,Bs,16)(bf16的32B分形内径16) — 复用主cache的布局变换语义
         v_tail_bnsd = torch.stack(v_tail_bnsd_list, dim=0).to(
             torch.bfloat16
         )  # (B,N2,Bs,D)
-        if KV_CACHE_LAYOUT == "BnBsND":
+        if KV_CACHE_LAYOUT == "PA_BBND":
             v_tail_pa = v_tail_bnsd.transpose(1, 2).contiguous()
         elif KV_CACHE_LAYOUT == "PA_NZ":
             Bn, N2c, Bsc, Dc = v_tail_bnsd.shape
@@ -1176,10 +1176,9 @@ def _build_qfa_section_info(actual_seq_q, actual_seq_kv):
     torch.npu.set_device(int(DEVICE_ID))
 
     layout_q = "TND" if ENABLE_PA else INPUT_LAYOUT
-    _pa_layout_kv_map = {"BnNBsD": "PA_BNBD", "BnBsND": "PA_BBND", "PA_NZ": "PA_NZ"}
-    layout_kv = (
-        _pa_layout_kv_map.get(KV_CACHE_LAYOUT, "PA_BNBD") if ENABLE_PA else INPUT_LAYOUT
-    )
+    # KV_CACHE_LAYOUT 与算子 kv_cache_layout 命名已统一 (PA_BNBD/PA_BBND/PA_NZ),
+    # 直接透传, 不再做 BnNBsD->PA_BNBD 映射。
+    layout_kv = KV_CACHE_LAYOUT if ENABLE_PA else INPUT_LAYOUT
     layout_out = "TND" if ENABLE_PA else INPUT_LAYOUT
     q_runtime_layout, _ = resolve_q_scale_layout()
 
@@ -2716,8 +2715,8 @@ def prepare_npu_inputs(
             else torch.as_tensor(block_table_torch, dtype=torch.int32).npu()
         )
 
-        _pa_layout_kv_map = {"BnNBsD": "PA_BNBD", "BnBsND": "PA_BBND", "PA_NZ": "PA_NZ"}
-        pa_layout_kv = _pa_layout_kv_map.get(KV_CACHE_LAYOUT, "PA_BNBD")
+        # KV_CACHE_LAYOUT 与算子 kv_cache_layout 命名已统一, 直接透传。
+        pa_layout_kv = KV_CACHE_LAYOUT
 
         # v_tail三件套: PA场景同样需要传递(一期v_tail仅PA_BNBD支持, 必须在本分支透传)
         _vtail_pa = _VTAIL_BUNDLE if ENABLE_V_TAIL else None

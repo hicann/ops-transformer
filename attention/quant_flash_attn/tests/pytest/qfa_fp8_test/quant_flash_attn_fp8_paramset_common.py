@@ -14,7 +14,7 @@ import itertools
 
 # QFA GQA FP8全量化 paramset 字段
 # GQA 固定值: quant_mode=6, layout_q=NTD, layout_kv=PA_BNBD, layout_out=TND,
-#             layout_q_descale=NT, block_size=128, D=128, enable_pa=True, kv_cache_layout=BnNBsD
+#             layout_q_descale=NT, block_size=128, D=128, enable_pa=True, kv_cache_layout=PA_BNBD
 PARAM_NAMES = [
     "B",
     "N_q",
@@ -62,7 +62,7 @@ TEST_PARAMS_DEFAULTS = {
     "layout_q_descale": ["NT"],
     "layout_kv": ["PA_BNBD"],
     "layout_out": ["TND"],
-    "kv_cache_layout": ["BnNBsD"],
+    "kv_cache_layout": ["PA_BNBD"],
     "p_scale": [1.0],
     "scale_value": [None],
     "is_contiguous": [True],

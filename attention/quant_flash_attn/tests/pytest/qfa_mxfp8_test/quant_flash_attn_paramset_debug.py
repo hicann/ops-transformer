@@ -32,7 +32,7 @@ TEST_PARAMS = {
         "p_scale": [1.0],
         "enable_lse": [False],
     },
-    "PA_BnNBsD_B1_QS128_KVS1024_Nq64_Nkv8_D128_SP3": {
+    "PA_BNBD_B1_QS128_KVS1024_Nq64_Nkv8_D128_SP3": {
         "B": [1],
         "N_q": [64],
         "N_kv": [8],
@@ -44,7 +44,7 @@ TEST_PARAMS = {
         "max_seqlen_q": [128],
         "max_seqlen_kv": [1024],
         "enable_pa": [True],
-        "kv_cache_layout": ["BnNBsD"],
+        "kv_cache_layout": ["PA_BNBD"],
         "block_size": [512],
         "mask_mode": [3],
         "q_scale_layout": ["TND"],

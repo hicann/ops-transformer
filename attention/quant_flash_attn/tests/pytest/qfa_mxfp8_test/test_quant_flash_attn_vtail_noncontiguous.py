@@ -21,7 +21,7 @@ from common import golden_cache, test_runner
 from common import quant_flash_attn_golden as golden
 
 MAIN = ("k", "v", "dequant_scale_k", "v_descale")
-SHAPES = (("BnNBsD", 64), ("BnBsND", 72), ("PA_NZ", 128))
+SHAPES = (("PA_BNBD", 64), ("PA_BBND", 72), ("PA_NZ", 128))
 ROUTES = (("TND", 64, 3), ("N2TGD", 1, 0), ("N2TGD", 64, 3))
 CASES = list(product(SHAPES, ROUTES, (0, 1, 17, 32, 63), (0.5, 1.0)))
 
@@ -107,7 +107,7 @@ def test_vtail_noncontiguous(spec, cache_dir, monkeypatch):
         ("tail_axis0", ("v_tail",), (0,)),
         ("both_axis0", MAIN + ("v_tail",), (0,)),
     ]
-    if params["kv_cache_layout"] != "BnBsND":
+    if params["kv_cache_layout"] != "PA_BBND":
         variants += [
             (label, keys, (0, 1))
             for label, keys in (
@@ -130,7 +130,7 @@ def test_vtail_noncontiguous(spec, cache_dir, monkeypatch):
     active.update(keys=("v_tail",), axes=(-1,))
     with pytest.raises(RuntimeError, match="v_tail only supports non-contiguous axes"):
         test_runner.execute_test(params, {"npu", "compare"}, str(cache))
-    if params["kv_cache_layout"] == "BnBsND":
+    if params["kv_cache_layout"] == "PA_BBND":
         active.update(axes=(1,))
         with pytest.raises(
             RuntimeError, match="v_tail only supports non-contiguous axes"
