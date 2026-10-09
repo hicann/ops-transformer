@@ -386,6 +386,7 @@
 | 调用方式           | 调用样例                                                                                    | 说明                                                                                                  |
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | aclnn调用 | [test_aclnn_flash_attention_score](./examples/test_aclnn_flash_attention_score.cpp) | 非TND场景，通过[aclnnFlashAttentionScore](./docs/aclnnFlashAttentionScoreV2.md)接口方式调用FlashAttention算子。             |
+| 图模式调用 | [test_geir_flash_attention_score](./examples/test_geir_flash_attention_score.cpp) | 通过[Ascend IR](./docs/ascendir_FlashAttentionScore.md)构图方式调用FlashAttention算子。 |
 
 ## 参考资源
 

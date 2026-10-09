@@ -179,3 +179,9 @@
   | 调用方式  | 样例代码                                                     | 说明                                                         |
   | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
   | aclnn接口 | [test_aclnn_FusedInferAttentionScoreV5](./examples/arch35/test_aclnn_fused_infer_attention_score_v5.cpp) | 通过[aclnnFusedInferAttentionScoreV5](./docs/aclnnFusedInferAttentionScoreV5.md)调用FusedInferAttentionScore算子 |
+
+- 通用（GE图模式，各支持芯片均适用）：
+
+  | 调用方式  | 样例代码                                                     | 说明                                                         |
+  | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+  | 图模式调用 | [test_geir_fused_infer_attention_score](./examples/test_geir_fused_infer_attention_score.cpp) | 通过[Ascend IR](./docs/ascendir_FusedInferAttentionScore.md)构图方式调用FusedInferAttentionScore算子 |
