@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：SparselightningIndexerGradKlLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，存放在SparseIndices中，从而减少长序列场景下Attention的计算量，加速长序列的网络的推理和训练的性能。
+- 接口功能：SparseLightningIndexerGradKLLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，存放在SparseIndices中，从而减少长序列场景下Attention的计算量，加速长序列网络的推理和训练。
 
 - 计算公式：
    用于取Top-k的value的计算公式可以表示为：
@@ -32,7 +32,7 @@
    I_{t,:}=W_{t,:}@ReLU(q_{t,:}@(K_{:t,:})^T)
    $$
 
-   其中，$W$是第$t$个token对应的weights，$q$是第$t$个token对应的$G$个query头合轴后的矩阵，$K$为$t$行$K$矩阵。
+   其中，$W$是第$t$个token对应的weights，$q$是第$t$个token对应的$G$个query头合轴后的矩阵，$K$为$t$行$K$列矩阵。
 
    LightningIndexer会单独训练，对应的loss function为：
 
@@ -49,7 +49,7 @@
    通过求导可得Loss的梯度表达式：
 
    $$
-   dI\mathop{{}}\nolimits_{{t,:}}=Softmax \left( I\mathop{{}}\nolimits_{{t,:}} \left) -p\mathop{{}}\nolimits_{{t,:}}\right. \right.
+   dI\mathop{{}}\nolimits_{{t,:}}=Softmax \left( I\mathop{{}}\nolimits_{{t,:}} \right) -p\mathop{{}}\nolimits_{{t,:}}
    $$
 
    利用链式法则可以进行weights，query和key矩阵的梯度计算：
@@ -172,7 +172,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         <tr>
             <td>queryIndex</td>
             <td>输入</td>
-            <td>lightingIndexer结构的输入queryIndex。</td>
+            <td>LightningIndexer结构的输入queryIndex。</td>
             <td>
             <ul>
                 <li>数据类型与query/key/keyIndex保持一致。</li>
@@ -187,7 +187,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         <tr>
             <td>keyIndex</td>
             <td>输入</td>
-            <td>lightingIndexer结构的输入keyIndex。</td>
+            <td>LightningIndexer结构的输入keyIndex。</td>
             <td>
             <ul>
                 <li>数据类型与query/key/queryIndex保持一致。</li>
@@ -294,7 +294,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
             <ul>
                 <li>值依赖。</li>
                 <li>长度与B保持一致。</li>
-                <li>累加和T2保持一致。</li>
+                <li>累加和与T2保持一致。</li>
                 <li>不支持空Tensor。</li>
             </ul>
             </td>
@@ -617,7 +617,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLoss(
         </tr>
         <tr>
             <td>S1、S2</td>
-            <td>S1支持1~32K，S2支持1~1M</td>
+            <td>S1支持1~32k，S2支持1~1M</td>
             <td>S1、S2支持不等长；S1必须小于等于S2</td>
         </tr>
         <tr>
