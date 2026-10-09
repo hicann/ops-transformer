@@ -40,9 +40,9 @@ constexpr size_t kCosIdx = 1;
 constexpr size_t kSinIdx = 2;
 constexpr size_t kDyIdx = 3;
 
-// Same gating as the built-in pass: fuse only on regbase platforms (NpuArch DAV_3510/DAV_5102).
+// Same gating as the built-in pass: fuse only on regbase platforms (NpuArch DAV_3510/DAV_9201/DAV_5102).
 // Gating on NpuArch instead of a short_soc_version string list: one arch covers multiple SoCs
-// (DAV_3510: Ascend950/Ascend350/Ascend960DT..., DAV_5102: MC62CM12A), so SoCs sharing the regbase
+// (DAV_3510: Ascend950/Ascend350, DAV_9201: Ascend960DT, DAV_5102: MC62CM12A), so SoCs sharing the regbase
 // arch are covered without maintaining the soc list.
 bool IsRegBasePlatform()
 {
@@ -54,6 +54,7 @@ bool IsRegBasePlatform()
     OP_LOGD(kPassName, "Platform NpuArch: %s.", npuArchVal);
     const std::string npuArch(npuArchVal);
     return npuArch == std::to_string(static_cast<uint32_t>(Ops::Base::DAV_3510)) ||
+           npuArch == std::to_string(static_cast<uint32_t>(Ops::Base::DAV_9201)) ||
            npuArch == std::to_string(static_cast<uint32_t>(Ops::Base::DAV_5102));
 }
 

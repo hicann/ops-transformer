@@ -38,7 +38,7 @@ void SetRtSocSpecFail(bool fail);
 }
 
 // socVersion -> NpuArch 映射，与 pass 侧 rtGetSocSpec("version", "NpuArch") 取到的数值字符串一致。
-// 注意 Ascend960DT 等同 arch 新 SoC 复用 "3510"，不在此表 —— 用 SetRtSocSpecNpuArch 直接指定。
+// 注意 Ascend960DT 复用 950 同族 regbase kernel 但上报独立 arch DAV_9201；其余未列举 SoC 走默认值。
 void SetPlatform(const std::string& socVersion)
 {
     fe::PlatformInfo platformInfo;
@@ -52,6 +52,8 @@ void SetPlatform(const std::string& socVersion)
     SetRtSocSpecFail(false);
     if (socVersion == "Ascend950" || socVersion == "Ascend350") {
         SetRtSocSpecNpuArch("3510"); // DAV_3510
+    } else if (socVersion == "Ascend960DT") {
+        SetRtSocSpecNpuArch("9201"); // DAV_9201
     } else if (socVersion == "MC62CM12A") {
         SetRtSocSpecNpuArch("5102"); // DAV_5102
     } else {
@@ -210,12 +212,28 @@ TEST_F(InterleaveRopeFusionPassTest, interleaveRopeFusionAscend350Success)
     EXPECT_EQ(CountNodes(graph, kDstOpType), 1);
 }
 
-// Ascend960DT shares NpuArch DAV_3510 with Ascend950 (regbase) but is not on the soc list:
+// A future SoC sharing NpuArch DAV_3510 with Ascend950 (regbase) but not on the soc list:
 // arch-based gating must still fire the fusion.
 TEST_F(InterleaveRopeFusionPassTest, interleaveRopeFusionNpuArch3510SocNotOnListSuccess)
 {
-    SetPlatform("Ascend960DT");  // only fills the fe-side platform map
+    SetPlatform("Ascend950X");   // hypothetical SoC, only fills the fe-side platform map
     SetRtSocSpecNpuArch("3510"); // DAV_3510
+    std::shared_ptr<Graph> graph = BuildInterleaveRopeGraph(DT_FLOAT16);
+
+    CustomPassContext passContext;
+    ops::InterleaveRope2RotaryPositionEmbeddingFusionPass pass;
+    Status status = pass.Run(graph, passContext);
+
+    EXPECT_EQ(status, SUCCESS);
+    EXPECT_EQ(CountNodes(graph, kSrcOpType), 0);
+    EXPECT_EQ(CountNodes(graph, kDstOpType), 1);
+}
+
+// Ascend960DT runs the same regbase kernels as Ascend950 but reports its own NpuArch DAV_9201:
+// the arch-based gating must cover it.
+TEST_F(InterleaveRopeFusionPassTest, interleaveRopeFusionAscend960dtSuccess)
+{
+    SetPlatform("Ascend960DT");
     std::shared_ptr<Graph> graph = BuildInterleaveRopeGraph(DT_FLOAT16);
 
     CustomPassContext passContext;
