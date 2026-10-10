@@ -147,7 +147,7 @@ cann_ops_transformer.block_sparse_attention(
   <!-- npu="910b,A3" id8 -->
   - 在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上：block_y须为128的倍数。
   <!-- end id8 -->
-- block_sparse_mask当前必须传入，且shape必须为[batch, headNum, ceilDiv(maxQS, block_x), ceilDiv(maxKVS, block_y)]。
+- block_sparse_mask当前必须传入，且shape为[batch, headNum, qBlockNum, kvBlockNum]；BNSD/BSND传入actual_seq_lengths和actual_seq_lengths_kv时，后两维可按实际长度最大值或Q/K shape中的S计算，分别用block_x和block_y向上取整。
 - actual_seq_lengths在q_input_layout为"TND"时必选；actual_seq_lengths_kv在kv_input_layout为"TND"时必选；两者必须同时配置或同时不配置，仅配置其中之一将被拦截。
 - qSeqlen和kvSeqlen不需要被block_shape整除，支持非对齐场景，实际分块数通过向上取整计算。
 - inner_precise仅支持配置0、1或4：
