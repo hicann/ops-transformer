@@ -47,11 +47,11 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::GetShapeAttrsInfo()
 
 bool GroupedMatmulFinalizeRoutingQuantTiling::CheckOptionalAttr()
 {
-    auto *attrs = context_->GetAttrs();
-    const int64_t *shareInputOffsetPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SHARE_INPUT_OFFSET);
-    const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
-    const int64_t *outputBSPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_OUTPUT_BS);
-    const int64_t *outputDtypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_DTYPE);
+    auto* attrs = context_->GetAttrs();
+    const int64_t* shareInputOffsetPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SHARE_INPUT_OFFSET);
+    const int64_t* groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE);
+    const int64_t* outputBSPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_OUTPUT_BS);
+    const int64_t* outputDtypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_DTYPE);
     OP_CHECK_IF(outputBSPtr == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "output_bs", "nullptr",
                                                       "attr batch cannot be nullptr"),
@@ -103,9 +103,9 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::AnalyzeAttrs()
                     inputParams_.opType, "attrs", std::to_string(attrs->GetAttrNum()),
                     BuildErrorMsgStr("the num of attrs must be greater than ", ATTR_INDEX_TUNING_CONFIG + 1)),
                 return false);
-    const float *shareInputWeightPtr = attrs->GetAttrPointer<float>(ATTR_INDEX_SHARE_INPUT_WEIGHT);
-    const bool *transposeXPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANSPOSE_X);
-    const bool *transposeWeightPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANSPOSE_W);
+    const float* shareInputWeightPtr = attrs->GetAttrPointer<float>(ATTR_INDEX_SHARE_INPUT_WEIGHT);
+    const bool* transposeXPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANSPOSE_X);
+    const bool* transposeWeightPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANSPOSE_W);
     OP_CHECK_IF(shareInputWeightPtr == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "residual_scale", "nullptr",
                                                       "attr residualScale cannot be nullptr"),
@@ -232,7 +232,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckOptionalInputsForRouting()
     return true;
 }
 
-bool GroupedMatmulFinalizeRoutingQuantTiling::CheckOptional(uint32_t index, const char *paramName,
+bool GroupedMatmulFinalizeRoutingQuantTiling::CheckOptional(uint32_t index, const char* paramName,
                                                             ge::DataType targetDtype) const
 {
     auto optionalDesc = context_->GetOptionalInputDesc(index);
@@ -320,9 +320,9 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckDtype() const
     return true;
 }
 
-bool GroupedMatmulFinalizeRoutingQuantTiling::CheckDim(const gert::Shape &xShape, const gert::Shape &wShape,
-                                                       const gert::StorageShape *pertokenScaleStorageShape,
-                                                       const gert::Shape &scaleShape, const gert::Shape &yShape) const
+bool GroupedMatmulFinalizeRoutingQuantTiling::CheckDim(const gert::Shape& xShape, const gert::Shape& wShape,
+                                                       const gert::StorageShape* pertokenScaleStorageShape,
+                                                       const gert::Shape& scaleShape, const gert::Shape& yShape) const
 {
     auto xDimNum = xShape.GetDimNum();
     OP_CHECK_IF(
@@ -346,7 +346,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckDim(const gert::Shape &xShape
 }
 
 bool GroupedMatmulFinalizeRoutingQuantTiling::CheckScaleAndPerTokenDims(
-    const gert::StorageShape *pertokenScaleStorageShape, const gert::Shape &scaleShape) const
+    const gert::StorageShape* pertokenScaleStorageShape, const gert::Shape& scaleShape) const
 {
     auto scaleDimNum = scaleShape.GetDimNum();
     if (IsMicroScaling()) {
@@ -358,7 +358,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckScaleAndPerTokenDims(
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "perTokenScale", "nullptr",
                                                           "input pertokenScaleStorageShape cannot be nullptr"),
                     return false);
-        const gert::Shape &pertokenScaleShape = pertokenScaleStorageShape->GetOriginShape();
+        const gert::Shape& pertokenScaleShape = pertokenScaleStorageShape->GetOriginShape();
         auto pertokenScaleDimNum = pertokenScaleShape.GetDimNum();
         OP_CHECK_IF(
             pertokenScaleDimNum != DIM_NUM_MX_PERTOKENSCALE,
@@ -371,7 +371,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckScaleAndPerTokenDims(
                                                  std::to_string(DIM_NUM_SCALE)),
                     return false);
         if (pertokenScaleStorageShape != nullptr) {
-            const gert::Shape &pertokenScaleShape = pertokenScaleStorageShape->GetOriginShape();
+            const gert::Shape& pertokenScaleShape = pertokenScaleStorageShape->GetOriginShape();
             auto pertokenScaleDimNum = pertokenScaleShape.GetDimNum();
             OP_CHECK_IF(
                 pertokenScaleDimNum != DIM_NUM_PERTOKENSCALE,
@@ -383,7 +383,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckScaleAndPerTokenDims(
     return true;
 }
 
-bool GroupedMatmulFinalizeRoutingQuantTiling::CheckFp4Shape(const gert::Shape &xShape, const gert::Shape &wShape) const
+bool GroupedMatmulFinalizeRoutingQuantTiling::CheckFp4Shape(const gert::Shape& xShape, const gert::Shape& wShape) const
 {
     bool a4w4 = IsFp4Dtype(inputParams_.aDtype) && IsFp4Dtype(inputParams_.bDtype);
     if (!a4w4) {
@@ -458,13 +458,13 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::CheckOptionalInputsShape()
     return true;
 }
 
-bool GroupedMatmulFinalizeRoutingQuantTiling::CheckInputsShape(const gert::Shape &xShape,
-                                                               const gert::StorageShape *wStorageShape,
-                                                               const gert::StorageShape *pertokenScaleStorageShape,
-                                                               const gert::Shape &scaleShape,
-                                                               const gert::Shape &yShape) const
+bool GroupedMatmulFinalizeRoutingQuantTiling::CheckInputsShape(const gert::Shape& xShape,
+                                                               const gert::StorageShape* wStorageShape,
+                                                               const gert::StorageShape* pertokenScaleStorageShape,
+                                                               const gert::Shape& scaleShape,
+                                                               const gert::Shape& yShape) const
 {
-    const gert::Shape &wShape = wStorageShape->GetOriginShape();
+    const gert::Shape& wShape = wStorageShape->GetOriginShape();
     OP_CHECK_IF(!CheckDim(xShape, wShape, pertokenScaleStorageShape, scaleShape, yShape),
                 OP_LOGE(context_->GetNodeName(), "CheckDim failed."), return false);
     if (IsMicroScaling()) {
@@ -481,21 +481,21 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::AnalyzeInputs()
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "x", "nullptr",
                                                       "input xStorageShape cannot be nullptr"),
                 return false);
-    const gert::Shape &xShape = xStorageShape->GetOriginShape();
+    const gert::Shape& xShape = xStorageShape->GetOriginShape();
 
     auto wStorageShape = context_->GetInputShape(W_INDEX);
     OP_CHECK_IF(wStorageShape == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "weight", "nullptr",
                                                       "input wStorageShape cannot be nullptr"),
                 return false);
-    const gert::Shape &wShape = wStorageShape->GetOriginShape();
+    const gert::Shape& wShape = wStorageShape->GetOriginShape();
 
     auto scaleStorageShape = context_->GetInputShape(SCALE_INDEX);
     OP_CHECK_IF(scaleStorageShape == nullptr,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "scale", "nullptr",
                                                       "input scaleStorageShape cannot be nullptr"),
                 return false);
-    const gert::Shape &scaleShape = scaleStorageShape->GetOriginShape();
+    const gert::Shape& scaleShape = scaleStorageShape->GetOriginShape();
 
     auto pertokenScaleStorageShape = context_->GetOptionalInputShape(PERTOKEN_SCALE_INDEX);
 
@@ -504,7 +504,7 @@ bool GroupedMatmulFinalizeRoutingQuantTiling::AnalyzeInputs()
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "y", "nullptr",
                                                       "output yStorageShape cannot be nullptr"),
                 return false);
-    const gert::Shape &yShape = yStorageShape->GetOriginShape();
+    const gert::Shape& yShape = yStorageShape->GetOriginShape();
 
     if (IsMicroScaling()) {
         bool isFullMx = (IsFp8Dtype(inputParams_.aDtype) && IsFp8Dtype(inputParams_.bDtype)) ||
@@ -616,11 +616,165 @@ uint64_t GroupedMatmulFinalizeRoutingQuantTiling::GetTilingKey() const
                               static_cast<uint64_t>(logitType_));
 }
 
+ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzL1Tiling()
+{
+    InitCommonL1TilingFields();
+    if (inputParams_.kSize == 0) {
+        return ge::GRAPH_SUCCESS;
+    }
+    uint64_t leftL1Size = 0;
+    OP_CHECK_IF(CalcLeftL1Size(leftL1Size) != ge::GRAPH_SUCCESS,
+                OP_LOGE(context_->GetNodeName(), "CalcLeftL1Size failed"), return ge::GRAPH_FAILED);
+    return CalWeightNzL1Depth(leftL1Size);
+}
+
+ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzL1Depth(uint64_t leftL1Size)
+{
+    const uint64_t baseASize = GetSizeWithDataType(basicTiling_.baseM * basicTiling_.baseK, inputParams_.aDtype);
+    const uint64_t baseBSize = GetSizeWithDataType(basicTiling_.baseN * basicTiling_.baseK, inputParams_.bDtype);
+    uint64_t baseScaleASize = 0;
+    uint64_t baseScaleBSize = 0;
+    CalcAlignedMxBaseScaleSize(baseScaleASize, baseScaleBSize);
+    const uint64_t baseL1Size = baseASize + baseBSize + baseScaleASize + baseScaleBSize;
+    OP_CHECK_IF(leftL1Size < baseL1Size,
+                OP_LOGE(context_->GetNodeName(), "L1 space overflow. Free L1Size: %lu, used space: %lu", leftL1Size,
+                        baseL1Size),
+                return ge::GRAPH_FAILED);
+
+    const uint64_t depthInit = GetDepthA1B1(leftL1Size, baseL1Size, 1UL);
+    basicTiling_.depthA1 = GetWeightNzDepthWithHighBW(std::min(inputParams_.mSize, basicTiling_.baseM));
+    basicTiling_.depthB1 = GetWeightNzDepthWithHighBW(std::min(inputParams_.nSize, basicTiling_.baseN));
+    if (basicTiling_.depthA1 * baseASize + basicTiling_.depthB1 * baseBSize +
+            std::max(basicTiling_.depthA1, basicTiling_.depthB1) * (baseScaleASize + baseScaleBSize) >
+        leftL1Size) {
+        basicTiling_.depthA1 = depthInit;
+        basicTiling_.depthB1 = depthInit;
+    }
+
+    ModifyWeightNzDepthForUnalign(leftL1Size, baseASize, baseBSize, baseScaleASize + baseScaleBSize);
+    CalStepKs();
+    return CalWeightNzScaleFactors();
+}
+
+uint64_t GroupedMatmulFinalizeRoutingQuantTiling::GetWeightNzDepthWithHighBW(uint64_t mnL1) const
+{
+    const uint64_t baseKSize = GetSizeWithDataType(basicTiling_.baseK, inputParams_.aDtype);
+    const uint64_t depth = GroupedMatmul::CeilAlign(GroupedMatmul::CeilDiv(MTE2_MIN_LOAD_SIZE_V120, mnL1),
+                                                    static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_256)) /
+                           baseKSize * DB_SIZE;
+    uint64_t pow2Depth = POWER_OF_TWO;
+    while (pow2Depth < depth) {
+        pow2Depth *= POWER_OF_TWO;
+    }
+    return std::min(pow2Depth, GroupedMatmul::CeilDiv(inputParams_.kSize, basicTiling_.baseK) * DB_SIZE);
+}
+
+void GroupedMatmulFinalizeRoutingQuantTiling::ModifyWeightNzDepthForUnalign(uint64_t leftL1Size, uint64_t baseASize,
+                                                                            uint64_t baseBSize,
+                                                                            uint64_t baseScaleABSize)
+{
+    if (inputParams_.kSize % GmmConstant::BASIC_BLOCK_SIZE_128 == 0) {
+        return;
+    }
+    if (inputParams_.transA && (!inputParams_.transB || inputParams_.bFormat == ge::FORMAT_FRACTAL_NZ)) {
+        return;
+    }
+    if (!inputParams_.transA) {
+        if (basicTiling_.depthA1 <= basicTiling_.depthB1) {
+            uint64_t leftASize = leftL1Size - basicTiling_.depthB1 * baseBSize - basicTiling_.depthB1 * baseScaleABSize;
+            while (basicTiling_.depthA1 * POWER_OF_TWO * baseASize <= leftASize) {
+                basicTiling_.depthA1 *= POWER_OF_TWO;
+            }
+            if (basicTiling_.depthA1 * baseASize + basicTiling_.depthB1 * baseBSize +
+                    std::max(basicTiling_.depthA1, basicTiling_.depthB1) * baseScaleABSize >
+                leftL1Size) {
+                basicTiling_.depthA1 = basicTiling_.depthB1;
+            }
+        } else if (inputParams_.transB && inputParams_.bFormat == ge::FORMAT_ND) {
+            uint64_t leftBSize = leftL1Size - basicTiling_.depthA1 * baseASize - basicTiling_.depthA1 * baseScaleABSize;
+            while (basicTiling_.depthB1 * POWER_OF_TWO * baseBSize <= leftBSize) {
+                basicTiling_.depthB1 *= POWER_OF_TWO;
+            }
+            if (basicTiling_.depthA1 * baseASize + basicTiling_.depthB1 * baseBSize +
+                    std::max(basicTiling_.depthA1, basicTiling_.depthB1) * baseScaleABSize >
+                leftL1Size) {
+                basicTiling_.depthB1 = basicTiling_.depthA1;
+            }
+        }
+    } else {
+        while ((basicTiling_.depthA1 * baseASize -
+                std::max(basicTiling_.depthA1, basicTiling_.depthB1 * POWER_OF_TWO) * baseScaleABSize) < leftL1Size) {
+            basicTiling_.depthB1 *= POWER_OF_TWO;
+        }
+    }
+}
+
+ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::CalWeightNzScaleFactors()
+{
+    const uint64_t baseScaleASize = GetSizeWithDataType(
+        GroupedMatmul::CeilAlign(GroupedMatmul::CeilDiv(basicTiling_.baseK, MX_GROUP_SIZE), MXFP_MULTI_BASE_SIZE) *
+            basicTiling_.baseM,
+        inputParams_.perTokenScaleDtype);
+    const uint64_t baseScaleBSize = GetSizeWithDataType(
+        GroupedMatmul::CeilAlign(GroupedMatmul::CeilDiv(basicTiling_.baseK, MX_GROUP_SIZE), MXFP_MULTI_BASE_SIZE) *
+            basicTiling_.baseN,
+        inputParams_.scaleDtype);
+    const uint64_t biasDtypeSize = ge::GetSizeByDataType(inputParams_.biasDtype);
+    const uint64_t baseBiasSize = inputParams_.hasBias ? basicTiling_.baseN * biasDtypeSize : 0;
+    const uint64_t baseASize = GetSizeWithDataType(basicTiling_.baseM * basicTiling_.baseK, inputParams_.aDtype);
+    const uint64_t baseBSize = GetSizeWithDataType(basicTiling_.baseN * basicTiling_.baseK, inputParams_.bDtype);
+    uint64_t leftL1Size =
+        aicoreParams_.l1Size - (basicTiling_.depthA1 * baseASize + basicTiling_.depthB1 * baseBSize + baseBiasSize);
+    const uint64_t scaleASpace = basicTiling_.depthA1 * baseScaleASize;
+    const uint64_t scaleBSpace = basicTiling_.depthB1 * baseScaleBSize;
+    OP_CHECK_IF(scaleASpace == 0 || scaleBSpace == 0,
+                OP_LOGE(context_->GetNodeName(), "Invalid MX scale L1 size, A: %lu, B: %lu", scaleASpace, scaleBSpace),
+                return ge::GRAPH_FAILED);
+
+    const uint32_t scaleInit = static_cast<uint32_t>(
+        leftL1Size / (std::max(basicTiling_.depthA1, basicTiling_.depthB1) * (baseScaleASize + baseScaleBSize)));
+    OP_CHECK_IF(scaleInit == 0, OP_LOGE(context_->GetNodeName(), "MX scale L1 capacity is zero"),
+                return ge::GRAPH_FAILED);
+    const uint32_t scaleFactorAMax =
+        std::min(static_cast<uint32_t>(MTE2_MIN_LOAD_SIZE_V120 / baseScaleASize), SCALER_FACTOR_MAX);
+    const uint32_t scaleFactorBMax =
+        std::min(static_cast<uint32_t>(MTE2_MIN_LOAD_SIZE_V120 / baseScaleBSize), SCALER_FACTOR_MAX);
+    const uint64_t stepAK = basicTiling_.stepKa * basicTiling_.baseK;
+    const uint64_t stepBK = basicTiling_.stepKb * basicTiling_.baseK;
+    OP_CHECK_IF(stepAK == 0 || stepBK == 0,
+                OP_LOGE(context_->GetNodeName(), "Invalid MX K step, A: %lu, B: %lu", stepAK, stepBK),
+                return ge::GRAPH_FAILED);
+    basicTiling_.scaleFactorA = std::min(
+        scaleFactorAMax,
+        std::max(SCALER_FACTOR_MIN, static_cast<uint32_t>(GroupedMatmul::CeilDiv(inputParams_.kSize, stepAK))));
+    basicTiling_.scaleFactorB = std::min(
+        scaleFactorBMax,
+        std::max(SCALER_FACTOR_MIN, static_cast<uint32_t>(GroupedMatmul::CeilDiv(inputParams_.kSize, stepBK))));
+
+    if (basicTiling_.scaleFactorA > scaleInit && basicTiling_.scaleFactorB > scaleInit) {
+        if (basicTiling_.depthA1 >= basicTiling_.depthB1) {
+            basicTiling_.scaleFactorA = scaleInit;
+            basicTiling_.scaleFactorB = scaleInit * basicTiling_.depthA1 / basicTiling_.depthB1;
+        } else {
+            basicTiling_.scaleFactorA = scaleInit * basicTiling_.depthB1 / basicTiling_.depthA1;
+            basicTiling_.scaleFactorB = scaleInit;
+        }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::DoLibApiTiling()
 {
     CalBasicBlock();
-    OP_CHECK_IF(CalL1Tiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"),
-                return ge::GRAPH_FAILED);
+    const bool isWeightNzMx = inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE &&
+                              inputParams_.bFormat == ge::FORMAT_FRACTAL_NZ;
+    if (isWeightNzMx) {
+        OP_CHECK_IF(CalWeightNzL1Tiling() != ge::GRAPH_SUCCESS,
+                    OP_LOGE(context_->GetNodeName(), "CalWeightNzL1Tiling failed"), return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(CalL1Tiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"),
+                    return ge::GRAPH_FAILED);
+    }
     tilingData_.matmulTiling.M = inputParams_.mSize;
     tilingData_.matmulTiling.N = inputParams_.nSize;
     tilingData_.matmulTiling.Ka = inputParams_.kSize;
@@ -669,7 +823,7 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::PostTiling()
                 OP_LOGE(context_->GetNodeName(), "Tiling data size[%zu] is not aligned to 8", tilingDataSize),
                 return ge::GRAPH_FAILED);
     error_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(inputParams_.opName, "Memcpy_s failed, ret = %d", ret);
         return ge::GRAPH_FAILED;
@@ -734,7 +888,7 @@ ge::graphStatus GroupedMatmulFinalizeRoutingQuantTiling::GetWorkspaceSize()
         return ret;
     }
     if (tilingData_.gmmFinalizeRoutingDataParams.deterministicFlag == 1) {
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
         workspaces[0] = SYS_WORKSPACE_SIZE + deterWorkspaceSize_;
         OP_LOGD(context_->GetNodeName(), "GetWorkspaceSize: deterministic workspace %u bytes, total=%zu bytes",

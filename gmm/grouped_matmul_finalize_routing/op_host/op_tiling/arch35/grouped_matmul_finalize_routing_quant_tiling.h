@@ -68,21 +68,21 @@ constexpr float DETER_WORKSPACE_RATIO = 0.8f; // 减去系统开销后，确定�
 
 class GroupedMatmulFinalizeRoutingQuantTiling : public GroupedQmmTiling {
 public:
-    explicit GroupedMatmulFinalizeRoutingQuantTiling(gert::TilingContext *context)
+    explicit GroupedMatmulFinalizeRoutingQuantTiling(gert::TilingContext* context)
         : GroupedQmmTiling(context)
     {
         Reset();
     }
     ~GroupedMatmulFinalizeRoutingQuantTiling() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         GroupedQmmTiling::Reset(context);
         Reset();
     }
 
 protected:
-    const char *GetOpType() const override
+    const char* GetOpType() const override
     {
         return "GroupedMatmulFinalizeRouting";
     }
@@ -105,28 +105,34 @@ private:
     bool AnalyzeAttrs() override;
     bool AnalyzeDtype() override;
     bool AnalyzeInputs() override;
+    ge::graphStatus CalWeightNzL1Tiling();
+    ge::graphStatus CalWeightNzL1Depth(uint64_t leftL1Size);
+    ge::graphStatus CalWeightNzScaleFactors();
+    uint64_t GetWeightNzDepthWithHighBW(uint64_t mnL1) const;
+    void ModifyWeightNzDepthForUnalign(uint64_t leftL1Size, uint64_t baseASize, uint64_t baseBSize,
+                                       uint64_t baseScaleABSize);
     int64_t LogQuantParams() const;
     int64_t LogMatmulParams() const;
     bool SetQuantModeForGMMFinalizeRouting();
 
     bool CheckOptionalAttr();
     bool CheckDtype() const;
-    bool CheckOptional(uint32_t index, const char *paramName, ge::DataType targetDtype) const;
+    bool CheckOptional(uint32_t index, const char* paramName, ge::DataType targetDtype) const;
     bool IsFp4Dtype(ge::DataType dtype) const;
     bool IsFp8Dtype(ge::DataType dtype) const;
-    bool CheckInputsShape(const gert::Shape &xShape, const gert::StorageShape *wStorageShape,
-                          const gert::StorageShape *pertokenScaleStorageShape, const gert::Shape &scaleShape,
-                          const gert::Shape &yShape) const;
+    bool CheckInputsShape(const gert::Shape& xShape, const gert::StorageShape* wStorageShape,
+                          const gert::StorageShape* pertokenScaleStorageShape, const gert::Shape& scaleShape,
+                          const gert::Shape& yShape) const;
     bool CheckOptionalInputsShape();
-    bool CheckDim(const gert::Shape &xShape, const gert::Shape &wShape,
-                  const gert::StorageShape *pertokenScaleStorageShape, const gert::Shape &scaleShape,
-                  const gert::Shape &yShape) const;
-    bool CheckFp4Shape(const gert::Shape &xShape, const gert::Shape &wShape) const;
+    bool CheckDim(const gert::Shape& xShape, const gert::Shape& wShape,
+                  const gert::StorageShape* pertokenScaleStorageShape, const gert::Shape& scaleShape,
+                  const gert::Shape& yShape) const;
+    bool CheckFp4Shape(const gert::Shape& xShape, const gert::Shape& wShape) const;
     bool CheckCoreNum() const override;
     bool LoadInputDescsForRouting();
     bool CheckOptionalInputsForRouting();
-    bool CheckScaleAndPerTokenDims(const gert::StorageShape *pertokenScaleStorageShape,
-                                   const gert::Shape &scaleShape) const;
+    bool CheckScaleAndPerTokenDims(const gert::StorageShape* pertokenScaleStorageShape,
+                                   const gert::Shape& scaleShape) const;
     bool IsBf16MxTensorApiTarget() const;
 
     GMMFinalizeRoutingTilingData tilingData_;
