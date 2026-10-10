@@ -74,16 +74,16 @@
 aclnnStatus aclnnMoeInitRoutingV2GetWorkspaceSize(
     const aclTensor  *x,
     const aclTensor  *expertIdx,
-    int64_t           activeNum,
-    int64_t           expertCapacity,
-    int64_t           expertNum,
-    int64_t           dropPadMode,
-    int64_t           expertTokensCountOrCumsumFlag,
-    bool              expertTokensBeforeCapacityFlag,
+    int64_t           activeNumOptional,
+    int64_t           expertCapacityOptional,
+    int64_t           expertNumOptional,
+    int64_t           dropPadModeOptional,
+    int64_t           expertTokensCountOrCumsumFlagOptional,
+    bool              expertTokensBeforeCapacityFlagOptional,
     const aclTensor  *expandedXOut,
     const aclTensor  *expandedRowIdxOut,
-    const aclTensor  *expertTokensCountOrCumsumOut,
-    const aclTensor  *expertTokensBeforeCapacityOut,
+    const aclTensor  *expertTokensCountOrCumsumOutOptional,
+    const aclTensor  *expertTokensBeforeCapacityOutOptional,
     uint64_t         *workspaceSize,
     aclOpExecutor   **executor)
 ```
@@ -143,7 +143,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>√</td>
     </tr>
     <tr>
-      <td>activeNum</td>
+      <td>activeNumOptional</td>
       <td>输入</td>
       <td>表示是否为Active场景。</td>
       <td>该属性在dropPadMode为0的非Drop/Pad场景生效，值范围大于等于0，0表示Dropless场景，大于0时表示Active场景，约束所有专家共同处理tokens总量不超过activeNum。</td>
@@ -153,7 +153,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>expertCapacity</td>
+      <td>expertCapacityOptional</td>
       <td>输入</td>
       <td>表示每个专家能够处理的tokens数。</td>
       <td>值范围大于等于0，Drop/Pad场景下值域范围(0, numRows]，此时各专家将超过capacity的tokens drop掉，不够capacity阈值时则pad全0 tokens，其他场景不关心该属性值。</td>
@@ -163,7 +163,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>expertNum</td>
+      <td>expertNumOptional</td>
       <td>输入</td>
       <td>表示专家总数。</td>
       <td>值范围大于等于0，Drop/Pad场景下或者expertTokensCountOrCumsumFlag大于0需要输出expertTokensCountOrCumsumOut时，expertNum需大于0。</td>
@@ -173,7 +173,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>dropPadMode</td>
+      <td>dropPadModeOptional</td>
       <td>输入</td>
       <td>表示是否为Drop/Pad场景。</td>
       <td>取值为0或1。<ul><li>0：表示非Drop/Pad场景，该场景下不校验expertCapacity。</li><li>1：表示Drop/Pad场景，需要校验expertNum和expertCapacity，该模式下输出内容会将每个专家需要处理的Token个数对齐为expertCapacity个，超过expertCapacity个的Token会被Drop，不足的会用0填充。</li></ul></td>
@@ -183,7 +183,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>expertTokensCountOrCumsumFlag</td>
+      <td>expertTokensCountOrCumsumFlagOptional</td>
       <td>输入</td>
       <td>控制是否输出expertTokensCountOrCumsumOut。</td>
       <td>取值为0、1和2。<ul><li>0：表示不输出expertTokensCountOrCumsumOut。</li><li>1：表示输出的值为各个专家处理的token数量的累计值。</li><li>2：表示输出的值为各个专家处理的token数量。</li></ul></td>
@@ -193,7 +193,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>expertTokensBeforeCapacityFlag</td>
+      <td>expertTokensBeforeCapacityFlagOptional</td>
       <td>输入</td>
       <td>控制是否输出expertTokensBeforeCapacityOut。</td>
       <td>取值为false和true<ul><li>false：表示不输出expertTokensBeforeCapacityOut。</li><li>true：表示输出expertTokensBeforeCapacityOut，值为在drop之前各个专家处理的token数量。</li></ul></td>
@@ -224,7 +224,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>×</td>
     </tr>
     <tr>
-      <td>expertTokensCountOrCumsumOut</td>
+      <td>expertTokensCountOrCumsumOutOptional</td>
       <td>输出</td>
       <td>输出每个专家处理的token数量的统计结果及累加值。</td>
       <td><ul><li>支持空tensor</li><li>通过expertTokensCountOrCumsumFlag参数控制是否输出，该值仅在非Drop/Pad场景下输出，要求是一个1D的Tensor，Shape为[expertNum]。</li></ul></td>
@@ -234,7 +234,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>×</td>
     </tr>
     <tr>
-      <td>expertTokensBeforeCapacityOut</td>
+      <td>expertTokensBeforeCapacityOutOptional</td>
       <td>输出</td>
       <td>输出drop之前每个专家处理的token数量的统计结果。</td>
       <td><ul><li>支持空tensor</li><li>通过expertTokensBeforeCapacityFlag参数控制是否输出，该值仅在Drop/Pad场景下输出，要求是一个1D的Tensor，Shape为[expertNum]。</li></ul></td>
