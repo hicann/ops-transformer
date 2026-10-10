@@ -33,20 +33,20 @@ public:
     using MM_OUT_T = T;
 
     __aicore__ inline KvQuantSparseFlashMlaCsaBlockCube(){};
-    __aicore__ inline void InitParams(const ConstInfo &mqCubeConstInfo);
+    __aicore__ inline void InitParams(const ConstInfo& mqCubeConstInfo);
     __aicore__ inline void InitMm1GlobalTensor(GlobalTensor<Q_T> queryGm, GlobalTensor<KV_T> oriKvGm,
                                                GlobalTensor<KV_T> cmpKV, GlobalTensor<MM_OUT_T> mm1ResGm);
     __aicore__ inline void InitMm2GlobalTensor(GlobalTensor<KV_T> vec1ResGm, GlobalTensor<MM_OUT_T> mm2ResGm,
                                                GlobalTensor<OUT_T> attentionOutGm);
-    __aicore__ inline void InitPageAttentionInfo(GlobalTensor<KV_T> oriKvGm, const GlobalTensor<KV_T> &kvMergeGm,
+    __aicore__ inline void InitPageAttentionInfo(GlobalTensor<KV_T> oriKvGm, const GlobalTensor<KV_T>& kvMergeGm,
                                                  GlobalTensor<int32_t> oriBlockTableGm,
                                                  GlobalTensor<int32_t> cmpBlockTableGm);
-    __aicore__ inline void InitBuffers(TPipe *pipe);
+    __aicore__ inline void InitBuffers(TPipe* pipe);
 
     __aicore__ inline void AllocEventID();
     __aicore__ inline void FreeEventID();
-    __aicore__ inline void ComputeMm1(const RunInfo &mqCubeRunInfo, const MSplitInfo mqCubeSplitInfo);
-    __aicore__ inline void ComputeMm2(const RunInfo &mqCubeRunInfo, const MSplitInfo mqCubeSplitInfo);
+    __aicore__ inline void ComputeMm1(const RunInfo& mqCubeRunInfo, const MSplitInfo mqCubeSplitInfo);
+    __aicore__ inline void ComputeMm2(const RunInfo& mqCubeRunInfo, const MSplitInfo mqCubeSplitInfo);
 
 private:
     static constexpr bool PAGE_ATTENTION = SAST::pageAttention;
@@ -138,21 +138,21 @@ private:
         return idxMap[mIdx % 2] + k1Idx;
     }
 
-    __aicore__ inline void CopyGmToL1(LocalTensor<KV_T> &l1Tensor, GlobalTensor<KV_T> &gmSrcTensor, uint32_t srcN,
+    __aicore__ inline void CopyGmToL1(LocalTensor<KV_T>& l1Tensor, GlobalTensor<KV_T>& gmSrcTensor, uint32_t srcN,
                                       uint32_t srcD, uint32_t srcDstride);
-    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &mqCubeRunInfo, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm1AToL1(LocalTensor<KV_T>& aL1Tensor, const RunInfo& mqCubeRunInfo, uint32_t mSeqIdx,
                                           uint32_t mSizeAct, uint32_t headSize, uint32_t headOffset);
 
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor, const RunInfo &mqCubeRunInfo, uint32_t mSeqIdx,
+    __aicore__ inline void CopyInMm2AToL1(LocalTensor<KV_T>& aL1Tensor, const RunInfo& mqCubeRunInfo, uint32_t mSeqIdx,
                                           uint32_t subMSizeAct, uint32_t nSize, uint32_t nOffset);
-    __aicore__ inline void LoadDataMm1A(LocalTensor<KV_T> &aL0Tensor, LocalTensor<KV_T> &aL1Tensor, uint32_t idx,
+    __aicore__ inline void LoadDataMm1A(LocalTensor<KV_T>& aL0Tensor, LocalTensor<KV_T>& aL1Tensor, uint32_t idx,
                                         uint32_t kSplitSize, uint32_t mSize, uint32_t kSize);
-    __aicore__ inline void LoadDataMm1B(LocalTensor<KV_T> &bL0Tensor, LocalTensor<KV_T> &bL1Tensor, uint32_t idx,
+    __aicore__ inline void LoadDataMm1B(LocalTensor<KV_T>& bL0Tensor, LocalTensor<KV_T>& bL1Tensor, uint32_t idx,
                                         uint32_t kSplitSize, uint32_t kSize, uint32_t nSize);
 };
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::InitParams(const ConstInfo &mqCubeConstInfo)
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::InitParams(const ConstInfo& mqCubeConstInfo)
 {
     this->mqCubeConstInfo = mqCubeConstInfo;
 }
@@ -183,7 +183,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::InitMm2GlobalTen
 
 template <typename SAST>
 __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::InitPageAttentionInfo(
-    GlobalTensor<KV_T> oriKvGm, const GlobalTensor<KV_T> &kvMergeGm, GlobalTensor<int32_t> oriBlockTableGm,
+    GlobalTensor<KV_T> oriKvGm, const GlobalTensor<KV_T>& kvMergeGm, GlobalTensor<int32_t> oriBlockTableGm,
     GlobalTensor<int32_t> cmpBlockTableGm)
 {
     this->oriKvGm = oriKvGm;
@@ -193,7 +193,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::InitPageAttentio
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::InitBuffers(TPipe *pipe)
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::InitBuffers(TPipe* pipe)
 {
     pipe->InitBuffer(bufQPL1, L1_BLOCK_SIZE * 4);
     l1QPTensor = bufQPL1.Get<Q_T>();
@@ -240,8 +240,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::FreeEventID()
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyGmToL1(LocalTensor<KV_T> &l1Tensor,
-                                                                           GlobalTensor<KV_T> &gmSrcTensor,
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyGmToL1(LocalTensor<KV_T>& l1Tensor,
+                                                                           GlobalTensor<KV_T>& gmSrcTensor,
                                                                            uint32_t srcN, uint32_t srcD,
                                                                            uint32_t srcDstride)
 {
@@ -258,8 +258,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyGmToL1(Local
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyInMm1AToL1(LocalTensor<KV_T> &l1Tensor,
-                                                                               const RunInfo &mqCubeRunInfo,
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyInMm1AToL1(LocalTensor<KV_T>& l1Tensor,
+                                                                               const RunInfo& mqCubeRunInfo,
                                                                                uint32_t mSeqIdx, uint32_t mSizeAct,
                                                                                uint32_t headSize, uint32_t headOffset)
 {
@@ -268,8 +268,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyInMm1AToL1(L
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::LoadDataMm1A(LocalTensor<KV_T> &aL0Tensor,
-                                                                             LocalTensor<KV_T> &aL1Tensor, uint32_t idx,
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::LoadDataMm1A(LocalTensor<KV_T>& aL0Tensor,
+                                                                             LocalTensor<KV_T>& aL1Tensor, uint32_t idx,
                                                                              uint32_t kSplitSize, uint32_t mSize,
                                                                              uint32_t kSize)
 {
@@ -303,8 +303,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::LoadDataMm1A(Loc
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::LoadDataMm1B(LocalTensor<KV_T> &l0Tensor,
-                                                                             LocalTensor<KV_T> &l1Tensor, uint32_t idx,
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::LoadDataMm1B(LocalTensor<KV_T>& l0Tensor,
+                                                                             LocalTensor<KV_T>& l1Tensor, uint32_t idx,
                                                                              uint32_t kSplitSize, uint32_t kSize,
                                                                              uint32_t nSize)
 {
@@ -321,8 +321,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::LoadDataMm1B(Loc
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyInMm2AToL1(LocalTensor<KV_T> &aL1Tensor,
-                                                                               const RunInfo &mqCubeRunInfo,
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyInMm2AToL1(LocalTensor<KV_T>& aL1Tensor,
+                                                                               const RunInfo& mqCubeRunInfo,
                                                                                uint32_t mSeqIdx, uint32_t subMSizeAct,
                                                                                uint32_t nSize, uint32_t nOffset)
 {
@@ -332,7 +332,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::CopyInMm2AToL1(L
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const RunInfo &mqCubeRunInfo,
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const RunInfo& mqCubeRunInfo,
                                                                            const MSplitInfo mqCubeSplitInfo)
 {
     uint32_t mSize = mqCubeSplitInfo.nBufferDealM;
@@ -371,8 +371,8 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
             uint32_t curSeqIdx = mqCubeRunInfo.s2BatchOffset + nL1 * N_SPLIT_SIZE;
             if (mqCubeRunInfo.isOriOnly) {
                 if constexpr (KV_LAYOUT_T == SAS_LAYOUT::PA_BSND || KV_LAYOUT_T == SAS_LAYOUT::PA_BNSD) {
-                    uint32_t curS2Offset =
-                        mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize + mqCubeRunInfo.s2StartPoint;
+                    uint32_t curS2Offset = mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize +
+                                           mqCubeRunInfo.s2StartPoint + nL1 * N_SPLIT_SIZE;
                     uint32_t copyFinishRowCnt = 0;
                     LocalTensor<KV_T> kTensor;
                     uint32_t copyRowCnt = 0;
@@ -583,7 +583,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm1(const
 }
 
 template <typename SAST>
-__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const RunInfo &mqCubeRunInfo,
+__aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const RunInfo& mqCubeRunInfo,
                                                                            const MSplitInfo mqCubeSplitInfo)
 {
     uint32_t mSize = mqCubeSplitInfo.nBufferDealM;
@@ -648,7 +648,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockCube<SAST>::ComputeMm2(const
                     if constexpr (KV_LAYOUT_T == SAS_LAYOUT::PA_BSND || KV_LAYOUT_T == SAS_LAYOUT::PA_BNSD) {
                         uint32_t copyFinishRowCnt = 0;
                         uint32_t curS2Offset =
-                            mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize + mqCubeRunInfo.s2StartPoint;
+                            mqCubeRunInfo.s2Idx * mqCubeConstInfo.s2BaseSize + mqCubeRunInfo.s2StartPoint + kL1 * 128;
                         while (copyFinishRowCnt < kL0Size) {
                             copyRowCnt = mqCubeConstInfo.paOriBlockSize - curS2Offset % mqCubeConstInfo.paOriBlockSize;
                             if (copyFinishRowCnt + copyRowCnt > kL0Size) {

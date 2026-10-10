@@ -16,12 +16,12 @@ if (BUILD_WITH_INSTALLED_DEPENDENCY_CANN_PKG)
 
   # aicpu json
   file(GLOB_RECURSE JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/*.json)
-  set_property(GLOBAL APPEND PROPERTY AICPU_JSON_FILES ${JSON_FILE})
 
   # aicpu cust kernel
   file(GLOB AICPU_SRC ${CMAKE_CURRENT_SOURCE_DIR}/*_aicpu*.cpp)
   message(STATUS "[mixed_quant_sparse_flash_mla_metadata] Found aicpu sources: ${AICPU_SRC}, ascend dir: ${ASCEND_DIR}, ophost name: ${OPHOST_NAME}")
 
+  set_property(GLOBAL APPEND PROPERTY AICPU_JSON_FILES ${JSON_FILE})
   set(OBJ_NAME mixed_quant_sparse_flash_mla_metadata_cust_obj)
   add_aicpu_cust_kernel_modules(${OBJ_NAME})
   target_sources(${OBJ_NAME} PRIVATE ${AICPU_SRC})

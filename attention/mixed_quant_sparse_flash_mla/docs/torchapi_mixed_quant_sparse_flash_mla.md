@@ -1108,6 +1108,28 @@ npu_result, npu_lse = torch.ops.cann_ops_transformer.mixed_quant_sparse_flash_ml
 torch.npu.synchronize()
 ```
 
+#### TurboQuant参数约束
+
+以下约束适用于<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>的`quant_mode=3`场景。以下字段均为原有参数，不增加新的位置参数；新增的Tensor数据类型和布局仅在`quant_mode=3`下生效。
+
+| 参数 | `quant_mode=3`约束 |
+| --- | --- |
+| `quant_mode` | 3 |
+| `q`、`attention_out` | FLOAT16或BFLOAT16，类型和shape一致；TND布局，shape为`(q_t, q_n, 512)`；`q_n`为4到128的4的倍数，`q_t`允许为0 |
+| `ori_kv` | 必传；数据类型、布局和shape详见`quant_mode`描述 |
+| `cmp_kv` | 必传；数据类型、布局和shape详见`quant_mode`描述 |
+| `layout_q`、`layout_kv` | 分别为TND、PA_BBND；两路KV的block_size均为16到1024的16的倍数，0轴stride必须覆盖一个完整物理块 |
+| `cmp_sparse_indices` | 必传INT32，shape为`(q_t, 1, 512)`或`(q_t, 1, 1024)`；无效位置填-1 |
+| `ori_block_table`、`cmp_block_table`、`cu_seqlens_q`、`seqused_ori_kv` | 均必传，沿用原有INT32类型和参数含义 |
+| `ori_sparse_indices`、`ori_topk_length`、`cmp_topk_length`、`cu_seqlens_ori_kv`、`cu_seqlens_cmp_kv`、`seqused_q`、`seqused_cmp_kv`、`cmp_residual_kv` | 不支持传入，保留原有可选参数位置 |
+| `ori_mask_mode`、`cmp_mask_mode`、`ori_win_left`、`ori_win_right` | 分别为4、3、非负值、0 |
+| `cmp_ratio`、`rope_head_dim`、`topk_value_mode` | 分别支持4或128、64、1；算子的压缩倍率支持范围不代表框架会量化全部压缩KV |
+| `metadata` | 必传，由前置Metadata接口以相同`quant_mode=3`及相同输入属性生成，INT32、shape为`(1024,)` |
+
+`sinks`和Softmax LSE继续使用原有参数及返回形式。调用时建议显式使用`quant_mode=3`。原有Torch实现还保留`key_dtype=None`、`value_dtype=None`两个参数；它们在TurboQuant适配前已存在。上文函数原型沿用基线文档，完整注册签名以`torch.ops.cann_ops_transformer.mixed_quant_sparse_flash_mla.default._schema`为准。
+
+<term>Ascend 950PR&950DT系列产品</term>的`quant_mode=1`和`quant_mode=2`参数校验条件保持不变。
+
 ### HCA，LayoutQ BSND，LayoutKv PA_BBND输入
 
 ```python
