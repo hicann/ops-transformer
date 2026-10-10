@@ -118,7 +118,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>输入</td>
       <td>公式中的query。</td>
       <td>当前仅支持layoutQ="TND"。其他layout的shape见<a href="#layout对应关系说明">layout对应关系说明</a>。</td>
-      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1FN、HIFLOAT8</td>
+      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN</td>
       <td>ND</td>
       <td>[totalQTokens, headNum, headDim]</td>
       <td>×</td>
@@ -128,7 +128,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>输入</td>
       <td>公式中的key。</td>
       <td>可作为原始Key或Paged KV Cache。当前仅支持layoutKv="PA_BBND"。其余layout及原始KV的shape见<a href="#layout对应关系说明">layout对应关系说明</a>、<a href="#paged-attention相关说明">Paged Attention相关说明</a>；dim0非连续见<a href="#其他约束">其他约束</a>。</td>
-      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1FN、HIFLOAT8</td>
+      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN</td>
       <td>ND</td>
       <td>[numBlocks, blockSize, numKeyValueHeads, headDim]</td>
       <td>√</td>
@@ -138,7 +138,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>输入</td>
       <td>公式中的value。</td>
       <td>可作为原始Value输入或Paged KV Cache输入，shape与key一致。当前仅支持layoutKv="PA_BBND"。</td>
-      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT4_E2M1FN、HIFLOAT8</td>
+      <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN</td>
       <td>ND</td>
       <td>与key一致</td>
       <td>√</td>
@@ -191,7 +191,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>query的反量化缩放因子。</td>
       <td>详情见<a href="#量化相关说明">量化相关说明</a>。当前仅quantType=0/5场景可传nullptr；quantType=1~4当前不支持，须传入nullptr。
       </td>
-      <td>FLOAT32、FLOAT8_E8M0</td>
+      <td>FLOAT32</td>
       <td>ND</td>
       <td>x</td>
       <td>×</td>
@@ -202,7 +202,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>key的反量化缩放因子。</td>
       <td>详情见<a href="#量化相关说明">量化相关说明</a>。当前仅quantType=0/5场景可传nullptr；quantType=1~4当前不支持，须传入nullptr。
       </td>
-      <td>FLOAT32、FLOAT8_E8M0</td>
+      <td>FLOAT32</td>
       <td>ND</td>
       <td>x</td>
       <td>×</td>
@@ -213,7 +213,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>value的反量化缩放因子。</td>
       <td>详情见<a href="#量化相关说明">量化相关说明</a>。当前仅quantType=0/5场景可传nullptr；quantType=1~4当前不支持，须传入nullptr。
       </td>
-      <td>FLOAT32、FLOAT8_E8M0</td>
+      <td>FLOAT32</td>
       <td>ND</td>
       <td>x</td>
       <td>×</td>
