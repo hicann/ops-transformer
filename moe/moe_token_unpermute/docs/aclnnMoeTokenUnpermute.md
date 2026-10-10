@@ -130,7 +130,7 @@ aclnnStatus aclnnMoeTokenUnpermute(
       <td>probsOptional（aclTensor）</td>
       <td>输入</td>
       <td>公式中的P。</td>
-      <td><ul><li>当probs传时，topK_num等于probs的第二维；当probs不传时，topK_num=1。</li><li>当probs传时，topK_num等于probs的第二维；当probs不传时，topK_num=1。</li><li>shape为（tokens_num，topK_num）。</li></ul></td>
+      <td><ul><li>当probs传时，topK_num等于probs的第二维；当probs不传时，topK_num=1。</li><li>shape为（tokens_num，topK_num）。</li></ul></td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>2</td>

@@ -569,7 +569,7 @@ aclnnStatus aclnnQuantMatmulAlltoAllV2(
     * 维度约束：
       * H1范围仅支持[1, 65535]。
       * mx量化场景下，x2必须转置，shape为(H2, H1)，transposeX2为True。
-      * mx量化场景下，且x1和x2输入为FLOAT4_E2M1时，H1必须是偶数，且ceil(H1/32)必须是偶数。
+      * mx量化场景下，x1和x2输入为FLOAT4_E2M1时，H1必须是偶数，且ceil(H1/32)必须是偶数。
   <!-- end id17 -->
 
 * 通算融合算子不支持并发调用，不同的通算融合算子也不支持并发调用。

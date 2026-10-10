@@ -514,7 +514,7 @@ aclnnStatus aclnnQuantGroupedMatMulAlltoAllv(
 - 通信引擎约束：
 
   <!-- npu="950" id7 -->
-  - Ascend 950DT系列产品：支持 AI_CPU 通信。
+  - Ascend 950DT系列产品：支持 AI CPU 通信。
   <!-- end id7 -->
 
 - e * epWorldSize 乘积最大支持 256，其中 e（单卡专家数），最大支持 32，epWorldSize 支持 2/4/8/16/32/64/128/256;

@@ -875,7 +875,7 @@ key、value的shape由layoutKv及是否使能Paged Cache决定，见<a href="#pa
           <li>BNSD: [batch, headNum, ceilDiv(maxQSeqLength, blockShapeX), 1]。</li>
           <li>BSND: [batch, ceilDiv(maxQSeqLength, blockShapeX), headNum, 1]。</li>
         </ul>
-        kDequantScaleOptional(必选)：
+        kDequantScaleOptional(必选):
         <ul>
           <li>TND: [batch*ceilDiv(qSeqLength, blockShapeY), kvHeadNum, 1]。</li>
           <li>BNSD: [batch, kvHeadNum, ceilDiv(maxKvSeqLength, blockShapeY), 1]。</li>

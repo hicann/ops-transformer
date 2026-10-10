@@ -238,7 +238,7 @@
 
              $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-             其中，$xScale_{i}$代表的是对应token对应的量化因子
+             其中，$xScale_{i}$代表的是对应token的量化因子
            - 3.量化输出结果
 
              $Q\_scale_{i} = \frac{max(|S_{i}|)}{max(type)}$

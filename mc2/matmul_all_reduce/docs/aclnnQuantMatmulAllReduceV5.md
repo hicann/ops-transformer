@@ -354,14 +354,14 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
 - 通信引擎commMode支持度：
 
   <!-- npu="910b" id7 -->
-  - <term>Atlas A2系列产品</term>：目前不支持指定通信引擎，commMode仅允许输入为"ai_cpu"，使用AICPU通信引擎。
+  - <term>Atlas A2系列产品</term>：目前不支持指定通信引擎，commMode仅允许输入为"ai_cpu"，使用AI CPU通信引擎。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：目前通信引擎支持AICPU和CCU，commMode允许输入为"ai_cpu"或者"ccu"。CCU仅支持单机UB域内互联，AICPU可支持跨机UB域内互联。
+  - <term>Ascend 950PR&950DT系列产品</term>：目前通信引擎支持AI CPU和CCU，commMode允许输入为"ai_cpu"或者"ccu"。CCU仅支持单机UB域内互联，AI CPU可支持跨机UB域内互联。
   <!-- end id8 -->
   - 同一条通信链路内，只能选择同一种通信引擎。
-  - AICPU和CCU通信引擎简单介绍：
-    - AICPU：不占用计算核，通信效率高，但通信静态开销较大，对小数据量通信场景不友好。适用于大数据高带宽场景。
+  - AI CPU和CCU通信引擎简单介绍：
+    - AI CPU：不占用计算核，通信效率高，但通信静态开销较大，对小数据量通信场景不友好。适用于大数据高带宽场景。
     - CCU：能够减少访存带宽与计算核占用，但受限于片上资源，支持的通信域数量有限。适用于高带宽、低时延的通信场景。
     - 更详细的通信引擎介绍，请参考[通信引擎](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/910beta1/programug/commopdev/hcclopdev_000005.html)。
 - 确定性计算：

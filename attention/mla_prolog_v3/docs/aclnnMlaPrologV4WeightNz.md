@@ -1,6 +1,6 @@
 # aclnnMlaPrologV4WeightNz
 
-[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/attention/mla_prolog_v4)
+[📄 查看源码](https://gitcode.com/cann/ops-transformer/tree/9.2.0/attention/mla_prolog_v3)
 
 ## 产品支持情况
 
@@ -143,7 +143,7 @@
     queryNorm = {\mathrm{cast\_to\_fp8}(c^Q / \mathrm{dequantScaleQNorm})}
     $$
 
-    其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数位的最大值emax。
+    其中$Q_{max}$为量化输出类型的最大值：INT8取127，FLOAT8_E4M3FN取448，HIFLOAT8取32768，8为FLOAT8_E4M3FN指数的最大值emax。
 
 ## 函数原型
 
@@ -1673,7 +1673,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
 
 <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-  ```Cpp
+```cpp
   #include <iostream>
   #include <cstring>
   #include <vector>
@@ -2068,7 +2068,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
 
 <term>Ascend 950PR&950DT系列产品</term>示例代码如下，仅供参考。
 
-  ```Cpp
+```cpp
 #include <iostream>
 #include <cstring>
 #include <vector>

@@ -433,7 +433,7 @@ MoeDistributeBuffer.low_latency_combine(x, topk_idx, topk_weights, assist_info_f
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
-    - `topk_weights`可传有效Tensor或None或空Tesenor，传有效Tensor时开启topK专家权重功能，传None或空Tesenor时不开启并直接对专家输出求和
+    - `topk_weights`可传有效Tensor或None或空Tensor，传有效Tensor时开启topK专家权重功能，传None或空Tensor时不开启并直接对专家输出求和
   <!-- end id8 -->
 - HCCL通信域缓存区大小：
 

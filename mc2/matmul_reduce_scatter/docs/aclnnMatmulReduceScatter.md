@@ -303,13 +303,13 @@ aclnnStatus aclnnMatmulReduceScatter(
 - 通信引擎约束：
 
   <!-- npu="910b" id7 -->
-  - <term>Atlas A2系列产品</term>：仅支持AICPU通信。
+  - <term>Atlas A2系列产品</term>：仅支持AI CPU通信。
   <!-- end id7 -->
   <!-- npu="A3" id8 -->
-  - <term>Atlas A3系列产品</term>  ：仅支持AICPU通信。
+  - <term>Atlas A3系列产品</term>：仅支持AI CPU通信。
   <!-- end id8 -->
   <!-- npu="950" id9 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：仅支持AICPU通信。
+  - <term>Ascend 950PR&950DT系列产品</term>：仅支持AI CPU通信。
 
   <!-- end id9 -->
 

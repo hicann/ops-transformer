@@ -25,7 +25,7 @@
 
 ## 功能说明
 
-- 接口功能：在micro-batch训练场景，需要做micro-batch的梯度累计，会存在大量GroupedMatMul后接InplaceAdd的融合场景。QuantGroupedMatmulInplaceAdd算子将上述算子融合起来，提高网络性能。实现分组矩阵乘计算和加法计算，基本功能为矩阵乘和加法的组合，如T-C量化场景下$y_i[m,n]=(x1_i[m,k_i] \times x2_i[k_i,n]) * scale2_i[n] * scale1_i + y_i[m,n], i=1...g$，其中g为分组个数，$m/k_i/n$为对应的维度。
+- 接口功能：在micro-batch训练场景，需要做micro-batch的梯度累积，会存在大量GroupedMatMul后接InplaceAdd的融合场景。QuantGroupedMatmulInplaceAdd算子将上述算子融合起来，提高网络性能。实现分组矩阵乘计算和加法计算，基本功能为矩阵乘和加法的组合，如T-C量化场景下$y_i[m,n]=(x1_i[m,k_i] \times x2_i[k_i,n]) * scale2_i[n] * scale1_i + y_i[m,n], i=1...g$，其中g为分组个数，$m/k_i/n$为对应的维度。
 
     相较于[aclnnGroupedMatmulV4](../../grouped_matmul/docs/aclnnGroupedMatmulV4.md)接口，**此接口变化：**
     - 输入输出参数类型均为aclTensor。
@@ -40,7 +40,7 @@
      y_i[m,n] = \sum_{j=0}^{kLoops-1} ((\sum_{k=0}^{gsK-1} (x1Slice_i * x2Slice_i)) * (scale1_i[m, j] * scale2_i[j, n])) + y_i[m,n]
     $$
 
-    其中，gsK代表K轴的量化的block size即32，$x1Slice_i$代表$x1_i$第m行长度为gsK的向量，$x2Slice_i$代表$x2_i$第n列长度为gsK的向量，K轴均从$j*gsK$起始切片，j的取值范围[0, kLoops), kLoops=ceil($K_i$ / gsK)，支持最后的切片长度不足gsK。
+    其中，gsK代表K轴的量化block size即32，$x1Slice_i$代表$x1_i$第m行长度为gsK的向量，$x2Slice_i$代表$x2_i$第n列长度为gsK的向量，K轴均从$j*gsK$起始切片，j的取值范围[0, kLoops), kLoops=ceil($K_i$ / gsK)，支持最后的切片长度不足gsK。
     - **T-T/T-C量化：**
 
     $$

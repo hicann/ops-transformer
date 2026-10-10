@@ -251,7 +251,7 @@ cann_ops_transformer.fused_causal_conv1d(
     - initial_state_idx[i] <= block_idx_last_scheduled_token[i]
     - block_idx_first_scheduled_token[i] <= block_idx_last_scheduled_token[i]
     - block_idx_last_scheduled_token[i] < max_num_blocks
-  - num_accepted_tokens分为None和非None，非None情况下长度为batch，prefile对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seq_len-1。
+  - num_accepted_tokens分为None和非None，非None情况下长度为batch，prefill对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seq_len-1。
   - num_computed_tokens中每个元素取值大于等于0。
   - cache_indices的取值范围为[0, conv_states.dim[0]-1],且值均不能相等（除非等于pad_slot_id）。
   - max_query_len = batch中的最大seq_len。

@@ -85,7 +85,7 @@ cann_ops_transformer.sparse_flash_mla_grad_metadata(
     num_heads_q,
     num_heads_kv,
     head_dim,
-    *，
+    *,
     cu_seqlens_q=None,
     cu_seqlens_ori_kv=None,
     cu_seqlens_cmp_kv=None,

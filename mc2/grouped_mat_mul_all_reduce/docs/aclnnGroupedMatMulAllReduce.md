@@ -146,7 +146,7 @@ aclnnStatus aclnnGroupedMatMulAllReduce(
       <tr>
       <td>group(char*)</td>
       <td>输入</td>
-      <td>Host侧标识列组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
+      <td>Host侧标识组的字符串，即通信域名称，通过Hccl接口HcclGetCommName获取commName作为该参数。</td>
       <td>字符串长度需大于0。</td>
       <td>STRING</td>
       <td>ND</td>

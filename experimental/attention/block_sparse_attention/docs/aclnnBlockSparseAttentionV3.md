@@ -18,26 +18,27 @@
   相比于BlockSparseAttentionV3,本接口新增pQuantScaleOptional、quantMode、dstTypeMax参数。
 - **计算公式**：稀疏块大小：$blockShapeX \times blockShapeY$，selectIdx指定稀疏模式
 
-  $$
-  attentionOut = Softmax(scale \cdot query \cdot key_{sparse}^T + atten\_mask) \cdot value_{sparse}
-  $$
+    $$
+    attentionOut = Softmax(scale \cdot query \cdot key_{sparse}^T + atten\_mask) \cdot value_{sparse}
+    $$
 
-  BlockSparseAttentionV2输入query、key、value的数据排布格式支持从多种维度排布解读，可通过qInputLayout和kvInputLayout传入。
+    BlockSparseAttentionV2输入query、key、value的数据排布格式支持从多种维度解读，可通过qInputLayout和kvInputLayout传入。
 
-  - B：表示输入样本批量大小（Batch）
-  - T：B和S合轴紧密排列的长度（Total tokens）
-  - S：表示输入样本序列长度（Seq-Length）
-  - H：表示隐藏层的大小（Head-Size）
-  - N：表示多头数（Head-Num）
-  - D：表示隐藏层最小的单元尺寸，需满足D=H/N（Head-Dim）
+    - B：表示输入样本批量大小（Batch）
+    - T：B和S合轴紧密排列的长度（Total tokens）
+    - S：表示输入样本序列长度（Seq-Length）
+    - H：表示隐藏层的大小（Head-Size）
+    - N：表示多头数（Head-Num）
+    - D：表示隐藏层最小的单元尺寸，需满足D=H/N（Head-Dim）
 
-  当前支持的布局：
+    当前支持的布局：
 
-  - qInputLayout: "TND" "BNSD" "BSND"
-  - kvInputLayout: "TND" "BNSD" "BSND"
+    - qInputLayout: "TND" "BNSD" "BSND"
+    - kvInputLayout: "TND" "BNSD" "BSND"
+
 - **MXFP4特性说明(仅Ascend 950PR&950DT系列产品支持)**
 
-  本接口新增支持MXFP4数据类型(FLOAT4_E2M1)的输入，以提供计算效率并降低显存占用。当使用MXFP4输入时，需要提供相应的量化缩放因子用于反量化计算。
+    本接口新增支持MXFP4数据类型(FLOAT4_E2M1)的输入，以提供计算效率并降低显存占用。当使用MXFP4输入时，需要提供相应的量化缩放因子用于反量化计算。
 - <summary><a id="MXFP4量化模式的量化缩放因子"></a><strong>MXFP4量化模式的量化缩放因子</strong></summary>
 
   - qDequantScaleOptional：

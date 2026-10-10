@@ -56,4 +56,4 @@ CANN算子量化是指对神经网络中Matmul等矩阵（cube）类算子的输
   - pertensor-perchannel-pergroup量化模式（简称T-CG量化模式）
   - perblock-perblock量化模式（简称B-B量化模式）
 - 伪量化：一般是指对权重矩阵（weight）进行量化的模式，包括perchannel量化模式（简称C量化模式）。
-- MX量化（Microscaling Formats）：指由开放计算项目（OCP）制定的低精度数据表示方式。属于pergroup量化模式，表示量化参数类型为FLOAT8\_E8M0且gourp size为32的特例情况。
+- MX量化（Microscaling Formats）：指由开放计算项目（OCP）制定的低精度数据表示方式。属于pergroup量化模式，表示量化参数类型为FLOAT8\_E8M0且group size为32的特例情况。

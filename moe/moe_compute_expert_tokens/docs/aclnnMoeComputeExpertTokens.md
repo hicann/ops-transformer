@@ -165,7 +165,7 @@ aclnnStatus aclnnMoeComputeExpertTokens(
     <td>sortedExperts的数据类型不在支持的范围之内。</td>
     </tr>
     <tr>
-    <td>sortedExperts的format格式不在支持的范围之内。</td>
+    <td>sortedExperts的format不在支持的范围之内。</td>
     </tr>
     <tr>
     <td> ACLNN_ERR_INNER_TILING_ERROR </td>

@@ -39,7 +39,7 @@
 
 ## 函数原型
 
-每个算子分为两段式接口，必须先调用“`aclnnMoeDistributeCombineTeardownGetWorkspaceSize`”接口获取入参并根据计算流程计算所需workspace大小获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“`aclnnMoeDistributeCombineTeardown`”接口执行计算。
+每个算子分为两段式接口，必须先调用“`aclnnMoeDistributeCombineTeardownGetWorkspaceSize`”接口获取入参并根据计算流程计算所需workspace大小以及包含了算子计算流程的执行器，再调用“`aclnnMoeDistributeCombineTeardown`”接口执行计算。
 
 ```cpp
 aclnnStatus aclnnMoeDistributeCombineTeardownGetWorkspaceSize(

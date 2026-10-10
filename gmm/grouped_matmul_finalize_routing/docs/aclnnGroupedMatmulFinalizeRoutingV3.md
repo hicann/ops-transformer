@@ -59,7 +59,7 @@
     $$
     y [rowIndex[i],:] = y[rowIndex[i],:] + sharedInputWeight \times sharedInput[j, :]
     $$
-  - 4.共享专家输出融合：最终输出结果是所有专家输出与共享专家输出，按照rowIndex所有进行合并的结果，计算过程如下：
+  - 4.共享专家输出融合：最终输出结果是所有专家输出与共享专家输出，按照rowIndex进行合并的结果，计算过程如下：
 
     $$
     y[rowIndex[i],:] = \sum_{i \in \mathcal{E}[j]} y_i [j - start_i] + sharedInputWeight \times sharedInput[j, :]
@@ -274,7 +274,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     <tr>
       <td>sharedInputOffset（int64_t）</td>
       <td>输入</td>
-      <td>共享专家输出的在总输出中的偏移。</td>
+      <td>共享专家输出在总输出中的偏移。</td>
       <td></td>
       <td>INT64</td>
       <td></td>
@@ -408,7 +408,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入参数是必选输入、输出或者必须属性，且是空指针。</td>
+      <td>传入参数是必选输入、输出或者必需属性，且是空指针。</td>
     </tr>
     <tr>
       <td rowspan="8">ACLNN_ERR_PARAM_INVALID</td>

@@ -156,7 +156,7 @@ aclnnStatus aclnnMoeInitRoutingV2(
       <td>expertCapacityOptional</td>
       <td>输入</td>
       <td>表示每个专家能够处理的tokens数。</td>
-      <td>值范围大于等于0，Drop/Pad场景下值域范围(0, numRows]，此时各专家将超过capacity的tokens drop掉，不够capacity阈值时则pad全0 tokens，其他场景不关心该属性值。</td>
+      <td>取值范围大于等于0，Drop/Pad场景下值域范围(0, numRows]，此时各专家将超过capacity的tokens drop掉，不够capacity阈值时则pad全0 tokens，其他场景不关心该属性值。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
