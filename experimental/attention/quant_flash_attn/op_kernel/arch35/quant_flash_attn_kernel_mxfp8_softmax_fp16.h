@@ -80,6 +80,11 @@ public:
     uint32_t prevBIdx_ = 0;
     uint32_t prevBN2Idx_ = 0;
     uint32_t prevGS1Idx_ = 0;
+    uint32_t rowBIdx_ = 0;
+    uint32_t rowN2Idx_ = 0;
+    uint32_t rowRealN2Idx_ = 0;
+    uint32_t rowMSize_ = 0;
+    uint32_t rowStateSlot_ = 0;
     uint32_t mloop_ = 0; // [bN2, gS1] 行计数，isFirstS2Loop 时递增，供 softmaxStateSlot 索引
     bool headS2Split_ = false;
     bool tailS2Split_ = false;
@@ -139,6 +144,15 @@ public:
         // 向量块 GM 输出初始化（必须在 parser Init 之后：OffsetCalculator 内部为拷贝语义）
         vectorBlock_.InitInput(attnOut, softmaxLse, pScale, qSeqUsedParser_);
         kvSeqUsedParser_.Init(sequsedKv, static_cast<uint32_t>(constInfo_.seqUsedKvSize), constInfo_.s2Size);
+        if ASCEND_IS_AIC {
+            bool fullTiles = constInfo_.bSize > 0U;
+            for (uint32_t b = 0; b < constInfo_.bSize; ++b) {
+                const auto qLen = qSeqUsedParser_.GetActualSeqLength(b);
+                const auto kvLen = kvSeqUsedParser_.GetActualSeqLength(b);
+                fullTiles = fullTiles && qLen > 0 && kvLen > 0 && qLen % S1_BASE_SIZE == 0 && kvLen % S2_BASE_SIZE == 0;
+            }
+            cubeBlock_.SetFullTileUnitReuse(fullTiles);
+        }
 
 #if QFA_SF16_DEBUG_PRINTF
         if ASCEND_IS_AIC {
@@ -279,7 +293,7 @@ public:
     __aicore__ inline TASK_DEAL_MODE GetTaskDealMode(uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur)
     {
         bool isFirstTask = (bN2Cur == bN2Start_) && (gS1Cur == gS1OStart_) && (s2Cur == s2OStart_);
-        uint32_t bIdx = bN2Cur / constInfo_.realN2Size;
+        uint32_t bIdx = (isFirstTask || bN2Cur != prevBN2Idx_) ? bN2Cur / constInfo_.realN2Size : prevBIdx_;
         if (isFirstTask || prevBIdx_ != bIdx) {
             prevBIdx_ = bIdx;
             actSeqLensKv_ = kvSeqUsedParser_.GetActualSeqLength(bIdx);
@@ -379,21 +393,26 @@ public:
     {
         info.loop = loop;
         info.mloop = mloop_;
-        info.bIdx = bN2Cur / constInfo_.realN2Size;
-        info.n2Idx = (bN2Cur / (constInfo_.realN2Size / constInfo_.n2Size)) % constInfo_.n2Size;
-        info.realN2Idx = bN2Cur % constInfo_.realN2Size;
+        // Batch/head division and S1 geometry are invariant across this row.
+        if (loop == 0U || s2Cur == curS2Start_) {
+            rowBIdx_ = bN2Cur / constInfo_.realN2Size;
+            rowRealN2Idx_ = bN2Cur % constInfo_.realN2Size;
+            rowN2Idx_ = rowRealN2Idx_ / constInfo_.gSize;
+            rowMSize_ = static_cast<uint32_t>(
+                AttentionCommon::Min(static_cast<uint64_t>(S1_BASE_SIZE), actSeqLensQ_ - gS1Cur * S1_BASE_SIZE));
+            rowStateSlot_ = mloop_ % PRELOAD_TASK_CACHE_SIZE;
+        }
+        info.bIdx = rowBIdx_;
+        info.n2Idx = rowN2Idx_;
+        info.realN2Idx = rowRealN2Idx_;
         info.gS1Idx = gS1Cur * S1_BASE_SIZE;
         // BNSD 为 GS1 layout（S1 与 G 交错）
-        info.s1Idx = info.gS1Idx % actSeqLensQ_;
+        info.s1Idx = info.gS1Idx; // realGSize is one for this BNSD kernel.
         info.s2Idx = s2Cur * S2_BASE_SIZE;
         info.actS1Size = actSeqLensQ_;
         info.actS2Size = actSeqLensKv_;
 
-        info.actMSize = S1_BASE_SIZE;
-        uint64_t gS1Size = info.actS1Size * constInfo_.realGSize;
-        if (((gS1Cur + 1) * S1_BASE_SIZE) > gS1Size) {
-            info.actMSize = static_cast<uint32_t>(gS1Size - gS1Cur * S1_BASE_SIZE);
-        }
+        info.actMSize = rowMSize_;
         info.actMSizeAlign32 = (info.actMSize + 31) >> 5 << 5;
 
         info.actSingleLoopS2Size = S2_BASE_SIZE;
@@ -415,9 +434,15 @@ public:
         // 情况2/3: loop=0 时，首个有效任务一定是某行 [bN2, gS1] 的首个 S2 分块
         info.isFirstS2Loop = ((loop == 0) || (s2Cur == curS2Start_));
         info.isLastS2Loop = (s2Cur + 1 == curS2End_);
+        info.pairSecond = ((s2Cur - curS2Start_) & 1U) != 0U;
+        info.pairCopyS2Size = info.actSingleLoopS2Size;
+        if (!info.pairSecond && !info.isLastS2Loop) {
+            info.pairCopyS2Size += static_cast<uint32_t>(
+                AttentionCommon::Min(static_cast<uint64_t>(S2_BASE_SIZE), info.actS2Size - info.s2Idx - S2_BASE_SIZE));
+        }
 
         // V1 softmax 在线状态槽位（accMax ring，mloop % 3）
-        info.softmaxStateSlot = mloop_ % PRELOAD_TASK_CACHE_SIZE;
+        info.softmaxStateSlot = rowStateSlot_;
 
         // P L1 ring 槽位（loop % 3，同 [bN2,gS1] 不同 S2 块用不同槽，防覆盖）
         info.pSlot = loop % PRELOAD_TASK_CACHE_SIZE;
@@ -436,28 +461,55 @@ public:
     // ============================== ExecuteTask：C1/V1/C2/V2 核间流水 ==============================
     __aicore__ inline void ExecuteTask(uint64_t loop, RunInfoMxfp8SoftmaxFp16 taskRunInfo[PRELOAD_TASK_CACHE_SIZE])
     {
-        RunInfoMxfp8SoftmaxFp16& runInfo0 = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE]; // 本轮任务
-        RunInfoMxfp8SoftmaxFp16& runInfo2 =
-            taskRunInfo[(loop - PRELOAD_N) % PRELOAD_TASK_CACHE_SIZE]; // 上 PRELOAD_N 轮任务
+        auto& current = taskRunInfo[loop % PRELOAD_TASK_CACHE_SIZE];
+        auto& delayed = taskRunInfo[(loop - PRELOAD_N) % PRELOAD_TASK_CACHE_SIZE];
+        if ASCEND_IS_AIC {
+            ExecutePhase1(current);
+            ExecutePhase2(loop, delayed);
+        } else {
+            ExecutePhase1(current);
+            ExecutePhase2(loop, delayed);
+        }
+    }
 
-        // ====== Phase 1: C1/V1（本任务）======
+    __aicore__ inline void ExecutePhase1(RunInfoMxfp8SoftmaxFp16& info)
+    {
+        if (likely(info.isValid && info.actMSize == S1_BASE_SIZE && info.actSingleLoopS2Size == S2_BASE_SIZE)) {
+            // Specialize full tiles while retaining the general tail path.
+            RunInfoMxfp8SoftmaxFp16 tile = info;
+            tile.actMSize = S1_BASE_SIZE;
+            tile.actMSizeAlign32 = S1_BASE_SIZE;
+            tile.actVecS1Size = S1_SUB_BLOCK_SIZE;
+            tile.actSingleLoopS2Size = S2_BASE_SIZE;
+            tile.actSingleLoopS2SizeAlign = S2_BASE_SIZE;
+            ExecutePhase1Impl(tile);
+        } else {
+            ExecutePhase1Impl(info);
+        }
+    }
+
+    __aicore__ inline void ExecutePhase1Impl(RunInfoMxfp8SoftmaxFp16& runInfo0)
+    {
         if (runInfo0.isValid) {
             uint32_t c1v1Loop = CeilDiv(runInfo0.actSingleLoopS2Size, S2_SUB_LOOP_SIZE);
             for (uint32_t subLoopIdx = 0; subLoopIdx < c1v1Loop; subLoopIdx++) {
+                // Each UB slot is released independently: Fixpipe may fill
+                // the other slot while Vector consumes this one.
+                uint16_t c1v1Flag = subLoopIdx == 0U ? CROSS_CORE_SYNC_C1_V1 : CROSS_CORE_SYNC_C1_V1_SECOND;
                 for (uint32_t subBlockId = 0; subBlockId < 2; subBlockId++) {
                     if ASCEND_IS_AIC {
                         // mm1Res UB 槽位空闲（对应 V 核已消费完）
-                        CrossCoreWaitFlag<SYNC_MODE_4, PIPE_FIX>(CROSS_CORE_SYNC_C1_V1 + subBlockId * 16);
+                        CrossCoreWaitFlag<SYNC_MODE_4, PIPE_FIX>(c1v1Flag + subBlockId * 16);
                         if (subBlockId == 0) {
                             ComputeMm1(runInfo0, subLoopIdx, subLoopIdx + 1 == c1v1Loop);
                         }
                         FixpipeMm1(runInfo0, subLoopIdx, subBlockId); // 单目标搬 [128,128] 给 V(subBlockId)
-                        CrossCoreSetFlag<SYNC_MODE_4, PIPE_FIX>(CROSS_CORE_SYNC_C1_V1 + subBlockId * 16);
+                        CrossCoreSetFlag<SYNC_MODE_4, PIPE_FIX>(c1v1Flag + subBlockId * 16);
                     } else {
                         if (subBlockId == constInfo_.subBlockIdx) {
-                            CrossCoreWaitFlag<SYNC_MODE_4, PIPE_V>(CROSS_CORE_SYNC_C1_V1);
+                            CrossCoreWaitFlag<SYNC_MODE_4, PIPE_V>(c1v1Flag);
                             ComputeVec1(runInfo0, subLoopIdx); // 在线 flash softmax，P/pScale 写 AIC L1
-                            CrossCoreSetFlag<SYNC_MODE_4, PIPE_V>(CROSS_CORE_SYNC_C1_V1);
+                            CrossCoreSetFlag<SYNC_MODE_4, PIPE_V>(c1v1Flag);
                         }
                     }
                 }
@@ -467,8 +519,29 @@ public:
                 CrossCoreSetFlag<SYNC_MODE_4, PIPE_MTE3>(CROSS_CORE_SYNC_V1_P_READY);
             }
         }
+    }
 
-        // ====== Phase 2: C2/V2（延迟 PRELOAD_N 任务）======
+    __aicore__ inline void ExecutePhase2(uint64_t loop, RunInfoMxfp8SoftmaxFp16& info)
+    {
+        if (likely(info.isValid && info.actMSize == S1_BASE_SIZE && info.actSingleLoopS2Size == S2_BASE_SIZE)) {
+            // Specialize full tiles while retaining the general tail path.
+            RunInfoMxfp8SoftmaxFp16 tile = info;
+            tile.actMSize = S1_BASE_SIZE;
+            tile.actMSizeAlign32 = S1_BASE_SIZE;
+            tile.actVecS1Size = S1_SUB_BLOCK_SIZE;
+            tile.actSingleLoopS2Size = S2_BASE_SIZE;
+            tile.actSingleLoopS2SizeAlign = S2_BASE_SIZE;
+            ExecutePhase2Impl(loop, tile);
+        } else {
+            ExecutePhase2Impl(loop, info);
+        }
+        if (loop >= PRELOAD_N) {
+            info.isValid = false;
+        }
+    }
+
+    __aicore__ inline void ExecutePhase2Impl(uint64_t loop, RunInfoMxfp8SoftmaxFp16& runInfo2)
+    {
         if (loop >= PRELOAD_N && runInfo2.isValid) {
             for (uint32_t vCore = 0; vCore < 2; vCore++) {
                 if ASCEND_IS_AIC {
@@ -540,6 +613,7 @@ public:
                 // 预置会让 cube Phase 2 在 V1 实际写入 L1 之前就读 PScale（读全零）。
                 // Phase 2 仅在 loop >= PRELOAD_N 时执行，此时对应 Phase 1 已 Set，无需预置。
                 CrossCoreSetFlag<SYNC_MODE_4, PIPE_V>(CROSS_CORE_SYNC_C1_V1);
+                CrossCoreSetFlag<SYNC_MODE_4, PIPE_V>(CROSS_CORE_SYNC_C1_V1_SECOND);
                 CrossCoreSetFlag<SYNC_MODE_4, PIPE_V>(CROSS_CORE_SYNC_C2_V2);
             }
         }
@@ -565,9 +639,11 @@ public:
 
         if (constInfo_.aicIdx < constInfo_.coreNum) {
             if ASCEND_IS_AIC {
-                // 收尾 Wait：配平两侧 V 核初始 Set 的 4 个 flag，防止 flag 计数泄漏
+                // Drain the six initial credits from both Vector cores.
                 CrossCoreWaitFlag<SYNC_MODE_4, PIPE_FIX>(CROSS_CORE_SYNC_C1_V1);
                 CrossCoreWaitFlag<SYNC_MODE_4, PIPE_FIX>(CROSS_CORE_SYNC_C1_V1 + 16);
+                CrossCoreWaitFlag<SYNC_MODE_4, PIPE_FIX>(CROSS_CORE_SYNC_C1_V1_SECOND);
+                CrossCoreWaitFlag<SYNC_MODE_4, PIPE_FIX>(CROSS_CORE_SYNC_C1_V1_SECOND + 16);
                 CrossCoreWaitFlag<SYNC_MODE_4, PIPE_FIX>(CROSS_CORE_SYNC_C2_V2);
                 CrossCoreWaitFlag<SYNC_MODE_4, PIPE_FIX>(CROSS_CORE_SYNC_C2_V2 + 16);
 #if QFA_SF16_DEBUG_PRINTF

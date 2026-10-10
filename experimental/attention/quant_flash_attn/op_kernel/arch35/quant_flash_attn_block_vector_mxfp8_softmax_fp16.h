@@ -44,13 +44,14 @@ public:
 
 private:
     // ===== UB 尺寸常量（vector 侧自有；mm1Res/mm2Res 直接用 common_def 跨核契约）=====
-    static constexpr uint32_t UB_VEC1P_SIZE = 2 * s2SubLoopSize * (s1BaseSize / 2); // 2 slots × [128,128] fp8
-    static constexpr uint32_t UB_STAGE2OUT_SIZE = dVBaseSize * (s1BaseSize / 2);    // [128,128] fp32
-    static constexpr uint32_t UB_ACCROWSUM_SIZE = s1BaseSize / 2;                   // [128] fp32
-    static constexpr uint32_t UB_SMAX_SLOT = s1BaseSize / 2;                        // [128] half
-    static constexpr uint32_t UB_SMAX_BUFCNT = 3;                                   // mloop%3
-    static constexpr uint32_t UB_SEXP_BUFCNT = 3;                                   // loop%3
-    static constexpr uint32_t UB_PSCALE_SUBLOOPS = 2;                               // subLoopUsedMaxUB 槽数
+    static constexpr uint32_t UB_VEC1P_SIZE =
+        2 * QfaVectorApi::QFA_UB_P_SLOT; // 2 padded slots: 4 * (4096 + 32) bytes each
+    static constexpr uint32_t UB_STAGE2OUT_SIZE = dVBaseSize * (s1BaseSize / 2); // [128,128] fp32
+    static constexpr uint32_t UB_ACCROWSUM_SIZE = s1BaseSize / 2;                // [128] fp32
+    static constexpr uint32_t UB_SMAX_SLOT = s1BaseSize / 2;                     // [128] half
+    static constexpr uint32_t UB_SMAX_BUFCNT = 3;                                // mloop%3
+    static constexpr uint32_t UB_SEXP_BUFCNT = 3;                                // loop%3
+    static constexpr uint32_t UB_PSCALE_SUBLOOPS = 2;                            // subLoopUsedMaxUB 槽数
     // pscale 网格影像（共享常量同源 vf_common_def）：[ring][768B]，ring 周期 6
     static constexpr uint32_t UB_PSCALE_SLOT = QfaVectorApi::QFA_UB_PSCALE_SLOT;   // 768B/槽
     static constexpr uint32_t UB_PSCALE_RINGS = QfaVectorApi::QFA_UB_PSCALE_RINGS; // 6
@@ -94,8 +95,8 @@ private:
     // ===== L1 共享区视图成员（AIC L1，V1 经 MTE3 写入 P/pscale 的目标地址）=====
     // P 槽核间交错布局（common_def L1_PSLOT 宏）下双核槽不连续——统一走宽视图 + 计算基址
     LocalTensor<QUANT_T> l1SharedTensor_;   // L1 共享区整域视图（P 数据，交错槽）
-    LocalTensor<SCALE_T> pScaleL1V0Tensor_; // V0 的 pscale（[0, 4608B) 窗口内）
-    LocalTensor<SCALE_T> pScaleL1V1Tensor_; // V1 的 pscale（[4608, 9216B) 窗口内）
+    LocalTensor<SCALE_T> pScaleL1V0Tensor_; // V0 pscale task grids (3 x 1280B).
+    LocalTensor<SCALE_T> pScaleL1V1Tensor_; // V1 pscale task grids (3 x 1280B).
 
     // ===== 依赖注入 =====
     const ConstInfo& constInfo_; // 核信息（subBlockIdx、scaleValue 等）
@@ -180,6 +181,7 @@ public:
         }
 
         SetFlag<HardEvent::MTE3_V>(EVT_P_COPY);
+        SetFlag<HardEvent::MTE3_V>(EVENT_ID4);
     }
 
     __aicore__ inline void ComputeVec1(RunInfoMxfp8SoftmaxFp16& runInfo, uint32_t subLoopIdx)
@@ -202,9 +204,9 @@ public:
         uint32_t stateSlot = runInfo.softmaxStateSlot; // mloop % 3
         uint32_t taskSlot = runInfo.loop % 3U;         // exp/pscale/pSlot 共用
 
-        if (subLoopIdx == 0U) {
-            WaitFlag<HardEvent::MTE3_V>(EVT_P_COPY);
-        }
+        // Reuse each P slot as soon as its own copy completes.
+        uint32_t pCopyEvent = subLoopIdx == 0U ? EVT_P_COPY : EVENT_ID4;
+        WaitFlag<HardEvent::MTE3_V>(pCopyEvent);
 
         // 行首复位 accMax：新 [bN2,gS1] 行的槽位含 3 行前旧值，必须复位为 MIN
         if (runInfo.isFirstS2Loop && subLoopIdx == 0U) {
@@ -217,7 +219,7 @@ public:
         }
 
         if (validRows < s2SubLoopSize) {
-            constexpr uint32_t pSlotSize = s2SubLoopSize * (s1BaseSize / 2); // 16KB（与 VfSoftmax 槽宽一致）
+            constexpr uint32_t pSlotSize = QfaVectorApi::QFA_UB_P_SLOT; // P slot includes four 32-byte padding blocks
             Duplicate(vec1PUb_.template ReinterpretCast<uint8_t>()[subLoopIdx * pSlotSize], static_cast<uint8_t>(0U),
                       pSlotSize);
         }
@@ -227,13 +229,21 @@ public:
         // P → AIC L1（MTE3；subLoop 粒度槽：ring = loop×2+subLoopIdx，核间交错 L1_PSLOT）
         SetFlag<HardEvent::V_MTE3>(EVT_P_COPY);
         WaitFlag<HardEvent::V_MTE3>(EVT_P_COPY);
-        // L1 P 槽（16KB）与 vec1PUb 暂存槽（16KB）布局完全同构：列组主序 [4 组 × 128 行]，
-        // 组 j @ j×4KB、行 r @ r×32B → 一次 16KB 纯连续拷贝。
-        // 尾块 S2∈(129,192] 时写满 16KB 也安全（槽定长不出界；垃圾行被 Mmad k=actSubKSize 截断）
+        // Scatter each 16KB UB half into its half of the full 32KB L1 NZ tile.
+        // UB groups have 4128-byte pitch; full-S2 L1 groups have 8192-byte pitch.
         // ——结构性消除旧跳写公式 subLoopIdx×4KB 越过 s2Align64=192 列组边界的 bug
         uint32_t pRing = L1_PRING(runInfo.loop, subLoopIdx);
-        constexpr uint32_t pSlotSize = s2SubLoopSize * (s1BaseSize / 2); // 16KB（= L1_P_SINGLE_SLOT_SIZE）
-        DataCopy(l1SharedTensor_[L1_PSLOT(constInfo_.subBlockIdx, pRing)], vec1PUb_[subLoopIdx * pSlotSize], pSlotSize);
+        constexpr uint32_t pSlotSize = QfaVectorApi::QFA_UB_P_SLOT; // UB padding is skipped during the copy to L1
+        // Interleave the two S2 halves into one [256,128] NZ tile.
+        DataCopyParams pCopy;
+        pCopy.blockCount = 4U;
+        pCopy.blockLen = 128U;
+        pCopy.srcStride = 1U;
+        pCopy.dstStride = 128U;
+        DataCopy(l1SharedTensor_[L1_PSLOT(constInfo_.subBlockIdx, pRing) + subLoopIdx * 4096U],
+                 vec1PUb_[subLoopIdx * pSlotSize], pCopy);
+
+        SetFlag<HardEvent::MTE3_V>(pCopyEvent);
 
         // ===== 末 subLoop epilogue：跨块因子 + pscale 网格影像直发 =====
         if (isLastSub) {
@@ -247,19 +257,23 @@ public:
             LocalTensor<SCALE_T>& pScaleL1Target =
                 (constInfo_.subBlockIdx == 0U) ? pScaleL1V0Tensor_ : pScaleL1V1Tensor_;
             LocalTensor<uint8_t> pscaleGridU8 = pscaleGridUB_.template ReinterpretCast<uint8_t>();
-            for (uint32_t i = 0; i < c1v1Loop; i++) {
+            for (uint32_t i = 0; i < 1U; i++) {
                 uint32_t psRing = L1_PRING(runInfo.loop, i);
                 QfaVectorApi::VfCalcPScale(pscaleGridU8, subLoopUsedMaxUB_, softmaxMaxUB_, psRing, i, stateSlot);
             }
             SetFlag<HardEvent::V_MTE3>(EVT_P_COPY);
             WaitFlag<HardEvent::V_MTE3>(EVT_P_COPY);
-            for (uint32_t i = 0; i < c1v1Loop; i++) {
+            for (uint32_t i = 0; i < 1U; i++) {
                 uint32_t psRing = L1_PRING(runInfo.loop, i);
-                DataCopy(pScaleL1Target.template ReinterpretCast<uint8_t>()[psRing * L1_PSCALE_SINGLE_SLOT_SIZE],
-                         pscaleGridU8[psRing * UB_PSCALE_SLOT], L1_PSCALE_SINGLE_SLOT_SIZE);
+                DataCopyParams scaleCopy;
+                scaleCopy.blockCount = 8U;
+                scaleCopy.blockLen = 2U;
+                scaleCopy.srcStride = 1U;
+                scaleCopy.dstStride = 3U;
+                DataCopy(pScaleL1Target
+                             .template ReinterpretCast<uint8_t>()[(psRing / 2U) * L1_PSCALE_SINGLE_SLOT_SIZE + i * 64U],
+                         pscaleGridU8[psRing * UB_PSCALE_SLOT], scaleCopy);
             }
-            // 为下一任务的顶部等待补 Set（全部 P/pscale MTE3 排空后触发）
-            SetFlag<HardEvent::MTE3_V>(EVT_P_COPY);
         }
     }
 
@@ -383,7 +397,11 @@ public:
         }
     }
 
-    __aicore__ inline void ReleaseTensorsVec() {}
+    __aicore__ inline void ReleaseTensorsVec()
+    {
+        WaitFlag<HardEvent::MTE3_V>(EVT_P_COPY);
+        WaitFlag<HardEvent::MTE3_V>(EVENT_ID4);
+    }
 };
 
 } // namespace QFA_KERNEL

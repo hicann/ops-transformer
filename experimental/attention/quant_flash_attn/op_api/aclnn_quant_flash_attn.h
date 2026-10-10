@@ -37,6 +37,13 @@ extern "C" {
  * @param sinksOptional       [IN]  可选。可学习的sink注意力权重，数据类型FLOAT32。
  * @param attnMaskOptional    [IN]  可选。attnmask的参数，数据类型INT8。
  * @param metadataOptional    [IN]  可选。预计算的tiling切分方案，数据类型INT32，由上游算子传入。
+ * @param vTailOptional       [IN]  可选。v_tail尾块高精窗口的value tensor。当前版本不支持，
+ *                                  须传nullptr；非空返回ACLNN_ERR_PARAM_INVALID（参数位保留
+ *                                  用于调用序列对齐）。
+ * @param blockTableTailOptional [IN] 可选。v_tail尾块高精窗口的分页块映射表。当前版本不支持，
+ *                                  须传nullptr；非空返回ACLNN_ERR_PARAM_INVALID。
+ * @param sequsedVTailOptional [IN] 可选。v_tail尾块高精窗口的实际序列长度。当前版本不支持，
+ *                                  须传nullptr；非空返回ACLNN_ERR_PARAM_INVALID。
  * @param quantMode           [IN]  ATTR。量化模式。INT。1:MXFP8 softmax FP32; 2:MXFP8 softmax BF16(预留)。
  * @param softmaxScale        [IN]  ATTR可选。softmax缩放系数。DOUBLE。默认值0.0表示使用1/sqrt(D)。
  * @param maskMode            [IN]  ATTR可选。掩码模式。INT。
@@ -61,14 +68,15 @@ extern "C" {
  * @return aclnnStatus 执行状态。ACLNN_SUCCESS表示成功。
  */
 aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
-    const aclTensor *q, const aclTensor *k, const aclTensor *v, const aclTensor *qDescale, const aclTensor *kDescale,
-    const aclTensor *vDescale, const aclTensor *blockTableOptional, const aclTensor *pScaleOptional,
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, const aclTensor *sinksOptional, const aclTensor *attnMaskOptional,
-    const aclTensor *metadataOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
-    int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char *layoutQ, const char *layoutQDescale,
-    const char *layoutKv, const char *layoutOut, bool returnSoftmaxLse, const aclTensor *attnOut,
-    const aclTensor *softmaxLseOptional, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* q, const aclTensor* k, const aclTensor* v, const aclTensor* qDescale, const aclTensor* kDescale,
+    const aclTensor* vDescale, const aclTensor* blockTableOptional, const aclTensor* pScaleOptional,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, const aclTensor* sinksOptional, const aclTensor* attnMaskOptional,
+    const aclTensor* metadataOptional, const aclTensor* vTailOptional, const aclTensor* blockTableTailOptional,
+    const aclTensor* sequsedVTailOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
+    int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char* layoutQ, const char* layoutQDescale,
+    const char* layoutKv, const char* layoutOut, bool returnSoftmaxLse, const aclTensor* attnOut,
+    const aclTensor* softmaxLseOptional, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnQuantFlashAttn的第二段接口，用于执行计算。
@@ -78,7 +86,7 @@ aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
  * @param stream          [IN] 用于执行计算的acl stream。
  * @return aclnnStatus 执行状态。
  */
-aclnnStatus aclnnQuantFlashAttn(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnQuantFlashAttn(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                 const aclrtStream stream);
 
 #ifdef __cplusplus

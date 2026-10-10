@@ -60,11 +60,13 @@ __simd_vf__ inline void VfSoftmaxFp16ToFp8VF(__ubuf__ T2* pDst, __ubuf__ half* a
     // 解交织表载入（循环外一次，全程复用；表由 InitTensorsVec 初始化 idx[i*128+j]=i+2j）
     LoadAlign(vreg_idx, nzIdx);
 
+    const uint16_t fullGroups = static_cast<uint16_t>(validRows / 4U);
     Duplicate(max0, MIN_VALUE);
     Duplicate(max1, MIN_VALUE);
     Duplicate(max2, MIN_VALUE);
     Duplicate(max3, MIN_VALUE);
-    for (uint32_t i = 0; i + 3 < validRows; i += 4) {
+    for (uint16_t group = 0; group < fullGroups; ++group) {
+        uint32_t i = static_cast<uint32_t>(group) * 4U;
         LoadAlign(r0, x + i * colStride);
         LoadAlign(r1, x + (i + 1) * colStride);
         LoadAlign(r2, x + (i + 2) * colStride);
@@ -76,7 +78,9 @@ __simd_vf__ inline void VfSoftmaxFp16ToFp8VF(__ubuf__ T2* pDst, __ubuf__ half* a
     }
 
     // 尾行（validRows % 4 余量）逐行并入 max0——max 交换结合律，不破坏归并树
-    for (uint32_t i = validRows & ~3U; i < validRows; i++) {
+    const uint16_t tailRows = static_cast<uint16_t>(validRows % 4U);
+    for (uint16_t tail = 0; tail < tailRows; ++tail) {
+        uint32_t i = (validRows & ~3U) + tail;
         LoadAlign(r0, x + i * colStride);
         Max(max0, max0, r0, preg_half);
     }
@@ -92,7 +96,8 @@ __simd_vf__ inline void VfSoftmaxFp16ToFp8VF(__ubuf__ T2* pDst, __ubuf__ half* a
     StoreAlign(usedMaxOut, vreg_k_used, preg_half);                       // 暂存 k_i（epilogue pscale 用）
     Muls(vreg_norm_max, vreg_k_used, LN2, preg_half);                     // k·ln2 → P 归一化基准
 
-    for (uint32_t i = 0; i + 3 < validRows; i += 4) {
+    for (uint16_t group = 0; group < fullGroups; ++group) {
+        uint32_t i = static_cast<uint32_t>(group) * 4U;
         LoadAlign(r0, x + i * colStride);
         LoadAlign(r1, x + (i + 1) * colStride);
         LoadAlign(r2, x + (i + 2) * colStride);
@@ -110,48 +115,40 @@ __simd_vf__ inline void VfSoftmaxFp16ToFp8VF(__ubuf__ T2* pDst, __ubuf__ half* a
         Muls(r1, r1, pScale, preg_half);
         Muls(r2, r2, pScale, preg_half);
         Muls(r3, r3, pScale, preg_half);
-        // fp8 成对窄化：half → float → fp8（硬件不支持 half→fp8 直接 Cast，经 float 中转）
-        // half(16b) --h2iZero/h2iZero--> float(32b, 64元素) --castTraitRintZero/Two/One/Three--> fp8(8b)
-        // 行 i 落偶字节位 [0,2,...,254]（ZERO+TWO），行 i+1 落奇字节位 [1,3,...,255]（ONE+THREE）
-        // —— 第一对 (行 i = r0, 行 i+1 = r1) ——
-        Cast<float, T, h2iZero>(f_tmp0, r0, preg_half);
-        Cast<float, T, h2iOne>(f_tmp1, r0, preg_half);
-        Cast<T2, float, castTraitRintZero>(vreg_quant_a, f_tmp0, preg_float);
-        Cast<T2, float, castTraitRintTwo>(fp8_tmp, f_tmp1, preg_float);
-        Or((RegTensor<uint8_t>&)vreg_quant_a, (RegTensor<uint8_t>&)vreg_quant_a, (RegTensor<uint8_t>&)fp8_tmp, preg_u8);
-        Cast<float, T, h2iZero>(f_tmp0, r1, preg_half);
-        Cast<float, T, h2iOne>(f_tmp1, r1, preg_half);
-        Cast<T2, float, castTraitRintOne>(vreg_quant_b, f_tmp0, preg_float);
-        Cast<T2, float, castTraitRintThree>(fp8_tmp, f_tmp1, preg_float);
-        Or((RegTensor<uint8_t>&)vreg_quant_b, (RegTensor<uint8_t>&)vreg_quant_b, (RegTensor<uint8_t>&)fp8_tmp, preg_u8);
-        // 异源配对交织 → Gather 解交织 → 半掩码双散布
-        Or((RegTensor<uint8_t>&)vreg_quant_a, (RegTensor<uint8_t>&)vreg_quant_a, (RegTensor<uint8_t>&)vreg_quant_b,
-           preg_u8);
-        // 解交织：[a0,b0,a1,b1,…] → [行i | 行i+1]（各 128B 顺序，前半行 i、后半行 i+1）
-        Gather((RegTensor<uint8_t>&)vreg_quant_a, (RegTensor<uint8_t>&)vreg_quant_a, vreg_idx);
-        // 存 A：行 i 的 4 个列组单元（寄存器前半）→ [j×4096B + i×32B]，j=0..3
-        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst + i * 32, (RegTensor<T2>&)vreg_quant_a, 128,
-                                                           preg_u8_first);
-        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst - 4 * 4096 + (i + 1) * 32, (RegTensor<T2>&)vreg_quant_a,
-                                                           128, preg_u8_second);
-        // —— 第二对 (行 i+2 = r2, 行 i+3 = r3) ——
-        Cast<float, T, h2iZero>(f_tmp0, r2, preg_half);
-        Cast<float, T, h2iOne>(f_tmp1, r2, preg_half);
-        Cast<T2, float, castTraitRintZero>(vreg_quant_b, f_tmp0, preg_float);
-        Cast<T2, float, castTraitRintTwo>(fp8_tmp, f_tmp1, preg_float);
-        Or((RegTensor<uint8_t>&)vreg_quant_b, (RegTensor<uint8_t>&)vreg_quant_b, (RegTensor<uint8_t>&)fp8_tmp, preg_u8);
-        Cast<float, T, h2iZero>(f_tmp0, r3, preg_half);
-        Cast<float, T, h2iOne>(f_tmp1, r3, preg_half);
-        Cast<T2, float, castTraitRintOne>(fp8_tmp, f_tmp0, preg_float);
-        Cast<T2, float, castTraitRintThree>((RegTensor<T2>&)r0, f_tmp1, preg_float); // r0 已消费，复用为 fp8 目标
-        Or((RegTensor<uint8_t>&)fp8_tmp, (RegTensor<uint8_t>&)fp8_tmp, (RegTensor<uint8_t>&)r0, preg_u8);
-        // 第二对同构：交织 → 解交织 → 行 i+2 / i+3 半掩码双散布
-        Or((RegTensor<uint8_t>&)vreg_quant_b, (RegTensor<uint8_t>&)vreg_quant_b, (RegTensor<uint8_t>&)fp8_tmp, preg_u8);
-        Gather((RegTensor<uint8_t>&)vreg_quant_b, (RegTensor<uint8_t>&)vreg_quant_b, vreg_idx);
-        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst + (i + 2) * 32, (RegTensor<T2>&)vreg_quant_b, 128,
-                                                           preg_u8_first);
-        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst - 4 * 4096 + (i + 3) * 32, (RegTensor<T2>&)vreg_quant_b,
-                                                           128, preg_u8_second);
+        // Keep four independent conversion chains available for dual issue.
+        // Check compiler register allocation when changing this unroll factor.
+        RegTensor<float> f0, f1, f2, f3, f4, f5, f6, f7;
+        RegTensor<T2> q0, q1, q2, q3, q4, q5, q6, q7;
+        Cast<float, T, h2iZero>(f0, r0, preg_half);
+        Cast<float, T, h2iOne>(f1, r0, preg_half);
+        Cast<float, T, h2iZero>(f2, r1, preg_half);
+        Cast<float, T, h2iOne>(f3, r1, preg_half);
+        Cast<float, T, h2iZero>(f4, r2, preg_half);
+        Cast<float, T, h2iOne>(f5, r2, preg_half);
+        Cast<float, T, h2iZero>(f6, r3, preg_half);
+        Cast<float, T, h2iOne>(f7, r3, preg_half);
+        Cast<T2, float, castTraitRintZero>(q0, f0, preg_float);
+        Cast<T2, float, castTraitRintTwo>(q1, f1, preg_float);
+        Cast<T2, float, castTraitRintOne>(q2, f2, preg_float);
+        Cast<T2, float, castTraitRintThree>(q3, f3, preg_float);
+        Cast<T2, float, castTraitRintZero>(q4, f4, preg_float);
+        Cast<T2, float, castTraitRintTwo>(q5, f5, preg_float);
+        Cast<T2, float, castTraitRintOne>(q6, f6, preg_float);
+        Cast<T2, float, castTraitRintThree>(q7, f7, preg_float);
+        Or((RegTensor<uint8_t>&)q0, (RegTensor<uint8_t>&)q0, (RegTensor<uint8_t>&)q1, preg_u8);
+        Or((RegTensor<uint8_t>&)q2, (RegTensor<uint8_t>&)q2, (RegTensor<uint8_t>&)q3, preg_u8);
+        Or((RegTensor<uint8_t>&)q4, (RegTensor<uint8_t>&)q4, (RegTensor<uint8_t>&)q5, preg_u8);
+        Or((RegTensor<uint8_t>&)q6, (RegTensor<uint8_t>&)q6, (RegTensor<uint8_t>&)q7, preg_u8);
+        Or((RegTensor<uint8_t>&)q0, (RegTensor<uint8_t>&)q0, (RegTensor<uint8_t>&)q2, preg_u8);
+        Or((RegTensor<uint8_t>&)q4, (RegTensor<uint8_t>&)q4, (RegTensor<uint8_t>&)q6, preg_u8);
+        Gather((RegTensor<uint8_t>&)q0, (RegTensor<uint8_t>&)q0, vreg_idx);
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst + (i + 0) * 32, q0, QFA_UB_P_GROUP_ROWS, preg_u8_first);
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst - 4 * QFA_UB_P_GROUP_BYTES + (i + 1) * 32, q0,
+                                                           QFA_UB_P_GROUP_ROWS, preg_u8_second);
+        Gather((RegTensor<uint8_t>&)q4, (RegTensor<uint8_t>&)q4, vreg_idx);
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst + (i + 2) * 32, q4, QFA_UB_P_GROUP_ROWS, preg_u8_first);
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst - 4 * QFA_UB_P_GROUP_BYTES + (i + 3) * 32, q4,
+                                                           QFA_UB_P_GROUP_ROWS, preg_u8_second);
     }
 
     for (uint32_t i = validRows & ~3U; i < validRows; i += 2U) {
@@ -179,10 +176,11 @@ __simd_vf__ inline void VfSoftmaxFp16ToFp8VF(__ubuf__ T2* pDst, __ubuf__ half* a
                preg_u8);
         }
         Gather((RegTensor<uint8_t>&)vreg_quant_a, (RegTensor<uint8_t>&)vreg_quant_a, vreg_idx);
-        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst + i * 32, (RegTensor<T2>&)vreg_quant_a, 128,
-                                                           preg_u8_first);
-        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst - 4 * 4096 + (i + 1) * 32, (RegTensor<T2>&)vreg_quant_a,
-                                                           128, preg_u8_second);
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst + i * 32, (RegTensor<T2>&)vreg_quant_a,
+                                                           QFA_UB_P_GROUP_ROWS, preg_u8_first);
+        StoreAlign<T2, Reg::DataCopyMode::DATA_BLOCK_COPY>(pDst - 4 * QFA_UB_P_GROUP_BYTES + (i + 1) * 32,
+                                                           (RegTensor<T2>&)vreg_quant_a, QFA_UB_P_GROUP_ROWS,
+                                                           preg_u8_second);
     }
 }
 
@@ -202,7 +200,7 @@ __aicore__ inline void VfSoftmaxFp16ToFp8(const LocalTensor<T2>& pDst, const Loc
     constexpr uint32_t s1HalfSize = 128;
     constexpr uint32_t smaxSlot = 128;
     constexpr uint32_t mm1ResSlot = 128 * 128;
-    constexpr uint32_t vec1PSlot = s2SubLoopSize * s1HalfSize;
+    constexpr uint32_t vec1PSlot = QFA_UB_P_SLOT;
 
     __ubuf__ T2* pDstPtr = reinterpret_cast<__ubuf__ T2*>(pDst.GetPhyAddr()) + subLoopIdx * vec1PSlot;
     __ubuf__ half* accMaxPtr = reinterpret_cast<__ubuf__ half*>(accMax.GetPhyAddr()) + stateSlot * smaxSlot;

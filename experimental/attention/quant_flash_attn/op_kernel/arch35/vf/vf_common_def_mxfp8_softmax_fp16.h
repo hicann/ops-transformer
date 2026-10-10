@@ -20,6 +20,10 @@
 
 namespace QFA_KERNEL {
 namespace QfaVectorApi {
+// One 32-byte padding block per P NZ column group avoids the 4KB store stride.
+constexpr uint32_t QFA_UB_P_GROUP_ROWS = 129U;
+constexpr uint32_t QFA_UB_P_GROUP_BYTES = QFA_UB_P_GROUP_ROWS * 32U;
+constexpr uint32_t QFA_UB_P_SLOT = 4U * QFA_UB_P_GROUP_BYTES;
 
 using namespace AscendC;
 using namespace AscendC::Reg;

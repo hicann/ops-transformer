@@ -22,6 +22,7 @@ MxFP8 Softmax FP16 Golden（quant_mode=3 / BNSD / 非 PA）
 
 import logging
 import math
+import os
 
 import torch
 
@@ -497,32 +498,38 @@ def npu_mxfp8_fa(
         max_seqlen_kv=max_seqlen_kv,
     )
 
-    atten_out, lse_out = quant_flash_attn(
-        q=q_npu,
-        k=k_npu,
-        v=v_npu,
-        q_descale=deq_q_npu,
-        k_descale=deq_k_npu,
-        v_descale=deq_v_npu,
-        quant_mode=QUANT_MODE,
-        block_table=None,
-        p_scale=p_scale_npu,
-        cu_seqlens_q=None,
-        cu_seqlens_kv=None,
-        seqused_q=seqused_q_t,
-        seqused_kv=seqused_kv_t,
-        attn_mask=None,
-        metadata=metadata,
-        softmax_scale=ss,
-        mask_mode=SPARSE_MODE,
-        layout_q=INPUT_LAYOUT,
-        layout_q_descale=Q_SCALE_LAYOUT,
-        layout_kv=INPUT_LAYOUT,
-        layout_out=INPUT_LAYOUT,
-        max_seqlen_q=max_seqlen_q,
-        max_seqlen_kv=max_seqlen_kv,
-        return_softmax_lse=ENABLE_LSE,
-    )
+    # Reuse device inputs and metadata for stable kernel-only profiling.
+    # The default preserves the single-call functional test behavior.
+    repeats = int(os.environ.get("QFA_PROFILE_REPEATS", "1"))
+    if repeats < 1:
+        raise ValueError("QFA_PROFILE_REPEATS must be positive")
+    for _ in range(repeats):
+        atten_out, lse_out = quant_flash_attn(
+            q=q_npu,
+            k=k_npu,
+            v=v_npu,
+            q_descale=deq_q_npu,
+            k_descale=deq_k_npu,
+            v_descale=deq_v_npu,
+            quant_mode=QUANT_MODE,
+            block_table=None,
+            p_scale=p_scale_npu,
+            cu_seqlens_q=None,
+            cu_seqlens_kv=None,
+            seqused_q=seqused_q_t,
+            seqused_kv=seqused_kv_t,
+            attn_mask=None,
+            metadata=metadata,
+            softmax_scale=ss,
+            mask_mode=SPARSE_MODE,
+            layout_q=INPUT_LAYOUT,
+            layout_q_descale=Q_SCALE_LAYOUT,
+            layout_kv=INPUT_LAYOUT,
+            layout_out=INPUT_LAYOUT,
+            max_seqlen_q=max_seqlen_q,
+            max_seqlen_kv=max_seqlen_kv,
+            return_softmax_lse=ENABLE_LSE,
+        )
     torch.npu.synchronize()
     return atten_out, lse_out
 

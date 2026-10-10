@@ -24,23 +24,32 @@ extern "C" {
 
 // 第一段接口：计算workspace大小
 aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
-    const aclTensor *q, const aclTensor *k, const aclTensor *v, const aclTensor *qDescale, const aclTensor *kDescale,
-    const aclTensor *vDescale, const aclTensor *blockTableOptional, const aclTensor *pScaleOptional,
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, const aclTensor *sinksOptional, const aclTensor *attnMaskOptional,
-    const aclTensor *metadataOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
-    int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char *layoutQ, const char *layoutQDescale,
-    const char *layoutKv, const char *layoutOut, bool returnSoftmaxLse, const aclTensor *attnOut,
-    const aclTensor *softmaxLseOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* q, const aclTensor* k, const aclTensor* v, const aclTensor* qDescale, const aclTensor* kDescale,
+    const aclTensor* vDescale, const aclTensor* blockTableOptional, const aclTensor* pScaleOptional,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, const aclTensor* sinksOptional, const aclTensor* attnMaskOptional,
+    const aclTensor* metadataOptional, const aclTensor* vTailOptional, const aclTensor* blockTableTailOptional,
+    const aclTensor* sequsedVTailOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
+    int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char* layoutQ, const char* layoutQDescale,
+    const char* layoutKv, const char* layoutOut, bool returnSoftmaxLse, const aclTensor* attnOut,
+    const aclTensor* softmaxLseOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGI("start aclnnQuantFlashAttnGetWorkspaceSize");
     OP_LOGI("quant_mode = %ld", static_cast<long>(quantMode));
 
+    // v_tail尾块高精窗口三件套为上层接口演进预留的参数位，本实现不支持该特性：
+    // 非空入参直接报错拦截；全空（Python侧传None）时丢弃，保持与既有调用序列等价的下发路径。
+    if (vTailOptional != nullptr || blockTableTailOptional != nullptr || sequsedVTailOptional != nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "v_tail high-precision tail window is not supported, "
+                                         "v_tail/block_table_tail/seqused_v_tail must be None.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
     // sinks shape为{0}时置nullptr
     QuantFlashAttnProcessSinks(sinksOptional);
 
-    const aclTensor *placeHolder = nullptr;
-    const aclTensor *tempTensor = nullptr;
+    const aclTensor* placeHolder = nullptr;
+    const aclTensor* tempTensor = nullptr;
     QuantFlashAttnProcessSoftmaxLse(returnSoftmaxLse, softmaxLseOptional, tempTensor, placeHolder);
 
     aclnnStatus ret = aclnnInnerQuantFlashAttnGetWorkspaceSize(
@@ -58,7 +67,7 @@ aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
 }
 
 // 第二段接口：执行计算
-aclnnStatus aclnnQuantFlashAttn(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnQuantFlashAttn(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                 const aclrtStream stream)
 {
     return aclnnInnerQuantFlashAttn(workspace, workspaceSize, executor, stream);

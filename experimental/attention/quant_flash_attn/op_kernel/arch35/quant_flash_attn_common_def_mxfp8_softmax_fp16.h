@@ -41,7 +41,9 @@ constexpr uint32_t PRELOAD_TASK_CACHE_SIZE = PRELOAD_N + 1; // = 3
 // 约束：C1/C2 各一个 Matmul 对象时，Matmul 高阶 API 内部占用 flagId [0, 3]，自定义 flagId 从 4 开始。
 // subBlock 寻址规则：AIC 侧 flagId 0-15 对应 V0，16-31 对应 V1（即 +16 指向 V1）；V 核侧统一用 [0, 15]。
 constexpr uint8_t SYNC_MODE_4 = 4;
-constexpr uint16_t CROSS_CORE_SYNC_C1_V1 = 4;      // mm1Res UB，C1(AIC)/V1(AIV) 双向，每 subBlockId
+constexpr uint16_t CROSS_CORE_SYNC_C1_V1 = 4; // mm1Res UB，C1(AIC)/V1(AIV) 双向，每 subBlockId
+// Independent credit for the second mm1Res UB slot.
+constexpr uint16_t CROSS_CORE_SYNC_C1_V1_SECOND = 7;
 constexpr uint16_t CROSS_CORE_SYNC_V1_P_READY = 5; // L1 P，V1(AIV)→C2(AIC)，每 C1 任务
 constexpr uint16_t CROSS_CORE_SYNC_C2_V2 = 6;      // mm2Res UB，C2(AIC)/V2(AIV) 双向，每 V 核
 
@@ -123,24 +125,25 @@ struct RunInfoMxfp8SoftmaxFp16 {
     // ==================== P L1 ring 槽位（CubeBlock C2 读取 / VectorBlock V1 写入） ====================
 
     // P 按 S2 分块写入（同 [bN2,gS1] 行的不同 S2 块用不同槽，避免覆盖），索引 = loop % (PRELOAD_N+1)
+    bool pairSecond = false;
+    uint32_t pairCopyS2Size = 0;
     uint32_t pSlot = 0;
 };
 
-constexpr uint32_t L1_P_BUFCNT = PRELOAD_TASK_CACHE_SIZE * 2U; // = 6（3 任务 × 2 subLoop）
+constexpr uint32_t L1_P_BUFCNT = PRELOAD_TASK_CACHE_SIZE; // 3 full-S2 tasks per Vector core
 
-constexpr uint32_t L1_P_SINGLE_SLOT_SIZE = 128 * 128; // fp8 [128,128] = 16KB（subLoop 粒度）
-// e8m0 scale 网格槽（subLoop 粒度）：[8 x 单元（S1 16 列/组 × 2B 对）][2 y 单元 + 1 pad] × 32B
-// = 768B；y 单元 = 64 S2 行组，读侧 yStart 恒 0（subK → 槽选择）
-constexpr uint32_t L1_PSCALE_SINGLE_SLOT_SIZE = 768;
+constexpr uint32_t L1_P_SINGLE_SLOT_SIZE = 256 * 128; // fp8 [256,128] = 32KB per task and Vector core
+// e8m0 task grid: 8 S1 groups x (4 S2 groups + 1 bank pad) x 32B.
+constexpr uint32_t L1_PSCALE_SINGLE_SLOT_SIZE = 1280;
 
 // pscale 全前置（AIV 直写窗口内——pscale 影响所有任务，必须全部可写）
 constexpr uint32_t L1_PSCALE_V0_BASE = 0;
 constexpr uint32_t L1_PSCALE_V1_BASE = L1_PSCALE_V0_BASE + L1_P_BUFCNT * L1_PSCALE_SINGLE_SLOT_SIZE;
 constexpr uint32_t L1_P_SLOTS_BASE = L1_PSCALE_V1_BASE + L1_P_BUFCNT * L1_PSCALE_SINGLE_SLOT_SIZE;
 // P 数据槽核间交错寻址（ring = loop×2+subLoopIdx，周期 6）：
-// 槽序 v0r0,v1r0,v0r1,v1r1,…——窗口内前 7 槽，loop 0 双核全保
+// Slots alternate V0/V1 for each task; two subloops share one 32KB slot.
 // common_def 同被 op_host（g++）引用，函数需 __aicore__ 标注而 host 无此属性——用宏
-#define L1_PSLOT(core, ring) (L1_P_SLOTS_BASE + ((ring) * 2U + (core)) * L1_P_SINGLE_SLOT_SIZE)
+#define L1_PSLOT(core, ring) (L1_P_SLOTS_BASE + (((ring) / 2U) * 2U + (core)) * L1_P_SINGLE_SLOT_SIZE)
 // P ring 槽号（loop×2+subLoopIdx 自动 mod 6：loop 周期 3）
 #define L1_PRING(loop, subLoop) (((loop) * 2U + (subLoop)) % 6U)
 constexpr uint32_t L1_SHARED_REGION_SIZE = L1_P_SLOTS_BASE + 2U * L1_P_BUFCNT * L1_P_SINGLE_SLOT_SIZE;
