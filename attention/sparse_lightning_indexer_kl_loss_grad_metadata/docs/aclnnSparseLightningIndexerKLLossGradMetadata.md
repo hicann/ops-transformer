@@ -38,10 +38,10 @@
 
 ``` cpp
 aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
-    const aclTensor *cuSeqLensQOptional,
-    const aclTensor *cuSeqLensKOptional,
-    const aclTensor *seqUsedQOptional,
-    const aclTensor *seqUsedKOptional,
+    const aclTensor *cuSeqlensQOptional,
+    const aclTensor *cuSeqlensKOptional,
+    const aclTensor *sequsedQOptional,
+    const aclTensor *sequsedKOptional,
     const aclTensor *cmpResidualKOptional,
     int64_t batchSize,
     int64_t maxSeqlenQ,
@@ -94,7 +94,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
     </tr></thead>
   <tbody>
     <tr>
-      <td>cuSeqLensQOptional（aclTensor*）</td>
+      <td>cuSeqlensQOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中q的累积sequence length。</td>
       <td><ul><li>支持空Tensor</li><li>shape固定为(B+1, )。</li></ul></td>
@@ -104,7 +104,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>√</td>
     </tr>
     <tr>
-      <td>cuSeqLensKOptional（aclTensor*）</td>
+      <td>cuSeqlensKOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中k的累积sequence length。</td>
       <td><ul><li>支持空Tensor</li><li>shape固定为(B+1, )。</li></ul></td>
@@ -114,7 +114,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>√</td>
     </tr>
     <tr>
-      <td>seqUsedQOptional（aclTensor*）</td>
+      <td>sequsedQOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中q实际参与运算的sequence length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
@@ -124,7 +124,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>√</td>
     </tr>
     <tr>
-      <td>seqUsedKOptional（aclTensor*）</td>
+      <td>sequsedKOptional（aclTensor*）</td>
       <td>输入</td>
       <td>表示不同batch中k实际参与运算的sequence length。</td>
       <td><ul><li>支持空Tensor。</li><li>shape固定为(B, )。</li></ul></td>
@@ -147,7 +147,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>batchSize（int64_t）</td>
       <td>输入</td>
       <td>表示batch数量。</td>
-      <td><ul><li>支持非负数。TND场景可填0，并通过cuSeqLensQOptional推导。</li><li>建议值为0。</li></ul></td>
+      <td><ul><li>支持非负数。TND场景可填0，并通过cuSeqlensQOptional推导。</li><li>建议值为0。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -291,10 +291,10 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
     <li><term>Ascend 950PR&950DT系列产品</term> ：topk仅支持[1, 2048]。</li>
     <!-- end id7 -->
     <!-- npu="A3" id8 -->
-    <li><term>Atlas A3系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <li><term>Atlas A3系列产品</term> ：不支持sequsedQOptional、sequsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
     <!-- end id8 -->
     <!-- npu="910b" id9 -->
-    <li><term>Atlas A2系列产品</term> ：不支持seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
+    <li><term>Atlas A2系列产品</term> ：不支持sequsedQOptional、sequsedKOptional、cmpResidualKOptional，numHeadsQ仅支持8/16/32/64，topk仅支持512/1024/2048/4096/8192。</li>
     <!-- end id9 -->
   </ul>
 
@@ -324,12 +324,12 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <tr>
         <td>ACLNN_ERR_INNER_NULLPTR</td>
         <td>561103</td>
-        <td>参数workspaceSize、executor是空指针，或参数cuSeqLensQOptional、cuSeqLensKOptional、seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional进行Contiguous处理后为空指针。</td>
+        <td>参数workspaceSize、executor是空指针，或参数cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional进行Contiguous处理后为空指针。</td>
       </tr>
       <tr>
         <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
         <td rowspan="2">161002</td>
-        <td>参数cuSeqLensQOptional、cuSeqLensKOptional、seqUsedQOptional、seqUsedKOptional、cmpResidualKOptional、batchSize、maxSeqlenQ、maxSeqlenK、numHeadsQ、numHeadsK、headDim、topk、layoutQOptional、layoutKOptional、maskMode、cmpRatio的规格不在支持范围内。</td>
+        <td>参数cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、batchSize、maxSeqlenQ、maxSeqlenK、numHeadsQ、numHeadsK、headDim、topk、layoutQOptional、layoutKOptional、maskMode、cmpRatio的规格不在支持范围内。</td>
       </tr>
     </tbody>
     </table>
@@ -398,16 +398,16 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
     - BSND场景
       - 必传batchSize、maxSeqlenQ、maxSeqlenK和topk参数，以获取shape信息。
     - TND场景
-      - 必传cuSeqLensQOptional、cuSeqLensKOptional和topk参数，以获取正确shape信息。
-      - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
+      - 必传cuSeqlensQOptional、cuSeqlensKOptional和topk参数，以获取正确shape信息。
+      - 当batchSize为0时，通过cuSeqlensQOptional的shape推导batch。
   <!-- end id11 -->
   <!-- npu="910b" id12 -->
   - <term>Atlas A2系列产品</term>约束：
     - BSND场景
       - 必传batchSize、maxSeqlenQ、maxSeqlenK和topk参数，以获取shape信息。
     - TND场景
-      - 必传cuSeqLensQOptional、cuSeqLensKOptional和topk参数，以获取正确shape信息。
-      - 当batchSize为0时，通过cuSeqLensQOptional的shape推导batch。
+      - 必传cuSeqlensQOptional、cuSeqlensKOptional和topk参数，以获取正确shape信息。
+      - 当batchSize为0时，通过cuSeqlensQOptional的shape推导batch。
   <!-- end id12 -->
 
 <details>
@@ -455,10 +455,10 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   - Atlas A3系列产品约束：
     - Batch取值规则
       - 如果batchSize大于0，优先使用batchSize。
-      - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqLensQOptional的shape推导batch。
+      - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqlensQOptional的shape推导batch。
       - 如果batchSize小于等于0，且layoutQOptional为BSND，则报错。
     - Seqlen取值规则
-      - TND场景下，通过cuSeqLensQOptional和cuSeqLensKOptional计算每个batch的实际q/k长度。
+      - TND场景下，通过cuSeqlensQOptional和cuSeqlensKOptional计算每个batch的实际q/k长度。
       - BSND场景下，通过maxSeqlenQ和maxSeqlenK获取q/k长度。
     - layout约束
       - layoutQOptional必须为BSND或TND。
@@ -475,10 +475,10 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
   - Atlas A2系列产品约束：
     - Batch取值规则
       - 如果batchSize大于0，优先使用batchSize。
-      - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqLensQOptional的shape推导batch。
+      - 如果batchSize小于等于0，且layoutQOptional为TND，则通过cuSeqlensQOptional的shape推导batch。
       - 如果batchSize小于等于0，且layoutQOptional为BSND，则报错。
     - Seqlen取值规则
-      - TND场景下，通过cuSeqLensQOptional和cuSeqLensKOptional计算每个batch的实际q/k长度。
+      - TND场景下，通过cuSeqlensQOptional和cuSeqlensKOptional计算每个batch的实际q/k长度。
       - BSND场景下，通过maxSeqlenQ和maxSeqlenK获取q/k长度。
     - layout约束
       - layoutQOptional必须为BSND或TND。
@@ -652,12 +652,12 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 #include "acl/acl.h"
 #include "aclnnop/aclnn_sparse_lightning_indexer_kl_loss_grad_metadata.h"
 
-#define CHECK_LOG_RET(cond, ret_val, fmt, ...)      \
-    do {                                            \
-        if (!(cond)) {                              \
-            printf(fmt "\n", ##__VA_ARGS__);        \
-            return (ret_val);                       \
-        }                                           \
+#define CHECK_LOG_RET(cond, ret_val, fmt, ...) \
+    do { \
+        if (!(cond)) { \
+            printf(fmt "\n", ##__VA_ARGS__); \
+            return (ret_val); \
+        } \
     } while (0)
 
 constexpr uint32_t SLI_METADATA_MAX_CORE_NUM = 25;
@@ -679,10 +679,11 @@ struct SliGradKLLossMetaData {
     int32_t bS1Index[SLI_METADATA_MAX_CORE_NUM];
 };
 
-struct ScopeGuard
-{
-    explicit ScopeGuard(std::function<void()> onExitScope) : m_exitFunc(std::move(onExitScope)),
-        m_isDismissed(false) {}
+struct ScopeGuard {
+    explicit ScopeGuard(std::function<void()> onExitScope)
+        : m_exitFunc(std::move(onExitScope)),
+          m_isDismissed(false)
+    {}
     ScopeGuard(const ScopeGuard&) = delete;
     ScopeGuard& operator=(const ScopeGuard&) = delete;
 
@@ -703,33 +704,33 @@ struct ScopeGuard
 };
 
 struct Tensor {
-    void *hostAddr { nullptr };
-    void *deviceAddr { nullptr };
-    aclTensor *data { nullptr };
+    void* hostAddr{nullptr};
+    void* deviceAddr{nullptr};
+    aclTensor* data{nullptr};
 };
 
 struct ArgScenario {
-    bool hasCuSeq { true };
+    bool hasCuSeq{true};
 };
 
 struct ArgContext {
-    Tensor cuSeqLensQOptional {};
-    Tensor cuSeqLensKOptional {};
-    Tensor seqUsedQOptional {};
-    Tensor seqUsedKOptional {};
-    Tensor cmpResidualKOptional {};
-    Tensor metadata {};
-    int64_t batchSize { 0 };
-    int64_t maxSeqlenQ { 0 };
-    int64_t maxSeqlenK { 0 };
-    int64_t numHeadsQ { 8 };
-    int64_t numHeadsK { 1 };
-    int64_t headDim { 128 };
-    int64_t topk { 512 };
-    char *layoutQOptional { nullptr };
-    char *layoutKOptional { nullptr };
-    int64_t maskMode { 0 };
-    int64_t cmpRatio { 4 };
+    Tensor cuSeqlensQOptional{};
+    Tensor cuSeqlensKOptional{};
+    Tensor sequsedQOptional{};
+    Tensor sequsedKOptional{};
+    Tensor cmpResidualKOptional{};
+    Tensor metadata{};
+    int64_t batchSize{0};
+    int64_t maxSeqlenQ{0};
+    int64_t maxSeqlenK{0};
+    int64_t numHeadsQ{8};
+    int64_t numHeadsK{1};
+    int64_t headDim{128};
+    int64_t topk{512};
+    char* layoutQOptional{nullptr};
+    char* layoutKOptional{nullptr};
+    int64_t maskMode{0};
+    int64_t cmpRatio{4};
 };
 
 int64_t GetShapeSize(const std::vector<int64_t>& shape)
@@ -759,7 +760,7 @@ void Finalize(int32_t deviceId, aclrtStream stream)
     aclFinalize();
 }
 
-aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape, Tensor &tensor)
+aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t>& shape, Tensor& tensor)
 {
     auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
     auto ret = aclrtMallocHost(&(tensor.hostAddr), size);
@@ -769,21 +770,21 @@ aclnnStatus CreateTensor(aclDataType dataType, const std::vector<int64_t> &shape
     ret = aclrtMalloc(&(tensor.deviceAddr), size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMalloc failed. ERROR: %d", ret);
     tensor.data = aclCreateTensor(shape.data(), shape.size(), dataType, nullptr, 0, aclFormat::ACL_FORMAT_ND,
-        shape.data(), shape.size(), tensor.deviceAddr);
+                                  shape.data(), shape.size(), tensor.deviceAddr);
 
     ret = aclrtMemcpy(tensor.deviceAddr, size, tensor.hostAddr, size, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMemcpy failed. ERROR: %d", ret);
     return ACL_SUCCESS;
 }
 
-void SetInt32TensorData(Tensor &tensor, const std::vector<int32_t> &hostData)
+void SetInt32TensorData(Tensor& tensor, const std::vector<int32_t>& hostData)
 {
     auto size = hostData.size() * sizeof(int32_t);
     memcpy(tensor.hostAddr, hostData.data(), size);
     aclrtMemcpy(tensor.deviceAddr, size, tensor.hostAddr, size, ACL_MEMCPY_HOST_TO_DEVICE);
 }
 
-void DestroyTensor(Tensor &tensor)
+void DestroyTensor(Tensor& tensor)
 {
     if (tensor.data != nullptr) {
         aclDestroyTensor(tensor.data);
@@ -799,13 +800,13 @@ void DestroyTensor(Tensor &tensor)
     }
 }
 
-void DestroyArgs(ArgContext &context)
+void DestroyArgs(ArgContext& context)
 {
     DestroyTensor(context.metadata);
-    DestroyTensor(context.cuSeqLensQOptional);
-    DestroyTensor(context.cuSeqLensKOptional);
-    DestroyTensor(context.seqUsedQOptional);
-    DestroyTensor(context.seqUsedKOptional);
+    DestroyTensor(context.cuSeqlensQOptional);
+    DestroyTensor(context.cuSeqlensKOptional);
+    DestroyTensor(context.sequsedQOptional);
+    DestroyTensor(context.sequsedKOptional);
     DestroyTensor(context.cmpResidualKOptional);
 
     if (context.layoutQOptional != nullptr) {
@@ -818,7 +819,7 @@ void DestroyArgs(ArgContext &context)
     }
 }
 
-aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
+aclnnStatus CreateArgs(const ArgScenario& scenario, ArgContext& context)
 {
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
     aclnnStatus ret;
@@ -826,21 +827,21 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     int64_t batchSize = 1;
     context.maxSeqlenQ = 16;
     context.maxSeqlenK = 4;
-    context.layoutQOptional = (char *)malloc(sizeof(char) * 16);
-    context.layoutKOptional = (char *)malloc(sizeof(char) * 16);
+    context.layoutQOptional = (char*)malloc(sizeof(char) * 16);
+    context.layoutKOptional = (char*)malloc(sizeof(char) * 16);
     strcpy(context.layoutQOptional, scenario.hasCuSeq ? "TND" : "BSND");
     strcpy(context.layoutKOptional, scenario.hasCuSeq ? "TND" : "BSND");
 
-    ret = CreateTensor(aclDataType::ACL_INT32, { SLI_METADATA_SIZE }, context.metadata);
+    ret = CreateTensor(aclDataType::ACL_INT32, {SLI_METADATA_SIZE}, context.metadata);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create metadata failed. Error: %d", ret);
 
     if (scenario.hasCuSeq) {
-        ret = CreateTensor(aclDataType::ACL_INT32, { batchSize + 1 }, context.cuSeqLensQOptional);
-        CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cuSeqLensQOptional failed. Error: %d", ret);
-        ret = CreateTensor(aclDataType::ACL_INT32, { batchSize + 1 }, context.cuSeqLensKOptional);
-        CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cuSeqLensKOptional failed. Error: %d", ret);
-        SetInt32TensorData(context.cuSeqLensQOptional, { 0, static_cast<int32_t>(context.maxSeqlenQ) });
-        SetInt32TensorData(context.cuSeqLensKOptional, { 0, static_cast<int32_t>(context.maxSeqlenK) });
+        ret = CreateTensor(aclDataType::ACL_INT32, {batchSize + 1}, context.cuSeqlensQOptional);
+        CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cuSeqlensQOptional failed. Error: %d", ret);
+        ret = CreateTensor(aclDataType::ACL_INT32, {batchSize + 1}, context.cuSeqlensKOptional);
+        CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create cuSeqlensKOptional failed. Error: %d", ret);
+        SetInt32TensorData(context.cuSeqlensQOptional, {0, static_cast<int32_t>(context.maxSeqlenQ)});
+        SetInt32TensorData(context.cuSeqlensKOptional, {0, static_cast<int32_t>(context.maxSeqlenK)});
         context.batchSize = 0;
     } else {
         context.batchSize = batchSize;
@@ -850,13 +851,13 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     return ACL_SUCCESS;
 }
 
-void PrintMetadata(const SliGradKLLossMetaData &metadata)
+void PrintMetadata(const SliGradKLLossMetaData& metadata)
 {
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     std::string socVersion = (socName != nullptr) ? std::string(socName) : std::string();
     bool isA5 = socVersion.find("Ascend910") == std::string::npos;
     if (isA5) {
-        const int32_t *data = reinterpret_cast<const int32_t *>(&metadata);
+        const int32_t* data = reinterpret_cast<const int32_t*>(&metadata);
         printf("TOTAL_NUM               : %d\n", data[TOTAL_NUM]);
         printf("FORMER_CORE_PROCESS_NUM : %d\n", data[FORMER_CORE_PROCESS_NUM]);
         printf("REMAIN_CORE_PROCESS_NUM : %d\n", data[REMAIN_CORE_PROCESS_NUM]);
@@ -872,30 +873,32 @@ void PrintMetadata(const SliGradKLLossMetaData &metadata)
     }
 }
 
-int main() {
+int main()
+{
     int32_t deviceId = 0;
     aclrtStream stream;
     auto ret = Init(deviceId, &stream);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Init acl failed. ERROR: %d", ret);
     ScopeGuard sysGuard([&] { Finalize(deviceId, stream); });
 
-    ArgScenario scenario {};
+    ArgScenario scenario{};
     scenario.hasCuSeq = true;
-    ArgContext context {};
+    ArgContext context{};
     ret = CreateArgs(scenario, context);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create input arguments failed. ERROR: %d", ret);
     ScopeGuard argsGuard([&] { DestroyArgs(context); });
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
     ret = aclnnSparseLightningIndexerKLLossGradMetadataGetWorkspaceSize(
-        context.cuSeqLensQOptional.data, context.cuSeqLensKOptional.data, context.seqUsedQOptional.data,
-        context.seqUsedKOptional.data, context.cmpResidualKOptional.data, context.batchSize, context.maxSeqlenQ,
-        context.maxSeqlenK, context.numHeadsQ, context.numHeadsK, context.headDim, context.topk, context.layoutQOptional,
-        context.layoutKOptional, context.maskMode, context.cmpRatio, context.metadata.data, &workspaceSize, &executor);
+        context.cuSeqlensQOptional.data, context.cuSeqlensKOptional.data, context.sequsedQOptional.data,
+        context.sequsedKOptional.data, context.cmpResidualKOptional.data, context.batchSize, context.maxSeqlenQ,
+        context.maxSeqlenK, context.numHeadsQ, context.numHeadsK, context.headDim, context.topk,
+        context.layoutQOptional, context.layoutKOptional, context.maskMode, context.cmpRatio, context.metadata.data,
+        &workspaceSize, &executor);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret,
-        "aclnnSparseLightningIndexerKLLossGradMetadataGetWorkspaceSize failed. ERROR: %d", ret);
+                  "aclnnSparseLightningIndexerKLLossGradMetadataGetWorkspaceSize failed. ERROR: %d", ret);
 
     if (workspaceSize > static_cast<uint64_t>(0)) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -909,13 +912,12 @@ int main() {
     });
 
     ret = aclnnSparseLightningIndexerKLLossGradMetadata(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_LOG_RET(ret == ACL_SUCCESS, ret,
-        "aclnnSparseLightningIndexerKLLossGradMetadata failed. ERROR: %d", ret);
+    CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclnnSparseLightningIndexerKLLossGradMetadata failed. ERROR: %d", ret);
 
     ret = aclrtSynchronizeStream(stream);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtSynchronizeStream failed. ERROR: %d", ret);
 
-    SliGradKLLossMetaData result {};
+    SliGradKLLossMetaData result{};
     ret = aclrtMemcpy(&result, sizeof(result), context.metadata.deviceAddr, sizeof(result), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMemcpy failed. ERROR: %d", ret);
     PrintMetadata(result);
