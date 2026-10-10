@@ -100,7 +100,7 @@ GET_PR_RELATED_OPS()
 {
     local ops=""
     if [ -f "${WORKSPACE}/pr_filelist.txt" ]; then
-        ops=$(python3 "${WORKSPQC}/cmake/scripts/parse_changed_files.py" \
+        ops=$(python3 "${WORKSPACE}/cmake/scripts/parse_changed_files.py" \
               -c "${WORKSPACE}/tests/test_config.yaml" \
               -f "${WORKSPACE}/pr_filelist.txt" get_related_examples 2>/dev/null)
     else
@@ -143,7 +143,7 @@ else
                 LOG_INFO "kirinx90 incremental build for ops: ${ops_names}"
                 LOG_DO bash build.sh --pkg --soc=kirinx90  --PR_PKG ./pr_filelist.txt --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
             else
-                ops_names="apply_rotary_pos_emb"
+                ops_names="moe_token_unpermute"
                 LOG_INFO "kirinx90 ops_names empty,build default op: ${ops_names}"
                 LOG_DO bash build.sh --pkg --soc=kirinx90 --ops="${ops_names}" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
             fi
@@ -165,7 +165,7 @@ else
                 LOG_INFO "kirin9030 incremental build for ops: ${ops_names}"
                 LOG_DO bash build.sh --pkg --soc=kirin9030  --PR_PKG ./pr_filelist.txt --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
             else
-                ops_names="apply_rotary_pos_emb"
+                ops_names="moe_token_unpermute"
                 LOG_INFO "kirin9030 ops_names empty,build default op: ${ops_names}"
                 LOG_DO bash build.sh --pkg --soc=kirin9030 --ops="${ops_names}" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
             fi
