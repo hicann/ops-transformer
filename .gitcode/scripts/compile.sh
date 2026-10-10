@@ -94,21 +94,6 @@ DP_ASSERT_EQUAL()
     fi
 }
 
-# 解析 PR 变更命中且带 examples 的算子。stdout 只输出分号分隔的结果串（可能为空）;
-# 解析脚本自身日志走 stderr,不会污染捕获。pr_filelist.txt 缺失或命中为空均输出空串。
-GET_PR_RELATED_OPS()
-{
-    local ops=""
-    if [ -f "${WORKSPACE}/pr_filelist.txt" ]; then
-        ops=$(python3 "${WORKSPACE}/cmake/scripts/parse_changed_files.py" \
-              -c "${WORKSPACE}/tests/test_config.yaml" \
-              -f "${WORKSPACE}/pr_filelist.txt" get_related_examples 2>/dev/null)
-    else
-        echo "pr_filelist.txt not found" >&2
-    fi
-    echo "${ops}"
-}
-
 LOG_HEAD "Build ${REPOSITORY_NAME}."
 cd "${WORKSPACE}/" || exit 1
 
@@ -138,15 +123,7 @@ if [ "${task_name}" == "Pre_Compile" ]; then
 else
     if [ "${GE_ST_RT2}X" == "kirinx90X" ]; then
         if [ "${GIT_TARGET_BRANCH}" = "master" ]; then
-            ops_names=$(GET_PR_RELATED_OPS)
-            if [ -n "${ops_names}" ]; then
-                LOG_INFO "kirinx90 incremental build for ops: ${ops_names}"
-                LOG_DO bash build.sh --pkg --soc=kirinx90  --PR_PKG ./pr_filelist.txt --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
-            else
-                ops_names="moe_token_unpermute"
-                LOG_INFO "kirinx90 ops_names empty,build default op: ${ops_names}"
-                LOG_DO bash build.sh --pkg --soc=kirinx90 --ops="${ops_names}" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
-            fi
+            LOG_DO bash build.sh --pkg --soc=kirinx90 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
             DP_ASSERT_EQUAL "$?" "0" "Build ${REPOSITORY_NAME}"
         else
             echo "not need build mobile_station"
@@ -160,15 +137,7 @@ else
             chmod +x *.run
             sudo chmod 777 /home/jenkins/Ascend
             yes "y" | sudo bash cann-asc-devkit_linux-x86_64_ubuntu24.run --full --install-path=/home/jenkins/Ascend
-            ops_names=$(GET_PR_RELATED_OPS)
-            if [ -n "${ops_names}" ]; then
-                LOG_INFO "kirin9030 incremental build for ops: ${ops_names}"
-                LOG_DO bash build.sh --pkg --soc=kirin9030  --PR_PKG ./pr_filelist.txt --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
-            else
-                ops_names="moe_token_unpermute"
-                LOG_INFO "kirin9030 ops_names empty,build default op: ${ops_names}"
-                LOG_DO bash build.sh --pkg --soc=kirin9030 --ops="${ops_names}" --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
-            fi
+            LOG_DO bash build.sh --pkg --soc=kirin9030 --cann_3rd_lib_path=${ASCEND_3RD_LIB_PATH} -j16
             DP_ASSERT_EQUAL "$?" "0" "Build ${REPOSITORY_NAME}"
         else
             echo "not need build mobile_station"
