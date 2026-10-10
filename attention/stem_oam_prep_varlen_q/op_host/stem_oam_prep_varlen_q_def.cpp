@@ -55,6 +55,7 @@ public:
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "stem_oam_prep_varlen_q");
         this->AICore().AddConfig("ascend950", aicore_config);
+        this->AICore().AddConfig("ascend350", aicore_config);
     }
 };
 OP_ADD(StemOamPrepVarlenQ);
