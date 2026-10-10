@@ -34,7 +34,7 @@
    I_{t,:}=W_{t,:}@ReLU(q_{t,:}@(K_{:t,:})^T)
    $$
 
-   其中，$W$是第$t$个token对应的weights，$q$是第$t$个token对应的$G$个query头合轴后的矩阵，$K$为$t$行$K$列矩阵。
+   其中，$W$是第$t$个token对应的weight，$q$是第$t$个token对应的$G$个query头合轴后的矩阵，$K$为$t$行$K$列矩阵。
 
    LightningIndexer会单独训练，对应的loss function为：
 
@@ -54,7 +54,7 @@
    dI\mathop{{}}\nolimits_{{t,:}}=Softmax \left( I\mathop{{}}\nolimits_{{t,:}} \right) -p\mathop{{}}\nolimits_{{t,:}}
    $$
 
-   利用链式法则可以进行weights，query和key矩阵的梯度计算：
+   利用链式法则可以进行weight，query和key矩阵的梯度计算：
 
    $$
    dW\mathop{{}}\nolimits_{{t,:}}=dI\mathop{{}}\nolimits_{{t,:}}\text{@} \left( ReLU \left( S\mathop{{}}\nolimits_{{t,:}} \left)  \left) \mathop{{}}\nolimits^{{T}}\right. \right. \right. \right.
@@ -84,15 +84,15 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize(
     const aclTensor     *key,
     const aclTensor     *queryIndex,
     const aclTensor     *keyIndex,
-    const aclTensor     *weights,
+    const aclTensor     *weight,
     const aclTensor     *sparseIndices,
     const aclTensor     *softmaxMax,
     const aclTensor     *softmaxSum,
-    const aclTensor     *queryRope,
-    const aclTensor     *keyRope,
-    const aclIntArray   *actualSeqLengthsQuery,
-    const aclIntArray   *actualSeqLengthsKey,
-    const aclTensor     *sinks,
+    const aclTensor     *queryRopeOptional,
+    const aclTensor     *keyRopeOptional,
+    const aclIntArray   *actualSeqLengthsQueryOptional,
+    const aclIntArray   *actualSeqLengthsKeyOptional,
+    const aclTensor     *sinksOptional,
     double               scaleValue,
     char                *layout,
     int64_t              sparseMode,
@@ -101,7 +101,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2GetWorkspaceSize(
     bool                 deterministic,
     const aclTensor     *dQueryIndex,
     const aclTensor     *dKeyIndex,
-    const aclTensor     *dWeights,
+    const aclTensor     *dWeight,
     const aclTensor     *loss,
     uint64_t            *workspaceSize,
     aclOpExecutor       **executor)
@@ -203,7 +203,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
             <td>√</td>
         </tr>
         <tr>
-            <td>weights</td>
+            <td>weight</td>
             <td>输入</td>
             <td>权重。</td>
             <td>不支持空Tensor。</td>
@@ -243,7 +243,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
             <td>√</td>
         </tr>
         <tr>
-            <td>queryRope</td>
+            <td>queryRopeOptional</td>
             <td>输入</td>
             <td>MLA rope部分：Query位置编码的输出。</td>
             <td>
@@ -258,7 +258,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
             <td>√</td>
         </tr>
         <tr>
-            <td>keyRope</td>
+            <td>keyRopeOptional</td>
             <td>输入</td>
             <td>MLA rope部分：Key位置编码的输出。</td>
             <td>
@@ -273,7 +273,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
             <td>√</td>
         </tr>
         <tr>
-            <td>actualSeqLengthsQuery</td>
+            <td>actualSeqLengthsQueryOptional</td>
             <td>输入</td>
             <td>每个Batch中，Query的有效token数。</td>
             <td>
@@ -290,7 +290,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
             <td>√</td>
         </tr>
         <tr>
-            <td>actualSeqLengthsKey</td>
+            <td>actualSeqLengthsKeyOptional</td>
             <td>输入</td>
             <td>每个Batch中，Key的有效token数。</td>
             <td>
@@ -370,7 +370,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
             <td>-</td>
         </tr>
         <tr>
-        <td>sinks</td>
+        <td>sinksOptional</td>
         <td>输入</td>
         <td>用于修正target distribution（p）归一化因子的附加softmax项。</td>
         <td>
@@ -418,9 +418,9 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
             <td>x</td>
         </tr>
         <tr>
-            <td>dWeights</td>
+            <td>dWeight</td>
             <td>输出</td>
-            <td>Weights的梯度。</td>
+            <td>Weight的梯度。</td>
             <td>-</td>
             <td>FLOAT16、BFLOAT16、FLOAT32</td>
             <td>ND</td>
@@ -485,7 +485,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>query、key、queryIndex、keyIndex、weights、sparseIndices、softmaxMax等输入变量的数据类型和数据格式不在支持的范围内。</td>
+                <td>query、key、queryIndex、keyIndex、weight、sparseIndices、softmaxMax等输入变量的数据类型和数据格式不在支持的范围内。</td>
             </tr>
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
@@ -544,7 +544,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
   - aclnnSparseLightningIndexerGradKLLossV2默认非确定性实现，支持通过aclrtCtxSetSysParamOpt开启确定性。
 - 公共约束
     - 参数query、key、queryIndex、keyIndex的数据类型应保持一致。
-    - 参数weights不为float32时，参数query、key、queryIndex、keyIndex、weights的数据类型应保持一致。
+    - 参数weight不为float32时，参数query、key、queryIndex、keyIndex、weight的数据类型应保持一致。
     - 入参为空的场景处理：
         - query为空Tensor：直接返回。
         - 公共约束里入参为空的场景和FAG保持一致。
