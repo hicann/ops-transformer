@@ -73,6 +73,7 @@ ops:
       - quant_flash_attn
       soc:
       - ascend950
+      - ascend960dt
     quant_lightning_indexer_v2_metadata:
       impact:
       - quant_lightning_indexer_v2_metadata

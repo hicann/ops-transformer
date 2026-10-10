@@ -36,7 +36,7 @@
 # 调用方(如 build.sh)可在 source 本库后按需覆盖此列表, 也可在本库被 source 之前预先定义
 # SUPPORTED_SOC_LIST 以覆盖默认值。
 if [[ -z "${SUPPORTED_SOC_LIST+x}" ]]; then
-    SUPPORTED_SOC_LIST=("ascend910b" "ascend910_93" "ascend950" "ascend310p" "ascend310b" "ascend910" "ascend610lite" "kirinx90" "kirin9030" "mc62")
+    SUPPORTED_SOC_LIST=("ascend910b" "ascend910_93" "ascend950" "ascend960dt" "ascend310p" "ascend310b" "ascend910" "ascend610lite" "kirinx90" "kirin9030" "mc62")
 fi
 
 # 报告变量: 当 validate_soc_list 校验失败时, 该变量被置为第一个非法 SoC 项, 供调用方输出错误信息

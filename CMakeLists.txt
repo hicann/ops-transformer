@@ -53,12 +53,12 @@ set(ASCEND_OP_NAME                "ALL"                           CACHE   STRING
 set(ASCEND_MODULE_NAME            "ALL"                           CACHE   STRING   "modules that need to be compiled")
 set(ARCH_DIRECTORY                ""                           CACHE   STRING   "arch directory that need to be compiled")
 set(VENDOR_NAME                   "custom"                     CACHE   STRING   "vendor name")
-set(ASCEND_ALL_COMPUTE_UNIT       "ascend910b;ascend910_93;ascend950;ascend350;mc62;kirinx90;kirin9030;ascend5162a" CACHE STRING "all soc list")
+set(ASCEND_ALL_COMPUTE_UNIT       "ascend910b;ascend910_93;ascend950;ascend960dt;ascend350;mc62;kirinx90;kirin9030;ascend5162a" CACHE STRING "all soc list")
 set(ASCEND_ALL_MODULE_NAME        "mc2;attention;moe;ffn;mhc;posembedding;gmm;mamba" CACHE STRING "all module list")
 
-#SOC和ARCH目录对应关系:ascend310p:arch20,ascend910b:arch22,ascend910_93:arch22,ascend950:arch35,ascend350:arch35,mc62:arch38,kirinx90:arch22,kirin9030:arch22,ascend5162a:arch35
-set(SOC_VERSION_LIST ascend310p ascend910b ascend910_93 ascend950 ascend350 mc62 kirinx90 kirin9030 ascend5162a)
-set(ARCH_DIRECTORY_LIST arch20 arch22 arch22 arch35 arch35 arch38 arch22 arch22 arch35)
+#SOC和ARCH目录对应关系:ascend310p:arch20,ascend910b:arch22,ascend910_93:arch22,ascend950:arch35,ascend960dt:arch35+arch92,ascend350:arch35,mc62:arch38,kirinx90:arch22,kirin9030:arch22,ascend5162a:arch35
+set(SOC_VERSION_LIST ascend310p ascend910b ascend910_93 ascend950 ascend960dt ascend350 mc62 kirinx90 kirin9030 ascend5162a)
+set(ARCH_DIRECTORY_LIST arch20 arch22 arch22 arch35 arch35 arch35 arch38 arch22 arch22 arch35)
 set(BISHENG_FLAGS "" CACHE STRING "bisheng compiler flags")
 set(ENABLE_AICPU_KERNEL FALSE CACHE BOOL "Enable AICPU Kernel")
 set(PACKAGE_TYPE "run" CACHE STRING "package type: run/rpm/deb/all")
@@ -117,6 +117,14 @@ foreach(SOC_VERSION ${ASCEND_COMPUTE_UNIT})
     endif()
   endif()
 endforeach()
+
+list(FIND ASCEND_COMPUTE_UNIT "ascend960dt" INDEX_960DT)
+if(NOT INDEX_960DT EQUAL -1)
+    list(FIND ARCH_DIRECTORY "arch92" INDEX_92)
+    if(INDEX_92 EQUAL -1)
+        list(APPEND ARCH_DIRECTORY "arch92")
+    endif()
+endif()
 
 if(PROJECT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   message(STATUS "compile project with library")
