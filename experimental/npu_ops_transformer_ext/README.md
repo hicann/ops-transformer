@@ -37,7 +37,7 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
 1. **安装CANN toolkit包**
 
     根据实际环境，下载对应`Ascend-cann-toolkit_${cann_version}_linux-${arch}.run`包，下载链接为[x86_64包](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-release/software/master/20260213000325157/x86_64/Ascend-cann-toolkit_9.0.0_linux-x86_64.run)、[aarch64包](https://ascend.devcloud.huaweicloud.com/artifactory/cann-run-release/software/master/20260213000325157/aarch64/Ascend-cann-toolkit_9.0.0_linux-aarch64.run)。
-    
+
     安装命令如下：
 
     ```bash
@@ -52,7 +52,7 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
     - \$\{install\_path\}：表示指定安装路径，toolkit包将安装在\$\{install\_path\}/ascend-toolkit目录下。
 
 2. **配置环境变量**
-	
+
 	根据实际场景，选择合适的命令。
 
     ```bash
@@ -60,9 +60,10 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
    source /usr/local/Ascend/ascend-toolkit/set_env.sh
    # 指定路径安装
    # source ${install-path}/ascend-toolkit/set_env.sh
-    ```  
+    ```
+
 3. **安装torch与TorchNPU包**
-   
+
    根据实际环境，下载对应torch包并安装: `torch-${torch_version}+cpu-${python_version}-linux_${arch}.whl`下载链接为:[官网地址](http://download.pytorch.org/whl/torch)
 
    安装命令如下：
@@ -78,7 +79,7 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
     ```sh
     pip install torch_npu
     ```
-    
+
     - \$\{torch\_version\}：表示torch包版本号。
     - \$\{python\_version\}：表示python版本号。
     - \$\{arch\}：表示CPU架构，如aarch64、x86_64。
@@ -123,10 +124,19 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
   pip install --no-build-isolation -e .
   ```
 
+只构建指定算子时，可以通过 `NPU_OPS_TRANSFORMER_EXT_OPS` 传入逗号或分号分隔的算子名。例如：
+
+  ```sh
+  NPU_OPS_TRANSFORMER_EXT_OPS=grouped_matmul_quant \
+    pip install --no-build-isolation -e .
+  ```
+
+此方式适合单算子开发和精度测试，不会编译默认白名单中的其他算子。
+
 ## 开发新算子 | Developing New Operators
 
 1. 编写算子调用文件，以在experimental/posembedding下添加算子my_ops为例
-   
+
     在`experimental/posembedding`目录下添加新的算子目录`my_ops`，在`my_ops`目录下添加新的算子调用文件`my_ops_torch.cpp`
 
     ```c++
@@ -153,13 +163,13 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
     ```
 
 2. 在`my_ops`目录下创建`CMakeLists.txt`
-   
+
     ```cmake
     if (BUILD_TORCH_OPS)
         # 使用您的实际算子名替换my_ops
         set(OPERATOR_NAME "my_ops")
         message(STATUS "BUILD_TORCH_OPS ON in ${OPERATOR_NAME}")
-        
+
         set(OPERATOR_TARGET "${OPERATOR_NAME}_objects")
         set(OPERATOR_CONFIG "${OPERATOR_NAME}:${OPERATOR_TARGET}" PARENT_SCOPE)
 
@@ -185,9 +195,9 @@ NpuOpsTransformerExt是一个轻量级，高性能的算子开发工程模板，
     ```cmake
     set(NPU_EXT_OPERATOR_LIST "typhoon_mla;score_normalize;rope_matrix;select_attention_operators;my_ops")
     ```
-    
+
 3. 在`npu_ops_transformer_ext/npu_ops_def.cpp`中添加TORCH_LIBRARY_IMPL定义
-   
+
     ```c++
     TORCH_LIBRARY_IMPL(npu_ops_transformer_ext, PrivateUse1, m) {
         m.impl("my_ops", my_ops_npu);

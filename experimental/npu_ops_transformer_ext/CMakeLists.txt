@@ -129,6 +129,7 @@ set(COMMON_LINK_LIBS
     register
     tiling_api
     runtime
+    ${CMAKE_DL_LIBS}
     ${Python3_LIBRARIES}
 )
 
@@ -154,8 +155,12 @@ endmacro()
 
 set(PARENT_DIRS attention mamba ffn gmm mc2 moe posembedding)
 set(OPERATOR_TARGETS "")
-# 进行白名单管理
-set(NPU_EXT_OPERATOR_LIST "typhoon_mla;score_normalize;rope_matrix;select_attention_operators")
+# 进行白名单管理。该 cache 变量允许调用方只构建需要的算子，
+# 避免单算子开发和测试被白名单中其他算子的编译问题阻断。
+set(NPU_EXT_OPERATOR_LIST
+    "typhoon_mla;score_normalize;rope_matrix;select_attention_operators;grouped_matmul_quant"
+    CACHE STRING "Semicolon-separated torch operators to build")
+message(STATUS "Selected torch operators: ${NPU_EXT_OPERATOR_LIST}")
 
 foreach(DIR_NAME ${PARENT_DIRS})
     set(PARENT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../${DIR_NAME}")

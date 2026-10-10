@@ -14,6 +14,7 @@ import os
 import logging
 import sys
 import glob
+import re
 import shutil
 import subprocess
 import sysconfig
@@ -25,39 +26,39 @@ from setuptools import Command
 
 class CleanCommand(Command):
     user_options = []
-    
+
     def initialize_options(self):
         pass
-    
+
     def finalize_options(self):
         pass
-    
+
     def run(self):
         # 删除构建目录
-        if os.path.exists('build'):
-            shutil.rmtree('build')
+        if os.path.exists("build"):
+            shutil.rmtree("build")
             logging.info("Removed build/")
-        
+
         # 删除dist目录
-        if os.path.exists('dist'):
-            shutil.rmtree('dist')
+        if os.path.exists("dist"):
+            shutil.rmtree("dist")
             logging.info("Removed dist/")
-        
+
         # 删除egg-info目录
         egg_info_dir = f"{self.distribution.get_name().replace('-', '_')}.egg-info"
         if os.path.exists(egg_info_dir):
             shutil.rmtree(egg_info_dir)
             logging.info(f"Removed {egg_info_dir}/")
-        
+
         # 删除.pyc文件和__pycache__目录
-        for root, dirs, files in os.walk('.'):
+        for root, dirs, files in os.walk("."):
             for file in files:
-                if file.endswith('.pyc'):
+                if file.endswith(".pyc"):
                     os.remove(os.path.join(root, file))
                     logging.info(f"Removed {os.path.join(root, file)}")
-            
+
             for dir_name in dirs:
-                if dir_name == '__pycache__':
+                if dir_name == "__pycache__":
                     shutil.rmtree(os.path.join(root, dir_name))
                     logging.info(f"Removed {os.path.join(root, dir_name)}/")
 
@@ -87,19 +88,37 @@ class CMakeBuild(build_ext):
 
     def build_cmake(self, ext):
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
-        python_include = sysconfig.get_path('include')
-        python_libs = sysconfig.get_config_var('LIBDIR')
+        python_include = sysconfig.get_path("include")
+        python_libs = sysconfig.get_config_var("LIBDIR")
 
         cmake_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
-            f"-DPYTHON_EXECUTABLE={sys.executable}",
-            f"-DBUILD_TORCH_OPS=ON",
-            f"-DPYTHON_EXTENSION_USE_ABI3=ON",
+            f"-DPython3_EXECUTABLE={sys.executable}",
+            "-DBUILD_TORCH_OPS=ON",
+            "-DPYTHON_EXTENSION_USE_ABI3=ON",
             f"-DPYTHON_INCLUDE_DIR={python_include}",
             f"-DPYTHON_LIBRARIES={python_libs}",
-            f"-DPy_LIMITED_API_VERSION=0x03080000",
-
+            "-DPy_LIMITED_API_VERSION=0x03080000",
         ]
+
+        selected_operators = os.getenv("NPU_OPS_TRANSFORMER_EXT_OPS", "").strip()
+        if selected_operators:
+            operator_names = [
+                name.strip()
+                for name in re.split(r"[,;]", selected_operators)
+                if name.strip()
+            ]
+            invalid_names = [
+                name
+                for name in operator_names
+                if not re.fullmatch(r"[A-Za-z0-9_]+", name)
+            ]
+            if invalid_names:
+                raise RuntimeError(
+                    "NPU_OPS_TRANSFORMER_EXT_OPS contains invalid operator names: "
+                    + ", ".join(invalid_names)
+                )
+            cmake_args.append(f"-DNPU_EXT_OPERATOR_LIST={';'.join(operator_names)}")
 
         build_type = "Debug" if self.debug else "Release"
         build_args = ["--config", build_type]
@@ -116,11 +135,11 @@ class CMakeBuild(build_ext):
 
 
 setup(
-    name='npu_ops_transformer_ext',
-    version='0.0.1',
+    name="npu_ops_transformer_ext",
+    version="0.0.1",
     packages=find_packages(),
     ext_modules=[CMakeExtension("npu_ops_transformer_ext._C", sourcedir=".")],
-    cmdclass={'build_ext': CMakeBuild, 'clean': CleanCommand},
+    cmdclass={"build_ext": CMakeBuild, "clean": CleanCommand},
     zip_safe=False,
     install_requires=["torch"],
     options={"bdist_wheel": {"py_limited_api": "cp38"}},

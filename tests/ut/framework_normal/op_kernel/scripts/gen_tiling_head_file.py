@@ -163,6 +163,21 @@ def get_asc_file_path(opname: str):
                         os.path.join(repo_dir_path, op_dir) + f"/op_kernel/{opname}.cpp"
                     )
                     return asc_file_path
+
+    # Experimental operators are nested one level deeper:
+    # experimental/<category>/<operator>/op_kernel/<operator>.cpp.
+    experimental_path = os.path.join(project_path, "experimental")
+    if os.path.isdir(experimental_path):
+        for category in os.listdir(experimental_path):
+            candidate = os.path.join(
+                experimental_path,
+                category,
+                opname,
+                "op_kernel",
+                f"{opname}.cpp",
+            )
+            if os.path.isfile(candidate):
+                return candidate
     return asc_file_path
 
 

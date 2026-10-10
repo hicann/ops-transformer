@@ -23,7 +23,7 @@
 #include <vector>
 
 extern "C" {
-PyObject* PyInit__C(void)
+PyObject *PyInit__C(void)
 {
     static struct PyModuleDef module_def = {
         PyModuleDef_HEAD_INIT, "_C", NULL, -1, NULL,
@@ -43,7 +43,10 @@ TORCH_LIBRARY(npu_ops_transformer_ext, m)
     m.def("mambav2_chunk_cumsum(Tensor at, Tensor dt, Tensor dt_bias, Tensor dt_mask) -> (Tensor, Tensor, Tensor)");
     m.def("mambav2_chunk_state(Tensor dt_out, Tensor dacs, Tensor bt, Tensor xt) -> Tensor");
     m.def("mambav2_chunk_state_passing(Tensor dacs, Tensor init_states, Tensor states, Tensor ct) -> (Tensor, Tensor)");
-    m.def("mambav2_chunk_scan(Tensor ct, Tensor bt, Tensor xt, Tensor dt, Tensor states, Tensor dacs, Tensor dtout) -> Tensor");
+    m.def("mambav2_chunk_scan(Tensor ct, Tensor bt, Tensor xt, Tensor dt, Tensor states, Tensor dacs, Tensor dtout) -> "
+          "Tensor");
+    m.def("grouped_matmul_quant(Tensor x, Tensor quantized_weight, Tensor weight_scale, Tensor weight_offset, "
+          "Tensor? group_list, int scale_group_size) -> Tensor");
 }
 
 } // namespace npu_ops_transformer_ext
