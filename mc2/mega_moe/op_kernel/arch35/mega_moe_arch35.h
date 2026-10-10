@@ -902,7 +902,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ExportAndResetExpertCou
 {
     WorkRange resetRange{};
     if (GetSubBlockIdx() == 0U) {
-        resetRange = GetBalancedWorkRange(static_cast<uint32_t>(PEERMEM_MTE_COUNT_REGION_SIZE / sizeof(int32_t)),
+        resetRange = GetBalancedWorkRange(commonConfig_.worldSize * commonConfig_.moeExpertPerRank,
                                           {.jobIndex = blockIdx_, .totalJobs = blockNum_});
     } else if (blockIdx_ == 0U) {
         ExportExpertTokenCounts(commonConfig_, countWorkspace_, params_, tokenDispatchScratch_);
@@ -914,9 +914,10 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::ExportAndResetExpertCou
         SyncFuncStatic<HardEvent::MTE3_V, SYNC_EVENT_ID2>();
         Duplicate<int32_t>(resetTensor_, 0, resetTensor_.GetSize());
         SyncFuncStatic<HardEvent::V_MTE3, SYNC_EVENT_ID2>();
-        ResetWorkspaceRegion(resetRange, params_.peermemInfo.expertCountRecvPtr, resetBatchElementCount_, resetTensor_);
+        ResetWorkspaceRegionWithStride(resetRange, params_.peermemInfo.expertCountRecvPtr, MTE_COUNT_SLOT_BYTES,
+                                       resetTensor_);
     }
-    // 输出和完整 count 区清零均完成后，才进入共享 GMM2 及出口跨卡握手。
+    // 输出和本轮有效 count 槽清零均完成后，才进入共享 GMM2 及出口跨卡握手。
     PipeBarrier<PIPE_ALL>();
     SyncAll<true>();
 }

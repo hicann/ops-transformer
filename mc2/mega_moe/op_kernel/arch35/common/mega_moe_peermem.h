@@ -24,7 +24,7 @@
 #include "op_kernel/math_util.h"
 #define HOST_DEVICE __forceinline__[aicore]
 #else
-#define GM_ADDR uint8_t *
+#define GM_ADDR uint8_t*
 // host 侧命名空间级自由函数需显式 inline 保 ODR；类内成员函数本就隐式 inline，加之无副作用。
 #define HOST_DEVICE inline
 // host 侧自洽：Ops::Base::CeilAlign/CeilDiv 的提供方，不再依赖包含方的 include 顺序。
@@ -39,8 +39,8 @@ namespace MegaMoeImpl {
 // URMA 的 rank 槽位超过预留区时动态扩展；MTE 保持原 60 KiB 固定布局。
 constexpr int64_t PEERMEM_MIN_RANK_SYNC_SIZE = 1024 * 48LL;
 constexpr int64_t PEERMEM_DATA_OFFSET = 1024 * 60LL;
-// MTE count 区固定预留 2048 个 int32 槽，容量覆盖总专家数上限。
-constexpr int64_t PEERMEM_MTE_COUNT_REGION_SIZE = 8LL * 1024LL;
+// MTE count 区固定预留 2048 个 512B 槽，每槽首个 int32 有效。
+constexpr int64_t PEERMEM_MTE_COUNT_REGION_SIZE = 512LL * 2048LL;
 constexpr int64_t PEERMEM_SYNC_COUNT_REGION_SIZE = PEERMEM_DATA_OFFSET - PEERMEM_MIN_RANK_SYNC_SIZE;
 constexpr int64_t PEERMEM_SYNC_SLOT_SIZE = static_cast<int64_t>(INT_CACHELINE) * sizeof(int32_t);
 
@@ -73,7 +73,7 @@ HOST_DEVICE int64_t CalcDispatchMaskAlignSizeBy(int64_t numMaxTokensPerRank, int
     return Ops::Base::CeilAlign(alignedRouteCount / static_cast<int64_t>(BITS_PER_BYTE), ALIGN_32);
 }
 
-HOST_DEVICE int64_t CalcDispatchMaskAlignSize(const MegaMoeTilingData *tilingData)
+HOST_DEVICE int64_t CalcDispatchMaskAlignSize(const MegaMoeTilingData* tilingData)
 {
     return CalcDispatchMaskAlignSizeBy(static_cast<int64_t>(tilingData->numMaxTokensPerRank),
                                        static_cast<int64_t>(tilingData->topK));
@@ -93,14 +93,14 @@ HOST_DEVICE int64_t CalcTopkIndexTypeBytes(int64_t numMaxTokensPerRank, int64_t 
 
 // 每个 (localExpert, srcRank) 槽直接保存有序 topkIndex。
 // 同一 token 的 topK expert id 不重复，因此单专家从一张源卡最多接收 numMaxTokensPerRank 个 index。
-HOST_DEVICE int64_t CalcDispatchRouteIndexAlignSize(const MegaMoeTilingData *tilingData)
+HOST_DEVICE int64_t CalcDispatchRouteIndexAlignSize(const MegaMoeTilingData* tilingData)
 {
     return Ops::Base::CeilAlign(static_cast<int64_t>(tilingData->numMaxTokensPerRank) *
                                     CalcTopkIndexTypeBytes(tilingData->numMaxTokensPerRank, tilingData->topK),
                                 ALIGN_32);
 }
 
-// route index 接收区不再携带槽尾 count；count 继续使用下方独立连续表。
+// route index 接收区不携带槽尾 count；MTE count 使用独立的 512B 间隔表。
 HOST_DEVICE int64_t CalcRouteIndexRecvSize(int64_t routeIndexAlignSize, int64_t moeExpertPerRank, int64_t epWorldSize)
 {
     return Ops::Base::CeilAlign(moeExpertPerRank * epWorldSize * routeIndexAlignSize, ALIGN_512);
@@ -112,7 +112,7 @@ HOST_DEVICE int64_t CalcMaskRecvSize(int64_t maskAlignSize, int64_t moeExpertPer
     return Ops::Base::CeilAlign(moeExpertPerRank * epWorldSize * maskSlotSize, ALIGN_512);
 }
 
-// 独立 raw count 表按 [localExpert][sourceRank] 排列，供接收端一次搬入并做前缀和。
+// URMA 的独立 raw count 表仍按 [localExpert][sourceRank] 连续排列；不使用 MTE slot 布局。
 HOST_DEVICE int64_t CalcExpertCountRecvSize(int64_t moeExpertPerRank, int64_t epWorldSize)
 {
     return Ops::Base::CeilAlign(moeExpertPerRank * epWorldSize * static_cast<int64_t>(sizeof(int32_t)), ALIGN_512);
@@ -198,7 +198,7 @@ struct PeermemLayoutSizes {
     int64_t combineSendSize;
 };
 
-HOST_DEVICE PeermemLayoutSizes CalcPeermemLayoutSizes(const PeermemSizeParams &params)
+HOST_DEVICE PeermemLayoutSizes CalcPeermemLayoutSizes(const PeermemSizeParams& params)
 {
     PeermemLayoutSizes sizes{};
     sizes.dataOffset = CalcPeermemDataOffset(params.topoType, params.epWorldSize);
@@ -236,7 +236,7 @@ HOST_DEVICE PeermemLayoutSizes CalcPeermemLayoutSizes(const PeermemSizeParams &p
  *   URMA：同步区 + mask 接收区 + count 接收区 + dispatch 接收区 + combine 接收区。
  * host 侧 tiling 用它校验用户传入的 cclBufferSize，不再各自手写一份布局公式。
  */
-HOST_DEVICE int64_t CalcPeermemLeastSize(const PeermemSizeParams &params)
+HOST_DEVICE int64_t CalcPeermemLeastSize(const PeermemSizeParams& params)
 {
     PeermemLayoutSizes sizes = CalcPeermemLayoutSizes(params);
     return sizes.dataOffset + sizes.maskRecvSize + sizes.expertCountRecvSize + sizes.dispatchRecordAreaSize +
@@ -255,7 +255,7 @@ struct PeermemInfo {
     GM_ADDR combineSendPtr{nullptr};
 
     __aicore__ inline PeermemInfo() = default;
-    __aicore__ inline PeermemInfo(GM_ADDR base, const MegaMoeTilingData *tilingData, uint32_t elemsPerByte = 1,
+    __aicore__ inline PeermemInfo(GM_ADDR base, const MegaMoeTilingData* tilingData, uint32_t elemsPerByte = 1,
                                   uint32_t serverNum = 1)
     {
         PeermemSizeParams params{};
@@ -275,7 +275,7 @@ struct PeermemInfo {
         rankSyncInWorldPtr = base;
         int64_t offset = sizes.dataOffset;
         if (tilingData->topoType == TOPO_TYPE_MTE) {
-            // count 固定在 [60 KiB, 68 KiB)，避免可变路由区覆盖历史 count 槽。
+            // count 固定在同步区之后的 1 MiB，避免可变路由区覆盖历史 count 槽。
             expertCountRecvPtr = base + offset;
             offset += sizes.expertCountRecvSize;
             maskRecvPtr = base + offset;

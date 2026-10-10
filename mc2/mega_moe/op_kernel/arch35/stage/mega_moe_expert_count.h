@@ -23,7 +23,7 @@ constexpr int64_t COUNT_TABLE_POLL_BACKOFF_CYCLES = 500;
 // 只检查 UB 快照的高 8 位轮次标签，不修改 count；成功后由前缀和计算去除标签。
 // expectedSyncRoundTag 使用 GetSyncRoundTag 返回的高 8 位标签；pending[0] 为零时才可消费快照。
 // pending 的各 lane 累积所有向量的失败结果，尾部无效 lane 不参与比较或写回。
-__simd_vf__ inline void CheckCountRoundTagsVF(__ubuf__ uint32_t *counts, __ubuf__ uint32_t *pending,
+__simd_vf__ inline void CheckCountRoundTagsVF(__ubuf__ uint32_t* counts, __ubuf__ uint32_t* pending,
                                               uint32_t elementCount, uint32_t expectedSyncRoundTag)
 {
     constexpr uint32_t ELEMENTS_PER_VECTOR = AscendC::GetVecLen() / sizeof(uint32_t);
@@ -50,22 +50,27 @@ __simd_vf__ inline void CheckCountRoundTagsVF(__ubuf__ uint32_t *counts, __ubuf_
     AscendC::Reg::StoreAlign(pending, resultReg, firstLaneMask);
 }
 
-// counts 为连续 count 表，pending 为独立、32B 对齐的 UB 暂存区（至少一个 int32）。
+// MTE GM count 表按 512B 槽存放；搬入后的 counts 为连续 UB 表。
+// pending 为独立、32B 对齐的 UB 暂存区（至少一个 int32）。
 // 首次立即读取；失败后等待 500 cycle，再重读整表。成功快照直接交给后续 VF cumsum。
 // 调用方保证在 AIV 上执行，且 elementCount > 0。
-__aicore__ inline void WaitForCountTable(const AscendC::GlobalTensor<int32_t> &countGm,
-                                         const AscendC::LocalTensor<int32_t> &counts,
-                                         const AscendC::LocalTensor<int32_t> &pending, uint32_t elementCount,
+__aicore__ inline void WaitForCountTable(const AscendC::GlobalTensor<int32_t>& countGm,
+                                         const AscendC::LocalTensor<int32_t>& counts,
+                                         const AscendC::LocalTensor<int32_t>& pending, uint32_t elementCount,
                                          uint32_t expectedSyncRoundTag)
 {
     // 首次搬运前保护此前的 Vector 访问；重试时上一轮 V_S 和 Scalar 判断已保证 VF 完成。
     SyncFuncStatic<AscendC::HardEvent::V_MTE2, SYNC_EVENT_ID2>();
     while (true) {
-        AscendC::DataCopyPad(counts, countGm, {1U, elementCount * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U},
-                             {true, 0U, 0U, 0U});
+        // Compact 将每个 GM 槽首部的 4B 紧密排入 UB，保持后续 epoch 校验和前缀和布局不变。
+        AscendC::DataCopyPad<int32_t, AscendC::PaddingMode::Compact>(
+            counts, countGm,
+            {static_cast<uint16_t>(elementCount), sizeof(int32_t),
+             static_cast<int64_t>(MTE_COUNT_SLOT_BYTES) - static_cast<int64_t>(sizeof(int32_t)), 0U, 0U},
+            {true, 0U, 0U, 0U});
         SyncFuncStatic<AscendC::HardEvent::MTE2_V, SYNC_EVENT_ID2>();
-        asc_vf_call<CheckCountRoundTagsVF>(reinterpret_cast<__ubuf__ uint32_t *>(counts.GetPhyAddr()),
-                                           reinterpret_cast<__ubuf__ uint32_t *>(pending.GetPhyAddr()), elementCount,
+        asc_vf_call<CheckCountRoundTagsVF>(reinterpret_cast<__ubuf__ uint32_t*>(counts.GetPhyAddr()),
+                                           reinterpret_cast<__ubuf__ uint32_t*>(pending.GetPhyAddr()), elementCount,
                                            expectedSyncRoundTag);
         SyncFuncStatic<AscendC::HardEvent::V_S, SYNC_EVENT_ID2>();
         if (pending.GetValue(0U) == 0) {
@@ -81,7 +86,7 @@ __aicore__ inline void WaitForCountTable(const AscendC::GlobalTensor<int32_t> &c
  * MegaMoe count 表的融合版本：先复用 int32 prefix-scan，再在同一次 VF 中提取每个专家的累计尾值
  * 并作差。相比先调用通用前缀和、再启动第二个 VF，融合实现省去一次 asc_vf_call 和外部流水同步。
  */
-__simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t *count, __ubuf__ int32_t *expertCounts,
+__simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t* count, __ubuf__ int32_t* expertCounts,
                                                    uint32_t elementCount, uint32_t expertCount, uint32_t worldSize,
                                                    uint32_t maxOutputSize)
 {
@@ -117,12 +122,12 @@ __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t *count, __ub
         AscendC::Reg::Muls(gatherIndexReg, gatherIndexReg, static_cast<int32_t>(worldSize), fullMask);
         AscendC::Reg::Adds(gatherIndexReg, gatherIndexReg, static_cast<int32_t>(worldSize - 1U), fullMask);
         AscendC::Reg::Gather(expertEndPrefixReg, count,
-                             reinterpret_cast<AscendC::Reg::RegTensor<uint32_t> &>(gatherIndexReg), activeMask);
+                             reinterpret_cast<AscendC::Reg::RegTensor<uint32_t>&>(gatherIndexReg), activeMask);
 
         AscendC::Reg::Adds(previousLaneIndexReg, laneIndexReg, -1, fullMask);
         AscendC::Reg::Maxs(previousLaneIndexReg, previousLaneIndexReg, 0, fullMask);
         AscendC::Reg::Gather(previousEndPrefixReg, expertEndPrefixReg,
-                             reinterpret_cast<AscendC::Reg::RegTensor<uint32_t> &>(previousLaneIndexReg));
+                             reinterpret_cast<AscendC::Reg::RegTensor<uint32_t>&>(previousLaneIndexReg));
         AscendC::Reg::Select(previousEndPrefixReg, previousVectorEndReg, previousEndPrefixReg, firstLaneMask);
         AscendC::Reg::MaskReg overflowMask;
         AscendC::Reg::Compares<int32_t, AscendC::CMPMODE::GE>(overflowMask, expertEndPrefixReg, maxOutputSizeInt32,
@@ -136,7 +141,7 @@ __simd_vf__ inline void ComputeExpertCountTablesVF(__ubuf__ int32_t *count, __ub
 
         AscendC::Reg::Duplicate(previousLaneIndexReg, static_cast<int32_t>(validCount - 1U), fullMask);
         AscendC::Reg::Gather(previousVectorEndReg, expertEndPrefixReg,
-                             reinterpret_cast<AscendC::Reg::RegTensor<uint32_t> &>(previousLaneIndexReg));
+                             reinterpret_cast<AscendC::Reg::RegTensor<uint32_t>&>(previousLaneIndexReg));
     }
 }
 
@@ -144,8 +149,8 @@ __aicore__ inline void ComputeExpertCountTables(LocalTensor<int32_t> countTensor
                                                 LocalTensor<int32_t> expertCountTensor, uint32_t expertCount,
                                                 uint32_t worldSize, uint32_t maxOutputSize)
 {
-    __ubuf__ int32_t *count = reinterpret_cast<__ubuf__ int32_t *>(countTensor.GetPhyAddr());
-    __ubuf__ int32_t *expertCounts = reinterpret_cast<__ubuf__ int32_t *>(expertCountTensor.GetPhyAddr());
+    __ubuf__ int32_t* count = reinterpret_cast<__ubuf__ int32_t*>(countTensor.GetPhyAddr());
+    __ubuf__ int32_t* expertCounts = reinterpret_cast<__ubuf__ int32_t*>(expertCountTensor.GetPhyAddr());
     asc_vf_call<ComputeExpertCountTablesVF>(count, expertCounts, expertCount * worldSize, expertCount, worldSize,
                                             maxOutputSize);
 }

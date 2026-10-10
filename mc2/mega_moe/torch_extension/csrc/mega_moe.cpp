@@ -411,7 +411,7 @@ constexpr int64_t MOE_PERMUTE_CHUNK = 1024LL;
 constexpr int64_t EXCEPTION_DUMP_REGION_SIZE = 60LL * 1024LL;
 // rankSyncInWorld 同步区
 constexpr int64_t PEERMEM_DATA_OFFSET = 60LL * 1024LL;
-constexpr int64_t PEERMEM_MTE_COUNT_REGION_SIZE = 8LL * 1024LL;
+constexpr int64_t PEERMEM_MTE_COUNT_REGION_SIZE = 512LL * 2048LL;
 
 int64_t CeilAlign(int64_t val, int64_t align)
 {

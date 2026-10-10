@@ -17,6 +17,9 @@ namespace MegaMoeImpl {
 
 constexpr uint32_t RANK_SYNC_COUNTER_OFFSET_BYTES = 48U * 1024U;
 constexpr uint32_t RANK_SYNC_COUNTER_SLOT_BYTES = 64U;
+// MTE GM count/epoch 每槽仅首个 int32 有效，按 512B 隔开以避免同区域请求串行；UB 表仍连续。
+constexpr uint32_t MTE_COUNT_SLOT_BYTES = 512U;
+
 // mode 0：本卡本次 kernel 的同类核全核同步，AIC 调用时同步全部 AIC，AIV 调用时同步全部 AIV。
 constexpr uint8_t ALL_AICORE_SYNC_MODE = 0;
 // mode 4：同一 AI Core 内 AIC 与单个 AIV 的同步，支持双向通知。

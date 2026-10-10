@@ -47,13 +47,13 @@ struct ExpertRouteInfo {
 
 // 装配 MTE 路径的 topK 有效下标发送配置。
 template <typename TopkIndexType>
-__aicore__ inline SendMaskConfig CreateSendMaskConfig(const Params &params, uint32_t aivCoreIdx)
+__aicore__ inline SendMaskConfig CreateSendMaskConfig(const Params& params, uint32_t aivCoreIdx)
 {
     uint64_t routeIndexWinOffset =
         static_cast<uint64_t>(params.peermemInfo.maskRecvPtr - params.peermemInfo.rankSyncInWorldPtr);
     uint64_t expertCountWinOffset =
         static_cast<uint64_t>(params.peermemInfo.expertCountRecvPtr - params.peermemInfo.rankSyncInWorldPtr);
-    const MegaMoeSendMaskBufferConfig &bufferConfig = aivCoreIdx < params.tilingData->sendMaskCoreCountWithExtraExpert ?
+    const MegaMoeSendMaskBufferConfig& bufferConfig = aivCoreIdx < params.tilingData->sendMaskCoreCountWithExtraExpert ?
                                                           params.tilingData->sendMaskConfigForCoreWithExtraExpert :
                                                           params.tilingData->sendMaskConfigForCoreWithoutExtraExpert;
     return {.expertCountWinOffset = expertCountWinOffset,
@@ -64,7 +64,7 @@ __aicore__ inline SendMaskConfig CreateSendMaskConfig(const Params &params, uint
 
 // 加载当前批次的 topkIds，并生成它们在完整数组中的下标。
 template <typename TopkIndexType>
-__aicore__ inline void PrepareTopkIdsForCurrentBatch(SendMaskScratch<TopkIndexType> &scratch, int32_t batchStart,
+__aicore__ inline void PrepareTopkIdsForCurrentBatch(SendMaskScratch<TopkIndexType>& scratch, int32_t batchStart,
                                                      int32_t validLen)
 {
     DataCopyExtParams loadParams{1U, static_cast<uint32_t>(validLen * sizeof(int32_t)), 0U, 0U, 0U};
@@ -79,12 +79,12 @@ __aicore__ inline void PrepareTopkIdsForCurrentBatch(SendMaskScratch<TopkIndexTy
  * 调用方须先等待该槽上次搬出完成；返回前完成 V_S，调用方可读取命中数量。
  */
 template <typename TopkIndexType>
-__aicore__ inline uint64_t SelectTopkIdsIndexByExpert(const SendMaskConfig &config,
-                                                      SendMaskScratch<TopkIndexType> &scratch,
-                                                      const ExpertRouteInfo &routeInfo, int32_t validLen,
-                                                      LocalTensor<TopkIndexType> &selectedTopkIdsIndexTensor)
+__aicore__ inline uint64_t SelectTopkIdsIndexByExpert(const SendMaskConfig& config,
+                                                      SendMaskScratch<TopkIndexType>& scratch,
+                                                      const ExpertRouteInfo& routeInfo, int32_t validLen,
+                                                      LocalTensor<TopkIndexType>& selectedTopkIdsIndexTensor)
 {
-    const MegaMoeSendMaskBufferConfig &bufferConfig = config.bufferConfig;
+    const MegaMoeSendMaskBufferConfig& bufferConfig = config.bufferConfig;
     const uint32_t compareMaskBytes = static_cast<uint32_t>(bufferConfig.routeItemsPerBatch) / BITS_PER_BYTE;
     uint32_t slotOffset = routeInfo.bufferIdx * bufferConfig.bufferBytes;
     LocalTensor<uint8_t> compareMaskTensor = scratch.routeRingTensor[slotOffset];
@@ -110,10 +110,10 @@ __aicore__ inline uint64_t SelectTopkIdsIndexByExpert(const SendMaskConfig &conf
 // 将筛选出的下标追加到专家所在卡，按剩余容量更新累计发送量。
 // 调用方在发送后发出 ring 槽复用事件，保护下次筛选对该槽的覆盖。
 template <typename TopkIndexType>
-__aicore__ inline void SendSelectedTopkIdsIndex(const MoeStageCommonConfig &common, GM_ADDR *winRankAddr,
-                                                const SendMaskConfig &config, SendMaskScratch<TopkIndexType> &scratch,
-                                                const ExpertRouteInfo &routeInfo,
-                                                const LocalTensor<TopkIndexType> &selectedTopkIdsIndexTensor,
+__aicore__ inline void SendSelectedTopkIdsIndex(const MoeStageCommonConfig& common, GM_ADDR* winRankAddr,
+                                                const SendMaskConfig& config, SendMaskScratch<TopkIndexType>& scratch,
+                                                const ExpertRouteInfo& routeInfo,
+                                                const LocalTensor<TopkIndexType>& selectedTopkIdsIndexTensor,
                                                 uint64_t selectedTopkIdsIndexCount)
 {
     const uint32_t countOffset = routeInfo.ownedIdx;
@@ -135,7 +135,7 @@ __aicore__ inline void SendSelectedTopkIdsIndex(const MoeStageCommonConfig &comm
                                  config.routeIndexAlignSize +
                              static_cast<uint64_t>(previousCount) * sizeof(TopkIndexType);
         GlobalTensor<TopkIndexType> dstRouteIndexGm;
-        dstRouteIndexGm.SetGlobalBuffer(reinterpret_cast<__gm__ TopkIndexType *>(winRankAddr[dstRank] + dstOffset));
+        dstRouteIndexGm.SetGlobalBuffer(reinterpret_cast<__gm__ TopkIndexType*>(winRankAddr[dstRank] + dstOffset));
         DataCopyPad(dstRouteIndexGm, selectedTopkIdsIndexTensor,
                     {1U, static_cast<uint32_t>(copiedCount * sizeof(TopkIndexType)), 0U, 0U, 0U});
     }
@@ -143,7 +143,7 @@ __aicore__ inline void SendSelectedTopkIdsIndex(const MoeStageCommonConfig &comm
 
 // source 为累计 count 表的对齐基址。用掩码 Gather 读取指定段，避免非对齐起点及尾段越界。
 // 对齐段的 destination 指向原段；非对齐段指向独立的、32B 对齐的复用区。
-__simd_vf__ inline void PrepareCountForSendVF(__ubuf__ uint32_t *source, __ubuf__ uint32_t *destination,
+__simd_vf__ inline void PrepareCountForSendVF(__ubuf__ uint32_t* source, __ubuf__ uint32_t* destination,
                                               uint32_t sourceOffset, uint32_t count, uint32_t syncRoundTag)
 {
     constexpr uint32_t ELEMENTS_PER_VECTOR = AscendC::GetVecLen() / sizeof(uint32_t);
@@ -158,7 +158,7 @@ __simd_vf__ inline void PrepareCountForSendVF(__ubuf__ uint32_t *source, __ubuf_
         uint32_t remaining = count - offset;
         AscendC::Reg::MaskReg activeMask = AscendC::Reg::UpdateMask<uint32_t>(remaining);
         AscendC::Reg::Adds(sourceIndexReg, laneIndexReg, static_cast<int32_t>(sourceOffset + offset), activeMask);
-        AscendC::Reg::Gather(countReg, source, reinterpret_cast<AscendC::Reg::RegTensor<uint32_t> &>(sourceIndexReg),
+        AscendC::Reg::Gather(countReg, source, reinterpret_cast<AscendC::Reg::RegTensor<uint32_t>&>(sourceIndexReg),
                              activeMask);
         AscendC::Reg::Or(countReg, countReg, tagReg, activeMask);
         AscendC::Reg::StoreAlign(destination + offset, countReg, activeMask);
@@ -166,18 +166,20 @@ __simd_vf__ inline void PrepareCountForSendVF(__ubuf__ uint32_t *source, __ubuf_
 }
 
 // countTensorToSend 已由 VF 编码并完成 V_MTE3，起点 32B 对齐，段内 count 连续存放。
-__aicore__ inline void SendTopkIdsCountToRank(const LocalTensor<int32_t> &countTensorToSend, uint32_t count,
+__aicore__ inline void SendTopkIdsCountToRank(const LocalTensor<int32_t>& countTensorToSend, uint32_t count,
                                               int32_t localExpertBegin, GM_ADDR dstRankAddr,
-                                              const MoeStageCommonConfig &common, const SendMaskConfig &config)
+                                              const MoeStageCommonConfig& common, const SendMaskConfig& config)
 {
     int32_t sourceRank = static_cast<int32_t>(common.rankId);
     int32_t worldSize = static_cast<int32_t>(common.worldSize);
     GlobalTensor<int32_t> dstCountGm;
     uint64_t dstOffset = config.expertCountWinOffset +
-                         static_cast<uint64_t>(localExpertBegin * worldSize + sourceRank) * sizeof(int32_t);
-    dstCountGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(dstRankAddr + dstOffset));
+                         static_cast<uint64_t>(localExpertBegin * worldSize + sourceRank) * MTE_COUNT_SLOT_BYTES;
+    dstCountGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(dstRankAddr + dstOffset));
     DataCopyExtParams countCopyParams{static_cast<uint16_t>(count), static_cast<uint32_t>(sizeof(int32_t)), 0,
-                                      static_cast<int64_t>(worldSize - 1) * static_cast<int64_t>(sizeof(int32_t)), 0U};
+                                      static_cast<int64_t>(worldSize) * static_cast<int64_t>(MTE_COUNT_SLOT_BYTES) -
+                                          static_cast<int64_t>(sizeof(int32_t)),
+                                      0U};
     DataCopyPad<int32_t, PaddingMode::Compact>(dstCountGm, countTensorToSend, countCopyParams);
 }
 
@@ -185,9 +187,9 @@ __aicore__ inline void SendTopkIdsCountToRank(const LocalTensor<int32_t> &countT
 // 仅由 AIV 调用，专家范围非空；紧接同一范围的下标发送调用，期间不能覆盖 scratch 中的累计数量。
 // 返回时搬出可能尚未完成；调用方在复用源 UB 前同步 MTE3 与后续读写流水。
 template <typename TopkIndexType>
-__aicore__ inline void SendTopkIdsCountForExperts(const WorkRange &ownedExpertRange, const MoeStageCommonConfig &common,
-                                                  int32_t syncCount, GM_ADDR *winRankAddr, const SendMaskConfig &config,
-                                                  const SendMaskScratch<TopkIndexType> &scratch)
+__aicore__ inline void SendTopkIdsCountForExperts(const WorkRange& ownedExpertRange, const MoeStageCommonConfig& common,
+                                                  int32_t syncCount, GM_ADDR* winRankAddr, const SendMaskConfig& config,
+                                                  const SendMaskScratch<TopkIndexType>& scratch)
 {
     int32_t ownedExpertBegin = static_cast<int32_t>(ownedExpertRange.start);
     int32_t ownedExpertNum = static_cast<int32_t>(ownedExpertRange.count);
@@ -226,8 +228,8 @@ __aicore__ inline void SendTopkIdsCountForExperts(const WorkRange &ownedExpertRa
             countTensorToSend = scratch.countSendScratchTensor[scratchOffset];
             scratchOffset += alignedCount;
         }
-        asc_vf_call<PrepareCountForSendVF>(reinterpret_cast<__ubuf__ uint32_t *>(scratch.sendCntAccTensor.GetPhyAddr()),
-                                           reinterpret_cast<__ubuf__ uint32_t *>(countTensorToSend.GetPhyAddr()),
+        asc_vf_call<PrepareCountForSendVF>(reinterpret_cast<__ubuf__ uint32_t*>(scratch.sendCntAccTensor.GetPhyAddr()),
+                                           reinterpret_cast<__ubuf__ uint32_t*>(countTensorToSend.GetPhyAddr()),
                                            countRangeInAccTensor.start, countRangeInAccTensor.count, syncRoundTag);
         SyncFuncStatic<AscendC::HardEvent::V_MTE3, SYNC_EVENT_ID3>();
         SendTopkIdsCountToRank(countTensorToSend, countRangeInAccTensor.count, sendExpertBegin - dstRankExpertBegin,
@@ -238,11 +240,11 @@ __aicore__ inline void SendTopkIdsCountForExperts(const WorkRange &ownedExpertRa
 // 仅由 AIV 调用，为指定的非空连续专家范围发送 topkIds 下标，同时累计各专家的发送数量。
 // 返回前等待所有 ring 槽搬出完成，随后由调用方发送累计数量。
 template <typename TopkIndexType>
-__aicore__ inline void SendTopkIdsIndexForExperts(const WorkRange &ownedExpertRange, const MoeStageCommonConfig &common,
-                                                  GM_ADDR *winRankAddr, const SendMaskConfig &config,
-                                                  SendMaskScratch<TopkIndexType> &scratch)
+__aicore__ inline void SendTopkIdsIndexForExperts(const WorkRange& ownedExpertRange, const MoeStageCommonConfig& common,
+                                                  GM_ADDR* winRankAddr, const SendMaskConfig& config,
+                                                  SendMaskScratch<TopkIndexType>& scratch)
 {
-    const MegaMoeSendMaskBufferConfig &bufferConfig = config.bufferConfig;
+    const MegaMoeSendMaskBufferConfig& bufferConfig = config.bufferConfig;
     int32_t ownedExpertBegin = static_cast<int32_t>(ownedExpertRange.start);
     int32_t ownedExpertNum = static_cast<int32_t>(ownedExpertRange.count);
 
