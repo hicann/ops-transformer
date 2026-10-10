@@ -62,7 +62,7 @@ bool MatmulReduceScatterV2Tiling::IsCapable()
     return false;
 }
 
-void PrintMMV3TilingData(const std::string &opName, Mc2MatMulV3TilingData &tiling)
+void PrintMMV3TilingData(const std::string& opName, Mc2MatMulV3TilingData& tiling)
 {
     PrintTCubeTilingData(opName, tiling.tCubeTiling);
     OP_LOGD(opName, "tiling.isHf32 %d", tiling.isHf32);
@@ -135,12 +135,15 @@ ge::graphStatus MatmulReduceScatterV2Tiling::SetMc2Hcomm()
                   args_.rankDim == PEER_ONLY_RANK_SIZE && mc2tiling::Mc2TilingUtils::GetDebugMode() == 0;
     if (isPeerOnly_) {
         mc2CcTilingConfig.SetAlgConfig(PEER_ONLY_ALGORITHM);
+        // The paired PeerOnly Matmul kernel writes the local contribution directly to output.
+        OP_TILING_CHECK(mc2CcTilingConfig.SetSkipLocalRankCopy(1) != 0,
+                        OP_LOGE(opName_, "SetSkipLocalRankCopy failed for peer-only MMRS"), return ge::GRAPH_FAILED);
     } else {
         uint64_t commDataBytes = args_.orgMValue * args_.orgNValue * args_.outputDtypeSize;
         uint32_t algoCount = 0;
         uint8_t commEngine =
             (commMode_ == TPL_CCU_COMM_MODE) ? mc2tiling::A5_CCU_ENGINE : mc2tiling::A5_AICPU_TS_ENGINE;
-        const Mc2Hcom::CommAlgoEntry *algoEntries = GetReduceScatterCommAlgoTable(algoCount);
+        const Mc2Hcom::CommAlgoEntry* algoEntries = GetReduceScatterCommAlgoTable(algoCount);
         std::string algoName = Mc2Hcom::Mc2CommAlgoSelector::SelectAlgoName(
             opName_, group, commEngine, commDataBytes, static_cast<uint32_t>(args_.rankDim), algoEntries, algoCount,
             REDUCE_SCATTER_DEFAULT_ALGO_NAME);
@@ -158,9 +161,9 @@ ge::graphStatus MatmulReduceScatterV2Tiling::SetMc2Hcomm()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MatmulReduceScatterV2Tiling::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg &tilingCfg,
-                                                              Mc2MMRegisterCfg &registerCfg,
-                                                              Mc2MatMulV3TilingData &tilingData)
+ge::graphStatus MatmulReduceScatterV2Tiling::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg& tilingCfg,
+                                                              Mc2MMRegisterCfg& registerCfg,
+                                                              Mc2MatMulV3TilingData& tilingData)
 {
     tilingCfg.SetRankDim(args_.rankDim);
     OP_LOGD(opName_, "execute DoMatmulV3Tiling!");
@@ -191,14 +194,14 @@ ge::graphStatus MatmulReduceScatterV2Tiling::DoAllMatmulTiling()
     // 获取tileTiling
     mmV3Args_.mValue = tileMValue_ * args_.rankDim;
     OP_LOGD(opName_, "Do Mc2MatMulV3 tile tiling!");
-    Mc2MatmulHelper::Mc2MatmulTilingCfg tileTilingCfg(static_cast<const void *>(&compileInfo_),
-                                                      static_cast<const void *>(&mmV3Args_), tileMValue_);
+    Mc2MatmulHelper::Mc2MatmulTilingCfg tileTilingCfg(static_cast<const void*>(&compileInfo_),
+                                                      static_cast<const void*>(&mmV3Args_), tileMValue_);
     MC2_CHECK_LOG_RET(opName_, DoMatmulV3Tiling(tileTilingCfg, registerCfg, MutableMC2MmV3TileTilingData()));
     if (tailMValue_ != 0UL) {
         mmV3Args_.mValue = tailMValue_ * args_.rankDim;
         OP_LOGD(opName_, "Do Mc2MatMulV3 tail tiling!");
-        Mc2MatmulHelper::Mc2MatmulTilingCfg tailTilingCfg(static_cast<const void *>(&compileInfo_),
-                                                          static_cast<const void *>(&mmV3Args_), tailMValue_);
+        Mc2MatmulHelper::Mc2MatmulTilingCfg tailTilingCfg(static_cast<const void*>(&compileInfo_),
+                                                          static_cast<const void*>(&mmV3Args_), tailMValue_);
         MC2_CHECK_LOG_RET(opName_, DoMatmulV3Tiling(tailTilingCfg, registerCfg, MutableMC2MmV3TailTilingData()));
     }
     return ge::GRAPH_SUCCESS;
