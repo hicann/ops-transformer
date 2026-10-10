@@ -110,7 +110,7 @@ inline uint32_t GetLengthByType(int32_t dtype)
     }
 }
 
-static void SetTiling(TilingParams &params, RopeWithSinCosCacheTilingData &tiling)
+static void SetTiling(TilingParams& params, RopeWithSinCosCacheTilingData& tiling)
 {
     tiling.set_core_num_use(params.core_num_use);
     tiling.set_num_tokens(params.num_tokens);
@@ -145,7 +145,7 @@ static void SetTiling(TilingParams &params, RopeWithSinCosCacheTilingData &tilin
     tiling.set_num_kheads_last_loop(params.num_kheads_last_loop);
 }
 
-static void PrintTilingData(const gert::TilingContext *context, RopeWithSinCosCacheTilingData &tiling)
+static void PrintTilingData(const gert::TilingContext* context, RopeWithSinCosCacheTilingData& tiling)
 {
     OP_LOGD(context->GetNodeName(), ">>>>>>>>>> Start to print RopeWithSinCosCache tiling data <<<<<<<<<<");
     OP_LOGD(context->GetNodeName(), "RopeWithSinCosCache_tiling: coreNumUse is %ld.", tiling.get_core_num_use());
@@ -198,7 +198,7 @@ static void PrintTilingData(const gert::TilingContext *context, RopeWithSinCosCa
             tiling.get_num_kheads_last_loop());
 }
 
-static ge::graphStatus TilingKeyChose(const gert::TilingContext *context, TilingParams &params)
+static ge::graphStatus TilingKeyChose(const gert::TilingContext* context, TilingParams& params)
 {
     auto qDtype = context->GetInputDesc(INPUT_QUERY_IN_INDEX)->GetDataType();
     if (qDtype == ge::DT_BF16) {
@@ -216,7 +216,7 @@ static ge::graphStatus TilingKeyChose(const gert::TilingContext *context, Tiling
     return ge::GRAPH_FAILED;
 }
 
-static ge::graphStatus TilingCompute(gert::TilingContext *context, TilingParams &params)
+static ge::graphStatus TilingCompute(gert::TilingContext* context, TilingParams& params)
 {
     uint64_t numTokens =
         static_cast<uint64_t>(context->GetOutputShape(INDEX_QUERYOUT_OUTPUT_)->GetStorageShape().GetDim(DIM_0));
@@ -230,11 +230,11 @@ static ge::graphStatus TilingCompute(gert::TilingContext *context, TilingParams 
         uint64_t keyLastDim =
             static_cast<uint64_t>(context->GetInputShape(INPUT_KEY_IN_INDEX)->GetStorageShape().GetDim(DIM_1));
         if (queryLastDim % headSize != 0) {
-            OP_LOGE(context->GetNodeName(), "queryIn.shape[1] must be divisible by headSize, but got %lu and %lu.",
+            OP_LOGW(context->GetNodeName(), "queryIn.shape[1] must be divisible by headSize, but got %lu and %lu.",
                     queryLastDim, headSize);
         }
         if (keyLastDim % headSize != 0) {
-            OP_LOGE(context->GetNodeName(), "keyIn.shape[1] must be divisible by headSize, but got %lu and %lu.",
+            OP_LOGW(context->GetNodeName(), "keyIn.shape[1] must be divisible by headSize, but got %lu and %lu.",
                     keyLastDim, headSize);
         }
     }
@@ -346,7 +346,7 @@ static ge::graphStatus TilingCompute(gert::TilingContext *context, TilingParams 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingRopeWithSinCosCache(gert::TilingContext *context)
+static ge::graphStatus TilingRopeWithSinCosCache(gert::TilingContext* context)
 {
     TilingParams params;
     RopeWithSinCosCacheTilingData tiling;
@@ -356,22 +356,22 @@ static ge::graphStatus TilingRopeWithSinCosCache(gert::TilingContext *context)
     context->SetBlockDim(totalCoreNum);
     params.core_num_use = context->GetBlockDim();
 
-    auto *attrs = context->GetAttrs();
+    auto* attrs = context->GetAttrs();
 
-    const uint64_t *attrNumQHeads = attrs->GetAttrPointer<uint64_t>(0);
+    const uint64_t* attrNumQHeads = attrs->GetAttrPointer<uint64_t>(0);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrNumQHeads);
     params.num_q_heads = static_cast<uint64_t>(*attrNumQHeads);
 
-    const uint64_t *attrNumKVHeads = attrs->GetAttrPointer<uint64_t>(1);
+    const uint64_t* attrNumKVHeads = attrs->GetAttrPointer<uint64_t>(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrNumKVHeads);
     params.num_kv_heads = static_cast<uint64_t>(*attrNumKVHeads);
 
-    const uint64_t *attrHeadSize = attrs->GetAttrPointer<uint64_t>(2);
+    const uint64_t* attrHeadSize = attrs->GetAttrPointer<uint64_t>(2);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrHeadSize);
     params.head_size = static_cast<uint64_t>(*attrHeadSize);
 
     const auto attrMRopeSection = attrs->GetAttrPointer<gert::ContinuousVector>(3);
-    const uint64_t *attrMRopeSectionData = reinterpret_cast<const uint64_t *>(attrMRopeSection->GetData());
+    const uint64_t* attrMRopeSectionData = reinterpret_cast<const uint64_t*>(attrMRopeSection->GetData());
     if (attrMRopeSectionData != nullptr) {
         params.mrope_section0 = attrMRopeSectionData[0];
         params.mrope_section1 = attrMRopeSectionData[1];
@@ -379,19 +379,19 @@ static ge::graphStatus TilingRopeWithSinCosCache(gert::TilingContext *context)
         params.mrope_section3 = attrMRopeSection->GetSize() == MRopeSectionMaxSize ? attrMRopeSectionData[3] : 0;
     }
 
-    const uint64_t *attrQStride = attrs->GetAttrPointer<uint64_t>(4);
+    const uint64_t* attrQStride = attrs->GetAttrPointer<uint64_t>(4);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrQStride);
     params.q_leading_dimension = static_cast<uint64_t>(*attrQStride);
 
-    const uint64_t *attrKStride = attrs->GetAttrPointer<uint64_t>(5);
+    const uint64_t* attrKStride = attrs->GetAttrPointer<uint64_t>(5);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrKStride);
     params.k_leading_dimension = static_cast<uint64_t>(*attrKStride);
 
-    const bool *attrIsNeoxStyle = attrs->GetAttrPointer<bool>(6);
+    const bool* attrIsNeoxStyle = attrs->GetAttrPointer<bool>(6);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrIsNeoxStyle);
     params.isNeoxStyle = static_cast<bool>(*attrIsNeoxStyle);
 
-    const uint64_t *attrCacheMode = attrs->GetAttrPointer<uint64_t>(INPUT_CACHE_MODE_INDEX);
+    const uint64_t* attrCacheMode = attrs->GetAttrPointer<uint64_t>(INPUT_CACHE_MODE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, attrCacheMode);
     params.cacheMode = static_cast<uint64_t>(*attrCacheMode);
     OP_CHECK_IF((attrMRopeSection->GetSize() == MRopeSectionMaxSize) && (params.cacheMode != 0),
@@ -408,7 +408,7 @@ static ge::graphStatus TilingRopeWithSinCosCache(gert::TilingContext *context)
     context->GetRawTilingData()->SetDataSize(tiling.GetDataSize());
 
     size_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
 
     size_t UserWorkspaceSize = 0;
 
@@ -419,7 +419,7 @@ static ge::graphStatus TilingRopeWithSinCosCache(gert::TilingContext *context)
 
 struct TilingmropeCompileInfo {};
 
-static ge::graphStatus TilingPreparemrope(gert::TilingParseContext *context)
+static ge::graphStatus TilingPreparemrope(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
