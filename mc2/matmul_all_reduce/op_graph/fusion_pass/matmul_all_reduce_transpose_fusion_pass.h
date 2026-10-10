@@ -16,14 +16,17 @@
 #include "ge/fusion/pass/pattern_fusion_pass.h"
 
 namespace ops {
-// 对齐 canndev MatmulAllReduceTransposeFusionPass：非 310P
+// 非 310P
 class __attribute__((visibility("default"))) MatmulAllReduceTransposeFusionPass : public ge::fusion::PatternFusionPass {
+public:
+    ge::Status Run(ge::GraphPtr& graph, ge::CustomPassContext& pass_context) override;
+
 protected:
     std::vector<ge::fusion::PatternUniqPtr> Patterns() override;
 
-    bool MeetRequirements(const std::unique_ptr<ge::fusion::MatchResult> &matchResult) override;
+    bool MeetRequirements(const std::unique_ptr<ge::fusion::MatchResult>& matchResult) override;
 
-    ge::fusion::GraphUniqPtr Replacement(const std::unique_ptr<ge::fusion::MatchResult> &matchResult) override;
+    ge::fusion::GraphUniqPtr Replacement(const std::unique_ptr<ge::fusion::MatchResult>& matchResult) override;
 };
 } // namespace ops
 #endif // GRAPH_FUSION_SUPPORT_VERSION
