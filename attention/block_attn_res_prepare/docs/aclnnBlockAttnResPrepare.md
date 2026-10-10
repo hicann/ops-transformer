@@ -217,8 +217,8 @@ aclnnStatus aclnnBlockAttnResPrepare(
       <td>eps（double）</td>
       <td>输入</td>
       <td>表示RMS归一化的稳定项，通常为1e-6。</td>
-      <td>必须为有限正数。</td>
-      <td>FLOAT</td>
+      <td><li>必选。</li><li>必须为有限正数。</li></td>
+      <td>-</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -351,7 +351,7 @@ aclnnStatus aclnnBlockAttnResPrepare(
 namespace {
 
 constexpr int64_t ROW_MAJOR_STRIDE_START_OFFSET = 2;
-constexpr float DEFAULT_EPS = 1.0e-6F;
+constexpr double DEFAULT_EPS = 1.0e-6;
 
 int64_t GetShapeSize(const std::vector<int64_t> &shape)
 {

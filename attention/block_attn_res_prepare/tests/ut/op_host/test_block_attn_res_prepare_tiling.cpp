@@ -46,8 +46,8 @@ constexpr size_t T_DIM_INDEX = 0U;
 constexpr size_t D_DIM_INDEX = 2U;
 constexpr size_t S_DIM_INDEX = 0U;
 constexpr size_t CSV_COLUMN_COUNT = 27U;
-constexpr const char *CSV_FILE_NAME = "test_block_attn_res_prepare_tiling.csv";
-constexpr const char *CSV_REPO_DIR = "attention/block_attn_res_prepare/tests/ut/op_host";
+constexpr const char* CSV_FILE_NAME = "test_block_attn_res_prepare_tiling.csv";
+constexpr const char* CSV_REPO_DIR = "attention/block_attn_res_prepare/tests/ut/op_host";
 
 struct VectorTilingDataView {
     uint32_t totalT;
@@ -104,8 +104,8 @@ struct MixTilingDataView {
 static_assert(sizeof(VectorTilingDataView) == VECTOR_TILING_DATA_SIZE);
 static_assert(sizeof(MixTilingDataView) == MIX_TILING_DATA_SIZE);
 
-void ExpectValueIfSpecified(uint64_t actual, int64_t expected, const std::string &fieldName,
-                            const std::string &caseName)
+void ExpectValueIfSpecified(uint64_t actual, int64_t expected, const std::string& fieldName,
+                            const std::string& caseName)
 {
     if (expected >= 0) {
         EXPECT_EQ(actual, static_cast<uint64_t>(expected)) << "field=" << fieldName << ", case=" << caseName;
@@ -125,7 +125,22 @@ struct BlockAttnResPrepareTilingCase {
                 SYSTEM_WORKSPACE_SIZE};
     }
 
-    gert::TilingContextPara MakeContext(optiling::BlockAttnResPrepareCompileInfo &compileInfo) const
+    std::string MakeSocInfoString() const
+    {
+        return std::string("{\"hardware_info\":{") + "\"BT_SIZE\":0," + "\"load3d_constraints\":\"1\"," +
+               "\"Intrinsic_fix_pipe_l0c2out\":false," + "\"Intrinsic_data_move_l12ub\":true," +
+               "\"Intrinsic_data_move_l0c2ub\":true," + "\"Intrinsic_data_move_out2l1_nd2nz\":false," +
+               "\"UB_SIZE\":" + std::to_string(ASCEND_950_UB_SIZE) + "," + "\"L2_SIZE\":33554432," +
+               "\"L1_SIZE\":" + std::to_string(ASCEND_950_L1_SIZE) + "," +
+               "\"L0A_SIZE\":" + std::to_string(ASCEND_950_L0A_SIZE) + "," +
+               "\"L0B_SIZE\":" + std::to_string(ASCEND_950_L0B_SIZE) + "," +
+               "\"L0C_SIZE\":" + std::to_string(ASCEND_950_L0C_SIZE) + "," +
+               "\"CORE_NUM\":" + std::to_string(contextCoreNum) + "," +
+               "\"cube_core_cnt\":" + std::to_string(aicCoreNum) + "," +
+               "\"vector_core_cnt\":" + std::to_string(aivCoreNum) + "," + "\"socVersion\":\"" + socVersion + "\"}}";
+    }
+
+    gert::TilingContextPara MakeContext(optiling::BlockAttnResPrepareCompileInfo& compileInfo) const
     {
         const std::vector<int64_t> blockDims = ops::ut::ParseDims(blockResShape);
         const std::vector<int64_t> queryDims = ops::ut::ParseDims(pseudoQueryShape);
@@ -147,13 +162,13 @@ struct BlockAttnResPrepareTilingCase {
                 {ops::ut::MakeGertStorageShape(std::vector<int64_t>{totalS, totalT}), ge::DT_FLOAT, ge::FORMAT_ND},
             },
             {{"eps", Ops::Transformer::AnyValue::CreateFrom<float>(eps)}}, &compileInfo, socVersion,
-            static_cast<uint64_t>(contextCoreNum), ASCEND_950_UB_SIZE, FAKE_L2_SIZE);
+            static_cast<uint64_t>(contextCoreNum), ASCEND_950_UB_SIZE, FAKE_L2_SIZE, MakeSocInfoString());
     }
 
-    void CheckVectorTiling(const TilingInfo &tilingInfo) const
+    void CheckVectorTiling(const TilingInfo& tilingInfo) const
     {
         ASSERT_GE(tilingInfo.tilingDataSize, sizeof(VectorTilingDataView));
-        const auto *tilingData = reinterpret_cast<const VectorTilingDataView *>(tilingInfo.tilingData.get());
+        const auto* tilingData = reinterpret_cast<const VectorTilingDataView*>(tilingInfo.tilingData.get());
         ASSERT_NE(tilingData, nullptr);
         ExpectValueIfSpecified(tilingData->baseD, expectBaseD, "baseD", caseName);
         ExpectValueIfSpecified(tilingData->qBufferNum, expectQBufferNum, "qBufferNum", caseName);
@@ -162,10 +177,10 @@ struct BlockAttnResPrepareTilingCase {
         ExpectValueIfSpecified(tilingData->vCacheRows, expectVCacheRows, "vCacheRows", caseName);
     }
 
-    void CheckMixTiling(const TilingInfo &tilingInfo) const
+    void CheckMixTiling(const TilingInfo& tilingInfo) const
     {
         ASSERT_GE(tilingInfo.tilingDataSize, sizeof(MixTilingDataView));
-        const auto *tilingData = reinterpret_cast<const MixTilingDataView *>(tilingInfo.tilingData.get());
+        const auto* tilingData = reinterpret_cast<const MixTilingDataView*>(tilingInfo.tilingData.get());
         ASSERT_NE(tilingData, nullptr);
         ExpectValueIfSpecified(tilingData->baseT, expectBaseT, "baseT", caseName);
         ExpectValueIfSpecified(tilingData->baseS, expectBaseS, "baseS", caseName);
@@ -283,19 +298,19 @@ std::vector<BlockAttnResPrepareTilingCase> LoadCases()
             testCase.expectMm1NAlign = std::stoll(ops::ut::Trim(items[index++]));
             testCase.checkWorkspaceFormula = ops::ut::ParseBool(items[index++]);
             cases.emplace_back(std::move(testCase));
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return cases;
 }
 
-std::string MakeParamName(const testing::TestParamInfo<BlockAttnResPrepareTilingCase> &info)
+std::string MakeParamName(const testing::TestParamInfo<BlockAttnResPrepareTilingCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
 
-const std::vector<BlockAttnResPrepareTilingCase> &GetCases()
+const std::vector<BlockAttnResPrepareTilingCase>& GetCases()
 {
     static const std::vector<BlockAttnResPrepareTilingCase> cases = LoadCases();
     return cases;

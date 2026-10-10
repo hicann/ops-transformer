@@ -165,7 +165,7 @@
 <tbody>
   <tr>
     <td>aclnn调用</td>
-    <td><a href="./examples/test_aclnn_block_attn_res_prepare.cpp">test_aclnn_block_attn_res_prepare</a></td>
+    <td><a href="./examples/arch35/test_aclnn_block_attn_res_prepare.cpp">test_aclnn_block_attn_res_prepare</a></td>
     <td>通过<a href="./docs/aclnnBlockAttnResPrepare.md">aclnnBlockAttnResPrepare.md</a>调用算子，算子编译block_attn_res_prepare。详细的算子编译运行方法参见<a href="../../docs/zh/invocation/quick_op_invocation.md">算子调用</a>。</td>
   </tr>
   <tr>

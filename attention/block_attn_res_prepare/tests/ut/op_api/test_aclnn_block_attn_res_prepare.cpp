@@ -23,7 +23,7 @@
 #include <utility>
 #include <vector>
 
-#include "../../../op_host/op_api/aclnn_block_attn_res_prepare.h"
+#include "../../../op_api/aclnn_block_attn_res_prepare.h"
 #include "gmm_csv_acl_parse_utils.h"
 #include "op_api_ut_common/op_api_ut.h"
 #include "op_api_ut_common/tensor_desc.h"
@@ -32,10 +32,10 @@
 namespace {
 
 constexpr size_t CSV_COLUMN_COUNT = 25U;
-constexpr const char *CSV_FILE_NAME = "test_aclnn_block_attn_res_prepare.csv";
-constexpr const char *CSV_REPO_DIR = "attention/block_attn_res_prepare/tests/ut/op_api";
+constexpr const char* CSV_FILE_NAME = "test_aclnn_block_attn_res_prepare.csv";
+constexpr const char* CSV_REPO_DIR = "attention/block_attn_res_prepare/tests/ut/op_api";
 
-std::vector<uint64_t> ParseU64List(const std::string &value)
+std::vector<uint64_t> ParseU64List(const std::string& value)
 {
     const std::string trimmed = ops::ut::Trim(value);
     if (trimmed.empty() || trimmed == "NONE") {
@@ -45,7 +45,7 @@ std::vector<uint64_t> ParseU64List(const std::string &value)
     ops::ut::SplitStr2Vec(trimmed, "|", tokens);
     std::vector<uint64_t> result;
     result.reserve(tokens.size());
-    for (const auto &token : tokens) {
+    for (const auto& token : tokens) {
         const std::string trimmedToken = ops::ut::Trim(token);
         if (trimmedToken.empty() || trimmedToken.front() == '-') {
             throw std::invalid_argument("validBlocksValue must contain uint64 values");
@@ -164,19 +164,19 @@ std::vector<BlockAttnResPrepareOpApiCase> LoadCases()
             testCase.eps = std::stod(ops::ut::Trim(items[index++]));
             testCase.expectRet = ops::ut::ParseAclnnStatus(items[index++]);
             cases.emplace_back(std::move(testCase));
-        } catch (const std::exception &error) {
+        } catch (const std::exception& error) {
             ADD_FAILURE() << ops::ut::BuildCsvParseErrorMessage(csvPath, lineNo, caseName, error);
         }
     }
     return cases;
 }
 
-std::string MakeParamName(const testing::TestParamInfo<BlockAttnResPrepareOpApiCase> &info)
+std::string MakeParamName(const testing::TestParamInfo<BlockAttnResPrepareOpApiCase>& info)
 {
     return ops::ut::MakeSafeParamName(info.param.prefix);
 }
 
-const std::vector<BlockAttnResPrepareOpApiCase> &GetCases()
+const std::vector<BlockAttnResPrepareOpApiCase>& GetCases()
 {
     static const std::vector<BlockAttnResPrepareOpApiCase> cases = LoadCases();
     return cases;
