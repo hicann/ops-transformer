@@ -51,7 +51,7 @@ constexpr int64_t AICPU_STRLEN = 6;
 const std::set<int> SUPPORT_RANK_SIZE{2, 4, 8, 16, 32, 64};
 const std::set<std::string> SUPPORT_COMM_MODE_A5{"ai_cpu", "ccu", "ccu_peer_only"};
 
-uint32_t MatmulReduceScatterTilingBase::ReduceScatterSpliteM(mc2tiling::TilingArgs &args, uint32_t maxTileCnt) const
+uint32_t MatmulReduceScatterTilingBase::ReduceScatterSpliteM(mc2tiling::TilingArgs& args, uint32_t maxTileCnt) const
 {
     // 检查允许通信的最大次数
     if (args.commTurn >= maxTileCnt) {
@@ -77,7 +77,7 @@ CutResult MatmulReduceScatterTilingBase::GetTilingResult()
     return scatterTiling.tilingM_.cutRes;
 }
 
-void MatmulReduceScatterTilingBase::DoFormulaticTiling(Mc2Tiling::RCSTiling &rcsCfg)
+void MatmulReduceScatterTilingBase::DoFormulaticTiling(Mc2Tiling::RCSTiling& rcsCfg)
 {
     CutResult mCutScatter = GetTilingResult();
     rcsCfg.tailCnt = 0;
@@ -125,7 +125,7 @@ ge::graphStatus MatmulReduceScatterTilingBase::CheckHCCLSize()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MatmulReduceScatterTilingBase::AdjustHCCLLimit(Mc2Tiling::RCSTiling &rcsCfg,
+ge::graphStatus MatmulReduceScatterTilingBase::AdjustHCCLLimit(Mc2Tiling::RCSTiling& rcsCfg,
                                                                mc2tiling::Mc2QuantMode quantMmMode)
 {
     if (tileMValue_ * args_.nValue * ge::GetSizeByDataType(args_.geCType) <= mc2tiling::ALL_GATHER_HCCL_MEM_LIMIT) {
@@ -162,7 +162,7 @@ ge::graphStatus MatmulReduceScatterTilingBase::AdjustHCCLLimit(Mc2Tiling::RCSTil
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MatmulReduceScatterTilingBase::DoSplitMTiling(Mc2Tiling::RCSTiling &rcsCfg)
+ge::graphStatus MatmulReduceScatterTilingBase::DoSplitMTiling(Mc2Tiling::RCSTiling& rcsCfg)
 {
     args_.mValue = args_.orgMValue / args_.rankDim; // 必须能够整数切分, 并且不能切K
     args_.rankTileNum = args_.rankDim;
@@ -191,7 +191,7 @@ ge::graphStatus MatmulReduceScatterTilingBase::DoSplitMTiling(Mc2Tiling::RCSTili
     return ge::GRAPH_SUCCESS;
 }
 
-void MatmulReduceScatterTilingBase::SetStorageAWorkSpaceSize(Mc2Tiling::RCSTiling &rcsCfg)
+void MatmulReduceScatterTilingBase::SetStorageAWorkSpaceSize(Mc2Tiling::RCSTiling& rcsCfg)
 {
     if (args_.cmdType == mc2tiling::AicpuComType::HCCL_CMD_REDUCE_SCATTER) {
         // A*B 的数据，需要找地方存储，因为 C 的长度 = A*B的长度/ RankDim
@@ -208,7 +208,7 @@ void MatmulReduceScatterTilingBase::SetStorageAWorkSpaceSize(Mc2Tiling::RCSTilin
     return;
 }
 
-void MatmulReduceScatterTilingBase::SetRcsTilingData(Mc2Tiling::RCSTiling &rcsCfg)
+void MatmulReduceScatterTilingBase::SetRcsTilingData(Mc2Tiling::RCSTiling& rcsCfg)
 {
     rcsCfg.rankDim = args_.rankDim;
     rcsCfg.isTransposeA = args_.isATrans;
@@ -237,7 +237,7 @@ void MatmulReduceScatterTilingBase::SetRcsTilingData(Mc2Tiling::RCSTiling &rcsCf
 
 ge::graphStatus MatmulReduceScatterTilingBase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "get workspace failed"), return ge::GRAPH_FAILED);
 
     // 如果是 A2A 路径，需要额外的 recvBuf (mmResultLen_)，否则只需要 senBuf
@@ -291,9 +291,9 @@ ge::graphStatus MatmulReduceScatterTilingBase::GetPlatformInfo()
 
 bool MatmulReduceScatterTilingBase::CheckBias() const
 {
-    const gert::StorageShape *aShape = context_->GetInputShape(INPUT_X1);
-    const gert::StorageShape *bShape = context_->GetInputShape(INPUT_X2);
-    const gert::StorageShape *biasShape = context_->GetOptionalInputShape(BIAS);
+    const gert::StorageShape* aShape = context_->GetInputShape(INPUT_X1);
+    const gert::StorageShape* bShape = context_->GetInputShape(INPUT_X2);
+    const gert::StorageShape* biasShape = context_->GetOptionalInputShape(BIAS);
     if (biasShape != nullptr) {
         uint64_t biasShapeDimNum = biasShape->GetStorageShape().GetDimNum();
         OP_TILING_CHECK(
@@ -392,8 +392,8 @@ bool MatmulReduceScatterTilingBase::CheckAttrInfoValid(uint64_t kValue)
 
 bool MatmulReduceScatterTilingBase::ReduceScatterCheckShapeInfo()
 {
-    const gert::StorageShape *aShape = context_->GetInputShape(0);
-    const gert::StorageShape *bShape = context_->GetInputShape(1);
+    const gert::StorageShape* aShape = context_->GetInputShape(0);
+    const gert::StorageShape* bShape = context_->GetInputShape(1);
     OP_TILING_CHECK((aShape == nullptr) || (bShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "x1"),
                     return false);
 
@@ -460,7 +460,7 @@ void MatmulReduceScatterTilingBase::SetReduceScatterTilingArgsDataType()
     auto aType = context_->GetInputDesc(0)->GetDataType();
     auto bType = context_->GetInputDesc(1)->GetDataType();
     auto cType = context_->GetOutputDesc(0)->GetDataType();
-    const gert::StorageShape *matrix_bias = context_->GetOptionalInputShape(2);
+    const gert::StorageShape* matrix_bias = context_->GetOptionalInputShape(2);
     if (matrix_bias == nullptr) {
         isBias = false;
         biasType = cType;
@@ -486,8 +486,8 @@ void MatmulReduceScatterTilingBase::SetReduceScatterTilingArgsDataType()
 
 void MatmulReduceScatterTilingBase::SetReduceScatterTilingArgsShapeInfo()
 {
-    const gert::StorageShape *aShape = context_->GetInputShape(0);
-    const gert::StorageShape *bShape = context_->GetInputShape(1);
+    const gert::StorageShape* aShape = context_->GetInputShape(0);
+    const gert::StorageShape* bShape = context_->GetInputShape(1);
     uint64_t mValue = aShape->GetStorageShape().GetDim(0);
     uint64_t kValue = aShape->GetStorageShape().GetDim(1);
     uint64_t nValue = bShape->GetStorageShape().GetDim(1);
@@ -552,13 +552,13 @@ ge::graphStatus MatmulReduceScatterTilingBase::GetShapeAttrsInfo()
     OP_TILING_CHECK(
         (args_.rankDim <= 0) || (args_.orgMValue % args_.rankDim != 0),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "rankDim", std::to_string(args_.rankDim).c_str(),
-                                              "The value of rankDim must be positive and divisible by orgMValue"),
+                                              "rankDim must be positive and orgMValue must be divisible by rankDim"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 };
 
-void MatmulReduceScatterTilingBase::SetMsgDataInfo(const Mc2Tiling::RCSTiling &rcsCfg, const ::TCubeTiling &mmTiling,
-                                                   const ::TCubeTiling &tailTiling, uint32_t debugMode)
+void MatmulReduceScatterTilingBase::SetMsgDataInfo(const Mc2Tiling::RCSTiling& rcsCfg, const ::TCubeTiling& mmTiling,
+                                                   const ::TCubeTiling& tailTiling, uint32_t debugMode)
 {
     (void)mmTiling;
     (void)tailTiling;
@@ -578,8 +578,8 @@ void MatmulReduceScatterTilingBase::SetMsgDataInfo(const Mc2Tiling::RCSTiling &r
 
 // tiling
 
-void MatmulReduceScatterTilingBase::SetTilingResult(Mc2Tiling::RCSTiling &rcsCfg, ::TCubeTiling &mmTiling,
-                                                    ::TCubeTiling &tailTiling, uint32_t &debugMode, uint32_t &dataType)
+void MatmulReduceScatterTilingBase::SetTilingResult(Mc2Tiling::RCSTiling& rcsCfg, ::TCubeTiling& mmTiling,
+                                                    ::TCubeTiling& tailTiling, uint32_t& debugMode, uint32_t& dataType)
 {
     auto debugMode_ = mc2tiling::Mc2TilingUtils::GetDebugMode();
 

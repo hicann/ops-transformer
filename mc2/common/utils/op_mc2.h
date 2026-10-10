@@ -55,7 +55,7 @@ enum class MC2V2InputIdx : size_t {
     K_BIAS,
     K_X1SCALE,
     K_X2SCALE,
-    K_QUNATSCALE
+    K_QUANTSCALE
 };
 
 enum class MC2OutputIdx : size_t {
