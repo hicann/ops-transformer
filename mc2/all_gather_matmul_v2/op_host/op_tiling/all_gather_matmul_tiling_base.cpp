@@ -51,15 +51,15 @@ static const std::initializer_list<ge::DataType> FP8_DTYPE_SUPPORT_LIST = {
 
 static const std::initializer_list<ge::DataType> FP4_DTYPE_SUPPORT_LIST = {ge::DataType::DT_FLOAT4_E2M1};
 
-static bool CheckSupportDtype(const ge::DataType x1DataType, const std::initializer_list<ge::DataType> &supportTypes)
+static bool CheckSupportDtype(const ge::DataType x1DataType, const std::initializer_list<ge::DataType>& supportTypes)
 {
     return std::find(supportTypes.begin(), supportTypes.end(), x1DataType) != supportTypes.end();
 }
 
 bool AllGatherMatmulTilingBase::CheckInputParaEmptyPointer()
 {
-    const gert::StorageShape *x1Shape = context_->GetInputShape(INPUT_X1);
-    const gert::StorageShape *x2Shape = context_->GetInputShape(INPUT_X2);
+    const gert::StorageShape* x1Shape = context_->GetInputShape(INPUT_X1);
+    const gert::StorageShape* x2Shape = context_->GetInputShape(INPUT_X2);
     OP_TILING_CHECK((x1Shape == nullptr) || (x2Shape == nullptr),
                     OP_LOGE_WITH_INVALID_INPUT(opName_, "x1Shape or x2Shape"), return false);
     auto x1TensorDesc = context_->GetInputDesc(INPUT_X1);
@@ -138,8 +138,8 @@ bool AllGatherMatmulTilingBase::CheckInputScale()
 
 bool AllGatherMatmulTilingBase::CheckInputParaArraySize()
 {
-    const gert::StorageShape *x1Shape = context_->GetInputShape(INPUT_X1);
-    const gert::StorageShape *x2Shape = context_->GetInputShape(INPUT_X2);
+    const gert::StorageShape* x1Shape = context_->GetInputShape(INPUT_X1);
+    const gert::StorageShape* x2Shape = context_->GetInputShape(INPUT_X2);
     uint64_t x1ShapeDimNum = x1Shape->GetStorageShape().GetDimNum();
     uint64_t x2ShapeDimNum = x2Shape->GetStorageShape().GetDimNum();
 
@@ -210,7 +210,7 @@ bool AllGatherMatmulTilingBase::CheckGatherOutPara()
     OP_TILING_CHECK(isGatherout == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "is_gather_out"), return false);
     auto gatherIndex = attrs->GetAttrPointer<int64_t>(GATHER_IDX);
     auto gatherOutShape = context_->GetOutputShape(GATHER_OUT);
-    const gert::StorageShape *x1Shape = context_->GetInputShape(INPUT_X1);
+    const gert::StorageShape* x1Shape = context_->GetInputShape(INPUT_X1);
     int64_t x1Dim0 = x1Shape->GetStorageShape().GetDim(0);
     int64_t x1Dim1 = x1Shape->GetStorageShape().GetDim(1);
     int64_t mValue = x1Dim0 * static_cast<int64_t>(rankSize_);
@@ -242,7 +242,7 @@ bool AllGatherMatmulTilingBase::CheckOutputParaDim0()
 {
     auto outputShape = context_->GetOutputShape(OUTPUT_Y);
     uint64_t outputDim0 = outputShape->GetStorageShape().GetDim(0);
-    const gert::StorageShape *x1Shape = context_->GetInputShape(INPUT_X1);
+    const gert::StorageShape* x1Shape = context_->GetInputShape(INPUT_X1);
     uint64_t x1Dim0 = x1Shape->GetStorageShape().GetDim(0);
     uint64_t mValue = x1Dim0 * static_cast<uint64_t>(rankSize_);
 
@@ -257,9 +257,9 @@ bool AllGatherMatmulTilingBase::CheckOutputParaDim0()
 
 bool AllGatherMatmulTilingBase::CheckBiasParaDim0()
 {
-    const gert::StorageShape *matrix_bias = context_->GetOptionalInputShape(BIAS);
-    const gert::StorageShape *x1Shape = context_->GetInputShape(INPUT_X1);
-    const gert::StorageShape *x2Shape = context_->GetInputShape(INPUT_X2);
+    const gert::StorageShape* matrix_bias = context_->GetOptionalInputShape(BIAS);
+    const gert::StorageShape* x1Shape = context_->GetInputShape(INPUT_X1);
+    const gert::StorageShape* x2Shape = context_->GetInputShape(INPUT_X2);
     uint64_t x1Dim1 = x1Shape->GetStorageShape().GetDim(1);
     uint64_t x2Dim0 = x2Shape->GetStorageShape().GetDim(0);
     uint64_t x2Dim1 = x2Shape->GetStorageShape().GetDim(1);
@@ -307,8 +307,8 @@ bool AllGatherMatmulTilingBase::CheckParaInvaild()
 
 void AllGatherMatmulTilingBase::SetTilingArgsDim()
 {
-    const gert::StorageShape *x1Shape = context_->GetInputShape(INPUT_X1);
-    const gert::StorageShape *x2Shape = context_->GetInputShape(INPUT_X2);
+    const gert::StorageShape* x1Shape = context_->GetInputShape(INPUT_X1);
+    const gert::StorageShape* x2Shape = context_->GetInputShape(INPUT_X2);
     uint64_t x1Dim0 = x1Shape->GetStorageShape().GetDim(0);
     uint64_t x1Dim1 = x1Shape->GetStorageShape().GetDim(1);
     uint64_t x2Dim0 = x2Shape->GetStorageShape().GetDim(0);
@@ -325,7 +325,7 @@ void AllGatherMatmulTilingBase::SetTilingArgsDim()
 
 void AllGatherMatmulTilingBase::SetTilingArgsDataType()
 {
-    const gert::StorageShape *matrixBias = context_->GetOptionalInputShape(BIAS);
+    const gert::StorageShape* matrixBias = context_->GetOptionalInputShape(BIAS);
     ge::DataType aType = context_->GetInputDesc(INPUT_X1)->GetDataType();
     ge::DataType bType = context_->GetInputDesc(INPUT_X2)->GetDataType();
     ge::DataType biasType;
@@ -400,8 +400,8 @@ ge::graphStatus AllGatherMatmulTilingBase::AnalyzeShapeAttr()
     return ge::GRAPH_SUCCESS;
 }
 
-void AllGatherMatmulTilingBase::SetMC2AllGatherDataInfo(Mc2Tiling::RCSTiling &rcsCfg, ::TCubeTiling &mmTiling,
-                                                        ::TCubeTiling &tailTiling, uint32_t debugMode)
+void AllGatherMatmulTilingBase::SetMC2AllGatherDataInfo(Mc2Tiling::RCSTiling& rcsCfg, ::TCubeTiling& mmTiling,
+                                                        ::TCubeTiling& tailTiling, uint32_t debugMode)
 {
     // 只通信不计算模式下，如果没有gatherOut且K > N, recvOff和sendCnt需要根据N计算
     auto columnNum = args_.orgKValue;
@@ -452,8 +452,8 @@ ge::graphStatus AllGatherMatmulTilingBase::CheckHCCLSize()
     return ge::GRAPH_SUCCESS;
 }
 
-void AllGatherMatmulTilingBase::DoAllGatherTiling(Mc2Tiling::RCSTiling &rcsCfg, ::TCubeTiling &mmTiling,
-                                                  ::TCubeTiling &tailTiling, uint32_t &debugMode, uint32_t &dataType)
+void AllGatherMatmulTilingBase::DoAllGatherTiling(Mc2Tiling::RCSTiling& rcsCfg, ::TCubeTiling& mmTiling,
+                                                  ::TCubeTiling& tailTiling, uint32_t& debugMode, uint32_t& dataType)
 {
     auto debugMode_ = mc2tiling::Mc2TilingUtils::GetDebugMode();
     debugMode = debugMode_;
@@ -470,7 +470,7 @@ void AllGatherMatmulTilingBase::DoAllGatherTiling(Mc2Tiling::RCSTiling &rcsCfg, 
     storageA_ = GetStorageA(rcsCfg);
 }
 
-void AllGatherMatmulTilingBase::SetRcsTilingData(Mc2Tiling::RCSTiling &rcsCfg)
+void AllGatherMatmulTilingBase::SetRcsTilingData(Mc2Tiling::RCSTiling& rcsCfg)
 {
     rcsCfg.rankDim = args_.rankDim;
     rcsCfg.isTransposeA = args_.isATrans;
@@ -503,7 +503,7 @@ bool AllGatherMatmulTilingBase::SetCommAlgo()
     return true;
 }
 
-uint32_t AllGatherMatmulTilingBase::AllGatherSplitM(mc2tiling::TilingArgs &args, uint32_t maxTileCnt = 64)
+uint32_t AllGatherMatmulTilingBase::AllGatherSplitM(mc2tiling::TilingArgs& args, uint32_t maxTileCnt = 64)
 {
     // 检查允许通信的最大次数
     if (args.commTurn >= maxTileCnt) {
@@ -534,7 +534,7 @@ CutResult AllGatherMatmulTilingBase::GetTilingResult()
     return tileFormulate.tilingM_.cutRes;
 }
 
-void AllGatherMatmulTilingBase::DoSplitMTiling(Mc2Tiling::RCSTiling &rcfCfg)
+void AllGatherMatmulTilingBase::DoSplitMTiling(Mc2Tiling::RCSTiling& rcfCfg)
 {
     if (args_.commAlg == mc2tiling::COMM_ALG_DOUBLE_RING) {
         args_.mValue /= DOUBLE_RING_FACTOR;
@@ -576,7 +576,7 @@ void AllGatherMatmulTilingBase::DoSplitMTiling(Mc2Tiling::RCSTiling &rcfCfg)
     }
 }
 
-void AllGatherMatmulTilingBase::PostDoSplitMTiling(Mc2Tiling::RCSTiling &rcfCfg, mc2tiling::Mc2QuantMode quantMmMode)
+void AllGatherMatmulTilingBase::PostDoSplitMTiling(Mc2Tiling::RCSTiling& rcfCfg, mc2tiling::Mc2QuantMode quantMmMode)
 {
     auto splitNum = args_.mValue / PERBLOCK_SCALE_SIZE;
     auto tileM = (args_.mValue - rcfCfg.tailM * rcfCfg.tailCnt) / rcfCfg.tileCnt;
@@ -604,8 +604,8 @@ void AllGatherMatmulTilingBase::Reset()
     commAlgorithm_ = 0U;
     enableNd2Nz_ = true;
     castBias_ = false;
-    biasLen_ = 0U;
-    storageA_ = 0U;
+    biasLen_ = 0UL;
+    storageA_ = 0UL;
     gatherIndex_ = 0U;
 }
 
@@ -700,7 +700,7 @@ uint64_t AllGatherMatmulTilingBase::CalcGatherLen(uint32_t dimA, uint32_t dimB, 
     return mc2tiling::AlignUp(dimA * dimB * args_.inputDtypeSize, alignAddrLen);
 }
 
-uint64_t AllGatherMatmulTilingBase::GetStorageA(Mc2Tiling::RCSTiling &rcsCfg)
+uint64_t AllGatherMatmulTilingBase::GetStorageA(Mc2Tiling::RCSTiling& rcsCfg)
 {
     constexpr uint64_t alignAddrLen = 512;
     uint32_t gatherIndex = rcsCfg.gatherIndex;
@@ -746,12 +746,12 @@ uint64_t AllGatherMatmulTilingBase::GetStorageA(Mc2Tiling::RCSTiling &rcsCfg)
 
 ge::graphStatus AllGatherMatmulTilingBase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "get workspace failed."), return ge::GRAPH_FAILED);
 
     workspaceSize_ = libApiWorkSpaceSize_ + storageA_ + biasLen_;
     workspaces[0] = workspaceSize_;
-    OP_LOGD(opName_, "workspaces[0] size=%ld, biasLen=%d", workspaces[0], biasLen_);
+    OP_LOGD(opName_, "workspaces[0] size=%ld, biasLen=%lu", workspaces[0], biasLen_);
 
     return ge::GRAPH_SUCCESS;
 }
