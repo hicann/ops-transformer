@@ -1,0 +1,183 @@
+/**
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
+
+/*!
+ * \file vf_softmax_dn_cast_nz_mxfp8_qs128_kvs128.h
+ * \brief qs128: OCP path uses FusedExpSub to split half into two float lanes (ZERO / ONE), then Interleave into
+ * consecutive qs64 and pack with CAST_RINT.
+ */
+#ifndef VF_SOFTMAX_DN_CAST_NZ_MXFP8_QS128_KVS128_H_
+#define VF_SOFTMAX_DN_CAST_NZ_MXFP8_QS128_KVS128_H_
+#include "kernel_tensor.h"
+#include "vf_common_def_mxfp8.h"
+#include "../../bsa_epilogue_dispatch_policy.hpp"
+namespace NpuArch::Epilogue::Block::Mxfp8VF {
+using AscendC::LocalTensor;
+using namespace AscendC;
+using namespace MicroAPI;
+
+template <MXQuantMode MX_QUANT_MODE = MXQuantMode::OCP, bool clear_gmax, typename T, typename T2,
+          uint16_t KvsBase = 128, uint16_t QsBase = 128>
+__simd_vf__ inline void softmax_with_group_max_qs128_kvs128_vf(__ubuf__ T2* pDest, __ubuf__ T* s,
+                                                               __ubuf__ T* local_group_max, __ubuf__ T* global_max,
+                                                               __ubuf__ uint8_t* indexesUb)
+{
+    // ====================== 寄存器定义 ======================
+    RegTensor<half> src_c0, src_c1, src_c2, src_c3;
+    RegTensor<half> src_n0, src_n1, src_n2, src_n3;
+    RegTensor<half> curr_group_max;
+    RegTensor<half> next_group_max;
+    RegTensor<half> group_gmax;
+    RegTensor<half> min_val_reg;
+    RegTensor<uint8_t> idx_nd2nz;
+
+    // 量化专用寄存器
+    RegTensor<float> src_f0, src_f1, src_f2, src_f3, src_f4, src_f5, src_f6, src_f7;
+
+    // ====================== 分块常量 ======================
+    const uint16_t ROWS_PER_GROUP = 32;
+    const uint16_t GROUP_COUNT = KvsBase / ROWS_PER_GROUP;
+    const uint16_t ROW_SUB_LOOP = 4;
+    const uint16_t ITER_PER_GROUP = ROWS_PER_GROUP / ROW_SUB_LOOP;
+    uint32_t MID_VALID_CNT = QsBase * (GROUP_COUNT - 1);
+
+    // ====================== 掩码定义 ======================
+    MaskReg preg_all_16bit = CreateMask<uint16_t, MaskPattern::ALL>();
+    MaskReg preg_all_8bit = CreateMask<uint8_t, MaskPattern::ALL>();
+    MaskReg preg_all_fp32 = CreateMask<float, MaskPattern::ALL>();
+    MaskReg preg_vl128 = CreateMask<uint8_t, MaskPattern::VL128>();
+    MaskReg preg_vl128_not;
+    MaskNot(preg_vl128_not, preg_vl128, preg_all_8bit);
+    MaskReg preg_invalid_max;
+
+    // ====================== 全局最大值初始化 ======================
+    LoadAlign(group_gmax, global_max);
+
+    LoadAlign(idx_nd2nz, indexesUb);
+
+    // ====================== 预计算：第一个分组的最大值 ======================
+    Duplicate(curr_group_max, MIN_VALUE);
+    for (uint16_t iter = 0; iter < ITER_PER_GROUP; ++iter) {
+        LoadAlign(src_c0, s + (iter * QsBase * ROW_SUB_LOOP + 0 * QsBase) * 2);
+        LoadAlign(src_c1, s + (iter * QsBase * ROW_SUB_LOOP + 1 * QsBase) * 2);
+        LoadAlign(src_c2, s + (iter * QsBase * ROW_SUB_LOOP + 2 * QsBase) * 2);
+        LoadAlign(src_c3, s + (iter * QsBase * ROW_SUB_LOOP + 3 * QsBase) * 2);
+
+        Max(src_c0, src_c0, src_c1, preg_all_16bit);
+        Max(src_c2, src_c2, src_c3, preg_all_16bit);
+        Max(curr_group_max, curr_group_max, src_c0, preg_all_16bit);
+        Max(curr_group_max, curr_group_max, src_c2, preg_all_16bit);
+    }
+
+    Muls(curr_group_max, curr_group_max, INV_LN2, preg_all_16bit);
+
+    Truncate<T, RoundMode::CAST_FLOOR>(curr_group_max, curr_group_max, preg_all_16bit);
+
+    Max(group_gmax, group_gmax, curr_group_max, preg_all_16bit);
+    StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(local_group_max, curr_group_max, preg_all_16bit);
+
+    Adds(curr_group_max, curr_group_max, NEG_EIGHT_VALE, preg_all_16bit);
+    Muls(curr_group_max, curr_group_max, LN2, preg_all_16bit);
+
+    // even/odd + VL128：4 行×64 打 256B，按 M 拆成 128B 共享 copy 的 256B 槽。
+    // lo qs[0:64) 占 TLA 0-15 / 32-47；hi qs[64:128) 占空出来的 TLA 16-31 / 48-63（+8192）。
+    for (uint16_t i = 0; i < GROUP_COUNT; i++) {
+        MaskReg preg_valid_max = UpdateMask<half>(MID_VALID_CNT);
+        MaskNot(preg_invalid_max, preg_valid_max, preg_all_16bit);
+
+        Duplicate(next_group_max, MIN_VALUE);
+
+        for (uint16_t j = 0; j < ITER_PER_GROUP; j += 2) {
+            uint16_t rowOffset_next = (i + 1) * ROWS_PER_GROUP + j * ROW_SUB_LOOP;
+            LoadAlign(src_n0, s + (rowOffset_next * QsBase + 0 * QsBase) * 2);
+            LoadAlign(src_n1, s + (rowOffset_next * QsBase + 1 * QsBase) * 2);
+            LoadAlign(src_n2, s + (rowOffset_next * QsBase + 2 * QsBase) * 2);
+            LoadAlign(src_n3, s + (rowOffset_next * QsBase + 3 * QsBase) * 2);
+            Max(src_n0, src_n0, src_n1, preg_valid_max);
+            Max(src_n2, src_n2, src_n3, preg_valid_max);
+            Max(next_group_max, next_group_max, src_n0, preg_valid_max);
+            Max(next_group_max, next_group_max, src_n2, preg_valid_max);
+
+            uint16_t rowOffset_cur = i * ROWS_PER_GROUP + j * ROW_SUB_LOOP;
+            LoadAlign(src_c0, s + (rowOffset_cur * QsBase + 0 * QsBase) * 2);
+            LoadAlign(src_c1, s + (rowOffset_cur * QsBase + 1 * QsBase) * 2);
+            LoadAlign(src_c2, s + (rowOffset_cur * QsBase + 2 * QsBase) * 2);
+            LoadAlign(src_c3, s + (rowOffset_cur * QsBase + 3 * QsBase) * 2);
+
+            BSA_MXFP8_EXPSUB_SPLIT_4WAY_MINS(src_f0, src_f1, src_f2, src_f3, src_f4, src_f5, src_f6, src_f7, src_c0,
+                                             src_c1, src_c2, src_c3, curr_group_max, preg_all_16bit, preg_all_fp32);
+            uint32_t pOff = i * 2048 + j * 256;
+            // K-outer：C0=0,1 占 TLA 0-15 / 16-31（高平面 +8064，vl128_not 落到 +8192）
+            BSA_MXFP8_PACK_STORE_E4M3_VL128(pDest, pOff, pOff + 8064, src_f0, src_f1, src_f2, src_f3, idx_nd2nz,
+                                            preg_all_fp32, preg_all_8bit, preg_vl128, preg_vl128_not);
+            BSA_MXFP8_PACK_STORE_E4M3_VL128(pDest, pOff + 16384, pOff + 24448, src_f4, src_f5, src_f6, src_f7,
+                                            idx_nd2nz, preg_all_fp32, preg_all_8bit, preg_vl128, preg_vl128_not);
+        }
+
+        for (uint16_t j = 0; j < ITER_PER_GROUP; j += 2) {
+            uint16_t rowOffset_next = (i + 1) * ROWS_PER_GROUP + (j + 1) * ROW_SUB_LOOP;
+            LoadAlign(src_n0, s + (rowOffset_next * QsBase + 0 * QsBase) * 2);
+            LoadAlign(src_n1, s + (rowOffset_next * QsBase + 1 * QsBase) * 2);
+            LoadAlign(src_n2, s + (rowOffset_next * QsBase + 2 * QsBase) * 2);
+            LoadAlign(src_n3, s + (rowOffset_next * QsBase + 3 * QsBase) * 2);
+            Max(src_n0, src_n0, src_n1, preg_valid_max);
+            Max(src_n2, src_n2, src_n3, preg_valid_max);
+            Max(next_group_max, next_group_max, src_n0, preg_valid_max);
+            Max(next_group_max, next_group_max, src_n2, preg_valid_max);
+
+            uint16_t rowOffset_cur = i * ROWS_PER_GROUP + (j + 1) * ROW_SUB_LOOP;
+            LoadAlign(src_c0, s + (rowOffset_cur * QsBase + 0 * QsBase) * 2);
+            LoadAlign(src_c1, s + (rowOffset_cur * QsBase + 1 * QsBase) * 2);
+            LoadAlign(src_c2, s + (rowOffset_cur * QsBase + 2 * QsBase) * 2);
+            LoadAlign(src_c3, s + (rowOffset_cur * QsBase + 3 * QsBase) * 2);
+
+            BSA_MXFP8_EXPSUB_SPLIT_4WAY_MINS(src_f0, src_f1, src_f2, src_f3, src_f4, src_f5, src_f6, src_f7, src_c0,
+                                             src_c1, src_c2, src_c3, curr_group_max, preg_all_16bit, preg_all_fp32);
+            uint32_t pOff = i * 2048 + j * 256;
+            BSA_MXFP8_PACK_STORE_E4M3_VL128(pDest, pOff + 128, pOff + 8192, src_f0, src_f1, src_f2, src_f3, idx_nd2nz,
+                                            preg_all_fp32, preg_all_8bit, preg_vl128, preg_vl128_not);
+            BSA_MXFP8_PACK_STORE_E4M3_VL128(pDest, pOff + 16384 + 128, pOff + 24576, src_f4, src_f5, src_f6, src_f7,
+                                            idx_nd2nz, preg_all_fp32, preg_all_8bit, preg_vl128, preg_vl128_not);
+        }
+
+        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(global_max, group_gmax, preg_invalid_max);
+
+        Muls(next_group_max, next_group_max, INV_LN2, preg_valid_max);
+        Truncate<T, RoundMode::CAST_FLOOR>(next_group_max, next_group_max, preg_valid_max);
+        Max(group_gmax, group_gmax, next_group_max, preg_valid_max);
+
+        StoreAlign<T, MicroAPI::StoreDist::DIST_NORM_B16>(local_group_max + ((i + 1) * QsBase), next_group_max,
+                                                          preg_valid_max);
+
+        Adds(next_group_max, next_group_max, NEG_EIGHT_VALE, preg_all_16bit);
+        Muls(curr_group_max, next_group_max, LN2, preg_valid_max);
+    }
+}
+
+template <MXQuantMode MX_QUANT_MODE = MXQuantMode::OCP, bool clear_gmax, typename T, typename T2,
+          uint16_t KvsBase = 128, uint16_t QsBase = 128>
+__aicore__ inline void SoftmaxWithGroupMaxQs128Kvs128CallVF(const LocalTensor<T2>& dstTensor,
+                                                            const LocalTensor<T>& srcTensor,
+                                                            const LocalTensor<T>& local_group_max,
+                                                            const LocalTensor<T>& global_max,
+                                                            const LocalTensor<uint8_t>& indexesBuf)
+{
+    __ubuf__ T2* pDest = (__ubuf__ T2*)dstTensor.GetPhyAddr();
+    __ubuf__ T* input_x_local_UB = (__ubuf__ T*)srcTensor.GetPhyAddr();
+    __ubuf__ T* localGroupMax = (__ubuf__ T*)local_group_max.GetPhyAddr();
+    __ubuf__ T* globalMax = (__ubuf__ T*)global_max.GetPhyAddr();
+    __ubuf__ uint8_t* indexesUb = (__ubuf__ uint8_t*)indexesBuf.GetPhyAddr();
+
+    softmax_with_group_max_qs128_kvs128_vf<MX_QUANT_MODE, clear_gmax, T, T2, KvsBase, QsBase>(
+        pDest, input_x_local_UB, localGroupMax, globalMax, indexesUb);
+}
+
+} // namespace NpuArch::Epilogue::Block::Mxfp8VF
+#endif // VF_SOFTMAX_DN_CAST_NZ_MXFP8_QS128_KVS128_H_

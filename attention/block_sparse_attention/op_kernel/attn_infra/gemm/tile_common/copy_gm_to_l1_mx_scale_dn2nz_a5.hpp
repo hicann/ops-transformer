@@ -29,14 +29,14 @@ struct CopyGmToL1MxScaleDn2NzA5 {
     // srcB16Off : 源 half 偏移（稀疏多段拼接时使用，稠密传 0）
     // dstB16Off : 目的 half 偏移
     // headMul   : 头内 token 步长因子（BNSD=1, BSND/TND=N）
-    __aicore__ inline void operator()(AscendC::LocalTensor<uint8_t> const &l1Scale,
-                                      AscendC::GlobalTensor<uint8_t> const &gScale, uint32_t rows, uint32_t scaleK,
+    __aicore__ inline void operator()(AscendC::LocalTensor<uint8_t> const& l1Scale,
+                                      AscendC::GlobalTensor<uint8_t> const& gScale, uint32_t rows, uint32_t scaleK,
                                       uint32_t srcB16Off = 0, uint32_t dstB16Off = 0, uint32_t headMul = 1)
     {
         uint32_t scaleRowHalf = scaleK / 2;
 
         AscendC::GlobalTensor<half> gScaleB16;
-        gScaleB16.SetGlobalBuffer((__gm__ half *)(gScale.GetPhyAddr()), Block::MXFP4::GM_MAX_BUFFER_LEN);
+        gScaleB16.SetGlobalBuffer((__gm__ half*)(gScale.GetPhyAddr()), Block::MXFP4::GM_MAX_BUFFER_LEN);
         auto l1ScaleB16 = l1Scale.ReinterpretCast<half>();
 
         AscendC::Dn2NzParams dn2nzParams;
@@ -47,7 +47,8 @@ struct CopyGmToL1MxScaleDn2NzA5 {
         dn2nzParams.srcDValue = headMul * scaleRowHalf;
         dn2nzParams.dstNzC0Stride = scaleRowHalf;
         dn2nzParams.dstNzNStride = 1;
-        dn2nzParams.dstNzMatrixStride = 0;
+        // dnNum 为 1 时 dstNzMatrixStride 不参与本块地址计算，与 nValue 取同一值。
+        dn2nzParams.dstNzMatrixStride = dn2nzParams.nValue;
 
         AscendC::DataCopy(l1ScaleB16[dstB16Off], gScaleB16[srcB16Off], dn2nzParams);
     }

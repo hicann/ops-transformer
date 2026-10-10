@@ -55,7 +55,7 @@ struct UBufTileHelper {
 };
 
 template <uint32_t MODE, pipe_t PIPE>
-__aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+__aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
 {
     // in mode 4, AIC set for 2 AIVs seperately
     if constexpr (MODE == 4U) {
@@ -64,7 +64,7 @@ __aicore__ inline void SetCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
 }
 
 template <uint32_t MODE, pipe_t PIPE>
-__aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag &crossCoreFlag)
+__aicore__ inline void WaitCrossCoreSync(Arch::CrossCoreFlag& crossCoreFlag)
 {
     // in mode 4, AIC wait for 2 AIVs seperately
     if constexpr (MODE == 4U) {
@@ -195,6 +195,98 @@ static constexpr uint64_t SYNC_GMAX_UB_TO_L1_BUF2_FLAG = 4;
 static constexpr uint64_t SYNC_GMAX_UB_TO_L1_BUF3_FLAG = 5;
 static constexpr uint64_t SYNC_ATTNOUT_BUF_FLAG = 6;
 } // namespace MXFP4
+
+namespace MXFP8 {
+static constexpr uint32_t KB_BYTE = 1024;
+static constexpr uint32_t QS_BASE_SIZE = 128;
+static constexpr uint32_t KVS_BASE_SIZE = 128; // kvs128 修订：softmax 基块 128×128
+static constexpr uint32_t DATA_BLOCK_BYTE = 32;
+
+static constexpr uint32_t UB_S_BUF_CNT = 2;
+static constexpr uint32_t UB_S_INNER_BUF_OFFSET = 256;
+static constexpr uint32_t UB_S_BUF_SIZE = 32 * KB_BYTE; // 128×128×2B
+static constexpr uint32_t UB_S_BUF_OFFSET = 0;
+
+static constexpr uint32_t UB_OTMP_BUF_SIZE = 32 * KB_BYTE;
+static constexpr uint32_t UB_OTMP_BUF_OFFSET = 64 * KB_BYTE;
+
+static constexpr uint32_t UB_LOCAL_ROW_SUM_BUF_SIZE = 256;
+static constexpr uint32_t UB_LOCAL_ROW_SUM_BUF_OFFSET = 96 * KB_BYTE;
+
+static constexpr uint32_t UB_GLOBAL_ROW_SUM_BUF_SIZE = 256;
+static constexpr uint32_t UB_GLOBAL_ROW_SUM_BUF_OFFSET = 96 * KB_BYTE + 256;
+
+// P：逻辑 16KB/槽；ping-pong 按 256B 交错，物理跨度 32KB（64×512）
+static constexpr uint32_t UB_P_BUF_CNT = 2;
+static constexpr uint32_t UB_P_INNER_BUF_OFFSET = 256;
+static constexpr uint32_t UB_P_INNER_BUF_ELEMENT_OFFSET = 256;
+static constexpr uint32_t UB_P_BUF_SIZE = 16 * KB_BYTE;
+static constexpr uint32_t UB_P_BUF_OFFSET = 96 * KB_BYTE + 512;
+static constexpr uint32_t UB_P_PHYSICAL_SPAN = 32 * KB_BYTE;
+
+static constexpr uint32_t UB_O_TRANS_BUF_SIZE = 18 * KB_BYTE;
+static constexpr uint32_t UB_O_TRANS_BUF_OFFSET = 96 * KB_BYTE + 512;
+
+// pScale 必须在 index 之后：G=16 后 localGroupMax 加长到 20KB，不能停在 176KB
+static constexpr uint32_t UB_P_SCALE_CNT = 20;
+static constexpr uint32_t UB_P_SCALE_BUF_SIZE = 768;
+static constexpr uint32_t UB_P_SCALE_BUF_OFFSET = 184 * KB_BYTE;
+
+// O 紧挨 P 物理窗口末尾（128.5KB），避免最后 512B 写穿
+static constexpr uint32_t UB_O_BUF_SIZE = 32 * KB_BYTE;
+static constexpr uint32_t UB_O_BUF_OFFSET = 128 * KB_BYTE + 512;
+
+static constexpr uint32_t UB_PEER_GLOBAL_MAX_CNT = 4;
+static constexpr uint32_t UB_PEER_GLOBAL_MAX_BUF_SIZE = 256;
+static constexpr uint32_t UB_PEER_GLOBAL_MAX_BUF_OFFSET = 160 * KB_BYTE + 512;
+
+static constexpr uint32_t UB_SOFTMAX_MAX_BUF_SIZE = 256;
+static constexpr uint32_t UB_SOFTMAX_MAX_BUF_OFFSET = 161 * KB_BYTE + 512;
+
+// localGroupMax：Dpv=20 → 20×1K
+static constexpr uint32_t UB_LOCAL_GROUP_MAX_CNT = 20;
+static constexpr uint32_t UB_LOCAL_GROUP_MAX_BUF_SIZE = KB_BYTE;
+static constexpr uint32_t UB_LOCAL_GROUP_MAX_BUF_OFFSET = 161 * KB_BYTE + 768;
+
+static constexpr uint32_t UB_LOCAL_GLOBAL_MAX_CNT = 4;
+static constexpr uint32_t UB_LOCAL_GLOBAL_MAX_BUF_SIZE = 256;
+static constexpr uint32_t UB_LOCAL_GLOBAL_MAX_BUF_OFFSET = 181 * KB_BYTE + 768;
+
+static constexpr uint32_t UB_UPDATE_SCALE_CNT = 4;
+static constexpr uint32_t UB_UPDATE_SCALE_BUF_SIZE = 256;
+static constexpr uint32_t UB_UPDATE_SCALE_BUF_OFFSET = 182 * KB_BYTE + 768;
+
+static constexpr uint32_t UB_INDEX_BUF_SIZE = 256;
+static constexpr uint32_t UB_INDEX_BUF_OFFSET = 183 * KB_BYTE + 768;
+
+// last-tile pscale 把 K_g 快照下来，delay20 rescale 再读（softmaxMax 会被后续 task 覆盖）
+static constexpr uint32_t UB_LSE_MAX_SNAP_CNT = 32;
+static constexpr uint32_t UB_LSE_MAX_SNAP_SIZE = 256; // 128 × fp16
+static constexpr uint32_t UB_LSE_MAX_SNAP_OFFSET = 200 * KB_BYTE;
+
+static constexpr uint64_t SYNC_VEC1_RES_BUF0_FLAG = 0;
+static constexpr uint64_t SYNC_VEC1_RES_BUF1_FLAG = 1;
+static constexpr uint64_t SYNC_GMAX_UB_TO_L1_BUF0_FLAG = 2;
+static constexpr uint64_t SYNC_GMAX_UB_TO_L1_BUF1_FLAG = 3;
+static constexpr uint64_t SYNC_GMAX_UB_TO_L1_BUF2_FLAG = 4;
+static constexpr uint64_t SYNC_GMAX_UB_TO_L1_BUF3_FLAG = 5;
+static constexpr uint64_t SYNC_ATTN_BUF_FLAG = 6;
+static constexpr uint64_t SYNC_INIT_OUTPUT = 7;
+
+static_assert(UB_INDEX_BUF_OFFSET + UB_INDEX_BUF_SIZE <= 256 * KB_BYTE, "MXFP8 UB exceeds 256KB");
+static_assert(UB_P_BUF_OFFSET + UB_P_PHYSICAL_SPAN == UB_O_BUF_OFFSET, "P 32KB physical window must abut O");
+static_assert(UB_O_BUF_OFFSET + UB_O_BUF_SIZE == UB_PEER_GLOBAL_MAX_BUF_OFFSET, "O must abut peerGlobalMax");
+static_assert(UB_LOCAL_GROUP_MAX_BUF_OFFSET + UB_LOCAL_GROUP_MAX_CNT * UB_LOCAL_GROUP_MAX_BUF_SIZE ==
+                  UB_LOCAL_GLOBAL_MAX_BUF_OFFSET,
+              "localGroupMax 20×1KB must abut localGlobalMax");
+static_assert(UB_INDEX_BUF_OFFSET + UB_INDEX_BUF_SIZE == UB_P_SCALE_BUF_OFFSET,
+              "pScale must start at index end (184KB)");
+static_assert(UB_P_SCALE_BUF_OFFSET >= UB_INDEX_BUF_OFFSET + UB_INDEX_BUF_SIZE,
+              "pScale must sit after index (outside P 32KB window)");
+static_assert(UB_P_SCALE_BUF_OFFSET + UB_P_SCALE_CNT * UB_P_SCALE_BUF_SIZE <= 256 * KB_BYTE, "pScale exceeds 256KB");
+static_assert(UB_LSE_MAX_SNAP_OFFSET + UB_LSE_MAX_SNAP_CNT * UB_LSE_MAX_SNAP_SIZE <= 256 * KB_BYTE,
+              "LSE K_g snap exceeds 256KB");
+} // namespace MXFP8
 
 } // namespace NpuArch::Epilogue::Block
 

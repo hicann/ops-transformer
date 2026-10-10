@@ -43,10 +43,10 @@
 
   - qInputLayout: "TND" "BNSD" "BSND"
   - kvInputLayout: "TND" "BNSD" "BSND"
-- **MXFP4特性说明(仅Ascend 950PR&950DT系列产品支持)**
+- **MXFP4/MXFP8特性说明(仅Ascend 950PR&950DT系列产品支持)**
 
-  本接口新增支持MXFP4数据类型(FLOAT4_E2M1)的输入，以提供计算效率并降低显存占用。当使用MXFP4输入时，需要提供相应的量化缩放因子用于反量化计算。
-- <summary><a id="MXFP4量化模式的量化缩放因子"></a><strong>MXFP4量化模式的量化缩放因子</strong></summary>
+  本接口支持MXFP4（FLOAT4_E2M1，quantMode=2/3）与MXFP8（FLOAT8_E4M3FN，quantMode=4）输入。MX量化模式下需要提供FLOAT8_E8M0缩放因子用于反量化计算，scale shape 与 MXFP4 一致。
+- <summary><a id="MXFP4量化模式的量化缩放因子"></a><strong>MX量化模式的量化缩放因子（quantMode=2/3/4）</strong></summary>
 
   - qDequantScaleOptional：
 
@@ -303,7 +303,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         当配置此输入时：
         <ul>
           <li>当quantMode=1, shape为[batch, headNum, ceilDiv(maxQSeqLength, 128), 1]。</li>
-  		   <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
+  		   <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
@@ -324,7 +324,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         当配置此输入时：
         <ul>
           <li>当quantMode=1,shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 256), 1]或shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 512), 1]。</li>
-  		 <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
+  		 <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
@@ -345,7 +345,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         当配置此输入时：
         <ul>
           <li>当quantMode=1, shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 256), 1]或shape为[batch, kvHeadNum, ceilDiv(maxKVSeqLength, 512), 1]。</li>
-         <li>quantMode=2/3, 约束见<a href="#MXFP4量化模式的量化缩放因子">MXFP4量化模式的量化缩放因子。</a></li>
+         <li>quantMode=2/3/4, 约束见<a href="#MXFP4量化模式的量化缩放因子">MX量化模式的量化缩放因子。</a></li>
         </ul>
       </td>
       <td>FLOAT32、FLOAT8_E8M0</td>
@@ -432,7 +432,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
         <ul>
           <li>0：表示online softmax和rescale全部采取fp32数据类型，适合追求计算精度的场景使用。</li>
           <li>1：仅支持输入的query、key、value均为fp16数据类型时配置，表示online softmax和rescale全部采取fp16数据类型，性能更好，但精度较低，且可能发生计算时的数值溢出，使用者需根据值域范围自行判断是否使用。</li>
-          <li>4：表示混合精度运算，在性能与精度上取得一个折中。online softmax采取fp16/bf16数据类型（与query、key、value数据类型相同），rescale采取fp32数据类型，在online softmax阶段可能发生数值溢出。mxfp4量化模式下（quantMode=2/3），online softmax仅支持fp16数据类型。</li>
+          <li>4：表示混合精度运算，在性能与精度上取得一个折中。online softmax采取fp16/bf16数据类型（与query、key、value数据类型相同），rescale采取fp32数据类型，在online softmax阶段可能发生数值溢出。mxfp4量化模式（quantMode=2/3）与mxfp8量化模式（quantMode=4）下，online softmax仅支持fp16数据类型。</li>
         </ul>
       </td>
       <td>INT64</td>
@@ -491,12 +491,13 @@ aclnnStatus aclnnBlockSparseAttentionV3(
       <td>输入</td>
       <td>量化模式选择标志位。</td>
       <td>
-        当前只支持传0、1、2、3。
+        当前只支持传0、1、2、3、4。
         <ul>
           <li>0：表示非量化。</li>
           <li>1：表示FP8量化。</li>
           <li>2：表示MXFP4 OCP量化(量化scale向下截断)。</li>
           <li>3：表示MXFP4 CX量化(自定义量化量程, 量化scale向上截断)。</li>
+          <li>4：表示MXFP8 OCP量化(QKV为FLOAT8_E4M3FN，scale为FLOAT8_E8M0)。</li>
           <li>详见<a href="#constraint_rule">约束说明</a>。</li>
         </ul>
       </td>
@@ -664,7 +665,7 @@ aclnnStatus aclnnBlockSparseAttentionV3(
 - query、key、value的D轴当前仅支持配置为64或128
 - blockShapeOptional如果传入，则必须包含两个元素[blockShapeX, blockShapeY]，且值必须大于0。blockShapeX/blockShapeY在不同产品上的倍数约束如下：
   <!-- npu="950" id7 -->
-  - 在<term>Ascend 950PR&950DT系列产品</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）时，blockShapeX和blockShapeY均只支持64的倍数。
+  - 在<term>Ascend 950PR&950DT系列产品</term>上：blockShapeY须为16的倍数；MXFP4量化（quantMode=2/3）与MXFP8量化（quantMode=4）时，blockShapeX和blockShapeY均只支持64的倍数。
   <!-- end id7 -->
   <!-- npu="910b,A3" id8 -->
   - 在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上：blockShapeY须为128的倍数。
@@ -725,6 +726,21 @@ aclnnStatus aclnnBlockSparseAttentionV3(
     - **CX量化公式**
 
       $$ P_{\text{Scale}} = 2^{\lceil \log_2 \left( P_{\text{max}} / dstTypeMax \right) \rceil} = 2^{\lceil \log_2 P_{\text{max}} - \log_2 dstTypeMax \rceil} $$
+
+- **quantMode=4 (MXFP8 OCP量化模式)相关约束（新增）**
+
+  - 仅Ascend 950PR&950DT系列产品支持
+  - 输入 query/key/value 为 FLOAT8_E4M3FN，scale 为 FLOAT8_E8M0
+  - blockShapeX 与 blockShapeY 均只支持 64 的倍数
+  - D仅支持64/128
+  - attentionOut数据类型仅支持FLOAT16或BFLOAT16
+  - innerPrecise 必须为 4；暂不支持attenMaskOptional、PagedAttention。softmaxLseFlag=1 可以输出 softmaxLse。
+  - 仅支持 V3 接口显式传入 quantMode=4，V1/V2 不会自动推断 mxfp8
+  - **量化公式**（e4m3 的 emax=8）
+    - 以P的量化为例, 其中 $P_{\text{max}}$ 为一个group（32个元素）内元素绝对值的最大值。
+    - **OCP 量化公式**
+
+      $$ P_{\text{Scale}} = 2^{\lfloor \log_2 P_{\text{max}} \rfloor - 8} $$
 
 ## 调用示例
 

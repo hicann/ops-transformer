@@ -14,18 +14,18 @@
 #include "block_sparse_attention_kernel_interface.cpp"
 
 extern "C" __global__ __aicore__ void block_sparse_attention(
-    __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *blockSparseMask,
-    __gm__ uint8_t *mask, __gm__ uint8_t *blockShape, __gm__ uint8_t *actualSeqLengths,
-    __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *blockTable, __gm__ uint8_t *qDequantScale,
-    __gm__ uint8_t *kDequantScale, __gm__ uint8_t *vDequantScale, __gm__ uint8_t *pQuantScale,
-    __gm__ uint8_t *attentionOut, __gm__ uint8_t *softmaxLse, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling)
+    __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* blockSparseMask,
+    __gm__ uint8_t* mask, __gm__ uint8_t* blockShape, __gm__ uint8_t* actualSeqLengths,
+    __gm__ uint8_t* actualSeqLengthsKv, __gm__ uint8_t* blockTable, __gm__ uint8_t* qDequantScale,
+    __gm__ uint8_t* kDequantScale, __gm__ uint8_t* vDequantScale, __gm__ uint8_t* pQuantScale,
+    __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     if (TILING_KEY_VAR >= BSA_BASE_TILING) {
-        __gm__ uint8_t *user = AscendC::GetUserWorkspace(workspace);
+        __gm__ uint8_t* user = AscendC::GetUserWorkspace(workspace);
         KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
         // 读取tilingKey进行kernel分发
-        __gm__ BlockSparseAttentionTilingData *tilingDataPtr =
-            reinterpret_cast<__gm__ BlockSparseAttentionTilingData *>(tiling);
+        __gm__ BlockSparseAttentionTilingData* tilingDataPtr =
+            reinterpret_cast<__gm__ BlockSparseAttentionTilingData*>(tiling);
         uint64_t tilingKey = tilingDataPtr->tilingKey;
 
 #if (__CCE_AICORE__ == 220)
@@ -169,6 +169,21 @@ extern "C" __global__ __aicore__ void block_sparse_attention(
         TILING_KEY_IS(QMFP4CX_KVMFP4CX_OF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_KEY);
         TILING_KEY_IS(QMFP4CX_KVMFP4CX_OF16_QBNSD_KVBNSD_NOCACHE_SMF16_REF32_NOMASK_KEY);
         TILING_KEY_IS(QMFP4CX_KVMFP4CX_OF16_QBSND_KVBSND_NOCACHE_SMF16_REF32_NOMASK_KEY);
+        // mxfp8 OCP 量化(mxfp8 OCP + mixed SM + BF16 out)
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OBF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_KEY);
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OBF16_QBNSD_KVBNSD_NOCACHE_SMF16_REF32_NOMASK_KEY);
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OBF16_QBSND_KVBSND_NOCACHE_SMF16_REF32_NOMASK_KEY);
+        // mxfp8 OCP 量化(mxfp8 OCP + mixed SM + FP16 out)
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_KEY);
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OF16_QBNSD_KVBNSD_NOCACHE_SMF16_REF32_NOMASK_KEY);
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OF16_QBSND_KVBSND_NOCACHE_SMF16_REF32_NOMASK_KEY);
+        // mxfp8 OCP 量化+混合精度softmax+lse
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OBF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY);
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OBF16_QBNSD_KVBNSD_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY);
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OBF16_QBSND_KVBSND_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY);
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY);
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OF16_QBNSD_KVBNSD_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY);
+        TILING_KEY_IS(QMFP8OCP_KVMFP8OCP_OF16_QBSND_KVBSND_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY);
 
 #if TILING_KEY_VAR == QF16_KVF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_KEY
         BsaInferIntfRegular<half, half, float, BsaKernelArch35::Format::TND, BsaKernelArch35::Format::TND,
@@ -524,6 +539,88 @@ extern "C" __global__ __aicore__ void block_sparse_attention(
         BsaInferInterfaceMXFP4FullQuant<fp4x2_e2m1_t, half, float, half, BsaKernelArch35::Format::BSND,
                                         BsaKernelArch35::Format::BSND, Epilogue::LseMode::NONE,
                                         Epilogue::LseFormat::BSN1, Epilogue::MXQuantMode::CX,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OBF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, bfloat16_t, BsaKernelArch35::Format::TND,
+                                        BsaKernelArch35::Format::TND, Epilogue::LseMode::NONE, Epilogue::LseFormat::TN1,
+                                        Epilogue::MXQuantMode::OCP, Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OBF16_QBNSD_KVBNSD_NOCACHE_SMF16_REF32_NOMASK_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, bfloat16_t, BsaKernelArch35::Format::BNSD,
+                                        BsaKernelArch35::Format::BNSD, Epilogue::LseMode::NONE,
+                                        Epilogue::LseFormat::BNS1, Epilogue::MXQuantMode::OCP,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OBF16_QBSND_KVBSND_NOCACHE_SMF16_REF32_NOMASK_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, bfloat16_t, BsaKernelArch35::Format::BSND,
+                                        BsaKernelArch35::Format::BSND, Epilogue::LseMode::NONE,
+                                        Epilogue::LseFormat::BSN1, Epilogue::MXQuantMode::OCP,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, half, BsaKernelArch35::Format::TND,
+                                        BsaKernelArch35::Format::TND, Epilogue::LseMode::NONE, Epilogue::LseFormat::TN1,
+                                        Epilogue::MXQuantMode::OCP, Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OF16_QBNSD_KVBNSD_NOCACHE_SMF16_REF32_NOMASK_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, half, BsaKernelArch35::Format::BNSD,
+                                        BsaKernelArch35::Format::BNSD, Epilogue::LseMode::NONE,
+                                        Epilogue::LseFormat::BNS1, Epilogue::MXQuantMode::OCP,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OF16_QBSND_KVBSND_NOCACHE_SMF16_REF32_NOMASK_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, half, BsaKernelArch35::Format::BSND,
+                                        BsaKernelArch35::Format::BSND, Epilogue::LseMode::NONE,
+                                        Epilogue::LseFormat::BSN1, Epilogue::MXQuantMode::OCP,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OBF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, bfloat16_t, BsaKernelArch35::Format::TND,
+                                        BsaKernelArch35::Format::TND, Epilogue::LseMode::OUT_ONLY,
+                                        Epilogue::LseFormat::TN1, Epilogue::MXQuantMode::OCP,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OBF16_QBNSD_KVBNSD_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, bfloat16_t, BsaKernelArch35::Format::BNSD,
+                                        BsaKernelArch35::Format::BNSD, Epilogue::LseMode::OUT_ONLY,
+                                        Epilogue::LseFormat::BNS1, Epilogue::MXQuantMode::OCP,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OBF16_QBSND_KVBSND_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, bfloat16_t, BsaKernelArch35::Format::BSND,
+                                        BsaKernelArch35::Format::BSND, Epilogue::LseMode::OUT_ONLY,
+                                        Epilogue::LseFormat::BSN1, Epilogue::MXQuantMode::OCP,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OF16_QTND_KVTND_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, half, BsaKernelArch35::Format::TND,
+                                        BsaKernelArch35::Format::TND, Epilogue::LseMode::OUT_ONLY,
+                                        Epilogue::LseFormat::TN1, Epilogue::MXQuantMode::OCP,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OF16_QBNSD_KVBNSD_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, half, BsaKernelArch35::Format::BNSD,
+                                        BsaKernelArch35::Format::BNSD, Epilogue::LseMode::OUT_ONLY,
+                                        Epilogue::LseFormat::BNS1, Epilogue::MXQuantMode::OCP,
+                                        Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
+            query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
+            kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);
+#elif TILING_KEY_VAR == QMFP8OCP_KVMFP8OCP_OF16_QBSND_KVBSND_NOCACHE_SMF16_REF32_NOMASK_LSE_OUT_KEY
+        BsaInferInterfaceMXFP8FullQuant<fp8_e4m3fn_t, half, float, half, BsaKernelArch35::Format::BSND,
+                                        BsaKernelArch35::Format::BSND, Epilogue::LseMode::OUT_ONLY,
+                                        Epilogue::LseFormat::BSN1, Epilogue::MXQuantMode::OCP,
                                         Gemm::Tile::CopyL0CToUBMode::SPLIT_N, true>(
             query, key, value, blockSparseMask, mask, blockTable, actualSeqLengths, actualSeqLengthsKv, qDequantScale,
             kDequantScale, vDequantScale, attentionOut, user, softmaxLse, tiling);

@@ -20,6 +20,7 @@
 #include "arch35/block_sparse_attention_kernel_arch35_regular.h"
 #include "arch35/block_sparse_attention_kernel_arch35_full_quant.h"
 #include "arch35/block_sparse_attention_kernel_arch35_mxfp4_full_quant.h"
+#include "arch35/block_sparse_attention_kernel_arch35_mxfp8_full_quant.h"
 #endif
 
 using namespace NpuArch;
@@ -462,5 +463,101 @@ __global__ __aicore__ void BsaInferInterfaceMXFP4FullQuant(
                                           tiling};
     BsaMXFP4FullQuantKernelArch35 bsaMXFP4FullQuantKernelArch35;
     bsaMXFP4FullQuantKernelArch35(params);
+}
+
+template <class InDtype, class SMDtype, class REDtype, class Otype, Format qFormat, Format kvFormat,
+          Epilogue::LseMode lseMode, Epilogue::LseFormat lseFormat, Epilogue::MXQuantMode mxQuantMode,
+          Gemm::Tile::CopyL0CToUBMode mm1L0C2UBMode, bool transposedMm1>
+__global__ __aicore__ void BsaInferInterfaceMXFP8FullQuant(
+    GM_ADDR query, GM_ADDR key, GM_ADDR value, GM_ADDR blockSparseMask, GM_ADDR attenMask, GM_ADDR blockTable,
+    GM_ADDR actualSeqLengths, GM_ADDR actualSeqLengthsKv, GM_ADDR qDequantScale, GM_ADDR kDequantScale,
+    GM_ADDR vDequantScale, GM_ADDR attentionOut, GM_ADDR workspace, GM_ADDR lse, GM_ADDR tiling)
+{
+    using ArchTag = Arch::AtlasA5;
+    using ElementSparseMask = uint8_t;
+    using ElementSparseIdx = int32_t;
+    using ElementSparseCount = int32_t;
+    using ElementQ = InDtype; // fp8_e4m3fn_t
+    using ElementK = InDtype;
+    using ElementV = InDtype;
+    using ElementS = SMDtype; // half
+    using ElementP = InDtype;
+    using ElementScale = uint8_t; // e8m0
+    using ElementOTmp = REDtype;  // float
+    using ElementDm = REDtype;
+    using ElementO = Otype;
+    using ElementGroupMax = SMDtype;
+    using ElementLocalGlobalMax = SMDtype;
+    using LayoutQ = layout::RowMajor;
+    using LayoutK = layout::ColumnMajor;
+    using LayoutS = layout::RowMajor;
+    using LayoutPDummy = layout::zN;
+    using LayoutPScale = layout::RowMajor;
+    using LayoutV = layout::RowMajor;
+    using LayoutO = layout::RowMajor;
+    using LayoutOTmp = layout::RowMajor;
+    using LayoutSparseIdx = layout::RowMajor;
+    using LayoutSparseCount = layout::RowMajor;
+    using LayoutLocalGlobalMax = layout::RowMajor;
+    using DispatchPolicyMask2Idx = Epilogue::EpilogueBsaMask2Idx;
+    using EpilogueMask2Idx =
+        Epilogue::Block::BlockEpilogue<DispatchPolicyMask2Idx, ElementSparseMask, ElementSparseIdx, ElementSparseCount>;
+    using L1TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
+    using L0TileShapeQK = Shape<Int<128>, Int<128>, Int<128>>;
+    using DispatchPolicyQK = Gemm::MmadAtlasA5BsaQKMxfp8<transposedMm1>;
+    using TileCopyQK =
+        Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementQ, layout::RowMajor, ElementK, layout::ColumnMajor, ElementS,
+                                          LayoutS, void, mm1L0C2UBMode, false, Gemm::Tile::ScaleGranularity::PER_GROUP>;
+    using BlockMmadQK = Gemm::Block::BlockMmadTla<DispatchPolicyQK, L1TileShapeQK, L0TileShapeQK, ElementQ, ElementK,
+                                                  ElementS, void, TileCopyQK>;
+    using DispatchPolicyOnlineSoftmax = Epilogue::EpilogueOnlineSoftmaxBsaMxfp8<transposedMm1, mxQuantMode>;
+    using PType = Gemm::GemmType<ElementP, LayoutPDummy>;
+    using SType = Gemm::GemmType<ElementS, LayoutS>;
+    using PScaleType = Gemm::GemmType<ElementScale, LayoutPScale>;
+    using EpilogueOnlineSoftmax = Epilogue::Block::BlockEpilogue<DispatchPolicyOnlineSoftmax, PType, SType, PScaleType>;
+    using DispatchPolicyComputePScale = Epilogue::EpilogueComputePScaleBsaMxfp8<transposedMm1, mxQuantMode>;
+    using EpilogueComputePScale =
+        Epilogue::Block::BlockEpilogue<DispatchPolicyComputePScale, ElementGroupMax, ElementDm, PScaleType>;
+    using DispatchPolicyCopyGlobalMaxUbToL1 = Epilogue::EpilogueCopyGlobalMaxUbToL1BsaMxfp8;
+    using EpilogueCopyGlobalMaxUbToL1 =
+        Epilogue::Block::BlockEpilogue<DispatchPolicyCopyGlobalMaxUbToL1, ElementLocalGlobalMax, LayoutLocalGlobalMax>;
+    using L1TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
+    using L0TileShapePV = Shape<Int<128>, Int<128>, Int<128>>;
+    using DispatchPolicyPV = Gemm::MmadAtlasA5BsaPVMxfp8<transposedMm1>;
+    using TileCopyPV =
+        Gemm::Tile::PackedTileCopyTlaToUB<ArchTag, ElementP, LayoutPDummy, ElementV, LayoutV, ElementOTmp, LayoutOTmp,
+                                          void, Gemm::Tile::CopyL0CToUBMode::SPLIT_M, false,
+                                          Gemm::Tile::ScaleGranularity::PER_GROUP>;
+    using BlockMmadPV = Gemm::Block::BlockMmadTla<DispatchPolicyPV, L1TileShapePV, L0TileShapePV, ElementP, ElementV,
+                                                  ElementOTmp, void, TileCopyPV>;
+    using BlockMmadCopyGlobalMaxL1ToUB = Gemm::Block::BlockMmadTla<Gemm::CopyGlobalMaxL1ToUBBsaMxfp8, void, void,
+                                                                   ElementLocalGlobalMax, void, void, void, void, void>;
+    using DispatchPolicyRescaleO = Epilogue::EpilogueAtlasA5BsaRescaleOMxfp8<lseMode, lseFormat, transposedMm1>;
+    using TileCopyRescaleO = Epilogue::Tile::TileCopyRescaleO<ArchTag, ElementO, LayoutO, LayoutOTmp>;
+    using EpilogueRescaleO = Epilogue::Block::BlockEpilogue<DispatchPolicyRescaleO, ElementO, ElementOTmp, ElementDm,
+                                                            TileCopyRescaleO, Arch::PositionL0C>;
+
+    using BsaMXFP8FullQuantKernelArch35 =
+        BsaMXFP8FullQuantKernelArch35<EpilogueMask2Idx, BlockMmadQK, EpilogueOnlineSoftmax, BlockMmadPV,
+                                      EpilogueRescaleO, EpilogueComputePScale, EpilogueCopyGlobalMaxUbToL1,
+                                      BlockMmadCopyGlobalMaxL1ToUB, qFormat, kvFormat, transposedMm1>;
+
+    BsaFullQuantKernelParamsArch35 params{query,
+                                          key,
+                                          value,
+                                          blockSparseMask,
+                                          attenMask,
+                                          blockTable,
+                                          actualSeqLengths,
+                                          actualSeqLengthsKv,
+                                          qDequantScale,
+                                          kDequantScale,
+                                          vDequantScale,
+                                          attentionOut,
+                                          workspace,
+                                          lse,
+                                          tiling};
+    BsaMXFP8FullQuantKernelArch35 bsaMXFP8FullQuantKernelArch35;
+    bsaMXFP8FullQuantKernelArch35(params);
 }
 #endif

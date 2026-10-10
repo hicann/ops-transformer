@@ -118,12 +118,21 @@ enum QuantMode : int64_t {
     FP8_QUANT = 1,
     MXFP4_OCP_QUANT = 2,
     MXFP4_CX_QUANT = 3,
+    MXFP8_OCP_QUANT = 4,
 };
 
 // 判断是否为 mxfp4 量化(OCP 或 CX)
 static bool IsMxfp4Quant(int64_t qm)
 {
     return qm == MXFP4_OCP_QUANT || qm == MXFP4_CX_QUANT;
+}
+static bool IsMxfp8Quant(int64_t qm)
+{
+    return qm == MXFP8_OCP_QUANT;
+}
+static bool IsMxFullQuant(int64_t qm)
+{
+    return IsMxfp4Quant(qm) || IsMxfp8Quant(qm);
 }
 
 static std::string DataTypeToString(ge::DataType dataType)
@@ -173,7 +182,7 @@ static inline uint32_t GetQNBlockTile()
     return qNBlockTile;
 }
 
-ge::graphStatus BSATiling::GetNpuInfo(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::GetNpuInfo(gert::TilingContext* bsaContext)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(bsaContext->GetPlatformInfo());
 
@@ -194,7 +203,7 @@ static ge::graphStatus CheckFormat(ge::Format format)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::CheckNDFormat(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::CheckNDFormat(gert::TilingContext* bsaContext)
 {
     auto queryFormat =
         static_cast<ge::Format>(ge::GetPrimaryFormat(bsaContext->GetInputDesc(QUERY_INDEX)->GetStorageFormat()));
@@ -209,7 +218,7 @@ ge::graphStatus BSATiling::CheckNDFormat(gert::TilingContext *bsaContext)
     OP_CHECK_IF(CheckFormat(valueFormat) != ge::GRAPH_SUCCESS,
                 OP_LOGE(bsaContext->GetNodeName(), "value check format failed"), return ge::GRAPH_FAILED);
 
-    const auto *blockSparseMaskTensor = bsaContext->GetOptionalInputTensor(BLOCK_SPARSE_MASK_INDEX);
+    const auto* blockSparseMaskTensor = bsaContext->GetOptionalInputTensor(BLOCK_SPARSE_MASK_INDEX);
     if (blockSparseMaskTensor != nullptr) {
         auto blockSparseMaskFormat =
             static_cast<ge::Format>(ge::GetPrimaryFormat(blockSparseMaskTensor->GetStorageFormat()));
@@ -217,35 +226,35 @@ ge::graphStatus BSATiling::CheckNDFormat(gert::TilingContext *bsaContext)
                     OP_LOGE(bsaContext->GetNodeName(), "blockSparseMask check format failed"), return ge::GRAPH_FAILED);
     }
 
-    const auto *attenMaskTensor = bsaContext->GetOptionalInputTensor(ATTEN_MASK_INDEX);
+    const auto* attenMaskTensor = bsaContext->GetOptionalInputTensor(ATTEN_MASK_INDEX);
     if (attenMaskTensor != nullptr) {
         auto attenMaskFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(attenMaskTensor->GetStorageFormat()));
         OP_CHECK_IF(CheckFormat(attenMaskFormat) != ge::GRAPH_SUCCESS,
                     OP_LOGE(bsaContext->GetNodeName(), "attenMask check format failed"), return ge::GRAPH_FAILED);
     }
 
-    const auto *blockTableTensor = bsaContext->GetOptionalInputTensor(BLOCK_TABLE_INDEX);
+    const auto* blockTableTensor = bsaContext->GetOptionalInputTensor(BLOCK_TABLE_INDEX);
     if (blockTableTensor != nullptr) {
         auto blockTableFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(blockTableTensor->GetStorageFormat()));
         OP_CHECK_IF(CheckFormat(blockTableFormat) != ge::GRAPH_SUCCESS,
                     OP_LOGE(bsaContext->GetNodeName(), "blockTable check format failed"), return ge::GRAPH_FAILED);
     }
 
-    const auto *qDequantScaleTensor = bsaContext->GetOptionalInputTensor(Q_DEQUANT_SCALE_INDEX);
+    const auto* qDequantScaleTensor = bsaContext->GetOptionalInputTensor(Q_DEQUANT_SCALE_INDEX);
     if (qDequantScaleTensor != nullptr) {
         auto qDequantScaleFormat =
             static_cast<ge::Format>(ge::GetPrimaryFormat(qDequantScaleTensor->GetStorageFormat()));
         OP_CHECK_IF(CheckFormat(qDequantScaleFormat) != ge::GRAPH_SUCCESS,
                     OP_LOGE(bsaContext->GetNodeName(), "qDequantScale check format failed"), return ge::GRAPH_FAILED);
     }
-    const auto *kDequantScaleTensor = bsaContext->GetOptionalInputTensor(K_DEQUANT_SCALE_INDEX);
+    const auto* kDequantScaleTensor = bsaContext->GetOptionalInputTensor(K_DEQUANT_SCALE_INDEX);
     if (kDequantScaleTensor != nullptr) {
         auto kDequantScaleFormat =
             static_cast<ge::Format>(ge::GetPrimaryFormat(kDequantScaleTensor->GetStorageFormat()));
         OP_CHECK_IF(CheckFormat(kDequantScaleFormat) != ge::GRAPH_SUCCESS,
                     OP_LOGE(bsaContext->GetNodeName(), "kDequantScale check format failed"), return ge::GRAPH_FAILED);
     }
-    const auto *vDequantScaleTensor = bsaContext->GetOptionalInputTensor(V_DEQUANT_SCALE_INDEX);
+    const auto* vDequantScaleTensor = bsaContext->GetOptionalInputTensor(V_DEQUANT_SCALE_INDEX);
     if (vDequantScaleTensor != nullptr) {
         auto vDequantScaleFormat =
             static_cast<ge::Format>(ge::GetPrimaryFormat(vDequantScaleTensor->GetStorageFormat()));
@@ -260,7 +269,7 @@ ge::graphStatus BSATiling::CheckNDFormat(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ValidateTNDSeqlenSum(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ValidateTNDSeqlenSum(gert::TilingContext* bsaContext)
 {
     // 只在TND格式时进行校验
     if (qInputLayout_ != BSAQInputLayout::TND_Q || kvCacheLayout_ != BSAKvCacheLayout::TND_KV) {
@@ -295,7 +304,7 @@ ge::graphStatus BSATiling::ValidateTNDSeqlenSum(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::GetInputLayout(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::GetInputLayout(gert::TilingContext* bsaContext)
 {
     auto attrs = bsaContext->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(bsaContext, attrs);
@@ -332,7 +341,7 @@ ge::graphStatus BSATiling::GetInputLayout(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::CheckQKVDtype(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::CheckQKVDtype(gert::TilingContext* bsaContext)
 {
     auto qInputDesc = bsaContext->GetInputDesc(QUERY_INDEX);
     auto kInputDesc = bsaContext->GetInputDesc(KEY_INDEX);
@@ -366,7 +375,7 @@ ge::graphStatus BSATiling::CheckQKVDtype(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::CheckQKVDimVal(gert::TilingContext *bsaContext, uint32_t kHeads, uint32_t vHeads,
+ge::graphStatus BSATiling::CheckQKVDimVal(gert::TilingContext* bsaContext, uint32_t kHeads, uint32_t vHeads,
                                           uint32_t kHeadDim, uint32_t vHeadDim)
 {
     if (embeddingSize_ != kHeadDim || embeddingSize_ != vHeadDim) {
@@ -398,11 +407,11 @@ ge::graphStatus BSATiling::CheckQKVDimVal(gert::TilingContext *bsaContext, uint3
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseQKVInTND(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseQKVInTND(gert::TilingContext* bsaContext)
 {
-    const auto *queryShape = bsaContext->GetInputShape(QUERY_INDEX);
-    const auto *keyShape = bsaContext->GetInputShape(KEY_INDEX);
-    const auto *valueShape = bsaContext->GetInputShape(VALUE_INDEX);
+    const auto* queryShape = bsaContext->GetInputShape(QUERY_INDEX);
+    const auto* keyShape = bsaContext->GetInputShape(KEY_INDEX);
+    const auto* valueShape = bsaContext->GetInputShape(VALUE_INDEX);
     if (queryShape == nullptr || keyShape == nullptr || valueShape == nullptr) {
         OP_LOGE(bsaContext->GetNodeName(), "Query/Key/Value shape is null");
         return ge::GRAPH_FAILED;
@@ -428,11 +437,11 @@ ge::graphStatus BSATiling::ParseQKVInTND(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseQKVInBNSD(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseQKVInBNSD(gert::TilingContext* bsaContext)
 {
-    const auto *queryShape = bsaContext->GetInputShape(QUERY_INDEX);
-    const auto *keyShape = bsaContext->GetInputShape(KEY_INDEX);
-    const auto *valueShape = bsaContext->GetInputShape(VALUE_INDEX);
+    const auto* queryShape = bsaContext->GetInputShape(QUERY_INDEX);
+    const auto* keyShape = bsaContext->GetInputShape(KEY_INDEX);
+    const auto* valueShape = bsaContext->GetInputShape(VALUE_INDEX);
     if (queryShape == nullptr || keyShape == nullptr || valueShape == nullptr) {
         OP_LOGE(bsaContext->GetNodeName(), "Query/Key/Value shape is null");
         return ge::GRAPH_FAILED;
@@ -468,11 +477,11 @@ ge::graphStatus BSATiling::ParseQKVInBNSD(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseQKVInBSND(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseQKVInBSND(gert::TilingContext* bsaContext)
 {
-    const auto *queryShape = bsaContext->GetInputShape(QUERY_INDEX);
-    const auto *keyShape = bsaContext->GetInputShape(KEY_INDEX);
-    const auto *valueShape = bsaContext->GetInputShape(VALUE_INDEX);
+    const auto* queryShape = bsaContext->GetInputShape(QUERY_INDEX);
+    const auto* keyShape = bsaContext->GetInputShape(KEY_INDEX);
+    const auto* valueShape = bsaContext->GetInputShape(VALUE_INDEX);
     if (queryShape == nullptr || keyShape == nullptr || valueShape == nullptr) {
         OP_LOGE(bsaContext->GetNodeName(), "Query/Key/Value shape is null");
         return ge::GRAPH_FAILED;
@@ -505,17 +514,10 @@ ge::graphStatus BSATiling::ParseQKVInBSND(gert::TilingContext *bsaContext)
         OP_LOGE(bsaContext->GetNodeName(), "Check query/key/value dim values failed.");
         return ge::GRAPH_FAILED;
     }
-    if (IsMxfp4Quant(quantMode_) &&
-        (embeddingSize_ != VALID_EMBEDDING_SIZE_64 && embeddingSize_ != VALID_EMBEDDING_SIZE_128)) {
-        OP_LOGE(bsaContext->GetNodeName(),
-                "(quantMode:%d)mxfp4 requires embeddingSize to be multiple of 64 or 128, but got %u.", quantMode_,
-                embeddingSize_);
-        return ge::GRAPH_FAILED;
-    }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::CheckAttentionOutDtype(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::CheckAttentionOutDtype(gert::TilingContext* bsaContext)
 {
     if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
         attentionOutDataType_ = bsaContext->GetOutputDesc(ATTENTION_OUT_INDEX)->GetDataType();
@@ -542,7 +544,7 @@ ge::graphStatus BSATiling::CheckAttentionOutDtype(gert::TilingContext *bsaContex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseRequiredTensors(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseRequiredTensors(gert::TilingContext* bsaContext)
 {
     if (CheckQKVDtype(bsaContext) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -566,10 +568,10 @@ ge::graphStatus BSATiling::ParseRequiredTensors(gert::TilingContext *bsaContext)
     return ret;
 }
 
-ge::graphStatus BSATiling::ParseSeqlensInTND(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseSeqlensInTND(gert::TilingContext* bsaContext)
 {
-    const auto *actualSeqLengths = bsaContext->GetOptionalInputTensor(ACTUAL_SEQ_LENGTHS_INDEX);
-    const auto *actualSeqLengthsKv = bsaContext->GetOptionalInputTensor(ACTUAL_SEQ_LENGTHS_KV_INDEX);
+    const auto* actualSeqLengths = bsaContext->GetOptionalInputTensor(ACTUAL_SEQ_LENGTHS_INDEX);
+    const auto* actualSeqLengthsKv = bsaContext->GetOptionalInputTensor(ACTUAL_SEQ_LENGTHS_KV_INDEX);
     if (actualSeqLengths == nullptr || actualSeqLengthsKv == nullptr) {
         OP_LOGE(bsaContext->GetNodeName(),
                 "ActualSeqLengths/actualSeqLengthsKv must be provided when corresponding layout is 'TND'.");
@@ -597,10 +599,10 @@ ge::graphStatus BSATiling::ParseSeqlensInTND(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseSeqlensInNonTND(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseSeqlensInNonTND(gert::TilingContext* bsaContext)
 {
-    const auto *actualSeqLengths = bsaContext->GetOptionalInputTensor(ACTUAL_SEQ_LENGTHS_INDEX);
-    const auto *actualSeqLengthsKv = bsaContext->GetOptionalInputTensor(ACTUAL_SEQ_LENGTHS_KV_INDEX);
+    const auto* actualSeqLengths = bsaContext->GetOptionalInputTensor(ACTUAL_SEQ_LENGTHS_INDEX);
+    const auto* actualSeqLengthsKv = bsaContext->GetOptionalInputTensor(ACTUAL_SEQ_LENGTHS_KV_INDEX);
     if (actualSeqLengths != nullptr && actualSeqLengthsKv != nullptr) {
         uint32_t batchQS = static_cast<uint32_t>(actualSeqLengths->GetShapeSize());
         uint32_t batchKvS = static_cast<uint32_t>(actualSeqLengthsKv->GetShapeSize());
@@ -645,7 +647,7 @@ ge::graphStatus BSATiling::ParseSeqlensInNonTND(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseSeqlens(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseSeqlens(gert::TilingContext* bsaContext)
 {
     ge::graphStatus ret = ge::GRAPH_SUCCESS;
     if (qInputLayout_ == BSAQInputLayout::TND_Q) {
@@ -656,9 +658,9 @@ ge::graphStatus BSATiling::ParseSeqlens(gert::TilingContext *bsaContext)
     return ret;
 }
 
-ge::graphStatus BSATiling::CheckSparsePattern(gert::TilingContext *bsaContext, const int64_t defaultShape)
+ge::graphStatus BSATiling::CheckSparsePattern(gert::TilingContext* bsaContext, const int64_t defaultShape)
 {
-    const auto *blockSparseMaskShape = bsaContext->GetOptionalInputShape(BLOCK_SPARSE_MASK_INDEX);
+    const auto* blockSparseMaskShape = bsaContext->GetOptionalInputShape(BLOCK_SPARSE_MASK_INDEX);
     if (blockShapeX_ <= 0 || blockShapeY_ <= 0) {
         OP_LOGE(bsaContext->GetNodeName(),
                 "BlockShape elems must be greater than 0, "
@@ -701,14 +703,14 @@ ge::graphStatus BSATiling::CheckSparsePattern(gert::TilingContext *bsaContext, c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseSparsePattern(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseSparsePattern(gert::TilingContext* bsaContext)
 {
     constexpr int64_t MIN_BLOCK_ALIGN = 16;
     constexpr int64_t DEFAULT_BLOCK_SHAPE = 128;
     blockShapeX_ = DEFAULT_BLOCK_SHAPE;
     blockShapeY_ = DEFAULT_BLOCK_SHAPE;
-    const auto *blockSparseMaskTensor = bsaContext->GetOptionalInputTensor(BLOCK_SPARSE_MASK_INDEX);
-    const auto *blockShapeTensor = bsaContext->GetOptionalInputTensor(BLOCK_SHAPE_INDEX);
+    const auto* blockSparseMaskTensor = bsaContext->GetOptionalInputTensor(BLOCK_SPARSE_MASK_INDEX);
+    const auto* blockShapeTensor = bsaContext->GetOptionalInputTensor(BLOCK_SHAPE_INDEX);
 
     if (blockSparseMaskTensor == nullptr) {
         OP_LOGE(bsaContext->GetNodeName(), "BlockSparseMask should be provided so far.");
@@ -730,24 +732,25 @@ ge::graphStatus BSATiling::ParseSparsePattern(gert::TilingContext *bsaContext)
     if (CheckSparsePattern(bsaContext, defaultShape) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    // V3 新增:mxfp4 要求 blockShapeX 为 64 的倍数
-    if (IsMxfp4Quant(quantMode_) && blockShapeX_ % 64 != 0) {
-        OP_LOGE(bsaContext->GetNodeName(), "mxfp4 requires blockShapeX to be multiple of 64, but got %u.",
-                blockShapeX_);
-        return ge::GRAPH_FAILED;
-    }
-    // V3 新增:mxfp4 要求 blockShapeY 为 64 的倍数
-    if (IsMxfp4Quant(quantMode_) && blockShapeY_ % 64 != 0) {
-        OP_LOGE(bsaContext->GetNodeName(), "mxfp4 requires blockShapeY to be multiple of 64, but got %u.",
-                blockShapeY_);
-        return ge::GRAPH_FAILED;
+    // mx full-quant (mxfp4/mxfp8) requires blockShapeX/Y to be multiples of 64
+    if (IsMxFullQuant(quantMode_)) {
+        if (blockShapeX_ % NUM_64 != 0) {
+            OP_LOGE(bsaContext->GetNodeName(), "mx full-quant requires blockShapeX to be multiple of 64, but got %u.",
+                    blockShapeX_);
+            return ge::GRAPH_FAILED;
+        }
+        if (blockShapeY_ % NUM_64 != 0) {
+            OP_LOGE(bsaContext->GetNodeName(), "mx full-quant requires blockShapeY to be multiple of 64, but got %u.",
+                    blockShapeY_);
+            return ge::GRAPH_FAILED;
+        }
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseAttenMask(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseAttenMask(gert::TilingContext* bsaContext)
 {
-    const auto *attenMaskTensor = bsaContext->GetOptionalInputTensor(ATTEN_MASK_INDEX);
+    const auto* attenMaskTensor = bsaContext->GetOptionalInputTensor(ATTEN_MASK_INDEX);
     if (attenMaskTensor != nullptr) {
         OP_LOGE(bsaContext->GetNodeName(), "AttenMask is NOT YET supported.");
         return ge::GRAPH_FAILED;
@@ -755,9 +758,9 @@ ge::graphStatus BSATiling::ParseAttenMask(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseBlockTable(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseBlockTable(gert::TilingContext* bsaContext)
 {
-    const auto *blockTableTensor = bsaContext->GetOptionalInputTensor(BLOCK_TABLE_INDEX);
+    const auto* blockTableTensor = bsaContext->GetOptionalInputTensor(BLOCK_TABLE_INDEX);
     if (blockTableTensor != nullptr) {
         OP_LOGE(bsaContext->GetNodeName(), "Paged cache is NOT YET supported, therefore blockTable should be nullptr.");
         return ge::GRAPH_FAILED;
@@ -765,7 +768,7 @@ ge::graphStatus BSATiling::ParseBlockTable(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ValidateGenericDequantScale(gert::TilingContext *bsaContext, const int parameterIndex)
+ge::graphStatus BSATiling::ValidateGenericDequantScale(gert::TilingContext* bsaContext, const int parameterIndex)
 {
     std::string parameterName;
     switch (parameterIndex) {
@@ -783,7 +786,7 @@ ge::graphStatus BSATiling::ValidateGenericDequantScale(gert::TilingContext *bsaC
             break;
     }
 
-    const auto *dequantScaleTensor = bsaContext->GetOptionalInputTensor(parameterIndex);
+    const auto* dequantScaleTensor = bsaContext->GetOptionalInputTensor(parameterIndex);
     if (quantMode_ == FP8_QUANT) {
         if (dequantScaleTensor == nullptr) {
             OP_LOGE(bsaContext->GetNodeName(), "Parameter %s must not be nullptr when the dtype is float8_e4m3fn.",
@@ -826,7 +829,7 @@ ge::graphStatus BSATiling::ValidateGenericDequantScale(gert::TilingContext *bsaC
                     NUM_1, dequantScaleBatch, dequantScaleNumHeads, dequantScaleBlockNum, dequantScaleLastDim);
             return ge::GRAPH_FAILED;
         }
-    } else if (IsMxfp4Quant(quantMode_)) {
+    } else if (IsMxFullQuant(quantMode_)) {
         return ValidateMxfp4DequantScale(bsaContext, parameterIndex);
     } else {
         if (dequantScaleTensor != nullptr) {
@@ -843,26 +846,26 @@ ge::graphStatus BSATiling::ValidateGenericDequantScale(gert::TilingContext *bsaC
 //   QScale:  BNSD=[B,N1,S1,D//64,2]  BSND=[B,S1,N1,D//64,2]
 //   KScale:  BNSD=[B,N2,S2,D//64,2]  BSND=[B,S2,N2,D//64,2]
 //   VScale:  BNSD=[B,N2,S2//64,D,2]  BSND=[B,S2//64,N2,D,2]  (S2//64 向上取整)
-ge::graphStatus BSATiling::ValidateMxfp4DequantScale(gert::TilingContext *bsaContext, const int parameterIndex)
+ge::graphStatus BSATiling::ValidateMxfp4DequantScale(gert::TilingContext* bsaContext, const int parameterIndex)
 {
-    const auto *scaleShape = bsaContext->GetOptionalInputShape(parameterIndex);
+    const auto* scaleShape = bsaContext->GetOptionalInputShape(parameterIndex);
     if (scaleShape == nullptr) {
-        OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3) mxfp4 dequantScale (index=%d) must not be nullptr.",
+        OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3/4) mx dequantScale (index=%d) must not be nullptr.",
                 parameterIndex);
         return ge::GRAPH_FAILED;
     }
-    auto &storageShape = scaleShape->GetStorageShape();
+    auto& storageShape = scaleShape->GetStorageShape();
 
     bool isTND = (qInputLayout_ == BSAQInputLayout::TND_Q);
     bool isBNSD = (qInputLayout_ == BSAQInputLayout::BNSD_Q);
-    const char *layoutName = isTND ? "TND" : (isBNSD ? "BNSD" : "BSND");
+    const char* layoutName = isTND ? "TND" : (isBNSD ? "BNSD" : "BSND");
     uint32_t dDiv64 = embeddingSize_ / NUM_64;
 
     auto checkDim = [&](uint32_t expected, int idx) -> bool {
         uint32_t actual = static_cast<uint32_t>(storageShape.GetDim(idx));
         if (actual != expected) {
             OP_LOGE(bsaContext->GetNodeName(),
-                    "(quantMode =2/3) mxfp4 scale dim[%d] mismatch (layout=%s, index=%d): expected %u, got %u.", idx,
+                    "(quantMode =2/3/4) mx scale dim[%d] mismatch (layout=%s, index=%d): expected %u, got %u.", idx,
                     layoutName, parameterIndex, expected, actual);
             return false;
         }
@@ -874,7 +877,7 @@ ge::graphStatus BSATiling::ValidateMxfp4DequantScale(gert::TilingContext *bsaCon
         //   QScale=[Tq,Nq,D//64,2]  KScale=[Tkv,Nkv,D//64,2]  VScale=[BTkv,Nkv,D,2]
         //   Tq=totalTokensT_, Tkv=totalTokensKv_, BTkv=btKvTokens_(sum_b CeilDiv(S2_b,64), ParseSeqlensInTND 累加)
         if (storageShape.GetDimNum() != DIM_NUM_4) {
-            OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3) mxfp4 TND scale must be 4D, got %zuD.",
+            OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3/4) mx TND scale must be 4D, got %zuD.",
                     storageShape.GetDimNum());
             return ge::GRAPH_FAILED;
         }
@@ -900,7 +903,7 @@ ge::graphStatus BSATiling::ValidateMxfp4DequantScale(gert::TilingContext *bsaCon
 
     // BNSD/BSND: 5D scale shapes (existing)
     if (storageShape.GetDimNum() != DIM_NUM_5) {
-        OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3) mxfp4 scale must be 5D, got %zuD.",
+        OP_LOGE(bsaContext->GetNodeName(), "(quantMode =2/3/4) mx scale must be 5D, got %zuD.",
                 storageShape.GetDimNum());
         return ge::GRAPH_FAILED;
     }
@@ -929,22 +932,22 @@ ge::graphStatus BSATiling::ValidateMxfp4DequantScale(gert::TilingContext *bsaCon
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ValidateQDequantScale(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ValidateQDequantScale(gert::TilingContext* bsaContext)
 {
     return ValidateGenericDequantScale(bsaContext, Q_DEQUANT_SCALE_INDEX);
 }
 
-ge::graphStatus BSATiling::ValidateKDequantScale(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ValidateKDequantScale(gert::TilingContext* bsaContext)
 {
     return ValidateGenericDequantScale(bsaContext, K_DEQUANT_SCALE_INDEX);
 }
 
-ge::graphStatus BSATiling::ValidateVDequantScale(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ValidateVDequantScale(gert::TilingContext* bsaContext)
 {
     return ValidateGenericDequantScale(bsaContext, V_DEQUANT_SCALE_INDEX);
 }
 
-ge::graphStatus BSATiling::ParseOptionalTensors(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseOptionalTensors(gert::TilingContext* bsaContext)
 {
     if (ParseSeqlens(bsaContext) != ge::GRAPH_SUCCESS || ParseSparsePattern(bsaContext) != ge::GRAPH_SUCCESS ||
         ParseAttenMask(bsaContext) != ge::GRAPH_SUCCESS || ParseBlockTable(bsaContext) != ge::GRAPH_SUCCESS) {
@@ -962,7 +965,7 @@ ge::graphStatus BSATiling::ParseOptionalTensors(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::ParseAttrs(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::ParseAttrs(gert::TilingContext* bsaContext)
 {
     auto attrs = bsaContext->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(bsaContext, attrs);
@@ -1085,8 +1088,8 @@ ge::graphStatus BSATiling::ParseAttrs(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-void BSATiling::CalculateBatchTaskSplit(int64_t qSeqlen, uint32_t groupSize, uint32_t &curTaskNum,
-                                        uint32_t &curQBlockNum)
+void BSATiling::CalculateBatchTaskSplit(int64_t qSeqlen, uint32_t groupSize, uint32_t& curTaskNum,
+                                        uint32_t& curQBlockNum)
 {
     uint32_t curQBlockTile = GetQNBlockTile();
     uint32_t qNBlockNumPerGroup = CeilDiv(groupSize, curQBlockTile);
@@ -1148,16 +1151,15 @@ void BSATiling::CalcBaseTileTilingParams950()
 {
     qBaseTile_ = (blockShapeX_ > TILE_SIZE_128) ? TILE_SIZE_128 : static_cast<uint32_t>(blockShapeX_);
     const bool isMixedPrecision = (innerPrecise_ == BsaInnerCalcPrec::LOW_HIGH_MIXED && embeddingSize_ <= D_SIZE_128);
-    if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
-        bool enableKvBaseTile512 = isMixedPrecision && (quantMode_ == FP8_QUANT) && (blockShapeY_ == 512);
-        if (enableKvBaseTile512) {
+    kvBaseTile_ = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
+    if (quantMode_ == MXFP8_OCP_QUANT) {
+        kvBaseTile_ = TILE_SIZE_128;
+    } else if (dataType_ == ge::DT_FLOAT8_E4M3FN) {
+        if (isMixedPrecision && quantMode_ == FP8_QUANT && blockShapeY_ == TILE_SIZE_512) {
             kvBaseTile_ = TILE_SIZE_512;
         } else {
-            const uint32_t preferredTile = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
-            kvBaseTile_ = CalcFp8KvBaseTile(static_cast<uint32_t>(blockShapeY_), preferredTile);
+            kvBaseTile_ = CalcFp8KvBaseTile(static_cast<uint32_t>(blockShapeY_), kvBaseTile_);
         }
-    } else {
-        kvBaseTile_ = isMixedPrecision ? TILE_SIZE_256 : TILE_SIZE_128;
     }
 }
 
@@ -1192,7 +1194,7 @@ void BSATiling::CalcSplitCoreTilingParams950()
     preActiveSubCoreNum_ = (totalRowNumBlockMask + avgRowPerSubCore_ - 1) / avgRowPerSubCore_;
 }
 
-ge::graphStatus BSATiling::CalculateTaskSplit(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::CalculateTaskSplit(gert::TilingContext* bsaContext)
 {
     // 计算总的Q块数量和最大KV块数量
     totalQBlocks_ = 0;
@@ -1236,7 +1238,7 @@ ge::graphStatus BSATiling::CalculateTaskSplit(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-void BSATiling::CalcWorkspaceTilingParams950(gert::TilingContext *bsaContext)
+void BSATiling::CalcWorkspaceTilingParams950(gert::TilingContext* bsaContext)
 {
     selectIdxSize_ =
         static_cast<uint64_t>(batch_) * numHeads_ * xBlockNumAligned_ * yBlockNumAligned_ * sizeof(int32_t);
@@ -1245,7 +1247,7 @@ void BSATiling::CalcWorkspaceTilingParams950(gert::TilingContext *bsaContext)
     bsaContext->GetWorkspaceSizes(1)[0] = workSpaceSize_;
 }
 
-ge::graphStatus BSATiling::CalculateWorkSpace(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::CalculateWorkSpace(gert::TilingContext* bsaContext)
 {
     if (blockDim_ == 0) {
         OP_LOGE(bsaContext->GetNodeName(), "blockDim is 0");
@@ -1336,7 +1338,7 @@ void BSATiling::CalcMatmulPhaseL1TileInfo950()
     }
 }
 
-ge::graphStatus BSATiling::FillTilingData(gert::TilingContext *bsaContext)
+ge::graphStatus BSATiling::FillTilingData(gert::TilingContext* bsaContext)
 {
     if (tilingData_ == nullptr) {
         return ge::GRAPH_FAILED;
@@ -1414,7 +1416,7 @@ ge::graphStatus BSATiling::FillTilingData(gert::TilingContext *bsaContext)
     return ge::GRAPH_SUCCESS;
 }
 
-uint64_t BSATiling::GenerateTilingKey(gert::TilingContext *bsaContext)
+uint64_t BSATiling::GenerateTilingKey(gert::TilingContext* bsaContext)
 {
     /**
      * 64位整数，使用十进制位域表示：
@@ -1454,6 +1456,12 @@ uint64_t BSATiling::GenerateTilingKey(gert::TilingContext *bsaContext)
             tilingKey += 41;
         } else {
             tilingKey += 40;
+        }
+    } else if (quantMode_ == MXFP8_OCP_QUANT) {
+        if (attentionOutDataType_ == ge::DT_FLOAT16) {
+            tilingKey += 51;
+        } else {
+            tilingKey += 50;
         }
     } else if (quantMode_ == FP8_QUANT) {
         if (attentionOutDataType_ == ge::DT_FLOAT16) {
@@ -1519,7 +1527,7 @@ uint64_t BSATiling::GenerateTilingKey(gert::TilingContext *bsaContext)
     return tilingKey;
 }
 
-ge::graphStatus BSATiling::GetBsaTiling(gert::TilingContext *bsaContext, BlockSparseAttentionTilingData &tilingData)
+ge::graphStatus BSATiling::GetBsaTiling(gert::TilingContext* bsaContext, BlockSparseAttentionTilingData& tilingData)
 {
     tilingData_ = &tilingData;
     ge::graphStatus ret = GetNpuInfo(bsaContext);
@@ -1573,7 +1581,7 @@ ge::graphStatus BSATiling::GetBsaTiling(gert::TilingContext *bsaContext, BlockSp
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus BSATiling::BsaSetTilingData(gert::TilingContext *context, BlockSparseAttentionTilingData &tilingData)
+ge::graphStatus BSATiling::BsaSetTilingData(gert::TilingContext* context, BlockSparseAttentionTilingData& tilingData)
 {
     OP_CHECK_IF(context->GetRawTilingData() == nullptr,
                 OPS_REPORT_VECTOR_INNER_ERR("BlockSparseAttention", "RawTilingData got from GE context is nullptr."),
@@ -1583,7 +1591,7 @@ ge::graphStatus BSATiling::BsaSetTilingData(gert::TilingContext *context, BlockS
     return ge::GRAPH_SUCCESS;
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingBlockSparseAttention(gert::TilingContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingBlockSparseAttention(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("BlockSparseAttention", "Context is nullptr."),
                 return ge::GRAPH_FAILED);
@@ -1598,7 +1606,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingBlockSparseAttention(gert::TilingContext 
     }
 }
 
-ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForBlockSparseAttention(gert::TilingParseContext *context)
+ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForBlockSparseAttention(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
