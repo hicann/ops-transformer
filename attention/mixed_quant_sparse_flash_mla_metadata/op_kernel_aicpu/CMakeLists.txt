@@ -23,9 +23,6 @@ if (BUILD_WITH_INSTALLED_DEPENDENCY_CANN_PKG)
 
   set_property(GLOBAL APPEND PROPERTY AICPU_JSON_FILES ${JSON_FILE})
   set(OBJ_NAME mixed_quant_sparse_flash_mla_metadata_cust_obj)
-  # Drop the temporary target name used by older incremental configurations.
-  list(REMOVE_ITEM AICPU_CUST_OBJ_TARGETS mixed_quant_sparse_flash_mla_metadata)
-  set(AICPU_CUST_OBJ_TARGETS "${AICPU_CUST_OBJ_TARGETS}" CACHE INTERNAL "All aicpu cust obj targets" FORCE)
   add_aicpu_cust_kernel_modules(${OBJ_NAME})
   target_sources(${OBJ_NAME} PRIVATE ${AICPU_SRC})
 endif()
