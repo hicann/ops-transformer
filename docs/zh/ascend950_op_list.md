@@ -32,7 +32,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>将各SP域PA算子的输出的中间结果lse，localOut两个局部变量结果更新成全局结果。</td>
   </tr>
@@ -61,7 +61,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../attention/dense_lightning_indexer_softmax_lse/README.md">dense_lightning_indexer_softmax_lse</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✗</td>
     <td>AI Core</td>
     <td>DenseLightningIndexerSoftmaxLse算子。</td>
@@ -72,7 +72,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>使用FlashAttention算法实现self-attention（自注意力）的计算。</td>
   </tr>
@@ -82,9 +82,29 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>训练场景下计算注意力的反向输出，即FlashAttentionScore的反向计算。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/flash_attn/README.md">flash_attn</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算FlashAttention前向输出。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/flash_attn_grad/README.md">flash_attn_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算FlashAttention反向梯度。</td>
   </tr>
   <tr>
     <td>attention</td>
@@ -161,8 +181,8 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../attention/kv_quant_sparse_flash_attention/README.md">kv_quant_sparse_flash_attention</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
     <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>在Sparse Flash Attention的基础上支持了`Per-Token-Head-Tile-128量化`输入。</td>
   </tr>
@@ -171,10 +191,20 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../attention/lightning_indexer/README.md">lightning_indexer</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
     <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>基于一系列操作得到每一个token对应的Top-k个位置。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/lightning_indexer_v2/README.md">lightning_indexer_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>根据Query、Key和权重计算每个token的Top-k位置。</td>
   </tr>
   <tr>
     <td>attention</td>
@@ -202,7 +232,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>推理MlaPrologV3WeightNz算子。</td>
   </tr>
@@ -211,8 +241,8 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../attention/quant_lightning_indexer/README.md">quant_lightning_indexer</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
     <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>推理场景下，SparseFlashAttention前处理的计算，选出关键的稀疏token，并对输入query和key进行量化实现存8算8。</td>
   </tr>
@@ -222,7 +252,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>完成不涉及CP切分的KDA分块正向计算。</td>
   </tr>
@@ -252,7 +282,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>训练场景下，更新两次FlashAttention的结果。</td>
   </tr>
@@ -281,7 +311,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../attention/sparse_flash_attention/README.md">sparse_flash_attention</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
     <td>针对大序列长度推理场景的高效注意力计算模块。</td>
@@ -291,7 +321,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../attention/sparse_flash_attention_grad/README.md">sparse_flash_attention_grad</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✗</td>
     <td>AI Core</td>
     <td>SparseFlashAttention的反向梯度计算。</td>
@@ -312,7 +342,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>大模型推理动态稀疏注意力机制的前置评分模块，为block-sparse-attention的前置评分模块。</td>
   </tr>
@@ -337,12 +367,362 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>Compressor的反向算子，用于计算输入X、权重W^KV/W^Gate与位置编码Ape的梯度，前向在gradEnabled为true时导出softmax_score与kv中间结果作为本算子输入。</td>
   </tr>
   <tr>
+    <td>attention</td>
+    <td><a href="../../attention/block_attn_res_prepare/README.md">block_attn_res_prepare</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算历史残差块间注意力，输出Softmax加权结果和统计量。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/block_attn_res_update/README.md">block_attn_res_update</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>更新局部残差，并结合在线Softmax状态计算注意力输出。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/block_sparse_attention_grad/README.md">block_sparse_attention_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算块稀疏注意力的反向梯度。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/bsa_select_block_mask/README.md">bsa_select_block_mask</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>根据Query和Key生成块稀疏注意力掩码。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/chunk_gated_delta_rule/README.md">chunk_gated_delta_rule</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算分块Gated Delta Rule。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/dense_lightning_indexer_grad_kl_loss/README.md">dense_lightning_indexer_grad_kl_loss</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算Dense LightningIndexer的反向梯度和KL Loss。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/dense_lightning_indexer_kl_loss_grad/README.md">dense_lightning_indexer_kl_loss_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算Dense LightningIndexer KL Loss的反向梯度。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/dense_lightning_indexer_softmax_lse_v2/README.md">dense_lightning_indexer_softmax_lse_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算Dense LightningIndexer的注意力评分和LSE。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/flash_mla_with_kvcache/docs/torchapi_flash_mla_with_kvcache.md">flash_mla_with_kvcache</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>使用KV Cache计算非量化MLA注意力。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/fused_floyd_attention/README.md">fused_floyd_attention</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算FloydAttention前向输出。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/fused_floyd_attention_grad/README.md">fused_floyd_attention_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算FloydAttention反向梯度。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/indexer_quant_cache/README.md">indexer_quant_cache</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>量化输入并按指定位置更新Indexer缓存。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/kda_input_proj/README.md">kda_input_proj</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>对隐藏状态做投影，生成Recurrent KDA所需的qkv、beta、gate和g。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/key_pool/README.md">key_pool</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>压缩注意力计算中的Key。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/kv_compress_epilog/README.md">kv_compress_epilog</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>压缩并原地更新KV Cache。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/kv_quant_sparse_flash_attention_v2/README.md">kv_quant_sparse_flash_attention_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算支持Per-Token-Head-Tile-128量化输入的稀疏注意力。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/lightning_indexer_grad/README.md">lightning_indexer_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>根据稀疏索引计算Query、Key和权重的梯度。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/mixed_quant_sparse_flash_mla/README.md">mixed_quant_sparse_flash_mla</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算支持KV量化输入的稀疏MLA注意力。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/mla_prolog/README.md">mla_prolog</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算MLA注意力的前处理结果。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/mla_prolog_v2/README.md">mla_prolog_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算MLA注意力的前处理结果。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/msa_index_score/README.md">msa_index_score</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算MSA索引分支的块评分。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/pool_key_indexer/README.md">pool_key_indexer</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算每个token对应的Top-k位置。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/quant_compressor/README.md">quant_compressor</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算Compressor的量化输出。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/quant_flash_attn/docs/torchapi_quant_flash_attn.md">quant_flash_attn</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算量化FlashAttention前向输出。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/quant_flash_attn_grad/README.md">quant_flash_attn_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算量化FlashAttention反向梯度。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/quant_flash_mla_with_kvcache/docs/torchapi_quant_flash_mla_with_kvcache.md">quant_flash_mla_with_kvcache</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>使用KV Cache计算量化MLA注意力。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/quant_lightning_indexer_v2/README.md">quant_lightning_indexer_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>根据量化Query和Key计算Top-k稀疏索引。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/quant_sparse_flash_mla/README.md">quant_sparse_flash_mla</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算全量化稀疏MLA注意力。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/rain_fusion_attention/README.md">rain_fusion_attention</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>按selectIdx指定的稀疏块计算注意力。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/scatter_pa_kv_cache_with_k_scale/README.md">scatter_pa_kv_cache_with_k_scale</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>更新KV Cache中指定位置的Key、Value及Key的量化scale。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/sparse_flash_mla/README.md">sparse_flash_mla</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算稀疏MLA注意力。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/sparse_flash_mla_grad/README.md">sparse_flash_mla_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算稀疏MLA注意力的反向梯度。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/sparse_flash_mla_softmax_l1_norm/README.md">sparse_flash_mla_softmax_l1_norm</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算稀疏MLA注意力的Softmax L1范数。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/sparse_lightning_indexer_kl_loss_grad/README.md">sparse_lightning_indexer_kl_loss_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算稀疏LightningIndexer KL Loss的反向梯度。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/stem_oam_prep_varlen_q/README.md">stem_oam_prep_varlen_q</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算变长Query的Stem OAM注意力前处理结果。</td>
+  </tr>
+  <tr>
     <td>gmm</td>
     <td><a href="../../gmm/grouped_matmul/README.md">grouped_matmul</a></td>
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>实现分组矩阵乘计算。</td>
   </tr>
@@ -362,7 +742,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>GroupedMatmul和MoeFinalizeRouting的融合算子，GroupedMatmul计算后的输出按照索引做combine动作。</td>
   </tr>
@@ -372,7 +752,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>融合GroupedMatmul 、dequant、swiglu和quant，新增了MXFP8量化场景（仅Ascend 950PR&950DT系列产品 AI处理器支持）。</td>
   </tr>
@@ -382,9 +762,29 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>实现分组矩阵乘计算和加法计算。</td>
+  </tr>
+  <tr>
+    <td>gmm</td>
+    <td><a href="../../gmm/grouped_matmul_activation_quant/README.md">grouped_matmul_activation_quant</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>融合分组矩阵乘、激活和量化计算。</td>
+  </tr>
+  <tr>
+    <td>mamba</td>
+    <td><a href="../../mamba/causal_conv1d/README.md">causal_conv1d</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算因果一维卷积并更新状态。</td>
   </tr>
   <tr>
     <td>mc2</td>
@@ -408,11 +808,21 @@ Ascend 950支持的算子分类和算子列表如下：
   </tr>
   <tr>
     <td>mc2</td>
-    <td><a href="../../mc2/allto_all_matmul/README.md">allto_all_matmul</a></td>
+    <td><a href="../../mc2/all_gather_matmul_v3/docs/torchapi_all_gather_quant_matmul.md">all_gather_matmul_v3</a></td>
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
     <td>✗</td>
+    <td>AI Core</td>
+    <td>融合AllGather通信与MX量化矩阵乘。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/allto_all_matmul/README.md">allto_all_matmul</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>完成AlltoAll通信与MatMul计算融合。</td>
   </tr>
@@ -442,7 +852,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>实现批量矩阵乘计算。</td>
   </tr>
@@ -482,7 +892,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>实现矩阵乘计算。</td>
   </tr>
@@ -502,7 +912,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>完成MatMul计算与AlltoAll通信融合。</td>
   </tr>
@@ -531,8 +941,8 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../mc2/mega_moe/README.md">mega_moe</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
-    <td>✗</td>
+    <td>✓</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>完成dispatch + group_matmul1 + swiglu_quant + group_matmul2 + combine的端到端融合计算。</td>
   </tr>
@@ -687,6 +1097,106 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>完成量化后的ReduceScatter通信。</td>
   </tr>
   <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/allto_all_matmul_v2/docs/torchapi_all_to_all_quant_matmul.md">allto_all_matmul_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>融合AlltoAll通信与MX量化矩阵乘。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/attention_to_ffn_v2/README.md">attention_to_ffn_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>将Attention节点的数据发送到FFN节点。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/engram_fetch">engram_fetch</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>按索引获取Engram数据。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/engram_fetch_grad">engram_fetch_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算Engram数据获取操作的反向梯度。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/engram_fetch_wait">engram_fetch_wait</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>等待Engram数据获取完成。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/ffn_to_attention_v2/README.md">ffn_to_attention_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>将FFN节点的数据发送到Attention节点。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/moe_ep_combine">moe_ep_combine</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>合并MoE专家并行计算后的token。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/moe_ep_combine_epilogue">moe_ep_combine_epilogue</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>处理MoE专家并行token合并的结果。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/moe_ep_dispatch">moe_ep_dispatch</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>向MoE专家并行节点分发token。</td>
+  </tr>
+  <tr>
+    <td>mc2</td>
+    <td><a href="../../mc2/moe_ep_dispatch_epilogue">moe_ep_dispatch_epilogue</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>处理MoE专家并行token分发的结果。</td>
+  </tr>
+  <tr>
     <td>mhc</td>
     <td><a href="../../mhc/mhc_post/README.md">mhc_post</a></td>
     <td>✓</td>
@@ -712,7 +1222,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>基于一系列计算得到MHC架构中hidden层的$H^{res}$和$H^{post}$投影矩阵以及Attention或MLP层的输入矩阵$h^{in}$。</td>
   </tr>
@@ -767,11 +1277,31 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>BlockAttentionResiduals的反向算子，计算partial_block、block_res、proj_weight、norm_weight的梯度。</td>
   </tr>
   <tr>
+    <td>mhc</td>
+    <td><a href="../../mhc/block_attention_residuals/README.md">block_attention_residuals</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>对残差块做归一化、投影打分和Softmax加权求和。</td>
+  </tr>
+  <tr>
+    <td>mhc</td>
+    <td><a href="../../mhc/mhc_pre_sinkhorn_backward/README.md">mhc_pre_sinkhorn_backward</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算MhcPreSinkhorn反向梯度。</td>
+  </tr>
+  <tr>
     <td>moe</td>
     <td><a href="../../moe/moe_compute_expert_tokens/README.md">moe_compute_expert_tokens</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
     <td>MoE计算中，通过二分查找的方式查找每个专家处理的最后一行的位置。</td>
@@ -821,7 +1351,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../moe/moe_gating_top_k_softmax/README.md">moe_gating_top_k_softmax</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
     <td>MoE计算中，对x的输出做Softmax计算，取TopK操作。</td>
@@ -891,7 +1421,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../moe/moe_re_routing/README.md">moe_re_routing</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
     <td>MoE网络中，进行AlltoAll操作从其他卡上拿到需要算的token后，将token按照专家顺序重新排列。</td>
@@ -931,7 +1461,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../moe/moe_token_unpermute_with_routing_map_grad/README.md">moe_token_unpermute_with_routing_map_grad</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✗</td>
     <td>AI Core</td>
     <td>aclnnMoeTokenUnpermuteWithRoutingMap的反向传播。</td>
@@ -942,7 +1472,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>MoE中根据索引进行原地加法操作。</td>
   </tr>
@@ -952,7 +1482,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>MoE中根据排序后的索引进行原地加法操作。</td>
   </tr>
@@ -962,9 +1492,79 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>MoE中根据mask进行scatter操作。</td>
+  </tr>
+  <tr>
+    <td>moe</td>
+    <td><a href="../../moe/moe_fused_topk/README.md">moe_fused_topk</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>对输入做Sigmoid和分组排序，选出Top-k专家。</td>
+  </tr>
+  <tr>
+    <td>moe</td>
+    <td><a href="../../moe/moe_init_routing_v4/README.md">moe_init_routing_v4</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>根据专家选择结果重排token，支持非量化、静态量化和动态量化。</td>
+  </tr>
+  <tr>
+    <td>moe</td>
+    <td><a href="../../moe/moe_re_routing_v2/README.md">moe_re_routing_v2</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>将AlltoAll接收的token按专家顺序重排。</td>
+  </tr>
+  <tr>
+    <td>moe</td>
+    <td><a href="../../moe/moe_token_permute_with_ep/README.md">moe_token_permute_with_ep</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>按专家并行索引重排token和可选权重，并截取指定范围。</td>
+  </tr>
+  <tr>
+    <td>moe</td>
+    <td><a href="../../moe/moe_token_permute_with_ep_grad/README.md">moe_token_permute_with_ep_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算专家并行token重排的反向梯度。</td>
+  </tr>
+  <tr>
+    <td>moe</td>
+    <td><a href="../../moe/moe_token_unpermute_with_ep/README.md">moe_token_unpermute_with_ep</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>按索引还原token顺序，并加权合并。</td>
+  </tr>
+  <tr>
+    <td>moe</td>
+    <td><a href="../../moe/moe_token_unpermute_with_ep_grad/README.md">moe_token_unpermute_with_ep_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算专家并行token还原操作的反向梯度。</td>
   </tr>
   <tr>
     <td>posembedding</td>
@@ -982,7 +1582,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>AI Core</td>
     <td>执行双路旋转位置编码ApplyRotaryPosEmb的反向计算，同时计算query和key的rope反向梯度，融合为一次kernel调用。</td>
   </tr>
@@ -1012,7 +1612,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>执行RmsNorm、RoPE和Concat融合计算。</td>
   </tr>
@@ -1022,7 +1622,7 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>✓</td>
     <td>✓</td>
-    <td>✓</td>
+    <td>✗</td>
     <td>AI Core</td>
     <td>NormRopeConcat的反向梯度计算。</td>
   </tr>
@@ -1051,10 +1651,70 @@ Ascend 950支持的算子分类和算子列表如下：
     <td><a href="../../posembedding/rotary_position_embedding_grad/README.md">rotary_position_embedding_grad</a></td>
     <td>✓</td>
     <td>✓</td>
-    <td>✗</td>
+    <td>✓</td>
     <td>✓</td>
     <td>AI Core</td>
     <td>执行单路旋转位置编码的反向计算。</td>
+  </tr>
+  <tr>
+    <td>posembedding</td>
+    <td><a href="../../posembedding/dequant_rope_quant_kvcache/README.md">dequant_rope_quant_kvcache</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>融合反量化、Q/K/V拆分、旋转位置编码、量化和KV Cache更新。</td>
+  </tr>
+  <tr>
+    <td>posembedding</td>
+    <td><a href="../../posembedding/inplace_partial_rotary_mul/README.md">inplace_partial_rotary_mul</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>原地计算单路旋转位置编码。</td>
+  </tr>
+  <tr>
+    <td>posembedding</td>
+    <td><a href="../../posembedding/qkv_rms_norm_rope_cache/README.md">qkv_rms_norm_rope_cache</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>融合Q/K/V拆分、RMS归一化、旋转位置编码、量化和KV Cache更新。</td>
+  </tr>
+  <tr>
+    <td>posembedding</td>
+    <td><a href="../../posembedding/qkv_rms_norm_rope_cache_with_k_scale/README.md">qkv_rms_norm_rope_cache_with_k_scale</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>拆分Q/K/V并更新KV Cache及Key的量化scale。</td>
+  </tr>
+  <tr>
+    <td>posembedding</td>
+    <td><a href="../../posembedding/rope_quant_kvcache/README.md">rope_quant_kvcache</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>拆分Q/K/V，对Q/K做旋转位置编码，并量化更新KV Cache。</td>
+  </tr>
+  <tr>
+    <td>posembedding</td>
+    <td><a href="../../posembedding/und_gen_qkv_rms_norm_rope_cache/README.md">und_gen_qkv_rms_norm_rope_cache</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算多模态模型的Q/K/V前处理结果。</td>
   </tr>
   <tr>
     <td>examples</td>
@@ -1065,6 +1725,16 @@ Ascend 950支持的算子分类和算子列表如下：
     <td>✓</td>
     <td>AI Core</td>
     <td>示例算子，用于演示算子开发流程。</td>
+  </tr>
+  <tr>
+    <td>ffn</td>
+    <td><a href="../../ffn/ffn_worker_batching/README.md">ffn_worker_batching</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>重排Attention与FFN分离部署时FFN节点上的token。</td>
   </tr>
 </tbody>
 </table>
