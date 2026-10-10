@@ -26,12 +26,12 @@
 namespace MC2Tiling {
 class AllToAllMatmulTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit AllToAllMatmulTilingBase(gert::TilingContext *context)
+    explicit AllToAllMatmulTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
     ~AllToAllMatmulTilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
     }
@@ -47,17 +47,18 @@ protected:
     virtual CutResult GetCutResOfCommAndCompute();
     ge::graphStatus TileCommAndCompute();
     void SetUserWorkSpace();
-    ge::graphStatus CheckAlltoAllOutShape(const gert::TilingContext *context, const char *opName);
-    ge::graphStatus CheckAlltoAllOut(const gert::TilingContext *context, const char *opName);
-    ge::graphStatus CheckMatrixMulShapes(const gert::TilingContext *context, const char *opName);
-    ge::graphStatus SetAlltoAllMatmulShapeInfo(const gert::TilingContext *context, TilingContextInfo &contextInfo);
-    ge::graphStatus CheckKcQuantTensorDataType(const gert::TilingContext *context, const char *opName);
-    ge::graphStatus CheckKcQuantShapeInfo(const gert::TilingContext *context, const char *opName,
-                                          const OpAttrIndexSchema &indexSchema);
+    ge::graphStatus CheckAlltoAllOutShape(const gert::TilingContext* context, const char* opName);
+    ge::graphStatus CheckAlltoAllOut(const gert::TilingContext* context, const char* opName);
+    ge::graphStatus CheckMatrixMulShapes(const gert::TilingContext* context, const char* opName);
+    ge::graphStatus SetAlltoAllMatmulShapeInfo(const gert::TilingContext* context, TilingContextInfo& contextInfo);
+    ge::graphStatus CheckKcQuantTensorDataType(const gert::TilingContext* context, const char* opName);
+    ge::graphStatus CheckKcQuantShapeInfo(const gert::TilingContext* context, const char* opName,
+                                          const OpAttrIndexSchema& indexSchema);
 
     NpuArch npuArch_;
-    const char *opName_{nullptr};
+    const char* opName_{nullptr};
     uint32_t libApiWorkSpaceSize_{0};
+    uint8_t hcclServerType_{0};
     TilingContextInfo contextInfo_;
     TilingInferredInfo inferredInfo_;
 #if MC2_DFX_ENABLE

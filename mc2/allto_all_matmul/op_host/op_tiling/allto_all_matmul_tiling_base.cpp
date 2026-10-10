@@ -29,7 +29,7 @@ namespace MC2Tiling {
  * @param value: 给定值
  * @return
  */
-static bool IsContain(const std::vector<uint32_t> &list, uint32_t value)
+static bool IsContain(const std::vector<uint32_t>& list, uint32_t value)
 {
     return std::count(list.begin(), list.end(), value) > 0;
 }
@@ -52,7 +52,7 @@ ge::graphStatus AllToAllMatmulTilingBase::GetShapeAttrsInfo()
  */
 ge::graphStatus AllToAllMatmulTilingBase::GetPlatformInfo()
 {
-    fe::PlatFormInfos *platformInfo = context_->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context_->GetPlatformInfo();
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "Fail to get platform info"), return ge::GRAPH_FAILED);
     platform_ascendc::PlatformAscendC ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     contextInfo_.args_.aicCoreNum = ascendcPlatform.GetCoreNumAic();
@@ -73,7 +73,7 @@ ge::graphStatus AllToAllMatmulTilingBase::DoLibApiTiling()
 
 ge::graphStatus AllToAllMatmulTilingBase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "get workspace failed"), return ge::GRAPH_FAILED);
     SetUserWorkSpace();
     uint64_t workspaceSize =
@@ -166,21 +166,21 @@ ge::graphStatus AllToAllMatmulTilingBase::TileCommAndCompute()
  * @param opName
  * @return ge::graphStatus
  */
-ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOutShape(const gert::TilingContext *context, const char *opName)
+ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOutShape(const gert::TilingContext* context, const char* opName)
 {
     // shape校验,假设x1的shape为（BS,H), 则alltoallout的shape应该为(BS/rankSize,
     // H*rankSize),在checkShapeInfo的时候校验 了BS能整除rankSize
     // 前面校验过，如果为-1的话，说明要调用接口获取
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
-    const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
+    const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     int64_t rankDim = 0;
     if (MatmulAlltoAllTilingUtil::GetAndValidateRankSize(context, opName, group, rankDim) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::StorageShape *x1Shape = context->GetInputShape(INPUT_X1_INDEX);
+    const gert::StorageShape* x1Shape = context->GetInputShape(INPUT_X1_INDEX);
     uint64_t x1Dim0 = x1Shape->GetStorageShape().GetDim(0);
     uint64_t x1Dim1 = x1Shape->GetStorageShape().GetDim(1);
-    const gert::StorageShape *allToAllOutShape = context->GetOutputShape(ALLTO_ALL_OUT_INDEX);
+    const gert::StorageShape* allToAllOutShape = context->GetOutputShape(ALLTO_ALL_OUT_INDEX);
     uint64_t outDim0 = allToAllOutShape->GetStorageShape().GetDim(0);
     uint64_t outDim1 = allToAllOutShape->GetStorageShape().GetDim(1);
     OP_TILING_CHECK(
@@ -191,6 +191,14 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOutShape(const gert::Tili
                                                   .c_str(),
                                               "The first dim of x1 should be rankSize times of allToAllOut first dim"),
         return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(x1Dim1 != (outDim1 / rankDim),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName, "x1 and allToAllOut",
+                        (Ops::Base::ToString(x1Shape->GetStorageShape()) + " and " +
+                         Ops::Base::ToString(allToAllOutShape->GetStorageShape()))
+                            .c_str(),
+                        "The second dim of allToAllOut should be rankSize times of x1 second dim"),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -201,11 +209,11 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOutShape(const gert::Tili
  * @param opName
  * @return ge::graphStatus
  */
-ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOut(const gert::TilingContext *context, const char *opName)
+ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOut(const gert::TilingContext* context, const char* opName)
 {
     // 非空校验在CheckAttrsInfo中已经校验过
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
-    const bool *allToAllOutFlag = attrs->GetAttrPointer<bool>(ALLTOALLMATMUL_ATTR_ALLTO_ALL_OUT_FLAG_INDEX);
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
+    const bool* allToAllOutFlag = attrs->GetAttrPointer<bool>(ALLTOALLMATMUL_ATTR_ALLTO_ALL_OUT_FLAG_INDEX);
     contextInfo_.allToAllOutFlag = (allToAllOutFlag != nullptr) ? *allToAllOutFlag : false;
     // 当alltoAlloutFlag非空时，需要进行校验:数据类型、DIM维度数、shape
     if (contextInfo_.allToAllOutFlag) {
@@ -222,7 +230,7 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOut(const gert::TilingCon
                                                   "The dtype of allToAllOut must be same as input x"),
             return ge::GRAPH_FAILED);
         // dim维度校验
-        const gert::StorageShape *allToAllOutShape = context->GetOutputShape(ALLTO_ALL_OUT_INDEX);
+        const gert::StorageShape* allToAllOutShape = context->GetOutputShape(ALLTO_ALL_OUT_INDEX);
         OP_TILING_CHECK((allToAllOutShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "allToAllOut"),
                         return ge::GRAPH_FAILED);
         uint64_t dimNum = allToAllOutShape->GetStorageShape().GetDimNum();
@@ -245,18 +253,18 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckAlltoAllOut(const gert::TilingCon
  *
  * @return ge::graphStatus
  */
-ge::graphStatus AllToAllMatmulTilingBase::CheckMatrixMulShapes(const gert::TilingContext *context, const char *opName)
+ge::graphStatus AllToAllMatmulTilingBase::CheckMatrixMulShapes(const gert::TilingContext* context, const char* opName)
 {
     // attr及其元素的非空校验在前置的Check方法里都校验过，所以这里不需要额外判断
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
-    const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
+    const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     int64_t rankDim = 0;
     if (MatmulAlltoAllTilingUtil::GetAndValidateRankSize(context, opName, group, rankDim) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
     bool x2TransFlag = false;
-    const bool *isTransX2 = attrs->GetAttrPointer<bool>(ALLTOALLMATMUL_ATTR_X2_TRANSPOSE_INDEX);
+    const bool* isTransX2 = attrs->GetAttrPointer<bool>(ALLTOALLMATMUL_ATTR_X2_TRANSPOSE_INDEX);
     if (isTransX2) {
         x2TransFlag = *isTransX2;
     }
@@ -293,13 +301,13 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckMatrixMulShapes(const gert::Tilin
  * @param contextInfo 存储了tiling的过程信息
  * @return ge::graphStatus
  */
-ge::graphStatus AllToAllMatmulTilingBase::SetAlltoAllMatmulShapeInfo(const gert::TilingContext *context,
-                                                                     TilingContextInfo &contextInfo)
+ge::graphStatus AllToAllMatmulTilingBase::SetAlltoAllMatmulShapeInfo(const gert::TilingContext* context,
+                                                                     TilingContextInfo& contextInfo)
 {
-    const gert::StorageShape *x1Shape = context->GetInputShape(INPUT_X1_INDEX);
+    const gert::StorageShape* x1Shape = context->GetInputShape(INPUT_X1_INDEX);
     uint64_t x1Dim0 = x1Shape->GetStorageShape().GetDim(0);
     uint64_t x1Dim1 = x1Shape->GetStorageShape().GetDim(1);
-    const gert::StorageShape *x2Shape = context->GetInputShape(INPUT_X2_INDEX);
+    const gert::StorageShape* x2Shape = context->GetInputShape(INPUT_X2_INDEX);
     uint64_t x2Dim0 = x2Shape->GetStorageShape().GetDim(0);
     uint64_t x2Dim1 = x2Shape->GetStorageShape().GetDim(1);
 
@@ -322,8 +330,8 @@ ge::graphStatus AllToAllMatmulTilingBase::SetAlltoAllMatmulShapeInfo(const gert:
  * @param runInfo 过程信息
  * @return ge::graphStatus
  */
-ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantTensorDataType(const gert::TilingContext *context,
-                                                                     const char *opName)
+ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantTensorDataType(const gert::TilingContext* context,
+                                                                     const char* opName)
 {
     // 获取并校验输入张量描述符
     auto x1TensorDesc = context->GetInputDesc(INPUT_X1_INDEX);
@@ -380,16 +388,16 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantTensorDataType(const gert:
  * @param indexSchema 存放输入参数索引差别的结构体
  * @return ge::graphStatus
  */
-ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantShapeInfo(const gert::TilingContext *context, const char *opName,
-                                                                const OpAttrIndexSchema &indexSchema)
+ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantShapeInfo(const gert::TilingContext* context, const char* opName,
+                                                                const OpAttrIndexSchema& indexSchema)
 {
     OP_TILING_CHECK(
         MatmulAlltoAllTilingUtil::CheckShapeInfo(context, opName, ALLTOALL_MATMUL_INDEX_SCHEMA) != ge::GRAPH_SUCCESS,
         OP_LOGE(opName, "Tiling common info check shape failed."), return ge::GRAPH_FAILED);
     ge::graphStatus status;
-    const gert::StorageShape *x1Shape = context->GetInputShape(INPUT_X1_INDEX);
-    const gert::StorageShape *x2Shape = context->GetInputShape(INPUT_X2_INDEX);
-    const gert::StorageShape *x2ScaleShape = context->GetOptionalInputShape(INPUT_X2_SCALE_INDEX);
+    const gert::StorageShape* x1Shape = context->GetInputShape(INPUT_X1_INDEX);
+    const gert::StorageShape* x2Shape = context->GetInputShape(INPUT_X2_INDEX);
+    const gert::StorageShape* x2ScaleShape = context->GetOptionalInputShape(INPUT_X2_SCALE_INDEX);
     OP_TILING_CHECK((x1Shape == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "x1"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((x2Shape == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "x2"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((x2ScaleShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName, "x2Scale"), return ge::GRAPH_FAILED);
@@ -403,8 +411,8 @@ ge::graphStatus AllToAllMatmulTilingBase::CheckKcQuantShapeInfo(const gert::Tili
         return ge::GRAPH_FAILED);
     uint64_t x2ScaleDim0 = x2ScaleShape->GetStorageShape().GetDim(0);
     bool x2IsTransFlag = false;
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
-    const bool *isTransX2 = attrs->GetAttrPointer<bool>(indexSchema.x2Transpose);
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
+    const bool* isTransX2 = attrs->GetAttrPointer<bool>(indexSchema.x2Transpose);
     if (isTransX2) {
         x2IsTransFlag = *isTransX2;
     }
