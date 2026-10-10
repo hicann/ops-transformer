@@ -528,7 +528,7 @@ aclnnStatus aclnnSparseFlashMla(
   </table>
 
   <!-- npu="A3,910b" id7 -->
-  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N1/N2支持1、2、4、8、16、32、64、128；SWA不传入cmpKv，cmpRatio不参与计算，CSA支持传入1、2或4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏ori_kv场景支持ori_sparse_indices及ori_topk_length，oriWinLeft和oriWinRight支持非负数，cmp_sparse_indices的最后一维K2当前支持[1, 8192]内的任意整数。
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N1/N2支持1、2、4、8、16、32、64、128；SWA不传入cmpKv，cmpRatio不参与计算，CSA支持传入1、2或4，HCA支持传入128；block_size取值为16的倍数，最大支持1024；SWA稀疏ori_kv场景支持ori_sparse_indices及ori_topk_length，layoutQ和layoutKv仅支持"TND"/"PA_BBND"组合，oriWinLeft和oriWinRight支持非负数，cmp_sparse_indices的最后一维K2当前支持[1, 8192]内的任意整数。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
   - <term>Ascend 950PR&950DT系列产品</term>：N1支持1-128，N2只支持1。
