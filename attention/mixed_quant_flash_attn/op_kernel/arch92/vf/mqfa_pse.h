@@ -13,8 +13,8 @@
  * \brief
  */
 
-#ifndef MQFA_PSE_H
-#define MQFA_PSE_H
+#ifndef FLASH_ATTENTION_SCORE_PSE_ARCH35_H
+#define FLASH_ATTENTION_SCORE_PSE_ARCH35_H
 
 #if ASC_DEVKIT_MAJOR >= 9
 #include "kernel_basic_intf.h"
