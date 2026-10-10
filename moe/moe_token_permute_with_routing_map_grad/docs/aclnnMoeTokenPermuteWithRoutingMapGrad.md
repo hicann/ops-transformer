@@ -33,13 +33,13 @@
     $$
 
     $$
-    capacity = permutedTokensOutputGrad.size(0) / numExperts
+    capacity = permutedTokenOutputGrad.size(0) / numExperts
     $$
 
     - probs不为None：
 
     $$
-    probsGradOutOptional = zeros(tokens_num, numExperts)
+    probsGradOutOptional = zeros(tokensNum, numExperts)
     $$
 
     - dropPaddedMode为true时
@@ -56,11 +56,11 @@
     - probs为None：
 
     $$
-    tokenGradOut= zeros(restoreShapeOptional, dtype=permutedTokens.dtype, device=permutedTokens.device)
+    tokensGradOut= zeros(restoreShapeOptional, dtype=permutedTokens.dtype, device=permutedTokens.device)
     $$
 
     $$
-    tokenGradOut[permuteTokenId[i]] += permutedTokens[outIndex[i]]
+    tokensGradOut[permuteTokenId[i]] += permutedTokens[outIndex[i]]
     $$
 
 ## 函数原型
@@ -69,14 +69,14 @@
 
 ```c++
 aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGradGetWorkspaceSize(
-    const aclTensor *permutedTokensOutputGrad,
+    const aclTensor *permutedTokenOutputGrad,
     const aclTensor *permutedProbsOutputGradOptional,
     const aclTensor *sortedIndices,
     const aclTensor *routingMapOptional,
-    int64_t          experts_num,
-    int64_t          tokens_num,
+    int64_t          numExperts,
+    int64_t          tokensNum,
     bool             dropAndPad,
-    aclTensor       *tokenGradOut,
+    aclTensor       *tokensGradOut,
     aclTensor       *probsGradOutOptional,
     uint64_t        *workspaceSize,
     aclOpExecutor   **executor)
@@ -116,15 +116,15 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
   </tr></thead>
   <tbody>
   <tr>
-      <td>permutedTokensOutputGrad</td>
+      <td>permutedTokenOutputGrad</td>
       <td>输入</td>
       <td>表示正向输出permutedTokens的梯度。</td>
       <td>shape支持2D维度，不支持空tensor，topK_num表示每个token最多被选中的专家数量上限，capacity表示每个专家选中的token数量。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>
-      • 非dropAndPad模式:（tokens_num * topK_num, hidden_size）<br>
-      • dropAndPad模式:（experts_num * capacity, hidden_size）</td>
+      • 非dropAndPad模式:（tokensNum * topK_num, hidden_size）<br>
+      • dropAndPad模式:（numExperts * capacity, hidden_size）</td>
       <td>√</td>
   </tr>
   <tr>
@@ -134,24 +134,24 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
       <td>
       •  不传则表示不需要计算probsGradOutOptional；<br>
       • shape为一个1D维度，topK_num表示每个token最多被选中的专家数量上限，capacity表示每个专家选中的token数量。<br>
-      • 数据类型与permutedTokensOutputGrad一致或者当permutedTokensOutputGrad是BFLOAT16时支持FLOAT。</td>
+      • 数据类型与permutedTokenOutputGrad一致或者当permutedTokenOutputGrad是BFLOAT16时支持FLOAT。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>
-      • 非dropAndPad模式:（tokens_num * topK_num）<br>
-      • dropAndPad模式:（experts_num * capacity）</td>
+      • 非dropAndPad模式:（tokensNum * topK_num）<br>
+      • dropAndPad模式:（numExperts * capacity）</td>
       <td>√</td>
   </tr>
   <tr>
       <td>sortedIndices</td>
       <td>输入</td>
       <td>排序的索引值。</td>
-      <td>非dropAndPad模式索引取值范围[0, tokens_num * topK_num - 1]或-1，-1表示无效槽位不参与计算，topK_num表示每个token选中的专家数量的上限；dropAndPad模式索引取值范围[0, experts_num * capacity - 1]，capacity表示每个专家选中的token数量。</td>
+      <td>非dropAndPad模式索引取值范围[0, tokensNum * topK_num - 1]或-1，-1表示无效槽位不参与计算，topK_num表示每个token选中的专家数量的上限；dropAndPad模式索引取值范围[0, numExperts * capacity - 1]，capacity表示每个专家选中的token数量。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>
-      • 非dropAndPad模式:（tokens_num * topK_num,）<br>
-      • dropAndPad模式:（experts_num * capacity）</td>
+      • 非dropAndPad模式:（tokensNum * topK_num,）<br>
+      • dropAndPad模式:（numExperts * capacity）</td>
       <td>√</td>
   </tr>
   <tr>
@@ -161,11 +161,11 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
       <td>要求shape为一个2D的tensor，非dropAndPad模式要求每行中包含不超过topK个true或1。</td>
       <td>INT8、bool(当数据类型为INT8，取值支持0、1，当数据类型为bool，取值支持true、false)</td>
       <td>ND</td>
-      <td>（tokens_num, experts_num）</td>
+      <td>（tokensNum, numExperts）</td>
       <td>√</td>
   </tr>
   <tr>
-      <td>experts_num</td>
+      <td>numExperts</td>
       <td>输入</td>
       <td>表示参与运算的专家个数。</td>
       <td>-</td>
@@ -175,7 +175,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
       <td>-</td>
   </tr>
       <tr>
-      <td>tokens_num</td>
+      <td>tokensNum</td>
       <td>输入</td>
       <td>表示参与运算的token个数。</td>
       <td>-</td>
@@ -195,13 +195,13 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
       <td>-</td>
   </tr>
   <tr>
-      <td>tokenGradOut</td>
+      <td>tokensGradOut</td>
       <td>输出</td>
       <td>输入permutedTokens的梯度</td>
       <td>要求为一个维度为2D的Tensor。</td>
       <td>BFLOAT16、FLOAT16、FLOAT32</td>
       <td>ND</td>
-      <td>（tokens_num, hidden_size）</td>
+      <td>（tokensNum, hidden_size）</td>
       <td>×</td>
   </tr>
   <tr>
@@ -211,7 +211,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMapGrad(
       <td>shape支持2D维度</td>
       <td>同permutedProbsOutputGradOptional</td>
       <td>ND</td>
-      <td>（tokens_num，experts_num）</td>
+      <td>（tokensNum，numExperts）</td>
       <td>×</td>
   </tr>
   <tr>
