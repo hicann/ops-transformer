@@ -230,11 +230,11 @@ static ge::graphStatus TilingCompute(gert::TilingContext *context, TilingParams 
         uint64_t keyLastDim =
             static_cast<uint64_t>(context->GetInputShape(INPUT_KEY_IN_INDEX)->GetStorageShape().GetDim(DIM_1));
         if (queryLastDim % headSize != 0) {
-            OP_LOGE(context->GetNodeName(), "queryIn.shape[1] must be divisible by headSize, but got %lu and %lu.",
+            OP_LOGW(context->GetNodeName(), "queryIn.shape[1] must be divisible by headSize, but got %lu and %lu.",
                     queryLastDim, headSize);
         }
         if (keyLastDim % headSize != 0) {
-            OP_LOGE(context->GetNodeName(), "keyIn.shape[1] must be divisible by headSize, but got %lu and %lu.",
+            OP_LOGW(context->GetNodeName(), "keyIn.shape[1] must be divisible by headSize, but got %lu and %lu.",
                     keyLastDim, headSize);
         }
     }
