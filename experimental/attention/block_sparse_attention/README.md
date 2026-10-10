@@ -71,7 +71,7 @@ aclnnStatus aclnnBlockSparseAttention(
   - BNSD: [batch, num_kv_heads, kv_seqlen, head_dim]
 
 - **blockSparseMaskOptional**:
-  - 稀疏Mask: [batch, headNum, ceilDiv(maxQSeqLength, blockShapeX), ceilDiv(maxKvSeqLength, blockShapeY)]
+  - 稀疏Mask: [batch, headNum, qBlockNum, kvBlockNum]。TND按actualSeqLengths/actualSeqLengthsKv的最大值计算块数；BNSD/BSND可按Q/K shape中的S，或在传入actualSeqLengths/actualSeqLengthsKv时按其最大值计算块数。
 
 - **blockShapeOptional**:
   - blockShapeX: Q方向块大小
@@ -158,7 +158,7 @@ KV方向: ceil(1024/128)=8块 [0, 1, 2, 3, 4, 5, 6, 7]
 2. kvInputLayout当前仅支持"TND"和"BNSD"。
 3. blockShapeOptional如果传入，则必须包含至少两个元素[blockShapeX, blockShapeY]，且值必须大于0，blockShapeY在<term>Ascend 950PR&950DT系列产品</term>上须为16的倍数，在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上须为128的倍数。
 4. qSeqlen和kvSeqlen不需要被blockShape整除，支持非对齐场景，实际分块数通过向上取整计算。
-5. blockSparseMaskOptional当前必须传入，且shape必须为[batch, headNum, ceilDiv(maxQS, blockShapeX), ceilDiv(maxKVS, blockShapeY)]。
+5. blockSparseMaskOptional当前必须传入，且shape为[batch, headNum, qBlockNum, kvBlockNum]。TND时，qBlockNum = ceilDiv(max(actualSeqLengths), blockShapeX)，kvBlockNum = ceilDiv(max(actualSeqLengthsKv), blockShapeY)。BNSD/BSND时，qBlockNum = ceilDiv(Q shape中的S, blockShapeX)，kvBlockNum = ceilDiv(K shape中的S, blockShapeY)；若传入actualSeqLengths和actualSeqLengthsKv，也可按实际长度计算：qBlockNum = ceilDiv(max(actualSeqLengths), blockShapeX)，kvBlockNum = ceilDiv(max(actualSeqLengthsKv), blockShapeY)。
 6. attenMaskOptional当前只支持传入nullptr。
 7. maskType当前只支持输入0，表示不加mask。
 8. actualSeqLengthsOptional在qInputLayout为“TND”时必选；actualSeqLengthsKvOptional在kvInputLayout为“TND”时必选。
