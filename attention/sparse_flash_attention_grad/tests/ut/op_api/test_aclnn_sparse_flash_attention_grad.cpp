@@ -16,6 +16,7 @@
 #include "../../../op_host/op_api/aclnn_sparse_flash_attention_grad.h"
 #include "../../../op_host/op_api/aclnn_sparse_flash_attention_grad_v2.h"
 #include "op_api_ut_common/tensor_desc.h"
+#include "opdev/op_dfx.h"
 #include "opdev/platform.h"
 
 using namespace std;
@@ -33,6 +34,34 @@ AclTensorPtr MakeTensor(const vector<int64_t>& shape, aclDataType dtype)
 {
     return AclTensorPtr(TensorDesc(shape, dtype, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
 }
+
+void RegisterOpapiUtResource()
+{
+    // NnopbaseGetExecutor requires registered binary metadata even though the UT
+    // framework stubs NnopbaseRunForWorkspace. Keep this fixture in memory so the
+    // API tests do not depend on an installed SparseFlashAttentionGrad package.
+    static const char opDesc[] = R"({
+        "binList": [{
+            "simplifiedKey": ["SparseFlashAttentionGrad/d=0,p=0/1,2"],
+            "binInfo": {"jsonFilePath": "sparse_flash_attention_grad_opapi_ut.json"}
+        }]
+    })";
+    static const char binDesc[] = R"({
+        "coreType": "AiCore",
+        "filePath": "sparse_flash_attention_grad_opapi_ut.json",
+        "supportInfo": {"simplifiedKey": ["SparseFlashAttentionGrad/d=0,p=0/1,2"]}
+    })";
+    // Never launched: these tests only exercise GetWorkspaceSize with runtime stubs.
+    static const uint8_t binary[] = {0};
+    const auto* opDescBegin = reinterpret_cast<const uint8_t*>(opDesc);
+    const auto* binDescBegin = reinterpret_cast<const uint8_t*>(binDesc);
+    const op::OP_BINARY_RES binaryResource = {{opDescBegin, opDescBegin + sizeof(opDesc) - 1},
+                                              {binDescBegin, binDescBegin + sizeof(binDesc) - 1},
+                                              {binary, binary + sizeof(binary)}};
+    const op::OP_RESOURCES resources = {
+        {"SparseFlashAttentionGrad", {op::OP_HOST_FUNC_HANDLE{}, binaryResource, op::OP_RUNTIME_KB_RES{}}}};
+    op::GenOpTypeId("SparseFlashAttentionGrad", resources);
+}
 } // namespace
 
 class SparseFlashAttentionGradOpapiUt : public testing::Test {
@@ -40,6 +69,7 @@ protected:
     static void SetUpTestCase()
     {
         op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+        RegisterOpapiUtResource();
         cout << "SparseFlashAttentionGradOpapiUt SetUp" << endl;
     }
     static void TearDownTestCase()

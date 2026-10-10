@@ -143,7 +143,7 @@ aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
     const aclTensor     *out,
     const aclTensor     *softmaxMax,
     const aclTensor     *softmaxSum,
-    const aclTensor     *sinksOptional,            // OSS Sink 输入 [N1]，OPTIONAL，与 dSinksOptional 成对出现
+    const aclTensor     *sinks,            // OSS Sink 输入 [N1]，OPTIONAL，与 dSinksOptional 成对出现
     const aclTensor     *actualSeqLengthsQueryOptional,
     const aclTensor     *actualSeqLengthsKvOptional,
     const aclTensor     *queryRopeOptional,
