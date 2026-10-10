@@ -208,9 +208,9 @@ cann_ops_transformer.generic_block_sparse_attention(
 | block_shape | list[int] | 必选 | 稀疏块形状 `[block_x, block_y]` | int64 | - | 长度为2 |
 | metadata | Tensor | 可选 | `generic_block_sparse_attention_metadata`生成的任务切分结果，传入后可优化调度 | int32 | ND | (1024,) |
 | attn_mask | Tensor | 可选 | 掩码矩阵 | bool | ND | - |
-| q_dequant_scale | Tensor | 可选 | query反量化缩放因子 | float32/float8_e8m0 | ND | - |
-| k_dequant_scale | Tensor | 可选 | key反量化缩放因子 | float32/float8_e8m0 | ND | - |
-| v_dequant_scale | Tensor | 可选 | value反量化缩放因子 | float32/float8_e8m0 | ND | - |
+| q_dequant_scale | Tensor | 可选 | query反量化缩放因子 | float32 | ND | - |
+| k_dequant_scale | Tensor | 可选 | key反量化缩放因子 | float32 | ND | - |
+| v_dequant_scale | Tensor | 可选 | value反量化缩放因子 | float32 | ND | - |
 | p_quant_scale | Tensor | 可选 | P量化缩放因子 | float32 | ND | - |
 | cu_seqlens_q | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | 可选 | 累积序列长度，用于处理变长序列，第一个元素必须为0 | int64 | ND | (B+1,) |
