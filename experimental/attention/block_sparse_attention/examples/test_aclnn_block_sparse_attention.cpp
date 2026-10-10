@@ -37,7 +37,7 @@ using namespace std;
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -46,7 +46,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -59,8 +59,8 @@ int Init(int32_t deviceId, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     // 检查shape是否有效
     if (shape.empty()) {
@@ -108,11 +108,11 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void FreeResource(aclTensor *query, aclTensor *key, aclTensor *value, aclTensor *blockSparseMask,
-                  aclTensor *attentionOut, aclIntArray *actualSeqLengths, aclIntArray *actualSeqLengthsKv,
-                  aclIntArray *blockShape, void *queryDeviceAddr, void *keyDeviceAddr, void *valueDeviceAddr,
-                  void *blockSparseMaskDeviceAddr, void *attentionOutDeviceAddr, void *workspaceAddr, int32_t deviceId,
-                  aclrtStream *stream)
+void FreeResource(aclTensor* query, aclTensor* key, aclTensor* value, aclTensor* blockSparseMask,
+                  aclTensor* attentionOut, aclIntArray* actualSeqLengths, aclIntArray* actualSeqLengthsKv,
+                  aclIntArray* blockShape, void* queryDeviceAddr, void* keyDeviceAddr, void* valueDeviceAddr,
+                  void* blockSparseMaskDeviceAddr, void* attentionOutDeviceAddr, void* workspaceAddr, int32_t deviceId,
+                  aclrtStream* stream)
 {
     // 释放资源
     if (query) {
@@ -159,7 +159,7 @@ void FreeResource(aclTensor *query, aclTensor *key, aclTensor *value, aclTensor 
         aclrtFree(workspaceAddr);
     }
 
-    aclrtDestroyStream(stream);
+    aclrtDestroyStream(*stream);
     aclrtResetDevice(deviceId);
     aclFinalize();
 }
@@ -173,7 +173,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
     // 2. 设置参数
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     std::string socVersion = (socName != nullptr) ? std::string(socName) : std::string();
     bool isArch22 = socVersion.find("Ascend910") != std::string::npos;
     int64_t innerPrecise = isArch22 ? 0 : 4;
@@ -193,21 +193,21 @@ int main()
     int32_t qBlockNum = (qSeqlen + blockShapeX - 1) / blockShapeX;   // Q块的X维度数量
     int32_t kvBlockNum = (kvSeqlen + blockShapeY - 1) / blockShapeY; // KV块的Y维度数量
 
-    aclTensor *queryTensor = nullptr;
-    aclTensor *keyTensor = nullptr;
-    aclTensor *valueTensor = nullptr;
-    aclTensor *blockSparseMaskTensor = nullptr;
-    aclTensor *attentionOutTensor = nullptr;
-    aclIntArray *actualSeqLengths = nullptr;
-    aclIntArray *actualSeqLengthsKv = nullptr;
-    aclIntArray *blockShape = nullptr;
+    aclTensor* queryTensor = nullptr;
+    aclTensor* keyTensor = nullptr;
+    aclTensor* valueTensor = nullptr;
+    aclTensor* blockSparseMaskTensor = nullptr;
+    aclTensor* attentionOutTensor = nullptr;
+    aclIntArray* actualSeqLengths = nullptr;
+    aclIntArray* actualSeqLengthsKv = nullptr;
+    aclIntArray* blockShape = nullptr;
 
-    void *queryDeviceAddr = nullptr;
-    void *keyDeviceAddr = nullptr;
-    void *valueDeviceAddr = nullptr;
-    void *blockSparseMaskDeviceAddr = nullptr;
-    void *attentionOutDeviceAddr = nullptr;
-    void *workspaceAddr = nullptr;
+    void* queryDeviceAddr = nullptr;
+    void* keyDeviceAddr = nullptr;
+    void* valueDeviceAddr = nullptr;
+    void* blockSparseMaskDeviceAddr = nullptr;
+    void* attentionOutDeviceAddr = nullptr;
+    void* workspaceAddr = nullptr;
 
     // 3. 创建Query tensor (TND format: [totalQTokens, numHeads, headDim])
     std::vector<int64_t> queryShape = {totalQTokens, numHeads, headDim};
@@ -282,8 +282,8 @@ int main()
         return -1);
 
     // 9. 准备字符串参数（确保缓冲区大小足够，包含null terminator）
-    const char *qLayoutStr = "TND";
-    const char *kvLayoutStr = "TND";
+    const char* qLayoutStr = "TND";
+    const char* kvLayoutStr = "TND";
     char qLayoutBuffer[16] = {0};
     char kvLayoutBuffer[16] = {0};
     strncpy(qLayoutBuffer, qLayoutStr, sizeof(qLayoutBuffer) - 1);
@@ -294,7 +294,7 @@ int main()
 
     // 11. 调用第一段接口
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     ret = aclnnBlockSparseAttentionGetWorkspaceSize(queryTensor,           // query
                                                     keyTensor,             // key
