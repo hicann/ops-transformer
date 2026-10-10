@@ -22,6 +22,9 @@
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 
+// 前置声明 pypto codegen 生成的 CompressorGradTiling，供 op_host UT 编译使用。
+class CompressorGradTiling;
+
 namespace optiling {
 // INPUT
 constexpr uint32_t TOKEN_X_INPUT_INDEX = 0;
@@ -167,14 +170,14 @@ const std::map<ge::DataType, std::string> DATATYPE_TO_STRING_MAP = {
 };
 
 struct RequiredParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
 };
 
 struct OptionalParaInfo {
-    const gert::CompileTimeTensorDesc *desc;
-    const gert::StorageShape *shape;
-    const gert::Tensor *tensor;
+    const gert::CompileTimeTensorDesc* desc;
+    const gert::StorageShape* shape;
+    const gert::Tensor* tensor;
 };
 
 const std::vector<uint32_t> COFF{1, 2};
@@ -192,9 +195,9 @@ enum class TemplateId : uint8_t {
 };
 
 struct CompressorGradContext {
-    const char *opName;
-    const char *opType;
-    fe::PlatFormInfos *platformInfo;
+    const char* opName;
+    const char* opType;
+    fe::PlatFormInfos* platformInfo;
 
     RequiredParaInfo x;
     RequiredParaInfo wkv;
@@ -210,14 +213,14 @@ struct CompressorGradContext {
     RequiredParaInfo dWgate;
     RequiredParaInfo dApe;
 
-    const uint32_t *coff;
-    const uint32_t *cmpRatio;
+    const uint32_t* coff;
+    const uint32_t* cmpRatio;
     TemplateId templateId;
 
     ge::DataType dtype = ge::DT_BF16;
     LayoutType layout = LayoutType::LAYOUT_BSH;
 
-    size_t *workSpaces;
+    size_t* workSpaces;
     uint64_t tilingKey;
     uint32_t blockDim;
 };
@@ -305,32 +308,32 @@ struct CompressorGradCompileInfo {
 // C++ injected-class-name 会遮蔽外部同名类型，导致 tilingData 成员类型错误。
 class CompressorGradTilingImpl {
 public:
-    explicit CompressorGradTilingImpl(CompressorGradContext *context)
+    explicit CompressorGradTilingImpl(CompressorGradContext* context)
         : context_(context)
     {}
     ~CompressorGradTilingImpl() = default;
 
-    static ge::graphStatus ConvertContext(gert::TilingContext &context, CompressorGradContext &compressorGradContext);
+    static ge::graphStatus ConvertContext(gert::TilingContext& context, CompressorGradContext& compressorGradContext);
     ge::graphStatus RunBigKernelTiling();
-    CompressorGradTiling *tilingData = nullptr;
+    CompressorGradTiling* tilingData = nullptr;
 
 private:
-    static ge::graphStatus ConvertRequiredParams(gert::TilingContext &context,
-                                                 CompressorGradContext &compressorGradContext);
-    static void ConvertOptionalParams(gert::TilingContext &context, CompressorGradContext &compressorGradContext);
+    static ge::graphStatus ConvertRequiredParams(gert::TilingContext& context,
+                                                 CompressorGradContext& compressorGradContext);
+    static void ConvertOptionalParams(gert::TilingContext& context, CompressorGradContext& compressorGradContext);
     ge::graphStatus GetNpuInfo();
     ge::graphStatus SetBaseInfo();
     ge::graphStatus SetTilingData();
     ge::graphStatus CalcWorkSpace();
     ge::graphStatus CheckSinglePara() const;
     ge::graphStatus GenTilingKey() const;
-    ge::graphStatus CheckDimNumInLayoutSupport(const std::string &layout, const gert::StorageShape *shape,
-                                               const std::string &name) const;
-    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
-    ge::graphStatus CheckDimNumSupport(const gert::StorageShape *shape, const std::string &name) const;
-    ge::graphStatus LogErrorShapeConsistency(const std::string &name, const gert::StorageShape *shape,
-                                             const uint32_t &dimNum, const std::string &subName,
-                                             const uint32_t &expectNum) const;
+    ge::graphStatus CheckDimNumInLayoutSupport(const std::string& layout, const gert::StorageShape* shape,
+                                               const std::string& name) const;
+    ge::graphStatus CheckDtypeSupport(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
+    ge::graphStatus CheckDimNumSupport(const gert::StorageShape* shape, const std::string& name) const;
+    ge::graphStatus LogErrorShapeConsistency(const std::string& name, const gert::StorageShape* shape,
+                                             const uint32_t& dimNum, const std::string& subName,
+                                             const uint32_t& expectNum) const;
     ge::graphStatus CheckSingleParaX() const;
     ge::graphStatus CheckSingleParaWkv() const;
     ge::graphStatus CheckSingleParaWgate() const;
@@ -351,7 +354,7 @@ private:
     ge::graphStatus CheckRequiredAttrExistence() const;
     ge::graphStatus CheckFeature() const;
     ge::graphStatus CheckShapeConsistency() const;
-    ge::graphStatus CheckDtypeConsistencyX(const gert::CompileTimeTensorDesc *desc, const std::string &name) const;
+    ge::graphStatus CheckDtypeConsistencyX(const gert::CompileTimeTensorDesc* desc, const std::string& name) const;
     ge::graphStatus CheckDtypeConsistency() const;
     ge::graphStatus CheckMultiParaConsistency() const;
     ge::graphStatus CheckDimNumConsistency() const;
@@ -371,7 +374,7 @@ private:
     uint8_t coff_ = 1;
     CompressorGradBaseParams baseParams_;
     CompressorGradWorkspaceParams workspaceParams_;
-    CompressorGradContext *context_ = nullptr;
+    CompressorGradContext* context_ = nullptr;
 };
 
 } // namespace optiling
