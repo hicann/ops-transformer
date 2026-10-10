@@ -1,11 +1,10 @@
 /**
- * This program is free software, you can redistribute it and/or modify it.
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING
- * BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
@@ -15,7 +14,7 @@
 namespace ascend_ops {
 namespace MoeDistributeCombineV2 {
 
-static void InitValidateContext(MoeDistributeCombineV2ValidateParams &params)
+static void InitValidateContext(MoeDistributeCombineV2ValidateParams& params)
 {
     params.maxEpWorldSize = ValidationConstants::MAX_EP_WORLD_SIZE;
     params.maxMoeExpertNum = ValidationConstants::MOE_EXPERT_MAX_NUM;
@@ -66,7 +65,7 @@ static void InitValidateContext(MoeDistributeCombineV2ValidateParams &params)
     }
 }
 
-static void ValidateEpAttrs(const MoeDistributeCombineV2ValidateParams &params)
+static void ValidateEpAttrs(const MoeDistributeCombineV2ValidateParams& params)
 {
     TORCH_CHECK((params.ep_world_size >= ValidationConstants::MIN_EP_WORLD_SIZE) &&
                     (params.ep_world_size <= params.maxEpWorldSize),
@@ -78,7 +77,7 @@ static void ValidateEpAttrs(const MoeDistributeCombineV2ValidateParams &params)
                 ", ep_rank_id=", params.ep_rank_id);
 }
 
-static void ValidateSharedExpertAttrs(const MoeDistributeCombineV2ValidateParams &params)
+static void ValidateSharedExpertAttrs(const MoeDistributeCombineV2ValidateParams& params)
 {
     // 验证三种有效的共享专家配置场景
     TORCH_CHECK(params.isNoShared || params.isValidShared,
@@ -92,7 +91,7 @@ static void ValidateSharedExpertAttrs(const MoeDistributeCombineV2ValidateParams
                 ", rank_num=", params.shared_expert_rank_num);
 }
 
-static void ValidateMoeExpertAttrs(const MoeDistributeCombineV2ValidateParams &params)
+static void ValidateMoeExpertAttrs(const MoeDistributeCombineV2ValidateParams& params)
 {
     // 验证moe_expert_num范围
     TORCH_CHECK((params.moe_expert_num > 0) && (params.moe_expert_num <= params.maxMoeExpertNum),
@@ -109,7 +108,7 @@ static void ValidateMoeExpertAttrs(const MoeDistributeCombineV2ValidateParams &p
                 params.localMoeExpertNum * params.ep_world_size);
 }
 
-static void ValidateQuantMode(const MoeDistributeCombineV2ValidateParams &params)
+static void ValidateQuantMode(const MoeDistributeCombineV2ValidateParams& params)
 {
     TORCH_CHECK((params.comm_quant_mode >= static_cast<int64_t>(CommQuantMode::NON_QUANT)) &&
                     (params.comm_quant_mode <= static_cast<int64_t>(CommQuantMode::MXFP8_E4M3_QUANT)),
@@ -117,7 +116,7 @@ static void ValidateQuantMode(const MoeDistributeCombineV2ValidateParams &params
                 static_cast<int64_t>(CommQuantMode::MXFP8_E4M3_QUANT), "], got: ", params.comm_quant_mode);
 }
 
-static void ValidateCommonAttrs(const MoeDistributeCombineV2ValidateParams &params)
+static void ValidateCommonAttrs(const MoeDistributeCombineV2ValidateParams& params)
 {
     TORCH_CHECK(params.expert_shard_type == 0,
                 "expert_shard_type invalid: only 0 supported, got: ", params.expert_shard_type);
@@ -137,7 +136,7 @@ static void ValidateCommonAttrs(const MoeDistributeCombineV2ValidateParams &para
                 ", const=", params.const_expert_num, ", moe=", params.moe_expert_num);
 }
 
-static void ValidateGlobalBs(const MoeDistributeCombineV2ValidateParams &params, int64_t bs, bool hasActiveMask)
+static void ValidateGlobalBs(const MoeDistributeCombineV2ValidateParams& params, int64_t bs, bool hasActiveMask)
 {
     TORCH_CHECK(!((params.global_bs != 0) &&
                   ((params.global_bs < params.ep_world_size * bs) || (params.global_bs % params.ep_world_size != 0))),
@@ -153,9 +152,9 @@ static void ValidateGlobalBs(const MoeDistributeCombineV2ValidateParams &params,
     }
 }
 
-static void ValidateRequiredTensorDims(const at::Tensor &expand_x, const at::Tensor &expert_ids,
-                                       const at::Tensor &assist_info_for_combine, const at::Tensor &ep_send_counts,
-                                       const at::Tensor &expert_scales)
+static void ValidateRequiredTensorDims(const at::Tensor& expand_x, const at::Tensor& expert_ids,
+                                       const at::Tensor& assist_info_for_combine, const at::Tensor& ep_send_counts,
+                                       const at::Tensor& expert_scales)
 {
     TORCH_CHECK(expand_x.dim() == 2, "expand_x dim invalid: 2D required, got ", expand_x.dim());
 
@@ -169,8 +168,8 @@ static void ValidateRequiredTensorDims(const at::Tensor &expand_x, const at::Ten
     TORCH_CHECK(expert_scales.dim() == 2, "expert_scales dim invalid: 2D required, got ", expert_scales.dim());
 }
 
-static void ValidateDimValues(const at::Tensor &expand_x, const at::Tensor &expert_ids,
-                              const MoeDistributeCombineV2ValidateParams &params, int64_t &bs, int64_t &h, int64_t &k)
+static void ValidateDimValues(const at::Tensor& expand_x, const at::Tensor& expert_ids,
+                              const MoeDistributeCombineV2ValidateParams& params, int64_t& bs, int64_t& h, int64_t& k)
 {
     bs = expert_ids.size(0);
     h = expand_x.size(1);
@@ -189,17 +188,17 @@ static void ValidateDimValues(const at::Tensor &expand_x, const at::Tensor &expe
                 ", moe=", params.moe_expert_num, ", zero_compute=", params.zeroComputeExpertNum);
 }
 
-static void ValidateOptionalDims(const c10::optional<at::Tensor> &x_active_mask,
-                                 const c10::optional<at::Tensor> &shared_expert_x,
-                                 const c10::optional<at::Tensor> &ori_x, const c10::optional<at::Tensor> &const_alpha1,
-                                 const c10::optional<at::Tensor> &const_alpha2,
-                                 const c10::optional<at::Tensor> &const_v,
-                                 const c10::optional<at::Tensor> &performance_info, int64_t bs, int64_t h, int64_t k,
-                                 const MoeDistributeCombineV2ValidateParams &params)
+static void ValidateOptionalDims(const c10::optional<at::Tensor>& x_active_mask,
+                                 const c10::optional<at::Tensor>& shared_expert_x,
+                                 const c10::optional<at::Tensor>& ori_x, const c10::optional<at::Tensor>& const_alpha1,
+                                 const c10::optional<at::Tensor>& const_alpha2,
+                                 const c10::optional<at::Tensor>& const_v,
+                                 const c10::optional<at::Tensor>& performance_info, int64_t bs, int64_t h, int64_t k,
+                                 const MoeDistributeCombineV2ValidateParams& params)
 {
     // x_active_mask验证
     if (x_active_mask.has_value()) {
-        const auto &mask = x_active_mask.value();
+        const auto& mask = x_active_mask.value();
         TORCH_CHECK((mask.dim() == 1) || (mask.dim() == 2), "x_active_mask dim invalid: 1D or 2D, got ", mask.dim());
         TORCH_CHECK(mask.size(0) == bs, "x_active_mask dim0 mismatch: expected ", bs, ", got ", mask.size(0));
         if (mask.dim() == 2) {
@@ -209,13 +208,13 @@ static void ValidateOptionalDims(const c10::optional<at::Tensor> &x_active_mask,
 
     // shared_expert_x验证
     if (shared_expert_x.has_value()) {
-        const auto &sxp = shared_expert_x.value();
+        const auto& sxp = shared_expert_x.value();
         TORCH_CHECK((sxp.dim() == 2) || (sxp.dim() == 3), "shared_expert_x dim invalid: 2D or 3D, got ", sxp.dim());
     }
 
     // ori_x验证
     if (ori_x.has_value()) {
-        const auto &ox = ori_x.value();
+        const auto& ox = ori_x.value();
         TORCH_CHECK(ox.dim() == 2, "ori_x dim invalid: 2D, got ", ox.dim());
         TORCH_CHECK(ox.size(0) == bs, "ori_x dim0 mismatch: ", bs, ", got ", ox.size(0));
         TORCH_CHECK(ox.size(1) == h, "ori_x dim1 mismatch: ", h, ", got ", ox.size(1));
@@ -236,16 +235,16 @@ static void ValidateOptionalDims(const c10::optional<at::Tensor> &x_active_mask,
 
     // performance_info验证
     if (performance_info.has_value()) {
-        const auto &perf = performance_info.value();
+        const auto& perf = performance_info.value();
         TORCH_CHECK(perf.dim() == 1, "performance_info dim invalid: 1D, got ", perf.dim());
         TORCH_CHECK(perf.size(0) == params.ep_world_size, "performance_info size mismatch: ", params.ep_world_size,
                     ", got ", perf.size(0));
     }
 }
 
-static void ValidateRequiredDataTypes(const at::Tensor &expand_x, const at::Tensor &expert_ids,
-                                      const at::Tensor &assist_info_for_combine, const at::Tensor &ep_send_counts,
-                                      const at::Tensor &expert_scales)
+static void ValidateRequiredDataTypes(const at::Tensor& expand_x, const at::Tensor& expert_ids,
+                                      const at::Tensor& assist_info_for_combine, const at::Tensor& ep_send_counts,
+                                      const at::Tensor& expert_scales)
 {
     TORCH_CHECK((expand_x.scalar_type() == at::kBFloat16) || (expand_x.scalar_type() == at::kHalf),
                 "expand_x dtype invalid: BF16 or FP16 required, got ", c10::toString(expand_x.scalar_type()));
@@ -263,65 +262,65 @@ static void ValidateRequiredDataTypes(const at::Tensor &expand_x, const at::Tens
                 c10::toString(expert_scales.scalar_type()));
 }
 
-static void ValidateOptionalDataTypes(const c10::optional<at::Tensor> &x_active_mask,
-                                      const c10::optional<at::Tensor> &shared_expert_x,
-                                      const c10::optional<at::Tensor> &ori_x,
-                                      const c10::optional<at::Tensor> &const_alpha1,
-                                      const c10::optional<at::Tensor> &const_alpha2,
-                                      const c10::optional<at::Tensor> &const_v,
-                                      const c10::optional<at::Tensor> &performance_info, const at::Tensor &expand_x)
+static void ValidateOptionalDataTypes(const c10::optional<at::Tensor>& x_active_mask,
+                                      const c10::optional<at::Tensor>& shared_expert_x,
+                                      const c10::optional<at::Tensor>& ori_x,
+                                      const c10::optional<at::Tensor>& const_alpha1,
+                                      const c10::optional<at::Tensor>& const_alpha2,
+                                      const c10::optional<at::Tensor>& const_v,
+                                      const c10::optional<at::Tensor>& performance_info, const at::Tensor& expand_x)
 {
     if (x_active_mask.has_value()) {
-        const auto &mask = x_active_mask.value();
+        const auto& mask = x_active_mask.value();
         TORCH_CHECK(mask.scalar_type() == at::kBool, "x_active_mask dtype invalid: Bool required, got ",
                     c10::toString(mask.scalar_type()));
     }
 
     if (shared_expert_x.has_value()) {
-        const auto &sxp = shared_expert_x.value();
+        const auto& sxp = shared_expert_x.value();
         TORCH_CHECK(sxp.scalar_type() == expand_x.scalar_type(), "shared_expert_x dtype mismatch: expected ",
                     c10::toString(expand_x.scalar_type()), ", got ", c10::toString(sxp.scalar_type()));
     }
 
     if (ori_x.has_value()) {
-        const auto &ox = ori_x.value();
+        const auto& ox = ori_x.value();
         TORCH_CHECK(ox.scalar_type() == expand_x.scalar_type(),
                     "ori_x dtype mismatch: ", c10::toString(expand_x.scalar_type()), ", got ",
                     c10::toString(ox.scalar_type()));
     }
 
     if (const_alpha1.has_value()) {
-        const auto &ca1 = const_alpha1.value();
+        const auto& ca1 = const_alpha1.value();
         TORCH_CHECK(ca1.scalar_type() == expand_x.scalar_type(),
                     "const_expert_alpha_1 dtype mismatch: ", c10::toString(expand_x.scalar_type()));
     }
 
     if (const_alpha2.has_value()) {
-        const auto &ca2 = const_alpha2.value();
+        const auto& ca2 = const_alpha2.value();
         TORCH_CHECK(ca2.scalar_type() == expand_x.scalar_type(),
                     "const_expert_alpha_2 dtype mismatch: ", c10::toString(expand_x.scalar_type()));
     }
 
     if (const_v.has_value()) {
-        const auto &cv = const_v.value();
+        const auto& cv = const_v.value();
         TORCH_CHECK(cv.scalar_type() == expand_x.scalar_type(),
                     "const_expert_v dtype mismatch: ", c10::toString(expand_x.scalar_type()));
     }
 
     if (performance_info.has_value()) {
-        const auto &perf = performance_info.value();
+        const auto& perf = performance_info.value();
         TORCH_CHECK(perf.scalar_type() == at::kLong, "performance_info dtype invalid: Int64 required, got ",
                     c10::toString(perf.scalar_type()));
     }
 }
 
 bool ValidateMoeDistributeCombineV2Input(
-    const at::Tensor &expand_x, const at::Tensor &expert_ids, const at::Tensor &assist_info_for_combine,
-    const at::Tensor &ep_send_counts, const at::Tensor &expert_scales, const c10::optional<at::Tensor> &x_active_mask,
-    const c10::optional<at::Tensor> &shared_expert_x, const c10::optional<at::Tensor> &ori_x,
-    const c10::optional<at::Tensor> &const_expert_alpha_1, const c10::optional<at::Tensor> &const_expert_alpha_2,
-    const c10::optional<at::Tensor> &const_expert_v, const c10::optional<at::Tensor> &performance_info,
-    MoeDistributeCombineV2ValidateParams &params)
+    const at::Tensor& expand_x, const at::Tensor& expert_ids, const at::Tensor& assist_info_for_combine,
+    const at::Tensor& ep_send_counts, const at::Tensor& expert_scales, const c10::optional<at::Tensor>& x_active_mask,
+    const c10::optional<at::Tensor>& shared_expert_x, const c10::optional<at::Tensor>& ori_x,
+    const c10::optional<at::Tensor>& const_expert_alpha_1, const c10::optional<at::Tensor>& const_expert_alpha_2,
+    const c10::optional<at::Tensor>& const_expert_v, const c10::optional<at::Tensor>& performance_info,
+    MoeDistributeCombineV2ValidateParams& params)
 {
     // 初始化和属性验证
     InitValidateContext(params);

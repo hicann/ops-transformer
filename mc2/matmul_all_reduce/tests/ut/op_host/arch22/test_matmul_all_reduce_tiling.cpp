@@ -1,7 +1,7 @@
 /**
- * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -20,7 +20,7 @@ namespace {
 
 constexpr uint64_t SKIP_TILING_KEY_VALIDATION = UINT64_MAX;
 
-gert::TilingContextPara::TensorDescription MakeTensorDesc(const std::string &shapeStr, ge::DataType dtype)
+gert::TilingContextPara::TensorDescription MakeTensorDesc(const std::string& shapeStr, ge::DataType dtype)
 {
     if (shapeStr.empty()) {
         return TD_DEFAULT;
@@ -28,7 +28,7 @@ gert::TilingContextPara::TensorDescription MakeTensorDesc(const std::string &sha
     return gert::TilingContextPara::TensorDescription(GetStorageShape(shapeStr), dtype, ge::FORMAT_ND);
 }
 
-std::vector<gert::TilingContextPara::OpAttr> MakeDefaultAttrs(const std::string &reduceOp, bool isTransB = false)
+std::vector<gert::TilingContextPara::OpAttr> MakeDefaultAttrs(const std::string& reduceOp, bool isTransB = false)
 {
     return {{"group", Ops::Transformer::AnyValue::CreateFrom<std::string>("group")},
             {"reduce_op", Ops::Transformer::AnyValue::CreateFrom<std::string>(reduceOp)},
@@ -42,7 +42,7 @@ std::vector<gert::TilingContextPara::OpAttr> MakeDefaultAttrs(const std::string 
             {"comm_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("ai_cpu")}};
 }
 
-void RunMatmulAllReduceTilingCase(const gert::TilingContextPara &tilingContextPara, uint64_t ranksize,
+void RunMatmulAllReduceTilingCase(const gert::TilingContextPara& tilingContextPara, uint64_t ranksize,
                                   ge::graphStatus expectResult = ge::GRAPH_SUCCESS)
 {
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", ranksize}};
@@ -53,7 +53,7 @@ void RunMatmulAllReduceTilingCase(const gert::TilingContextPara &tilingContextPa
 struct MatmulAllReduceCompileInfo {
 } g_extraTestCompileInfo;
 
-gert::TilingContextPara BuildFloat16TilingContext(const std::string &reduceOp, uint64_t coreNum, uint64_t ubsize,
+gert::TilingContextPara BuildFloat16TilingContext(const std::string& reduceOp, uint64_t coreNum, uint64_t ubsize,
                                                   uint64_t ranksize)
 {
     (void)ranksize;
@@ -122,7 +122,7 @@ class MatmulAllReduceArch22TilingExtraTest : public testing::Test {};
 
 TEST_F(MatmulAllReduceArch22TilingExtraTest, DebugModeAicpuBufferType)
 {
-    const char *envValue = getenv("ASCEND_MC2_DEBUG_MODE");
+    const char* envValue = getenv("ASCEND_MC2_DEBUG_MODE");
     std::string originalEnv = envValue != nullptr ? envValue : "";
     setenv("ASCEND_MC2_DEBUG_MODE", "4", 1);
     auto tilingContextPara = BuildFloat16TilingContext("sum", 24, 196608, 8);
@@ -136,7 +136,7 @@ TEST_F(MatmulAllReduceArch22TilingExtraTest, DebugModeAicpuBufferType)
 
 TEST_F(MatmulAllReduceArch22TilingExtraTest, HcclBuffsizeValid)
 {
-    const char *envValue = getenv("HCCL_BUFFSIZE");
+    const char* envValue = getenv("HCCL_BUFFSIZE");
     std::string originalEnv = envValue != nullptr ? envValue : "";
     setenv("HCCL_BUFFSIZE", "50", 1);
     auto tilingContextPara = BuildFloat16TilingContext("sum", 24, 196608, 8);
@@ -150,7 +150,7 @@ TEST_F(MatmulAllReduceArch22TilingExtraTest, HcclBuffsizeValid)
 
 TEST_F(MatmulAllReduceArch22TilingExtraTest, HcclBuffsizeInvalid)
 {
-    const char *envValue = getenv("HCCL_BUFFSIZE");
+    const char* envValue = getenv("HCCL_BUFFSIZE");
     std::string originalEnv = envValue != nullptr ? envValue : "";
     setenv("HCCL_BUFFSIZE", "invalid", 1);
     auto tilingContextPara = BuildFloat16TilingContext("sum", 24, 196608, 8);

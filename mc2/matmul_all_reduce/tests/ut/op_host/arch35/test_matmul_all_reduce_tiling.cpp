@@ -1,7 +1,7 @@
 /**
- * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -24,7 +24,7 @@ constexpr uint64_t SKIP_TILING_KEY_VALIDATION = UINT64_MAX;
 struct MatmulAllReduceCompileInfo {
 } g_arch35ExtraTestCompileInfo;
 
-gert::TilingContextPara::TensorDescription MakeArch35TensorDesc(const std::string &shapeStr, ge::DataType dtype)
+gert::TilingContextPara::TensorDescription MakeArch35TensorDesc(const std::string& shapeStr, ge::DataType dtype)
 {
     if (shapeStr.empty()) {
         return TD_DEFAULT;
@@ -46,7 +46,7 @@ std::vector<gert::TilingContextPara::OpAttr> MakeArch35DefaultAttrs(bool isTrans
             {"comm_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("ai_cpu")}};
 }
 
-void RunArch35MatmulAllReduceTilingCase(const gert::TilingContextPara &tilingContextPara, uint64_t ranksize)
+void RunArch35MatmulAllReduceTilingCase(const gert::TilingContextPara& tilingContextPara, uint64_t ranksize)
 {
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", ranksize}};
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, SKIP_TILING_KEY_VALIDATION, "", {},
@@ -355,7 +355,7 @@ TEST_F(MatmulAllReduceArch35TilingExtraTest, TilingParseSuccess)
     ASSERT_NE(opImpl, nullptr);
     ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext));
+    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext));
     EXPECT_EQ(ret, ge::GRAPH_SUCCESS);
 }
 

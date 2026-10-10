@@ -1,13 +1,12 @@
 /**
-* This program is free software, you can redistribute it and/or modify.
-* Copyright (c) 2025 Huawei Technologies Co., Ltd.
-* This file is a part of the CANN Open Software.
-* Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
-* Please refer to the License for details. You may not use this file except in compliance with the License.
-* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING
-* BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE. See LICENSE in the root of
-* the software repository for the full text of the License.
-*/
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 #include <array>
 #include <vector>
@@ -20,14 +19,13 @@
 
 using namespace std;
 
-extern "C" __global__ __aicore__ void
-mla_preprocess_v2(GM_ADDR hiddenStateGm, GM_ADDR gamma1Gm, GM_ADDR beta1Gm, GM_ADDR quantScale1Gm,
-                  GM_ADDR quantOffset1Gm, GM_ADDR wdqkvGm, GM_ADDR descale1Gm, GM_ADDR bias1Gm, GM_ADDR gamma2Gm,
-                  GM_ADDR beta2Gm, GM_ADDR quantScale2Gm, GM_ADDR quantOffset2Gm, GM_ADDR wuqGm, GM_ADDR descale2Gm,
-                  GM_ADDR bias2Gm, GM_ADDR gamma3Gm, GM_ADDR cos1Gm, GM_ADDR sin1Gm, GM_ADDR wukGm, GM_ADDR keycacheGm,
-                  GM_ADDR keycacheRopeGm, GM_ADDR slotMappingGm, GM_ADDR gmCtkvScale, GM_ADDR gmQnopeScale, GM_ADDR qGm,
-                  GM_ADDR keycacheOutGm, GM_ADDR qGm2, GM_ADDR keycacheOutGm2, GM_ADDR qDownGm, GM_ADDR workspace,
-                  GM_ADDR tiling);
+extern "C" __global__ __aicore__ void mla_preprocess_v2(
+    GM_ADDR hiddenStateGm, GM_ADDR gamma1Gm, GM_ADDR beta1Gm, GM_ADDR quantScale1Gm, GM_ADDR quantOffset1Gm,
+    GM_ADDR wdqkvGm, GM_ADDR descale1Gm, GM_ADDR bias1Gm, GM_ADDR gamma2Gm, GM_ADDR beta2Gm, GM_ADDR quantScale2Gm,
+    GM_ADDR quantOffset2Gm, GM_ADDR wuqGm, GM_ADDR descale2Gm, GM_ADDR bias2Gm, GM_ADDR gamma3Gm, GM_ADDR cos1Gm,
+    GM_ADDR sin1Gm, GM_ADDR wukGm, GM_ADDR keycacheGm, GM_ADDR keycacheRopeGm, GM_ADDR slotMappingGm,
+    GM_ADDR gmCtkvScale, GM_ADDR gmQnopeScale, GM_ADDR qGm, GM_ADDR keycacheOutGm, GM_ADDR qGm2, GM_ADDR keycacheOutGm2,
+    GM_ADDR qDownGm, GM_ADDR workspace, GM_ADDR tiling);
 
 class mla_preprocess_v2_test : public testing::TestWithParam<bool> {
 protected:
@@ -84,43 +82,43 @@ TEST_P(mla_preprocess_v2_test, test_case_0)
     size_t keycacheOutGm2Size = bloackNum * bloackSize * 1 * 64 * sizeof(half);
     size_t qDownGmSize = tokenNum * 1536;
 
-    uint8_t *hiddenStateGm = (uint8_t *)AscendC::GmAlloc(hiddenStateSize);
-    uint8_t *gamma1Gm = (uint8_t *)AscendC::GmAlloc(gamma1Size);
-    uint8_t *beta1Gm = (uint8_t *)AscendC::GmAlloc(beta1Size);
-    uint8_t *quantScale1Gm = (uint8_t *)AscendC::GmAlloc(quantScale1Size);
-    uint8_t *quantOffset1Gm = (uint8_t *)AscendC::GmAlloc(quantOffset1Size);
-    uint8_t *wdqkvGm = (uint8_t *)AscendC::GmAlloc(wdqkvSize);
-    uint8_t *descale1Gm = (uint8_t *)AscendC::GmAlloc(descale1Size);
-    uint8_t *bias1Gm = (uint8_t *)AscendC::GmAlloc(bias1Size);
-    uint8_t *gamma2Gm = (uint8_t *)AscendC::GmAlloc(gamma2Size);
-    uint8_t *beta2Gm = (uint8_t *)AscendC::GmAlloc(beta2Size);
-    uint8_t *quantScale2Gm = (uint8_t *)AscendC::GmAlloc(quantScale2Size);
-    uint8_t *quantOffset2Gm = (uint8_t *)AscendC::GmAlloc(quantOffset2Size);
-    uint8_t *wuqGm = (uint8_t *)AscendC::GmAlloc(wuqSize);
-    uint8_t *descale2Gm = (uint8_t *)AscendC::GmAlloc(descale2Size);
-    uint8_t *bias2Gm = (uint8_t *)AscendC::GmAlloc(bias2Size);
-    uint8_t *gamma3Gm = (uint8_t *)AscendC::GmAlloc(gamma3Size);
-    uint8_t *cos1Gm = (uint8_t *)AscendC::GmAlloc(cos1Size);
-    uint8_t *sin1Gm = (uint8_t *)AscendC::GmAlloc(sin1Size);
-    uint8_t *wukGm = (uint8_t *)AscendC::GmAlloc(wukSize);
-    uint8_t *keycacheGm = (uint8_t *)AscendC::GmAlloc(keycacheSize);
-    uint8_t *keycacheRopeGm = (uint8_t *)AscendC::GmAlloc(keycacheRopeSize);
-    uint8_t *slotMappingGm = (uint8_t *)AscendC::GmAlloc(slotMappingSize);
-    uint8_t *gmCtkvScale = (uint8_t *)AscendC::GmAlloc(gmCtkvScaleSize);
-    uint8_t *gmQnopeScale = (uint8_t *)AscendC::GmAlloc(gmQnopeScaleSize);
-    uint8_t *qGm = (uint8_t *)AscendC::GmAlloc(qGmSize);
-    uint8_t *keycacheOutGm = (uint8_t *)AscendC::GmAlloc(keycacheOutGmSize);
-    uint8_t *qGm2 = (uint8_t *)AscendC::GmAlloc(qGm2Size);
-    uint8_t *keycacheOutGm2 = (uint8_t *)AscendC::GmAlloc(keycacheOutGm2Size);
-    uint8_t *qDownGm = (uint8_t *)AscendC::GmAlloc(qDownGmSize);
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(17956864);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tiling_data_size);
+    uint8_t* hiddenStateGm = (uint8_t*)AscendC::GmAlloc(hiddenStateSize);
+    uint8_t* gamma1Gm = (uint8_t*)AscendC::GmAlloc(gamma1Size);
+    uint8_t* beta1Gm = (uint8_t*)AscendC::GmAlloc(beta1Size);
+    uint8_t* quantScale1Gm = (uint8_t*)AscendC::GmAlloc(quantScale1Size);
+    uint8_t* quantOffset1Gm = (uint8_t*)AscendC::GmAlloc(quantOffset1Size);
+    uint8_t* wdqkvGm = (uint8_t*)AscendC::GmAlloc(wdqkvSize);
+    uint8_t* descale1Gm = (uint8_t*)AscendC::GmAlloc(descale1Size);
+    uint8_t* bias1Gm = (uint8_t*)AscendC::GmAlloc(bias1Size);
+    uint8_t* gamma2Gm = (uint8_t*)AscendC::GmAlloc(gamma2Size);
+    uint8_t* beta2Gm = (uint8_t*)AscendC::GmAlloc(beta2Size);
+    uint8_t* quantScale2Gm = (uint8_t*)AscendC::GmAlloc(quantScale2Size);
+    uint8_t* quantOffset2Gm = (uint8_t*)AscendC::GmAlloc(quantOffset2Size);
+    uint8_t* wuqGm = (uint8_t*)AscendC::GmAlloc(wuqSize);
+    uint8_t* descale2Gm = (uint8_t*)AscendC::GmAlloc(descale2Size);
+    uint8_t* bias2Gm = (uint8_t*)AscendC::GmAlloc(bias2Size);
+    uint8_t* gamma3Gm = (uint8_t*)AscendC::GmAlloc(gamma3Size);
+    uint8_t* cos1Gm = (uint8_t*)AscendC::GmAlloc(cos1Size);
+    uint8_t* sin1Gm = (uint8_t*)AscendC::GmAlloc(sin1Size);
+    uint8_t* wukGm = (uint8_t*)AscendC::GmAlloc(wukSize);
+    uint8_t* keycacheGm = (uint8_t*)AscendC::GmAlloc(keycacheSize);
+    uint8_t* keycacheRopeGm = (uint8_t*)AscendC::GmAlloc(keycacheRopeSize);
+    uint8_t* slotMappingGm = (uint8_t*)AscendC::GmAlloc(slotMappingSize);
+    uint8_t* gmCtkvScale = (uint8_t*)AscendC::GmAlloc(gmCtkvScaleSize);
+    uint8_t* gmQnopeScale = (uint8_t*)AscendC::GmAlloc(gmQnopeScaleSize);
+    uint8_t* qGm = (uint8_t*)AscendC::GmAlloc(qGmSize);
+    uint8_t* keycacheOutGm = (uint8_t*)AscendC::GmAlloc(keycacheOutGmSize);
+    uint8_t* qGm2 = (uint8_t*)AscendC::GmAlloc(qGm2Size);
+    uint8_t* keycacheOutGm2 = (uint8_t*)AscendC::GmAlloc(keycacheOutGm2Size);
+    uint8_t* qDownGm = (uint8_t*)AscendC::GmAlloc(qDownGmSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(17956864);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tiling_data_size);
     uint32_t blockDim = 24;
 
-    char *path_ = get_current_dir_name();
+    char* path_ = get_current_dir_name();
     string path(path_);
 
-    MlaTilingData *tilingData = reinterpret_cast<MlaTilingData *>(tiling);
+    MlaTilingData* tilingData = reinterpret_cast<MlaTilingData*>(tiling);
     tilingData->numCore = 24;
     tilingData->n = 8;
     tilingData->perTaskNum = 0;
@@ -224,7 +222,7 @@ TEST_P(mla_preprocess_v2_test, test_case_0)
                 descale1Gm, bias1Gm, gamma2Gm, beta2Gm, quantScale2Gm, quantOffset2Gm, wuqGm, descale2Gm, bias2Gm,
                 gamma3Gm, enableRope ? cos1Gm : nullptr, enableRope ? sin1Gm : nullptr, wukGm, keycacheGm,
                 keycacheRopeGm, slotMappingGm, gmCtkvScale, gmQnopeScale, qGm, keycacheOutGm, qGm2, keycacheOutGm2,
-                qDownGm, workspace, (uint8_t *)(tilingData));
+                qDownGm, workspace, (uint8_t*)(tilingData));
 
     AscendC::GmFree(hiddenStateGm);
     AscendC::GmFree(gamma1Gm);

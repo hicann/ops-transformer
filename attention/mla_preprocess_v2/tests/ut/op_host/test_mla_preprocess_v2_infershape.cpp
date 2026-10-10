@@ -1,12 +1,12 @@
 /**
-* This program is free software, you can redistribute it and/or modify.
-* Copyright (c) 2025 Huawei Technologies Co., Ltd.
-* This file is a part of the CANN Open Software.
-* Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
-* Please refer to the License for details. You may not use this file except in compliance with the License.
-* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
-* See LICENSE in the root of the software repository for the full text of the License.
-*/
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 #include <gtest/gtest.h>
 #include <iostream>
@@ -16,11 +16,11 @@
 #include "base/registry/op_impl_space_registry_v2.h"
 
 namespace {
-gert::StorageShape MakeStorageShape(const std::vector<int64_t> &dims)
+gert::StorageShape MakeStorageShape(const std::vector<int64_t>& dims)
 {
     gert::StorageShape shape;
-    auto &originShape = shape.MutableOriginShape();
-    auto &storageShape = shape.MutableStorageShape();
+    auto& originShape = shape.MutableOriginShape();
+    auto& storageShape = shape.MutableStorageShape();
     originShape.SetDimNum(dims.size());
     storageShape.SetDimNum(dims.size());
     for (size_t i = 0; i < dims.size(); ++i) {
@@ -72,14 +72,13 @@ TEST_P(MlaPreprocessV2Proto, mla_preprocess_v2_infershape_1)
     const std::vector<int64_t> normalRopeShape = {tokenNum, 64};
     const std::vector<int64_t> disabledRopeShape = {0};
     const std::vector<int64_t> tokenMismatchShape = {0, 64};
-    const std::vector<int64_t> cosShape =
-        ropeInputMode == 0 || ropeInputMode == 2 || ropeInputMode == 4
-            ? normalRopeShape
-            : (ropeInputMode == 1 ? disabledRopeShape : tokenMismatchShape);
+    const std::vector<int64_t> cosShape = ropeInputMode == 0 || ropeInputMode == 2 || ropeInputMode == 4 ?
+                                              normalRopeShape :
+                                              (ropeInputMode == 1 ? disabledRopeShape : tokenMismatchShape);
     const std::vector<int64_t> sinShape =
-        ropeInputMode == 0 || ropeInputMode == 4
-            ? normalRopeShape
-            : (ropeInputMode == 1 || ropeInputMode == 2 ? disabledRopeShape : tokenMismatchShape);
+        ropeInputMode == 0 || ropeInputMode == 4 ?
+            normalRopeShape :
+            (ropeInputMode == 1 || ropeInputMode == 2 ? disabledRopeShape : tokenMismatchShape);
     gert::InfershapeContextPara infershapeContextPara(
         "MlaPreprocessV2",
         {
@@ -101,8 +100,8 @@ TEST_P(MlaPreprocessV2Proto, mla_preprocess_v2_infershape_1)
             {{{headNum * 192}, {headNum * 192}}, ge::DT_INT64, ge::FORMAT_ND},                    // deScale1
             {{{headNum * 192}, {headNum * 192}}, ge::DT_INT32, ge::FORMAT_ND},                    // bias1
             {{{512}, {512}}, ge::DT_FLOAT16, ge::FORMAT_ND},                                      // gamma2
-            {MakeStorageShape(cosShape), ge::DT_FLOAT16, ge::FORMAT_ND},                              // cos
-            {MakeStorageShape(sinShape), ge::DT_FLOAT16, ge::FORMAT_ND},                              // sin
+            {MakeStorageShape(cosShape), ge::DT_FLOAT16, ge::FORMAT_ND},                          // cos
+            {MakeStorageShape(sinShape), ge::DT_FLOAT16, ge::FORMAT_ND},                          // sin
             {{{headNum, 128, 512}, {headNum, 128, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND},          // wuk
             {{{blockNum, blockSize, 1, 576}, {blockNum, blockSize, 1, 576}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // kvCache
             {{{blockNum, blockSize, 1, 64}, {blockNum, blockSize, 1, 64}},
@@ -137,9 +136,8 @@ TEST_P(MlaPreprocessV2Proto, mla_preprocess_v2_infershape_1)
         });
     std::vector<std::vector<int64_t>> expectOutputShape = {
         {tokenNum, 1536, 512}, {blockNum, blockSize, 1, 576}, {tokenNum, headNum, 64}, {blockNum, blockSize, 1, 64}};
-    ExecuteTestCase(infershapeContextPara, ropeInputMode == 2 || ropeInputMode == 3 ? ge::GRAPH_FAILED
-                                                                                   : ge::GRAPH_SUCCESS,
-                    expectOutputShape);
+    ExecuteTestCase(infershapeContextPara,
+                    ropeInputMode == 2 || ropeInputMode == 3 ? ge::GRAPH_FAILED : ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
 INSTANTIATE_TEST_SUITE_P(RopeModes, MlaPreprocessV2Proto, testing::Values(0, 1, 2, 3, 4));

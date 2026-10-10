@@ -1,11 +1,10 @@
 /**
- * This program is free software, you can redistribute it and/or modify it.
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING
- * BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
@@ -14,7 +13,7 @@
 namespace ascend_ops {
 namespace MoeDistributeDispatchV2 {
 
-static void InitValidateContext(MoeDistributeDispatchV2ValidateParams &params)
+static void InitValidateContext(MoeDistributeDispatchV2ValidateParams& params)
 {
     params.maxEpWorldSize = ValidationConstants::MAX_EP_WORLD_SIZE;
     params.maxMoeExpertNum = ValidationConstants::MOE_EXPERT_MAX_NUM;
@@ -78,7 +77,7 @@ static void InitValidateContext(MoeDistributeDispatchV2ValidateParams &params)
     params.k = 0;
 }
 
-static void ValidateEpAttrs(const MoeDistributeDispatchV2ValidateParams &params)
+static void ValidateEpAttrs(const MoeDistributeDispatchV2ValidateParams& params)
 {
     TORCH_CHECK((params.ep_world_size >= ValidationConstants::MIN_EP_WORLD_SIZE) &&
                     (params.ep_world_size <= params.maxEpWorldSize),
@@ -90,7 +89,7 @@ static void ValidateEpAttrs(const MoeDistributeDispatchV2ValidateParams &params)
                 " ep_world_size: ", params.ep_world_size, ", ep_rank_id: ", params.ep_rank_id);
 }
 
-static void ValidateSharedExpertAttrs(const MoeDistributeDispatchV2ValidateParams &params)
+static void ValidateSharedExpertAttrs(const MoeDistributeDispatchV2ValidateParams& params)
 {
     TORCH_CHECK(params.isNoShared || params.isValidShared,
                 "shared_expert_num/rank_num invalid configs. Valid: (0,0), or (n,m) where m%n==0. ",
@@ -102,7 +101,7 @@ static void ValidateSharedExpertAttrs(const MoeDistributeDispatchV2ValidateParam
                 " ep_world_size: ", params.ep_world_size, ", shared_expert_rank_num: ", params.shared_expert_rank_num);
 }
 
-static void ValidateMoeExpertAttrs(const MoeDistributeDispatchV2ValidateParams &params)
+static void ValidateMoeExpertAttrs(const MoeDistributeDispatchV2ValidateParams& params)
 {
     TORCH_CHECK((params.moe_expert_num > 0) && (params.moe_expert_num <= params.maxMoeExpertNum),
                 "moe_expert_num is invalid, only support (0, ", params.maxMoeExpertNum, "], but got ",
@@ -122,7 +121,7 @@ static void ValidateMoeExpertAttrs(const MoeDistributeDispatchV2ValidateParams &
                 ", localMoeExpertNum = ", params.localMoeExpertNum, ", ep_world_size = ", params.ep_world_size);
 }
 
-static void ValidateQuantModeAndScales(const MoeDistributeDispatchV2ValidateParams &params)
+static void ValidateQuantModeAndScales(const MoeDistributeDispatchV2ValidateParams& params)
 {
     TORCH_CHECK((params.quant_mode == static_cast<int64_t>(QuantModeA5::NON_QUANT)) ||
                     (params.quant_mode == static_cast<int64_t>(QuantModeA5::PERTOKEN_DYNAMIC_QUANT)),
@@ -130,7 +129,7 @@ static void ValidateQuantModeAndScales(const MoeDistributeDispatchV2ValidatePara
                 params.quant_mode);
 }
 
-static void ValidateCommonAttrs(const MoeDistributeDispatchV2ValidateParams &params)
+static void ValidateCommonAttrs(const MoeDistributeDispatchV2ValidateParams& params)
 {
     TORCH_CHECK((params.expert_token_nums_type == 0) || (params.expert_token_nums_type == 1),
                 "The expert_token_nums_type should be 0 or 1.");
@@ -152,7 +151,7 @@ static void ValidateCommonAttrs(const MoeDistributeDispatchV2ValidateParams &par
                 ", const_expert_num: ", params.const_expert_num, ", moe_expert_num: ", params.moe_expert_num);
 }
 
-static void ValidateGlobalBs(const MoeDistributeDispatchV2ValidateParams &params, int64_t bs, bool hasActiveMask)
+static void ValidateGlobalBs(const MoeDistributeDispatchV2ValidateParams& params, int64_t bs, bool hasActiveMask)
 {
     TORCH_CHECK(!((params.global_bs != 0) &&
                   ((params.global_bs < params.ep_world_size * bs) || (params.global_bs % params.ep_world_size != 0))),
@@ -168,8 +167,8 @@ static void ValidateGlobalBs(const MoeDistributeDispatchV2ValidateParams &params
     }
 }
 
-static void ValidateInputTensorDim(const at::Tensor &x, const at::Tensor &expert_ids,
-                                   MoeDistributeDispatchV2ValidateParams &params)
+static void ValidateInputTensorDim(const at::Tensor& x, const at::Tensor& expert_ids,
+                                   MoeDistributeDispatchV2ValidateParams& params)
 {
     TORCH_CHECK(x.dim() == 2, "x must be 2-dimension, but got ", x.dim(), " dimension");
 
@@ -197,16 +196,16 @@ static void ValidateInputTensorDim(const at::Tensor &x, const at::Tensor &expert
                 ", const_expert_num: ", params.const_expert_num);
 }
 
-static void ValidateOptionalTensorDim(const c10::optional<at::Tensor> &scales,
-                                      const c10::optional<at::Tensor> &x_active_mask,
-                                      const c10::optional<at::Tensor> &expert_scales,
-                                      const c10::optional<at::Tensor> &performance_info,
-                                      MoeDistributeDispatchV2ValidateParams &params)
+static void ValidateOptionalTensorDim(const c10::optional<at::Tensor>& scales,
+                                      const c10::optional<at::Tensor>& x_active_mask,
+                                      const c10::optional<at::Tensor>& expert_scales,
+                                      const c10::optional<at::Tensor>& performance_info,
+                                      MoeDistributeDispatchV2ValidateParams& params)
 {
     params.isScales = scales.has_value();
 
     if (x_active_mask.has_value()) {
-        const auto &mask = x_active_mask.value();
+        const auto& mask = x_active_mask.value();
         TORCH_CHECK((mask.dim() == 1) || (mask.dim() == 2),
                     "x_active_mask must be 1-dimension or 2-dimension, but got ", mask.dim(), " dimension");
         TORCH_CHECK(mask.size(0) == params.bs, "x_active_mask's dim0 not equal to bs, x_active_mask: ", mask.size(0),
@@ -218,13 +217,13 @@ static void ValidateOptionalTensorDim(const c10::optional<at::Tensor> &scales,
     }
 
     if (expert_scales.has_value()) {
-        const auto &exp_scales = expert_scales.value();
+        const auto& exp_scales = expert_scales.value();
         TORCH_CHECK(exp_scales.dim() == 2, "expert_scales must be 2-dimension, but got ", exp_scales.dim(),
                     " dimension");
     }
 
     if (performance_info.has_value()) {
-        const auto &perf = performance_info.value();
+        const auto& perf = performance_info.value();
         TORCH_CHECK(perf.dim() == 1, "performance_info must be 1-dimension, but got ", perf.dim(), " dimension");
         TORCH_CHECK(perf.size(0) == params.ep_world_size,
                     "performance_info's dim0 not equal to ep_world_size, performance_info: ", perf.size(0),
@@ -232,8 +231,8 @@ static void ValidateOptionalTensorDim(const c10::optional<at::Tensor> &scales,
     }
 }
 
-static void ValidateInputDataType(const at::Tensor &x, const at::Tensor &expert_ids,
-                                  const MoeDistributeDispatchV2ValidateParams &params)
+static void ValidateInputDataType(const at::Tensor& x, const at::Tensor& expert_ids,
+                                  const MoeDistributeDispatchV2ValidateParams& params)
 {
     TORCH_CHECK((x.scalar_type() == at::kBFloat16) || (x.scalar_type() == at::kHalf),
                 "dtype of x should be BFloat16 or Float16, but got ", c10::toString(x.scalar_type()));
@@ -242,46 +241,46 @@ static void ValidateInputDataType(const at::Tensor &x, const at::Tensor &expert_
                 c10::toString(expert_ids.scalar_type()));
 }
 
-static void ValidateOptionalTensorDataType(const c10::optional<at::Tensor> &scales,
-                                           const c10::optional<at::Tensor> &x_active_mask,
-                                           const c10::optional<at::Tensor> &expert_scales,
-                                           const c10::optional<at::Tensor> &performance_info)
+static void ValidateOptionalTensorDataType(const c10::optional<at::Tensor>& scales,
+                                           const c10::optional<at::Tensor>& x_active_mask,
+                                           const c10::optional<at::Tensor>& expert_scales,
+                                           const c10::optional<at::Tensor>& performance_info)
 {
     if (scales.has_value()) {
-        const auto &scales_tensor = scales.value();
+        const auto& scales_tensor = scales.value();
         TORCH_CHECK(scales_tensor.scalar_type() == at::kFloat,
                     "scales datatype is invalid, datatype should be Float, but is ",
                     c10::toString(scales_tensor.scalar_type()));
     }
 
     if (x_active_mask.has_value()) {
-        const auto &mask = x_active_mask.value();
+        const auto& mask = x_active_mask.value();
         TORCH_CHECK(mask.scalar_type() == at::kBool,
                     "x_active_mask datatype is invalid, datatype should be Bool, but is ",
                     c10::toString(mask.scalar_type()));
     }
 
     if (expert_scales.has_value()) {
-        const auto &exp_scales = expert_scales.value();
+        const auto& exp_scales = expert_scales.value();
         TORCH_CHECK(exp_scales.scalar_type() == at::kFloat,
                     "expert_scales datatype is invalid, datatype should be Float, but is ",
                     c10::toString(exp_scales.scalar_type()));
     }
 
     if (performance_info.has_value()) {
-        const auto &perf = performance_info.value();
+        const auto& perf = performance_info.value();
         TORCH_CHECK(perf.scalar_type() == at::kLong,
                     "performance_info datatype is invalid, datatype should be Long, but is ",
                     c10::toString(perf.scalar_type()));
     }
 }
 
-bool ValidateMoeDistributeDispatchV2Input(const at::Tensor &x, const at::Tensor &expert_ids,
-                                          const c10::optional<at::Tensor> &scales,
-                                          const c10::optional<at::Tensor> &x_active_mask,
-                                          const c10::optional<at::Tensor> &expert_scales,
-                                          const c10::optional<at::Tensor> &performance_info,
-                                          MoeDistributeDispatchV2ValidateParams &params)
+bool ValidateMoeDistributeDispatchV2Input(const at::Tensor& x, const at::Tensor& expert_ids,
+                                          const c10::optional<at::Tensor>& scales,
+                                          const c10::optional<at::Tensor>& x_active_mask,
+                                          const c10::optional<at::Tensor>& expert_scales,
+                                          const c10::optional<at::Tensor>& performance_info,
+                                          MoeDistributeDispatchV2ValidateParams& params)
 {
     // 初始化和属性验证
     InitValidateContext(params);

@@ -13,8 +13,6 @@
 """
 Function:
 The replay funtion entry
-Copyright Information:
-Huawei Technologies Co., Ltd. All Rights Reserved © 2020
 """
 
 import os

@@ -1,3 +1,13 @@
+# ----------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# ----------------------------------------------------------------------------
+
 import torch
 import numpy as np
 import copy
@@ -6,8 +16,9 @@ from ml_dtypes import float8_e4m3fn as np_float8_e4m3fn
 
 __golden__ = {
     "kernel": {"stem_oam_prep_paged_kv": "stem_oam_prep_paged_kv_golden"},
-    "aclnn": {"aclnnStemOamPrepPagedKv": "aclnn_stem_oam_prep_paged_kv_golden"}
+    "aclnn": {"aclnnStemOamPrepPagedKv": "aclnn_stem_oam_prep_paged_kv_golden"},
 }
+
 
 def _numpy_to_torch(t, dtype=torch.float32):
     if t is None:
@@ -20,6 +31,7 @@ def _numpy_to_torch(t, dtype=torch.float32):
         return t.to(dtype)
     return torch.from_numpy(t).to(dtype)
 
+
 def stem_oam_prep_paged_kv(
     kcache_fp8,
     vcache_fp8,
@@ -31,7 +43,7 @@ def stem_oam_prep_paged_kv(
     lambda_mag=0.3,
     kv_layout=0,
     stem_block_size=128,
-    stem_stride=16
+    stem_stride=16,
 ):
     """Pure PyTorch golden for stem_oam_prep_paged_kv.
 
@@ -77,18 +89,26 @@ def stem_oam_prep_paged_kv(
 
     k_padded_lens = (
         (kv_seq_lens.to(torch.int64) + stem_block_size - 1)
-        // stem_block_size * stem_block_size
+        // stem_block_size
+        * stem_block_size
     ).to(torch.int32)
     max_k_padded = k_padded_lens.max().item()
     max_Kb = max_k_padded // stem_block_size
 
     kflat_out = torch.zeros(
-        num_batch, num_head_kv, max_Kb, stem_stride * dim_qk,
-        dtype=torch.bfloat16, device=device,
+        num_batch,
+        num_head_kv,
+        max_Kb,
+        stem_stride * dim_qk,
+        dtype=torch.bfloat16,
+        device=device,
     )
     v_bias_out = torch.zeros(
-        num_batch, num_head_kv, max_Kb,
-        dtype=torch.float32, device=device,
+        num_batch,
+        num_head_kv,
+        max_Kb,
+        dtype=torch.float32,
+        device=device,
     )
 
     kcache_f32 = kcache_fp8.to(torch.float32)
@@ -109,22 +129,40 @@ def stem_oam_prep_paged_kv(
             v_paged = vcache_f32[block_ids].reshape(-1, num_head_kv, dim_v)
             kScale_paged = kscale_fp32[block_ids].reshape(-1, num_head_kv, 1)
         else:
-            k_paged = kcache_f32[block_ids].permute(0, 2, 1, 3).reshape(-1, num_head_kv, dim_qk)
-            v_paged = vcache_f32[block_ids].permute(0, 2, 1, 3).reshape(-1, num_head_kv, dim_v)
-            kScale_paged = kscale_fp32[block_ids].permute(0, 2, 1, 3).reshape(-1, num_head_kv, 1)
+            k_paged = (
+                kcache_f32[block_ids]
+                .permute(0, 2, 1, 3)
+                .reshape(-1, num_head_kv, dim_qk)
+            )
+            v_paged = (
+                vcache_f32[block_ids]
+                .permute(0, 2, 1, 3)
+                .reshape(-1, num_head_kv, dim_v)
+            )
+            kScale_paged = (
+                kscale_fp32[block_ids].permute(0, 2, 1, 3).reshape(-1, num_head_kv, 1)
+            )
 
-        k_dense = torch.zeros(k_padded, num_head_kv, dim_qk, dtype=torch.float32, device=device)
-        v_dense = torch.zeros(k_padded, num_head_kv, dim_v, dtype=torch.float32, device=device)
-        kScale_dense = torch.zeros(k_padded, num_head_kv, 1, dtype=torch.float32, device=device)
+        k_dense = torch.zeros(
+            k_padded, num_head_kv, dim_qk, dtype=torch.float32, device=device
+        )
+        v_dense = torch.zeros(
+            k_padded, num_head_kv, dim_v, dtype=torch.float32, device=device
+        )
+        kScale_dense = torch.zeros(
+            k_padded, num_head_kv, 1, dtype=torch.float32, device=device
+        )
 
         actual_rows = min(kv_len, num_kv_blocks * kv_block_size)
         k_dense[:actual_rows] = k_paged.reshape(-1, num_head_kv, dim_qk)[:actual_rows]
         v_dense[:actual_rows] = v_paged.reshape(-1, num_head_kv, dim_v)[:actual_rows]
-        kScale_dense[:actual_rows] = kScale_paged.reshape(-1, num_head_kv, 1)[:actual_rows]
+        kScale_dense[:actual_rows] = kScale_paged.reshape(-1, num_head_kv, 1)[
+            :actual_rows
+        ]
 
         k_scaled = (
-            k_dense[:num_stem_blocks * stem_block_size]
-            * kScale_dense[:num_stem_blocks * stem_block_size]
+            k_dense[: num_stem_blocks * stem_block_size]
+            * kScale_dense[: num_stem_blocks * stem_block_size]
         )
 
         for h in range(num_head_kv):
@@ -133,15 +171,17 @@ def stem_oam_prep_paged_kv(
             k_group_sum = k_blocks.sum(dim=1)
             k_group_rev = k_group_sum.flip(1)
             kflat_out[b, h, :num_stem_blocks] = k_group_rev.reshape(
-                num_stem_blocks, stem_stride * dim_qk,
+                num_stem_blocks,
+                stem_stride * dim_qk,
             ).to(torch.bfloat16)
 
             vscale_h = vscale[h].item()
-            v_h = v_dense[:num_stem_blocks * stem_block_size, h, :] * vscale_h
+            v_h = v_dense[: num_stem_blocks * stem_block_size, h, :] * vscale_h
             v_rows = v_h.reshape(k_down_len, stem_stride, dim_v)
-            norms = torch.sqrt((v_rows ** 2).sum(dim=-1))
+            norms = torch.sqrt((v_rows**2).sum(dim=-1))
             row_ids = torch.arange(
-                num_stem_blocks * stem_block_size, device=device,
+                num_stem_blocks * stem_block_size,
+                device=device,
             ).reshape(k_down_len, stem_stride)
             norms = torch.where(row_ids < kv_len, norms, torch.zeros_like(norms))
             v_norm_down = norms.max(dim=-1).values
@@ -156,10 +196,13 @@ def stem_oam_prep_paged_kv(
                 inv_std = 1.0 / (v_std + epsilon)
                 normalized = (log_vals - v_mean) * inv_std
                 v_final = lambda_mag * torch.relu(normalized)
-                v_final_blocks = v_final[:num_stem_blocks * R].reshape(num_stem_blocks, R)
+                v_final_blocks = v_final[: num_stem_blocks * R].reshape(
+                    num_stem_blocks, R
+                )
                 v_bias_out[b, h, :num_stem_blocks] = v_final_blocks.mean(dim=1)
 
     return kflat_out, v_bias_out
+
 
 def aclnn_stem_oam_prep_paged_kv_golden(
     kCache,
@@ -174,7 +217,7 @@ def aclnn_stem_oam_prep_paged_kv_golden(
     stemStride,
     kFlat,
     vBias,
-    **kwargs
+    **kwargs,
 ):
     kvSeqLens = torch.tensor(kvSeqLens, dtype=torch.int32)
     kvBlockSize = kCache.shape[1]
@@ -182,11 +225,23 @@ def aclnn_stem_oam_prep_paged_kv_golden(
     if kvLayout == "BNBD":
         cacheLayout = 1
         kvBlockSize = kCache.shape[2]
-    
-    kflat_out, v_bias_out = stem_oam_prep_paged_kv(kCache, vCache, kScaleCache, vScale, kvIndices, kvSeqLens, 
-                                                kvBlockSize, lambdaMag, cacheLayout, stemBlockSize, stemStride)
+
+    kflat_out, v_bias_out = stem_oam_prep_paged_kv(
+        kCache,
+        vCache,
+        kScaleCache,
+        vScale,
+        kvIndices,
+        kvSeqLens,
+        kvBlockSize,
+        lambdaMag,
+        cacheLayout,
+        stemBlockSize,
+        stemStride,
+    )
 
     return (kflat_out, v_bias_out)
+
 
 def stem_oam_prep_paged_kv_golden(
     kCache,
@@ -199,7 +254,7 @@ def stem_oam_prep_paged_kv_golden(
     kvLayout,
     stemBlockSize,
     stemStride,
-    **kwargs
+    **kwargs,
 ):
     kCache = _numpy_to_torch(kCache, torch.float8_e4m3fn)
     vCache = _numpy_to_torch(vCache, torch.float8_e4m3fn)
@@ -212,9 +267,20 @@ def stem_oam_prep_paged_kv_golden(
     if kvLayout == "BNBD":
         cacheLayout = 1
         kvBlockSize = kCache.shape[2]
-    
-    kflat_out, v_bias_out = stem_oam_prep_paged_kv(kCache, vCache, kScaleCache, vScale, kvIndices, kvSeqLens, 
-                                                kvBlockSize, lambdaMag, stemBlockSize, stemStride, cacheLayout)
+
+    kflat_out, v_bias_out = stem_oam_prep_paged_kv(
+        kCache,
+        vCache,
+        kScaleCache,
+        vScale,
+        kvIndices,
+        kvSeqLens,
+        kvBlockSize,
+        lambdaMag,
+        stemBlockSize,
+        stemStride,
+        cacheLayout,
+    )
     kflat_out = kflat_out.to(torch.float32).numpy()
     v_bias_out = v_bias_out.numpy()
 

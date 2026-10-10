@@ -1,8 +1,8 @@
 /**
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under terms and conditions of
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to License for details. You may not use this file except in compliance with License.
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
  * See LICENSE in the root of the software repository for the full text of the License.
@@ -33,12 +33,12 @@ TEST_F(MhcSinkhornBackwardProto, MhcSinkhornBackward_infershape_bsnn)
     gert::InfershapeContextPara infershapeContextPara(
         "MhcSinkhornBackward",
         {
-            {{{4, 128, 8, 8}, {4, 128, 8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},     // 0: grad_y
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                              // 1: norm 
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                              // 2: sum 
+            {{{4, 128, 8, 8}, {4, 128, 8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_y
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // 1: norm
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // 2: sum
         },
         {
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},   // 0: grad_input
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_input
         },
         {});
 
@@ -53,12 +53,12 @@ TEST_F(MhcSinkhornBackwardProto, MhcSinkhornBackward_infershape_tnn)
     gert::InfershapeContextPara infershapeContextPara(
         "MhcSinkhornBackward",
         {
-            {{{512, 8, 8}, {512, 8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},     // 0: grad_y
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // 1: norm 
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // 2: sum 
+            {{{512, 8, 8}, {512, 8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_y
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                   // 1: norm
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                   // 2: sum
         },
         {
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},       // 0: grad_input
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_input
         },
         {});
 
@@ -73,12 +73,12 @@ TEST_F(MhcSinkhornBackwardProto, MhcSinkhornBackward_infershape_unknown_rank)
     gert::InfershapeContextPara infershapeContextPara(
         "MhcSinkhornBackward",
         {
-            {{{-2}, {-2}}, ge::DT_FLOAT, ge::FORMAT_ND},       // 0: grad_y (unknown rank)
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},           // 1: norm
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},           // 2: sum
+            {{{-2}, {-2}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_y (unknown rank)
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},     // 1: norm
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},     // 2: sum
         },
         {
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},       // 0: grad_input
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_input
         },
         {});
 
@@ -94,8 +94,8 @@ TEST_F(MhcSinkhornBackwardProto, MhcSinkhornBackward_infershape_bsnn_n4)
         "MhcSinkhornBackward",
         {
             {{{2, 256, 4, 4}, {2, 256, 4, 4}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_y
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                              // 1: norm 
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                              // 2: sum 
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // 1: norm
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // 2: sum
         },
         {
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_input
@@ -114,8 +114,8 @@ TEST_F(MhcSinkhornBackwardProto, MhcSinkhornBackward_infershape_tnn_n6)
         "MhcSinkhornBackward",
         {
             {{{-1, 6, 6}, {-1, 6, 6}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_y
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // 1: norm 
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // 2: sum 
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                 // 1: norm
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                 // 2: sum
         },
         {
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_input
@@ -152,8 +152,8 @@ TEST_F(MhcSinkhornBackwardProto, MhcSinkhornBackward_infershape_invalid_dim_coun
         "MhcSinkhornBackward",
         {
             {{{2, 128, 8, 8, 1}, {2, 128, 8, 8, 1}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_y (5D, invalid)
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                   // 1: norm
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                                   // 2: sum
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                               // 1: norm
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                               // 2: sum
         },
         {
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_input
@@ -170,8 +170,8 @@ TEST_F(MhcSinkhornBackwardProto, MhcSinkhornBackward_infershape_bsnn_batch1)
         "MhcSinkhornBackward",
         {
             {{{1, 64, 8, 8}, {1, 64, 8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_y
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // 1: norm 
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                         // 2: sum 
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // 1: norm
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                       // 2: sum
         },
         {
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_input
@@ -190,8 +190,8 @@ TEST_F(MhcSinkhornBackwardProto, MhcSinkhornBackward_infershape_tnn_large)
         "MhcSinkhornBackward",
         {
             {{{4096, 8, 8}, {4096, 8, 8}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_y
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // 1: norm 
-            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                          // 2: sum 
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                     // 1: norm
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                     // 2: sum
         },
         {
             {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 0: grad_input

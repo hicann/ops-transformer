@@ -1,7 +1,18 @@
+# ----------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# ----------------------------------------------------------------------------
+
 import os
 import re
 import struct
 import torch
+
 
 def hex32_to_float(hex_str):
     """
@@ -12,7 +23,7 @@ def hex32_to_float(hex_str):
     # 转成32位无符号整数
     int_value = int(hex_str, 16)
     # struct 解析为 float (大端模式，与内存数据一致)
-    float_value = struct.unpack('!f', struct.pack('!I', int_value))[0]
+    float_value = struct.unpack("!f", struct.pack("!I", int_value))[0]
     return float_value
 
 
@@ -21,18 +32,19 @@ def parse_log_data(log_text):
     解析日志文本，提取所有32位16进制数据并转float
     """
     # 正则匹配 8位16进制数（在[]中间）
-    pattern = r'\[([0-9a-fA-F]{8})\]'
+    pattern = r"\[([0-9a-fA-F]{8})\]"
     hex_list = re.findall(pattern, log_text)
-    
+
     # 转换为float
     float_results = []
     for idx, h in enumerate(hex_list):
         f_val = hex32_to_float(h)
         float_results.append(f_val)
-       #  print(f"地址 0x{idx*4:08x} | 16进制: {h:>8} | float: {f_val:.10f}")
-    
-#     print("\n✅ 解析完成，共 {} 个float数据".format(len(float_results)))
+    #  print(f"地址 0x{idx*4:08x} | 16进制: {h:>8} | float: {f_val:.10f}")
+
+    #     print("\n✅ 解析完成，共 {} 个float数据".format(len(float_results)))
     return float_results
+
 
 def list_to_2d_tensor_custom(your_list):
     """
@@ -42,31 +54,33 @@ def list_to_2d_tensor_custom(your_list):
     """
     # 转成tensor方便操作
     data = torch.tensor(your_list, dtype=torch.float32)
-    
+
     # 计算维度：每8行拼成1行128，每行取前16
-    num_rows = data.shape[0]       # 输入总行数
-    num_batches = num_rows // 8    # 最终输出行数 = 输入/8
-    feature_dim = 128              # 固定最后一维
-    chunk_size = 16                # 每次搬16个
-    
+    num_rows = data.shape[0]  # 输入总行数
+    num_batches = num_rows // 8  # 最终输出行数 = 输入/8
+    feature_dim = 128  # 固定最后一维
+    chunk_size = 16  # 每次搬16个
+
     # 存储结果
     result = []
-    
+
     # 按8行一组处理
     for i in range(num_batches):
         # 取出当前组的8行
-        group = data[i*8 : (i+1)*8]
+        group = data[i * 8 : (i + 1) * 8]
         # 每行取前16个，拼接成 1×128
         row_128 = torch.cat([row[:chunk_size] for row in group])
         result.append(row_128)
-    
+
     # 拼成最终二维 tensor
     final_tensor = torch.stack(result)
-    
+
     return final_tensor
+
 
 import re
 import struct
+
 
 def hex_bf16_to_float(hex_str):
     """
@@ -77,7 +91,8 @@ def hex_bf16_to_float(hex_str):
     exp = (h >> 7) & 0xFF
     mantissa = h & 0x7F
     f32_bits = (sign << 31) | (exp << 23) | (mantissa << 16)
-    return struct.unpack('!f', struct.pack('!I', f32_bits))[0]
+    return struct.unpack("!f", struct.pack("!I", f32_bits))[0]
+
 
 def parse_log_data_bf16(log_text):
     """
@@ -87,27 +102,29 @@ def parse_log_data_bf16(log_text):
     低位在后4位 → 先放后4位的值，再放前4位的值
     """
     # 正则匹配 [] 中的 8 位 hex
-    pattern = r'\[([0-9a-fA-F]{8})\]'
+    pattern = r"\[([0-9a-fA-F]{8})\]"
     hex_list = re.findall(pattern, log_text)
-    
+
     float_results = []
     for full_hex in hex_list:
         # 拆分：前4位(高16位)、后4位(低16位)
         hex_high = full_hex[:4]  # 前4位：高16位
-        hex_low = full_hex[4:]   # 后4位：低16位（低位）
-        
+        hex_low = full_hex[4:]  # 后4位：低16位（低位）
+
         # 低位在后4位 → 先加低位值，再加高位值
         f_low = hex_bf16_to_float(hex_low)
         f_high = hex_bf16_to_float(hex_high)
-        
+
         float_results.append(f_low)
         float_results.append(f_high)
-    
+
     return float_results
 
+
 import re
 
 import re
+
 
 def fp8_e4m3_to_float(byte_val):
     """
@@ -137,19 +154,20 @@ def fp8_e4m3_to_float(byte_val):
     elif exp == 0b1111:
         # 指数全1：无穷大或NaN
         if mantissa == 0:
-            return float('inf') if sign == 1 else float('-inf')  # 无穷大
+            return float("inf") if sign == 1 else float("-inf")  # 无穷大
         else:
-            return float('nan')  # NaN
+            return float("nan")  # NaN
     else:
         # 规格化数: 值 = (1 + mantissa/8) * 2^(exp - bias)
         val = (1 + mantissa / 8) * (2 ** (exp - bias))
 
     return sign * val
 
+
 def parse_fp8e4m3_log(log_data):
     """解析日志数据，提取地址并转换为FP8 E4M3"""
     # 正则匹配：Address XXXXXXXX = [XXXXXXXX]
-    pattern = r'Address\s+([0-9a-fA-F]{8})\s*=\s*\[([0-9a-fA-F]{8})\]'
+    pattern = r"Address\s+([0-9a-fA-F]{8})\s*=\s*\[([0-9a-fA-F]{8})\]"
     matches = re.findall(pattern, log_data)
 
     results = []
@@ -162,6 +180,7 @@ def parse_fp8e4m3_log(log_data):
             fp_val = fp8_e4m3_to_float(byte)
             results.append(fp_val)
     return results
+
 
 def fp8_e8m0_to_float(byte_val):
     """
@@ -181,7 +200,7 @@ def fp8_e8m0_to_float(byte_val):
 def parse_fp8_log(log_data):
     """解析日志数据，提取地址并转换为FP8 E8M0"""
     # 正则匹配：Address XXXXXXXX = [XXXXXXXX]
-    pattern = r'Address\s+([0-9a-fA-F]{8})\s*=\s*\[([0-9a-fA-F]{8})\]'
+    pattern = r"Address\s+([0-9a-fA-F]{8})\s*=\s*\[([0-9a-fA-F]{8})\]"
     matches = re.findall(pattern, log_data)
 
     results = []
@@ -195,6 +214,7 @@ def parse_fp8_log(log_data):
             results.append(fp_val)
     return results
 
+
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_path = os.path.join(script_dir, "data.txt")
@@ -202,29 +222,29 @@ def main():
         LOG_DATA = f.read()
 
     # 解析数据
-#     parsed_results = parse_fp8e4m3_log(LOG_DATA)
+    #     parsed_results = parse_fp8e4m3_log(LOG_DATA)
     parsed_results = parse_log_data(LOG_DATA)
-#     tensor = list_to_2d_tensor_custom(parsed_results)
-#     print(tensor)
+    #     tensor = list_to_2d_tensor_custom(parsed_results)
+    #     print(tensor)
 
     # 打印结果（表格形式）
     # print(f"{'地址':<10} {'原始字节':<8} {'FP8 E4M3 数值'}")
     # print("-" * 40)
-    
-#     for res in parsed_results:
-#         # print(f"{res['address']:<10} {res['byte_hex']:<8} {res['fp8_e4m3']:.5f}")
-#         print(f"{res:.4f}")
 
+    #     for res in parsed_results:
+    #         # print(f"{res['address']:<10} {res['byte_hex']:<8} {res['fp8_e4m3']:.5f}")
+    #         print(f"{res:.4f}")
 
-       # 初始化计数器
+    # 初始化计数器
     count = 0
     for res in parsed_results:
-    # 打印数值，保留4位小数
-       print(f"{res:.4f}", end=" ")
-       count += 1
-       # 每32个换一行
-       if count % 32 == 0:
-           print()
+        # 打印数值，保留4位小数
+        print(f"{res:.4f}", end=" ")
+        count += 1
+        # 每32个换一行
+        if count % 32 == 0:
+            print()
+
 
 #     # 可选：保存到CSV文件
 #     import csv

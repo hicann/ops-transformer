@@ -33,6 +33,8 @@
                 <filteritem type="filename" name="*.yaml" desc="YAML configuration files, no license header required"/>
                 <filteritem type="filename" name="*.yml" desc="YAML configuration files, no license header required"/>
                 <filteritem type="filename" name="*.csv" desc="CSV test case files, no license header required"/>
+                <filteritem type="filename" name="LICENSE" desc="Root LICENSE file is the license text itself, no license header applicable"/>
+                <filteritem type="filepath" name="experimental/.*" desc="Experimental incubator code, not subject to release compliance scanning"/>
             </filefilter>
             <filefilter name="copyrightPolicyFilter" desc="Filters for copyright header policies">
                 <filteritem type="filename" name="requirements*.txt" desc="Dependency manifest files, copyright header not applicable"/>
@@ -41,6 +43,8 @@
                 <!--filteritem type="filepath" name="abcdefg/.*.uvwxyz" desc="Describe the reason for filtering scan results"/-->
                 <!--filteritem type="filepath" name="projectroot/[a-zA-Z0-9]{20,}.sh" desc="Temp files"/-->
                 <filteritem type="filename" name="*.csv" desc="CSV test case files cannot contain a copyright header without breaking their schema"/>
+                <filteritem type="filename" name="Third_Party_Open_Source_Software_Notice" desc="Third-party open source software notice file, contains third-party copyrights by design"/>
+                <filteritem type="filepath" name="experimental/.*" desc="Experimental incubator code, not subject to release compliance scanning"/>
             </filefilter>
             <filefilter name="licenseFileNamePolicyFilter" desc="Filters for LICENSE file policies">
                 <!--filteritem type="filename" name="*.uvwxyz" desc="Describe the reason for filtering scan results"/-->
@@ -62,6 +66,8 @@
                 <!--filteritem type="filepath" name="abcdefg/.*.uvwxyz" desc="Describe the reason for filtering scan results"/-->
                 <!--filteritem type="filepath" name="projectroot/[a-zA-Z0-9]{20,}.sh" desc="Temp files"/-->
                 <filteritem type="filename" name="*.png" desc="PNG image files for documentation"/>
+                <filteritem type="filename" name="*.jpg" desc="JPG image files for documentation"/>
+                <filteritem type="filepath" name="experimental/.*" desc="Experimental incubator code, not subject to release compliance scanning"/>
             </filefilter>
 
         </filefilterlist>

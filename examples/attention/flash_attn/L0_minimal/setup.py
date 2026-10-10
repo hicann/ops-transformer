@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 # ----------------------------------------------------------------------------
-# This program is free software, you can redistribute it and/or modify it.
 # Copyright (c) 2026 Huawei Technologies Co., Ltd.
-# This file is a part of the CANN Open Software.
-# Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
-# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING
-# BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # ----------------------------------------------------------------------------
 
@@ -33,12 +32,12 @@ class CleanCommand(Command):
         pass
 
     def run(self):
-        if os.path.exists('build'):
-            shutil.rmtree('build')
+        if os.path.exists("build"):
+            shutil.rmtree("build")
             print("Removed build/")
 
-        if os.path.exists('dist'):
-            shutil.rmtree('dist')
+        if os.path.exists("dist"):
+            shutil.rmtree("dist")
             print("Removed dist/")
 
         egg_info_dir = f"{self.distribution.get_name().replace('-', '_')}.egg-info"
@@ -46,14 +45,14 @@ class CleanCommand(Command):
             shutil.rmtree(egg_info_dir)
             print(f"Removed {egg_info_dir}/")
 
-        for root, dirs, files in os.walk('.'):
+        for root, dirs, files in os.walk("."):
             for file in files:
-                if file.endswith('.pyc'):
+                if file.endswith(".pyc"):
                     os.remove(os.path.join(root, file))
                     print(f"Removed {os.path.join(root, file)}")
 
             for dir in dirs:
-                if dir == '__pycache__':
+                if dir == "__pycache__":
                     shutil.rmtree(os.path.join(root, dir))
                     print(f"Removed {os.path.join(root, dir)}/")
 
@@ -76,18 +75,17 @@ class CMakeBuild(build_ext):
 
     def build_cmake(self, ext):
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
-        python_include = sysconfig.get_path('include')
-        python_libs = sysconfig.get_config_var('LIBDIR')
+        python_include = sysconfig.get_path("include")
+        python_libs = sysconfig.get_config_var("LIBDIR")
 
         cmake_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DPYTHON_EXECUTABLE={sys.executable}",
-            f"-DBUILD_TORCH_OPS=ON",
-            f"-DPYTHON_EXTENSION_USE_ABI3=ON",
+            "-DBUILD_TORCH_OPS=ON",
+            "-DPYTHON_EXTENSION_USE_ABI3=ON",
             f"-DPYTHON_INCLUDE_DIR={python_include}",
             f"-DPYTHON_LIBRARIES={python_libs}",
-            f"-DPy_LIMITED_API_VERSION=0x03080000",
-
+            "-DPy_LIMITED_API_VERSION=0x03080000",
         ]
 
         build_type = "Debug" if self.debug else "Release"
@@ -105,11 +103,11 @@ class CMakeBuild(build_ext):
 
 
 setup(
-    name='ascend_ops',
-    version='0.0.1',
+    name="ascend_ops",
+    version="0.0.1",
     packages=find_packages(),
     ext_modules=[CMakeExtension("ascend_ops._C", sourcedir=".")],
-    cmdclass={'build_ext': CMakeBuild, 'clean': CleanCommand},
+    cmdclass={"build_ext": CMakeBuild, "clean": CleanCommand},
     zip_safe=False,
     install_requires=["torch"],
     options={"bdist_wheel": {"py_limited_api": "cp38"}},

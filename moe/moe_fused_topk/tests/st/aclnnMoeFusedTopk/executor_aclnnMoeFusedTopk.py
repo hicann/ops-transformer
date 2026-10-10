@@ -1,5 +1,13 @@
-# Copyright (c) Huawei Technologies Co., Ltd. 2012-2023. All rights reserved.
 # -*- coding: utf-8 -*-
+# ----------------------------------------------------------------------------
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
+# This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+# CANN Open Software License Agreement Version 2.0 (the "License").
+# Please refer to the License for details. You may not use this file except in compliance with the License.
+# THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+# See LICENSE in the root of the software repository for the full text of the License.
+# ----------------------------------------------------------------------------
 import random
 import torch
 import numpy as np
@@ -8,18 +16,31 @@ from atk.configs.dataset_config import InputDataset
 from atk.tasks.api_execute import register
 from atk.tasks.api_execute.base_api import BaseApi
 
-@register("ascend_moe_fused_topk")            
-class AclnnMoeFusedTopkApi(BaseApi):  
+
+@register("ascend_moe_fused_topk")
+class AclnnMoeFusedTopkApi(BaseApi):
     def __call__(self, input_data: InputDataset, with_output: bool = False):
-        
-        if self.device == 'cpu':
+        if self.device == "cpu":
             input_dic = input_data.kwargs
             y, indices = self.calc_golden(**input_dic)
 
             return y, indices
-    
 
-    def calc_golden(self, x, add_num, mapping_num, mapping_table, group_num, group_topk, top_n, top_k, activate_type, is_norm, scale, enable_expert_mapping):
+    def calc_golden(
+        self,
+        x,
+        add_num,
+        mapping_num,
+        mapping_table,
+        group_num,
+        group_topk,
+        top_n,
+        top_k,
+        activate_type,
+        is_norm,
+        scale,
+        enable_expert_mapping,
+    ):
         x = x.to(torch.float32)
         add_num = add_num.to(torch.float32)
         # sigmoid
@@ -34,9 +55,11 @@ class AclnnMoeFusedTopkApi(BaseApi):
         output = input0.clone()
         group_tensor = torch.topk(input0, top_n).values
         group_tensor = torch.sum(group_tensor, dim=-1)
-        sort_index = torch.from_numpy(np.argsort(-group_tensor.numpy(), kind='stable')) 
-        cols_to_use = torch.arange(group_topk, group_num, dtype=torch.long) 
-        row_indices = torch.arange(sort_index.shape[0]).repeat_interleave(cols_to_use.shape[0])
+        sort_index = torch.from_numpy(np.argsort(-group_tensor.numpy(), kind="stable"))
+        cols_to_use = torch.arange(group_topk, group_num, dtype=torch.long)
+        row_indices = torch.arange(sort_index.shape[0]).repeat_interleave(
+            cols_to_use.shape[0]
+        )
         col_indices = sort_index.index_select(1, cols_to_use).view(-1)
         output[row_indices, col_indices] = float(0)
         group_top_k_res = torch.reshape(output, (token_num, expert_num))

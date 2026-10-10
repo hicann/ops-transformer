@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2025 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * the CANN Open Software License Agreement Version 2.0 (the "License").
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -104,7 +104,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource)
+    BlockEpilogue(Arch::Resource<ArchTag> const& resource)
     {
         size_t ubOffset = 0;
         int32_t eventVMTE2 = 0;
@@ -168,17 +168,17 @@ public:
     }
 
     CATLASS_DEVICE
-    void UpdateParams(Params const &params_)
+    void UpdateParams(Params const& params_)
     {
         params = params_;
     }
 
     // perChannel、perToken
     CATLASS_DEVICE
-    void operator()(MatrixCoord const &blockOffset, GemmCoord const &actualBlockShapeMNK,
-                    AscendC::GlobalTensor<ElementC> const &gmBlockC, LayoutC const &layoutBlockC,
-                    AscendC::GlobalTensor<ElementD> const &gmBlockD, LayoutD const &layoutBlockD,
-                    Callback &&callback = Callback{})
+    void operator()(MatrixCoord const& blockOffset, GemmCoord const& actualBlockShapeMNK,
+                    AscendC::GlobalTensor<ElementC> const& gmBlockC, LayoutC const& layoutBlockC,
+                    AscendC::GlobalTensor<ElementD> const& gmBlockD, LayoutD const& layoutBlockD,
+                    Callback&& callback = Callback{})
     {
         if (actualBlockShapeMNK.k() == 0) {
             return;
@@ -189,12 +189,12 @@ public:
         MatrixCoord actualBlockShape = actualBlockShapeMNK.GetCoordMN();
 
         AscendC::GlobalTensor<ElementScale> gmScale;
-        gmScale.SetGlobalBuffer((__gm__ ElementScale *)params.ptrScale);
+        gmScale.SetGlobalBuffer((__gm__ ElementScale*)params.ptrScale);
         AscendC::GlobalTensor<ElementPerTokenScale> gmPerTokenScale;
-        gmPerTokenScale.SetGlobalBuffer((__gm__ ElementPerTokenScale *)params.ptrPerTokenScale);
+        gmPerTokenScale.SetGlobalBuffer((__gm__ ElementPerTokenScale*)params.ptrPerTokenScale);
         AscendC::GlobalTensor<ElementBias> gmBias;
         if (params.ptrBias != nullptr) {
-            gmBias.SetGlobalBuffer((__gm__ ElementBias *)params.ptrBias);
+            gmBias.SetGlobalBuffer((__gm__ ElementBias*)params.ptrBias);
         }
 
         auto ubTileStride = MakeCoord(static_cast<int64_t>(TileShape::COLUMN), 1L);
@@ -213,7 +213,7 @@ public:
             auto gmTileC = gmBlockC[layoutBlockC.GetOffset(tileOffsetInBlock)];
             auto layoutGmTileC = layoutBlockC.GetTileLayout(actualTileShape);
 
-            auto &ubC = ubCList[ubListId];
+            auto& ubC = ubCList[ubListId];
             LayoutC layoutUbC{actualTileShape, ubTileStride};
             // 把 C 从GM拷贝到UB
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
@@ -226,7 +226,7 @@ public:
             auto gmTileScale = gmScale[params.layoutScale.GetOffset(scaleTileOffset)];
             auto layoutGmTileScale = params.layoutScale.GetTileLayout(scaleTileShape);
 
-            auto &ubScale = ubScaleList[ubListId];
+            auto& ubScale = ubScaleList[ubListId];
 
             auto layoutUbScale = LayoutScale::template MakeLayoutInUb<ElementScale>(scaleTileShape);
 
@@ -241,7 +241,7 @@ public:
             auto gmTilePerTokenScale = gmPerTokenScale[params.layoutPerTokenScale.GetOffset(perTokenScaleTileOffset)];
             auto layoutGmTilePerTokenScale = params.layoutPerTokenScale.GetTileLayout(perTokenScaleTileShape);
 
-            auto &ubPerTokenScale = ubPerTokenScaleList[ubListId];
+            auto& ubPerTokenScale = ubPerTokenScaleList[ubListId];
             auto layoutUbPerTokenScale =
                 LayoutScale::template MakeLayoutInUb<ElementPerTokenScale>(perTokenScaleTileShape);
 
@@ -259,7 +259,7 @@ public:
                 auto gmTileBias = gmBias[params.layoutBias.GetOffset(biasTileOffset)];
                 auto layoutGmTileBias = params.layoutBias.GetTileLayout(biasTileShape);
 
-                auto &ubBias = ubBiasList[ubListId];
+                auto& ubBias = ubBiasList[ubListId];
                 auto layoutUbBias = LayoutBias::template MakeLayoutInUb<ElementBias>(biasTileShape);
 
                 // 把bias 从GM拷贝到UB
@@ -294,7 +294,7 @@ public:
             AscendC::PipeBarrier<PIPE_V>();
 
             // 选择要cast的源tensor：如果有bias，使用ubBiasAdd；否则直接使用ubPerTokenMul
-            AscendC::LocalTensor<float> &castSrc = params.ptrBias != nullptr ? ubBiasAdd : ubPerTokenMul;
+            AscendC::LocalTensor<float>& castSrc = params.ptrBias != nullptr ? ubBiasAdd : ubPerTokenMul;
 
             // 只有当bias不为nullptr时，才执行bias加法
             if (params.ptrBias != nullptr) {
@@ -303,14 +303,14 @@ public:
                     tileRowBroadcastAdd(ubBiasAdd, ubPerTokenMul, ubBiasFp32);
                     AscendC::PipeBarrier<PIPE_V>();
                 } else {
-                    auto &ubBias = ubBiasList[ubListId];
+                    auto& ubBias = ubBiasList[ubListId];
                     AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbBiasMTE2VList[ubListId]);
                     tileRowBroadcastAdd(ubBiasAdd, ubPerTokenMul, ubBias);
                     AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbBiasVMTE2List[ubListId]);
                 }
             }
 
-            auto &ubD = ubDList[ubListId];
+            auto& ubD = ubDList[ubListId];
             LayoutD layoutUbD{actualTileShape, ubTileStride};
 
             // 将乘法结果从UB cast到D

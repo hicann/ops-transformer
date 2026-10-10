@@ -1,7 +1,7 @@
 /**
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * the CANN Open Software License Agreement Version 2.0 (the "License").
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -18,19 +18,19 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_causal_conv1d_fn.h"
 
-#define CHECK_RET(cond, return_expr)                                                                                   \
-    do {                                                                                                               \
-        if (!(cond)) {                                                                                                 \
-            return_expr;                                                                                               \
-        }                                                                                                              \
+#define CHECK_RET(cond, return_expr) \
+    do { \
+        if (!(cond)) { \
+            return_expr; \
+        } \
     } while (0)
 
-#define LOG_PRINT(message, ...)                                                                                        \
-    do {                                                                                                               \
-        printf(message, ##__VA_ARGS__);                                                                                \
+#define LOG_PRINT(message, ...) \
+    do { \
+        printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -39,7 +39,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-void PrintOutResult(const char *name, std::vector<int64_t> &shape, void **deviceAddr)
+void PrintOutResult(const char* name, std::vector<int64_t>& shape, void** deviceAddr)
 {
     auto size = GetShapeSize(shape);
     std::vector<aclFloat16> resultData(size, 0);
@@ -52,7 +52,7 @@ void PrintOutResult(const char *name, std::vector<int64_t> &shape, void **device
     }
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
@@ -68,8 +68,8 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -89,19 +89,19 @@ int main()
     auto ret = Init(deviceId, &context, &stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-    void *xDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *biasDeviceAddr = nullptr;
-    void *convStatesDeviceAddr = nullptr;
-    void *queryStartLocDeviceAddr = nullptr;
-    void *yDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* biasDeviceAddr = nullptr;
+    void* convStatesDeviceAddr = nullptr;
+    void* queryStartLocDeviceAddr = nullptr;
+    void* yDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *bias = nullptr;
-    aclTensor *convStates = nullptr;
-    aclTensor *queryStartLoc = nullptr;
-    aclTensor *y = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* bias = nullptr;
+    aclTensor* convStates = nullptr;
+    aclTensor* queryStartLoc = nullptr;
+    aclTensor* y = nullptr;
 
     int32_t batchSize = 2;
     int32_t seqLen = 4;
@@ -139,8 +139,8 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
-    const char *activation = "silu";
+    aclOpExecutor* executor;
+    const char* activation = "silu";
     int64_t nullBlockId = 0;
     int64_t blockSizeToAlign = 0;
 
@@ -150,7 +150,7 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCausalConv1dFnGetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
         ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);

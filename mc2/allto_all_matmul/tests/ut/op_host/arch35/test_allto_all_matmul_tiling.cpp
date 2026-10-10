@@ -1,7 +1,7 @@
 /**
- * Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved.
- * This file is a part of the CANN Open Software.
- * Licensed under CANN Open Software License Agreement Version 2.0 (the "License").
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
  * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
@@ -13,9 +13,9 @@
 #include "../allto_all_matmul_host_ut_param.h"
 #include "tiling_case_executor.h"
 
-static std::string GetCsvPath(const char *file)
+static std::string GetCsvPath(const char* file)
 {
-    const char *envPath = std::getenv("CSV_CASE_PATH");
+    const char* envPath = std::getenv("CSV_CASE_PATH");
     if (envPath != nullptr && strlen(envPath) > 0) {
         return std::string(envPath);
     }
