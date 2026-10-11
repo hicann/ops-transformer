@@ -62,8 +62,8 @@ constexpr uint32_t MAX_K_VALUE_A2 = 16;
 constexpr uint64_t TILING_KEY_BASE_A2 = 2000UL;
 constexpr uint64_t TILING_KEY_LAYERED_COMM_A2 = 3000UL;
 constexpr uint64_t TILING_KEY_INT8_COMM_QUANT_A2 = 100UL;
-const char *K_OP_NAME = "MoeDistributeCombineV2";
-const char *K_INNER_DEBUG = "MoeDistributeCombineV2 Tiling Debug";
+const char* K_OP_NAME = "MoeDistributeCombineV2";
+const char* K_INNER_DEBUG = "MoeDistributeCombineV2 Tiling Debug";
 
 enum class CommQuantMode : int32_t {
     NON_QUANT = 0,
@@ -78,8 +78,8 @@ using CommQuantModeType = std::underlying_type_t<CommQuantMode>;
 namespace optiling {
 // 为了兼容老版本，在未配置commAlg参数时，读取环境变量；
 // commAlg参数当前支持"fullmesh"和"hierarchy"两种，其余报错。
-static ge::graphStatus MoeDistributeCombineCheckCommAlg(const gert::TilingContext *context, bool &isLayered,
-                                                        const CombineV2Config &config)
+static ge::graphStatus MoeDistributeCombineCheckCommAlg(const gert::TilingContext* context, bool& isLayered,
+                                                        const CombineV2Config& config)
 {
     isLayered = false;
     auto attrs = context->GetAttrs();
@@ -125,12 +125,12 @@ static std::string MoeDistributeCombineA2GetAlgConfig(int32_t epWorldSize, bool 
 // token数据类型为float16/bfloat16，每个元素字节数为2
 constexpr uint64_t A2_WIN_SIZE_DTYPE_X_BYTES = 2ULL;
 constexpr uint64_t A2_WIN_SIZE_BUFFER_NUM = 2UL;
-constexpr const char *A2_HCCL_BUFFSIZE_HINT =
+constexpr const char* A2_HCCL_BUFFSIZE_HINT =
     "Please increase the HCCL_BUFFSIZE environment variable or provide an HcclCommConfig with a larger "
     "hcclBufferSize when creating the communication domain.";
 
 // 分层（layered）算法：每个token发往k个专家时额外带上专家索引/topk权重/量化系数/到达标志位等信息，估算最小缓冲。
-static void CheckA2LayeredWinSize(const char *nodeName, const MoeDistributeCombineA2Info &info, uint32_t epWorldSize,
+static void CheckA2LayeredWinSize(const char* nodeName, const MoeDistributeCombineA2Info& info, uint32_t epWorldSize,
                                   uint64_t maxBs, uint64_t hcclBuffSize)
 {
     constexpr uint64_t BUFFER_ALIGN = 512UL;
@@ -153,7 +153,7 @@ static void CheckA2LayeredWinSize(const char *nodeName, const MoeDistributeCombi
 }
 
 // 全互联（fullmesh）算法：按最大接收token数估算最小缓冲。
-static void CheckA2FullmeshWinSize(const char *nodeName, const MoeDistributeCombineA2Info &info, uint32_t epWorldSize,
+static void CheckA2FullmeshWinSize(const char* nodeName, const MoeDistributeCombineA2Info& info, uint32_t epWorldSize,
                                    uint32_t localMoeExpertNum, uint64_t maxBs, uint64_t hcclBuffSize)
 {
     constexpr uint64_t extraBuffSize = 2 * MB_SIZE; // 固定2M额外空间作为存储非数据信息的区域
@@ -170,8 +170,8 @@ static void CheckA2FullmeshWinSize(const char *nodeName, const MoeDistributeComb
     }
 }
 
-static ge::graphStatus MoeDistributeCombineA2CheckWinSize(const gert::TilingContext *context, const char *nodeName,
-                                                          MoeDistributeCombineA2Info &info, bool isLayered)
+static ge::graphStatus MoeDistributeCombineA2CheckWinSize(const gert::TilingContext* context, const char* nodeName,
+                                                          MoeDistributeCombineA2Info& info, bool isLayered)
 {
     // 为避免兼容性问题，校验失败时不直接返回错误，而是输出警告日志
     auto groupEp = context->GetAttrs()->GetAttrPointer<char>(ATTR_GROUP_EP_INDEX);
@@ -193,7 +193,7 @@ static ge::graphStatus MoeDistributeCombineA2CheckWinSize(const gert::TilingCont
 }
 
 // a2专有
-static void PrintA2TilingDataInfo(MoeDistributeCombineA2Info &info)
+static void PrintA2TilingDataInfo(MoeDistributeCombineA2Info& info)
 {
     OP_LOGD(K_INNER_DEBUG, "epWorldSize is %u.", info.epWorldSize);
     OP_LOGD(K_INNER_DEBUG, "epRankId is %u.", info.epRankId);
@@ -203,8 +203,8 @@ static void PrintA2TilingDataInfo(MoeDistributeCombineA2Info &info)
     OP_LOGD(K_INNER_DEBUG, "globalBs is %u.", info.globalBs);
 }
 
-static ge::graphStatus CheckA2ExpertParallelAttrs(const char *groupEpPtr, const int64_t *epWorldSizePtr,
-                                                  const int64_t *epRankIdPtr, const int64_t *moeExpertNumPtr,
+static ge::graphStatus CheckA2ExpertParallelAttrs(const char* groupEpPtr, const int64_t* epWorldSizePtr,
+                                                  const int64_t* epRankIdPtr, const int64_t* moeExpertNumPtr,
                                                   bool isLayered)
 {
     OP_TILING_CHECK((groupEpPtr == nullptr) || (strnlen(groupEpPtr, MAX_GROUP_NAME_LENGTH) == 0) ||
@@ -237,9 +237,9 @@ static ge::graphStatus CheckA2ExpertParallelAttrs(const char *groupEpPtr, const 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2CommunicationAttrs(const int64_t *tpWorldSizePtr, const int64_t *expertSharedTypePtr,
-                                                 const int64_t *sharedExpertRankNumPtr, const int64_t *globalBsPtr,
-                                                 const int64_t *commQuantModePtr, bool isLayered)
+static ge::graphStatus CheckA2CommunicationAttrs(const int64_t* tpWorldSizePtr, const int64_t* expertSharedTypePtr,
+                                                 const int64_t* sharedExpertRankNumPtr, const int64_t* globalBsPtr,
+                                                 const int64_t* commQuantModePtr, bool isLayered)
 {
     OP_TILING_CHECK(tpWorldSizePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "tpWorldSize"),
                     return GRAPH_FAILED);
@@ -267,8 +267,8 @@ static ge::graphStatus CheckA2CommunicationAttrs(const int64_t *tpWorldSizePtr, 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2SpecialExpertAttrs(const int64_t *zeroExpertNumPtr, const int64_t *copyExpertNumPtr,
-                                                 const int64_t *constExpertNumPtr)
+static ge::graphStatus CheckA2SpecialExpertAttrs(const int64_t* zeroExpertNumPtr, const int64_t* copyExpertNumPtr,
+                                                 const int64_t* constExpertNumPtr)
 {
     OP_TILING_CHECK(zeroExpertNumPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "zeroExpertNum"),
                     return GRAPH_FAILED);
@@ -283,11 +283,11 @@ static ge::graphStatus CheckA2SpecialExpertAttrs(const int64_t *zeroExpertNumPtr
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetA2ExpertAttrs(MoeDistributeCombineA2Info &info, int32_t &commQuantMode, int32_t globalBs,
-                                        const int64_t *epWorldSizePtr, const int64_t *epRankIdPtr,
-                                        const int64_t *moeExpertNumPtr, const int64_t *zeroExpertNumPtr,
-                                        const int64_t *copyExpertNumPtr, const int64_t *globalBsPtr,
-                                        const int64_t *commQuantModePtr)
+static ge::graphStatus SetA2ExpertAttrs(MoeDistributeCombineA2Info& info, int32_t& commQuantMode, int32_t globalBs,
+                                        const int64_t* epWorldSizePtr, const int64_t* epRankIdPtr,
+                                        const int64_t* moeExpertNumPtr, const int64_t* zeroExpertNumPtr,
+                                        const int64_t* copyExpertNumPtr, const int64_t* globalBsPtr,
+                                        const int64_t* commQuantModePtr)
 {
     // 判断是否满足uint32_t及其他限制
     int64_t moeExpertNum = static_cast<int64_t>(*moeExpertNumPtr);
@@ -320,10 +320,10 @@ static ge::graphStatus SetA2ExpertAttrs(MoeDistributeCombineA2Info &info, int32_
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeCombineA2CheckAttrAndSetTiling(const gert::TilingContext *context,
-                                                                   MoeDistributeCombineA2Info &info,
-                                                                   int32_t &commQuantMode, const bool isLayered,
-                                                                   const CombineV2Config &config)
+static ge::graphStatus MoeDistributeCombineA2CheckAttrAndSetTiling(const gert::TilingContext* context,
+                                                                   MoeDistributeCombineA2Info& info,
+                                                                   int32_t& commQuantMode, const bool isLayered,
+                                                                   const CombineV2Config& config)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "attrs"), return ge::GRAPH_FAILED);
@@ -353,7 +353,7 @@ static ge::graphStatus MoeDistributeCombineA2CheckAttrAndSetTiling(const gert::T
                                   commQuantModePtr, isLayered) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::StorageShape *expertIdStorageShape = context->GetInputShape(config.expertIdsIndex);
+    const gert::StorageShape* expertIdStorageShape = context->GetInputShape(config.expertIdsIndex);
     OP_TILING_CHECK(expertIdStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "xShape"), return false);
     int32_t globalBs = *epWorldSizePtr * expertIdStorageShape->GetStorageShape().GetDim(0);
 
@@ -361,7 +361,7 @@ static ge::graphStatus MoeDistributeCombineA2CheckAttrAndSetTiling(const gert::T
                             zeroExpertNumPtr, copyExpertNumPtr, globalBsPtr, commQuantModePtr);
 }
 
-static ge::graphStatus CheckA2ActiveMaskShape(const gert::StorageShape *xActiveMaskStorageShape, uint32_t bs,
+static ge::graphStatus CheckA2ActiveMaskShape(const gert::StorageShape* xActiveMaskStorageShape, uint32_t bs,
                                               uint32_t k)
 {
     bool isActiveMask = (xActiveMaskStorageShape != nullptr);
@@ -392,7 +392,7 @@ static ge::graphStatus CheckA2ActiveMaskShape(const gert::StorageShape *xActiveM
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2OriginalXShape(const gert::StorageShape *oriXStorageShape, uint32_t bs, uint32_t h)
+static ge::graphStatus CheckA2OriginalXShape(const gert::StorageShape* oriXStorageShape, uint32_t bs, uint32_t h)
 {
     if (oriXStorageShape != nullptr) {
         // 必须是2维
@@ -420,8 +420,8 @@ static ge::graphStatus CheckA2OriginalXShape(const gert::StorageShape *oriXStora
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2ConstExpertAlpha1Shape(const gert::StorageShape *constExpertAlpha1StorageShape,
-                                                     const int64_t *constExpertNumPtr)
+static ge::graphStatus CheckA2ConstExpertAlpha1Shape(const gert::StorageShape* constExpertAlpha1StorageShape,
+                                                     const int64_t* constExpertNumPtr)
 {
     if (constExpertAlpha1StorageShape != nullptr) {
         // 必须是1维
@@ -446,8 +446,8 @@ static ge::graphStatus CheckA2ConstExpertAlpha1Shape(const gert::StorageShape *c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2ConstExpertAlpha2Shape(const gert::StorageShape *constExpertAlpha2StorageShape,
-                                                     const int64_t *constExpertNumPtr)
+static ge::graphStatus CheckA2ConstExpertAlpha2Shape(const gert::StorageShape* constExpertAlpha2StorageShape,
+                                                     const int64_t* constExpertNumPtr)
 {
     if (constExpertAlpha2StorageShape != nullptr) {
         // 必须是1维
@@ -472,8 +472,8 @@ static ge::graphStatus CheckA2ConstExpertAlpha2Shape(const gert::StorageShape *c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2ConstExpertVShape(const gert::StorageShape *constExpertVStorageShape,
-                                                const int64_t *constExpertNumPtr, uint32_t h)
+static ge::graphStatus CheckA2ConstExpertVShape(const gert::StorageShape* constExpertVStorageShape,
+                                                const int64_t* constExpertNumPtr, uint32_t h)
 {
     if (constExpertVStorageShape != nullptr) {
         // 必须是2维
@@ -503,8 +503,8 @@ static ge::graphStatus CheckA2ConstExpertVShape(const gert::StorageShape *constE
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2PerformanceInfoShape(const gert::TilingContext *context,
-                                                   const gert::StorageShape *performanceInfoStorageShape)
+static ge::graphStatus CheckA2PerformanceInfoShape(const gert::TilingContext* context,
+                                                   const gert::StorageShape* performanceInfoStorageShape)
 {
     OP_TILING_CHECK(
         performanceInfoStorageShape != nullptr && performanceInfoStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
@@ -532,12 +532,12 @@ static ge::graphStatus CheckA2PerformanceInfoShape(const gert::TilingContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2SpecialExpertShapes(const gert::StorageShape *oriXStorageShape,
-                                                  const gert::StorageShape *constExpertAlpha1StorageShape,
-                                                  const gert::StorageShape *constExpertAlpha2StorageShape,
-                                                  const gert::StorageShape *constExpertVStorageShape,
+static ge::graphStatus CheckA2SpecialExpertShapes(const gert::StorageShape* oriXStorageShape,
+                                                  const gert::StorageShape* constExpertAlpha1StorageShape,
+                                                  const gert::StorageShape* constExpertAlpha2StorageShape,
+                                                  const gert::StorageShape* constExpertVStorageShape,
                                                   int32_t copyExpertNum, int32_t constExpertNum,
-                                                  const int64_t *constExpertNumPtr, uint32_t bs, uint32_t h)
+                                                  const int64_t* constExpertNumPtr, uint32_t bs, uint32_t h)
 {
     // copy expert and const expert
     OP_TILING_CHECK(
@@ -573,9 +573,9 @@ static ge::graphStatus CheckA2SpecialExpertShapes(const gert::StorageShape *oriX
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2RequiredShapes(const gert::StorageShape *expandXStorageShape,
-                                             const gert::StorageShape *expertIdStorageShape, bool isLayered,
-                                             uint32_t &h, uint32_t &bs)
+static ge::graphStatus CheckA2RequiredShapes(const gert::StorageShape* expandXStorageShape,
+                                             const gert::StorageShape* expertIdStorageShape, bool isLayered,
+                                             uint32_t& h, uint32_t& bs)
 {
     OP_TILING_CHECK(
         expandXStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
@@ -603,17 +603,17 @@ static ge::graphStatus CheckA2RequiredShapes(const gert::StorageShape *expandXSt
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckA2TopKAndExpertShapes(const gert::TilingContext *context, const CombineV2Config &config,
-                                                  const gert::StorageShape *xActiveMaskStorageShape, uint32_t k,
+static ge::graphStatus CheckA2TopKAndExpertShapes(const gert::TilingContext* context, const CombineV2Config& config,
+                                                  const gert::StorageShape* xActiveMaskStorageShape, uint32_t k,
                                                   uint32_t bs, uint32_t h)
 {
     // copy expert and const expert
-    const gert::StorageShape *oriXStorageShape = context->GetOptionalInputShape(config.oriXIndex);
-    const gert::StorageShape *constExpertAlpha1StorageShape =
+    const gert::StorageShape* oriXStorageShape = context->GetOptionalInputShape(config.oriXIndex);
+    const gert::StorageShape* constExpertAlpha1StorageShape =
         context->GetOptionalInputShape(config.constExpertAlpha1Index);
-    const gert::StorageShape *constExpertAlpha2StorageShape =
+    const gert::StorageShape* constExpertAlpha2StorageShape =
         context->GetOptionalInputShape(config.constExpertAlpha2Index);
-    const gert::StorageShape *constExpertVStorageShape = context->GetOptionalInputShape(config.constExpertVIndex);
+    const gert::StorageShape* constExpertVStorageShape = context->GetOptionalInputShape(config.constExpertVIndex);
 
     auto attrs = context->GetAttrs();
     auto moeExpertNumPtr = attrs->GetAttrPointer<int64_t>(ATTR_MOE_EXPERT_NUM_INDEX);
@@ -640,15 +640,15 @@ static ge::graphStatus CheckA2TopKAndExpertShapes(const gert::TilingContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeCombineA2CheckShapeAndSetTiling(const gert::TilingContext *context,
-                                                                    MoeDistributeCombineA2Info &info, bool isLayered,
-                                                                    const CombineV2Config &config)
+static ge::graphStatus MoeDistributeCombineA2CheckShapeAndSetTiling(const gert::TilingContext* context,
+                                                                    MoeDistributeCombineA2Info& info, bool isLayered,
+                                                                    const CombineV2Config& config)
 {
-    const gert::StorageShape *expandXStorageShape = context->GetInputShape(config.expandXIndex);
-    const gert::StorageShape *expertIdStorageShape = context->GetInputShape(config.expertIdsIndex);
-    const gert::StorageShape *xActiveMaskStorageShape = context->GetOptionalInputShape(config.xActiveMaskIndex);
-    const gert::StorageShape *elasticInfoStorageShape = context->GetOptionalInputShape(config.elasticInfoIndex);
-    const gert::StorageShape *performanceInfoStorageShape = context->GetOptionalInputShape(config.performanceInfoIndex);
+    const gert::StorageShape* expandXStorageShape = context->GetInputShape(config.expandXIndex);
+    const gert::StorageShape* expertIdStorageShape = context->GetInputShape(config.expertIdsIndex);
+    const gert::StorageShape* xActiveMaskStorageShape = context->GetOptionalInputShape(config.xActiveMaskIndex);
+    const gert::StorageShape* elasticInfoStorageShape = context->GetOptionalInputShape(config.elasticInfoIndex);
+    const gert::StorageShape* performanceInfoStorageShape = context->GetOptionalInputShape(config.performanceInfoIndex);
     OP_TILING_CHECK(expandXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "expandXShape"),
                     return GRAPH_FAILED);
     OP_TILING_CHECK(expertIdStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "expertIdShape"),
@@ -685,8 +685,8 @@ static ge::graphStatus MoeDistributeCombineA2CheckShapeAndSetTiling(const gert::
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeCombineA2GetPlatformInfoAndSetTiling(const gert::TilingContext *context,
-                                                                         MoeDistributeCombineA2Info &info)
+static ge::graphStatus MoeDistributeCombineA2GetPlatformInfoAndSetTiling(const gert::TilingContext* context,
+                                                                         MoeDistributeCombineA2Info& info)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -702,10 +702,10 @@ static ge::graphStatus MoeDistributeCombineA2GetPlatformInfoAndSetTiling(const g
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetA2CommunicationTiling(gert::TilingContext *context,
-                                                MoeDistributeCombineA2TilingData *tilingData, bool isLayered)
+static ge::graphStatus SetA2CommunicationTiling(gert::TilingContext* context,
+                                                MoeDistributeCombineA2TilingData* tilingData, bool isLayered)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // 3. communication
     auto attrs = context->GetAttrs();
     auto group = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_GROUP_EP_INDEX));
@@ -724,11 +724,11 @@ static ge::graphStatus SetA2CommunicationTiling(gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeCombineA2SetBlocksAndWorkspace(gert::TilingContext *context,
-                                                                   const MoeDistributeCombineA2Info &info,
+static ge::graphStatus MoeDistributeCombineA2SetBlocksAndWorkspace(gert::TilingContext* context,
+                                                                   const MoeDistributeCombineA2Info& info,
                                                                    bool isLayered, int32_t commQuantMode)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t numBlocks = ascendcPlatform.CalcTschBlockDim(aivNum, 0, aivNum);
@@ -739,16 +739,16 @@ static ge::graphStatus MoeDistributeCombineA2SetBlocksAndWorkspace(gert::TilingC
     uint64_t tilingKey = MoeDistributeCombineA2CalcTilingKey(isLayered, commQuantMode);
     context->SetTilingKey(tilingKey);
     // 2. workspace
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "workSpaces"), return ge::GRAPH_FAILED);
     // SYSTEM_NEED_WORKSPACE + userWorkspaceSize
     workSpaces[0] = SYSTEM_NEED_WORKSPACE + static_cast<size_t>(info.moeExpertNum * sizeof(uint32_t) * 2U);
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeCombineA2TilingFuncImpl(gert::TilingContext *context, const CombineV2Config &config)
+static ge::graphStatus MoeDistributeCombineA2TilingFuncImpl(gert::TilingContext* context, const CombineV2Config& config)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGI(nodeName, "Enter MoeDistributeCombineA2 tiling func.");
     // 涉及SyncAll，设置batch mode模式，所有核同时启动
     uint32_t batch_mode = 1U;
@@ -756,9 +756,9 @@ static ge::graphStatus MoeDistributeCombineA2TilingFuncImpl(gert::TilingContext 
     MC2_CHECK_LOG_RET(nodeName, ret);
 
     // tilingData
-    MoeDistributeCombineA2TilingData *tilingData = context->GetTilingData<MoeDistributeCombineA2TilingData>();
+    MoeDistributeCombineA2TilingData* tilingData = context->GetTilingData<MoeDistributeCombineA2TilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
-    MoeDistributeCombineA2Info &info = tilingData->moeDistributeCombineInfo;
+    MoeDistributeCombineA2Info& info = tilingData->moeDistributeCombineInfo;
 
     bool isLayered = false;
     OP_TILING_CHECK(MoeDistributeCombineCheckCommAlg(context, isLayered, config) != ge::GRAPH_SUCCESS,
@@ -792,8 +792,8 @@ static ge::graphStatus MoeDistributeCombineA2TilingFuncImpl(gert::TilingContext 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeCombineV2TilingFuncA2A3::MoeDistributeCombineTilingFuncImpl(gert::TilingContext *context,
-                                                                                         const CombineV2Config &config)
+ge::graphStatus MoeDistributeCombineV2TilingFuncA2A3::MoeDistributeCombineTilingFuncImpl(gert::TilingContext* context,
+                                                                                         const CombineV2Config& config)
 {
     std::string socVersion = mc2tiling::GetSocVersion(context);
     ge::graphStatus ret;
@@ -808,13 +808,13 @@ ge::graphStatus MoeDistributeCombineV2TilingFuncA2A3::MoeDistributeCombineTiling
 }
 
 struct MoeDistributeCombineCompileInfo {};
-static ge::graphStatus TilingParseForMoeDistributeCombineV2(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForMoeDistributeCombineV2(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeCombineV2TilingFuncImplA2A3(gert::TilingContext *context)
+static ge::graphStatus MoeDistributeCombineV2TilingFuncImplA2A3(gert::TilingContext* context)
 {
     MoeDistributeCombineV2TilingFuncA2A3 impl;
     return impl.MoeDistributeCombineV2TilingFunc(context);

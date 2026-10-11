@@ -38,13 +38,13 @@ extern "C" {
  * @return aclnnStatus: 返回值，返回状态码
  *
  */
-ACLNN_API aclnnStatus aclnnMoeUpdateExpertGetWorkspaceSize(const aclTensor *expertIds, const aclTensor *eplbTable,
-                                                           const aclTensor *expertScalesOptional,
-                                                           const aclTensor *pruningThresholdOptional,
-                                                           const aclTensor *activeMaskOptional, int64_t localRankId,
+ACLNN_API aclnnStatus aclnnMoeUpdateExpertGetWorkspaceSize(const aclTensor* expertIds, const aclTensor* eplbTable,
+                                                           const aclTensor* expertScalesOptional,
+                                                           const aclTensor* pruningThresholdOptional,
+                                                           const aclTensor* activeMaskOptional, int64_t localRankId,
                                                            int64_t worldSize, int64_t balanceMode,
-                                                           aclTensor *balancedExpertIds, aclTensor *balancedActiveMask,
-                                                           uint64_t *workspaceSize, aclOpExecutor **executor);
+                                                           aclTensor* balancedExpertIds, aclTensor* balancedActiveMask,
+                                                           uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMoeUpdateExpert的第二段接口，用于执行计算。
@@ -55,7 +55,7 @@ ACLNN_API aclnnStatus aclnnMoeUpdateExpertGetWorkspaceSize(const aclTensor *expe
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnMoeUpdateExpert(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeUpdateExpert(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            aclrtStream stream);
 
 #ifdef __cplusplus

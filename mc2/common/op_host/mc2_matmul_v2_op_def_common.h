@@ -18,7 +18,7 @@
 namespace ops {
 namespace Mc2OpDef {
 
-inline OpAICoreConfig &ConfigureMatmulV2DynamicAicore(OpAICoreConfig &config)
+inline OpAICoreConfig& ConfigureMatmulV2DynamicAicore(OpAICoreConfig& config)
 {
     return config.DynamicCompileStaticFlag(true)
         .DynamicFormatFlag(true)
@@ -31,7 +31,7 @@ inline OpAICoreConfig &ConfigureMatmulV2DynamicAicore(OpAICoreConfig &config)
         .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
 }
 
-inline const std::vector<ge::DataType> &GetMatmulV2ScaleDataTypes()
+inline const std::vector<ge::DataType>& GetMatmulV2ScaleDataTypes()
 {
     static const std::vector<ge::DataType> dataTypes = {
         ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,       ge::DT_FLOAT,

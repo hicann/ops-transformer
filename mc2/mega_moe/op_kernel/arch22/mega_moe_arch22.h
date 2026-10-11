@@ -133,7 +133,7 @@ private:
     float activationParams2_;
 
     // Quant/NonQuant 两种 tiling 结构的 common 字段类型一致，此处统一加载公共字段
-    __aicore__ inline void LoadCommonTiling(const MegaMoeA2A3TilingData &common)
+    __aicore__ inline void LoadCommonTiling(const MegaMoeA2A3TilingData& common)
     {
         aivNum_ = common.aivNum;
         m_ = common.M;

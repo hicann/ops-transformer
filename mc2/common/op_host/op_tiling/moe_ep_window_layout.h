@@ -87,13 +87,13 @@ uint64_t AlignMoeEpUb(uint64_t value);
 uint64_t AlignMoeEpWin(uint64_t value);
 
 ge::graphStatus ResolveMoeEpTopology(uint32_t epWorldSize, int64_t requestedNetworkMode, int64_t rankNumPerServer,
-                                     MoeEpTopology &topology);
+                                     MoeEpTopology& topology);
 
-ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams &params, MoeEpWindowLayout &layout);
+ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams& params, MoeEpWindowLayout& layout);
 
-ge::graphStatus CheckMoeEpWindowCapacity(uint64_t requiredBytes, uint64_t cclBufferSize, const char *nodeName);
+ge::graphStatus CheckMoeEpWindowCapacity(uint64_t requiredBytes, uint64_t cclBufferSize, const char* nodeName);
 
-MoeEpDumpMetadata BuildMoeEpDumpMetadata(const MoeEpWindowLayoutParams &params, const MoeEpWindowLayout &layout,
+MoeEpDumpMetadata BuildMoeEpDumpMetadata(const MoeEpWindowLayoutParams& params, const MoeEpWindowLayout& layout,
                                          uint32_t aivNum);
 
 } // namespace Mc2Tiling

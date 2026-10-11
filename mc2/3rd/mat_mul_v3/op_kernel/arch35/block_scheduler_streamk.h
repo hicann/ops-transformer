@@ -60,11 +60,11 @@ public:
     using ProblemShape = ProblemShape_;
 
     struct Params {
-        const Mc2MatMulV3BasicTilingData *tilingData;
+        const Mc2MatMulV3BasicTilingData* tilingData;
     };
 
 public:
-    __aicore__ inline Mc2BlockSchedulerStreamKBuiltIn(const ProblemShape &shape, const Params &params)
+    __aicore__ inline Mc2BlockSchedulerStreamKBuiltIn(const ProblemShape& shape, const Params& params)
     {
         usedCoreNum_ = params.tilingData->usedCoreNum;
         m_ = shape.m;

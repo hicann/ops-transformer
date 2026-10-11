@@ -30,15 +30,15 @@
 #include "aclnn/aclnn_base.h"
 
 extern "C" {
-aclnnStatus aclnnEngramFetchGradGetWorkspaceSize(const aclTensor *commContext, const aclTensor *gradFetched,
-                                                 const aclTensor *perm, const aclTensor *sendCounts,
-                                                 const aclTensor *recvCounts, const aclTensor *recvLocalEntry,
-                                                 const aclTensor *numRecv, aclTensor *gradUniqueOut,
-                                                 aclTensor *uniqueLocalEntryOut, aclTensor *numUniqueOut,
+aclnnStatus aclnnEngramFetchGradGetWorkspaceSize(const aclTensor* commContext, const aclTensor* gradFetched,
+                                                 const aclTensor* perm, const aclTensor* sendCounts,
+                                                 const aclTensor* recvCounts, const aclTensor* recvLocalEntry,
+                                                 const aclTensor* numRecv, aclTensor* gradUniqueOut,
+                                                 aclTensor* uniqueLocalEntryOut, aclTensor* numUniqueOut,
                                                  int64_t numEntriesPerRank, int64_t commBufferSize,
-                                                 uint64_t *workspaceSize, aclOpExecutor **executor);
+                                                 uint64_t* workspaceSize, aclOpExecutor** executor);
 
-aclnnStatus aclnnEngramFetchGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream);
+aclnnStatus aclnnEngramFetchGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream);
 }
 
 using namespace op;
@@ -82,7 +82,7 @@ TEST_F(AclnnEngramFetchGradTest, dav3510_success)
         OUTPUT());
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -110,7 +110,7 @@ TEST_F(AclnnEngramFetchGradTest, dav3510_nullptr_commContext)
         OUTPUT());
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -137,7 +137,7 @@ TEST_F(AclnnEngramFetchGradTest, dav3510_nullptr_gradFetched)
         OUTPUT());
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -164,7 +164,7 @@ TEST_F(AclnnEngramFetchGradTest, dav3510_nullptr_gradUniqueOut)
         OUTPUT());
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }

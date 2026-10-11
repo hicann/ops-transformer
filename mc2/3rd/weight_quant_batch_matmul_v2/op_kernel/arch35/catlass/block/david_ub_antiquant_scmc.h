@@ -48,16 +48,16 @@ public:
     static constexpr bool isTransB =
         isWeightNz ? false : AscendC::Std::is_same_v<typename AscendC::Std::tuple_element<1, StrideB>::type, _1>;
     struct Arguments {
-        __gm__ DtypeA *aGmAddr = nullptr;
+        __gm__ DtypeA* aGmAddr = nullptr;
         StrideA strideA{};
-        __gm__ DtypeB *bGmAddr = nullptr;
+        __gm__ DtypeB* bGmAddr = nullptr;
         StrideB strideB{};
-        __gm__ DtypeA *antiquantScaleGmAddr = nullptr;
+        __gm__ DtypeA* antiquantScaleGmAddr = nullptr;
         StrideAntiquantScale strideAntiquantScale{};
-        __gm__ DtypeA *antiquantOffsetGmAddr = nullptr;
-        __gm__ DtypeBias *biasGmAddr = nullptr;
+        __gm__ DtypeA* antiquantOffsetGmAddr = nullptr;
+        __gm__ DtypeBias* biasGmAddr = nullptr;
         NonVoidStrideBias strideBias{};
-        __gm__ DtypeC *cGmAddr = nullptr;
+        __gm__ DtypeC* cGmAddr = nullptr;
         StrideC strideC{};
         uint64_t groupSize;
     };

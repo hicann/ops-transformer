@@ -3383,7 +3383,7 @@ protected:
 };
 
 // ut
-static void TestOneParamCase(const MatmulAlltoAllTestParam &param)
+static void TestOneParamCase(const MatmulAlltoAllTestParam& param)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
 
@@ -3438,7 +3438,7 @@ static void TestOneParamCase(const MatmulAlltoAllTestParam &param)
     //
     struct MatmulAlltoAllCompileInfo {
     } compileInfoInstance; // 创建一个实例
-    void *pCompileInfo = &compileInfoInstance;
+    void* pCompileInfo = &compileInfoInstance;
     gert::TilingContextPara tilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, pCompileInfo,
                                               param.socVersion, param.coreNum);
     ExecuteTestCase(tilingContextPara, param.status, param.expectTilingKey, param.expectTilingData,
@@ -3450,14 +3450,14 @@ static void TestOneParamCase(const MatmulAlltoAllTestParam &param)
     }
 }
 
-static void ThreadFunction(const MatmulAlltoAllTestParam *testCases, size_t caseNum, size_t threadIdx, size_t threadNum)
+static void ThreadFunction(const MatmulAlltoAllTestParam* testCases, size_t caseNum, size_t threadIdx, size_t threadNum)
 {
     for (size_t idx = threadIdx; idx < caseNum; idx += threadNum) {
         TestOneParamCase(testCases[idx]);
     }
 }
 
-static void TestExecMultiThread(const MatmulAlltoAllTestParam *testCases, size_t testCaseNum, size_t threadNum)
+static void TestExecMultiThread(const MatmulAlltoAllTestParam* testCases, size_t testCaseNum, size_t threadNum)
 {
     std::thread threads[threadNum];
     for (size_t idx = 0; idx < threadNum; ++idx) {

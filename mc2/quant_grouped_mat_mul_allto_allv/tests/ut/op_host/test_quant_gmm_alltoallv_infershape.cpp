@@ -62,11 +62,11 @@ TEST_F(QuantGroupedMatMulAlltoAllvInfershapeTest, InferDataTypeTest_Normal)
     std::vector<ge::DataType> inputDtypes{ge::DT_HIFLOAT8, ge::DT_HIFLOAT8, ge::DT_INT64,
                                           ge::DT_INT64,    ge::DT_HIFLOAT8, ge::DT_HIFLOAT8};
 
-    std::vector<void *> inputDtypesPtrs(inputNum);
+    std::vector<void*> inputDtypesPtrs(inputNum);
     for (int64_t i = 0; i < inputNum; i++) {
         inputDtypesPtrs[i] = &inputDtypes[i];
     }
-    std::vector<void *> outputDtypesPtrs(outputNum);
+    std::vector<void*> outputDtypesPtrs(outputNum);
 
     auto contextHolder =
         gert::InferDataTypeContextFaker()
@@ -108,11 +108,11 @@ TEST_F(QuantGroupedMatMulAlltoAllvInfershapeTest, InferDataTypeTest_Float8E5M2)
     std::vector<ge::DataType> inputDtypes{ge::DT_FLOAT8_E5M2, ge::DT_FLOAT8_E5M2, ge::DT_INT64,
                                           ge::DT_INT64,       ge::DT_FLOAT8_E5M2, ge::DT_FLOAT8_E5M2};
 
-    std::vector<void *> inputDtypesPtrs(inputNum);
+    std::vector<void*> inputDtypesPtrs(inputNum);
     for (int64_t i = 0; i < inputNum; i++) {
         inputDtypesPtrs[i] = &inputDtypes[i];
     }
-    std::vector<void *> outputDtypesPtrs(outputNum);
+    std::vector<void*> outputDtypesPtrs(outputNum);
 
     auto contextHolder =
         gert::InferDataTypeContextFaker()

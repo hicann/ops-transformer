@@ -24,17 +24,17 @@ namespace optiling {
 
 class MoeDistributeDispatchV2TilingFuncA2A3 : public MoeDistributeDispatchV2TilingFuncBase {
 public:
-    ge::graphStatus MoeDistributeDispatchV2TilingFunc(gert::TilingContext *context) override;
-    ge::graphStatus MoeDistributeDispatchTilingFuncImpl(gert::TilingContext *context) override;
-    bool CheckTensorDataType(const gert::TilingContext *context, const char *nodeName, const bool isScales,
+    ge::graphStatus MoeDistributeDispatchV2TilingFunc(gert::TilingContext* context) override;
+    ge::graphStatus MoeDistributeDispatchTilingFuncImpl(gert::TilingContext* context) override;
+    bool CheckTensorDataType(const gert::TilingContext* context, const char* nodeName, const bool isScales,
                              const uint32_t quantMode, const bool isActiveMask, const bool hasElasticInfo,
-                             const bool isPerformance, DispatchV2Config &config) override;
+                             const bool isPerformance, DispatchV2Config& config) override;
     uint64_t CalTilingKey(const bool isScales, const uint32_t quantMode, const bool isSetFullMeshV2,
                           bool isLayered) override;
-    ge::graphStatus CheckQuantModeMatchScales(gert::TilingContext *context, const char *nodeName, bool isScales,
-                                              uint32_t quantMode, DispatchV2Config &config) override;
-    ge::graphStatus CheckCommAlgPtr(const char *commAlgPtr, const char *nodeName) override;
-    ge::graphStatus CheckQuantModePtr(const int64_t *quantModePtr, const char *nodeName) override;
+    ge::graphStatus CheckQuantModeMatchScales(gert::TilingContext* context, const char* nodeName, bool isScales,
+                                              uint32_t quantMode, DispatchV2Config& config) override;
+    ge::graphStatus CheckCommAlgPtr(const char* commAlgPtr, const char* nodeName) override;
+    ge::graphStatus CheckQuantModePtr(const int64_t* quantModePtr, const char* nodeName) override;
 };
 } // namespace optiling
 

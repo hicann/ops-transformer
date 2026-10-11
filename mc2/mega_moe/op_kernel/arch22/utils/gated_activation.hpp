@@ -35,8 +35,8 @@ struct SwigluActivation {
     static constexpr uint32_t MIN_SHARED_TMP_BYTES = 32 * 1024;
 
     CATLASS_DEVICE
-    static void Compute(AscendC::LocalTensor<float> const &output, AscendC::LocalTensor<float> const &gate,
-                        AscendC::LocalTensor<float> const &up, AscendC::LocalTensor<uint8_t> const &sharedTmpBuffer,
+    static void Compute(AscendC::LocalTensor<float> const& output, AscendC::LocalTensor<float> const& gate,
+                        AscendC::LocalTensor<float> const& up, AscendC::LocalTensor<uint8_t> const& sharedTmpBuffer,
                         uint32_t dataLength, float clampLimit)
     {
         if (clampLimit > 0.0f) {
@@ -69,8 +69,8 @@ struct SwigluActivation {
 //     min(SiLU(gate), clampLimit) * clip(up, -clampLimit, clampLimit).
 struct SwigluStepActivation {
     CATLASS_DEVICE
-    static void Compute(AscendC::LocalTensor<float> const &output, AscendC::LocalTensor<float> const &gate,
-                        AscendC::LocalTensor<float> const &up, AscendC::LocalTensor<uint8_t> const &sharedTmpBuffer,
+    static void Compute(AscendC::LocalTensor<float> const& output, AscendC::LocalTensor<float> const& gate,
+                        AscendC::LocalTensor<float> const& up, AscendC::LocalTensor<uint8_t> const& sharedTmpBuffer,
                         uint32_t dataLength, float clampLimit)
     {
         if (clampLimit > 0.0f) {
@@ -104,8 +104,8 @@ struct SwigluOaiActivation {
     static constexpr float DEFAULT_BETA = 1.0f;
 
     CATLASS_DEVICE
-    static void Compute(AscendC::LocalTensor<float> const &output, AscendC::LocalTensor<float> const &gate,
-                        AscendC::LocalTensor<float> const &up, AscendC::LocalTensor<uint8_t> const &sharedTmpBuffer,
+    static void Compute(AscendC::LocalTensor<float> const& output, AscendC::LocalTensor<float> const& gate,
+                        AscendC::LocalTensor<float> const& up, AscendC::LocalTensor<uint8_t> const& sharedTmpBuffer,
                         uint32_t dataLength, float clampLimit, float alpha = DEFAULT_ALPHA, float beta = DEFAULT_BETA)
     {
         if (clampLimit > 0.0f) {
@@ -144,8 +144,8 @@ struct SituActivation {
     static constexpr float LINEAR_BETA_DISABLED = 0.0f;
 
     CATLASS_DEVICE
-    static void Compute(AscendC::LocalTensor<float> const &output, AscendC::LocalTensor<float> const &gate,
-                        AscendC::LocalTensor<float> const &up, AscendC::LocalTensor<uint8_t> const &sharedTmpBuffer,
+    static void Compute(AscendC::LocalTensor<float> const& output, AscendC::LocalTensor<float> const& gate,
+                        AscendC::LocalTensor<float> const& up, AscendC::LocalTensor<uint8_t> const& sharedTmpBuffer,
                         uint32_t dataLength, float beta = DEFAULT_BETA, float linearBeta = LINEAR_BETA_DISABLED)
     {
         bool enableLinearBeta = linearBeta != LINEAR_BETA_DISABLED;
@@ -203,9 +203,9 @@ struct GatedActivation {
     static constexpr uint32_t MIN_SHARED_TMP_BYTES = SwigluActivation::MIN_SHARED_TMP_BYTES;
 
     template <class Element>
-    CATLASS_DEVICE static void PrepareBranches(AscendC::LocalTensor<float> const &gate,
-                                               AscendC::LocalTensor<float> const &up,
-                                               AscendC::LocalTensor<Element> const &packedInput, uint32_t branchStride,
+    CATLASS_DEVICE static void PrepareBranches(AscendC::LocalTensor<float> const& gate,
+                                               AscendC::LocalTensor<float> const& up,
+                                               AscendC::LocalTensor<Element> const& packedInput, uint32_t branchStride,
                                                uint32_t dataLength)
     {
         AscendC::Cast(gate, packedInput, AscendC::RoundMode::CAST_NONE, dataLength);
@@ -214,8 +214,8 @@ struct GatedActivation {
     }
 
     CATLASS_DEVICE
-    static void Compute(AscendC::LocalTensor<float> const &output, AscendC::LocalTensor<float> const &gate,
-                        AscendC::LocalTensor<float> const &up, AscendC::LocalTensor<uint8_t> const &sharedTmpBuffer,
+    static void Compute(AscendC::LocalTensor<float> const& output, AscendC::LocalTensor<float> const& gate,
+                        AscendC::LocalTensor<float> const& up, AscendC::LocalTensor<uint8_t> const& sharedTmpBuffer,
                         uint32_t dataLength, float clampLimit, uint32_t activationCode,
                         float activationParams1 = SwigluOaiActivation::DEFAULT_ALPHA,
                         float activationParams2 = SituActivation::DEFAULT_BETA)

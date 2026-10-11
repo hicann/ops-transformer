@@ -21,7 +21,7 @@
 namespace optiling {
 class MoeDistributeDispatchSetupTilingA3 : public MoeDistributeDispatchSetupTilingBase {
 public:
-    explicit MoeDistributeDispatchSetupTilingA3(gert::TilingContext *context)
+    explicit MoeDistributeDispatchSetupTilingA3(gert::TilingContext* context)
         : MoeDistributeDispatchSetupTilingBase(context)
     {
         socTilingName_ = "MoeDistributeDispatchSetupA3";

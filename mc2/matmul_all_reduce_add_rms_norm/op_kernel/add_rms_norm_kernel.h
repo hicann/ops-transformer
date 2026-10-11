@@ -35,8 +35,8 @@ constexpr uint32_t ADD_RMS_NORM_MULTI_N = 14;
 using namespace AscendC;
 class AddRmsNormKernel {
 public:
-    __aicore__ inline AddRmsNormKernel(ArnGmAddrs *arnAddrs, TPipe *tPipe, uint32_t dataSize, uint32_t tileCnt,
-                                       uint32_t tailCnt, Hccl<HCCL_SERVER_TYPE_AICPU> *hccl,
+    __aicore__ inline AddRmsNormKernel(ArnGmAddrs* arnAddrs, TPipe* tPipe, uint32_t dataSize, uint32_t tileCnt,
+                                       uint32_t tailCnt, Hccl<HCCL_SERVER_TYPE_AICPU>* hccl,
                                        AscendC::HcclHandle tileHandleId, AscendC::HcclHandle tailHandleId)
         : arnAddrs_(arnAddrs),
           tPipe_(tPipe),
@@ -48,15 +48,15 @@ public:
           tailHandleId_(tailHandleId)
     {}
 
-    __aicore__ inline void ComputeAddRmsNorm(Mc2Tiling::AddRMSNormTilingData &addRMSNormTileTilingData,
-                                             Mc2Tiling::AddRMSNormTilingData &addRMSNormTailTilingData,
-                                             Mc2Tiling::AddRMSNormTilingeKeyData &addRmsNormTilingeKeyData,
+    __aicore__ inline void ComputeAddRmsNorm(Mc2Tiling::AddRMSNormTilingData& addRMSNormTileTilingData,
+                                             Mc2Tiling::AddRMSNormTilingData& addRMSNormTailTilingData,
+                                             Mc2Tiling::AddRMSNormTilingeKeyData& addRmsNormTilingeKeyData,
                                              GM_ADDR rcvCntGM)
     {
         uint32_t lastCnt = 0;
         uint32_t addRmsNormCount = 1;
         GlobalTensor<int64_t> rcvCntGMTensor;
-        rcvCntGMTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(rcvCntGM));
+        rcvCntGMTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(rcvCntGM));
 
         while (true) {
             if (GetBlockIdx() == 0) {
@@ -65,7 +65,7 @@ public:
                     continue;
                 }
                 *rcvCntGM = curCnt;
-                rcvCntGMTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t *>(rcvCntGM));
+                rcvCntGMTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int64_t*>(rcvCntGM));
                 DataCacheCleanAndInvalid<int64_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
                                          AscendC::DcciDst::CACHELINE_OUT>(rcvCntGMTensor);
             }
@@ -103,7 +103,7 @@ private:
                           rcvCnt); \
     } while (0)
 
-    __aicore__ inline void AddRmsNorm(Mc2Tiling::AddRMSNormTilingData &rmsTilingData, uint32_t keyTile,
+    __aicore__ inline void AddRmsNorm(Mc2Tiling::AddRMSNormTilingData& rmsTilingData, uint32_t keyTile,
                                       uint32_t numBlocks, uint32_t rcvCnt, uint32_t addRmsNormCount)
     {
         if (GetBlockIdx() >= numBlocks) {
@@ -132,9 +132,9 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeAddRmsNormInner(Mc2Tiling::AddRMSNormTilingData &addRMSNormTilingData,
+    __aicore__ inline void ComputeAddRmsNormInner(Mc2Tiling::AddRMSNormTilingData& addRMSNormTilingData,
                                                   uint32_t ARNKey, uint32_t ARNNumBlocks, uint32_t rcvCnt,
-                                                  uint32_t &addRmsNormCount)
+                                                  uint32_t& addRmsNormCount)
     {
         uint64_t offset = CalcShapeOffset(dataSize_, addRMSNormTilingData.num_row, addRMSNormTilingData.num_col);
         uint32_t cnt = rcvCnt - addRmsNormCount + 1;
@@ -156,12 +156,12 @@ private:
         return tileCnt + hccl_->Query(tailHandleId_);
     }
 
-    ArnGmAddrs *arnAddrs_;
-    TPipe *tPipe_;
+    ArnGmAddrs* arnAddrs_;
+    TPipe* tPipe_;
     uint32_t dataSize_;
     uint32_t tileCnt_;
     uint32_t tailCnt_;
-    Hccl<HCCL_SERVER_TYPE_AICPU> *hccl_;
+    Hccl<HCCL_SERVER_TYPE_AICPU>* hccl_;
     AscendC::HcclHandle tileHandleId_, tailHandleId_;
 };
 #endif

@@ -45,7 +45,7 @@ protected:
     }
 };
 
-static void SplitStr2Vec(const string &input, const string &delimiter, vector<string> &output)
+static void SplitStr2Vec(const string& input, const string& delimiter, vector<string>& output)
 {
     auto delimiterLen = delimiter.size();
     std::string::size_type currPos = 0;
@@ -68,7 +68,7 @@ struct MatmulAllReduceArnCompileInfo {
     int32_t totalCoreNum = 0;
     uint64_t ubSize = 0;
 };
-static void TestOneParamCase(const WeightQuantTestParam &param)
+static void TestOneParamCase(const WeightQuantTestParam& param)
 {
     std::cout << "run case " << param.caseName << std::endl;
     std::vector<string> testParam;

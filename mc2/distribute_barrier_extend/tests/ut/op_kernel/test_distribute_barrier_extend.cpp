@@ -22,20 +22,20 @@ extern "C" __global__ __aicore__ void distribute_barrier_extend(GM_ADDR context,
                                                                 GM_ADDR elasticInfo, GM_ADDR xRefOut,
                                                                 GM_ADDR workspaceGM, GM_ADDR tilingGM);
 
-uint8_t *g_hcclContextReserved[2] = {nullptr};
+uint8_t* g_hcclContextReserved[2] = {nullptr};
 
 class DistributeBarrierExtendTest : public testing::Test {
 protected:
     static void SetUpTestCase()
     {
         size_t ctxSize = sizeof(HcclOpResParam);
-        g_hcclContextReserved[0] = (uint8_t *)AscendC::GmAlloc(ctxSize);
+        g_hcclContextReserved[0] = (uint8_t*)AscendC::GmAlloc(ctxSize);
         std::cout << "DistributeBarrierExtendTest SetUp" << std::endl;
     }
 
     static void TearDownTestCase()
     {
-        AscendC::GmFree((void *)g_hcclContextReserved[0]);
+        AscendC::GmFree((void*)g_hcclContextReserved[0]);
         std::cout << "DistributeBarrierExtendTest TearDown" << std::endl;
     }
 };
@@ -46,25 +46,25 @@ TEST_F(DistributeBarrierTest, DistributeBarrierExtendTest10000)
     size_t sysWorkspaceSize = 16 * 1024 * 1024;
     size_t usrWorkspaceSize = 0;
     size_t allWorkspaceSize = usrWorkspaceSize + sysWorkspaceSize;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(allWorkspaceSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(allWorkspaceSize);
     size_t tilingSize = sizeof(DistributeBarrierTilingData);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingSize);
 
-    DistributeBarrierTilingData *tilingData = reinterpret_cast<DistributeBarrierTilingData *>(tiling);
+    DistributeBarrierTilingData* tilingData = reinterpret_cast<DistributeBarrierTilingData*>(tiling);
     tilingData->distributeBarrierInfo.worldSize = 16;
     tilingData->distributeBarrierInfo.rankId = 0;
     tilingData->distributeBarrierInfo.aivNum = 48;
     tilingData->distributeBarrierInfo.isMc2Context = true;
 
-    uint8_t *context = (uint8_t *)AscendC::GmAlloc(2052 * sizeof(uint32_t));
-    uint8_t *xRef = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
-    uint8_t *xRefOut = (uint8_t *)AscendC::GmAlloc(1024 * sizeof(uint16_t));
+    uint8_t* context = (uint8_t*)AscendC::GmAlloc(2052 * sizeof(uint32_t));
+    uint8_t* xRef = (uint8_t*)AscendC::GmAlloc(1024 * sizeof(uint16_t));
+    uint8_t* xRefOut = (uint8_t*)AscendC::GmAlloc(1024 * sizeof(uint16_t));
 
     ICPU_RUN_KF(distribute_barrier_extend, 48, context, xRef, nullptr, nullptr, xRefOut, workspace, tiling);
 
-    AscendC::GmFree((void *)workspace);
-    AscendC::GmFree((void *)tiling);
-    AscendC::GmFree((void *)context);
-    AscendC::GmFree((void *)xRef);
-    AscendC::GmFree((void *)xRefOut);
+    AscendC::GmFree((void*)workspace);
+    AscendC::GmFree((void*)tiling);
+    AscendC::GmFree((void*)context);
+    AscendC::GmFree((void*)xRef);
+    AscendC::GmFree((void*)xRefOut);
 }

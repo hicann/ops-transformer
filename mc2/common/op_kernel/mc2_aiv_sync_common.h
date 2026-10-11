@@ -37,8 +37,8 @@ inline __aicore__ void SetAicSync(uint64_t flagId)
     FFTSCrossCoreSync<PIPE_MTE3, AIC_SYNC_MODE>(flagId);
 }
 
-__attribute__((always_inline)) inline __aicore__ void SetBuffFlagByAdd(__gm__ int32_t *buff,
-                                                                       TBuf<AscendC::TPosition::VECCALC> &uBuf,
+__attribute__((always_inline)) inline __aicore__ void SetBuffFlagByAdd(__gm__ int32_t* buff,
+                                                                       TBuf<AscendC::TPosition::VECCALC>& uBuf,
                                                                        int32_t flag)
 {
     PipeBarrier<PIPE_ALL>();

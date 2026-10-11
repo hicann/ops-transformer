@@ -18,7 +18,7 @@
 
 using namespace MoeUpdateExpertNamespace;
 
-inline void InitMoeUpdateExpertTilingData(uint8_t *tiling, MoeUpdateExpertTilingData *constData)
+inline void InitMoeUpdateExpertTilingData(uint8_t* tiling, MoeUpdateExpertTilingData* constData)
 {
     memcpy(constData, tiling, sizeof(MoeUpdateExpertTilingData));
 }

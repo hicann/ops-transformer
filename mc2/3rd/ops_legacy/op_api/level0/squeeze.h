@@ -15,9 +15,9 @@
 
 namespace l0op {
 
-const aclTensor *SqueezeNd(const aclTensor *x, const aclIntArray *dim, aclOpExecutor *executor);
+const aclTensor* SqueezeNd(const aclTensor* x, const aclIntArray* dim, aclOpExecutor* executor);
 
-const aclTensor *SqueezeNd(const aclTensor *x, int64_t dim, aclOpExecutor *executor);
+const aclTensor* SqueezeNd(const aclTensor* x, int64_t dim, aclOpExecutor* executor);
 
 } // namespace l0op
 

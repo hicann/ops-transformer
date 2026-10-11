@@ -36,9 +36,9 @@ enum GMMAllReduceAttrIdx : size_t {
     K_COMM_TURN,
 };
 
-static graphStatus PrepareInputTensorListGMMAllReduce(OpExecuteContext *host_api_ctx,
-                                                      std::vector<const gert::Tensor *> &tensorList, size_t index,
-                                                      size_t &num)
+static graphStatus PrepareInputTensorListGMMAllReduce(OpExecuteContext* host_api_ctx,
+                                                      std::vector<const gert::Tensor*>& tensorList, size_t index,
+                                                      size_t& num)
 {
     while (1) {
         auto inputGe = host_api_ctx->GetDynamicInputTensor(index, num);
@@ -51,8 +51,8 @@ static graphStatus PrepareInputTensorListGMMAllReduce(OpExecuteContext *host_api
     return GRAPH_SUCCESS;
 }
 
-static graphStatus PrepareOutputTensorListGMMAllReduce(OpExecuteContext *host_api_ctx,
-                                                       std::vector<const gert::Tensor *> &tensorList, size_t index,
+static graphStatus PrepareOutputTensorListGMMAllReduce(OpExecuteContext* host_api_ctx,
+                                                       std::vector<const gert::Tensor*>& tensorList, size_t index,
                                                        size_t numGeWeight, int32_t splitItem)
 {
     size_t numGeY = 0;
@@ -76,18 +76,18 @@ static graphStatus PrepareOutputTensorListGMMAllReduce(OpExecuteContext *host_ap
     return GRAPH_SUCCESS;
 }
 
-static graphStatus GroupedMatMulAllReduceExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus GroupedMatMulAllReduceExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OPS_ERR_IF(host_api_ctx == nullptr, OP_LOGE_WITH_INVALID_INPUT("gmm_all_reduce_fallback", "host_api_ctx"),
                return GRAPH_FAILED);
-    std::vector<const gert::Tensor *> geTensorListX;
+    std::vector<const gert::Tensor*> geTensorListX;
     size_t numGeX = 0;
     PrepareInputTensorListGMMAllReduce(host_api_ctx, geTensorListX, GMMAllReduceInOutIdx::INPUT_X, numGeX);
-    std::vector<const gert::Tensor *> geTensorListWeight;
+    std::vector<const gert::Tensor*> geTensorListWeight;
     size_t numGeWeight = 0;
     PrepareInputTensorListGMMAllReduce(host_api_ctx, geTensorListWeight, GMMAllReduceInOutIdx::INPUT_WEIGHT,
                                        numGeWeight);
-    std::vector<const gert::Tensor *> geTensorListBias;
+    std::vector<const gert::Tensor*> geTensorListBias;
     size_t numGeBias = 0;
     PrepareInputTensorListGMMAllReduce(host_api_ctx, geTensorListBias, GMMAllReduceInOutIdx::INPUT_BIAS, numGeBias);
 
@@ -95,7 +95,7 @@ static graphStatus GroupedMatMulAllReduceExecuteFunc(OpExecuteContext *host_api_
     std::vector<int64_t> shape;
     if (groupListGe != nullptr) {
         auto groupListDataPtr = groupListGe->GetData<int64_t>();
-        auto &groupListShape = groupListGe->GetStorageShape();
+        auto& groupListShape = groupListGe->GetStorageShape();
         if (groupListShape.GetDimNum() > 0) {
             auto groupListLength = groupListShape.GetDim(0);
             for (int64_t i = 0; i < groupListLength; i++) {
@@ -107,19 +107,19 @@ static graphStatus GroupedMatMulAllReduceExecuteFunc(OpExecuteContext *host_api_
 
     auto attrs = host_api_ctx->GetAttrs();
     OPS_ERR_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT("gmm_all_reduce_fallback", "attrs"), return GRAPH_FAILED);
-    const int64_t *splitItem = attrs->GetAttrPointer<int64_t>(GMMAllReduceAttrIdx::K_SPLIT_ITEM);
+    const int64_t* splitItem = attrs->GetAttrPointer<int64_t>(GMMAllReduceAttrIdx::K_SPLIT_ITEM);
     OPS_ERR_IF(splitItem == nullptr, OP_LOGE_WITH_INVALID_INPUT("gmm_all_reduce_fallback", "splitItem"),
                return GRAPH_FAILED);
-    const char *group = attrs->GetStr(static_cast<size_t>(GMMAllReduceAttrIdx::K_GROUP));
+    const char* group = attrs->GetStr(static_cast<size_t>(GMMAllReduceAttrIdx::K_GROUP));
     OPS_ERR_IF(group == nullptr, OP_LOGE_WITH_INVALID_INPUT("gmm_all_reduce_fallback", "group"),
                return ge::GRAPH_FAILED);
-    const char *op = attrs->GetStr(static_cast<size_t>(GMMAllReduceAttrIdx::K_OP));
+    const char* op = attrs->GetStr(static_cast<size_t>(GMMAllReduceAttrIdx::K_OP));
     OPS_ERR_IF(op == nullptr, OP_LOGE_WITH_INVALID_INPUT("gmm_all_reduce_fallback", "op"), return ge::GRAPH_FAILED);
-    const int64_t *comm_turn_ptr = attrs->GetInt(static_cast<size_t>(GMMAllReduceAttrIdx::K_COMM_TURN));
+    const int64_t* comm_turn_ptr = attrs->GetInt(static_cast<size_t>(GMMAllReduceAttrIdx::K_COMM_TURN));
     const int64_t comm_turn = (comm_turn_ptr != nullptr ? *comm_turn_ptr : 0);
     const int64_t stream_mode = 1; // 1  STOP_ON_FAILURE
 
-    std::vector<const gert::Tensor *> geTensorListY;
+    std::vector<const gert::Tensor*> geTensorListY;
     PrepareOutputTensorListGMMAllReduce(host_api_ctx, geTensorListY, GMMAllReduceInOutIdx::OUTPUT_Y, numGeWeight,
                                         *splitItem);
 

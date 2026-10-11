@@ -59,8 +59,8 @@ struct DistributeBarrierConfig {
     bool isMc2Context = false;
 };
 
-ge::graphStatus DistributeBarrierExtendTilingFuncNew(gert::TilingContext *context,
-                                                     const DistributeBarrierConfig &config);
+ge::graphStatus DistributeBarrierExtendTilingFuncNew(gert::TilingContext* context,
+                                                     const DistributeBarrierConfig& config);
 
 } // namespace optiling
 #endif // DISTRIBUTE_BARRIER_TILING_HELPER_H

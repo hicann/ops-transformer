@@ -28,7 +28,7 @@ class MatmulCompute {
 
 public:
     __aicore__ inline MatmulCompute() {}
-    __aicore__ inline void Init(Mc2Tiling::RCSTiling &cfg, TCubeTiling &tiling, Mc2Tiling::TileL2Tiling &l2Tiling,
+    __aicore__ inline void Init(Mc2Tiling::RCSTiling& cfg, TCubeTiling& tiling, Mc2Tiling::TileL2Tiling& l2Tiling,
                                 uint32_t rankID);
     __aicore__ inline void InitGlobalTensor(GM_ADDR bGM, GM_ADDR biasGM);
     __aicore__ inline void InitGlobalTensor(GM_ADDR aGM, uint64_t aSize, GM_ADDR cGM, uint64_t cSize);
@@ -60,8 +60,8 @@ __aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, T>::Init
                                                                                              GM_ADDR biasGM)
 {
     // MC2的计算流中默认B矩阵不变，GM地址无需偏移
-    bGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM), tiling_.Kb * tiling_.N);
-    biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM), tiling_.N);
+    bGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ B_T*>(bGM), tiling_.Kb * tiling_.N);
+    biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT*>(biasGM), tiling_.N);
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, SplitType T>
@@ -70,14 +70,14 @@ __aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, T>::Init
                                                                                              GM_ADDR cGM,
                                                                                              uint64_t cSize)
 {
-    aGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM), aSize);
-    cGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM), cSize);
+    aGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ A_T*>(aGM), aSize);
+    cGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ C_T*>(cGM), cSize);
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, SplitType T>
-__aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, T>::Init(Mc2Tiling::RCSTiling &cfg,
-                                                                                 TCubeTiling &tiling,
-                                                                                 Mc2Tiling::TileL2Tiling &l2Tiling,
+__aicore__ inline void MatmulCompute<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, T>::Init(Mc2Tiling::RCSTiling& cfg,
+                                                                                 TCubeTiling& tiling,
+                                                                                 Mc2Tiling::TileL2Tiling& l2Tiling,
                                                                                  uint32_t rankID)
 {
     // MatmulImpl初始化

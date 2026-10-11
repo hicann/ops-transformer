@@ -25,7 +25,7 @@ namespace Mc2weight_quant_batch_matmul_v2 {
 
 class Mc2WeightQuantBatchMatmulV2TilingAS : public Mc2WeightQuantBatchMatmulV2Tiling {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2TilingAS(gert::TilingContext *context)
+    explicit Mc2WeightQuantBatchMatmulV2TilingAS(gert::TilingContext* context)
         : Mc2WeightQuantBatchMatmulV2Tiling(context)
     {
         if (context->GetCompileInfo() == nullptr) {
@@ -87,9 +87,9 @@ private:
     void SetPreLoad();
     void EnlargeBaseK(uint64_t l0aMaxBaseK);
     void EnlargeBaseKInFullloadA(uint64_t maxBaseK, uint64_t minKL1, uint64_t maxL1,
-                                 const std::vector<uint64_t> &l0BaseKList, const std::vector<uint64_t> &l1KList);
-    void EnlargeBaseKNotFullloadA(uint64_t maxBaseK, uint64_t maxKL1, const std::vector<uint64_t> &l0BaseKList,
-                                  const std::vector<uint64_t> &l1KList);
+                                 const std::vector<uint64_t>& l0BaseKList, const std::vector<uint64_t>& l1KList);
+    void EnlargeBaseKNotFullloadA(uint64_t maxBaseK, uint64_t maxKL1, const std::vector<uint64_t>& l0BaseKList,
+                                  const std::vector<uint64_t>& l1KList);
     bool IsWeight4Nz() const;
     void ReSetTilingAfterExtendedBaseN(uint64_t extendedBaseN, uint64_t firstTailBlockL1Size,
                                        uint64_t firstTailBlockCount, uint64_t secondTailBlockL1Size,

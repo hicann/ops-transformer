@@ -21,16 +21,16 @@
 #include "mc2_platform_info.h"
 
 namespace ops {
-ge::Status MoeDistributeCombineCalcParamFunc(gert::ExeResGenerationContext *context)
+ge::Status MoeDistributeCombineCalcParamFunc(gert::ExeResGenerationContext* context)
 {
     OPS_LOG_D(context->GetNodeName(), "Do general calc param");
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, "aicpu kfc server", "kfc_stream");
 }
 
-ge::Status MoeDistributeCombineGenTaskFunc(const gert::ExeResGenerationContext *context,
-                                           std::vector<std::vector<uint8_t>> &tasks)
+ge::Status MoeDistributeCombineGenTaskFunc(const gert::ExeResGenerationContext* context,
+                                           std::vector<std::vector<uint8_t>>& tasks)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     if (IsTargetPlatformSocVersion(nodeName, PLATFORM_A2)) {
         OPS_LOG_D(context->GetNodeName(), "Do A2 gen task");
         return Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallback(context, tasks);

@@ -24,10 +24,10 @@
 
 using namespace op;
 
-static bool CheckNotNull(const aclTensor *commContext, const aclTensor *gradFetched, const aclTensor *perm,
-                         const aclTensor *sendCounts, const aclTensor *recvCounts, const aclTensor *recvLocalEntry,
-                         const aclTensor *numRecv, aclTensor *gradUniqueOut, aclTensor *uniqueLocalEntryOut,
-                         aclTensor *numUniqueOut)
+static bool CheckNotNull(const aclTensor* commContext, const aclTensor* gradFetched, const aclTensor* perm,
+                         const aclTensor* sendCounts, const aclTensor* recvCounts, const aclTensor* recvLocalEntry,
+                         const aclTensor* numRecv, aclTensor* gradUniqueOut, aclTensor* uniqueLocalEntryOut,
+                         aclTensor* numUniqueOut)
 {
     OP_CHECK_NULL(commContext, return false);
     OP_CHECK_NULL(gradFetched, return false);
@@ -42,10 +42,10 @@ static bool CheckNotNull(const aclTensor *commContext, const aclTensor *gradFetc
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *commContext, const aclTensor *gradFetched, const aclTensor *perm,
-                               const aclTensor *sendCounts, const aclTensor *recvCounts,
-                               const aclTensor *recvLocalEntry, const aclTensor *numRecv, aclTensor *gradUniqueOut,
-                               aclTensor *uniqueLocalEntryOut, aclTensor *numUniqueOut)
+static aclnnStatus CheckParams(const aclTensor* commContext, const aclTensor* gradFetched, const aclTensor* perm,
+                               const aclTensor* sendCounts, const aclTensor* recvCounts,
+                               const aclTensor* recvLocalEntry, const aclTensor* numRecv, aclTensor* gradUniqueOut,
+                               aclTensor* uniqueLocalEntryOut, aclTensor* numUniqueOut)
 {
     CHECK_RET(CheckNotNull(commContext, gradFetched, perm, sendCounts, recvCounts, recvLocalEntry, numRecv,
                            gradUniqueOut, uniqueLocalEntryOut, numUniqueOut),
@@ -57,13 +57,13 @@ static aclnnStatus CheckParams(const aclTensor *commContext, const aclTensor *gr
 extern "C" {
 #endif
 
-aclnnStatus aclnnEngramFetchGradGetWorkspaceSize(const aclTensor *commContext, const aclTensor *gradFetched,
-                                                 const aclTensor *perm, const aclTensor *sendCounts,
-                                                 const aclTensor *recvCounts, const aclTensor *recvLocalEntry,
-                                                 const aclTensor *numRecv, aclTensor *gradUniqueOut,
-                                                 aclTensor *uniqueLocalEntryOut, aclTensor *numUniqueOut,
+aclnnStatus aclnnEngramFetchGradGetWorkspaceSize(const aclTensor* commContext, const aclTensor* gradFetched,
+                                                 const aclTensor* perm, const aclTensor* sendCounts,
+                                                 const aclTensor* recvCounts, const aclTensor* recvLocalEntry,
+                                                 const aclTensor* numRecv, aclTensor* gradUniqueOut,
+                                                 aclTensor* uniqueLocalEntryOut, aclTensor* numUniqueOut,
                                                  int64_t numEntriesPerRank, int64_t commBufferSize,
-                                                 uint64_t *workspaceSize, aclOpExecutor **executor)
+                                                 uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     auto retParam = CheckParams(commContext, gradFetched, perm, sendCounts, recvCounts, recvLocalEntry, numRecv,
                                 gradUniqueOut, uniqueLocalEntryOut, numUniqueOut);
@@ -74,7 +74,7 @@ aclnnStatus aclnnEngramFetchGradGetWorkspaceSize(const aclTensor *commContext, c
     return ret;
 }
 
-aclnnStatus aclnnEngramFetchGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnEngramFetchGrad(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     aclnnStatus ret = aclnnInnerEngramFetchGrad(workspace, workspaceSize, executor, stream);
     return ret;

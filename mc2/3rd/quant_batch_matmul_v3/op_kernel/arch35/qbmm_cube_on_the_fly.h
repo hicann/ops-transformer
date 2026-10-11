@@ -33,7 +33,7 @@ class MatMulASWKernel {
 public:
     __aicore__ inline MatMulASWKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale,
-                                GM_ADDR cGM, GM_ADDR workSpace, const void *tilingData, TPipe *que);
+                                GM_ADDR cGM, GM_ADDR workSpace, const void* tilingData, TPipe* que);
     __aicore__ inline void UpdateGlobalAddr(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR perTokenScale,
                                             GM_ADDR scale, GM_ADDR cGM, GM_ADDR workSpace);
     __aicore__ inline void Process();
@@ -44,7 +44,7 @@ protected:
     __aicore__ inline void SetMMParaAndCompute();
 
     uint32_t blockIdx_;
-    const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *quantBmmTilingData_;
+    const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* quantBmmTilingData_;
 
     GlobalTensor<x1Type> aGlobal_;
     GlobalTensor<x2Type> bGlobal_;
@@ -80,12 +80,12 @@ LOCAL_TEMPLATE_CLASS_PARAMS
 __aicore__ inline void MatMulASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias,
                                                                          GM_ADDR scale, GM_ADDR perTokenScale,
                                                                          GM_ADDR cGM, GM_ADDR workSpace,
-                                                                         const void *tilingData, TPipe *que)
+                                                                         const void* tilingData, TPipe* que)
 {
     if ASCEND_IS_AIV {
         return;
     }
-    quantBmmTilingData_ = static_cast<const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *>(tilingData);
+    quantBmmTilingData_ = static_cast<const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams*>(tilingData);
     blockIdx_ = GetBlockIdx();
     UpdateGlobalAddr(aGM, bGM, bias, scale, perTokenScale, cGM, workSpace);
     mm_.SetSubBlockIdx(0);
@@ -100,38 +100,38 @@ __aicore__ inline void MatMulASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::UpdateGlobal
 {
     block_.Init(quantBmmTilingData_, blockIdx_);
     if constexpr (DequantBmm::IsMxType<scaleType>()) {
-        scaleAGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t *)perTokenScale);
-        scaleBGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t *)scale);
+        scaleAGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t*)perTokenScale);
+        scaleBGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t*)scale);
     } else {
         if (static_cast<bool>(quantBmmTilingData_->params.isDoubleScale)) { // doubleScale
-            float deqScale = (*((__gm__ float *)scale)) * (*((__gm__ float *)perTokenScale));
-            uint32_t uint32Scale = *(reinterpret_cast<uint32_t *>(&deqScale));
+            float deqScale = (*((__gm__ float*)scale)) * (*((__gm__ float*)perTokenScale));
+            uint32_t uint32Scale = *(reinterpret_cast<uint32_t*>(&deqScale));
             block_.offset_.scaleScalar = uint32Scale & DEQ_SCALE_MUL;            // fixpipe只能取高19位
         } else if (static_cast<bool>(quantBmmTilingData_->params.isPerTensor)) { // pertensor
             if constexpr (!IsSameType<scaleType, uint64_t>::value) {
                 uint32_t uint32Scale = 0;
                 if constexpr (IsSameType<scaleType, bfloat16_t>::value) {
-                    uint16_t uint16Scale = *((__gm__ uint16_t *)scale);
+                    uint16_t uint16Scale = *((__gm__ uint16_t*)scale);
                     uint32Scale = static_cast<uint32_t>(uint16Scale << BMM_BLOCK_NUM);
                 } else {
-                    uint32Scale = *((__gm__ uint32_t *)scale);
+                    uint32Scale = *((__gm__ uint32_t*)scale);
                 }
                 block_.offset_.scaleScalar = uint32Scale & DEQ_SCALE_MUL;
             } else {
-                block_.offset_.scaleScalar = *((__gm__ uint64_t *)scale);
+                block_.offset_.scaleScalar = *((__gm__ uint64_t*)scale);
             }
         } else {
-            scaleGlobal_.SetGlobalBuffer((__gm__ uint64_t *)scale);
+            scaleGlobal_.SetGlobalBuffer((__gm__ uint64_t*)scale);
         }
     }
 
     // update global buffer
-    aGlobal_.SetGlobalBuffer((__gm__ x1Type *)aGM);
-    bGlobal_.SetGlobalBuffer((__gm__ x2Type *)bGM);
+    aGlobal_.SetGlobalBuffer((__gm__ x1Type*)aGM);
+    bGlobal_.SetGlobalBuffer((__gm__ x2Type*)bGM);
     if (static_cast<bool>(quantBmmTilingData_->matmulTiling.isBias)) {
-        biasGlobal_.SetGlobalBuffer((__gm__ biasType *)bias);
+        biasGlobal_.SetGlobalBuffer((__gm__ biasType*)bias);
     }
-    cGlobal_.SetGlobalBuffer((__gm__ yType *)cGM);
+    cGlobal_.SetGlobalBuffer((__gm__ yType*)cGM);
 }
 
 LOCAL_TEMPLATE_CLASS_PARAMS

@@ -36,9 +36,9 @@ enum class NnopbaseHcclServerType : uint32_t {
     NNOPBASE_HCCL_SERVER_TYPE_CCU,
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
-static bool IsTransposeLastTwoDims(const aclTensor *tensor)
+static bool IsTransposeLastTwoDims(const aclTensor* tensor)
 {
     if (tensor->GetViewShape().GetDimNum() < 2 || tensor->GetViewShape().GetDimNum() > 6) {
         return false;
@@ -59,7 +59,7 @@ const std::initializer_list<op::DataType> X_DTYPE_SUPPORT_LIST = {
 const std::initializer_list<op::DataType> SCALE_DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT8_E8M0};
 
 // CheckDtype: dtype 校验（bitcast 场景校验声明的 dtype，与 op_def 白名单一致）
-aclnnStatus CheckDtype(const aclTensor *x1, const aclTensor *x2, const aclTensor *x1Scale, const aclTensor *x2Scale)
+aclnnStatus CheckDtype(const aclTensor* x1, const aclTensor* x2, const aclTensor* x1Scale, const aclTensor* x2Scale)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, X_DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
     OP_CHECK_DTYPE_NOT_SUPPORT(x2, X_DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
@@ -77,7 +77,7 @@ aclnnStatus CheckDtype(const aclTensor *x1, const aclTensor *x2, const aclTensor
     return ACLNN_SUCCESS;
 }
 
-static aclTensor *TransX2Tensor(const aclTensor *x2)
+static aclTensor* TransX2Tensor(const aclTensor* x2)
 {
     uint64_t storageShapeDimNum = x2->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDim(storageShapeDimNum);
@@ -104,9 +104,9 @@ static aclTensor *TransX2Tensor(const aclTensor *x2)
                            storageShapeDimNum, x2->GetTensor()->GetAddr());
 }
 
-static bool CheckNullParams(const aclTensor *x1, const aclTensor *x2, const aclTensor *x1ScaleOptional,
-                            const aclTensor *x2ScaleOptional, const aclTensor *output, uint64_t *workspaceSize,
-                            aclOpExecutor **executor)
+static bool CheckNullParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* x1ScaleOptional,
+                            const aclTensor* x2ScaleOptional, const aclTensor* output, uint64_t* workspaceSize,
+                            aclOpExecutor** executor)
 {
     if (x1 == nullptr || x2 == nullptr || x1ScaleOptional == nullptr || x2ScaleOptional == nullptr ||
         output == nullptr || workspaceSize == nullptr || executor == nullptr) {
@@ -130,11 +130,11 @@ static bool CheckNullParams(const aclTensor *x1, const aclTensor *x2, const aclT
 }
 
 extern "C" aclnnStatus AlltoAllMatmulV2GetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
-    const aclTensor *x1ScaleOptional, const aclTensor *x2ScaleOptional, const char *group, int64_t worldSize,
-    int64_t hcclBufferSize, int64_t x1QuantMode, int64_t x2QuantMode, int64_t groupSize, const char *commMode,
-    int64_t precisionMode, const aclTensor *output, const aclTensor *alltoAllOutOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* context, const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional,
+    const aclTensor* x1ScaleOptional, const aclTensor* x2ScaleOptional, const char* group, int64_t worldSize,
+    int64_t hcclBufferSize, int64_t x1QuantMode, int64_t x2QuantMode, int64_t groupSize, const char* commMode,
+    int64_t precisionMode, const aclTensor* output, const aclTensor* alltoAllOutOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     OP_LOGD("AlltoAllMatmulV2GetWorkspaceSize start");
 
@@ -155,7 +155,7 @@ extern "C" aclnnStatus AlltoAllMatmulV2GetWorkspaceSize(
         }
     }
 
-    const char *effectiveCommMode = commMode != nullptr ? commMode : "aiv_urma";
+    const char* effectiveCommMode = commMode != nullptr ? commMode : "aiv_urma";
     if (strcmp(effectiveCommMode, "aiv_urma") != 0) {
         OP_LOGE_WITH_INVALID_ATTR("AlltoAllMatmulV2", "commMode", effectiveCommMode, "'aiv_urma'");
         return ACLNN_ERR_PARAM_INVALID;
@@ -177,9 +177,9 @@ extern "C" aclnnStatus AlltoAllMatmulV2GetWorkspaceSize(
     constexpr int64_t kDefaultX1QuantDtype = 28; // ge::DT_UNDEFINED
     constexpr bool kDefaultTransposeX1 = false;
     aclnnStatus ret = aclnnInnerAlltoAllMatmulV2GetWorkspaceSize(
-        context, x1, transX2, biasOptional, x1ScaleOptional, x2ScaleOptional, const_cast<char *>(group), worldSize,
+        context, x1, transX2, biasOptional, x1ScaleOptional, x2ScaleOptional, const_cast<char*>(group), worldSize,
         hcclBufferSize, yDtype, x1QuantMode, x2QuantMode, kDefaultX1QuantDtype, kDefaultTransposeX1, transposeX2,
-        groupSize, const_cast<char *>(effectiveCommMode), precisionMode, output, alltoAllOutOptional, workspaceSize,
+        groupSize, const_cast<char*>(effectiveCommMode), precisionMode, output, alltoAllOutOptional, workspaceSize,
         executor);
 
     if (ret != ACLNN_SUCCESS) {
@@ -190,7 +190,7 @@ extern "C" aclnnStatus AlltoAllMatmulV2GetWorkspaceSize(
     return ret;
 }
 
-extern "C" aclnnStatus AlltoAllMatmulV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus AlltoAllMatmulV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream)
 {
     OP_LOGD("AlltoAllMatmulV2 start");

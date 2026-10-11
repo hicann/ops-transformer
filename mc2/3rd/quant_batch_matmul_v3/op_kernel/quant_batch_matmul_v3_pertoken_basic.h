@@ -24,8 +24,8 @@ class BmmDequantPertokenBasic {
 public:
     __aicore__ inline BmmDequantPertokenBasic() {}
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale, GM_ADDR bias, GM_ADDR pertokenScale, GM_ADDR y,
-                                GM_ADDR workSpace, const Mc2QuantBatchMatmulV3TilingData *__restrict tilingData,
-                                TPipe *tPipe)
+                                GM_ADDR workSpace, const Mc2QuantBatchMatmulV3TilingData* __restrict tilingData,
+                                TPipe* tPipe)
     {
         blockIdx_ = GetBlockIdx();
         blockIdx_ /= GetTaskRation();
@@ -50,7 +50,7 @@ public:
         loop_ = 0; // all_gather_quant_batch_mat_mul.h循环调Init和Process，管理CV同步的计数器每次都要清零
     }
 
-    __aicore__ inline void UpdateBatchOffset(uint64_t batchIndex, QBmmBlockOffset &offset)
+    __aicore__ inline void UpdateBatchOffset(uint64_t batchIndex, QBmmBlockOffset& offset)
     {
         uint64_t batchAOffset = batchIndex % batchA_;
         uint64_t batchBOffset = batchIndex % batchB_;
@@ -95,13 +95,13 @@ public:
         End();
     }
 
-    __aicore__ inline UPDATE_TYPE &GetUpdateObj()
+    __aicore__ inline UPDATE_TYPE& GetUpdateObj()
     {
         return update_;
     }
 
 private:
-    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData *tilingData)
+    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData* tilingData)
     {
         isPerTensor_ = tilingData->params.isPerTensor;
         m_ = tilingData->matmulTiling.M;
@@ -132,28 +132,28 @@ private:
                                              GM_ADDR y, GM_ADDR workSpace)
     {
         if (isPerTensor_) {
-            scaleScalar_ = *((__gm__ scaleType *)scale);
+            scaleScalar_ = *((__gm__ scaleType*)scale);
         }
-        xGm_.SetGlobalBuffer((__gm__ x1Type *)x1);
-        weightGm_.SetGlobalBuffer((__gm__ x2Type *)x2);
+        xGm_.SetGlobalBuffer((__gm__ x1Type*)x1);
+        weightGm_.SetGlobalBuffer((__gm__ x2Type*)x2);
         if (m_ <= baseM_) {
             weightGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
         }
         if (hasBias_ != 0U) {
             if (biasDtype_ == DT_BF16) {
-                biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t *)bias);
+                biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t*)bias);
             } else if (biasDtype_ == DT_FLOAT16) {
-                biasGmFp16_.SetGlobalBuffer((__gm__ half *)bias);
+                biasGmFp16_.SetGlobalBuffer((__gm__ half*)bias);
             } else if (biasDtype_ == DT_FLOAT) {
-                biasGmFp32_.SetGlobalBuffer((__gm__ float *)bias);
+                biasGmFp32_.SetGlobalBuffer((__gm__ float*)bias);
             } else {
-                biasGmInt32_.SetGlobalBuffer((__gm__ int32_t *)bias);
+                biasGmInt32_.SetGlobalBuffer((__gm__ int32_t*)bias);
             }
         }
-        yGm_.SetGlobalBuffer((__gm__ yType *)y);
-        scaleGm_.SetGlobalBuffer((__gm__ scaleType *)scale);
-        pertokenScaleGm_.SetGlobalBuffer((__gm__ float *)pertokenScale);
-        mmOutGm_.SetGlobalBuffer((__gm__ int32_t *)workSpace, BUFFER_NUM * usedCoreNum_ * baseM_ * baseN_);
+        yGm_.SetGlobalBuffer((__gm__ yType*)y);
+        scaleGm_.SetGlobalBuffer((__gm__ scaleType*)scale);
+        pertokenScaleGm_.SetGlobalBuffer((__gm__ float*)pertokenScale);
+        mmOutGm_.SetGlobalBuffer((__gm__ int32_t*)workSpace, BUFFER_NUM * usedCoreNum_ * baseM_ * baseN_);
     }
 
     __aicore__ inline void InitLocalBuffers()
@@ -174,7 +174,7 @@ private:
     }
 
     __aicore__ inline void OneTileCompute(uint64_t mTileIndex, uint64_t nTileIndex, uint64_t pingOffsetC,
-                                          uint64_t batchIndex, bool &pongSwitch)
+                                          uint64_t batchIndex, bool& pongSwitch)
     {
         for (uint64_t j = 0; j < block_.realRound_; j++) {
             // 更新此次基本块的大小和输入输出地址
@@ -222,8 +222,8 @@ private:
     }
 
     __aicore__ inline void PertokenCalculate(uint32_t basicBlockComputeInfo[], uint32_t mUbLoopIdx,
-                                             DataCopyPadParams &padParams, LocalTensor<float> &dstLocalFp32,
-                                             LocalTensor<float> &tmpdstLocal)
+                                             DataCopyPadParams& padParams, LocalTensor<float>& dstLocalFp32,
+                                             LocalTensor<float>& tmpdstLocal)
 
     {
         uint32_t curAivN = basicBlockComputeInfo[0];
@@ -261,7 +261,7 @@ private:
         vecQuePertokenScale_.FreeTensor(pertokenScaleLocal);
     }
 
-    __aicore__ inline void BasicDequantCompute(GlobalTensor<int32_t> &curMmOutGm, uint32_t curAicM, uint32_t curAicN)
+    __aicore__ inline void BasicDequantCompute(GlobalTensor<int32_t>& curMmOutGm, uint32_t curAicM, uint32_t curAicN)
     {
         LocalTensor<float> dstLocalFp32 = outFp32Tmp_.Get<float>();
         LocalTensor<float> biasFp32;
@@ -330,9 +330,9 @@ private:
         }
     }
 
-    __aicore__ inline void BiasTensorInit(LocalTensor<float> & /* dstLocalFp32 */, LocalTensor<float> &biasFp32,
-                                          LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                          LocalTensor<float> &oriBiasFp32)
+    __aicore__ inline void BiasTensorInit(LocalTensor<float>& /* dstLocalFp32 */, LocalTensor<float>& biasFp32,
+                                          LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                          LocalTensor<float>& oriBiasFp32)
     {
         biasFp32 = biasFp32Tmp_.Get<float>();
         if (biasDtype_ == DT_BF16) {
@@ -344,8 +344,8 @@ private:
         }
     }
 
-    __aicore__ inline void BiasGm2Ub(LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                     LocalTensor<float> &oriBiasFp32, DataCopyPadParams padParams, uint32_t curAivN)
+    __aicore__ inline void BiasGm2Ub(LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                     LocalTensor<float>& oriBiasFp32, DataCopyPadParams padParams, uint32_t curAivN)
     {
         DataCopyParams bias2UbParams{1, 0, 0, 0};
         bias2UbParams.blockLen = curAivN * biasDtypeSize_;
@@ -359,9 +359,9 @@ private:
         }
     }
 
-    __aicore__ inline void CalBiasAdd(LocalTensor<float> &dstLocalFp32, LocalTensor<float> &biasFp32,
-                                      LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                      LocalTensor<float> &oriBiasFp32, uint32_t curAivN, uint32_t curAivM)
+    __aicore__ inline void CalBiasAdd(LocalTensor<float>& dstLocalFp32, LocalTensor<float>& biasFp32,
+                                      LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                      LocalTensor<float>& oriBiasFp32, uint32_t curAivN, uint32_t curAivM)
     {
         uint32_t computedAivN = DequantBmm::Align(curAivN, 8U); // 8: 32B aligened for int32_t
         uint32_t ubResAlignedN = DequantBmm::Align(curAivN);    // 16: sizeof(ytype) is 2 , 32B / 2
@@ -412,7 +412,7 @@ private:
     GlobalTensor<float> pertokenScaleGm_;
     GlobalTensor<int32_t> mmOutGm_;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     // define the que
     TQue<QuePosition::VECIN, 1> vecQueSrc_;
     TQue<QuePosition::VECIN, 1> vecQueScale_;

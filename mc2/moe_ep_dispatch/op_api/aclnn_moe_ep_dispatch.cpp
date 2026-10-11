@@ -22,10 +22,10 @@ constexpr int64_t NETWORK_DIRECT = 0;
 constexpr int64_t NETWORK_HYBRID = 1;
 } // namespace
 
-static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx,
-                                const aclTensor *numRecvTokensPerRank, const aclTensor *numRecvTokensPerExpert,
-                                const aclTensor *dstBufferSlotIdx, const aclTensor *routeCount,
-                                const aclTensor *routeDstScaleout, const aclTensor *routeScaleoutSlot)
+static aclnnStatus CheckNotNull(const aclTensor* context, const aclTensor* x, const aclTensor* topkIdx,
+                                const aclTensor* numRecvTokensPerRank, const aclTensor* numRecvTokensPerExpert,
+                                const aclTensor* dstBufferSlotIdx, const aclTensor* routeCount,
+                                const aclTensor* routeDstScaleout, const aclTensor* routeScaleoutSlot)
 {
     CHECK_RET(context != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(x != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -41,8 +41,8 @@ static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *x, co
 
 static aclnnStatus CheckParams(int64_t epWorldSize, int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank,
                                int64_t cclBufferSize, bool doCpuSync, int64_t topoType, int64_t rankNumPerServer,
-                               const aclTensor *cachedDstSlotIdx, const aclTensor *cachedRouteCount,
-                               const aclTensor *cachedRouteDstScaleout, const aclTensor *cachedRouteScaleoutSlot)
+                               const aclTensor* cachedDstSlotIdx, const aclTensor* cachedRouteCount,
+                               const aclTensor* cachedRouteDstScaleout, const aclTensor* cachedRouteScaleoutSlot)
 {
     CHECK_RET(epWorldSize > 1, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(epRankId >= 0 && epRankId < epWorldSize, ACLNN_ERR_PARAM_INVALID);
@@ -77,17 +77,17 @@ enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
 aclnnStatus aclnnMoeEpDispatchGetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx, const aclTensor *topkWeights,
-    const aclTensor *scales, const aclTensor *cachedDstSlotIdx, const aclTensor *cachedRouteCount,
-    const aclTensor *cachedRouteDstScaleout, const aclTensor *cachedRouteScaleoutSlot, int64_t epWorldSize,
+    const aclTensor* context, const aclTensor* x, const aclTensor* topkIdx, const aclTensor* topkWeights,
+    const aclTensor* scales, const aclTensor* cachedDstSlotIdx, const aclTensor* cachedRouteCount,
+    const aclTensor* cachedRouteDstScaleout, const aclTensor* cachedRouteScaleoutSlot, int64_t epWorldSize,
     int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank, int64_t cclBufferSize, int64_t expertAlignment,
     bool doCpuSync, int64_t hostPinnedCounterAddr, int64_t topoType, int64_t rankNumPerServer,
-    aclTensor *numRecvTokensPerRank, aclTensor *numRecvTokensPerExpert, aclTensor *dstBufferSlotIdx,
-    aclTensor *routeCount, aclTensor *routeDstScaleout, aclTensor *routeScaleoutSlot, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    aclTensor* numRecvTokensPerRank, aclTensor* numRecvTokensPerExpert, aclTensor* dstBufferSlotIdx,
+    aclTensor* routeCount, aclTensor* routeDstScaleout, aclTensor* routeScaleoutSlot, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     OP_LOGD("aclnnMoeEpDispatch WorkspaceSize start");
 
@@ -109,7 +109,7 @@ aclnnStatus aclnnMoeEpDispatchGetWorkspaceSize(
     return getWorkspaceSizesRes;
 }
 
-aclnnStatus aclnnMoeEpDispatch(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMoeEpDispatch(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     OP_LOGD("aclnnMoeEpDispatch start");
     if (NnopbaseSetHcclServerType) {

@@ -257,7 +257,7 @@ struct HcclA2CombineOpParam {
                                                      // and others are cross-card mapping addresses.
     uint8_t res[8328];
     uint8_t multiFlag;
-    __gm__ AscendC::IbVerbsData *data;
+    __gm__ AscendC::IbVerbsData* data;
     uint64_t dataSize;
     // 追加字段
     uint64_t sizeOfAiRMAInfo; // sizeof(HcclAiRMAInfo)
@@ -309,12 +309,12 @@ struct hns_roce_lite_wqe_data_seg {
     uint64_t localVA;
 };
 
-__aicore__ inline void cacheWriteThrough(__gm__ uint8_t *sourceAddr, uint64_t length)
+__aicore__ inline void cacheWriteThrough(__gm__ uint8_t* sourceAddr, uint64_t length)
 {
-    __gm__ uint8_t *start =
-        (__gm__ uint8_t *)((uint64_t)sourceAddr / AscendC::CACHE_LINE_SIZE * AscendC::CACHE_LINE_SIZE);
-    __gm__ uint8_t *end =
-        (__gm__ uint8_t *)(((uint64_t)sourceAddr + length) / AscendC::CACHE_LINE_SIZE * AscendC::CACHE_LINE_SIZE);
+    __gm__ uint8_t* start =
+        (__gm__ uint8_t*)((uint64_t)sourceAddr / AscendC::CACHE_LINE_SIZE * AscendC::CACHE_LINE_SIZE);
+    __gm__ uint8_t* end =
+        (__gm__ uint8_t*)(((uint64_t)sourceAddr + length) / AscendC::CACHE_LINE_SIZE * AscendC::CACHE_LINE_SIZE);
     AscendC::GlobalTensor<uint8_t> global;
     global.SetGlobalBuffer(start);
     for (uint32_t i = 0; i <= end - start; i += AscendC::CACHE_LINE_SIZE) {

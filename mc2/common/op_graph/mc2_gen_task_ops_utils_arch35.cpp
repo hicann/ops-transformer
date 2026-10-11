@@ -17,8 +17,8 @@
 
 namespace ops {
 
-ge::Status Mc2Arch35GenTaskOpsUtils::CreateCCUFusionTask(const gert::ExeResGenerationContext *context,
-                                                         std::vector<std::vector<uint8_t>> &tasks)
+ge::Status Mc2Arch35GenTaskOpsUtils::CreateCCUFusionTask(const gert::ExeResGenerationContext* context,
+                                                         std::vector<std::vector<uint8_t>>& tasks)
 {
     // 填充groupinfo
     GroupInfo groupInfo;
@@ -29,7 +29,7 @@ ge::Status Mc2Arch35GenTaskOpsUtils::CreateCCUFusionTask(const gert::ExeResGener
 
     // 添加ccugroup
     std::vector<std::string> ccuGroups;
-    for (const std::string &groupAttrName : groupInfo.groupAttrNames) {
+    for (const std::string& groupAttrName : groupInfo.groupAttrNames) {
         ccuGroups.emplace_back(groupAttrName);
         OPS_LOG_D(context->GetNodeName(), "Set group attr [%s] to ccu task info success.", groupAttrName.c_str());
     }
@@ -51,7 +51,7 @@ ge::Status Mc2Arch35GenTaskOpsUtils::CreateCCUFusionTask(const gert::ExeResGener
     OPS_LOG_I(context->GetNodeName(), "aicore task set numBlocks successfully, set numBlocks %ld.", numBlocks);
 
     // 获取aicore task的args format
-    const char *prevArgsFormatStr = prevAicoreTask.GetArgsFormat();
+    const char* prevArgsFormatStr = prevAicoreTask.GetArgsFormat();
     if (prevArgsFormatStr == nullptr) {
         OPS_LOG_E(context->GetNodeName(), "Failed to get Args Format from aicore task in previous aicore task.");
         return ge::GRAPH_FAILED;

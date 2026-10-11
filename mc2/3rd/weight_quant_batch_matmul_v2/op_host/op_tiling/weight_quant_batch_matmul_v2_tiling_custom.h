@@ -22,12 +22,12 @@
 namespace optiling {
 class Mc2WeightQuantBatchMatmulV2TilingCustom : public Mc2WeightQuantBatchMatmulV2Tiling {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2TilingCustom(gert::TilingContext *context)
+    explicit Mc2WeightQuantBatchMatmulV2TilingCustom(gert::TilingContext* context)
         : Mc2WeightQuantBatchMatmulV2Tiling(context)
     {
         Reset();
     }
-    Mc2WeightQuantBatchMatmulV2TilingCustom(gert::TilingContext *context, Mc2WeightQuantBatchMatmulV2TilingData *out)
+    Mc2WeightQuantBatchMatmulV2TilingCustom(gert::TilingContext* context, Mc2WeightQuantBatchMatmulV2TilingData* out)
         : Mc2WeightQuantBatchMatmulV2Tiling(context)
     {
         Reset();
@@ -35,7 +35,7 @@ public:
         InitCompileInfo();
         isOutTilingData_ = true;
     }
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -43,7 +43,7 @@ public:
     ~Mc2WeightQuantBatchMatmulV2TilingCustom() override = default;
 
 protected:
-    Mc2WeightQuantBatchMatmulV2TilingData *tilingData_ = nullptr;
+    Mc2WeightQuantBatchMatmulV2TilingData* tilingData_ = nullptr;
     std::unique_ptr<Mc2WeightQuantBatchMatmulV2TilingData> tilingDataManager_;
     // mc2信息
     bool isOutTilingData_ = false;
@@ -62,15 +62,15 @@ protected:
     void SetShapeSize();
     void AdjustMatmulTiling() const;
     void AdjustL1Size() const;
-    void ComputeDefaultBlock(uint64_t &defaultVecSingleK, uint64_t &defaultVecSingleN);
-    void ComputeGroupDefaultBlock(uint64_t &defaultVecSingleK, uint64_t &defaultVecSingleN);
-    void ReviseGroupDefaultBlockWithTrans(uint64_t &defaultVecSingleK, uint64_t &defaultVecSingleN);
-    void ReviseGroupDefaultBlockWithoutTrans(uint64_t &defaultVecSingleK, uint64_t &defaultVecSingleN);
-    void ComputeVectorDefaultBlock(uint64_t &defaultVecSingleK, uint64_t &defaultVecSingleN);
-    void ComputeInt4VectorDefaultBlock(uint64_t &defaultVecSingleK, uint64_t &defaultVecSingleN);
-    uint64_t ComputeAntiquantBuffer(uint64_t &defaultVecSingleK, uint64_t &defaultVecSingleN);
+    void ComputeDefaultBlock(uint64_t& defaultVecSingleK, uint64_t& defaultVecSingleN);
+    void ComputeGroupDefaultBlock(uint64_t& defaultVecSingleK, uint64_t& defaultVecSingleN);
+    void ReviseGroupDefaultBlockWithTrans(uint64_t& defaultVecSingleK, uint64_t& defaultVecSingleN);
+    void ReviseGroupDefaultBlockWithoutTrans(uint64_t& defaultVecSingleK, uint64_t& defaultVecSingleN);
+    void ComputeVectorDefaultBlock(uint64_t& defaultVecSingleK, uint64_t& defaultVecSingleN);
+    void ComputeInt4VectorDefaultBlock(uint64_t& defaultVecSingleK, uint64_t& defaultVecSingleN);
+    uint64_t ComputeAntiquantBuffer(uint64_t& defaultVecSingleK, uint64_t& defaultVecSingleN);
     uint64_t ComputeWeightBuffer(uint64_t defaultVecSingleK, uint64_t defaultVecSingleN);
-    void ComputeInt8VectorDefaultBlock(uint64_t &defaultVecSingleK, uint64_t &defaultVecSingleN) const;
+    void ComputeInt8VectorDefaultBlock(uint64_t& defaultVecSingleK, uint64_t& defaultVecSingleN) const;
     bool GetTilingFromCache();
     bool CheckCacheTiling();
     bool InvokeCacheTiling();

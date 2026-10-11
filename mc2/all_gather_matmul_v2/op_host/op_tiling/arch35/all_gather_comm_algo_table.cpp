@@ -37,7 +37,7 @@ static constexpr Mc2Hcom::CommAlgoEntry ALLGATHER_COMM_ALGO_TABLE[] = {
      MAX_DATA_BYTES_UNLIMITED, RANK_SIZE_2, MAX_RANK_SIZE, DEFAULT, ALLGATHER_DEFAULT_ALGO_NAME},
 };
 
-const Mc2Hcom::CommAlgoEntry *GetAllGatherCommAlgoTable(uint32_t &count)
+const Mc2Hcom::CommAlgoEntry* GetAllGatherCommAlgoTable(uint32_t& count)
 {
     count = sizeof(ALLGATHER_COMM_ALGO_TABLE) / sizeof(ALLGATHER_COMM_ALGO_TABLE[0]);
     return ALLGATHER_COMM_ALGO_TABLE;

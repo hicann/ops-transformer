@@ -30,7 +30,7 @@ namespace matmul_allto_all_check {
 using namespace op;
 
 // 校验AlltoAll和Permute数据交换的方向参数, 可以为空和{-1,-2}, 不允许为其他值
-bool CheckAlltoAllAxes(const char *opName, const aclIntArray *alltoAllAxesOptional, bool isMatmulAlltoAll)
+bool CheckAlltoAllAxes(const char* opName, const aclIntArray* alltoAllAxesOptional, bool isMatmulAlltoAll)
 {
     // alltoAllAxesOptional为空时会兼容性处理，不报错
     if (alltoAllAxesOptional == nullptr) {
@@ -68,7 +68,7 @@ bool CheckAlltoAllAxes(const char *opName, const aclIntArray *alltoAllAxesOption
 }
 
 // 校验输入的转置配置，x1不允许转置
-bool CheckTransposeX1(const char *opName, bool transposeX1)
+bool CheckTransposeX1(const char* opName, bool transposeX1)
 {
     OP_API_CHECK(transposeX1, {
         OP_LOGE_FOR_INVALID_VALUE(opName, "transposeX1", "true", "false");
@@ -78,7 +78,7 @@ bool CheckTransposeX1(const char *opName, bool transposeX1)
 }
 
 // 校验通信域名的字符串长度是否符合要求
-bool CheckGroupLength(const char *opName, const char *group)
+bool CheckGroupLength(const char* opName, const char* group)
 {
     if (group == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "group");
@@ -93,8 +93,8 @@ bool CheckGroupLength(const char *opName, const char *group)
 }
 
 // 校验输入tensor的维度
-bool CheckInputDimensions(const char *opName, const aclTensor *x1, const aclTensor *x2, const aclTensor *output,
-                          const aclTensor *alltoAllOutOptional = nullptr)
+bool CheckInputDimensions(const char* opName, const aclTensor* x1, const aclTensor* x2, const aclTensor* output,
+                          const aclTensor* alltoAllOutOptional = nullptr)
 {
     if (x1->GetViewShape().GetDimNum() != TWO_DIMS) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "x1",
@@ -127,7 +127,7 @@ bool CheckInputDimensions(const char *opName, const aclTensor *x1, const aclTens
 }
 
 // 校验bias的维度和shape
-bool CheckBiasShape(const char *opName, const aclTensor *biasOptional, int64_t nVal)
+bool CheckBiasShape(const char* opName, const aclTensor* biasOptional, int64_t nVal)
 {
     if (biasOptional != nullptr) {
         if (biasOptional->GetViewShape().GetDimNum() != ONE_DIM) {
@@ -147,8 +147,8 @@ bool CheckBiasShape(const char *opName, const aclTensor *biasOptional, int64_t n
 }
 
 // 校验MatmulAlltoAll和QuantMatmulAlltoAll输入属性shape
-bool CheckShapeMMAA(const char *opName, const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
-                    bool transposeX2, const aclTensor *output)
+bool CheckShapeMMAA(const char* opName, const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional,
+                    bool transposeX2, const aclTensor* output)
 {
     if (!CheckInputDimensions(opName, x1, x2, output)) {
         return false;
@@ -174,8 +174,8 @@ bool CheckShapeMMAA(const char *opName, const aclTensor *x1, const aclTensor *x2
 }
 
 // 校验AlltoAllMatmul和AlltoAllQuantMatmul输入属性shape
-bool CheckShapeAAMM(const char *opName, const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
-                    bool transposeX2, const aclTensor *output, const aclTensor *alltoAllOutOptional)
+bool CheckShapeAAMM(const char* opName, const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional,
+                    bool transposeX2, const aclTensor* output, const aclTensor* alltoAllOutOptional)
 {
     if (!CheckInputDimensions(opName, x1, x2, output, alltoAllOutOptional)) {
         return false;
@@ -185,7 +185,7 @@ bool CheckShapeAAMM(const char *opName, const aclTensor *x1, const aclTensor *x2
 }
 
 // 检查tensor是否连续
-bool IsTransposeLastTwoDims(const aclTensor *tensor)
+bool IsTransposeLastTwoDims(const aclTensor* tensor)
 {
     // 当输入tensor的shape小于2或者大于6的时候，返回错误
     if (tensor->GetViewShape().GetDimNum() < 2 || tensor->GetViewShape().GetDimNum() > 6) {
@@ -208,7 +208,7 @@ bool IsTransposeLastTwoDims(const aclTensor *tensor)
 }
 
 // 检查x2是否合法
-aclnnStatus CheckX2Valid(const char *opName, const aclTensor *x2)
+aclnnStatus CheckX2Valid(const char* opName, const aclTensor* x2)
 {
     if (x2 == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "x2");
@@ -228,8 +228,8 @@ aclnnStatus CheckX2Valid(const char *opName, const aclTensor *x2)
 }
 
 // 检查commMode参数是否合法，并获取commMode对应枚举值
-aclnnStatus CheckAndHandleCommMode(const char *opName, const char *group, const char *commModeStr,
-                                   uint8_t &commModeEnum)
+aclnnStatus CheckAndHandleCommMode(const char* opName, const char* group, const char* commModeStr,
+                                   uint8_t& commModeEnum)
 {
     (void)group;
     const size_t maxLength = 7UL;
@@ -260,7 +260,7 @@ aclnnStatus CheckAndHandleCommMode(const char *opName, const char *group, const 
 }
 
 // 检查是否有alltoallout输出
-bool IsAll2AllOut(const char *opName, const aclTensor *alltoAllOut)
+bool IsAll2AllOut(const char* opName, const aclTensor* alltoAllOut)
 {
     if (alltoAllOut == nullptr) {
         return false;
@@ -273,7 +273,7 @@ bool IsAll2AllOut(const char *opName, const aclTensor *alltoAllOut)
 }
 
 // 处理支持转置的tensor物理排布不连续问题
-aclTensor *TransX2Tensor(const aclTensor *x2)
+aclTensor* TransX2Tensor(const aclTensor* x2)
 {
     uint64_t storageShapeDimNum = x2->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDim(storageShapeDimNum);

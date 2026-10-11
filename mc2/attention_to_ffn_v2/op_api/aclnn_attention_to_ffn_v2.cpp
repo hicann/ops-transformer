@@ -28,12 +28,12 @@ enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
 // check nullptr
-static bool CheckNullStatus(const aclTensor *context, const aclTensor *x, const aclTensor *sessionId,
-                            const aclTensor *microBatchId, const aclTensor *layerId, const aclTensor *expertIds,
-                            const aclTensor *expertRankTable, const char *group)
+static bool CheckNullStatus(const aclTensor* context, const aclTensor* x, const aclTensor* sessionId,
+                            const aclTensor* microBatchId, const aclTensor* layerId, const aclTensor* expertIds,
+                            const aclTensor* expertRankTable, const char* group)
 {
     // 检查必选入参出参为非空
     OP_CHECK_NULL(context, return false);
@@ -51,9 +51,9 @@ static bool CheckNullStatus(const aclTensor *context, const aclTensor *x, const 
 }
 
 // 入参校验
-static aclnnStatus CheckParams(const aclTensor *context, const aclTensor *x, const aclTensor *sessionId,
-                               const aclTensor *microBatchId, const aclTensor *layerId, const aclTensor *expertIds,
-                               const aclTensor *expertRankTable, const char *group)
+static aclnnStatus CheckParams(const aclTensor* context, const aclTensor* x, const aclTensor* sessionId,
+                               const aclTensor* microBatchId, const aclTensor* layerId, const aclTensor* expertIds,
+                               const aclTensor* expertRankTable, const char* group)
 {
     CHECK_RET(CheckNullStatus(context, x, sessionId, microBatchId, layerId, expertIds, expertRankTable, group),
               ACLNN_ERR_PARAM_NULLPTR);
@@ -69,24 +69,24 @@ static aclnnStatus CheckParams(const aclTensor *context, const aclTensor *x, con
 }
 
 aclnnStatus aclnnAttentionToFfnV2GetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x, const aclTensor *sessionId, const aclTensor *microBatchId,
-    const aclTensor *layerId, const aclTensor *expertIds, const aclTensor *expertRankTable,
-    const aclTensor *scalesOptional, const aclTensor *activeMaskOptional, const char *group, int64_t worldSize,
-    const aclIntArray *ffnTokenInfoTableShape, const aclIntArray *ffnTokenDataShape,
-    const aclIntArray *attnTokenInfoTableShape, int64_t moeExpertNum, int64_t quantMode, int64_t syncFlag,
-    int64_t ffnStartRankId, int64_t cclBufferSize, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* context, const aclTensor* x, const aclTensor* sessionId, const aclTensor* microBatchId,
+    const aclTensor* layerId, const aclTensor* expertIds, const aclTensor* expertRankTable,
+    const aclTensor* scalesOptional, const aclTensor* activeMaskOptional, const char* group, int64_t worldSize,
+    const aclIntArray* ffnTokenInfoTableShape, const aclIntArray* ffnTokenDataShape,
+    const aclIntArray* attnTokenInfoTableShape, int64_t moeExpertNum, int64_t quantMode, int64_t syncFlag,
+    int64_t ffnStartRankId, int64_t cclBufferSize, uint64_t* workspaceSize, aclOpExecutor** executor)
 
 {
     auto retParam = CheckParams(context, x, sessionId, microBatchId, layerId, expertIds, expertRankTable, group);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     aclnnStatus ret = aclnnInnerAttentionToFfnV2GetWorkspaceSize(
         context, x, sessionId, microBatchId, layerId, expertIds, expertRankTable, scalesOptional, activeMaskOptional,
-        const_cast<char *>(group), worldSize, ffnTokenInfoTableShape, ffnTokenDataShape, attnTokenInfoTableShape,
+        const_cast<char*>(group), worldSize, ffnTokenInfoTableShape, ffnTokenDataShape, attnTokenInfoTableShape,
         moeExpertNum, quantMode, syncFlag, ffnStartRankId, cclBufferSize, workspaceSize, executor);
     return ret;
 }
 
-aclnnStatus aclnnAttentionToFfnV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnAttentionToFfnV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {
         NnopbaseSetHcclServerType(executor, NNOPBASE_HCCL_SERVER_TYPE_MTE);

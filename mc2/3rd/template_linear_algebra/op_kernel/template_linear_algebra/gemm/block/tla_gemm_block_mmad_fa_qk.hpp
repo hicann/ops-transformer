@@ -70,7 +70,7 @@ public:
 
     /// Construct
     CATLASS_DEVICE
-    BlockMmad(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0)
+    BlockMmad(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
     {
         for (uint32_t i = 0; i < STAGES; i++) {
             l1ATensor[i] = resource.l1Buf.template GetBufferByByte<ElementA>(l1BufAddrStart + L1A_SIZE * i);
@@ -105,7 +105,7 @@ public:
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementB> gB,
                     AscendC::GlobalTensor<ElementC> gC, LayoutA layoutA, LayoutB layoutB, LayoutC layoutC,
-                    GemmCoord actualShape, uint32_t &pingpongFlag, bool isFirst)
+                    GemmCoord actualShape, uint32_t& pingpongFlag, bool isFirst)
     {
         LayoutAInL1 layoutAInL1 = LayoutAInL1::template MakeLayout<ElementA>(L1TileShape::M, L1TileShape::K);
         LayoutBInL1 layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(L1TileShape::K, L1TileShape::N);

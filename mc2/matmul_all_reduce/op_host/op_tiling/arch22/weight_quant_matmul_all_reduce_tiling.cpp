@@ -23,7 +23,7 @@ namespace optiling {
 ge::graphStatus WeightQuantTilingTransferHelper::GetShapeAttrsInfo()
 {
     OP_LOGI(tilingProcesser_.opName_, "Start assemble input params for matmul tiling");
-    auto &&tilingArgs = tilingProcesser_.args_;
+    auto&& tilingArgs = tilingProcesser_.args_;
     opName_ = tilingProcesser_.opName_;
     matmulInfoPtr_ = std::make_unique<Mc2WeightQuantBatchMatmulInfo>();
     matmulInfoPtr_->transA = tilingArgs.isATrans;
@@ -52,7 +52,7 @@ ge::graphStatus WeightQuantTilingTransferHelper::GetShapeAttrsInfo()
     PrintTilingInputParam(*matmulInfoPtr_);
     return ge::GRAPH_SUCCESS;
 }
-void WeightQuantTilingTransferHelper::PrintTilingInputParam(Mc2WeightQuantBatchMatmulInfo &weightQuantBatchMatmulInfo)
+void WeightQuantTilingTransferHelper::PrintTilingInputParam(Mc2WeightQuantBatchMatmulInfo& weightQuantBatchMatmulInfo)
 {
     OP_LOGD(tilingProcesser_.opName_, " transA_ %d transB_ %d, hasBias_ %d, hasAntiQuantOffset_ %d",
             weightQuantBatchMatmulInfo.transA, weightQuantBatchMatmulInfo.transB, weightQuantBatchMatmulInfo.hasBias,
@@ -157,7 +157,7 @@ ge::graphStatus WeightQuantMatmulAllReduceTiling::GetWorkspaceSize()
         OP_LOGD(opName_, " Empty tensor k is 0, set workspace size %lu to context", myWorkSpaceSize_);
     }
     OP_LOGI(opName_, " set max workspace size %lu to context", myWorkSpaceSize_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     workspaces[0] = myWorkSpaceSize_;
     return ge::GRAPH_SUCCESS;
 }
@@ -172,7 +172,7 @@ ge::graphStatus WeightQuantMatmulAllReduceTiling::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingDataSize);
 
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&weightQuantMatmulAllReduceTilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&weightQuantMatmulAllReduceTilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -306,12 +306,12 @@ ge::graphStatus WeightQuantMatmulAllReduceTiling::CheckInput()
     return CheckAxisSize();
 }
 
-WeightQuantMatmulAllReduceTiling::WeightQuantMatmulAllReduceTiling(gert::TilingContext *context)
+WeightQuantMatmulAllReduceTiling::WeightQuantMatmulAllReduceTiling(gert::TilingContext* context)
     : MatmulAllReduceTilingBase(context),
       weightQuantMatmulAllReduceTilingData_(weightQuantMatmulAllReduceTilingDataSelf_)
 {}
-WeightQuantMatmulAllReduceTiling::WeightQuantMatmulAllReduceTiling(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                                                                   WeightQuantMatmulAllReduceTilingData *out)
+WeightQuantMatmulAllReduceTiling::WeightQuantMatmulAllReduceTiling(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                                                                   WeightQuantMatmulAllReduceTilingData* out)
     : MatmulAllReduceTilingBase(context, mmrCtxInfo),
       weightQuantMatmulAllReduceTilingData_(*out)
 {}
@@ -321,8 +321,8 @@ CutResult WeightQuantMatmulAllReduceTiling::GetTilingResult()
     CutResult mCutAllreduceVal;
     SocVersion_2201 inputSocVer = SocVersion_2201::SOC910_B;
     SetMCutSocVersion(inputSocVer);
-    const gert::StorageShape *commQuantScaleFirstShape = mmrCtxInfo_.comm_quant_scale_1_shape;
-    const gert::StorageShape *commQuantScaleSecondShape = mmrCtxInfo_.comm_quant_scale_2_shape;
+    const gert::StorageShape* commQuantScaleFirstShape = mmrCtxInfo_.comm_quant_scale_1_shape;
+    const gert::StorageShape* commQuantScaleSecondShape = mmrCtxInfo_.comm_quant_scale_2_shape;
     if ((commQuantScaleFirstShape != nullptr) && (commQuantScaleSecondShape != nullptr)) { // low-bit comm
         OP_LOGD(opName_, "TileCnt enter comm quant.");
         MMPlusQuantAllReduce quantAllReduceHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_, inputSocVer);

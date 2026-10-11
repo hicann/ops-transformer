@@ -32,7 +32,7 @@ struct MoeTokenUnpermuteTilingData {
 };
 
 __forceinline__[host, aicore] void MoeTokenUnpermuteTiling(int32_t m, int32_t n, int32_t topK,
-                                                           MoeTokenUnpermuteTilingData &tilingData, uint32_t coreNum)
+                                                           MoeTokenUnpermuteTilingData& tilingData, uint32_t coreNum)
 {
 #define I64(x) static_cast<int64_t>(x)
     tilingData.hidden_size = I64(n);

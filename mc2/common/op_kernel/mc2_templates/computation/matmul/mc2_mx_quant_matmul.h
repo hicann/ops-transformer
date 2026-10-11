@@ -29,12 +29,12 @@ struct MXQuantMMAdditionalData {
 template <typename MMTilingType, typename MMType>
 class MC2MXQuantMatmul {
 public:
-    __aicore__ inline MC2MXQuantMatmul(AscendC::TPipe *tPipe)
+    __aicore__ inline MC2MXQuantMatmul(AscendC::TPipe* tPipe)
         : tPipePtr_(tPipe){};
     // 初始化方法
     __aicore__ inline void Init();
     // 获取数据上下文引用
-    __aicore__ inline MC2MMContext<MXQuantMMAdditionalData, MMTilingType> *GetContextPtr();
+    __aicore__ inline MC2MMContext<MXQuantMMAdditionalData, MMTilingType>* GetContextPtr();
     // 执行一次计算的方法
     __aicore__ inline void Process(uint32_t taskIndex);
     // 结束方法
@@ -43,7 +43,7 @@ public:
 protected:
     MC2MMContext<MXQuantMMAdditionalData, MMTilingType> MMcontext_;
     MMType MMImpl_;
-    AscendC::TPipe *tPipePtr_;
+    AscendC::TPipe* tPipePtr_;
 };
 
 template <typename MMTilingType, typename MMType>
@@ -51,7 +51,7 @@ inline __aicore__ void MC2MXQuantMatmul<MMTilingType, MMType>::Init()
 {}
 
 template <typename MMTilingType, typename MMType>
-inline __aicore__ MC2MMContext<MXQuantMMAdditionalData, MMTilingType> *
+inline __aicore__ MC2MMContext<MXQuantMMAdditionalData, MMTilingType>*
 MC2MXQuantMatmul<MMTilingType, MMType>::GetContextPtr()
 {
     return &MMcontext_;

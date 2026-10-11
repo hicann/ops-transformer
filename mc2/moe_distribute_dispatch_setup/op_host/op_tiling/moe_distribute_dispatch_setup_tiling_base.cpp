@@ -108,7 +108,7 @@ uint64_t MoeDistributeDispatchSetupTilingBase::GetTilingKey() const
 
 const void MoeDistributeDispatchSetupTilingBase::PrintTilingDataInfo()
 {
-    const MoeDistributeDispatchSetupInfo &info = tilingData_->moeDistributeDispatchSetupInfo;
+    const MoeDistributeDispatchSetupInfo& info = tilingData_->moeDistributeDispatchSetupInfo;
     OP_LOGD(nodeName_, "epWorldSize is %u.", info.epWorldSize);
     OP_LOGD(nodeName_, "epRankId is %u.", info.epRankId);
     OP_LOGD(nodeName_, "expertShardType is %u.", info.expertShardType);
@@ -293,11 +293,11 @@ ge::graphStatus MoeDistributeDispatchSetupTilingBase::GetOptionalAttrAndSetTilin
 
 ge::graphStatus MoeDistributeDispatchSetupTilingBase::GetComplexAttrAndSetTilingData()
 {
-    const uint32_t &epRankId = tilingData_->moeDistributeDispatchSetupInfo.epRankId;
-    const uint32_t &epWorldSize = tilingData_->moeDistributeDispatchSetupInfo.epWorldSize;
-    const uint32_t &sharedExpertNum = tilingData_->moeDistributeDispatchSetupInfo.sharedExpertNum;
-    const uint32_t &sharedExpertRankNum = tilingData_->moeDistributeDispatchSetupInfo.sharedExpertRankNum;
-    const uint32_t &moeExpertNum = tilingData_->moeDistributeDispatchSetupInfo.moeExpertNum;
+    const uint32_t& epRankId = tilingData_->moeDistributeDispatchSetupInfo.epRankId;
+    const uint32_t& epWorldSize = tilingData_->moeDistributeDispatchSetupInfo.epWorldSize;
+    const uint32_t& sharedExpertNum = tilingData_->moeDistributeDispatchSetupInfo.sharedExpertNum;
+    const uint32_t& sharedExpertRankNum = tilingData_->moeDistributeDispatchSetupInfo.sharedExpertRankNum;
+    const uint32_t& moeExpertNum = tilingData_->moeDistributeDispatchSetupInfo.moeExpertNum;
 
     // localMoeExpertNum
     if (epRankId >= sharedExpertRankNum) {
@@ -323,7 +323,7 @@ ge::graphStatus MoeDistributeDispatchSetupTilingBase::GetComplexAttrAndSetTiling
 const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckOneTensorDim(std::string name, TensorType tensortype,
                                                                               uint32_t index, uint32_t dims)
 {
-    const gert::StorageShape *shape;
+    const gert::StorageShape* shape;
     if (tensortype == TensorType::INPUT) {
         shape = context_->GetInputShape(index);
     } else if (tensortype == TensorType::OUTPUT) {
@@ -363,8 +363,8 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckInputTensorDim(
 
 const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckOptionalInputTensorDim()
 {
-    const gert::StorageShape *scalesStorageShape = context_->GetOptionalInputShape(SCALES_INDEX);
-    const gert::StorageShape *xActiveMaskStorageShape = context_->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
+    const gert::StorageShape* scalesStorageShape = context_->GetOptionalInputShape(SCALES_INDEX);
+    const gert::StorageShape* xActiveMaskStorageShape = context_->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
     uint64_t scalesCount = 0;
     if (scalesStorageShape != nullptr) {
         size_t scalesDimNum = scalesStorageShape->GetStorageShape().GetDimNum();
@@ -425,8 +425,8 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckTensorDim()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckScaleWidth(const gert::StorageShape *xStorageShape,
-                                                                      const gert::StorageShape *scalesShape)
+ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckScaleWidth(const gert::StorageShape* xStorageShape,
+                                                                      const gert::StorageShape* scalesShape)
 {
     // H校验
     int64_t quantMode = tilingData_->moeDistributeDispatchSetupInfo.quantMode;
@@ -597,16 +597,16 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckTensorDataType(
 
 ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckTensorShapeSizeAndSetTilingData()
 {
-    auto *xStorageShape = context_->GetInputShape(X_INDEX);
-    auto *expertIdsShape = context_->GetInputShape(EXPERT_IDS_INDEX);
+    auto* xStorageShape = context_->GetInputShape(X_INDEX);
+    auto* expertIdsShape = context_->GetInputShape(EXPERT_IDS_INDEX);
 
     int64_t H = xStorageShape->GetStorageShape().GetDim(1);
     int64_t BS = xStorageShape->GetStorageShape().GetDim(0);
     int64_t K = expertIdsShape->GetStorageShape().GetDim(1);
 
-    uint32_t &epWorldSize = tilingData_->moeDistributeDispatchSetupInfo.epWorldSize;
-    uint32_t &moeExpertNum = tilingData_->moeDistributeDispatchSetupInfo.moeExpertNum;
-    uint32_t &globalBs = tilingData_->moeDistributeDispatchSetupInfo.globalBs;
+    uint32_t& epWorldSize = tilingData_->moeDistributeDispatchSetupInfo.epWorldSize;
+    uint32_t& moeExpertNum = tilingData_->moeDistributeDispatchSetupInfo.moeExpertNum;
+    uint32_t& globalBs = tilingData_->moeDistributeDispatchSetupInfo.globalBs;
 
     OP_TILING_CHECK((H < MIN_H) || (H > MAX_H),
                     OP_LOGE_FOR_INVALID_VALUE(
@@ -756,13 +756,13 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckHcclBuffSize()
                     OP_LOGE(nodeName_, "HCCL_BUFFSIZE [%ld] < [%ld].", hcclBuffSize, MIN_AVAILABLE_BUFF_SIZE),
                     return ge::GRAPH_FAILED);
 
-    uint32_t &epWorldSize = tilingData_->moeDistributeDispatchSetupInfo.epWorldSize;
-    uint32_t &sharedExpertNum = tilingData_->moeDistributeDispatchSetupInfo.sharedExpertNum;
-    uint32_t &globalBs = tilingData_->moeDistributeDispatchSetupInfo.globalBs;
-    uint32_t &BS = tilingData_->moeDistributeDispatchSetupInfo.bs;
-    uint32_t &H = tilingData_->moeDistributeDispatchSetupInfo.h;
-    uint32_t &K = tilingData_->moeDistributeDispatchSetupInfo.k;
-    uint32_t &localExpertNum = tilingData_->moeDistributeDispatchSetupInfo.moeExpertPerRankNum;
+    uint32_t& epWorldSize = tilingData_->moeDistributeDispatchSetupInfo.epWorldSize;
+    uint32_t& sharedExpertNum = tilingData_->moeDistributeDispatchSetupInfo.sharedExpertNum;
+    uint32_t& globalBs = tilingData_->moeDistributeDispatchSetupInfo.globalBs;
+    uint32_t& BS = tilingData_->moeDistributeDispatchSetupInfo.bs;
+    uint32_t& H = tilingData_->moeDistributeDispatchSetupInfo.h;
+    uint32_t& K = tilingData_->moeDistributeDispatchSetupInfo.k;
+    uint32_t& localExpertNum = tilingData_->moeDistributeDispatchSetupInfo.moeExpertPerRankNum;
     uint32_t maxBs = BS;
     if (globalBs != 0) {
         maxBs = globalBs / epWorldSize;
@@ -805,7 +805,7 @@ const ge::graphStatus MoeDistributeDispatchSetupTilingBase::CheckHcclBuffSize()
 
 ge::graphStatus MoeDistributeDispatchSetupTilingBase::SetWorkspace()
 {
-    size_t *workspace = context_->GetWorkspaceSizes(1);
+    size_t* workspace = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspace == nullptr, OP_LOGE(nodeName_, "get workspace failed"), return ge::GRAPH_FAILED);
     workspace[0] = static_cast<size_t>(SYSTEM_NEED_WORKSPACE) + SDMA_NEED_WORKSPACE;
     OP_LOGD(nodeName_, "workspace[0] size is %lu", workspace[0]);

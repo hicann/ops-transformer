@@ -20,7 +20,7 @@
 namespace Ops {
 namespace Transformer {
 constexpr uint32_t kHashSeed = 271828;
-uint32_t MurmurHash(const void *src, uint32_t len, uint32_t seed = kHashSeed);
+uint32_t MurmurHash(const void* src, uint32_t len, uint32_t seed = kHashSeed);
 } // namespace Transformer
 } // namespace Ops
 #endif // OPS_BUILT_IN_OP_TILING_CUBE_ALGORITHM_HASH_HASH_H_

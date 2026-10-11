@@ -24,10 +24,10 @@ namespace Catlass::Gemm::Kernel {
 namespace detail {
 
 template <class T>
-CATLASS_DEVICE void UnpackListParam(T *const dst, GM_ADDR src, uint32_t len)
+CATLASS_DEVICE void UnpackListParam(T* const dst, GM_ADDR src, uint32_t len)
 {
     for (uint32_t i = 0; i * sizeof(uint64_t) < len * sizeof(T); ++i) {
-        reinterpret_cast<uint64_t *>(dst)[i] = reinterpret_cast<__gm__ uint64_t *>(src)[i];
+        reinterpret_cast<uint64_t*>(dst)[i] = reinterpret_cast<__gm__ uint64_t*>(src)[i];
     }
 }
 
@@ -47,7 +47,7 @@ public:
     CopyUb2Gm copyUb2Gm;
 
     CATLASS_DEVICE
-    PaddingMatrix(Arch::Resource<ArchTag> &resource)
+    PaddingMatrix(Arch::Resource<ArchTag>& resource)
     {
         int64_t bufferOffset = 0;
         for (uint32_t i = 0; i < BUFFER_NUM; i++) { //
@@ -57,19 +57,19 @@ public:
     }
 
     CATLASS_DEVICE
-    ComputeLayout GetPaddingComputeLayout(layout::RowMajor const &layout)
+    ComputeLayout GetPaddingComputeLayout(layout::RowMajor const& layout)
     {
         return ComputeLayout(layout.shape(0), layout.shape(1), layout.stride(0));
     }
 
     CATLASS_DEVICE
-    ComputeLayout GetPaddingComputeLayout(layout::ColumnMajor const &layout)
+    ComputeLayout GetPaddingComputeLayout(layout::ColumnMajor const& layout)
     {
         return ComputeLayout(layout.shape(1), layout.shape(0), layout.stride(1));
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<Element> const &dst, AscendC::GlobalTensor<Element> const &src,
+    void operator()(AscendC::GlobalTensor<Element> const& dst, AscendC::GlobalTensor<Element> const& src,
                     Layout layoutDst, Layout layoutSrc)
     {
         ComputeLayout computeLayoutSrc = GetPaddingComputeLayout(layoutSrc);
@@ -113,7 +113,7 @@ public:
                 AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(eventIds[bufferIndex]);
                 ComputeLayout dstLayout = computeLayoutDst.GetTileLayout(MatrixCoord(1, actualDataNum));
                 ComputeLayout srcLayout = computeLayoutSrc.GetTileLayout(MatrixCoord(1, actualDataNum));
-                ComputeLayout &ubLayout = dstLayout;
+                ComputeLayout& ubLayout = dstLayout;
                 copyGm2Ub(inputBuffer[bufferIndex], src[gmSrcOffset], ubLayout, srcLayout);
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(eventIds[bufferIndex]);
                 AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(eventIds[bufferIndex]);
@@ -137,7 +137,7 @@ public:
                 AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(eventIds[bufferIndex]);
                 ComputeLayout dstLayout = computeLayoutDst.GetTileLayout(MatrixCoord(actualTilesNum, tileLen));
                 ComputeLayout srcLayout = computeLayoutSrc.GetTileLayout(MatrixCoord(actualTilesNum, tileLen));
-                ComputeLayout &ubLayout = dstLayout;
+                ComputeLayout& ubLayout = dstLayout;
                 copyGm2Ub(inputBuffer[bufferIndex], src[gmSrcOffset], ubLayout, srcLayout);
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE3>(eventIds[bufferIndex]);
                 AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE3>(eventIds[bufferIndex]);
@@ -264,11 +264,11 @@ public:
     }
 
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params &params)
+    CATLASS_DEVICE void operator()(Params& params)
     {}
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIC>(Params &params)
+    CATLASS_DEVICE void operator()<AscendC::AIC>(Params& params)
     {
         GemmCoord problemShapeList[MAX_TENSOR_COUNT];
         LayoutA layoutAList[MAX_TENSOR_COUNT];
@@ -301,11 +301,11 @@ public:
             LayoutB layoutWB = layoutWBList[groupIdx];
             Arch::CrossCoreWaitFlag(flagAivFinishPadding);
             AscendC::GlobalTensor<ElementA> gmA;
-            gmA.SetGlobalBuffer((__gm__ ElementA *)params.ptrWA);
+            gmA.SetGlobalBuffer((__gm__ ElementA*)params.ptrWA);
             AscendC::GlobalTensor<ElementB> gmB;
-            gmB.SetGlobalBuffer((__gm__ ElementB *)params.ptrWB);
+            gmB.SetGlobalBuffer((__gm__ ElementB*)params.ptrWB);
             AscendC::GlobalTensor<ElementC> gmC;
-            gmC.SetGlobalBuffer((__gm__ ElementC *)params.ptrWorkspace);
+            gmC.SetGlobalBuffer((__gm__ ElementC*)params.ptrWorkspace);
             uint32_t M = problemShape.m();
             uint32_t N = problemShape.n();
             uint32_t K = problemShape.k();
@@ -374,7 +374,7 @@ public:
     }
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIV>(Params &params)
+    CATLASS_DEVICE void operator()<AscendC::AIV>(Params& params)
     {
         GemmCoord problemShapeList[MAX_TENSOR_COUNT];
         LayoutA layoutAList[MAX_TENSOR_COUNT];
@@ -405,16 +405,16 @@ public:
         Arch::Resource<ArchTag> resource;
         AscendC::GlobalTensor<ElementA> gmA;
         AscendC::GlobalTensor<ElementA> gmWA;
-        gmA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA *>(params.ptrA));
-        gmWA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA *>(params.ptrWA));
+        gmA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA*>(params.ptrA));
+        gmWA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA*>(params.ptrWA));
         AscendC::GlobalTensor<ElementB> gmB;
         AscendC::GlobalTensor<ElementB> gmWB;
-        gmB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB *>(params.ptrB));
-        gmWB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB *>(params.ptrWB));
+        gmB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB*>(params.ptrB));
+        gmWB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB*>(params.ptrWB));
         PaddingA paddingA(resource);
         PaddingB paddingB(resource);
         AscendC::GlobalTensor<ElementC> gmC;
-        gmC.SetGlobalBuffer((__gm__ ElementC *)params.ptrWorkspace);
+        gmC.SetGlobalBuffer((__gm__ ElementC*)params.ptrWorkspace);
         for (uint32_t groupIdx = 0; groupIdx < params.problemCount; ++groupIdx) {
             GemmCoord problemShape = problemShapeList[groupIdx];
             LayoutA layoutA = layoutAList[groupIdx];

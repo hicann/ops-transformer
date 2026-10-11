@@ -61,12 +61,12 @@ extern "C" {
  * @return aclnnStatus: 执行状态，返回0表示成功，其他值表示错误。
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllQuantMatmulGetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, const aclTensor *x1ScaleOptional,
-    const aclTensor *x2Scale, const aclTensor *commScaleOptional, const aclTensor *x1OffsetOptional,
-    const aclTensor *x2OffsetOptional, const char *group, const aclIntArray *alltoAllAxesOptional, int64_t x1QuantMode,
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional, const aclTensor* x1ScaleOptional,
+    const aclTensor* x2Scale, const aclTensor* commScaleOptional, const aclTensor* x1OffsetOptional,
+    const aclTensor* x2OffsetOptional, const char* group, const aclIntArray* alltoAllAxesOptional, int64_t x1QuantMode,
     int64_t x2QuantMode, int64_t commQuantMode, int64_t commQuantDtype, int64_t x1QuantDtype, int64_t groupSize,
-    bool transposeX1, bool transposeX2, const aclTensor *output, const aclTensor *alltoAllOutOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    bool transposeX1, bool transposeX2, const aclTensor* output, const aclTensor* alltoAllOutOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnAlltoAllQuantMatMul的第二段接口，用于执行计算。
@@ -76,8 +76,8 @@ __attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllQuantMatmulGetWo
  * @param [in] stream: 指定执行任务的Stream。
  * @return aclnnStatus: 返回状态码
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllQuantMatmul(void *workspace, uint64_t workspaceSize,
-                                                                            aclOpExecutor *executor,
+__attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllQuantMatmul(void* workspace, uint64_t workspaceSize,
+                                                                            aclOpExecutor* executor,
                                                                             aclrtStream stream);
 
 #ifdef __cplusplus

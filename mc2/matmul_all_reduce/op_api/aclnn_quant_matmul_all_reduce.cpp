@@ -28,14 +28,14 @@ extern "C" {
 #endif
 
 extern "C" uint64_t NnopbaseMsprofSysTime();
-extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId& dfxId);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
-aclnnStatus aclnnQuantMatmulAllReduceGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                                      const aclTensor *x3, const aclTensor *dequantScale,
-                                                      const char *group, const char *reduceOp, int64_t commTurn,
-                                                      int64_t streamMode, const aclTensor *output,
-                                                      uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnQuantMatmulAllReduceGetWorkspaceSize(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                                      const aclTensor* x3, const aclTensor* dequantScale,
+                                                      const char* group, const char* reduceOp, int64_t commTurn,
+                                                      int64_t streamMode, const aclTensor* output,
+                                                      uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
     // 固定写法，参数检查
@@ -43,7 +43,7 @@ aclnnStatus aclnnQuantMatmulAllReduceGetWorkspaceSize(const aclTensor *x1, const
         QuantMatmulAllReduceCheckParams(x1, x2, bias, dequantScale, nullptr, x3, reduceOp, streamMode, output);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     // dequantScale转为uint64
-    auto dequant = const_cast<aclTensor *>(dequantScale);
+    auto dequant = const_cast<aclTensor*>(dequantScale);
     if (dequant == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnQuantMatmulAllReduce", "dequantScale");
         return ACLNN_ERR_INNER;
@@ -60,7 +60,7 @@ aclnnStatus aclnnQuantMatmulAllReduceGetWorkspaceSize(const aclTensor *x1, const
     return ret;
 }
 
-aclnnStatus aclnnQuantMatmulAllReduce(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnQuantMatmulAllReduce(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                       const aclrtStream stream)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();

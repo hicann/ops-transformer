@@ -48,12 +48,12 @@ TEST_F(AclnnFfnToAttentionV2Test, TestFfnToAttentionV2AttnRankTable)
     TensorDesc expertOffsets = TensorDesc({1584}, ACL_INT32, ACL_FORMAT_ND);
     TensorDesc actualTokenNum = TensorDesc({1}, ACL_INT64, ACL_FORMAT_ND);
     TensorDesc attnRankTable = TensorDesc({11}, ACL_INT32, ACL_FORMAT_ND);
-    const char *group = "test_ffn_to_attention_v2_group";
+    const char* group = "test_ffn_to_attention_v2_group";
     int64_t worldSize = 16;
     std::vector<int64_t> tokenInfoTable = {1, 16, 9};
     std::vector<int64_t> tokenData = {1, 16, 9, 7168};
-    aclIntArray *tokenInfoTableShape = aclCreateIntArray(tokenInfoTable.data(), tokenInfoTable.size());
-    aclIntArray *tokenDataShape = aclCreateIntArray(tokenData.data(), tokenData.size());
+    aclIntArray* tokenInfoTableShape = aclCreateIntArray(tokenInfoTable.data(), tokenInfoTable.size());
+    aclIntArray* tokenDataShape = aclCreateIntArray(tokenData.data(), tokenData.size());
     int64_t cclBufferSize = 1LL << 30;
 
     auto ut = OP_API_UT(aclnnFFNToAttentionV2,
@@ -61,7 +61,7 @@ TEST_F(AclnnFfnToAttentionV2Test, TestFfnToAttentionV2AttnRankTable)
                               attnRankTable, group, worldSize, tokenInfoTableShape, tokenDataShape, cclBufferSize),
                         OUTPUT());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -75,13 +75,13 @@ TEST_F(AclnnFfnToAttentionV2Test, TestFfnToAttentionV2NoAttnRankTable)
     TensorDesc tokenIds = TensorDesc({1584}, ACL_INT32, ACL_FORMAT_ND);
     TensorDesc expertOffsets = TensorDesc({1584}, ACL_INT32, ACL_FORMAT_ND);
     TensorDesc actualTokenNum = TensorDesc({1}, ACL_INT64, ACL_FORMAT_ND);
-    aclTensor *attnRankTable = nullptr;
-    const char *group = "test_ffn_to_attention_v2_group";
+    aclTensor* attnRankTable = nullptr;
+    const char* group = "test_ffn_to_attention_v2_group";
     int64_t worldSize = 16;
     std::vector<int64_t> tokenInfoTable = {1, 16, 9};
     std::vector<int64_t> tokenData = {1, 16, 9, 7168};
-    aclIntArray *tokenInfoTableShape = aclCreateIntArray(tokenInfoTable.data(), tokenInfoTable.size());
-    aclIntArray *tokenDataShape = aclCreateIntArray(tokenData.data(), tokenData.size());
+    aclIntArray* tokenInfoTableShape = aclCreateIntArray(tokenInfoTable.data(), tokenInfoTable.size());
+    aclIntArray* tokenDataShape = aclCreateIntArray(tokenData.data(), tokenData.size());
     int64_t cclBufferSize = 1LL << 30;
 
     auto ut = OP_API_UT(aclnnFFNToAttentionV2,
@@ -89,7 +89,7 @@ TEST_F(AclnnFfnToAttentionV2Test, TestFfnToAttentionV2NoAttnRankTable)
                               attnRankTable, group, worldSize, tokenInfoTableShape, tokenDataShape, cclBufferSize),
                         OUTPUT());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }

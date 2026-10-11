@@ -31,7 +31,7 @@ struct TileBroadcastInplaceByRow {
     TileBroadcastInplaceByRow() {}
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<ElementCompute> const &ubInOut)
+    void operator()(AscendC::LocalTensor<ElementCompute> const& ubInOut)
     {
         constexpr uint32_t eleNumPerVectorFractal = BYTE_PER_VECTOR_FRCATLASSAL / sizeof(ElementCompute);
 

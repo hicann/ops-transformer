@@ -126,7 +126,7 @@ ge::graphStatus MoeDistributeCombineTeardownTilingA3::CheckAttrsComplex()
 
 ge::graphStatus MoeDistributeCombineTeardownTilingA3::SetHcommCfg()
 {
-    const char *nodeName = context_->GetNodeName();
+    const char* nodeName = context_->GetNodeName();
     OP_LOGD(nodeName, "MoeDistributeCombine groupEp = %s", groupEp_.c_str());
     uint32_t opType1 = OP_TYPE_ALL_TO_ALL;
     std::string algConfigAllToAllStr = "AlltoAll=level0:fullmesh;level1:pairwise";

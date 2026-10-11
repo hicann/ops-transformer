@@ -29,8 +29,8 @@ namespace SortLib::detail {
 
 template <typename KeyT, bool isDescend>
 __simd_callee__ __aicore__ inline void Twiddle(uint16_t repeatTime, uint32_t vfLen, uint32_t inputNum,
-                                               AscendC::Reg::RegTensor<KeyT> &xorReg, __ubuf__ KeyT *xValuePtr,
-                                               __ubuf__ KeyT *uXValuePtr)
+                                               AscendC::Reg::RegTensor<KeyT>& xorReg, __ubuf__ KeyT* xValuePtr,
+                                               __ubuf__ KeyT* uXValuePtr)
 {
     AscendC::Reg::MaskReg xorMask;
     AscendC::Reg::RegTensor<KeyT> inputReg;
@@ -52,7 +52,7 @@ __simd_callee__ __aicore__ inline void Twiddle(uint16_t repeatTime, uint32_t vfL
 }
 
 template <typename KeyT, bool isDescend, uint32_t VF_LEN>
-__simd_vf__ __aicore__ inline void TwiddleSignedVF(__ubuf__ KeyT *src, __ubuf__ KeyT *dst, uint16_t rpt, uint32_t n)
+__simd_vf__ __aicore__ inline void TwiddleSignedVF(__ubuf__ KeyT* src, __ubuf__ KeyT* dst, uint16_t rpt, uint32_t n)
 {
     constexpr KeyT xorVal = static_cast<KeyT>(static_cast<KeyT>(1) << (sizeof(KeyT) * 8 - 1));
     AscendC::Reg::RegTensor<KeyT> xorValue;
@@ -67,12 +67,12 @@ __aicore__ inline void TwiddleInSignedInt(AscendC::LocalTensor<ValT> inputX, Asc
 {
     constexpr uint32_t vfLen = 256 / sizeof(KeyT);
     uint16_t repeatTime = AscendC::CeilDivision(numTileData, vfLen);
-    asc_vf_call<TwiddleSignedVF<KeyT, isDescend, vfLen>>(
-        (__ubuf__ KeyT *)inputX.GetPhyAddr(), (__ubuf__ KeyT *)uInputX.GetPhyAddr(), repeatTime, numTileData);
+    asc_vf_call<TwiddleSignedVF<KeyT, isDescend, vfLen>>((__ubuf__ KeyT*)inputX.GetPhyAddr(),
+                                                         (__ubuf__ KeyT*)uInputX.GetPhyAddr(), repeatTime, numTileData);
 }
 
 template <typename T, bool isDescend, uint32_t VF_LEN>
-__simd_vf__ __aicore__ inline void TwiddleFpVF(__ubuf__ T *src, __ubuf__ T *dst, uint16_t rpt, uint32_t n, T lowestKey,
+__simd_vf__ __aicore__ inline void TwiddleFpVF(__ubuf__ T* src, __ubuf__ T* dst, uint16_t rpt, uint32_t n, T lowestKey,
                                                T xorVal, T minusZero)
 {
     AscendC::Reg::RegTensor<T> inputReg, vnotReg;
@@ -115,13 +115,13 @@ __aicore__ inline void TwiddleInFp(AscendC::LocalTensor<ValT> inputX, AscendC::L
 {
     constexpr uint32_t vfLen = 256 / sizeof(T);
     uint16_t repeatTime = AscendC::CeilDivision(numTileData, vfLen);
-    asc_vf_call<TwiddleFpVF<T, isDescend, vfLen>>((__ubuf__ T *)inputX.GetPhyAddr(),
-                                                  (__ubuf__ T *)uintInputX.GetPhyAddr(), repeatTime, numTileData,
+    asc_vf_call<TwiddleFpVF<T, isDescend, vfLen>>((__ubuf__ T*)inputX.GetPhyAddr(),
+                                                  (__ubuf__ T*)uintInputX.GetPhyAddr(), repeatTime, numTileData,
                                                   lowestKey, xorValue, minusZero);
 }
 
 template <typename KeyT, uint32_t VF_LEN>
-__simd_vf__ __aicore__ inline void ReverseInputVF(__ubuf__ KeyT *src, __ubuf__ KeyT *dst, uint16_t rpt, uint32_t n)
+__simd_vf__ __aicore__ inline void ReverseInputVF(__ubuf__ KeyT* src, __ubuf__ KeyT* dst, uint16_t rpt, uint32_t n)
 {
     AscendC::Reg::RegTensor<KeyT> inputVectorOne;
     AscendC::Reg::RegTensor<KeyT> vnotVectorZero;
@@ -141,18 +141,18 @@ __aicore__ inline void ReverseInputData(AscendC::LocalTensor<ValT> inputX, Ascen
 {
     constexpr uint32_t vfLen = 256 / sizeof(KeyT);
     uint16_t repeatTime = AscendC::CeilDivision(numTileData, vfLen);
-    asc_vf_call<ReverseInputVF<KeyT, vfLen>>((__ubuf__ KeyT *)inputX.GetPhyAddr(),
-                                             (__ubuf__ KeyT *)uintInputX.GetPhyAddr(), repeatTime, numTileData);
+    asc_vf_call<ReverseInputVF<KeyT, vfLen>>((__ubuf__ KeyT*)inputX.GetPhyAddr(),
+                                             (__ubuf__ KeyT*)uintInputX.GetPhyAddr(), repeatTime, numTileData);
 }
 
 // ── Histogram ──
 
 template <typename CountT>
 __simd_callee__ __aicore__ inline void ComputeSumChist(
-    AscendC::Reg::RegTensor<uint16_t> &chist0, AscendC::Reg::RegTensor<uint16_t> &chist1,
-    AscendC::Reg::RegTensor<uint16_t> &hist0, AscendC::Reg::RegTensor<uint16_t> &hist1, AscendC::Reg::MaskReg &maskB16,
-    AscendC::Reg::MaskReg &maskB32, __ubuf__ CountT *blockExclusiveUbRPtr, __ubuf__ CountT *blockExclusiveUbWPtr,
-    __ubuf__ uint16_t *histUbPtr, __ubuf__ uint16_t *histCumsumUbPtr)
+    AscendC::Reg::RegTensor<uint16_t>& chist0, AscendC::Reg::RegTensor<uint16_t>& chist1,
+    AscendC::Reg::RegTensor<uint16_t>& hist0, AscendC::Reg::RegTensor<uint16_t>& hist1, AscendC::Reg::MaskReg& maskB16,
+    AscendC::Reg::MaskReg& maskB32, __ubuf__ CountT* blockExclusiveUbRPtr, __ubuf__ CountT* blockExclusiveUbWPtr,
+    __ubuf__ uint16_t* histUbPtr, __ubuf__ uint16_t* histCumsumUbPtr)
 {
     // chist is inclusive per-tile cumulative histogram. Subtract the current bin count to get the per-bin exclusive
     // offset used by the later scatter phase.
@@ -173,9 +173,9 @@ __simd_callee__ __aicore__ inline void ComputeSumChist(
 
     AscendC::Reg::Duplicate(zeroReg, 0, maskB16);
     AscendC::Reg::RegTensor<uint32_t> sum0, sum1, sum2, sum3;
-    AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint16_t> &)sum0, (AscendC::Reg::RegTensor<uint16_t> &)sum1,
+    AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint16_t>&)sum0, (AscendC::Reg::RegTensor<uint16_t>&)sum1,
                              exclusiveSumZero, zeroReg);
-    AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint16_t> &)sum2, (AscendC::Reg::RegTensor<uint16_t> &)sum3,
+    AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint16_t>&)sum2, (AscendC::Reg::RegTensor<uint16_t>&)sum3,
                              exclusiveSumOne, zeroReg);
     if constexpr (sizeof(CountT) == sizeof(uint32_t)) {
         AscendC::Reg::RegTensor<uint32_t> sumIn0, sumIn1, sumIn2, sumIn3;
@@ -204,18 +204,18 @@ __simd_callee__ __aicore__ inline void ComputeSumChist(
         AscendC::Reg::MaskReg maskB64 = AscendC::Reg::CreateMask<int64_t>();
         AscendC::Reg::RegTensor<int64_t> sum0Int64, sum1Int64, sum2Int64, sum3Int64;
         AscendC::Reg::RegTensor<int64_t> sum4Int64, sum5Int64, sum6Int64, sum7Int64;
-        AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint32_t> &)sum0Int64,
-                                 (AscendC::Reg::RegTensor<uint32_t> &)sum1Int64, sum0,
-                                 (AscendC::Reg::RegTensor<uint32_t> &)zeroReg);
-        AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint32_t> &)sum2Int64,
-                                 (AscendC::Reg::RegTensor<uint32_t> &)sum3Int64, sum1,
-                                 (AscendC::Reg::RegTensor<uint32_t> &)zeroReg);
-        AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint32_t> &)sum4Int64,
-                                 (AscendC::Reg::RegTensor<uint32_t> &)sum5Int64, sum2,
-                                 (AscendC::Reg::RegTensor<uint32_t> &)zeroReg);
-        AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint32_t> &)sum6Int64,
-                                 (AscendC::Reg::RegTensor<uint32_t> &)sum7Int64, sum3,
-                                 (AscendC::Reg::RegTensor<uint32_t> &)zeroReg);
+        AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint32_t>&)sum0Int64,
+                                 (AscendC::Reg::RegTensor<uint32_t>&)sum1Int64, sum0,
+                                 (AscendC::Reg::RegTensor<uint32_t>&)zeroReg);
+        AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint32_t>&)sum2Int64,
+                                 (AscendC::Reg::RegTensor<uint32_t>&)sum3Int64, sum1,
+                                 (AscendC::Reg::RegTensor<uint32_t>&)zeroReg);
+        AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint32_t>&)sum4Int64,
+                                 (AscendC::Reg::RegTensor<uint32_t>&)sum5Int64, sum2,
+                                 (AscendC::Reg::RegTensor<uint32_t>&)zeroReg);
+        AscendC::Reg::Interleave((AscendC::Reg::RegTensor<uint32_t>&)sum6Int64,
+                                 (AscendC::Reg::RegTensor<uint32_t>&)sum7Int64, sum3,
+                                 (AscendC::Reg::RegTensor<uint32_t>&)zeroReg);
         AscendC::Reg::RegTensor<int64_t> int64In0, int64In1, int64In2, int64In3;
         AscendC::Reg::RegTensor<int64_t> int64In4, int64In5, int64In6, int64In7;
         AscendC::Reg::LoadAlign<int64_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(int64In0, blockExclusiveUbRPtr,
@@ -263,13 +263,13 @@ __simd_callee__ __aicore__ inline void ComputeSumChist(
 }
 
 template <typename KeyT, typename CountT>
-__simd_vf__ __aicore__ inline void HistogramB32VF(__ubuf__ KeyT *inP, __ubuf__ CountT *ebW, __ubuf__ uint16_t *hp,
-                                                  __ubuf__ uint16_t *cp, __ubuf__ uint8_t *b8p, uint32_t sz,
+__simd_vf__ __aicore__ inline void HistogramB32VF(__ubuf__ KeyT* inP, __ubuf__ CountT* ebW, __ubuf__ uint16_t* hp,
+                                                  __ubuf__ uint16_t* cp, __ubuf__ uint8_t* b8p, uint32_t sz,
                                                   uint16_t repeatTime, uint32_t round)
 {
     uint32_t bitOffset = round * SHIFT_BIT_NUM;
-    __ubuf__ CountT *blockExclusiveUbWPtr = ebW;
-    __ubuf__ CountT *blockExclusiveUbRPtr = ebW;
+    __ubuf__ CountT* blockExclusiveUbWPtr = ebW;
+    __ubuf__ CountT* blockExclusiveUbRPtr = ebW;
     uint32_t inputElementNum = sz;
     AscendC::Reg::RegTensor<uint32_t> in0, in1, in2, in3;
     AscendC::Reg::RegTensor<uint16_t> hist0, hist1, chist0, chist1;
@@ -292,13 +292,13 @@ __simd_vf__ __aicore__ inline void HistogramB32VF(__ubuf__ KeyT *inP, __ubuf__ C
         AscendC::Reg::ShiftRights<uint32_t, int16_t>(shift2, in2, bitOffset, maskB32);
         AscendC::Reg::ShiftRights<uint32_t, int16_t>(shift3, in3, bitOffset, maskB32);
         AscendC::Reg::RegTensor<uint16_t> deInter0, deInter1, deInter2, deInter3;
-        AscendC::Reg::DeInterleave(deInter0, deInter1, (AscendC::Reg::RegTensor<uint16_t> &)shift0,
-                                   (AscendC::Reg::RegTensor<uint16_t> &)shift1);
-        AscendC::Reg::DeInterleave(deInter2, deInter3, (AscendC::Reg::RegTensor<uint16_t> &)shift2,
-                                   (AscendC::Reg::RegTensor<uint16_t> &)shift3);
+        AscendC::Reg::DeInterleave(deInter0, deInter1, (AscendC::Reg::RegTensor<uint16_t>&)shift0,
+                                   (AscendC::Reg::RegTensor<uint16_t>&)shift1);
+        AscendC::Reg::DeInterleave(deInter2, deInter3, (AscendC::Reg::RegTensor<uint16_t>&)shift2,
+                                   (AscendC::Reg::RegTensor<uint16_t>&)shift3);
         AscendC::Reg::RegTensor<uint8_t> deInter0B8, deInter1B8;
-        AscendC::Reg::DeInterleave(deInter0B8, deInter1B8, (AscendC::Reg::RegTensor<uint8_t> &)deInter0,
-                                   (AscendC::Reg::RegTensor<uint8_t> &)deInter2);
+        AscendC::Reg::DeInterleave(deInter0B8, deInter1B8, (AscendC::Reg::RegTensor<uint8_t>&)deInter0,
+                                   (AscendC::Reg::RegTensor<uint8_t>&)deInter2);
         AscendC::Reg::StoreAlign<uint8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(b8p, deInter0B8, VF_LEN_B8,
                                                                                        histMask);
         AscendC::Reg::Histograms<uint8_t, uint16_t, AscendC::Reg::HistogramsBinType::BIN0,
@@ -315,13 +315,13 @@ __simd_vf__ __aicore__ inline void HistogramB32VF(__ubuf__ KeyT *inP, __ubuf__ C
 }
 
 template <typename KeyT, typename CountT>
-__simd_vf__ __aicore__ inline void HistogramB64VF(__ubuf__ KeyT *inP, __ubuf__ CountT *ebW, __ubuf__ uint16_t *hp,
-                                                  __ubuf__ uint16_t *cp, __ubuf__ uint8_t *b8p, uint32_t sz,
+__simd_vf__ __aicore__ inline void HistogramB64VF(__ubuf__ KeyT* inP, __ubuf__ CountT* ebW, __ubuf__ uint16_t* hp,
+                                                  __ubuf__ uint16_t* cp, __ubuf__ uint8_t* b8p, uint32_t sz,
                                                   uint16_t repeatTime, uint32_t round)
 {
     uint32_t bitOffset = round * SHIFT_BIT_NUM;
-    __ubuf__ CountT *blockExclusiveUbWPtr = ebW;
-    __ubuf__ CountT *blockExclusiveUbRPtr = ebW;
+    __ubuf__ CountT* blockExclusiveUbWPtr = ebW;
+    __ubuf__ CountT* blockExclusiveUbRPtr = ebW;
     uint32_t inputElementNum = sz;
     AscendC::Reg::RegTensor<uint64_t> in0, in1, in2, in3, in4, in5, in6, in7;
     AscendC::Reg::RegTensor<uint16_t> hist0, hist1, chist0, chist1;
@@ -354,22 +354,22 @@ __simd_vf__ __aicore__ inline void HistogramB64VF(__ubuf__ KeyT *inP, __ubuf__ C
         AscendC::Reg::ShiftRights<uint64_t, int16_t>(shift7, in7, bitOffset, maskB64);
         AscendC::Reg::RegTensor<uint32_t> deInter0, deInter1, deInter2, deInter3, deInter4, deInter5, deInter6,
             deInter7;
-        AscendC::Reg::DeInterleave(deInter0, deInter1, (AscendC::Reg::RegTensor<uint32_t> &)shift0,
-                                   (AscendC::Reg::RegTensor<uint32_t> &)shift1);
-        AscendC::Reg::DeInterleave(deInter2, deInter3, (AscendC::Reg::RegTensor<uint32_t> &)shift2,
-                                   (AscendC::Reg::RegTensor<uint32_t> &)shift3);
-        AscendC::Reg::DeInterleave(deInter4, deInter5, (AscendC::Reg::RegTensor<uint32_t> &)shift4,
-                                   (AscendC::Reg::RegTensor<uint32_t> &)shift5);
-        AscendC::Reg::DeInterleave(deInter6, deInter7, (AscendC::Reg::RegTensor<uint32_t> &)shift6,
-                                   (AscendC::Reg::RegTensor<uint32_t> &)shift7);
+        AscendC::Reg::DeInterleave(deInter0, deInter1, (AscendC::Reg::RegTensor<uint32_t>&)shift0,
+                                   (AscendC::Reg::RegTensor<uint32_t>&)shift1);
+        AscendC::Reg::DeInterleave(deInter2, deInter3, (AscendC::Reg::RegTensor<uint32_t>&)shift2,
+                                   (AscendC::Reg::RegTensor<uint32_t>&)shift3);
+        AscendC::Reg::DeInterleave(deInter4, deInter5, (AscendC::Reg::RegTensor<uint32_t>&)shift4,
+                                   (AscendC::Reg::RegTensor<uint32_t>&)shift5);
+        AscendC::Reg::DeInterleave(deInter6, deInter7, (AscendC::Reg::RegTensor<uint32_t>&)shift6,
+                                   (AscendC::Reg::RegTensor<uint32_t>&)shift7);
         AscendC::Reg::RegTensor<uint16_t> deInter0B16, deInter1B16, deInter2B16, deInter3B16;
-        AscendC::Reg::DeInterleave(deInter0B16, deInter1B16, (AscendC::Reg::RegTensor<uint16_t> &)deInter0,
-                                   (AscendC::Reg::RegTensor<uint16_t> &)deInter2);
-        AscendC::Reg::DeInterleave(deInter2B16, deInter3B16, (AscendC::Reg::RegTensor<uint16_t> &)deInter4,
-                                   (AscendC::Reg::RegTensor<uint16_t> &)deInter6);
+        AscendC::Reg::DeInterleave(deInter0B16, deInter1B16, (AscendC::Reg::RegTensor<uint16_t>&)deInter0,
+                                   (AscendC::Reg::RegTensor<uint16_t>&)deInter2);
+        AscendC::Reg::DeInterleave(deInter2B16, deInter3B16, (AscendC::Reg::RegTensor<uint16_t>&)deInter4,
+                                   (AscendC::Reg::RegTensor<uint16_t>&)deInter6);
         AscendC::Reg::RegTensor<uint8_t> deInter0B8, deInter1B8;
-        AscendC::Reg::DeInterleave(deInter0B8, deInter1B8, (AscendC::Reg::RegTensor<uint8_t> &)deInter0B16,
-                                   (AscendC::Reg::RegTensor<uint8_t> &)deInter2B16);
+        AscendC::Reg::DeInterleave(deInter0B8, deInter1B8, (AscendC::Reg::RegTensor<uint8_t>&)deInter0B16,
+                                   (AscendC::Reg::RegTensor<uint8_t>&)deInter2B16);
         AscendC::Reg::StoreAlign<uint8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(b8p, deInter0B8, VF_LEN_B8,
                                                                                        histMask);
         AscendC::Reg::Histograms<uint8_t, uint16_t, AscendC::Reg::HistogramsBinType::BIN0,
@@ -386,13 +386,13 @@ __simd_vf__ __aicore__ inline void HistogramB64VF(__ubuf__ KeyT *inP, __ubuf__ C
 }
 
 template <typename KeyT, typename CountT>
-__simd_vf__ __aicore__ inline void HistogramB16VF(__ubuf__ KeyT *inP, __ubuf__ CountT *ebW, __ubuf__ uint16_t *hp,
-                                                  __ubuf__ uint16_t *cp, __ubuf__ uint8_t *b8p, uint32_t sz,
+__simd_vf__ __aicore__ inline void HistogramB16VF(__ubuf__ KeyT* inP, __ubuf__ CountT* ebW, __ubuf__ uint16_t* hp,
+                                                  __ubuf__ uint16_t* cp, __ubuf__ uint8_t* b8p, uint32_t sz,
                                                   uint16_t repeatTime, uint32_t round)
 {
     uint32_t bitOffset = round * SHIFT_BIT_NUM;
-    __ubuf__ CountT *blockExclusiveUbWPtr = ebW;
-    __ubuf__ CountT *blockExclusiveUbRPtr = ebW;
+    __ubuf__ CountT* blockExclusiveUbWPtr = ebW;
+    __ubuf__ CountT* blockExclusiveUbRPtr = ebW;
     uint32_t inputElementNum = sz;
     AscendC::Reg::MaskReg histMask;
     AscendC::Reg::RegTensor<uint16_t> in0, in1;
@@ -411,8 +411,8 @@ __simd_vf__ __aicore__ inline void HistogramB16VF(__ubuf__ KeyT *inP, __ubuf__ C
         AscendC::Reg::ShiftRights<uint16_t, int16_t>(shift0, in0, bitOffset, maskB16);
         AscendC::Reg::ShiftRights<uint16_t, int16_t>(shift1, in1, bitOffset, maskB16);
         AscendC::Reg::RegTensor<uint8_t> deInter0B8, deInter1B8;
-        AscendC::Reg::DeInterleave(deInter0B8, deInter1B8, (AscendC::Reg::RegTensor<uint8_t> &)shift0,
-                                   (AscendC::Reg::RegTensor<uint8_t> &)shift1);
+        AscendC::Reg::DeInterleave(deInter0B8, deInter1B8, (AscendC::Reg::RegTensor<uint8_t>&)shift0,
+                                   (AscendC::Reg::RegTensor<uint8_t>&)shift1);
         AscendC::Reg::StoreAlign<uint8_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(b8p, deInter0B8, VF_LEN_B8,
                                                                                        histMask);
         AscendC::Reg::Histograms<uint8_t, uint16_t, AscendC::Reg::HistogramsBinType::BIN0,
@@ -429,13 +429,13 @@ __simd_vf__ __aicore__ inline void HistogramB16VF(__ubuf__ KeyT *inP, __ubuf__ C
 }
 
 template <typename KeyT, typename CountT>
-__simd_vf__ __aicore__ inline void HistogramB8VF(__ubuf__ KeyT *inP, __ubuf__ CountT *ebW, __ubuf__ uint16_t *hp,
-                                                 __ubuf__ uint16_t *cp, __ubuf__ uint8_t *b8p, uint32_t sz,
+__simd_vf__ __aicore__ inline void HistogramB8VF(__ubuf__ KeyT* inP, __ubuf__ CountT* ebW, __ubuf__ uint16_t* hp,
+                                                 __ubuf__ uint16_t* cp, __ubuf__ uint8_t* b8p, uint32_t sz,
                                                  uint16_t repeatTime, uint32_t round)
 {
     (void)round;
-    __ubuf__ CountT *blockExclusiveUbWPtr = ebW;
-    __ubuf__ CountT *blockExclusiveUbRPtr = ebW;
+    __ubuf__ CountT* blockExclusiveUbWPtr = ebW;
+    __ubuf__ CountT* blockExclusiveUbRPtr = ebW;
     uint32_t inputElementNum = sz;
     AscendC::Reg::MaskReg histMask;
     AscendC::Reg::RegTensor<uint8_t> in0;
@@ -466,7 +466,7 @@ __simd_vf__ __aicore__ inline void HistogramB8VF(__ubuf__ KeyT *inP, __ubuf__ Co
 // ── Scatter / Lookback / Prefix ──
 
 template <typename CountT>
-__simd_vf__ __aicore__ inline void EncodeHistVF(__ubuf__ uint16_t *blockHistPtr, __ubuf__ CountT *blockHistWithFlagPtr)
+__simd_vf__ __aicore__ inline void EncodeHistVF(__ubuf__ uint16_t* blockHistPtr, __ubuf__ CountT* blockHistWithFlagPtr)
 {
     AscendC::Reg::MaskReg predicateDefaultB16 = AscendC::Reg::CreateMask<uint16_t>();
     AscendC::Reg::RegTensor<uint16_t> blockHistZero, blockHistOne;
@@ -485,13 +485,13 @@ __simd_vf__ __aicore__ inline void EncodeHistVF(__ubuf__ uint16_t *blockHistPtr,
         AscendC::Reg::Duplicate(aggregateReadyMask, AGGREGATE_READY_MASK, predicateDefault);
         AscendC::Reg::RegTensor<uint32_t> lookaheadOutZeroMask, lookaheadOutOneMask, lookaheadOutTwoMask,
             lookaheadOutThreeMask;
-        AscendC::Reg::Or(lookaheadOutZeroMask, (AscendC::Reg::RegTensor<uint32_t> &)lookaheadOutZero,
-                         aggregateReadyMask, predicateDefault);
-        AscendC::Reg::Or(lookaheadOutOneMask, (AscendC::Reg::RegTensor<uint32_t> &)lookaheadOutOne, aggregateReadyMask,
+        AscendC::Reg::Or(lookaheadOutZeroMask, (AscendC::Reg::RegTensor<uint32_t>&)lookaheadOutZero, aggregateReadyMask,
                          predicateDefault);
-        AscendC::Reg::Or(lookaheadOutTwoMask, (AscendC::Reg::RegTensor<uint32_t> &)lookaheadOutTwo, aggregateReadyMask,
+        AscendC::Reg::Or(lookaheadOutOneMask, (AscendC::Reg::RegTensor<uint32_t>&)lookaheadOutOne, aggregateReadyMask,
                          predicateDefault);
-        AscendC::Reg::Or(lookaheadOutThreeMask, (AscendC::Reg::RegTensor<uint32_t> &)lookaheadOutThree,
+        AscendC::Reg::Or(lookaheadOutTwoMask, (AscendC::Reg::RegTensor<uint32_t>&)lookaheadOutTwo, aggregateReadyMask,
+                         predicateDefault);
+        AscendC::Reg::Or(lookaheadOutThreeMask, (AscendC::Reg::RegTensor<uint32_t>&)lookaheadOutThree,
                          aggregateReadyMask, predicateDefault);
         AscendC::Reg::StoreAlign<uint32_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
             blockHistWithFlagPtr, lookaheadOutZeroMask, VF_LEN_B32, predicateDefault);
@@ -517,21 +517,21 @@ __simd_vf__ __aicore__ inline void EncodeHistVF(__ubuf__ uint16_t *blockHistPtr,
         AscendC::Reg::RegTensor<int64_t> lookaheadOutOneMaskB64A, lookaheadOutOneMaskB64B;
         AscendC::Reg::RegTensor<int64_t> lookaheadOutTwoMaskB64A, lookaheadOutTwoMaskB64B;
         AscendC::Reg::RegTensor<int64_t> lookaheadOutThreeMaskB64A, lookaheadOutThreeMaskB64B;
-        AscendC::Reg::Or(lookaheadOutZeroMaskB64A, (AscendC::Reg::RegTensor<int64_t> &)lookaheadOutZeroB64A,
+        AscendC::Reg::Or(lookaheadOutZeroMaskB64A, (AscendC::Reg::RegTensor<int64_t>&)lookaheadOutZeroB64A,
                          aggregateReadyMask, predicateDefault);
-        AscendC::Reg::Or(lookaheadOutZeroMaskB64B, (AscendC::Reg::RegTensor<int64_t> &)lookaheadOutZeroB64B,
+        AscendC::Reg::Or(lookaheadOutZeroMaskB64B, (AscendC::Reg::RegTensor<int64_t>&)lookaheadOutZeroB64B,
                          aggregateReadyMask, predicateDefault);
-        AscendC::Reg::Or(lookaheadOutOneMaskB64A, (AscendC::Reg::RegTensor<int64_t> &)lookaheadOutOneB64A,
+        AscendC::Reg::Or(lookaheadOutOneMaskB64A, (AscendC::Reg::RegTensor<int64_t>&)lookaheadOutOneB64A,
                          aggregateReadyMask, predicateDefault);
-        AscendC::Reg::Or(lookaheadOutOneMaskB64B, (AscendC::Reg::RegTensor<int64_t> &)lookaheadOutOneB64B,
+        AscendC::Reg::Or(lookaheadOutOneMaskB64B, (AscendC::Reg::RegTensor<int64_t>&)lookaheadOutOneB64B,
                          aggregateReadyMask, predicateDefault);
-        AscendC::Reg::Or(lookaheadOutTwoMaskB64A, (AscendC::Reg::RegTensor<int64_t> &)lookaheadOutTwoB64A,
+        AscendC::Reg::Or(lookaheadOutTwoMaskB64A, (AscendC::Reg::RegTensor<int64_t>&)lookaheadOutTwoB64A,
                          aggregateReadyMask, predicateDefault);
-        AscendC::Reg::Or(lookaheadOutTwoMaskB64B, (AscendC::Reg::RegTensor<int64_t> &)lookaheadOutTwoB64B,
+        AscendC::Reg::Or(lookaheadOutTwoMaskB64B, (AscendC::Reg::RegTensor<int64_t>&)lookaheadOutTwoB64B,
                          aggregateReadyMask, predicateDefault);
-        AscendC::Reg::Or(lookaheadOutThreeMaskB64A, (AscendC::Reg::RegTensor<int64_t> &)lookaheadOutThreeB64A,
+        AscendC::Reg::Or(lookaheadOutThreeMaskB64A, (AscendC::Reg::RegTensor<int64_t>&)lookaheadOutThreeB64A,
                          aggregateReadyMask, predicateDefault);
-        AscendC::Reg::Or(lookaheadOutThreeMaskB64B, (AscendC::Reg::RegTensor<int64_t> &)lookaheadOutThreeB64B,
+        AscendC::Reg::Or(lookaheadOutThreeMaskB64B, (AscendC::Reg::RegTensor<int64_t>&)lookaheadOutThreeB64B,
                          aggregateReadyMask, predicateDefault);
         AscendC::Reg::StoreAlign<int64_t, AscendC::Reg::PostLiteral::POST_MODE_UPDATE>(
             blockHistWithFlagPtr, lookaheadOutZeroMaskB64A, VF_LEN_B64, predicateDefault);
@@ -553,8 +553,8 @@ __simd_vf__ __aicore__ inline void EncodeHistVF(__ubuf__ uint16_t *blockHistPtr,
 }
 
 template <typename CountT>
-__simd_vf__ __aicore__ inline void LookbackCheckStateVF(__ubuf__ CountT *tilePrevHistValuePtr,
-                                                        __ubuf__ uint32_t *ubFlagTensorPtr, uint16_t repeatTime)
+__simd_vf__ __aicore__ inline void LookbackCheckStateVF(__ubuf__ CountT* tilePrevHistValuePtr,
+                                                        __ubuf__ uint32_t* ubFlagTensorPtr, uint16_t repeatTime)
 {
     AscendC::Reg::MaskReg pRegSelect;
     AscendC::Reg::MaskReg maskB32 = AscendC::Reg::CreateMask<uint32_t>();
@@ -580,7 +580,7 @@ __simd_vf__ __aicore__ inline void LookbackCheckStateVF(__ubuf__ CountT *tilePre
             AscendC::Reg::MaskReg maskB64 = AscendC::Reg::CreateMask<int64_t>();
             AscendC::Reg::RegTensor<uint64_t> stateTmp;
             AscendC::Reg::ShiftRights<uint64_t, int16_t>(
-                stateTmp, (AscendC::Reg::RegTensor<uint64_t> &)prevTileHistValue, STATE_BIT_SHF_VALUE_B64, maskB64);
+                stateTmp, (AscendC::Reg::RegTensor<uint64_t>&)prevTileHistValue, STATE_BIT_SHF_VALUE_B64, maskB64);
             AscendC::Reg::Pack(stateBitValue, stateTmp);
             pRegSelect = AscendC::Reg::CreateMask<uint32_t, AscendC::Reg::MaskPattern::H>();
         }
@@ -616,9 +616,9 @@ __simd_vf__ __aicore__ inline void LookbackCheckStateVF(__ubuf__ CountT *tilePre
 }
 
 template <typename CountT>
-__simd_vf__ __aicore__ inline void LookbackAccumVF(__ubuf__ CountT *nowTileHistBufferPtr,
-                                                   __ubuf__ CountT *nowTileHistBufferPtrCopy,
-                                                   __ubuf__ CountT *tilePrevHistValuePtrCopy, uint16_t repeatTime)
+__simd_vf__ __aicore__ inline void LookbackAccumVF(__ubuf__ CountT* nowTileHistBufferPtr,
+                                                   __ubuf__ CountT* nowTileHistBufferPtrCopy,
+                                                   __ubuf__ CountT* tilePrevHistValuePtrCopy, uint16_t repeatTime)
 {
     AscendC::Reg::MaskReg predicateDefault = AscendC::Reg::CreateMask<uint16_t>();
     AscendC::Reg::RegTensor<CountT> histMask;
@@ -654,7 +654,7 @@ __simd_vf__ __aicore__ inline void LookbackAccumVF(__ubuf__ CountT *nowTileHistB
 }
 
 template <typename CountT>
-__simd_vf__ __aicore__ inline void SetPrefixReadyVF(__ubuf__ CountT *histCumsumPtr, __ubuf__ CountT *histCumsumPtrCopy,
+__simd_vf__ __aicore__ inline void SetPrefixReadyVF(__ubuf__ CountT* histCumsumPtr, __ubuf__ CountT* histCumsumPtrCopy,
                                                     uint16_t repeatTime)
 {
     AscendC::Reg::RegTensor<CountT> prefixReadyMask, prefixRemainMask;
@@ -689,70 +689,70 @@ __simd_vf__ __aicore__ inline void SetPrefixReadyVF(__ubuf__ CountT *histCumsumP
 // ── Histogram wrappers ──
 
 template <typename KeyT, typename CountT>
-__aicore__ inline void GetGlobalExclusiveSumB32(AscendC::LocalTensor<KeyT> &inputX,
-                                                AscendC::LocalTensor<CountT> &blockExclusiveUb,
-                                                AscendC::LocalTensor<uint16_t> &histUb,
-                                                AscendC::LocalTensor<uint16_t> &histCumsumUb,
-                                                AscendC::LocalTensor<uint8_t> &inputB8Ub, uint32_t currTileSize,
+__aicore__ inline void GetGlobalExclusiveSumB32(AscendC::LocalTensor<KeyT>& inputX,
+                                                AscendC::LocalTensor<CountT>& blockExclusiveUb,
+                                                AscendC::LocalTensor<uint16_t>& histUb,
+                                                AscendC::LocalTensor<uint16_t>& histCumsumUb,
+                                                AscendC::LocalTensor<uint8_t>& inputB8Ub, uint32_t currTileSize,
                                                 uint32_t round)
 {
     uint16_t repeatTime = AscendC::CeilDivision(currTileSize, VF_LEN_B8);
     asc_vf_call<HistogramB32VF<KeyT, CountT>>(
-        (__ubuf__ KeyT *)inputX.GetPhyAddr(), (__ubuf__ CountT *)blockExclusiveUb.GetPhyAddr(),
-        (__ubuf__ uint16_t *)histUb.GetPhyAddr(), (__ubuf__ uint16_t *)histCumsumUb.GetPhyAddr(),
-        (__ubuf__ uint8_t *)inputB8Ub.GetPhyAddr(), currTileSize, repeatTime, round);
+        (__ubuf__ KeyT*)inputX.GetPhyAddr(), (__ubuf__ CountT*)blockExclusiveUb.GetPhyAddr(),
+        (__ubuf__ uint16_t*)histUb.GetPhyAddr(), (__ubuf__ uint16_t*)histCumsumUb.GetPhyAddr(),
+        (__ubuf__ uint8_t*)inputB8Ub.GetPhyAddr(), currTileSize, repeatTime, round);
 }
 
 template <typename KeyT, typename CountT>
-__aicore__ inline void GetGlobalExclusiveSumB64(AscendC::LocalTensor<KeyT> &inputX,
-                                                AscendC::LocalTensor<CountT> &blockExclusiveUb,
-                                                AscendC::LocalTensor<uint16_t> &histUb,
-                                                AscendC::LocalTensor<uint16_t> &histCumsumUb,
-                                                AscendC::LocalTensor<uint8_t> &inputB8Ub, uint32_t currTileSize,
+__aicore__ inline void GetGlobalExclusiveSumB64(AscendC::LocalTensor<KeyT>& inputX,
+                                                AscendC::LocalTensor<CountT>& blockExclusiveUb,
+                                                AscendC::LocalTensor<uint16_t>& histUb,
+                                                AscendC::LocalTensor<uint16_t>& histCumsumUb,
+                                                AscendC::LocalTensor<uint8_t>& inputB8Ub, uint32_t currTileSize,
                                                 uint32_t round)
 {
     uint16_t repeatTime = AscendC::CeilDivision(currTileSize, VF_LEN_B8);
     asc_vf_call<HistogramB64VF<KeyT, CountT>>(
-        (__ubuf__ KeyT *)inputX.GetPhyAddr(), (__ubuf__ CountT *)blockExclusiveUb.GetPhyAddr(),
-        (__ubuf__ uint16_t *)histUb.GetPhyAddr(), (__ubuf__ uint16_t *)histCumsumUb.GetPhyAddr(),
-        (__ubuf__ uint8_t *)inputB8Ub.GetPhyAddr(), currTileSize, repeatTime, round);
+        (__ubuf__ KeyT*)inputX.GetPhyAddr(), (__ubuf__ CountT*)blockExclusiveUb.GetPhyAddr(),
+        (__ubuf__ uint16_t*)histUb.GetPhyAddr(), (__ubuf__ uint16_t*)histCumsumUb.GetPhyAddr(),
+        (__ubuf__ uint8_t*)inputB8Ub.GetPhyAddr(), currTileSize, repeatTime, round);
 }
 
 template <typename KeyT, typename CountT>
-__aicore__ inline void GetGlobalExclusiveSumB16(AscendC::LocalTensor<KeyT> &inputX,
-                                                AscendC::LocalTensor<CountT> &blockExclusiveUb,
-                                                AscendC::LocalTensor<uint16_t> &histUb,
-                                                AscendC::LocalTensor<uint16_t> &histCumsumUb,
-                                                AscendC::LocalTensor<uint8_t> &inputB8Ub, uint32_t currTileSize,
+__aicore__ inline void GetGlobalExclusiveSumB16(AscendC::LocalTensor<KeyT>& inputX,
+                                                AscendC::LocalTensor<CountT>& blockExclusiveUb,
+                                                AscendC::LocalTensor<uint16_t>& histUb,
+                                                AscendC::LocalTensor<uint16_t>& histCumsumUb,
+                                                AscendC::LocalTensor<uint8_t>& inputB8Ub, uint32_t currTileSize,
                                                 uint32_t round)
 {
     uint16_t repeatTime = AscendC::CeilDivision(currTileSize, VF_LEN_B8);
     asc_vf_call<HistogramB16VF<KeyT, CountT>>(
-        (__ubuf__ KeyT *)inputX.GetPhyAddr(), (__ubuf__ CountT *)blockExclusiveUb.GetPhyAddr(),
-        (__ubuf__ uint16_t *)histUb.GetPhyAddr(), (__ubuf__ uint16_t *)histCumsumUb.GetPhyAddr(),
-        (__ubuf__ uint8_t *)inputB8Ub.GetPhyAddr(), currTileSize, repeatTime, round);
+        (__ubuf__ KeyT*)inputX.GetPhyAddr(), (__ubuf__ CountT*)blockExclusiveUb.GetPhyAddr(),
+        (__ubuf__ uint16_t*)histUb.GetPhyAddr(), (__ubuf__ uint16_t*)histCumsumUb.GetPhyAddr(),
+        (__ubuf__ uint8_t*)inputB8Ub.GetPhyAddr(), currTileSize, repeatTime, round);
 }
 
 template <typename KeyT, typename CountT>
-__aicore__ inline void GetGlobalExclusiveSumB8(AscendC::LocalTensor<KeyT> &inputX,
-                                               AscendC::LocalTensor<CountT> &blockExclusiveUb,
-                                               AscendC::LocalTensor<uint16_t> &histUb,
-                                               AscendC::LocalTensor<uint16_t> &histCumsumUb,
-                                               AscendC::LocalTensor<uint8_t> &inputB8Ub, uint32_t currTileSize,
+__aicore__ inline void GetGlobalExclusiveSumB8(AscendC::LocalTensor<KeyT>& inputX,
+                                               AscendC::LocalTensor<CountT>& blockExclusiveUb,
+                                               AscendC::LocalTensor<uint16_t>& histUb,
+                                               AscendC::LocalTensor<uint16_t>& histCumsumUb,
+                                               AscendC::LocalTensor<uint8_t>& inputB8Ub, uint32_t currTileSize,
                                                uint32_t round)
 {
     uint16_t repeatTime = AscendC::CeilDivision(currTileSize, VF_LEN_B8);
     asc_vf_call<HistogramB8VF<KeyT, CountT>>(
-        (__ubuf__ KeyT *)inputX.GetPhyAddr(), (__ubuf__ CountT *)blockExclusiveUb.GetPhyAddr(),
-        (__ubuf__ uint16_t *)histUb.GetPhyAddr(), (__ubuf__ uint16_t *)histCumsumUb.GetPhyAddr(),
-        (__ubuf__ uint8_t *)inputB8Ub.GetPhyAddr(), currTileSize, repeatTime, round);
+        (__ubuf__ KeyT*)inputX.GetPhyAddr(), (__ubuf__ CountT*)blockExclusiveUb.GetPhyAddr(),
+        (__ubuf__ uint16_t*)histUb.GetPhyAddr(), (__ubuf__ uint16_t*)histCumsumUb.GetPhyAddr(),
+        (__ubuf__ uint8_t*)inputB8Ub.GetPhyAddr(), currTileSize, repeatTime, round);
 }
 
 // ── SIMT global ops ──
 template <typename CountT>
 __simt_vf__ LAUNCH_BOUND(RADIX_SORT_NUM) __aicore__
-    void SimtGlobalOffset(uint32_t exclusiveBinOffset, __gm__ CountT *exclusiveBinsGm,
-                          __ubuf__ CountT *blockExclusiveBuffer)
+    void SimtGlobalOffset(uint32_t exclusiveBinOffset, __gm__ CountT* exclusiveBinsGm,
+                          __ubuf__ CountT* blockExclusiveBuffer)
 {
     for (int32_t i = threadIdx.x; i < RADIX_SORT_NUM; i += RADIX_SORT_NUM) {
         CountT srcData = blockExclusiveBuffer[i];
@@ -763,12 +763,12 @@ __simt_vf__ LAUNCH_BOUND(RADIX_SORT_NUM) __aicore__
 template <typename ValT, typename CountT, typename IdxT, bool propagateIndex>
 __simt_vf__ LAUNCH_BOUND(THREAD_DIM_NUM) __aicore__
     void CopyOutGm(CountT tileDataStart, uint32_t cureTileSize, uint64_t outputXUnsortedAxisOffset,
-                   uint64_t exclRoundOffset, __ubuf__ uint16_t *blockExclusiveSumAddr,
-                   __gm__ volatile CountT *exclusiveBinsGmAddr, __ubuf__ CountT *blockDataInGlobalPosAddr,
-                   __ubuf__ uint32_t *sortedIndexLocalAddr, __ubuf__ CountT *xInputIndexLocalAddr,
-                   __ubuf__ uint8_t *sortedValueLocalAddr, __ubuf__ ValT *xInputValueLocalAddr,
-                   __ubuf__ CountT *blockHistFlagAddr, __ubuf__ uint16_t *blockHistAddr,
-                   __gm__ volatile IdxT *indexDoubleBufferGmAddr, __gm__ volatile ValT *inputXDoubleBufferAddr)
+                   uint64_t exclRoundOffset, __ubuf__ uint16_t* blockExclusiveSumAddr,
+                   __gm__ volatile CountT* exclusiveBinsGmAddr, __ubuf__ CountT* blockDataInGlobalPosAddr,
+                   __ubuf__ uint32_t* sortedIndexLocalAddr, __ubuf__ CountT* xInputIndexLocalAddr,
+                   __ubuf__ uint8_t* sortedValueLocalAddr, __ubuf__ ValT* xInputValueLocalAddr,
+                   __ubuf__ CountT* blockHistFlagAddr, __ubuf__ uint16_t* blockHistAddr,
+                   __gm__ volatile IdxT* indexDoubleBufferGmAddr, __gm__ volatile ValT* inputXDoubleBufferAddr)
 {
     for (int i = threadIdx.x; i < RADIX_SORT_NUM; i += THREAD_DIM_NUM) {
         CountT blockHistCumsumVal = blockHistFlagAddr[i];

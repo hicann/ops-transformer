@@ -23,7 +23,7 @@
 #include "mc2_log.h"
 namespace ops {
 
-ge::Status MoeDistributeCombineSetupCalcParamFunc(gert::ExeResGenerationContext *context)
+ge::Status MoeDistributeCombineSetupCalcParamFunc(gert::ExeResGenerationContext* context)
 {
     const ge::AscendString name = "aicpu kfc server";
     const ge::AscendString reuseKey = "kfc_stream";
@@ -31,8 +31,8 @@ ge::Status MoeDistributeCombineSetupCalcParamFunc(gert::ExeResGenerationContext 
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, name, reuseKey);
 }
 
-ge::Status MoeDistributeCombineSetupGenTaskFunc(const gert::ExeResGenerationContext *context,
-                                                std::vector<std::vector<uint8_t>> &tasks)
+ge::Status MoeDistributeCombineSetupGenTaskFunc(const gert::ExeResGenerationContext* context,
+                                                std::vector<std::vector<uint8_t>>& tasks)
 {
     OPS_LOG_I(context->GetNodeName(), "Do A3 aicpu GenTask.");
     return Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallbackV2(context, tasks);

@@ -16,7 +16,7 @@
 #include "matmul_reduce_scatter_v2_smallm_rank8_pipeline_rules.h"
 
 namespace optiling {
-ge::graphStatus MatmulReduceScatterTilingV2AivModeFunc(gert::TilingContext *context);
+ge::graphStatus MatmulReduceScatterTilingV2AivModeFunc(gert::TilingContext* context);
 }
 
 #endif // DECISION_RULES_H

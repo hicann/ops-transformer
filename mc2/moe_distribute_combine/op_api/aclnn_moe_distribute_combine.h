@@ -57,13 +57,13 @@ extern "C" {
  *
  */
 ACLNN_API aclnnStatus aclnnMoeDistributeCombineGetWorkspaceSize(
-    const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *expandIdx, const aclTensor *epSendCounts,
-    const aclTensor *expertScales, const aclTensor *tpSendCounts, const aclTensor *xActiveMask,
-    const aclTensor *activationScale, const aclTensor *weightScale, const aclTensor *groupList,
-    const aclTensor *expandScales, const char *groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
-    const char *groupTp, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
+    const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* expandIdx, const aclTensor* epSendCounts,
+    const aclTensor* expertScales, const aclTensor* tpSendCounts, const aclTensor* xActiveMask,
+    const aclTensor* activationScale, const aclTensor* weightScale, const aclTensor* groupList,
+    const aclTensor* expandScales, const char* groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
+    const char* groupTp, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t outDtype, int64_t commQuantMode, int64_t groupListType,
-    aclTensor *x, uint64_t *workspaceSize, aclOpExecutor **executor);
+    aclTensor* x, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMoeDistributeCombine的第二段接口，用于执行计算。
@@ -74,7 +74,7 @@ ACLNN_API aclnnStatus aclnnMoeDistributeCombineGetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnMoeDistributeCombine(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeDistributeCombine(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                 aclrtStream stream);
 
 #ifdef __cplusplus

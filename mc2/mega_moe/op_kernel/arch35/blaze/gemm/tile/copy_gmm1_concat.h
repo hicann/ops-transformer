@@ -20,12 +20,12 @@ namespace MegaMoeImpl {
 // QGMM's K slices. Ordinary tensors still use the upstream concat copy unchanged.
 template <typename Tensor>
 struct Gmm1NzWeightView : Tensor {
-    __aicore__ explicit inline Gmm1NzWeightView(const Tensor &tensor)
+    __aicore__ explicit inline Gmm1NzWeightView(const Tensor& tensor)
         : Tensor(tensor)
     {}
 
     template <typename Coord, typename Shape>
-    __aicore__ inline auto slice(const Coord &coord, const Shape &shape) const
+    __aicore__ inline auto slice(const Coord& coord, const Shape& shape) const
     {
         // Delegate indexing to Tensor; preserve the NZ copy tag on the returned view.
         auto slice = Tensor::slice(coord, shape);
@@ -40,7 +40,7 @@ struct Gmm1OutputView {
 };
 
 template <typename Tensor>
-__aicore__ inline auto MakeGmm1WeightView(const Tensor &tensor)
+__aicore__ inline auto MakeGmm1WeightView(const Tensor& tensor)
 {
     using Pattern = asc::te::get_layout_pattern<typename Tensor::layout_type>;
     if constexpr (AscendC::Std::is_same_v<Pattern, asc::te::zn_layout_ptn>) {
@@ -55,21 +55,21 @@ __aicore__ inline auto MakeGmm1WeightView(const Tensor &tensor)
 // (gate + up); only its left half is read before jumping to up[j]. Destination
 // already describes the concatenated compute tile. No global weight permutation.
 template <typename Tensor>
-__aicore__ inline uint64_t ConcatTensorRows(const Tensor &tensor)
+__aicore__ inline uint64_t ConcatTensorRows(const Tensor& tensor)
 {
-    const auto &shape = AscendC::Std::get<0>(tensor.layout().shape());
+    const auto& shape = AscendC::Std::get<0>(tensor.layout().shape());
     return AscendC::Std::get<0>(shape) * AscendC::Std::get<1>(shape);
 }
 
 template <typename Tensor>
-__aicore__ inline uint64_t ConcatTensorColumns(const Tensor &tensor)
+__aicore__ inline uint64_t ConcatTensorColumns(const Tensor& tensor)
 {
-    const auto &shape = AscendC::Std::get<1>(tensor.layout().shape());
+    const auto& shape = AscendC::Std::get<1>(tensor.layout().shape());
     return AscendC::Std::get<0>(shape) * AscendC::Std::get<1>(shape);
 }
 
 template <typename Dst, typename Src>
-__aicore__ inline void CopyGmm1WeightConcatToUb(const Dst &dst, const Src &src, uint64_t halfN)
+__aicore__ inline void CopyGmm1WeightConcatToUb(const Dst& dst, const Src& src, uint64_t halfN)
 {
     using Pattern = asc::te::get_layout_pattern<typename Src::layout_type>;
     ASCENDC_ASSERT((AscendC::Std::is_same_v<Pattern, asc::te::zn_layout_ptn>),
@@ -79,14 +79,14 @@ __aicore__ inline void CopyGmm1WeightConcatToUb(const Dst &dst, const Src &src, 
     const uint32_t blockCount = 2U * ConcatTensorRows(src) / c0;
     const uint32_t blockBytes = ConcatTensorColumns(src) / 2U * columnBytes;
     // Unlike tensor strides, these intrinsics take byte distances between block starts.
-    asc_copy_gm2ub_align(reinterpret_cast<__ubuf__ uint8_t *>(dst.data().get()),
-                         reinterpret_cast<__gm__ uint8_t *>(src.data().get()), blockCount, blockBytes, 0, 0, false,
+    asc_copy_gm2ub_align(reinterpret_cast<__ubuf__ uint8_t*>(dst.data().get()),
+                         reinterpret_cast<__gm__ uint8_t*>(src.data().get()), blockCount, blockBytes, 0, 0, false,
                          static_cast<asc_load_l2_cache_mode>(src.engine().get_cache_mode()), halfN * columnBytes,
                          blockBytes);
 }
 
 template <typename Dst, typename Src>
-__aicore__ inline void CopyGmm1ScaleConcatToL1(const Dst &dst, const Src &src, uint64_t halfN, uint64_t fullK)
+__aicore__ inline void CopyGmm1ScaleConcatToL1(const Dst& dst, const Src& src, uint64_t halfN, uint64_t fullK)
 {
     using Pattern = asc::te::get_layout_pattern<typename Src::layout_type>;
     ASCENDC_ASSERT((AscendC::Std::is_same_v<Pattern, asc::te::scaleb_dn_layout_ptn>),
@@ -104,22 +104,22 @@ namespace asc::te {
 // These overloads match only MegaMoe's view types. Declare them before including
 // QGMM, whose qualified copy calls resolve the overload set at template definition.
 template <typename Dst, typename Src>
-__aicore__ inline void copy(const copy_atom<copy_traits<Blaze::Gemm::Tile::CopyConcatGM2L1>> &copy, const Dst &dst,
-                            const MegaMoeImpl::Gmm1NzWeightView<Src> &src)
+__aicore__ inline void copy(const copy_atom<copy_traits<Blaze::Gemm::Tile::CopyConcatGM2L1>>& copy, const Dst& dst,
+                            const MegaMoeImpl::Gmm1NzWeightView<Src>& src)
 {
-    using Element = get_attribute_element_type<typename Src::element_type *>;
+    using Element = get_attribute_element_type<typename Src::element_type*>;
     const uint64_t c0 = AscendC::Std::get<0>(AscendC::Std::get<0>(src.layout().shape()));
     const uint64_t columnBytes = (Blaze::Gemm::IsFp4<Element>() ? c0 / 2U : c0) * sizeof(Element);
     const uint64_t singleN = get_total_column_shape(src.layout());
     const uint64_t curK = get_total_row_shape(src.layout());
-    asc_copy_gm2l1_align(reinterpret_cast<__cbuf__ uint8_t *>(dst.data().get()),
-                         reinterpret_cast<__gm__ uint8_t *>(src.data().get()), static_cast<uint32_t>(2U * curK / c0),
+    asc_copy_gm2l1_align(reinterpret_cast<__cbuf__ uint8_t*>(dst.data().get()),
+                         reinterpret_cast<__gm__ uint8_t*>(src.data().get()), static_cast<uint32_t>(2U * curK / c0),
                          static_cast<uint32_t>(singleN * columnBytes), 0, 0, true, src.engine().get_cache_mode(),
                          (copy.params.n / 2U) * columnBytes, static_cast<uint32_t>(singleN * columnBytes));
 }
 
 template <typename Atom, typename Dst, typename Src>
-__aicore__ inline void copy(const copy_atom<Atom> &, const MegaMoeImpl::Gmm1OutputView<Dst> &dst, const Src &src)
+__aicore__ inline void copy(const copy_atom<Atom>&, const MegaMoeImpl::Gmm1OutputView<Dst>& dst, const Src& src)
 {
     auto valid =
         src.slice(make_coord(uint64_t(0), uint64_t(0)),

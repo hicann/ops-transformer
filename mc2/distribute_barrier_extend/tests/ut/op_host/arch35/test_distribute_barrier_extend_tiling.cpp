@@ -21,10 +21,10 @@ namespace DistributeBarrierExtendUT {
 constexpr uint64_t g_mc2TilingDataReservedLen = sizeof(Mc2InitTiling) + sizeof(Mc2CcTiling);
 
 template <typename T>
-static string ToString(void *buf, size_t size, unordered_set<size_t> mask = {})
+static string ToString(void* buf, size_t size, unordered_set<size_t> mask = {})
 {
     string result;
-    const T *data = reinterpret_cast<const T *>(buf);
+    const T* data = reinterpret_cast<const T*>(buf);
     size_t len = size / sizeof(T);
     for (size_t i = 0; i < len; i++) {
         result += mask.find(i) == mask.end() ? std::to_string(data[i]) : "*";

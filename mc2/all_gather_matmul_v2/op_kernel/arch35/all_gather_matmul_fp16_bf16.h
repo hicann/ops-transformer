@@ -46,8 +46,8 @@ public:
     __aicore__ inline AllGatherMatmulFP16BF16() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR contextGM,
                                 GM_ADDR workspaceGM, GM_ADDR gatherOut,
-                                Mc2Tiling::AllGatherMatmulTilingDataV2 *tilingData, __gm__ void *mc2InitTiling,
-                                __gm__ void *mc2CcTiling, TPipe *tPipe);
+                                Mc2Tiling::AllGatherMatmulTilingDataV2* tilingData, __gm__ void* mc2InitTiling,
+                                __gm__ void* mc2CcTiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -56,12 +56,12 @@ private:
     __aicore__ inline void InnerProcessGatherMM(); // 远端
     __aicore__ inline void InnerProcess();         // 计算本卡、远端数据
     __aicore__ inline void InnerProcessLocalMM();
-    __aicore__ inline void MatmulKernelComputeGather(GM_ADDR aGM, GM_ADDR cGM, Mc2MatMulV3TilingData &tiling,
+    __aicore__ inline void MatmulKernelComputeGather(GM_ADDR aGM, GM_ADDR cGM, Mc2MatMulV3TilingData& tiling,
                                                      uint32_t count, bool isLast, bool isTail);
 
 private:
-    Mc2Tiling::AllGatherMatmulTilingDataV2 *tilingData_;
-    TPipe *tPipe_;
+    Mc2Tiling::AllGatherMatmulTilingDataV2* tilingData_;
+    TPipe* tPipe_;
     GM_ADDR aGM_;
     GM_ADDR bGM_;
     GM_ADDR cGM_;
@@ -80,12 +80,12 @@ private:
 template <typename AType, typename BType, typename BiasType, typename CType, uint8_t ServerMode>
 __aicore__ inline void AllGatherMatmulFP16BF16<AType, BType, BiasType, CType, ServerMode>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR contextGM, GM_ADDR workspaceGM, GM_ADDR gatherOut,
-    Mc2Tiling::AllGatherMatmulTilingDataV2 *tilingData, __gm__ void *mc2InitTiling, __gm__ void *mc2CcTiling,
-    TPipe *tPipe)
+    Mc2Tiling::AllGatherMatmulTilingDataV2* tilingData, __gm__ void* mc2InitTiling, __gm__ void* mc2CcTiling,
+    TPipe* tPipe)
 {
     // 获取tilingdata数据
     tilingData_ = tilingData;
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     // 获取 context
     context_ = contextGM;
     // 初始化Hccl类
@@ -124,7 +124,7 @@ __aicore__ inline void AllGatherMatmulFP16BF16<AType, BType, BiasType, CType, Se
     if (notifyFlag_) {
         GM_ADDR sendBuff;
         GM_ADDR recvBuffer;
-        auto &&cfg = tilingData_->param;
+        auto&& cfg = tilingData_->param;
         using A_T = typename AType::T;
         uint32_t tileCnt = cfg.tileCnt;
         uint32_t tailCnt = cfg.tailCnt;
@@ -204,12 +204,12 @@ __aicore__ inline void AllGatherMatmulFP16BF16<AType, BType, BiasType, CType, Se
 template <typename AType, typename BType, typename BiasType, typename CType, uint8_t ServerMode>
 __aicore__ inline void AllGatherMatmulFP16BF16<AType, BType, BiasType, CType, ServerMode>::InnerProcessLocalMM()
 {
-    auto &&tiling = tilingData_->mc2MmV3LocalTilingData;
+    auto&& tiling = tilingData_->mc2MmV3LocalTilingData;
     if (GetBlockIdx() >= tiling.tCubeTiling.usedCoreNum) {
         return;
     }
 
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     auto aLocalGM = aGM_;
     auto cLocalGM = cGM_;
 
@@ -227,7 +227,7 @@ __aicore__ inline void AllGatherMatmulFP16BF16<AType, BType, BiasType, CType, Se
 template <typename AType, typename BType, typename BiasType, typename CType, uint8_t ServerMode>
 __aicore__ inline void AllGatherMatmulFP16BF16<AType, BType, BiasType, CType, ServerMode>::InnerProcessGatherMM()
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     // 处理gather主块
     if (debugMode_ == MC2_DEBUG_ONLY_CUBE) {
         MatmulKernelComputeGather(aGM_, cGM_, tilingData_->mc2MmV3TileTilingData, cfg.tileCnt, cfg.tailM ? false : true,
@@ -256,9 +256,9 @@ __aicore__ inline void AllGatherMatmulFP16BF16<AType, BType, BiasType, CType, Se
 
 template <typename AType, typename BType, typename BiasType, typename CType, uint8_t ServerMode>
 __aicore__ inline void AllGatherMatmulFP16BF16<AType, BType, BiasType, CType, ServerMode>::MatmulKernelComputeGather(
-    GM_ADDR aGM, GM_ADDR cGM, Mc2MatMulV3TilingData &tiling, uint32_t count, bool isLast, bool isTail)
+    GM_ADDR aGM, GM_ADDR cGM, Mc2MatMulV3TilingData& tiling, uint32_t count, bool isLast, bool isTail)
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     cfg.rankID = rankId_;
     uint32_t shift = isTail ? cfg.tileCnt : 0;
     if ((GetBlockIdx() >= tiling.tCubeTiling.usedCoreNum) || (cfg.rankN == 0)) {

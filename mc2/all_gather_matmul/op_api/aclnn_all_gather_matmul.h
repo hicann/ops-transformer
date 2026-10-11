@@ -38,11 +38,11 @@ extern "C" {
  * @param [out] executor: 返回op执行器，包含了算子计算流程。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnAllGatherMatmulGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2,
-                                                           const aclTensor *bias, const char *group,
+ACLNN_API aclnnStatus aclnnAllGatherMatmulGetWorkspaceSize(const aclTensor* x1, const aclTensor* x2,
+                                                           const aclTensor* bias, const char* group,
                                                            int64_t gatherIndex, int64_t commTurn, int64_t streamMode,
-                                                           const aclTensor *output, const aclTensor *gatherOut,
-                                                           uint64_t *workspaceSize, aclOpExecutor **executor);
+                                                           const aclTensor* output, const aclTensor* gatherOut,
+                                                           uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnAllGatherMatmul的第二段接口，用于执行计算。
@@ -52,7 +52,7 @@ ACLNN_API aclnnStatus aclnnAllGatherMatmulGetWorkspaceSize(const aclTensor *x1, 
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnAllGatherMatmul(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnAllGatherMatmul(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            aclrtStream stream);
 
 #ifdef __cplusplus

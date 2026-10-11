@@ -67,7 +67,7 @@ public:
         Params() {}
 
         CATLASS_DEVICE
-        Params(GM_ADDR ptrX_, LayoutX const &layoutX_, GM_ADDR ptrD_, LayoutD const &layoutD_)
+        Params(GM_ADDR ptrX_, LayoutX const& layoutX_, GM_ADDR ptrD_, LayoutD const& layoutD_)
             : ptrX(ptrX_),
               layoutX(layoutX_),
               ptrD(ptrD_),
@@ -76,7 +76,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, Params const &params)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource, Params const& params)
         : params(params)
     {
         ubC = resource.ubBuf.template GetBufferByByte<ElementC>(0);
@@ -96,9 +96,9 @@ public:
     }
 
     CATLASS_DEVICE
-    void operator()(GemmCoord const &blockShapeMNK, GemmCoord const &blockCoordMNK,
-                    GemmCoord const &actualBlockShapeMNK, AscendC::GlobalTensor<ElementCompute> const &gmBlockC,
-                    LayoutX const &layoutBlockC)
+    void operator()(GemmCoord const& blockShapeMNK, GemmCoord const& blockCoordMNK,
+                    GemmCoord const& actualBlockShapeMNK, AscendC::GlobalTensor<ElementCompute> const& gmBlockC,
+                    LayoutX const& layoutBlockC)
     {
         // Calculate the offset of the current block
         MatrixCoord blockShape = blockShapeMNK.GetCoordMN();
@@ -120,13 +120,13 @@ public:
 
         // Get the data and layout of X
         AscendC::GlobalTensor<ElementX> gmX;
-        gmX.SetGlobalBuffer(reinterpret_cast<__gm__ ElementX *>(params.ptrX));
+        gmX.SetGlobalBuffer(reinterpret_cast<__gm__ ElementX*>(params.ptrX));
         auto gmSubblockX = gmX[params.layoutX.GetOffset(blockOffset + subblockOffset)];
         auto layoutSubblockX = params.layoutX.GetTileLayout(actualSubblockShape);
 
         // Get the data and layout of D
         AscendC::GlobalTensor<ElementD> gmD;
-        gmD.SetGlobalBuffer(reinterpret_cast<__gm__ ElementD *>(params.ptrD));
+        gmD.SetGlobalBuffer(reinterpret_cast<__gm__ ElementD*>(params.ptrD));
         auto gmSubblockD = gmD[params.layoutD.GetOffset(blockOffset + subblockOffset)];
         auto layoutSubblockD = params.layoutD.GetTileLayout(actualSubblockShape);
 

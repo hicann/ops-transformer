@@ -79,7 +79,7 @@ public:
                   "TileShape is too large to fit in UB");
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource)
+    BlockEpilogue(Arch::Resource<ArchTag> const& resource)
     {
         Mc2MatmulAivDequant::UbTensorAllocator<Arch::Resource<ArchTag>> ubAllocator(resource);
         Mc2MatmulAivDequant::EventIdAllocator eventAllocator;
@@ -132,10 +132,10 @@ public:
 
     // perChannel、perToken
     CATLASS_DEVICE
-    void operator()(__gm__ ElementScale *ptrScale, LayoutScale layoutScale,
-                    __gm__ ElementPerTokenScale *ptrPerTokenScale, LayoutPerTokenScale layoutPerTokenScale,
-                    __gm__ ElementBias *ptrBias, LayoutBias layoutBias, __gm__ ElementC *ptrC, LayoutC layoutC,
-                    __gm__ ElementD *ptrD, LayoutD layoutD, GemmCoord problemShape)
+    void operator()(__gm__ ElementScale* ptrScale, LayoutScale layoutScale,
+                    __gm__ ElementPerTokenScale* ptrPerTokenScale, LayoutPerTokenScale layoutPerTokenScale,
+                    __gm__ ElementBias* ptrBias, LayoutBias layoutBias, __gm__ ElementC* ptrC, LayoutC layoutC,
+                    __gm__ ElementD* ptrD, LayoutD layoutD, GemmCoord problemShape)
     {
         // Calculate the offset of the current block
         MatrixCoord actualBlockShape = problemShape.GetCoordMN();
@@ -145,7 +145,7 @@ public:
         gmC.SetGlobalBuffer(ptrC);
         gmD.SetGlobalBuffer(ptrD);
         if (ptrBias != nullptr) {
-            gmBias.SetGlobalBuffer((__gm__ ElementBias *)ptrBias);
+            gmBias.SetGlobalBuffer((__gm__ ElementBias*)ptrBias);
         }
 
         auto ubTileStride = MakeCoord(static_cast<int64_t>(TileShape::COLUMN), 1L);
@@ -162,13 +162,13 @@ public:
             auto tileOffset = tileCoord * tileShape;
 
             // C: GM -> UB
-            auto &ubC = CopyCToUb(tileOffset, actualTileShape, ubTileStride, layoutC);
+            auto& ubC = CopyCToUb(tileOffset, actualTileShape, ubTileStride, layoutC);
 
             // perChannel scale: GM -> UB
-            auto &ubScale = CopyScaleToUb(tileOffset, actualTileShape, layoutScale);
+            auto& ubScale = CopyScaleToUb(tileOffset, actualTileShape, layoutScale);
 
             // perToken scale: GM -> UB
-            auto &ubPerTokenScale = CopyPerTokenScaleToUb(tileOffset, actualTileShape, layoutPerTokenScale);
+            auto& ubPerTokenScale = CopyPerTokenScaleToUb(tileOffset, actualTileShape, layoutPerTokenScale);
 
             // bias: GM -> UB (optional)
             CopyBiasToUb(tileOffset, actualTileShape, layoutBias, ptrBias);
@@ -191,7 +191,7 @@ public:
 
             AddBias(ubPerTokenMul, ptrBias);
             // 选择要cast的源tensor：如果有bias，使用ubBiasAdd；否则直接使用ubPerTokenMul
-            AscendC::LocalTensor<float> &castSrc = ptrBias != nullptr ? ubBiasAdd : ubPerTokenMul;
+            AscendC::LocalTensor<float>& castSrc = ptrBias != nullptr ? ubBiasAdd : ubPerTokenMul;
 
             // FP32 -> D -> GM
             CastToDAndStore(castSrc, tileOffset, actualTileShape, layoutD, gmD);
@@ -202,8 +202,8 @@ public:
 
     // perChannel
     CATLASS_DEVICE
-    void operator()(__gm__ ElementScale *ptrScale, LayoutScale layoutScale, __gm__ ElementBias *ptrBias,
-                    LayoutBias layoutBias, __gm__ ElementC *ptrC, LayoutC layoutC, __gm__ ElementD *ptrD,
+    void operator()(__gm__ ElementScale* ptrScale, LayoutScale layoutScale, __gm__ ElementBias* ptrBias,
+                    LayoutBias layoutBias, __gm__ ElementC* ptrC, LayoutC layoutC, __gm__ ElementD* ptrD,
                     LayoutD layoutD, GemmCoord problemShape)
     {
         // Calculate the offset of the current block
@@ -213,7 +213,7 @@ public:
         gmC.SetGlobalBuffer(ptrC);
         gmD.SetGlobalBuffer(ptrD);
         if (ptrBias != nullptr) {
-            gmBias.SetGlobalBuffer((__gm__ ElementBias *)ptrBias);
+            gmBias.SetGlobalBuffer((__gm__ ElementBias*)ptrBias);
         }
 
         auto ubTileStride = MakeCoord(static_cast<int64_t>(TileShape::COLUMN), 1L);
@@ -230,10 +230,10 @@ public:
             auto tileOffset = tileCoord * tileShape;
 
             // C: GM -> UB
-            auto &ubC = CopyCToUb(tileOffset, actualTileShape, ubTileStride, layoutC);
+            auto& ubC = CopyCToUb(tileOffset, actualTileShape, ubTileStride, layoutC);
 
             // perChannel scale: GM -> UB
-            auto &ubScale = CopyScaleToUb(tileOffset, actualTileShape, layoutScale);
+            auto& ubScale = CopyScaleToUb(tileOffset, actualTileShape, layoutScale);
 
             // bias: GM -> UB (optional)
             CopyBiasToUb(tileOffset, actualTileShape, layoutBias, ptrBias);
@@ -252,7 +252,7 @@ public:
 
             AddBias(ubMul, ptrBias);
             // 选择要cast的源tensor：如果有bias，使用ubBiasAdd；否则直接使用ubMul
-            AscendC::LocalTensor<float> &castSrc = ptrBias != nullptr ? ubBiasAdd : ubMul;
+            AscendC::LocalTensor<float>& castSrc = ptrBias != nullptr ? ubBiasAdd : ubMul;
 
             // FP32 -> D -> GM
             CastToDAndStore(castSrc, tileOffset, actualTileShape, layoutD, gmD);
@@ -263,9 +263,9 @@ public:
 
     // perToken
     CATLASS_DEVICE
-    void operator()(__gm__ ElementPerTokenScale *ptrPerTokenScale, LayoutPerTokenScale layoutPerTokenScale,
-                    __gm__ ElementBias *ptrBias, LayoutBias layoutBias, __gm__ ElementD *ptrIn, LayoutD layoutIn,
-                    __gm__ ElementD *ptrOut, LayoutD layoutOut, GemmCoord problemShape)
+    void operator()(__gm__ ElementPerTokenScale* ptrPerTokenScale, LayoutPerTokenScale layoutPerTokenScale,
+                    __gm__ ElementBias* ptrBias, LayoutBias layoutBias, __gm__ ElementD* ptrIn, LayoutD layoutIn,
+                    __gm__ ElementD* ptrOut, LayoutD layoutOut, GemmCoord problemShape)
     {
         // Calculate the offset of the current block
         MatrixCoord actualBlockShape = problemShape.GetCoordMN();
@@ -276,7 +276,7 @@ public:
         gmIn.SetGlobalBuffer(ptrIn);
         gmOut.SetGlobalBuffer(ptrOut);
         if (ptrBias != nullptr) {
-            gmBias.SetGlobalBuffer((__gm__ ElementBias *)ptrBias);
+            gmBias.SetGlobalBuffer((__gm__ ElementBias*)ptrBias);
         }
 
         auto ubTileStride = MakeCoord(static_cast<int64_t>(TileShape::COLUMN), 1L);
@@ -293,7 +293,7 @@ public:
             auto tileOffset = tileCoord * tileShape;
 
             // D(input): GM -> UB, reuse ubDList and C's event slots
-            auto &ubIn = ubDList[ubListId];
+            auto& ubIn = ubDList[ubListId];
             LayoutD layoutUbIn{actualTileShape, ubTileStride};
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
             copyGmToUbD(ubIn, gmIn[layoutIn.GetOffset(tileOffset)], layoutUbIn,
@@ -301,7 +301,7 @@ public:
             AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[ubListId]);
 
             // perToken scale: GM -> UB
-            auto &ubPerTokenScale = CopyPerTokenScaleToUb(tileOffset, actualTileShape, layoutPerTokenScale);
+            auto& ubPerTokenScale = CopyPerTokenScaleToUb(tileOffset, actualTileShape, layoutPerTokenScale);
 
             // bias: GM -> UB (optional)
             CopyBiasToUb(tileOffset, actualTileShape, layoutBias, ptrBias);
@@ -322,7 +322,7 @@ public:
 
             AddBias(ubPerTokenMul, ptrBias);
             // 选择要cast的源tensor：如果有bias，使用ubBiasAdd；否则直接使用ubPerTokenMul
-            AscendC::LocalTensor<float> &castSrc = ptrBias != nullptr ? ubBiasAdd : ubPerTokenMul;
+            AscendC::LocalTensor<float>& castSrc = ptrBias != nullptr ? ubBiasAdd : ubPerTokenMul;
 
             // FP32 -> D -> GM (writes back to ubIn = ubDList[ubListId])
             CastToDAndStore(castSrc, tileOffset, actualTileShape, layoutOut, gmOut);
@@ -335,10 +335,10 @@ private:
     // C 矩阵从 GM 拷贝到 UB（perChannel 场景共用），返回 ubC 供后续 Cast 使用
     // ubTileStride 类型为 Coord<2, int64_t>（即 LayoutC::Stride），与 MakeCoord(int64_t, 1L) 一致
     CATLASS_DEVICE
-    AscendC::LocalTensor<ElementC> &CopyCToUb(MatrixCoord tileOffset, MatrixCoord actualTileShape,
+    AscendC::LocalTensor<ElementC>& CopyCToUb(MatrixCoord tileOffset, MatrixCoord actualTileShape,
                                               Coord<2, int64_t> ubTileStride, LayoutC layoutC)
     {
-        auto &ubC = ubCList[ubListId];
+        auto& ubC = ubCList[ubListId];
         LayoutC layoutUbC{actualTileShape, ubTileStride};
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
         copyGmToUbC(ubC, gmC[layoutC.GetOffset(tileOffset)], layoutUbC, layoutC.GetTileLayout(actualTileShape));
@@ -348,11 +348,11 @@ private:
 
     // perChannel scale 从 GM 拷贝到 UB，返回 ubScale 供后续广播乘法使用
     CATLASS_DEVICE
-    AscendC::LocalTensor<ElementScale> &CopyScaleToUb(MatrixCoord tileOffset, MatrixCoord actualTileShape,
+    AscendC::LocalTensor<ElementScale>& CopyScaleToUb(MatrixCoord tileOffset, MatrixCoord actualTileShape,
                                                       LayoutScale layoutScale)
     {
         auto scaleTileShape = actualTileShape.template GetCoordByAxis<1>();
-        auto &ubScale = ubScaleList[ubListId];
+        auto& ubScale = ubScaleList[ubListId];
         auto layoutUbScale = LayoutScale::template MakeLayoutInUb<ElementScale>(scaleTileShape);
         copyGmToUbScale(ubScale, gmScale[layoutScale.GetOffset(tileOffset.template GetCoordByAxis<1>())], layoutUbScale,
                         layoutScale.GetTileLayout(scaleTileShape));
@@ -362,12 +362,12 @@ private:
 
     // perToken scale 从 GM 拷贝到 UB，返回 ubPerTokenScale 供后续广播乘法使用
     CATLASS_DEVICE
-    AscendC::LocalTensor<ElementPerTokenScale> &CopyPerTokenScaleToUb(MatrixCoord tileOffset,
+    AscendC::LocalTensor<ElementPerTokenScale>& CopyPerTokenScaleToUb(MatrixCoord tileOffset,
                                                                       MatrixCoord actualTileShape,
                                                                       LayoutPerTokenScale layoutPerTokenScale)
     {
         auto perTokenTileShape = actualTileShape.template GetCoordByAxis<0>();
-        auto &ubPerTokenScale = ubPerTokenScaleList[ubListId];
+        auto& ubPerTokenScale = ubPerTokenScaleList[ubListId];
         auto layoutUbPerTokenScale = LayoutScale::template MakeLayoutInUb<ElementPerTokenScale>(perTokenTileShape);
         copyGmToUbPerTokenScale(ubPerTokenScale,
                                 gmPerTokenScale[layoutPerTokenScale.GetOffset(tileOffset.template GetCoordByAxis<0>())],
@@ -379,14 +379,14 @@ private:
     // bias 从 GM 拷贝到 UB；half/bfloat16 时同时转成 FP32。ptrBias 为 nullptr 时直接返回。
     CATLASS_DEVICE
     void CopyBiasToUb(MatrixCoord tileOffset, MatrixCoord actualTileShape, LayoutBias layoutBias,
-                      __gm__ ElementBias *ptrBias)
+                      __gm__ ElementBias* ptrBias)
     {
         if (ptrBias == nullptr) {
             return;
         }
         auto biasTileOffset = tileOffset.template GetCoordByAxis<1>();
         auto biasTileShape = actualTileShape.template GetCoordByAxis<1>();
-        auto &ubBias = ubBiasList[ubListId];
+        auto& ubBias = ubBiasList[ubListId];
         auto layoutUbBias = LayoutBias::template MakeLayoutInUb<ElementBias>(biasTileShape);
 
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbBiasVMTE2List[ubListId]);
@@ -406,7 +406,7 @@ private:
     // half/bfloat16 使用预转好的 ubBiasFp32；其它类型从 ubBias 读取（含事件同步）。
     // 末尾保证 PipeBarrier<PIPE_V>。
     CATLASS_DEVICE
-    void AddBias(AscendC::LocalTensor<float> &src, __gm__ ElementBias *ptrBias)
+    void AddBias(AscendC::LocalTensor<float>& src, __gm__ ElementBias* ptrBias)
     {
         if (ptrBias == nullptr) {
             return;
@@ -415,7 +415,7 @@ private:
                       AscendC::IsSameType<ElementBias, half>::value) {
             tileRowBroadcastAdd(ubBiasAdd, src, ubBiasFp32);
         } else {
-            auto &ubBias = ubBiasList[ubListId];
+            auto& ubBias = ubBiasList[ubListId];
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbBiasMTE2VList[ubListId]);
             tileRowBroadcastAdd(ubBiasAdd, src, ubBias);
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbBiasVMTE2List[ubListId]);
@@ -425,10 +425,10 @@ private:
 
     // 将 FP32 结果 cast 到 D 并拷贝回 GM。op1/op2 传 gmD，perToken 场景传 gmOut。
     CATLASS_DEVICE
-    void CastToDAndStore(AscendC::LocalTensor<float> &castSrc, MatrixCoord tileOffset, MatrixCoord actualTileShape,
-                         LayoutD layoutD, AscendC::GlobalTensor<ElementD> &gmDst)
+    void CastToDAndStore(AscendC::LocalTensor<float>& castSrc, MatrixCoord tileOffset, MatrixCoord actualTileShape,
+                         LayoutD layoutD, AscendC::GlobalTensor<ElementD>& gmDst)
     {
-        auto &ubD = ubDList[ubListId];
+        auto& ubD = ubDList[ubListId];
         auto ubTileStride = MakeCoord(static_cast<int64_t>(TileShape::COLUMN), 1L);
         LayoutD layoutUbD{actualTileShape, ubTileStride};
 

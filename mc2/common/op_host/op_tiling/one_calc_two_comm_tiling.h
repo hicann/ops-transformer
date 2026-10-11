@@ -46,7 +46,7 @@ public:
     uint64_t minProductEC = ONE;
 
     // Constructor
-    explicit OneCalcTwoCommBase(const mc2tiling::TilingArgs &args, uint64_t inputEpDim, uint64_t inputTpDim,
+    explicit OneCalcTwoCommBase(const mc2tiling::TilingArgs& args, uint64_t inputEpDim, uint64_t inputTpDim,
                                 uint64_t batchSize, SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_93)
         : bmmPerf(args, Ops::Base::DAV_2201, socVersion_2201),
           epCommPerf(inputEpDim, KernelType::ALL_TO_ALL, Ops::Base::DAV_2201, socVersion_2201),
@@ -64,8 +64,8 @@ public:
     };
 
     // TilingMethods
-    void ECutInit(CutResult &eCut);
-    void EAxisCut(uint64_t tmpCnt, uint64_t eSize, CutResult &eCut) const;
+    void ECutInit(CutResult& eCut);
+    void EAxisCut(uint64_t tmpCnt, uint64_t eSize, CutResult& eCut) const;
     void MaxTileCntCheckForE();
 
     // Wrapper function
@@ -89,7 +89,7 @@ public:
     uint64_t maxNonLocalCnt = 1; // Try cut non-local when maxNonLocalCut > 1
 
     // Constructor
-    explicit OneCalcTwoCommShardHBase(const mc2tiling::TilingArgs &args, uint64_t inputEpDim, uint64_t inputTpDim,
+    explicit OneCalcTwoCommShardHBase(const mc2tiling::TilingArgs& args, uint64_t inputEpDim, uint64_t inputTpDim,
                                       uint64_t batchSize, SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_93)
         : bmmPerf(args, Ops::Base::DAV_2201, socVersion_2201),
           epCommPerf(inputEpDim, KernelType::ALL_TO_ALL, Ops::Base::DAV_2201, socVersion_2201),
@@ -109,15 +109,15 @@ public:
     };
 
     // TilingMethods
-    void InitCutResult(CutResult &tmpCut, uint64_t totalLen) const;
-    void CutAxisE(CutResult &cutRes, uint64_t maxCutNum, uint64_t minLen, double unbalanceRatio) const;
+    void InitCutResult(CutResult& tmpCut, uint64_t totalLen) const;
+    void CutAxisE(CutResult& cutRes, uint64_t maxCutNum, uint64_t minLen, double unbalanceRatio) const;
     void CutAxisC(uint64_t maxCutNum, uint64_t minLen, double unbalanceRatio);
     void AsignMaxCutNumForBranches(double totalBMMTime, double totalCommTime);
     virtual bool SetShortTilePositionFlag([[maybe_unused]] double totalBMMTime, [[maybe_unused]] double totalCommTime)
     {
         return false;
     };
-    void TrimCutResult(CutResult &tmpCut, bool setShortFlag) const;
+    void TrimCutResult(CutResult& tmpCut, bool setShortFlag) const;
 
     // wrapper function
     void GetTiling();

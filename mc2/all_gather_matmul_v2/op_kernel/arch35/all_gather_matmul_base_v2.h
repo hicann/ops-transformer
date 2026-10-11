@@ -46,9 +46,9 @@ struct HcclTypeSelector<HCCL_COMM_MODE_AICPU> {
 template <typename AType, typename CType, Mc2CoreType CoreType, uint8_t ServerMode = HCCL_COMM_MODE_CCU>
 class AllGatherMatmulBase {
 public:
-    __aicore__ inline AllGatherMatmulBase(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs,
-                                          Mc2Tiling::AllGatherMatmulTilingDataFp8 *tilingData, GM_ADDR contextGM,
-                                          TPipe *tPipe)
+    __aicore__ inline AllGatherMatmulBase(MC2GmAddrs* addrs, QuantGmAddrs* quantAddrs,
+                                          Mc2Tiling::AllGatherMatmulTilingDataFp8* tilingData, GM_ADDR contextGM,
+                                          TPipe* tPipe)
         : addrs_(addrs),
           quantAddrs_(quantAddrs),
           tPipe_(tPipe)
@@ -59,7 +59,7 @@ public:
         debugMode_ = tilingData->debugMode;
         context_ = contextGM;
     }
-    __aicore__ inline void Init(__gm__ void *mc2InitTiling, __gm__ void *mc2CcTiling)
+    __aicore__ inline void Init(__gm__ void* mc2InitTiling, __gm__ void* mc2CcTiling)
     {
         hccl_.InitV2(context_, &(tilingData_->mc2InitTiling));
         hccl_.SetCcTilingV2(offsetof(Mc2Tiling::AllGatherMatmulTilingDataFp8, mc2CcTiling));
@@ -152,9 +152,9 @@ protected:
         }
     }
 
-    MC2GmAddrs *addrs_ = nullptr;
-    QuantGmAddrs *quantAddrs_ = nullptr;
-    Mc2Tiling::RCSTiling *paramInTiling_ = nullptr;
+    MC2GmAddrs* addrs_ = nullptr;
+    QuantGmAddrs* quantAddrs_ = nullptr;
+    Mc2Tiling::RCSTiling* paramInTiling_ = nullptr;
     Mc2Tiling::MC2TileInfo localInfo_;
     Mc2Tiling::MC2TileInfo tileInfo_;
     Mc2Tiling::MC2TileInfo tailInfo_;
@@ -168,13 +168,13 @@ protected:
     uint64_t oneRankBlockSizeCnt_{0U};
     uint64_t oneRankBlockSizeOffset_{0U};
     uint8_t debugMode_;
-    TPipe *tPipe_;
+    TPipe* tPipe_;
     GM_ADDR gatherX1Addr_;
     GM_ADDR gatherScale1Addr_;
     GM_ADDR gatherScaleAddr_;
     AscendC::HcclHandle hcclHandleIdList[MAX_HANDLE_WITH_SCALE1]; /* hccl handle */
     uint32_t batchWeight_[MAX_RANK_DIM] = {0};
-    Mc2Tiling::AllGatherMatmulTilingDataFp8 *tilingData_;
+    Mc2Tiling::AllGatherMatmulTilingDataFp8* tilingData_;
 
 private:
     __aicore__ inline void UpdateNotifyFlag()

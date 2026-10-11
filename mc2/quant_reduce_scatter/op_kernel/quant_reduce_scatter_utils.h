@@ -77,7 +77,7 @@ static constexpr AscendC::Reg::CastTrait castTrait = {AscendC::Reg::RegLayout::Z
                                                       AscendC::RoundMode::CAST_NONE};
 
 // fp8_e8m0_t数据类型到bf16_t数据类型转换
-static __aicore__ inline void CastVf(__local_mem__ bfloat16_t *dstPtr, __local_mem__ fp8_e8m0_t *srcPtr, uint32_t count)
+static __aicore__ inline void CastVf(__local_mem__ bfloat16_t* dstPtr, __local_mem__ fp8_e8m0_t* srcPtr, uint32_t count)
 {
     AscendC::Reg::RegTensor<fp8_e8m0_t> srcReg;
     AscendC::Reg::RegTensor<fp8_e8m0_t> srcZeroReg;

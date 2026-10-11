@@ -20,13 +20,13 @@
 using namespace ge;
 
 namespace optiling {
-bool MoeDistributeDispatchTilingHelper::CheckScaleTensorDim(const gert::TilingContext *context, const char *nodeName,
+bool MoeDistributeDispatchTilingHelper::CheckScaleTensorDim(const gert::TilingContext* context, const char* nodeName,
                                                             const bool isScales, const uint32_t quantMode,
                                                             const uint32_t scalesIndex)
 {
     // 如果scales不为空进行shape维度检查
     if (isScales) {
-        const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(scalesIndex);
+        const gert::StorageShape* scalesStorageShape = context->GetOptionalInputShape(scalesIndex);
         OP_TILING_CHECK(scalesStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "scalesShape"),
                         return false);
         if (quantMode != static_cast<uint32_t>(QuantModeA5::STATIC_QUANT)) {
@@ -62,11 +62,11 @@ bool MoeDistributeDispatchTilingHelper::CheckScaleTensorDim(const gert::TilingCo
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDim(const gert::TilingContext *context,
-                                                                   const char *nodeName, const bool isScales,
+inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDim(const gert::TilingContext* context,
+                                                                   const char* nodeName, const bool isScales,
                                                                    const uint32_t quantMode)
 {
-    const gert::StorageShape *xStorageShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* xStorageShape = context->GetInputShape(X_INDEX);
     OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xShape"), return false);
     OP_TILING_CHECK(xStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
@@ -76,7 +76,7 @@ inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDim(const gert::T
     OP_LOGD(nodeName, "x dim0 = %ld", xStorageShape->GetStorageShape().GetDim(0));
     OP_LOGD(nodeName, "x dim1 = %ld", xStorageShape->GetStorageShape().GetDim(1));
 
-    const gert::StorageShape *expertIdStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
+    const gert::StorageShape* expertIdStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertIdShape"),
                     return false);
     OP_TILING_CHECK(
@@ -93,10 +93,10 @@ inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDim(const gert::T
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckDynamicScalesDim(const gert::TilingContext *context,
-                                                                     const char *nodeName, const uint32_t quantMode)
+inline bool MoeDistributeDispatchTilingHelper::CheckDynamicScalesDim(const gert::TilingContext* context,
+                                                                     const char* nodeName, const uint32_t quantMode)
 {
-    const gert::StorageShape *dynamicScalesStorageShape = context->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
+    const gert::StorageShape* dynamicScalesStorageShape = context->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
     OP_TILING_CHECK(dynamicScalesStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "dynamicScalesShape"),
                     return false);
     if ((quantMode == static_cast<uint32_t>(QuantModeA5::PERTOKEN_DYNAMIC_QUANT))) {
@@ -122,10 +122,10 @@ inline bool MoeDistributeDispatchTilingHelper::CheckDynamicScalesDim(const gert:
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckOutputTensorDim(gert::TilingContext *context, const char *nodeName,
+inline bool MoeDistributeDispatchTilingHelper::CheckOutputTensorDim(gert::TilingContext* context, const char* nodeName,
                                                                     const uint32_t quantMode)
 {
-    const gert::StorageShape *expandXStorageShape = context->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
+    const gert::StorageShape* expandXStorageShape = context->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
     OP_TILING_CHECK(expandXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandXShape"), return false);
     OP_TILING_CHECK(
         expandXStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
@@ -145,7 +145,7 @@ inline bool MoeDistributeDispatchTilingHelper::CheckOutputTensorDim(gert::Tiling
         }
     }
 
-    const gert::StorageShape *expandIdxStorageShape = context->GetOutputShape(OUTPUT_EXPAND_IDX_INDEX);
+    const gert::StorageShape* expandIdxStorageShape = context->GetOutputShape(OUTPUT_EXPAND_IDX_INDEX);
     OP_TILING_CHECK(expandIdxStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandIdxShape"),
                     return false);
     OP_TILING_CHECK(
@@ -156,7 +156,7 @@ inline bool MoeDistributeDispatchTilingHelper::CheckOutputTensorDim(gert::Tiling
         return false);
     OP_LOGD(nodeName, "expandIdx dim0 = %ld", expandIdxStorageShape->GetStorageShape().GetDim(0));
 
-    const gert::StorageShape *expertTokenNumsStorageShape = context->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    const gert::StorageShape* expertTokenNumsStorageShape = context->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
     OP_TILING_CHECK(expertTokenNumsStorageShape == nullptr,
                     OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertTokenNumsShape"), return false);
     OP_TILING_CHECK(expertTokenNumsStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
@@ -169,10 +169,10 @@ inline bool MoeDistributeDispatchTilingHelper::CheckOutputTensorDim(gert::Tiling
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckEpTpRecvTensorDim(const gert::TilingContext *context,
-                                                                      const char *nodeName)
+inline bool MoeDistributeDispatchTilingHelper::CheckEpTpRecvTensorDim(const gert::TilingContext* context,
+                                                                      const char* nodeName)
 {
-    const gert::StorageShape *epRecvCountStorageShape = context->GetOutputShape(OUTPUT_EP_RECV_COUNTS_INDEX);
+    const gert::StorageShape* epRecvCountStorageShape = context->GetOutputShape(OUTPUT_EP_RECV_COUNTS_INDEX);
     OP_TILING_CHECK(epRecvCountStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "epRecvCountShape"),
                     return false);
     OP_TILING_CHECK(epRecvCountStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
@@ -185,7 +185,7 @@ inline bool MoeDistributeDispatchTilingHelper::CheckEpTpRecvTensorDim(const gert
     return true;
 }
 
-bool MoeDistributeDispatchTilingHelper::CheckTensorDim(gert::TilingContext *context, const char *nodeName,
+bool MoeDistributeDispatchTilingHelper::CheckTensorDim(gert::TilingContext* context, const char* nodeName,
                                                        const bool isScales, const uint32_t quantMode,
                                                        const uint32_t opVersion)
 {
@@ -196,7 +196,7 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDim(gert::TilingContext *cont
 
     // A3/A5 v1接口的x_active_mask不支持传入
     if (opVersion == OP_VERSION_1) {
-        const gert::StorageShape *xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
+        const gert::StorageShape* xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
         if (xActiveMaskStorageShape != nullptr) {
             OP_LOGE_FOR_INVALID_VALUE(nodeName, "x_active_mask", "provided",
                                       "only None is supported on this interface version");
@@ -211,8 +211,8 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDim(gert::TilingContext *cont
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckCommonOutputTensorDataType(const gert::TilingContext *context,
-                                                                               const char *nodeName)
+inline bool MoeDistributeDispatchTilingHelper::CheckCommonOutputTensorDataType(const gert::TilingContext* context,
+                                                                               const char* nodeName)
 {
     auto expandIdxDesc = context->GetOutputDesc(OUTPUT_EXPAND_IDX_INDEX);
     if (expandIdxDesc == nullptr) {
@@ -250,8 +250,8 @@ inline bool MoeDistributeDispatchTilingHelper::CheckCommonOutputTensorDataType(c
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDataType(const gert::TilingContext *context,
-                                                                        const char *nodeName, const bool isScales)
+inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDataType(const gert::TilingContext* context,
+                                                                        const char* nodeName, const bool isScales)
 {
     auto xDesc = context->GetInputDesc(X_INDEX);
     if (xDesc == nullptr) {
@@ -290,7 +290,7 @@ inline bool MoeDistributeDispatchTilingHelper::CheckInputTensorDataType(const ge
     return true;
 }
 
-bool MoeDistributeDispatchTilingHelper::CheckTensorDataType(gert::TilingContext *context, const char *nodeName,
+bool MoeDistributeDispatchTilingHelper::CheckTensorDataType(gert::TilingContext* context, const char* nodeName,
                                                             const bool isScales, const uint32_t quantMode)
 {
     auto xDesc = context->GetInputDesc(X_INDEX);
@@ -329,8 +329,8 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDataType(gert::TilingContext 
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeNoScales(const gert::TilingContext *context,
-                                                                           const char *nodeName, const bool isScales)
+inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeNoScales(const gert::TilingContext* context,
+                                                                           const char* nodeName, const bool isScales)
 {
     auto xDesc = context->GetInputDesc(X_INDEX);
     OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"), return false);
@@ -377,8 +377,8 @@ inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeNoScales(const
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeStaticOrDynamic(const gert::TilingContext *context,
-                                                                                  const char *nodeName, bool isScales)
+inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeStaticOrDynamic(const gert::TilingContext* context,
+                                                                                  const char* nodeName, bool isScales)
 {
     auto xDesc = context->GetInputDesc(X_INDEX);
     OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"), return false);
@@ -406,8 +406,8 @@ inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeStaticOrDynami
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeMxfp8(const gert::TilingContext *context,
-                                                                        const char *nodeName)
+inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeMxfp8(const gert::TilingContext* context,
+                                                                        const char* nodeName)
 {
     auto xDesc = context->GetInputDesc(X_INDEX);
     OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"), return false);
@@ -427,8 +427,8 @@ inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeMxfp8(const ge
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckDistinctTensorDataType(gert::TilingContext *context,
-                                                                           const char *nodeName, const bool isScales,
+inline bool MoeDistributeDispatchTilingHelper::CheckDistinctTensorDataType(gert::TilingContext* context,
+                                                                           const char* nodeName, const bool isScales,
                                                                            const uint32_t quantMode)
 {
     if (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
@@ -449,7 +449,7 @@ inline bool MoeDistributeDispatchTilingHelper::CheckDistinctTensorDataType(gert:
     return true;
 }
 
-bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeA5(gert::TilingContext *context, const char *nodeName,
+bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeA5(gert::TilingContext* context, const char* nodeName,
                                                               const bool isScales, const uint32_t quantMode)
 {
     auto expertIdDesc = context->GetInputDesc(EXPERT_IDS_INDEX);
@@ -471,7 +471,7 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeA5(gert::TilingContex
     return true;
 }
 
-bool MoeDistributeDispatchTilingHelper::CheckTensorFormat(const gert::TilingContext *context, const char *nodeName,
+bool MoeDistributeDispatchTilingHelper::CheckTensorFormat(const gert::TilingContext* context, const char* nodeName,
                                                           const bool isScales, const uint32_t quantMode)
 {
     auto xDesc = context->GetInputDesc(X_INDEX);
@@ -576,8 +576,8 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorFormat(const gert::TilingCont
     return true;
 }
 
-ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispatch(gert::TilingContext *context,
-                                                                                    const char *nodeName,
+ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispatch(gert::TilingContext* context,
+                                                                                    const char* nodeName,
                                                                                     const bool isScales,
                                                                                     const uint32_t quantMode)
 {
@@ -591,13 +591,13 @@ ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispa
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispatchA5(gert::TilingContext *context,
+ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispatchA5(gert::TilingContext* context,
                                                                                       const bool isScales,
                                                                                       const uint32_t quantMode,
                                                                                       const bool isTokenMask)
 {
     // nodeName已在调用处判空
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     auto opVersion = OpVersionManager::GetInstance().GetVersion();
     OP_TILING_CHECK(!CheckTensorDim(context, nodeName, isScales, quantMode, opVersion),
                     OP_LOGE_WITH_INVALID_INPUT(nodeName, "params shape"), return ge::GRAPH_FAILED);
@@ -612,10 +612,10 @@ ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispa
     return ge::GRAPH_SUCCESS;
 }
 
-bool MoeDistributeDispatchTilingHelper::CheckTokenMask(const gert::TilingContext *context, const char *nodeName)
+bool MoeDistributeDispatchTilingHelper::CheckTokenMask(const gert::TilingContext* context, const char* nodeName)
 {
     // Check Dim/DType/Format
-    const gert::StorageShape *xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
+    const gert::StorageShape* xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
     if (xActiveMaskStorageShape == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(nodeName, "xActiveMaskStorageShape");
         return false;

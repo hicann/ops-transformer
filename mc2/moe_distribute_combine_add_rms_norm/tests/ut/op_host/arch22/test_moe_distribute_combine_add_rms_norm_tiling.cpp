@@ -58,16 +58,16 @@ protected:
     }
 };
 
-std::unordered_map<string, std::function<void(TilingParams &tilingParams, const string &valueStr)>>
+std::unordered_map<string, std::function<void(TilingParams& tilingParams, const string& valueStr)>>
     g_tilingParamsStrHandlers = {
-        {"BSK", [](TilingParams &tilingParams, const string &valueStr) { tilingParams.BSK = std::stoi(valueStr); }}};
+        {"BSK", [](TilingParams& tilingParams, const string& valueStr) { tilingParams.BSK = std::stoi(valueStr); }}};
 
 TEST_P(MoeDistributeCombineAddRmsNormArch22TilingTest, CommonTest)
 {
     auto testParam = GetParam();
     auto tilingParams = TilingParams{};
 
-    for (auto &kv : testParam.tilingParamsStrPair) {
+    for (auto& kv : testParam.tilingParamsStrPair) {
         if (g_tilingParamsStrHandlers.count(kv.first) != 0) {
             g_tilingParamsStrHandlers[kv.first](tilingParams, kv.second);
         }
@@ -133,7 +133,7 @@ static TestParam g_testParams[] = {{"Test_sample", {}, {}, ge::GRAPH_SUCCESS}};
 INSTANTIATE_TEST_SUITE_P(
     MoeDistributeCombineAddRmsNormArch22TilingTest, MoeDistributeCombineAddRmsNormArch22TilingTest,
     testing::ValuesIn(g_testParams),
-    [](const testing::TestParamInfo<MoeDistributeCombineAddRmsNormArch22TilingTest::ParamType> &info) {
+    [](const testing::TestParamInfo<MoeDistributeCombineAddRmsNormArch22TilingTest::ParamType>& info) {
         return info.param.testName;
     });
 

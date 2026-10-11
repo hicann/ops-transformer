@@ -22,7 +22,7 @@ using Ops::Transformer::OpTiling::TilingRegistryNew;
 
 namespace MC2Tiling {
 
-static ge::graphStatus MatmulAlltoAllTilingFunc(gert::TilingContext *context)
+static ge::graphStatus MatmulAlltoAllTilingFunc(gert::TilingContext* context)
 {
     auto platformInfo = context->GetPlatformInfo();
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
@@ -33,7 +33,7 @@ static ge::graphStatus MatmulAlltoAllTilingFunc(gert::TilingContext *context)
     return TilingRegistryNew::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingParseForMatmulAlltoAll(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForMatmulAlltoAll(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

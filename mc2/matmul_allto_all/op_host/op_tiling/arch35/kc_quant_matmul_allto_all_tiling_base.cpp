@@ -69,8 +69,8 @@ ge::graphStatus KcQuantMatmulAllToAllTilingBase::CheckOpInputInfo()
  * @param opName: 算子名称
  * @return
  */
-ge::graphStatus KcQuantMatmulAllToAllTilingBase::CheckKcTensorFormat(const gert::TilingContext *context,
-                                                                     const char *opName)
+ge::graphStatus KcQuantMatmulAllToAllTilingBase::CheckKcTensorFormat(const gert::TilingContext* context,
+                                                                     const char* opName)
 {
     OP_TILING_CHECK(MatmulAlltoAllTilingUtil::CheckTensorFormat(context_, opName_) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Tiling check format failed."), return ge::GRAPH_FAILED);
@@ -208,26 +208,26 @@ const gert::Shape KcQuantMatmulAlltoAllHelper::GetX2Shape(const size_t index)
                         static_cast<int64_t>(tilingProcesser_.contextInfo.args_.nValue)});
 }
 
-const gert::Shape &KcQuantMatmulAlltoAllHelper::GetScaleShape(const size_t index)
+const gert::Shape& KcQuantMatmulAlltoAllHelper::GetScaleShape(const size_t index)
 {
     (void)index;
     return context_->GetOptionalInputShape(static_cast<size_t>(INPUT_X2_SCALE_INDEX))->GetStorageShape();
 }
 
-const gert::StorageShape *KcQuantMatmulAlltoAllHelper::GetOffsetShape(const size_t index)
+const gert::StorageShape* KcQuantMatmulAlltoAllHelper::GetOffsetShape(const size_t index)
 {
     (void)index;
     return nullptr;
 }
 
-const gert::StorageShape *KcQuantMatmulAlltoAllHelper::GetPertokenShape(const size_t index)
+const gert::StorageShape* KcQuantMatmulAlltoAllHelper::GetPertokenShape(const size_t index)
 {
     (void)index;
     kcQuantStorageShape = gert::StorageShape({static_cast<int64_t>(mmLen)}, {static_cast<int64_t>(mmLen)});
     return &kcQuantStorageShape;
 }
 
-const gert::StorageShape *KcQuantMatmulAlltoAllHelper::GetBiasShape(const size_t index)
+const gert::StorageShape* KcQuantMatmulAlltoAllHelper::GetBiasShape(const size_t index)
 {
     (void)index;
     return context_->GetOptionalInputShape(static_cast<size_t>(INPUT_BIAS_INDEX));
@@ -236,7 +236,7 @@ const gert::StorageShape *KcQuantMatmulAlltoAllHelper::GetBiasShape(const size_t
 ge::graphStatus KcQuantMatmulAlltoAllHelper::GetShapeAttrsInfo()
 {
     OP_LOGD(tilingProcesser_.opName_, "Start assemble input params for matmul tiling");
-    auto &&tilingArgs = tilingProcesser_.contextInfo.args_;
+    auto&& tilingArgs = tilingProcesser_.contextInfo.args_;
     inputParams_.opName = tilingProcesser_.opName_;
     inputParams_.transA = false;
     inputParams_.transB = tilingArgs.isBTrans;
@@ -267,7 +267,7 @@ ge::graphStatus KcQuantMatmulAlltoAllHelper::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-void KcQuantMatmulAlltoAllHelper::PrintTilingInputParam(Mc2QuantBatchMatmulInfo &quantMatmulInfo)
+void KcQuantMatmulAlltoAllHelper::PrintTilingInputParam(Mc2QuantBatchMatmulInfo& quantMatmulInfo)
 {
     OP_LOGD(tilingProcesser_.opName_, "mSize_ %ld kSize_ %ld nSize_ %ld libApiWorkSpaceSize %u", quantMatmulInfo.mSize,
             quantMatmulInfo.kSize, quantMatmulInfo.nSize, quantMatmulInfo.libApiWorkSpaceSize);
@@ -306,8 +306,8 @@ ge::graphStatus KcQuantMatmulAlltoAllHelper::PostTiling()
  * @param context
  */
 KcQuantMatmulAlltoAllHelper::KcQuantMatmulAlltoAllHelper(
-    KcQuantMatmulAllToAllTilingBase &kcQuantMatmulAllToAllTilingBase,
-    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &out, uint64_t &mmMvalueLen)
+    KcQuantMatmulAllToAllTilingBase& kcQuantMatmulAllToAllTilingBase,
+    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& out, uint64_t& mmMvalueLen)
     : Mc2AdaptiveSlidingWindowTiling(kcQuantMatmulAllToAllTilingBase.context_, &out),
       tilingProcesser_(kcQuantMatmulAllToAllTilingBase),
       mmLen(mmMvalueLen)
@@ -320,7 +320,7 @@ KcQuantMatmulAlltoAllHelper::KcQuantMatmulAlltoAllHelper(
  * @param tiling
  */
 void KcQuantMatmulAllToAllTilingBase::PrintKcQuantMMV3TilingData(
-    const std::string &opName, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &tiling)
+    const std::string& opName, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& tiling)
 {
     PrintTCubeTilingData(opName, tiling.matmulTiling);
     PrintExtendMatmulTiling(opName, tiling);
@@ -332,8 +332,8 @@ void KcQuantMatmulAllToAllTilingBase::PrintKcQuantMMV3TilingData(
  * @param opName
  * @param tiling
  */
-void KcQuantMatmulAllToAllTilingBase::PrintExtendMatmulTiling(const std::string &opName,
-                                                              DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &tiling)
+void KcQuantMatmulAllToAllTilingBase::PrintExtendMatmulTiling(const std::string& opName,
+                                                              DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& tiling)
 {
     OP_LOGD(opName, "QuantBmmV3Params.batchA=%u.", tiling.params.batchA);
     OP_LOGD(opName, "QuantBmmV3Params.batchA1=%u.", tiling.params.batchA1);
@@ -383,8 +383,8 @@ void KcQuantMatmulAllToAllTilingBase::PrintExtendMatmulTiling(const std::string 
  * @param opName
  * @param tilingInfo
  */
-void KcQuantMatmulAllToAllTilingBase::PrintKcQuantMatmulAlltoAllTilingInfo(const std::string &opName,
-                                                                           MatmulAlltoAllTilingInfo &tilingInfo)
+void KcQuantMatmulAllToAllTilingBase::PrintKcQuantMatmulAlltoAllTilingInfo(const std::string& opName,
+                                                                           MatmulAlltoAllTilingInfo& tilingInfo)
 {
     OP_LOGD(opName, "tilingInfo.rankDim: %u", tilingInfo.rankDim);
     OP_LOGD(opName, "tilingInfo.tileM: %u", tilingInfo.tileM);
@@ -407,7 +407,7 @@ void KcQuantMatmulAllToAllTilingBase::PrintKcQuantMatmulAlltoAllTilingInfo(const
  *
  * @param outTilingData tilingData参数
  */
-void KcQuantMatmulAllToAllTilingBase::PrintKcQuantMatmulAlltoAllTilingData(QuantMatmulAlltoAllTilingData &outTilingData)
+void KcQuantMatmulAllToAllTilingBase::PrintKcQuantMatmulAlltoAllTilingData(QuantMatmulAlltoAllTilingData& outTilingData)
 {
     PrintKcQuantMatmulAlltoAllTilingInfo(opName_, outTilingData.quantMatmulAlltoAllTilingInfo);
     PrintKcQuantMMV3TilingData(opName_, outTilingData.mc2QuantBmmV3TileTilingData);
@@ -427,7 +427,7 @@ ge::graphStatus KcQuantMatmulAllToAllTilingBase::PostTiling()
 {
     context_->SetScheduleMode(1);
     SetTilingInfo(localTilingData_.quantMatmulAlltoAllTilingInfo);
-    QuantMatmulAlltoAllTilingData *outTilingData = context_->GetTilingData<QuantMatmulAlltoAllTilingData>();
+    QuantMatmulAlltoAllTilingData* outTilingData = context_->GetTilingData<QuantMatmulAlltoAllTilingData>();
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
     OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "failed to get tiling data from context"),
                     return ge::GRAPH_FAILED);
@@ -453,7 +453,7 @@ ge::graphStatus KcQuantMatmulAllToAllTilingBase::PostTiling()
  *
  * @param tilingInfo 目标结构体
  */
-void KcQuantMatmulAllToAllTilingBase::SetTilingInfo(MatmulAlltoAllTilingInfo &tilingInfo) const
+void KcQuantMatmulAllToAllTilingBase::SetTilingInfo(MatmulAlltoAllTilingInfo& tilingInfo) const
 {
     // 基本字段拷贝
     tilingInfo.rankM = contextInfo.args_.mValue;
@@ -521,7 +521,7 @@ CutResult KcQuantMatmulAllToAllTilingBase::GetTilingResult()
  *
  * @param context
  */
-KcQuantMatmulAllToAllTilingBase::KcQuantMatmulAllToAllTilingBase(gert::TilingContext *context)
+KcQuantMatmulAllToAllTilingBase::KcQuantMatmulAllToAllTilingBase(gert::TilingContext* context)
     : MatmulAllToAllTilingBase(context)
 {}
 

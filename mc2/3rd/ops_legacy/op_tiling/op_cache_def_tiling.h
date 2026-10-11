@@ -237,7 +237,7 @@ struct QuantBatchMatmulRunParas {
     uint64_t groupSizeM = 0UL;
     uint64_t groupSizeK = 0UL;
     uint64_t groupSizeN = 0UL;
-    const char *opName = nullptr;
+    const char* opName = nullptr;
     ge::Format aFormat = ge::FORMAT_ND;
     ge::Format bFormat = ge::FORMAT_ND;
     ge::Format cFormat = ge::FORMAT_ND;
@@ -261,7 +261,7 @@ struct WeightQuantBatchMatmulCacheTilingParas {
     bool nz = false;
     uint64_t aicNum = 0;
 
-    bool operator<(const WeightQuantBatchMatmulCacheTilingParas &right) const
+    bool operator<(const WeightQuantBatchMatmulCacheTilingParas& right) const
     {
         return memcmp(this, &right, sizeof(WeightQuantBatchMatmulCacheTilingParas)) < 0;
     }

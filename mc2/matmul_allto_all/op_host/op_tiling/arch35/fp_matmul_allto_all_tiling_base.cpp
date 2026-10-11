@@ -105,7 +105,7 @@ ge::graphStatus FpMatmulAllToAllTilingBase::DoOpTiling()
 ge::graphStatus FpMatmulAllToAllTilingBase::DoMMTiling()
 {
     // 非空校验已在GetPlatformInfo校验过
-    fe::PlatFormInfos *platformInfo = context_->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context_->GetPlatformInfo();
     if (mc2_matmul_v3_advanced::InitCompileInfo(platformInfo, &compileInfo_) != ge::GRAPH_SUCCESS) {
         OP_LOGE(opName_, "Fail to Init CompileInfo!");
         return ge::GRAPH_FAILED;
@@ -125,15 +125,15 @@ ge::graphStatus FpMatmulAllToAllTilingBase::DoMMTiling()
 
     // tile tiling, 对于matmulAlltoAll,mvalue就是切块大小
     mmV3Args_.mValue = inferredInfo.tileM;
-    Mc2MatmulHelper::Mc2MatmulTilingCfg tileTilingCfg(static_cast<const void *>(&compileInfo_),
-                                                      static_cast<const void *>(&mmV3Args_));
+    Mc2MatmulHelper::Mc2MatmulTilingCfg tileTilingCfg(static_cast<const void*>(&compileInfo_),
+                                                      static_cast<const void*>(&mmV3Args_));
     MC2_CHECK_LOG_RET(opName_, DoMatmulV3Tiling(tileTilingCfg, registerCfg, localTilingData_.mc2MmV3TileTilingData));
 
     if (inferredInfo.tailM > 0) {
         //  tail  tiling
         mmV3Args_.mValue = inferredInfo.tailM;
-        Mc2MatmulHelper::Mc2MatmulTilingCfg tailTilingCfg(static_cast<const void *>(&compileInfo_),
-                                                          static_cast<const void *>(&mmV3Args_));
+        Mc2MatmulHelper::Mc2MatmulTilingCfg tailTilingCfg(static_cast<const void*>(&compileInfo_),
+                                                          static_cast<const void*>(&mmV3Args_));
         MC2_CHECK_LOG_RET(opName_,
                           DoMatmulV3Tiling(tailTilingCfg, registerCfg, localTilingData_.mc2MmV3TailTilingData));
     }
@@ -149,9 +149,9 @@ ge::graphStatus FpMatmulAllToAllTilingBase::DoMMTiling()
  * @param tilingData 对应首块或尾块的tilingData
  * @return ge::graphStatus
  */
-ge::graphStatus FpMatmulAllToAllTilingBase::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg &tilingCfg,
-                                                             Mc2MMRegisterCfg &registerCfg,
-                                                             Mc2MatMulV3TilingData &tilingData)
+ge::graphStatus FpMatmulAllToAllTilingBase::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg& tilingCfg,
+                                                             Mc2MMRegisterCfg& registerCfg,
+                                                             Mc2MatMulV3TilingData& tilingData)
 {
     tilingCfg.SetRankDim(contextInfo.args_.rankDim);
     tilingCfg.SetMatMulV3TilingData(tilingData);
@@ -210,7 +210,7 @@ ge::graphStatus FpMatmulAllToAllTilingBase::SetHcclTiling()
  * @param opName
  * @param tiling
  */
-void FpMatmulAllToAllTilingBase::PrintMMV3TilingData(const std::string &opName, Mc2MatMulV3TilingData &tiling)
+void FpMatmulAllToAllTilingBase::PrintMMV3TilingData(const std::string& opName, Mc2MatMulV3TilingData& tiling)
 {
     PrintTCubeTilingData(opName, tiling.tCubeTiling);
     OP_LOGD(opName, " tiling.mTailCnt %d", tiling.mTailCnt);
@@ -230,8 +230,8 @@ void FpMatmulAllToAllTilingBase::PrintMMV3TilingData(const std::string &opName, 
  * @param opName
  * @param tilingInfo
  */
-void FpMatmulAllToAllTilingBase::PrintMatmulAlltoAllTilingInfo(const std::string &opName,
-                                                               MatmulAlltoAllTilingInfo &tilingInfo)
+void FpMatmulAllToAllTilingBase::PrintMatmulAlltoAllTilingInfo(const std::string& opName,
+                                                               MatmulAlltoAllTilingInfo& tilingInfo)
 {
     OP_LOGD(opName, "tilingInfo.rankDim: %u", tilingInfo.rankDim);
     OP_LOGD(opName, "tilingInfo.tileM: %u", tilingInfo.tileM);
@@ -254,7 +254,7 @@ void FpMatmulAllToAllTilingBase::PrintMatmulAlltoAllTilingInfo(const std::string
  *
  * @param outTilingData tilingData参数
  */
-void FpMatmulAllToAllTilingBase::PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingData &outTilingData)
+void FpMatmulAllToAllTilingBase::PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingData& outTilingData)
 {
     PrintMatmulAlltoAllTilingInfo(opName_, outTilingData.matmulAlltoAllTilingInfo);
     PrintMMV3TilingData(opName_, outTilingData.mc2MmV3TileTilingData);
@@ -329,7 +329,7 @@ uint8_t FpMatmulAllToAllTilingBase::ChooseAddBiasSplitMode() const
 ge::graphStatus FpMatmulAllToAllTilingBase::PostTiling()
 {
     SetTilingInfo(localTilingData_.matmulAlltoAllTilingInfo);
-    MatmulAlltoAllTilingData *outTilingData = context_->GetTilingData<MatmulAlltoAllTilingData>();
+    MatmulAlltoAllTilingData* outTilingData = context_->GetTilingData<MatmulAlltoAllTilingData>();
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
     OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get tiling data from context"),
                     return ge::GRAPH_FAILED);
@@ -358,7 +358,7 @@ ge::graphStatus FpMatmulAllToAllTilingBase::PostTiling()
  *
  * @param tilingInfo 目标结构体
  */
-void FpMatmulAllToAllTilingBase::SetTilingInfo(MatmulAlltoAllTilingInfo &tilingInfo) const
+void FpMatmulAllToAllTilingBase::SetTilingInfo(MatmulAlltoAllTilingInfo& tilingInfo) const
 {
     // 基本字段拷贝
     tilingInfo.tileM = inferredInfo.tileM;
@@ -399,7 +399,7 @@ CutResult FpMatmulAllToAllTilingBase::GetTilingResult()
  *
  * @param context
  */
-FpMatmulAllToAllTilingBase::FpMatmulAllToAllTilingBase(gert::TilingContext *context)
+FpMatmulAllToAllTilingBase::FpMatmulAllToAllTilingBase(gert::TilingContext* context)
     : MatmulAllToAllTilingBase(context)
 {}
 

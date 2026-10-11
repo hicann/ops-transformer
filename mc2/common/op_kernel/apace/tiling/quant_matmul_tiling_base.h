@@ -31,7 +31,7 @@ public:
     QuantMatmulTilingBase() = default;
     virtual ~QuantMatmulTilingBase() = default;
 
-    void GetTilingData(uint64_t m, uint64_t n, uint64_t k, bool transA, bool transB, QuantMatmulTilingData &tilingData,
+    void GetTilingData(uint64_t m, uint64_t n, uint64_t k, bool transA, bool transB, QuantMatmulTilingData& tilingData,
                        uint64_t batch = 1)
     {
         // Clear the cached state so one tiling object can safely be reused for
@@ -49,7 +49,7 @@ public:
         PrintTilingData(tilingData);
     }
 
-    void GetTilingData(uint64_t m, uint64_t n, uint64_t k, QuantMatmulTilingData &tilingData, uint64_t batch = 1)
+    void GetTilingData(uint64_t m, uint64_t n, uint64_t k, QuantMatmulTilingData& tilingData, uint64_t batch = 1)
     {
         // Keep compatibility with the common sample default:
         // A is not transposed and B is transposed.
@@ -64,7 +64,7 @@ public:
     {
         enableMTailAlign_ = enable;
     }
-    void SetPlatformInfoPtr(fe::PlatFormInfos *ptr)
+    void SetPlatformInfoPtr(fe::PlatFormInfos* ptr)
     {
         platformInfoPtr_ = ptr;
     }
@@ -91,18 +91,18 @@ protected:
     uint32_t coreLimitAicNum_{0};
     uint32_t coreLimitAivNum_{0};
     bool enableMTailAlign_{false};
-    fe::PlatFormInfos *platformInfoPtr_{nullptr};
+    fe::PlatFormInfos* platformInfoPtr_{nullptr};
     bool enableAdjustBasicBlock_{true};
 
-    virtual const char *TilingName() const = 0;
+    virtual const char* TilingName() const = 0;
 
-    virtual void DoOpTiling(QuantMatmulTilingData &tilingData) = 0;
+    virtual void DoOpTiling(QuantMatmulTilingData& tilingData) = 0;
 
 private:
     // 仅当全局日志级别为 DEBUG(ASCEND_GLOBAL_LOG_LEVEL=0) 时打印 tiling 调试信息，默认级别下不打印。
-    void PrintTilingData(const QuantMatmulTilingData &tilingData) const
+    void PrintTilingData(const QuantMatmulTilingData& tilingData) const
     {
-        const char *level = std::getenv("ASCEND_GLOBAL_LOG_LEVEL");
+        const char* level = std::getenv("ASCEND_GLOBAL_LOG_LEVEL");
         if (level == nullptr || level[0] != '0') {
             return;
         }
@@ -135,7 +135,7 @@ private:
         // Prefer the context-injected platform info (UT-friendly); fall back
         // to the global manager singleton for standalone host launchers.
         std::optional<platform_ascendc::PlatformAscendC> ctxPlatform;
-        platform_ascendc::PlatformAscendC *ascendcPlatform = nullptr;
+        platform_ascendc::PlatformAscendC* ascendcPlatform = nullptr;
         if (platformInfoPtr_ != nullptr) {
             ctxPlatform.emplace(platformInfoPtr_);
             ascendcPlatform = &(*ctxPlatform);

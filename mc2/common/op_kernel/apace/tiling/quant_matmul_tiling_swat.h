@@ -45,12 +45,12 @@ public:
     }
 
 protected:
-    const char *TilingName() const override
+    const char* TilingName() const override
     {
         return "swat";
     }
 
-    void DoOpTiling(QuantMatmulTilingData &tilingData) override
+    void DoOpTiling(QuantMatmulTilingData& tilingData) override
     {
         // The streaming path can reuse the common base block search directly,
         // then specializes only the tail split and L1-depth decisions.
@@ -89,7 +89,7 @@ private:
                                               runInfo_.scaleFactorB * runInfo_.stepKb * runInfo_.baseK));
     }
 
-    void BuildTilingData(QuantMatmulTilingData &tilingData, uint32_t scaleKL1, uint8_t nBufferNum) const
+    void BuildTilingData(QuantMatmulTilingData& tilingData, uint32_t scaleKL1, uint8_t nBufferNum) const
     {
         // Flatten the host-side search result into the POD payload consumed by
         // the launcher and device kernel.
@@ -128,8 +128,8 @@ private:
         uint64_t nTile = 1UL;
         uint64_t preSplit = 1UL;
         uint64_t secSplit = 1UL;
-        uint64_t &preSplitValid = runInfo_.mTailSize >= runInfo_.nTailSize ? mTile : nTile;
-        uint64_t &secSplitValid = runInfo_.mTailSize >= runInfo_.nTailSize ? nTile : mTile;
+        uint64_t& preSplitValid = runInfo_.mTailSize >= runInfo_.nTailSize ? mTile : nTile;
+        uint64_t& secSplitValid = runInfo_.mTailSize >= runInfo_.nTailSize ? nTile : mTile;
         uint64_t tileMax = platformInfo_.aicNum / runInfo_.tailBlockCnt;
         uint64_t mTileMax = std::min(tileMax, CeilDiv(runInfo_.baseM, CUBE_BLOCK));
         uint64_t nTileMax = std::min(tileMax, CeilDiv(runInfo_.baseN, CUBE_BLOCK));
@@ -400,7 +400,7 @@ private:
         }
     }
 
-    uint64_t CalUsedCoreNum(const QuantMatmulRunInfo &runInfo, uint64_t mTile, uint64_t nTile) const
+    uint64_t CalUsedCoreNum(const QuantMatmulRunInfo& runInfo, uint64_t mTile, uint64_t nTile) const
     {
         return mTile * nTile * runInfo.tailBlockCnt;
     }
@@ -426,7 +426,7 @@ private:
         return 0;
     }
 
-    uint64_t GetDepthA1B1(const QuantMatmulRunInfo &runInfo, uint64_t leftSize, uint64_t perDepthSize,
+    uint64_t GetDepthA1B1(const QuantMatmulRunInfo& runInfo, uint64_t leftSize, uint64_t perDepthSize,
                           uint64_t depthInit) const
     {
         // The first pass grows by powers of two to find a feasible region; the
@@ -457,7 +457,7 @@ private:
         return depthInit * depthScale;
     }
 
-    void CalStepKs(const QuantMatmulArgs &args, QuantMatmulRunInfo &runInfo) const
+    void CalStepKs(const QuantMatmulArgs& args, QuantMatmulRunInfo& runInfo) const
     {
         // Convert L1 depth to step-K counts and keep A/B synchronized so both
         // sides advance through K with the same outer scheduling cadence.
@@ -486,8 +486,8 @@ private:
         runInfo.depthB1 = runInfo.stepKb * DB_SIZE;
     }
 
-    void CalScaleFactors(const QuantMatmulArgs &args, const QuantMatmulPlatformInfo &platformInfo,
-                         QuantMatmulRunInfo &runInfo, uint64_t baseASize, uint64_t baseBSize, uint64_t baseScaleASize,
+    void CalScaleFactors(const QuantMatmulArgs& args, const QuantMatmulPlatformInfo& platformInfo,
+                         QuantMatmulRunInfo& runInfo, uint64_t baseASize, uint64_t baseBSize, uint64_t baseScaleASize,
                          uint64_t baseScaleBSize) const
     {
         // Scale reuse is solved after A/B depth is fixed. The search keeps the

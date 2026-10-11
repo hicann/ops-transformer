@@ -51,8 +51,8 @@ struct AddRMSNormTilingData {
 #pragma pack()
 
 #define CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
-    __ubuf__ tilingStruct *tilingDataPointer = \
-        reinterpret_cast<__ubuf__ tilingStruct *>((__ubuf__ uint8_t *)(tilingPointer));
+    __ubuf__ tilingStruct* tilingDataPointer = \
+        reinterpret_cast<__ubuf__ tilingStruct*>((__ubuf__ uint8_t*)(tilingPointer));
 
 #define INIT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer) \
     CONVERT_TILING_DATA(tilingStruct, tilingDataPointer, tilingPointer);
@@ -76,8 +76,8 @@ struct AddRMSNormTilingData {
 constexpr uint16_t MAX_TENSOR_CONT = 256;
 constexpr uint16_t MAX_CORE_CONT = 64;
 
-inline void InitMatmulAllReduceAddRmsNormTilingData(uint8_t *tiling,
-                                                    Mc2Tiling::MatmulAllReduceAddRmsNormTilingData *constData)
+inline void InitMatmulAllReduceAddRmsNormTilingData(uint8_t* tiling,
+                                                    Mc2Tiling::MatmulAllReduceAddRmsNormTilingData* constData)
 {
     memcpy(constData, tiling, sizeof(Mc2Tiling::MatmulAllReduceAddRmsNormTilingData));
 }
@@ -87,8 +87,8 @@ inline void InitMatmulAllReduceAddRmsNormTilingData(uint8_t *tiling,
     InitMatmulAllReduceAddRmsNormTilingData(tilingArg, &tilingData)
 
 #define GET_TILING_DATA_MEMBER(tilingType, member, var, tiling) \
-    auto var = ((tilingType *)((uint8_t *)AscendC::GmAlloc(1024)))->member; \
-    size_t offset##var = (size_t)(&((tilingType *)0)->member); \
+    auto var = ((tilingType*)((uint8_t*)AscendC::GmAlloc(1024)))->member; \
+    size_t offset##var = (size_t)(&((tilingType*)0)->member); \
     InitTilingData<decltype(var)>(tiling + offset##var, &var);
 
 #endif // FOREACH_MINIMUM_SCALAR_TILING_DEF_H

@@ -62,7 +62,7 @@ struct Mc2MulMultiBatchBaseBlockArgs {
 class Mc2BatchMatMulMultiBatchFullLoadBlock {
 public:
     __aicore__ inline Mc2BatchMatMulMultiBatchFullLoadBlock() {}
-    __aicore__ inline void Init(const void *tilingData);
+    __aicore__ inline void Init(const void* tilingData);
     __aicore__ inline void SetC0(uint64_t c0Size)
     {
         c0Size_ = c0Size;
@@ -73,15 +73,15 @@ public:
 public:
     Mc2MulMultiBatchBaseBlockOffset offset_;
     Mc2MulMultiBatchBaseBlockArgs params_;
-    const Mc2BatchMatmulTilingData *batchMatmulTilingData_;
+    const Mc2BatchMatmulTilingData* batchMatmulTilingData_;
 
 protected:
     uint64_t c0Size_;
 };
 
-__aicore__ inline void Mc2BatchMatMulMultiBatchFullLoadBlock::Init(const void *tilingData)
+__aicore__ inline void Mc2BatchMatMulMultiBatchFullLoadBlock::Init(const void* tilingData)
 {
-    batchMatmulTilingData_ = static_cast<const Mc2BatchMatmulTilingData *>(tilingData);
+    batchMatmulTilingData_ = static_cast<const Mc2BatchMatmulTilingData*>(tilingData);
     params_.isTransposeA = batchMatmulTilingData_->matmulTiling.matmulRunInfo.transA;
     params_.isTransposeB = batchMatmulTilingData_->matmulTiling.matmulRunInfo.transB;
     params_.isHf32 = batchMatmulTilingData_->matmulTiling.matmulRunInfo.isHf32;
@@ -165,19 +165,19 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchFullLoadBlock::CalcGMOffset()
 class Mc2BatchMatMulMultiBatchBaseBlock {
 public:
     __aicore__ inline Mc2BatchMatMulMultiBatchBaseBlock() {}
-    __aicore__ inline void Init(const void *tilingData);
+    __aicore__ inline void Init(const void* tilingData);
     __aicore__ inline void GetMultiBatchInfo(uint64_t loopIndex);
     __aicore__ inline void CalcGMOffset();
 
 public:
     Mc2MulMultiBatchBaseBlockOffset offset_;
     Mc2MulMultiBatchBaseBlockArgs params_;
-    const Mc2BatchMatmulTilingData *batchMatmulTilingData_;
+    const Mc2BatchMatmulTilingData* batchMatmulTilingData_;
 };
 
-__aicore__ inline void Mc2BatchMatMulMultiBatchBaseBlock::Init(const void *tilingData)
+__aicore__ inline void Mc2BatchMatMulMultiBatchBaseBlock::Init(const void* tilingData)
 {
-    batchMatmulTilingData_ = static_cast<const Mc2BatchMatmulTilingData *>(tilingData);
+    batchMatmulTilingData_ = static_cast<const Mc2BatchMatmulTilingData*>(tilingData);
     params_.isTransposeA = batchMatmulTilingData_->matmulTiling.matmulRunInfo.transA;
     params_.isTransposeB = batchMatmulTilingData_->matmulTiling.matmulRunInfo.transB;
     params_.isHf32 = batchMatmulTilingData_->matmulTiling.matmulRunInfo.isHf32;
@@ -241,7 +241,7 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchBaseBlock::CalcGMOffset()
 class Mc2BatchMatMulUnalignedMultiBatchBaseBlock : public Mc2BatchMatMulMultiBatchBaseBlock {
 public:
     __aicore__ inline Mc2BatchMatMulUnalignedMultiBatchBaseBlock() {}
-    __aicore__ inline void Init(const void *tilingData);
+    __aicore__ inline void Init(const void* tilingData);
     __aicore__ inline void SetC0(uint64_t c0Size)
     {
         c0Size_ = c0Size;
@@ -258,7 +258,7 @@ protected:
     int32_t nd2nzFlag_;
 };
 
-__aicore__ inline void Mc2BatchMatMulUnalignedMultiBatchBaseBlock::Init(const void *tilingData)
+__aicore__ inline void Mc2BatchMatMulUnalignedMultiBatchBaseBlock::Init(const void* tilingData)
 {
     Mc2BatchMatMulMultiBatchBaseBlock::Init(tilingData);
 

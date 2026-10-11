@@ -79,7 +79,7 @@ __aicore__ inline T CeilDiv(T a, T b)
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPad2D(const LocalTensor<T> &dst, const GlobalTensor<T> &src, uint32_t blockCount,
+__aicore__ inline void DataCopyPad2D(const LocalTensor<T>& dst, const GlobalTensor<T>& src, uint32_t blockCount,
                                      uint32_t blockLen, uint32_t dstInnerLength, uint32_t srcInnerLength)
 {
     DataCopyExtParams params;

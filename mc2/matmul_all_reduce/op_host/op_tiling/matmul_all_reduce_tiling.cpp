@@ -23,10 +23,10 @@ using Ops::Transformer::OpTiling::TilingRegistryNew;
 
 namespace optiling {
 
-ge::graphStatus MatmulAllReduceTilingFunc(gert::TilingContext *context);
-ge::graphStatus TilingParseForMatmulAllReduce(gert::TilingParseContext *context);
+ge::graphStatus MatmulAllReduceTilingFunc(gert::TilingContext* context);
+ge::graphStatus TilingParseForMatmulAllReduce(gert::TilingParseContext* context);
 
-ge::graphStatus MatmulAllReduceTilingFunc(gert::TilingContext *context)
+ge::graphStatus MatmulAllReduceTilingFunc(gert::TilingContext* context)
 {
     auto platformInfo = context->GetPlatformInfo();
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
@@ -39,7 +39,7 @@ ge::graphStatus MatmulAllReduceTilingFunc(gert::TilingContext *context)
 
 struct MatmulAllReduceCompileInfo {};
 
-ge::graphStatus TilingParseForMatmulAllReduce(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForMatmulAllReduce(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

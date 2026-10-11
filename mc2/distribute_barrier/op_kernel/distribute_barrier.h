@@ -47,7 +47,7 @@ class DistributeBarrier {
 public:
     __aicore__ inline DistributeBarrier(){};
     __aicore__ inline void Init(GM_ADDR mc2Context, GM_ADDR timeOut, GM_ADDR elasticInfo, GM_ADDR workspaceGM,
-                                TPipe *pipe, const DistributeBarrierTilingData *tilingData);
+                                TPipe* pipe, const DistributeBarrierTilingData* tilingData);
     __aicore__ inline void TimeOutTest();
     __aicore__ inline void BarrierProcess();
     __aicore__ inline void Process();
@@ -55,7 +55,7 @@ public:
 private:
     __aicore__ inline GM_ADDR GeWindowAddr(uint32_t toRankId, uint32_t curRankID);
     __aicore__ inline void InitElasticInfo(GM_ADDR elasticInfo);
-    __aicore__ inline void InitContextAndRankInfo(GM_ADDR mc2Context, const DistributeBarrierTilingData *tilingData);
+    __aicore__ inline void InitContextAndRankInfo(GM_ADDR mc2Context, const DistributeBarrierTilingData* tilingData);
     __aicore__ inline void InitStatus();
     __aicore__ inline void SplitToCore();
     __aicore__ inline void SetStatus();
@@ -65,7 +65,7 @@ private:
     uint32_t sendAivId_;
     uint32_t rankIdOriginal_;
     uint32_t rankId_;
-    TPipe *tpipe_{nullptr};
+    TPipe* tpipe_{nullptr};
     uint32_t aivNum_{0};
     uint32_t sendAivNum_{0};
     uint32_t sendRankNum_{0};
@@ -81,8 +81,8 @@ private:
     bool isElasticTrueFlag_{false};
     bool isMc2Context_ = {false};
 
-    __gm__ Mc2Kernel::HcclOpParam *winContext_{nullptr};
-    __gm__ Mc2MoeContext *mc2Context_{nullptr};
+    __gm__ Mc2Kernel::HcclOpParam* winContext_{nullptr};
+    __gm__ Mc2MoeContext* mc2Context_{nullptr};
 
     LocalTensor<float> statusFp32Tensor_;
     LocalTensor<int32_t> elasticInfoTensor_;
@@ -107,7 +107,7 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Tim
     float curRank = 0.0;
     uint32_t usedAivNum = sendRankNum_ > 0 ? sendAivNum_ : worldSize_;
     GlobalTensor<float> finishTensor;
-    finishTensor.SetGlobalBuffer((__gm__ float *)finishGm_);
+    finishTensor.SetGlobalBuffer((__gm__ float*)finishGm_);
     LocalTensor<float> timeoutTensor;
     timeoutTensor = timeoutInfoBuf_.Get<float>();
     uint32_t mask = 1;
@@ -162,7 +162,7 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Ini
         Ceil((ELASTIC_METAINFO_OFFSET + RANK_LIST_NUM * worldSizeOriginal_) * sizeof(uint32_t), UB_ALIGN) * UB_ALIGN);
     elasticInfoTensor_ = elasticInfoBuf_.Get<int32_t>();
     GlobalTensor<int32_t> elasticInfoGMTensor;
-    elasticInfoGMTensor.SetGlobalBuffer((__gm__ int32_t *)(elasticInfo));
+    elasticInfoGMTensor.SetGlobalBuffer((__gm__ int32_t*)(elasticInfo));
     DataCopyExtParams elasticInfoParams = {
         1U, static_cast<uint32_t>((ELASTIC_METAINFO_OFFSET + RANK_LIST_NUM * worldSizeOriginal_) * sizeof(uint32_t)),
         0U, 0U, 0U};
@@ -183,7 +183,7 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Ini
 {
     GlobalTensor<int32_t> selfDataStatusTensor;
     // 获取flag标记，flag标记写在win状态区的STATE_WIN_OFFSET偏移的位置
-    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t *)(statusDataSpaceGm_ + STATE_WIN_OFFSET));
+    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t*)(statusDataSpaceGm_ + STATE_WIN_OFFSET));
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(
         selfDataStatusTensor[aivId_ * UB_ALIGN]);
     dataState_ = selfDataStatusTensor(aivId_ * UB_ALIGN);
@@ -198,19 +198,19 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Ini
 
 template <TemplateDistributeBarrierTypeClass>
 __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::InitContextAndRankInfo(
-    GM_ADDR mc2Context, const DistributeBarrierTilingData *tilingData)
+    GM_ADDR mc2Context, const DistributeBarrierTilingData* tilingData)
 {
     if (tilingData->distributeBarrierInfo.isMc2Context) {
         isMc2Context_ = true;
     }
 
     if (isMc2Context_) {
-        mc2Context_ = (__gm__ Mc2MoeContext *)mc2Context;
+        mc2Context_ = (__gm__ Mc2MoeContext*)mc2Context;
         rankIdOriginal_ = mc2Context_->epRankId;
         rankId_ = mc2Context_->epRankId;
         statusDataSpaceGm_ = (GM_ADDR)(mc2Context_->epHcclBuffer_[rankId_]);
     } else {
-        winContext_ = (__gm__ Mc2Kernel::HcclOpParam *)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
+        winContext_ = (__gm__ Mc2Kernel::HcclOpParam*)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
         rankIdOriginal_ = Mc2Kernel::GetRankId(winContext_);
         rankId_ = Mc2Kernel::GetRankId(winContext_);
         statusDataSpaceGm_ = Mc2Kernel::GetStatusDataSpaceGm(winContext_);
@@ -237,8 +237,8 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Spl
 
 template <TemplateDistributeBarrierTypeClass>
 __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Init(
-    GM_ADDR mc2Context, GM_ADDR timeOut, GM_ADDR elasticInfo, GM_ADDR workspaceGM, TPipe *pipe,
-    const DistributeBarrierTilingData *tilingData)
+    GM_ADDR mc2Context, GM_ADDR timeOut, GM_ADDR elasticInfo, GM_ADDR workspaceGM, TPipe* pipe,
+    const DistributeBarrierTilingData* tilingData)
 {
     tpipe_ = pipe;
     aivId_ = GetBlockIdx();
@@ -250,7 +250,7 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Ini
     isInputElasticInfo_ = tilingData->distributeBarrierInfo.isInputElasticInfo;
     if (isInputTimeout_) {
         GlobalTensor<int32_t> timeOutGMTensor;
-        timeOutGMTensor.SetGlobalBuffer((__gm__ int32_t *)(timeOut));
+        timeOutGMTensor.SetGlobalBuffer((__gm__ int32_t*)(timeOut));
         timeOut_ = timeOutGMTensor.GetValue(0);
     }
 
@@ -287,7 +287,7 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Ini
 
     statusSpaceGm_ = GeWindowAddr(rankIdOriginal_, rankIdOriginal_);
     finishGm_ = statusSpaceGm_ + STATE_WIN_OFFSET + aivNum_ * UB_ALIGN * sizeof(float);
-    windowInstatusFp32Tensor_.SetGlobalBuffer((__gm__ float *)(statusSpaceGm_));
+    windowInstatusFp32Tensor_.SetGlobalBuffer((__gm__ float*)(statusSpaceGm_));
 }
 
 template <TemplateDistributeBarrierTypeClass>
@@ -301,9 +301,9 @@ __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::Set
             if (isElasticTrueFlag_) {
                 toRankId = elasticInfoTensor_.GetValue(ELASTIC_METAINFO_OFFSET + worldSizeOriginal_ + rankIndex);
             }
-            GM_ADDR rankGM = (__gm__ uint8_t *)(GeWindowAddr(toRankId, rankIdOriginal_) + offset); // 计算地址偏移
+            GM_ADDR rankGM = (__gm__ uint8_t*)(GeWindowAddr(toRankId, rankIdOriginal_) + offset); // 计算地址偏移
             SyncFunc<AscendC::HardEvent::V_MTE3>();
-            rankGMTensor.SetGlobalBuffer((__gm__ float *)rankGM);
+            rankGMTensor.SetGlobalBuffer((__gm__ float*)rankGM);
             DataCopy<float>(rankGMTensor, statusFp32Tensor_, UB_ALIGN / sizeof(float)); // 8时数据大小，按32对齐拷贝
         }
     }
@@ -334,7 +334,7 @@ template <TemplateDistributeBarrierTypeClass>
 __aicore__ inline void DistributeBarrier<TemplateDistributeBarrierTypeFunc>::CleanStatus()
 {
     GlobalTensor<float> finishTensor;
-    finishTensor.SetGlobalBuffer((__gm__ float *)finishGm_);
+    finishTensor.SetGlobalBuffer((__gm__ float*)finishGm_);
     finishTensor(sendAivId_ * UB_ALIGN) = 1.0;
     DataCacheCleanAndInvalid<float, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(
         finishTensor[sendAivId_ * UB_ALIGN]);

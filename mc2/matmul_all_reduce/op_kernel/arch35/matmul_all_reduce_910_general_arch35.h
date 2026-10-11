@@ -31,12 +31,12 @@ template <typename XType, typename WType, typename YType, class MmType, Mc2CoreT
           int commMode>
 class MatmulAllReduce910General : public MatmulAllReduceBase<XType, YType, CoreType, basedA2aRsAg, commMode> {
 public:
-    __aicore__ inline MatmulAllReduce910General(MC2GmAddrs *addrs, ArnGmAddrs *arnAddrs, MC2TilingHeader *tilingData,
-                                                TPipe *tPipe)
+    __aicore__ inline MatmulAllReduce910General(MC2GmAddrs* addrs, ArnGmAddrs* arnAddrs, MC2TilingHeader* tilingData,
+                                                TPipe* tPipe)
         : MatmulAllReduceBase<XType, YType, CoreType, basedA2aRsAg, commMode>(addrs, nullptr, arnAddrs, tilingData,
                                                                               tPipe)
     {
-        mc2TilingData_ = (Mc2Tiling::MatmulAllReduce910TilingDataA5 *)tilingData;
+        mc2TilingData_ = (Mc2Tiling::MatmulAllReduce910TilingDataA5*)tilingData;
         this->tileInfo_.mmTiling = &mc2TilingData_->mC2Mmv3TileTilingData.tCubeTiling;
         this->tailInfo_.mmTiling = &mc2TilingData_->mC2Mmv3TailTilingData.tCubeTiling;
         // 从 tiling struct 读取 bias 相关字段传入基类
@@ -57,9 +57,9 @@ public:
     }
 
 protected:
-    __aicore__ inline void InnerProcess(bool tailFlag, uint32_t turnCnt, const MC2TileInfo &tileInfo)
+    __aicore__ inline void InnerProcess(bool tailFlag, uint32_t turnCnt, const MC2TileInfo& tileInfo)
     {
-        const Mc2MatMulV3TilingData *tiling =
+        const Mc2MatMulV3TilingData* tiling =
             (tailFlag ? &mc2TilingData_->mC2Mmv3TailTilingData : &mc2TilingData_->mC2Mmv3TileTilingData);
 
         MmType mmOp;
@@ -81,7 +81,7 @@ protected:
     }
 
 private:
-    Mc2Tiling::MatmulAllReduce910TilingDataA5 *mc2TilingData_;
+    Mc2Tiling::MatmulAllReduce910TilingDataA5* mc2TilingData_;
 };
 
 #define INVOKE_MC2_910_OP_IMPL_HELPER(opTemplateClass, bTransFlag, coreType, basedA2aRsAg, commMode) \
@@ -94,7 +94,7 @@ private:
             opTemplateClass<AType, BType, CType, BiasType, Mc2MatmulV3Advanced::Mc2MatmulAswBlock, MM_CFG_NO_PRELOAD>; \
         MC2GmAddrs addrs = {aGM, bGM, biasGM, addGM, cGM, workspaceGM, cGM}; \
         MatmulAllReduce910General<DTYPE_X1, DTYPE_X2, DTYPE_Y, OpType, coreType, basedA2aRsAg, commMode> op( \
-            &addrs, nullptr, (MC2TilingHeader *)&tilingData, &tPipe); \
+            &addrs, nullptr, (MC2TilingHeader*)&tilingData, &tPipe); \
         op.Init(); \
         op.Process(); \
     } while (0)

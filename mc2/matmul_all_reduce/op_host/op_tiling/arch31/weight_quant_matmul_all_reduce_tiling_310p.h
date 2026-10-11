@@ -28,15 +28,15 @@ struct WeightQuantMatmul310TPLParam {
 class WeightQuantMatmulAllReduceTiling310P : public MatmulAllReduceTilingBase {
     class WeightQuantTilingTransferHelper : public Mc2WeightQuantBatchMatmulV2WeightNz {
     public:
-        WeightQuantTilingTransferHelper(WeightQuantMatmulAllReduceTiling310P &weightQuantMatmulAllReduceTiling,
-                                        Mc2WeightQuantBatchMatmulV2NzTilingData &data)
+        WeightQuantTilingTransferHelper(WeightQuantMatmulAllReduceTiling310P& weightQuantMatmulAllReduceTiling,
+                                        Mc2WeightQuantBatchMatmulV2NzTilingData& data)
             : Mc2WeightQuantBatchMatmulV2WeightNz(weightQuantMatmulAllReduceTiling.context_, &data),
               tilingProcesser_(weightQuantMatmulAllReduceTiling)
         {}
         ge::graphStatus GetShapeAttrsInfo() override
         {
             OP_LOGI(tilingProcesser_.opName_, "Start assemble input params for matmul tiling");
-            auto &&tilingArgs = tilingProcesser_.args_;
+            auto&& tilingArgs = tilingProcesser_.args_;
             inputParams_.opName = tilingProcesser_.opName_;
             inputParams_.transA = tilingArgs.isATrans;
             inputParams_.transB = tilingArgs.isBTrans;
@@ -55,7 +55,7 @@ class WeightQuantMatmulAllReduceTiling310P : public MatmulAllReduceTilingBase {
             PrintTilingInputParam(inputParams_);
             return ge::GRAPH_SUCCESS;
         }
-        void PrintTilingInputParam(Mc2WeightQuantBatchMatmulInfo &weightQuantBatchMatmulInfo)
+        void PrintTilingInputParam(Mc2WeightQuantBatchMatmulInfo& weightQuantBatchMatmulInfo)
         {
             OP_LOGD(tilingProcesser_.opName_, " transA_ %d transB_ %d, hasBias_ %d, hasAntiQuantOffset_ %d, ",
                     weightQuantBatchMatmulInfo.transA, weightQuantBatchMatmulInfo.transB,
@@ -97,7 +97,7 @@ class WeightQuantMatmulAllReduceTiling310P : public MatmulAllReduceTilingBase {
         void PrintMatMulTiling([[maybe_unused]] int32_t logLevel)
         {
             std::stringstream ss;
-            auto &matmulTiling = tilingData_->matmulTiling;
+            auto& matmulTiling = tilingData_->matmulTiling;
             ss << "usedCoreNum " << matmulTiling.usedCoreNum << " M " << matmulTiling.M << " N " << matmulTiling.N
                << " Ka " << matmulTiling.Ka << " Kb " << matmulTiling.Kb << " singleCoreM " << matmulTiling.singleCoreM
                << " singleCoreN " << matmulTiling.singleCoreN << " singleCoreK " << matmulTiling.singleCoreK
@@ -133,11 +133,11 @@ class WeightQuantMatmulAllReduceTiling310P : public MatmulAllReduceTilingBase {
         }
 
     private:
-        WeightQuantMatmulAllReduceTiling310P &tilingProcesser_;
+        WeightQuantMatmulAllReduceTiling310P& tilingProcesser_;
     };
 
 public:
-    explicit WeightQuantMatmulAllReduceTiling310P(gert::TilingContext *context)
+    explicit WeightQuantMatmulAllReduceTiling310P(gert::TilingContext* context)
         : MatmulAllReduceTilingBase(context)
     {}
 
@@ -156,13 +156,13 @@ protected:
 
     ge::graphStatus PostTiling() override;
 
-    Mc2Tiling::Mc2Msg &MutableMc2MsgData() override;
+    Mc2Tiling::Mc2Msg& MutableMc2MsgData() override;
 
-    Mc2Tiling::RCSTiling &MutableRCSTilingData() override;
+    Mc2Tiling::RCSTiling& MutableRCSTilingData() override;
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTileTilingData() override;
+    AscendC::tiling::TCubeTiling& MutableTCubeTileTilingData() override;
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTailTilingData() override;
+    AscendC::tiling::TCubeTiling& MutableTCubeTailTilingData() override;
 
     CutResult GetTilingResult() override;
 

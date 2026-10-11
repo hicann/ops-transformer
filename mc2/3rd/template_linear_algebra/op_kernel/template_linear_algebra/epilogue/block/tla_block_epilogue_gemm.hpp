@@ -80,7 +80,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, GemmCoord blockShape_, Params const &params_,
+    BlockEpilogue(Arch::Resource<ArchTag>& resource, GemmCoord blockShape_, Params const& params_,
                   uint32_t ubByteStart = 0)
         : blockShapeMNK(blockShape_),
           params(params_)
@@ -120,13 +120,13 @@ public:
     }
 
     CATLASS_DEVICE
-    void operator()(GemmCoord const &actualShapeMNK, GemmCoord const &blockCoordMNK,
-                    AscendC::GlobalTensor<ElementC> const &gmBlockC, LayoutC const &layoutC, uint64_t const &offset)
+    void operator()(GemmCoord const& actualShapeMNK, GemmCoord const& blockCoordMNK,
+                    AscendC::GlobalTensor<ElementC> const& gmBlockC, LayoutC const& layoutC, uint64_t const& offset)
     {
         AscendC::GlobalTensor<ElementX> gmBlockX;
-        gmBlockX.SetGlobalBuffer(reinterpret_cast<__gm__ ElementX *>(params.ptrX));
+        gmBlockX.SetGlobalBuffer(reinterpret_cast<__gm__ ElementX*>(params.ptrX));
         AscendC::GlobalTensor<ElementD> gmBlockD;
-        gmBlockD.SetGlobalBuffer(reinterpret_cast<__gm__ ElementD *>(params.ptrD));
+        gmBlockD.SetGlobalBuffer(reinterpret_cast<__gm__ ElementD*>(params.ptrD));
         MatrixCoord blockShapeMN = blockShapeMNK.GetCoordMN();
         MatrixCoord blockCoordMN = blockCoordMNK.GetCoordMN();
         MatrixCoord actualShapeMN = actualShapeMNK.GetCoordMN();

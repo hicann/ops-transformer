@@ -45,7 +45,7 @@ struct AlltoAllAllGatherBatchInfo {
 }; // BmmTiling计算时需要用到的结构体
 
 struct AlltoAllAllGatherMatmulInfo {
-    const char *opName = nullptr;
+    const char* opName = nullptr;
     bool isWeightTrans = false;
     bool isBias = false;
     ge::DataType aType = ge::DT_FLOAT16;
@@ -59,9 +59,9 @@ struct AlltoAllAllGatherMatmulInfo {
 
 class AlltoAllAllGatherBatchMatMulTiling : public Mc2batch_mat_mul_v3::Mc2BatchMatmulV3BaseTiling {
 public:
-    AlltoAllAllGatherBatchMatMulTiling(gert::TilingContext *context, Mc2BatchMatmulTilingData &bmmTilingData,
-                                       AlltoAllAllGatherBatchInfo &BMMV3BatchInfo,
-                                       AlltoAllAllGatherMatmulInfo &MMV3ArgsInfo)
+    AlltoAllAllGatherBatchMatMulTiling(gert::TilingContext* context, Mc2BatchMatmulTilingData& bmmTilingData,
+                                       AlltoAllAllGatherBatchInfo& BMMV3BatchInfo,
+                                       AlltoAllAllGatherMatmulInfo& MMV3ArgsInfo)
         : Mc2BatchMatmulV3BaseTiling(context, bmmTilingData),
           BMMV3BatchInfo_(BMMV3BatchInfo),
           MMV3ArgsInfo_(MMV3ArgsInfo)

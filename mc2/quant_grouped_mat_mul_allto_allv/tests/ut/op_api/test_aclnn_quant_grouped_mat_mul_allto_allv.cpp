@@ -57,10 +57,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_gmmX_quantmode0_with_sca
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -91,10 +91,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_gmmX_quantmode1_without_
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -126,10 +126,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_gmmWeight_quantmode0_wit
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -160,10 +160,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_gmmWeight_quantmode1_wit
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -195,10 +195,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mmX_quantmode0_with_scal
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -229,10 +229,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mmX_quantmode1_without_s
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -264,10 +264,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mmWeight_quantmode0_with
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -298,10 +298,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mmWeight_quantmode1_with
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -337,10 +337,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_sendCountsTensor_not_nul
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
@@ -371,10 +371,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_recvCountsTensor_not_nul
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
@@ -406,11 +406,11 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_sendCounts_empty_array)
     constexpr int64_t e = 4;
     constexpr int64_t BS = 4096;
     constexpr int64_t K = 2;
-    aclIntArray *sendCounts = aclCreateIntArray(nullptr, 0);
+    aclIntArray* sendCounts = aclCreateIntArray(nullptr, 0);
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
@@ -439,10 +439,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_recvCounts_empty_array)
     constexpr int64_t BS = 4096;
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(nullptr, 0);
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(nullptr, 0);
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
@@ -475,10 +475,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_group_nullptr)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
@@ -486,7 +486,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_group_nullptr)
                               mmX_, mmWeight_, nullptr, nullptr,   // mm scale
                               nullptr,                             // commQuantScale
                               0, 0, 0, 0, 0, -1, 0,
-                              (const char *)nullptr, // group=nullptr
+                              (const char*)nullptr, // group=nullptr
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -513,10 +513,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_commQuantMode_nonzero)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -549,10 +549,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_tt_quant_normal)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -583,10 +583,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_commQuantMode_reject)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllv,
@@ -622,10 +622,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_gmmx_dtype_invalid)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -659,10 +659,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmmX_nullptr)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -695,10 +695,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmmWeight_nullptr)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -731,10 +731,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_y_nullptr)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -767,10 +767,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmmXScale_null)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -803,10 +803,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmmWeightScale_null)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -841,10 +841,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_mm_mode_noquant_inval
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -879,10 +879,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_mm_mode_mismatch_inva
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -916,10 +916,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_mmXScale_null)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -953,10 +953,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_mmWeightScale_null)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -987,10 +987,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_sendCounts_nullptr_valid
     constexpr int64_t K = 2;
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = nullptr;
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = nullptr;
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1016,10 +1016,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_recvCounts_nullptr_valid
     constexpr int64_t K = 2;
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = nullptr;
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = nullptr;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1051,10 +1051,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mm_optional_partial_mmY_
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1081,10 +1081,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_quant_mode_perchannel_un
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, nullptr, nullptr, mmX_, mmWeight_, nullptr, nullptr,
@@ -1110,10 +1110,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_quant_mode_unknown_enum)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     constexpr int64_t kBadQuantMode = 99;
     auto ut =
@@ -1141,10 +1141,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_group_empty_string)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, nullptr, nullptr, mmX_, mmWeight_, nullptr, nullptr,
@@ -1171,10 +1171,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_group_name_length_ge_max
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr,
@@ -1200,10 +1200,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmm_weight_scale_rank
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1230,10 +1230,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmm_weight_scale_last
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1265,10 +1265,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_mm_weight_scale_last_
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1294,10 +1294,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_sendCounts_empty_array_a
     constexpr int64_t K = 2;
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(nullptr, 0);
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(nullptr, 0);
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1323,10 +1323,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_recvCounts_empty_array_a
     constexpr int64_t K = 2;
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(nullptr, 0);
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(nullptr, 0);
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1354,10 +1354,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmm_weight_transpose_
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1385,10 +1385,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_gmm_weight_transpose_
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1423,10 +1423,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_mm_weight_transpose_c
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1461,10 +1461,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_mx_mm_weight_transpose_a
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1491,10 +1491,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_tt_gmm_weight_transpose_
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1521,10 +1521,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_tt_gmm_weight_transpose_
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1557,10 +1557,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_tt_mm_weight_transpose_c
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,
@@ -1593,10 +1593,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all, test_tt_mm_weight_transpose_a
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnQuantGroupedMatMulAlltoAllv,

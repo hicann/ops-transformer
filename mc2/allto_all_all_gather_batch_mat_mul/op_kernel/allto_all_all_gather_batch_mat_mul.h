@@ -55,13 +55,13 @@ class AlltoAllAllGatherBatchMatMul {
 public:
     __aicore__ inline AlltoAllAllGatherBatchMatMul(){};
     __aicore__ inline void Init(GM_ADDR xGM, GM_ADDR weightGM, GM_ADDR biasGM, GM_ADDR y1GM, GM_ADDR y2GM, GM_ADDR y3GM,
-                                GM_ADDR workspaceGM, TPipe *pipe, AlltoAllAllGatherBatchMatMulTilingData *tilingData,
-                                __gm__ void *hcclInitTiling, __gm__ void *allGatherCcTiling,
-                                __gm__ void *alltoAllCcTiling);
+                                GM_ADDR workspaceGM, TPipe* pipe, AlltoAllAllGatherBatchMatMulTilingData* tilingData,
+                                __gm__ void* hcclInitTiling, __gm__ void* allGatherCcTiling,
+                                __gm__ void* alltoAllCcTiling);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void GetTilingData(AlltoAllAllGatherBatchMatMulTilingData *tilingData);
+    __aicore__ inline void GetTilingData(AlltoAllAllGatherBatchMatMulTilingData* tilingData);
     __aicore__ inline void InitTpipe();
     __aicore__ inline void LocalCommunication();
     __aicore__ inline void LocalCalculation();
@@ -136,9 +136,9 @@ private:
     GlobalTensor<DataType1> allgatherNonLocalOutGM;
     GlobalTensor<DataType1> transposeOutGM; // 每轮地址复用
     GlobalTensor<DataType1> bmmOutGM;
-    BMM_Mc2MatmulTilingData *bmmLocalTiling;
-    BMM_Mc2MatmulTilingData *bmmNonLocalTileTiling;
-    BMM_Mc2MatmulTilingData *bmmNonLocalTailTiling;
+    BMM_Mc2MatmulTilingData* bmmLocalTiling;
+    BMM_Mc2MatmulTilingData* bmmNonLocalTileTiling;
+    BMM_Mc2MatmulTilingData* bmmNonLocalTailTiling;
 
     Hccl<HCCL_SERVER_TYPE_AICPU> hcclAlltoall;
     Hccl<HCCL_SERVER_TYPE_AICPU> hcclAllgather;
@@ -150,7 +150,7 @@ private:
     BMM_TileInfo nonLocalE; // 无尾块
     BMM_TileInfo nonLocalC;
 
-    TPipe *tpipe;
+    TPipe* tpipe;
     TBuf<> tBuf;
     LocalTensor<DataType1> transposeTmp;
     LocalTensor<DataType1> xTmp; // 类型转换之前的数据
@@ -166,8 +166,8 @@ template <typename DataType1, typename DataType2, int64_t ShardType, bool IsTran
 __aicore__ inline void
 AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardType, IsTransposeWeight, IsNeedBias, IsNeedY2, IsNeedY3>::Init(
     GM_ADDR xGM, GM_ADDR weightGM, GM_ADDR biasGM, GM_ADDR y1GM, GM_ADDR y2GM, GM_ADDR y3GM, GM_ADDR workspaceGM,
-    TPipe *pipe, AlltoAllAllGatherBatchMatMulTilingData *tilingData, __gm__ void *hcclInitTiling,
-    __gm__ void *allGatherCcTiling, __gm__ void *alltoAllCcTiling)
+    TPipe* pipe, AlltoAllAllGatherBatchMatMulTilingData* tilingData, __gm__ void* hcclInitTiling,
+    __gm__ void* allGatherCcTiling, __gm__ void* alltoAllCcTiling)
 {
     this->tpipe = pipe;
     GetTilingData(tilingData);
@@ -180,28 +180,28 @@ AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardType, IsTransposeWeight,
 
     InitTpipe();
 
-    this->xGM.SetGlobalBuffer((__gm__ DataType1 *)xGM);
-    this->weightGM.SetGlobalBuffer((__gm__ DataType1 *)weightGM);
-    this->y1GM.SetGlobalBuffer((__gm__ DataType1 *)y1GM);
+    this->xGM.SetGlobalBuffer((__gm__ DataType1*)xGM);
+    this->weightGM.SetGlobalBuffer((__gm__ DataType1*)weightGM);
+    this->y1GM.SetGlobalBuffer((__gm__ DataType1*)y1GM);
     if constexpr (IsNeedBias) {
-        this->biasGM.SetGlobalBuffer((__gm__ DataType2 *)biasGM);
+        this->biasGM.SetGlobalBuffer((__gm__ DataType2*)biasGM);
     }
     if constexpr (IsNeedY2) {
-        this->y2GM.SetGlobalBuffer((__gm__ DataType1 *)y2GM);
+        this->y2GM.SetGlobalBuffer((__gm__ DataType1*)y2GM);
     }
     if constexpr (IsNeedY3) {
-        this->y3GM.SetGlobalBuffer((__gm__ DataType1 *)y3GM);
+        this->y3GM.SetGlobalBuffer((__gm__ DataType1*)y3GM);
     }
 
     uint64_t maxLenNonLocalC = ((nonLocalC.tileLen > nonLocalC.tailLen) ? nonLocalC.tileLen : nonLocalC.tailLen);
-    alltoallNonLocalOutGM.SetGlobalBuffer((__gm__ DataType1 *)workspaceGM);
-    allgatherLocalOutGM.SetGlobalBuffer((__gm__ DataType1 *)alltoallNonLocalOutGM.GetPhyAddr() + E * C * H);
-    allgatherNonLocalInGM.SetGlobalBuffer((__gm__ DataType1 *)allgatherLocalOutGM.GetPhyAddr() +
+    alltoallNonLocalOutGM.SetGlobalBuffer((__gm__ DataType1*)workspaceGM);
+    allgatherLocalOutGM.SetGlobalBuffer((__gm__ DataType1*)alltoallNonLocalOutGM.GetPhyAddr() + E * C * H);
+    allgatherNonLocalInGM.SetGlobalBuffer((__gm__ DataType1*)allgatherLocalOutGM.GetPhyAddr() +
                                           expertOverEp * C * H * tpRankSize);
-    allgatherNonLocalOutGM.SetGlobalBuffer((__gm__ DataType1 *)allgatherNonLocalInGM.GetPhyAddr() +
+    allgatherNonLocalOutGM.SetGlobalBuffer((__gm__ DataType1*)allgatherNonLocalInGM.GetPhyAddr() +
                                            expertOverEp * C * H * epRankSize);
-    transposeOutGM.SetGlobalBuffer((__gm__ DataType1 *)allgatherNonLocalOutGM.GetPhyAddr() + E * C * H * tpRankSize);
-    bmmOutGM.SetGlobalBuffer((__gm__ DataType1 *)transposeOutGM.GetPhyAddr() +
+    transposeOutGM.SetGlobalBuffer((__gm__ DataType1*)allgatherNonLocalOutGM.GetPhyAddr() + E * C * H * tpRankSize);
+    bmmOutGM.SetGlobalBuffer((__gm__ DataType1*)transposeOutGM.GetPhyAddr() +
                              ((localE.tileLen * localC.tileLen * H * tpRankSize >
                                (epRankSize - 1U) * nonLocalE.tileLen * maxLenNonLocalC * H * tpRankSize) ?
                                   localE.tileLen * localC.tileLen * H * tpRankSize :
@@ -265,7 +265,7 @@ template <typename DataType1, typename DataType2, int64_t ShardType, bool IsTran
           bool IsNeedY2, bool IsNeedY3>
 __aicore__ inline void
 AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardType, IsTransposeWeight, IsNeedBias, IsNeedY2,
-                             IsNeedY3>::GetTilingData(AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+                             IsNeedY3>::GetTilingData(AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     E = tilingData->commonTiling.expert;
     C = tilingData->commonTiling.COverTp;
@@ -316,8 +316,8 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
                                                     IsNeedY2, IsNeedY3>::LocalCommunication()
 {
     // E_ep切分无尾块；Local块不切C
-    GM_ADDR allgatherSendBuf = (__gm__ uint8_t *)xGM.GetPhyAddr() + expertOverEp * epRankId * C * H * dataLen1;
-    GM_ADDR allgatherRecvBuf = (__gm__ uint8_t *)allgatherLocalOutGM.GetPhyAddr();
+    GM_ADDR allgatherSendBuf = (__gm__ uint8_t*)xGM.GetPhyAddr() + expertOverEp * epRankId * C * H * dataLen1;
+    GM_ADDR allgatherRecvBuf = (__gm__ uint8_t*)allgatherLocalOutGM.GetPhyAddr();
     uint64_t allGatherSendCount = localE.tileLen * C * H;
     uint64_t allgatherSendBufOffset = localE.tileLen * C * H * dataLen1;
     for (uint32_t e_idx = 0U; e_idx < localE.tileCnt; e_idx++) {
@@ -339,7 +339,7 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
     using bType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DataType1, IsTransposeWeight>;
     using cType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DataType1, false>;
     using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DataType2, false>;
-    GM_ADDR wGM = (__gm__ uint8_t *)weightGM.GetPhyAddr();
+    GM_ADDR wGM = (__gm__ uint8_t*)weightGM.GetPhyAddr();
     uint64_t weightOffset = localE.tileLen * H * M * dataLen1;
     GlobalTensor<DataType2> biasBuf;
     uint64_t biasOffset;
@@ -377,16 +377,16 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
 
         GM_ADDR bmmInGm;
         if ((localE.tileLen != 1) || IsNeedY2) {
-            bmmInGm = (__gm__ uint8_t *)transposeOutGM.GetPhyAddr();
+            bmmInGm = (__gm__ uint8_t*)transposeOutGM.GetPhyAddr();
         } else {
-            bmmInGm = (__gm__ uint8_t *)allgatherRecvTensor.GetPhyAddr();
+            bmmInGm = (__gm__ uint8_t*)allgatherRecvTensor.GetPhyAddr();
         }
         allgatherRecvTensor = allgatherRecvTensor[allgatherRecvBufOffset];
 
         // bmm
         tpipe->Reset();
         Mc2BatchMatMulCommonKernel<aType, bType, cType, biasType> bmmv3;
-        bmmv3.Init(bmmInGm, wGM, (__gm__ uint8_t *)bmmOutGM.GetPhyAddr(), nullptr, nullptr, nullptr,
+        bmmv3.Init(bmmInGm, wGM, (__gm__ uint8_t*)bmmOutGM.GetPhyAddr(), nullptr, nullptr, nullptr,
                    &bmmLocalTiling->bmmTilingData, tpipe);
         bmmv3.Process();
         SyncAll<false>();
@@ -416,8 +416,8 @@ template <typename DataType1, typename DataType2, int64_t ShardType, bool IsTran
 __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardType, IsTransposeWeight, IsNeedBias,
                                                     IsNeedY2, IsNeedY3>::NonLocalCommunication()
 {
-    GM_ADDR alltoallSendBuf = (__gm__ uint8_t *)xGM.GetPhyAddr();
-    GM_ADDR alltoallRecvBuf = (__gm__ uint8_t *)alltoallNonLocalOutGM.GetPhyAddr();
+    GM_ADDR alltoallSendBuf = (__gm__ uint8_t*)xGM.GetPhyAddr();
+    GM_ADDR alltoallRecvBuf = (__gm__ uint8_t*)alltoallNonLocalOutGM.GetPhyAddr();
     uint64_t tempDataPiece = H * dataLen1;
     uint64_t alltoallSendBufOffsetBase = C * tempDataPiece;
     uint64_t alltoallSendBufOffsetTile = nonLocalC.tileLen * tempDataPiece;
@@ -440,8 +440,8 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
         alltoallRdisplsTail[i] = i * dataCountsTailTemp;
     }
 
-    GM_ADDR allgatherRecvBuf = (__gm__ uint8_t *)allgatherNonLocalOutGM.GetPhyAddr();
-    GM_ADDR allgatherSendBuf = (__gm__ uint8_t *)alltoallNonLocalOutGM.GetPhyAddr();
+    GM_ADDR allgatherRecvBuf = (__gm__ uint8_t*)allgatherNonLocalOutGM.GetPhyAddr();
+    GM_ADDR allgatherSendBuf = (__gm__ uint8_t*)alltoallNonLocalOutGM.GetPhyAddr();
     uint64_t allgatherSendBufOffsetCalcTemp = nonLocalE.tileLen * epRankSize * H * dataLen1;
     allgatherRecvBufOffsetTile = allgatherSendBufOffsetCalcTemp * nonLocalC.tileLen * tpRankSize;
     allgatherRecvBufOffsetTail = allgatherSendBufOffsetCalcTemp * nonLocalC.tailLen * tpRankSize;
@@ -450,7 +450,7 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
     uint64_t allGatherSendCountTile = nonLocalE.tileLen * epRankSize * nonLocalC.tileLen * H;
     uint64_t allGatherSendCountTail = nonLocalE.tileLen * epRankSize * nonLocalC.tailLen * H;
     if (epRankSize == 2U) {
-        allgatherSendBuf = (__gm__ uint8_t *)allgatherNonLocalInGM.GetPhyAddr();
+        allgatherSendBuf = (__gm__ uint8_t*)allgatherNonLocalInGM.GetPhyAddr();
         allGatherSendCountTile = allGatherSendCountTile / epRankSize;
         allGatherSendCountTail = allGatherSendCountTail / epRankSize;
     }
@@ -460,7 +460,7 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
     uint64_t alltoallHandleIndex = 0UL;
     for (uint32_t e_idx = 0U; e_idx < nonLocalE.tileCnt; e_idx++) {
         for (uint32_t c_idx = 0U; c_idx < nonLocalC.tileCnt; c_idx++) {
-            alltoallSendBuf = (__gm__ uint8_t *)xGM.GetPhyAddr() +
+            alltoallSendBuf = (__gm__ uint8_t*)xGM.GetPhyAddr() +
                               e_idx * nonLocalE.tileLen * alltoallSendBufOffsetBase + c_idx * alltoallSendBufOffsetTile;
             if ASCEND_IS_AIV {
                 uint32_t allgatherHandleId = 0;
@@ -493,7 +493,7 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
 
         if (nonLocalC.tailCnt == 1U) { // 处理C的尾块
             if ASCEND_IS_AIV {
-                alltoallSendBuf = (__gm__ uint8_t *)xGM.GetPhyAddr() +
+                alltoallSendBuf = (__gm__ uint8_t*)xGM.GetPhyAddr() +
                                   e_idx * nonLocalE.tileLen * alltoallSendBufOffsetBase +
                                   nonLocalC.tileCnt * alltoallSendBufOffsetTile;
                 if ASCEND_IS_AIV {
@@ -501,10 +501,10 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
                         hcclAlltoall.InterHcclGroupSync(1, handleIdx - 1);
                     }
                     for (uint32_t k = 0U; k < nonLocalE.tileLen; k++) {
-                        alltoallHandle = hcclAlltoall.AlltoAllV<true>(alltoallSendBuf, (void *)alltoallDataCountsTail,
-                                                                      (void *)alltoallSdispls, hcclDataType,
-                                                                      alltoallRecvBuf, (void *)alltoallDataCountsTail,
-                                                                      (void *)alltoallRdisplsTail, hcclDataType, 1);
+                        alltoallHandle = hcclAlltoall.AlltoAllV<true>(alltoallSendBuf, (void*)alltoallDataCountsTail,
+                                                                      (void*)alltoallSdispls, hcclDataType,
+                                                                      alltoallRecvBuf, (void*)alltoallDataCountsTail,
+                                                                      (void*)alltoallRdisplsTail, hcclDataType, 1);
                         alltoallSendBuf += alltoallSendBufOffsetBase;
                         alltoallRecvBuf += alltoallRecvBufOffsetTail;
                         alltoallHandleList[alltoallHandleIndex++] = alltoallHandle;
@@ -570,7 +570,7 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
     using bType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DataType1, IsTransposeWeight>;
     using cType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DataType1, false>;
     using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, DataType2, false>;
-    GM_ADDR wGM = (__gm__ uint8_t *)weightGM.GetPhyAddr();
+    GM_ADDR wGM = (__gm__ uint8_t*)weightGM.GetPhyAddr();
     GlobalTensor<DataType2> biasBuf;
     uint64_t weightOffset = nonLocalE.tileLen * H * M * dataLen1;
     uint64_t biasOffset;
@@ -622,11 +622,11 @@ __aicore__ inline void AlltoAllAllGatherBatchMatMul<DataType1, DataType2, ShardT
             Mc2BatchMatMulCommonKernel<aType, bType, cType, biasType> bmmv3;
             if (isCTail) {
                 allgatherRecvTensor = allgatherRecvTensor[allgatherRecvBufOffsetTail];
-                bmmv3.Init((__gm__ uint8_t *)transposeOutGM.GetPhyAddr(), wGM, (__gm__ uint8_t *)bmmOutGM.GetPhyAddr(),
+                bmmv3.Init((__gm__ uint8_t*)transposeOutGM.GetPhyAddr(), wGM, (__gm__ uint8_t*)bmmOutGM.GetPhyAddr(),
                            nullptr, nullptr, nullptr, &bmmNonLocalTailTiling->bmmTilingData, tpipe);
             } else {
                 allgatherRecvTensor = allgatherRecvTensor[allgatherRecvBufOffsetTile];
-                bmmv3.Init((__gm__ uint8_t *)transposeOutGM.GetPhyAddr(), wGM, (__gm__ uint8_t *)bmmOutGM.GetPhyAddr(),
+                bmmv3.Init((__gm__ uint8_t*)transposeOutGM.GetPhyAddr(), wGM, (__gm__ uint8_t*)bmmOutGM.GetPhyAddr(),
                            nullptr, nullptr, nullptr, &bmmNonLocalTileTiling->bmmTilingData, tpipe);
             }
             bmmv3.Process();

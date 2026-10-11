@@ -52,19 +52,19 @@ struct Mc2MatMulMultiBatchBaseBlockArgs {
 class Mc2BatchMatMulMultiBatchBaseBlock {
 public:
     __aicore__ inline Mc2BatchMatMulMultiBatchBaseBlock() {}
-    __aicore__ inline void Init(const void *tilingData);
+    __aicore__ inline void Init(const void* tilingData);
     __aicore__ inline void GetMultiBatchInfo(uint64_t loopIndex);
     __aicore__ inline void CalcGMOffset();
 
 public:
     Mc2MatMulMultiBatchBaseBlockOffset offset_;
     Mc2MatMulMultiBatchBaseBlockArgs params_;
-    const BatchMatMulV3TilingData *batchMatmulTilingData_;
+    const BatchMatMulV3TilingData* batchMatmulTilingData_;
 };
 
-__aicore__ inline void Mc2BatchMatMulMultiBatchBaseBlock::Init(const void *tilingData)
+__aicore__ inline void Mc2BatchMatMulMultiBatchBaseBlock::Init(const void* tilingData)
 {
-    batchMatmulTilingData_ = static_cast<const BatchMatMulV3TilingData *>(tilingData);
+    batchMatmulTilingData_ = static_cast<const BatchMatMulV3TilingData*>(tilingData);
     params_.isHf32 = batchMatmulTilingData_->matMulTilingData.isHf32;
 
     params_.singleASize = static_cast<uint64_t>(batchMatmulTilingData_->matMulTilingData.tCubeTiling.M) *

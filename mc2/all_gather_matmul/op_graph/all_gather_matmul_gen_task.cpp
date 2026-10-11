@@ -24,13 +24,13 @@
 #include "mc2_log.h"
 
 namespace ops {
-static ge::Status AllGatherMatmulCalcOpParam(gert::ExeResGenerationContext *context)
+static ge::Status AllGatherMatmulCalcOpParam(gert::ExeResGenerationContext* context)
 {
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, "aicpu kfc server", "kfc_stream");
 }
 
-static ge::Status AllGatherMatmulGenTask(const gert::ExeResGenerationContext *context,
-                                         std::vector<std::vector<uint8_t>> &tasks)
+static ge::Status AllGatherMatmulGenTask(const gert::ExeResGenerationContext* context,
+                                         std::vector<std::vector<uint8_t>>& tasks)
 {
     return Mc2GenTaskOpsUtils::CommonKFCMc2GenTask(context, tasks);
 }

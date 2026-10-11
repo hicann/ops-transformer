@@ -18,7 +18,7 @@
 #include "graph/utils/type_utils.h"
 
 namespace optiling {
-ge::graphStatus MatmulReduceScatterTilingV2Func(gert::TilingContext *context);
+ge::graphStatus MatmulReduceScatterTilingV2Func(gert::TilingContext* context);
 } // namespace optiling
 
 #endif // MATMUL_REDUCE_SCATTER_V2_TILING_COMMON_H

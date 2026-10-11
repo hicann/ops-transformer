@@ -103,13 +103,13 @@ struct HcclAicpuOpParam {
 };
 
 struct Mc2MatmulShapeInfo {
-    const gert::StorageShape *x1Shape{nullptr};
-    const gert::StorageShape *x2Shape{nullptr};
-    const gert::StorageShape *x1ScaleShape{nullptr};
-    const gert::StorageShape *x2ScaleShape{nullptr};
+    const gert::StorageShape* x1Shape{nullptr};
+    const gert::StorageShape* x2Shape{nullptr};
+    const gert::StorageShape* x1ScaleShape{nullptr};
+    const gert::StorageShape* x2ScaleShape{nullptr};
     bool isMxfp{false};
     bool isBTrans{false};
-    const char *opName{nullptr};
+    const char* opName{nullptr};
 };
 
 struct KFCMsgBody {
@@ -129,39 +129,39 @@ constexpr std::initializer_list<ge::DataType> FP8DTYPE_SUPPORT_LIST = {
 constexpr std::initializer_list<ge::DataType> MXFP8DTYPE_SUPPORT_LIST = {ge::DataType::DT_FLOAT8_E4M3FN,
                                                                          ge::DataType::DT_FLOAT8_E5M2};
 
-matmul_tiling::DataType ConvertGeTypeToMmType(const std::string &opName, ge::DataType type);
-ge::DataType ConvertMmTypeToGeType(const std::string &opName, matmul_tiling::DataType type);
-uint64_t GetDataTypeSize(const std::string &opName, ge::DataType type);
-HcclDataType ConvertGeTypeToHcclType(const std::string &opName, ge::DataType type);
+matmul_tiling::DataType ConvertGeTypeToMmType(const std::string& opName, ge::DataType type);
+ge::DataType ConvertMmTypeToGeType(const std::string& opName, matmul_tiling::DataType type);
+uint64_t GetDataTypeSize(const std::string& opName, ge::DataType type);
+HcclDataType ConvertGeTypeToHcclType(const std::string& opName, ge::DataType type);
 bool CheckSuppportedFormat(ge::Format format);
 bool IsDeterministic();
-bool GetRankSize(const std::string &opName, const char *group, int64_t &rankSize);
+bool GetRankSize(const std::string& opName, const char* group, int64_t& rankSize);
 bool CheckRankSize(const NpuArch npuArch, const uint32_t rankSize);
-uint8_t Mc2GetCommAlgo(int64_t rankDim, uint64_t mValue, const char *group, const gert::TilingContext *context);
+uint8_t Mc2GetCommAlgo(int64_t rankDim, uint64_t mValue, const char* group, const gert::TilingContext* context);
 
 bool CheckDataTypeVaild(ge::DataType type, std::initializer_list<ge::DataType> supportDtypeList);
 
 // 解析commAlg属性：未配置(空或"0")时按HCCL环境变量回退选择分层/全互联方案；
 // 返回GRAPH_FAILED表示commAlg取值非法，由调用方负责打印错误日志
-ge::graphStatus ParseCommAlgWithEnvFallback(const char *entityName, const char *commAlg, bool &isLayered);
+ge::graphStatus ParseCommAlgWithEnvFallback(const char* entityName, const char* commAlg, bool& isLayered);
 
 // 读取HCCL环境变量判断是否使用分层(HCCL_INTRA_PCIE_ENABLE=1且HCCL_INTRA_ROCE_ENABLE=0)
-bool IsHcclPcieLayered(const char *entityName);
+bool IsHcclPcieLayered(const char* entityName);
 
-void UpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args &mmV3Args, const mc2tiling::TilingArgs &args,
-                        const char *opName);
-ge::graphStatus GetMatmulV3PriorityPolicy(const NpuArch npuArch, std::vector<int32_t> &priorities, const char *opName);
+void UpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args& mmV3Args, const mc2tiling::TilingArgs& args,
+                        const char* opName);
+ge::graphStatus GetMatmulV3PriorityPolicy(const NpuArch npuArch, std::vector<int32_t>& priorities, const char* opName);
 
-inline std::string GetSocVersion(const gert::TilingContext *context)
+inline std::string GetSocVersion(const gert::TilingContext* context)
 {
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
-    fe::PlatFormInfos &platformInfo = *platformInfoPtr;
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos& platformInfo = *platformInfoPtr;
     std::string socVersion;
     (void)platformInfo.GetPlatformResWithLock("version", "Short_SoC_version", socVersion);
     return socVersion;
 }
 
-inline NpuArch GetNpuArch(const gert::TilingContext *context)
+inline NpuArch GetNpuArch(const gert::TilingContext* context)
 {
     auto platformInfo = context->GetPlatformInfo();
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
@@ -173,16 +173,16 @@ public:
     static uint8_t GetDebugMode();
     static uint8_t GetDebugCommAlg();
     static uint8_t GetDebugStepSize();
-    static uint32_t GetCommSets(const char *group);
-    static ge::graphStatus CommonParamCheck(const gert::TilingContext *context);
+    static uint32_t GetCommSets(const char* group);
+    static ge::graphStatus CommonParamCheck(const gert::TilingContext* context);
     static mc2tiling::HcclDataType GetDataType(ge::DataType type);
     static uint64_t GetMaxWindowSize();
     static bool CheckRankSize(NpuArch npuArch, uint32_t rankSize);
-    static HcclDataType ConvertGeTypeToHcclType(const std::string &opName, ge::DataType type);
-    static bool InferGroupSize(Mc2MatmulShapeInfo &mmInfo, uint64_t &groupSizeM, uint64_t &groupSizeN,
-                               uint64_t &groupSizeK);
+    static HcclDataType ConvertGeTypeToHcclType(const std::string& opName, ge::DataType type);
+    static bool InferGroupSize(Mc2MatmulShapeInfo& mmInfo, uint64_t& groupSizeM, uint64_t& groupSizeN,
+                               uint64_t& groupSizeK);
     template <typename T>
-    static uint64_t GetTilingKey(T &tilingData, bool isFullMeshHost = false)
+    static uint64_t GetTilingKey(T& tilingData, bool isFullMeshHost = false)
     {
         uint8_t commAlg = isFullMeshHost ? COMM_ALG_FULL_MESH_HOST : tilingData.msg.get_commAlg();
         uint64_t castBias = tilingData.param.get_biasLen() == 0 ? 0 : 1;
@@ -231,7 +231,7 @@ const std::map<NpuArch, std::set<uint32_t>> supportedRankSizeSet = {
 const std::set<ge::Format> SUPPORTED_FORMAT = {ge::FORMAT_NCL,  ge::FORMAT_NCDHW, ge::FORMAT_DHWCN,
                                                ge::FORMAT_NHWC, ge::FORMAT_NCHW,  ge::FORMAT_ND};
 
-inline ge::graphStatus GetCclBufferSize(const char *groupStr, uint64_t *cclBufferSize, const char *nodeName)
+inline ge::graphStatus GetCclBufferSize(const char* groupStr, uint64_t* cclBufferSize, const char* nodeName)
 {
     HcclComm hcclComm;
     OP_TILING_CHECK(
@@ -249,8 +249,8 @@ inline ge::graphStatus GetCclBufferSize(const char *groupStr, uint64_t *cclBuffe
     return ge::GRAPH_SUCCESS;
 }
 
-inline ge::graphStatus GetEpWinSize(const gert::TilingContext *context, const char *nodeName,
-                                    uint64_t &hcclBufferSizeEp, uint64_t &maxWindowSizeEp, uint32_t attrGroupEpIndex,
+inline ge::graphStatus GetEpWinSize(const gert::TilingContext* context, const char* nodeName,
+                                    uint64_t& hcclBufferSizeEp, uint64_t& maxWindowSizeEp, uint32_t attrGroupEpIndex,
                                     bool isLayered)
 {
     auto attrs = context->GetAttrs();
@@ -297,7 +297,7 @@ inline bool IsUseA2APath(const uint32_t rankDim, const NpuArch npuArch)
 
 // 按条件表查值：命中 m/k/n 区间条目返回其键值，否则返回 defaultValue
 inline int32_t GetValueFromMKNConditionMap(int32_t m, int32_t k, int32_t n, int32_t defaultValue,
-                                           const std::map<int, std::vector<std::vector<int>>> &conditionMap)
+                                           const std::map<int, std::vector<std::vector<int>>>& conditionMap)
 {
     // 条件向量列索引：[M_ST, M_END, K_ST, K_END, N_ST, N_END]
     constexpr int32_t CONDITION_M_ST = 0;
@@ -307,8 +307,8 @@ inline int32_t GetValueFromMKNConditionMap(int32_t m, int32_t k, int32_t n, int3
     constexpr int32_t CONDITION_N_ST = 4;
     constexpr int32_t CONDITION_N_END = 5;
     int32_t value = defaultValue;
-    for (auto &item : conditionMap) {
-        for (auto &condition : item.second) {
+    for (auto& item : conditionMap) {
+        for (auto& condition : item.second) {
             bool inRange = m > condition[CONDITION_M_ST] && m <= condition[CONDITION_M_END] &&
                            k > condition[CONDITION_K_ST] && k <= condition[CONDITION_K_END] &&
                            n > condition[CONDITION_N_ST] && n <= condition[CONDITION_N_END];
@@ -323,9 +323,9 @@ inline int32_t GetValueFromMKNConditionMap(int32_t m, int32_t k, int32_t n, int3
 // 遍历 tiling 参数表：带条件表的项按 MKN 条件查值，否则取 value（-1 表示跳过不赋值）
 template <typename TilingValueT>
 inline void SetTilingParamsFromConditionMap(int32_t m, int32_t k, int32_t n,
-                                            const std::map<int *, TilingValueT> &tilingParamMap)
+                                            const std::map<int*, TilingValueT>& tilingParamMap)
 {
-    for (auto &item : tilingParamMap) {
+    for (auto& item : tilingParamMap) {
         auto value = item.second.value;
         auto conditionMap = item.second.conditionMap;
         if (!conditionMap.empty()) {
@@ -338,7 +338,7 @@ inline void SetTilingParamsFromConditionMap(int32_t m, int32_t k, int32_t n,
 
 // CoCTiling 参数尾处理：ubMoveNum 折算半 KB 单位，并推导 k0/n0 基础块
 template <typename CoCTilingT>
-inline void FinalizeCoCTilingParam(CoCTilingT &cocTilingData)
+inline void FinalizeCoCTilingParam(CoCTilingT& cocTilingData)
 {
     constexpr int32_t HALF_KBYTE = 512;  // 半 KB 折算单位
     constexpr int32_t DEFAULT_ROW = 128; // 默认 m0 行数
@@ -351,8 +351,8 @@ inline void FinalizeCoCTilingParam(CoCTilingT &cocTilingData)
 }
 
 // 校验 HCCL BUFF 空间大小：获取失败仅告警跳过；成功但小于最小值则报错
-inline ge::graphStatus CheckHcclBuffSize(const gert::TilingContext *context, uint32_t attrGroupIndex,
-                                         int32_t minBuffBytes, const char *nodeName)
+inline ge::graphStatus CheckHcclBuffSize(const gert::TilingContext* context, uint32_t attrGroupIndex,
+                                         int32_t minBuffBytes, const char* nodeName)
 {
     constexpr int32_t MB_SIZE_BYTES = 1024 * 1024; // MB 换算字节数
     auto attrs = context->GetAttrs();
@@ -372,8 +372,8 @@ inline ge::graphStatus CheckHcclBuffSize(const gert::TilingContext *context, uin
 
 // 设置 hccl 通信任务配置（MultiPut=level0:fullmesh）并填充 tiling 数据
 template <typename TilingDataT>
-inline ge::graphStatus SetHcclCcTilingConfig(const gert::TilingContext *context, uint32_t attrGroupIndex,
-                                             TilingDataT *tilingData)
+inline ge::graphStatus SetHcclCcTilingConfig(const gert::TilingContext* context, uint32_t attrGroupIndex,
+                                             TilingDataT* tilingData)
 {
     constexpr uint32_t MC2_CC_OP_TYPE_BATCH_WRITE = 18; // batch write
     auto attrs = context->GetAttrs();
@@ -388,14 +388,14 @@ inline ge::graphStatus SetHcclCcTilingConfig(const gert::TilingContext *context,
 // ===== 非量化 A3 tiling 公共校验 =====
 
 // 工具函数：判断指定 value 是否存在于 list 中
-inline bool IsContains(const std::vector<uint32_t> &list, uint32_t value)
+inline bool IsContains(const std::vector<uint32_t>& list, uint32_t value)
 {
     return std::count(list.begin(), list.end(), value) > 0;
 }
 
 // 非量化场景校验 bias 数据类型：x1 为 BF16 要求 FLOAT；x1 为 FLOAT16 要求与 x1 一致
-inline ge::graphStatus CheckNonQuantBiasDataType(const gert::CompileTimeTensorDesc *biasTensorDesc,
-                                                 ge::DataType x1Dtype, const char *opName)
+inline ge::graphStatus CheckNonQuantBiasDataType(const gert::CompileTimeTensorDesc* biasTensorDesc,
+                                                 ge::DataType x1Dtype, const char* opName)
 {
     if (biasTensorDesc != nullptr) {
         ge::DataType biasDtype = biasTensorDesc->GetDataType();
@@ -424,7 +424,7 @@ inline ge::graphStatus CheckNonQuantBiasDataType(const gert::CompileTimeTensorDe
 
 // 按通信轮次上限切分 M 维：tileLen 按 128 字节对齐（2 字节 dtype 对齐 64 元素，4 字节对齐 32 元素）；
 // commTurn 超过 maxTileCnt 时截断为 maxTileCnt，返回切分后的单份行数
-inline uint32_t SplitMValueByCommTurn(uint64_t mValue, uint64_t &commTurn, uint64_t dtypeSize, uint32_t maxTileCnt = 64)
+inline uint32_t SplitMValueByCommTurn(uint64_t mValue, uint64_t& commTurn, uint64_t dtypeSize, uint32_t maxTileCnt = 64)
 {
     if (commTurn >= maxTileCnt) {
         commTurn = maxTileCnt;

@@ -145,29 +145,29 @@ struct TilingInferredInfo {
 
 class MatmulAlltoAllTilingUtil {
 public:
-    static QuantMode GetQuantMode(const gert::TilingContext *context, const char *opName);
-    static ge::graphStatus GetAndValidateRankSize(const gert::TilingContext *context, const char *opName,
-                                                  const char *group, int64_t &rankDim);
-    static ge::graphStatus GetAndConvertCommMode(const gert::TilingContext *context, const char *opName,
-                                                 const TilingContextInfo &contextInfo,
-                                                 const OpAttrIndexSchema &indexSchema, uint8_t &commMode);
-    static void GetMatrix2DShapes(const gert::TilingContext *context, Matrix2DShapes &shapes);
-    static ge::graphStatus CheckAttrsInfo(const gert::TilingContext *context, const char *opName,
-                                          const OpAttrIndexSchema &indexSchema);
-    static ge::graphStatus CheckShapeInfo(const gert::TilingContext *context, const char *opName,
-                                          const OpAttrIndexSchema &indexSchema);
-    static ge::graphStatus CheckKcQuantShapeInfo(const gert::TilingContext *context, const char *opName,
-                                                 const OpAttrIndexSchema &indexSchema);
-    static ge::graphStatus CheckTensorFormat(const gert::TilingContext *context, const char *opName);
-    static ge::graphStatus CheckNonQuantTensorDataType(const gert::TilingContext *context, const char *opName);
-    static ge::graphStatus CheckKcQuantTensorDataType(const gert::TilingContext *context, const char *opName);
-    static ge::graphStatus SetAttrsInfo(const gert::TilingContext *context, const char *opName,
-                                        TilingContextInfo &contextInfo, const OpAttrIndexSchema &indexSchema);
-    static ge::graphStatus SetShapeInfo(const gert::TilingContext *context, TilingContextInfo &contextInfo);
-    static ge::graphStatus SetDataTypeInfo(const gert::TilingContext *context, const char *opName,
-                                           TilingContextInfo &contextInfo);
-    static ge::graphStatus SetKcDataTypeInfo(const gert::TilingContext *context, const char *opName,
-                                             TilingContextInfo &contextInfo);
+    static QuantMode GetQuantMode(const gert::TilingContext* context, const char* opName);
+    static ge::graphStatus GetAndValidateRankSize(const gert::TilingContext* context, const char* opName,
+                                                  const char* group, int64_t& rankDim);
+    static ge::graphStatus GetAndConvertCommMode(const gert::TilingContext* context, const char* opName,
+                                                 const TilingContextInfo& contextInfo,
+                                                 const OpAttrIndexSchema& indexSchema, uint8_t& commMode);
+    static void GetMatrix2DShapes(const gert::TilingContext* context, Matrix2DShapes& shapes);
+    static ge::graphStatus CheckAttrsInfo(const gert::TilingContext* context, const char* opName,
+                                          const OpAttrIndexSchema& indexSchema);
+    static ge::graphStatus CheckShapeInfo(const gert::TilingContext* context, const char* opName,
+                                          const OpAttrIndexSchema& indexSchema);
+    static ge::graphStatus CheckKcQuantShapeInfo(const gert::TilingContext* context, const char* opName,
+                                                 const OpAttrIndexSchema& indexSchema);
+    static ge::graphStatus CheckTensorFormat(const gert::TilingContext* context, const char* opName);
+    static ge::graphStatus CheckNonQuantTensorDataType(const gert::TilingContext* context, const char* opName);
+    static ge::graphStatus CheckKcQuantTensorDataType(const gert::TilingContext* context, const char* opName);
+    static ge::graphStatus SetAttrsInfo(const gert::TilingContext* context, const char* opName,
+                                        TilingContextInfo& contextInfo, const OpAttrIndexSchema& indexSchema);
+    static ge::graphStatus SetShapeInfo(const gert::TilingContext* context, TilingContextInfo& contextInfo);
+    static ge::graphStatus SetDataTypeInfo(const gert::TilingContext* context, const char* opName,
+                                           TilingContextInfo& contextInfo);
+    static ge::graphStatus SetKcDataTypeInfo(const gert::TilingContext* context, const char* opName,
+                                             TilingContextInfo& contextInfo);
 };
 
 // Builder模式成员函数通常使用小写字母开头
@@ -203,45 +203,45 @@ private:
 
 public:
     struct ConfigFile {
-        static constexpr const char *GROUP_NAME = "groupName";
-        static constexpr const char *OP_TYPE = "opType";
-        static constexpr const char *ALG_CONFIG = "algConfig";
-        static constexpr const char *REDUCE_TYPE = "reduceType";
-        static constexpr const char *STEP_SIZE = "stepSize";
-        static constexpr const char *SKIP_LOCAL_RANK_COPY = "skipLocalRankCopy";
-        static constexpr const char *SKIP_BUFFER_WINDOW_COPY = "skipBufferWindowCopy";
-        static constexpr const char *DEBUG_MODE = "debugMode";
-        static constexpr const char *COMM_BLOCK_NUM = "commBlockNum";
-        static constexpr const char *QUEUE_NUM = "queueNum";
-        static constexpr const char *COMM_ENGINE = "commEngine";
+        static constexpr const char* GROUP_NAME = "groupName";
+        static constexpr const char* OP_TYPE = "opType";
+        static constexpr const char* ALG_CONFIG = "algConfig";
+        static constexpr const char* REDUCE_TYPE = "reduceType";
+        static constexpr const char* STEP_SIZE = "stepSize";
+        static constexpr const char* SKIP_LOCAL_RANK_COPY = "skipLocalRankCopy";
+        static constexpr const char* SKIP_BUFFER_WINDOW_COPY = "skipBufferWindowCopy";
+        static constexpr const char* DEBUG_MODE = "debugMode";
+        static constexpr const char* COMM_BLOCK_NUM = "commBlockNum";
+        static constexpr const char* QUEUE_NUM = "queueNum";
+        static constexpr const char* COMM_ENGINE = "commEngine";
     };
 
     struct AlgConfigType {
-        static constexpr const char *ALL_REDUCE = "AllReduce=level0:doublering";
-        static constexpr const char *ALL_GATHER = "AllGather=level0:doublering";
-        static constexpr const char *REDUCE_SCATTER = "ReduceScatter=level0:doublering";
-        static constexpr const char *ALL_TO_ALL = "AlltoAll=level0:fullmesh;level1:pairwise";
-        static constexpr const char *BATCH_WRITE = "BatchWrite=level0:fullmesh";
+        static constexpr const char* ALL_REDUCE = "AllReduce=level0:doublering";
+        static constexpr const char* ALL_GATHER = "AllGather=level0:doublering";
+        static constexpr const char* REDUCE_SCATTER = "ReduceScatter=level0:doublering";
+        static constexpr const char* ALL_TO_ALL = "AlltoAll=level0:fullmesh;level1:pairwise";
+        static constexpr const char* BATCH_WRITE = "BatchWrite=level0:fullmesh";
     };
 
-    static constexpr const char *GROUP = "group";
+    static constexpr const char* GROUP = "group";
     static constexpr const uint8_t CONSTANTS_ZERO = 0;
     static constexpr const uint8_t CONSTANTS_ONE = 1;
     static constexpr const uint8_t CONSTANTS_TWO = 2;
 
     // 构造函数
-    Mc2CcTilingConfigBuilder(const std::string &groupName, uint32_t opType, const std::string &algConfig);
+    Mc2CcTilingConfigBuilder(const std::string& groupName, uint32_t opType, const std::string& algConfig);
 
     // 链式配置方法（声明),通过change和with方法来修改hccl中的对应属性
-    Mc2CcTilingConfigBuilder &withReduceType(const char *opName, mc2tiling::HcclReduceOp reduceType,
+    Mc2CcTilingConfigBuilder& withReduceType(const char* opName, mc2tiling::HcclReduceOp reduceType,
                                              ge::DataType dstDataType, ge::DataType srcDataType);
-    Mc2CcTilingConfigBuilder &withStepSize(uint8_t stepSize);
-    Mc2CcTilingConfigBuilder &isLocalRankDataToLocalDst(bool flag);
-    Mc2CcTilingConfigBuilder &isSrcDataFromWindow(bool fromWindow);
-    Mc2CcTilingConfigBuilder &withDebugMode(uint8_t debugMode);
-    Mc2CcTilingConfigBuilder &withCommBlockNum(uint16_t commBlockNum);
-    Mc2CcTilingConfigBuilder &withQueueNum(uint16_t queueNum);
-    Mc2CcTilingConfigBuilder &withCommEngine(uint8_t commEngine);
+    Mc2CcTilingConfigBuilder& withStepSize(uint8_t stepSize);
+    Mc2CcTilingConfigBuilder& isLocalRankDataToLocalDst(bool flag);
+    Mc2CcTilingConfigBuilder& isSrcDataFromWindow(bool fromWindow);
+    Mc2CcTilingConfigBuilder& withDebugMode(uint8_t debugMode);
+    Mc2CcTilingConfigBuilder& withCommBlockNum(uint16_t commBlockNum);
+    Mc2CcTilingConfigBuilder& withQueueNum(uint16_t queueNum);
+    Mc2CcTilingConfigBuilder& withCommEngine(uint8_t commEngine);
 
     AscendC::Mc2CcTilingConfig build();
     bool isSuccess() const;
@@ -250,17 +250,17 @@ public:
 
     // 模版方法
     template <typename... Args>
-    void setCcTilingData(Args &&...args)
+    void setCcTilingData(Args&&... args)
     {
         (mc2CcTilingConfig.GetTiling(args), ...);
     }
 
     // 静态工厂
-    static Mc2CcTilingConfigBuilder create(const std::string &groupName, mc2tiling::AicpuComType opType,
-                                           const std::string &algConfig);
+    static Mc2CcTilingConfigBuilder create(const std::string& groupName, mc2tiling::AicpuComType opType,
+                                           const std::string& algConfig);
 };
 
-inline bool IsArrayEqual(std::vector<uint32_t> &arr1, const std::vector<uint32_t> &arr2, uint32_t size)
+inline bool IsArrayEqual(std::vector<uint32_t>& arr1, const std::vector<uint32_t>& arr2, uint32_t size)
 {
     if (arr1.size() < size || arr2.size() < size) {
         return false;

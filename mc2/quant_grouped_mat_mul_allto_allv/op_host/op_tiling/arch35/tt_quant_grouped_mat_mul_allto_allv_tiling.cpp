@@ -45,7 +45,7 @@ bool TTQuantGroupedMatmulAllToAllvTiling::IsCapable()
 
 ge::graphStatus TTQuantGroupedMatmulAllToAllvTiling::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "get workspace failed"), return ge::GRAPH_FAILED);
     workspaces[0] = workSpaceSize_;
     OP_LOGD(opName_, "Workspaces[0] size=%ld", workspaces[0]);

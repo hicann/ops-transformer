@@ -61,7 +61,7 @@ struct MoeDistributeCombineSetupTestParam {
     uint64_t mc2TilingDataReservedLen;
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MoeDistributeCombineSetupTestParam &param)
+inline std::ostream& operator<<(std::ostream& os, const MoeDistributeCombineSetupTestParam& param)
 {
     return os << param.caseName;
 }
@@ -1801,7 +1801,7 @@ protected:
     }
 };
 
-gert::StorageShape make_shape(const std::initializer_list<int64_t> &input_shape)
+gert::StorageShape make_shape(const std::initializer_list<int64_t>& input_shape)
 {
     if (input_shape.size() == 0) {
         return gert::StorageShape{};
@@ -1812,7 +1812,7 @@ gert::StorageShape make_shape(const std::initializer_list<int64_t> &input_shape)
 struct MoeDistributeCombineSetupCompileInfo {};
 static MoeDistributeCombineSetupCompileInfo compileInfo{};
 
-static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombineSetupTestParam &param)
+static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombineSetupTestParam& param)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
 

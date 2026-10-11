@@ -44,24 +44,24 @@ TEST_F(GroupedMatMulAlltoAllvTest, GroupedMatMulAlltoAllvTest0)
     size_t sysWorkspaceSize = 10 * 1024 * 1024;
     size_t usrWorkspaceSize = 10 * 1024 * 1024;
     size_t allWorkspaceSize = usrWorkspaceSize + sysWorkspaceSize;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(allWorkspaceSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(allWorkspaceSize);
     size_t tilingSize = sizeof(GroupedMatMulAlltoAllvTilingData);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingSize);
 
     GmmAlltoAllvCommonTilingInfo commonTilingInfo{4096, 7168, 7168, 1,     4096,  2048,  4096, 4096,
                                                   1,    20,   40,   false, false, false, false};
-    GroupedMatMulAlltoAllvTilingData *tilingData = reinterpret_cast<GroupedMatMulAlltoAllvTilingData *>(tiling);
+    GroupedMatMulAlltoAllvTilingData* tilingData = reinterpret_cast<GroupedMatMulAlltoAllvTilingData*>(tiling);
     tilingData->commonTilingInfo = commonTilingInfo;
 
-    uint8_t *gmmxGM = (uint8_t *)AscendC::GmAlloc(commonTilingInfo.A * commonTilingInfo.H * sizeof(uint16_t));
-    uint8_t *gmmweightGM = (uint8_t *)AscendC::GmAlloc(commonTilingInfo.E_ep * commonTilingInfo.H *
-                                                       commonTilingInfo.N1 * sizeof(uint16_t));
-    uint8_t *sendCountsTensorOptionalGM = nullptr;
-    uint8_t *recvCountsTensorOptionalGM = nullptr;
-    uint8_t *mmxOptionalGM = nullptr;
-    uint8_t *mmweightOptionalGM = nullptr;
-    uint8_t *yGM = (uint8_t *)AscendC::GmAlloc(commonTilingInfo.BsK * commonTilingInfo.N1 * sizeof(uint16_t));
-    uint8_t *mmyOptionalGM = nullptr;
+    uint8_t* gmmxGM = (uint8_t*)AscendC::GmAlloc(commonTilingInfo.A * commonTilingInfo.H * sizeof(uint16_t));
+    uint8_t* gmmweightGM =
+        (uint8_t*)AscendC::GmAlloc(commonTilingInfo.E_ep * commonTilingInfo.H * commonTilingInfo.N1 * sizeof(uint16_t));
+    uint8_t* sendCountsTensorOptionalGM = nullptr;
+    uint8_t* recvCountsTensorOptionalGM = nullptr;
+    uint8_t* mmxOptionalGM = nullptr;
+    uint8_t* mmweightOptionalGM = nullptr;
+    uint8_t* yGM = (uint8_t*)AscendC::GmAlloc(commonTilingInfo.BsK * commonTilingInfo.N1 * sizeof(uint16_t));
+    uint8_t* mmyOptionalGM = nullptr;
 
     ICPU_SET_TILING_KEY(0);
     auto groupedMatMulAlltoAllvWrapper = [](GM_ADDR gmmxGM, GM_ADDR gmmweightGM, GM_ADDR sendCountsTensorOptionalGM,
@@ -75,9 +75,9 @@ TEST_F(GroupedMatMulAlltoAllvTest, GroupedMatMulAlltoAllvTest0)
     ICPU_RUN_KF(groupedMatMulAlltoAllvWrapper, 20, gmmxGM, gmmweightGM, sendCountsTensorOptionalGM,
                 recvCountsTensorOptionalGM, mmxOptionalGM, mmweightOptionalGM, yGM, mmyOptionalGM, workspace, tiling);
 
-    AscendC::GmFree((void *)workspace);
-    AscendC::GmFree((void *)tiling);
-    AscendC::GmFree((void *)gmmxGM);
-    AscendC::GmFree((void *)gmmweightGM);
-    AscendC::GmFree((void *)yGM);
+    AscendC::GmFree((void*)workspace);
+    AscendC::GmFree((void*)tiling);
+    AscendC::GmFree((void*)gmmxGM);
+    AscendC::GmFree((void*)gmmweightGM);
+    AscendC::GmFree((void*)yGM);
 }

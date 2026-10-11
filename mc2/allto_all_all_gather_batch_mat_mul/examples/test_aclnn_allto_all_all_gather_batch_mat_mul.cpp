@@ -38,7 +38,7 @@ constexpr int EP_WORLD_SIZE = 4;
 constexpr int TP_WORLD_SIZE = 2;
 constexpr int DEV_NUM = EP_WORLD_SIZE * TP_WORLD_SIZE;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -48,8 +48,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -73,7 +73,7 @@ struct Args {
     aclrtContext context;
 };
 
-int LaunchOneThreadAlltoAllAllGatherBmm(Args &args)
+int LaunchOneThreadAlltoAllAllGatherBmm(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret: %d\n", ret); return ret);
@@ -119,22 +119,22 @@ int LaunchOneThreadAlltoAllAllGatherBmm(Args &args)
         return -1;
     }
 
-    void *xDeviceAddr = nullptr;
-    void *weightDeviceAddr = nullptr;
-    void *biasDeviceAddr = nullptr;
-    void *y1OutDeviceAddr = nullptr;
-    void *y2OutDeviceAddr = nullptr;
-    void *y3OutDeviceAddr = nullptr;
-    aclTensor *x = nullptr;
-    aclTensor *weight = nullptr;
-    aclTensor *bias = nullptr;
-    aclTensor *y1Out = nullptr;
-    aclTensor *y2Out = nullptr;
-    aclTensor *y3Out = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* weightDeviceAddr = nullptr;
+    void* biasDeviceAddr = nullptr;
+    void* y1OutDeviceAddr = nullptr;
+    void* y2OutDeviceAddr = nullptr;
+    void* y3OutDeviceAddr = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* weight = nullptr;
+    aclTensor* bias = nullptr;
+    aclTensor* y1Out = nullptr;
+    aclTensor* y2Out = nullptr;
+    aclTensor* y3Out = nullptr;
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     long long xShapeSize = GetShapeSize(xShape);
     long long weightShapeSize = GetShapeSize(weightShape);
@@ -231,7 +231,7 @@ int LaunchOneThreadAlltoAllAllGatherBmm(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // 本样例基于Atlas A3实现，必须在Atlas A3上运行
     int ret = aclInit(nullptr);

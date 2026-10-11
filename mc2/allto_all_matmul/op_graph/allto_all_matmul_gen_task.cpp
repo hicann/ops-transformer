@@ -26,7 +26,7 @@
 
 namespace ops {
 
-static ge::Status GetCommModeFromAttrs(const gert::ExeResGenerationContext *context, uint8_t &commMode)
+static ge::Status GetCommModeFromAttrs(const gert::ExeResGenerationContext* context, uint8_t& commMode)
 {
     ge::AscendString commModeStr;
     if (!context->GetStrAttrVal("comm_mode", commModeStr)) {
@@ -45,13 +45,13 @@ static ge::Status GetCommModeFromAttrs(const gert::ExeResGenerationContext *cont
     return ge::GRAPH_SUCCESS;
 }
 
-ge::Status AlltoAllMatmulGenTaskCallback(const gert::ExeResGenerationContext *context,
-                                         std::vector<std::vector<uint8_t>> &tasks)
+ge::Status AlltoAllMatmulGenTaskCallback(const gert::ExeResGenerationContext* context,
+                                         std::vector<std::vector<uint8_t>>& tasks)
 {
     return Mc2GenTaskOpsUtils::CommonKFCMc2GenTask(context, tasks);
 }
 
-static ge::Status AlltoAllMatmulCalcOpParamFunc(gert::ExeResGenerationContext *context)
+static ge::Status AlltoAllMatmulCalcOpParamFunc(gert::ExeResGenerationContext* context)
 {
     if (IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5)) {
         uint8_t commMode = Mc2Comm::COMM_MODE_CCU;
@@ -70,8 +70,8 @@ static ge::Status AlltoAllMatmulCalcOpParamFunc(gert::ExeResGenerationContext *c
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, "aicpu kfc server", "kfc_stream");
 }
 
-static ge::Status AlltoAllMatmulGenTaskFunc(const gert::ExeResGenerationContext *context,
-                                            std::vector<std::vector<uint8_t>> &tasks)
+static ge::Status AlltoAllMatmulGenTaskFunc(const gert::ExeResGenerationContext* context,
+                                            std::vector<std::vector<uint8_t>>& tasks)
 {
     if (IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5)) {
         uint8_t commMode = Mc2Comm::COMM_MODE_CCU;

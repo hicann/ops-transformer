@@ -53,9 +53,9 @@ __global__ __aicore__ void matmul_reduce_scatter(GM_ADDR aGM, GM_ADDR bGM, GM_AD
     REGISTER_TILING_DEFAULT(MatmulReduceScatterTilingData);
 // matmulreducescatter算子kernel侧代码不支持A5
 #if __CCE_AICORE__ != 310
-    auto tiling = (__gm__ MatmulReduceScatterTilingData *)tilingGM;
-    __gm__ void *mc2InitTiling = (__gm__ void *)(&(tiling->mc2InitTiling));
-    __gm__ void *mc2CcTiling = (__gm__ void *)(&(tiling->mc2CcTiling));
+    auto tiling = (__gm__ MatmulReduceScatterTilingData*)tilingGM;
+    __gm__ void* mc2InitTiling = (__gm__ void*)(&(tiling->mc2InitTiling));
+    __gm__ void* mc2CcTiling = (__gm__ void*)(&(tiling->mc2CcTiling));
     GET_TILING_DATA(tilingData, tilingGM);
 
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);

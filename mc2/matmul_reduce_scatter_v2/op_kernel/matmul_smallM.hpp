@@ -103,7 +103,7 @@ public:
         Params() {}
 
         CATLASS_HOST_DEVICE
-        Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
+        Params(GemmCoord const& problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR ptrBias_, GM_ADDR ptrC_, GM_ADDR ptrScale_, int32_t pValue_, int32_t swizzlCount_,
                int32_t swizzlDirect_, int32_t rankIdx_, int32_t rankSize_, bool needFixpipe_)
             : problemShape(problemShape_),
@@ -128,9 +128,9 @@ public:
     MatmulReduceScatterAivModeSmallM() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params const &params);
+    CATLASS_DEVICE void operator()(Params const& params);
 
-    inline __aicore__ void InitArgs(Params const &params)
+    inline __aicore__ void InitArgs(Params const& params)
     {
         block_id = AscendC::GetBlockIdx();
         core_num = AscendC::GetBlockNum();
@@ -167,16 +167,16 @@ public:
         return GemmCoord{mActual, nActual, kActual};
     }
 
-    inline __aicore__ void FixpipeMatmul(Params const &params)
+    inline __aicore__ void FixpipeMatmul(Params const& params)
     {
         AscendC::GlobalTensor<ElementScale> gmScale;
         AscendC::GlobalTensor<ElementAInt8> gmAInt8;
         AscendC::GlobalTensor<ElementBInt8> gmBInt8;
         AscendC::GlobalTensor<ElementCHalf> gmCHalf;
-        gmScale.SetGlobalBuffer((__gm__ ElementScale *)params.ptrScale);
-        gmAInt8.SetGlobalBuffer((__gm__ ElementAInt8 *)params.ptrA);
-        gmBInt8.SetGlobalBuffer((__gm__ ElementBInt8 *)params.ptrB);
-        gmCHalf.SetGlobalBuffer((__gm__ ElementCHalf *)params.ptrC);
+        gmScale.SetGlobalBuffer((__gm__ ElementScale*)params.ptrScale);
+        gmAInt8.SetGlobalBuffer((__gm__ ElementAInt8*)params.ptrA);
+        gmBInt8.SetGlobalBuffer((__gm__ ElementBInt8*)params.ptrB);
+        gmCHalf.SetGlobalBuffer((__gm__ ElementCHalf*)params.ptrC);
 
         LayoutScale layoutScale{static_cast<uint32_t>(params.problemShape.n())};
 
@@ -275,17 +275,17 @@ public:
         }
     }
 
-    inline __aicore__ void Matmul(Params const &params)
+    inline __aicore__ void Matmul(Params const& params)
     {
         AscendC::GlobalTensor<ElementA> gmA;
         AscendC::GlobalTensor<ElementB> gmB;
         AscendC::GlobalTensor<ElementC> gmC;
         AscendC::GlobalTensor<ElementBias> gmBias;
-        gmA.SetGlobalBuffer((__gm__ ElementA *)params.ptrA);
-        gmB.SetGlobalBuffer((__gm__ ElementB *)params.ptrB);
-        gmC.SetGlobalBuffer((__gm__ ElementC *)params.ptrC);
+        gmA.SetGlobalBuffer((__gm__ ElementA*)params.ptrA);
+        gmB.SetGlobalBuffer((__gm__ ElementB*)params.ptrB);
+        gmC.SetGlobalBuffer((__gm__ ElementC*)params.ptrC);
         if constexpr (HasBias) {
-            gmBias.SetGlobalBuffer((__gm__ ElementBias *)params.ptrBias);
+            gmBias.SetGlobalBuffer((__gm__ ElementBias*)params.ptrBias);
         }
 
         BlockMmad blockMmad(resource);
@@ -390,7 +390,7 @@ public:
     }
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const& params)
     {
         Catlass::Arch::CrossCoreWaitFlag(flagAivFinishPadding);
 

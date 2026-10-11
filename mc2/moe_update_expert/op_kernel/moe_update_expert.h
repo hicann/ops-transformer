@@ -44,7 +44,7 @@ public:
     __aicore__ inline void Init(GM_ADDR expertIdsGM, GM_ADDR eplbTableGM, GM_ADDR expertScalesGM,
                                 GM_ADDR pruningThresholdGM, GM_ADDR activeMaskGM, GM_ADDR balancedExpertIdsOutGM,
                                 GM_ADDR balancedActiveMaskOutGM, GM_ADDR workspaceGM,
-                                const MoeUpdateExpertTilingData *tilingData, TPipe *tPipe);
+                                const MoeUpdateExpertTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessPruning(int32_t tokenStart, int32_t tokenEnd);
 
@@ -52,8 +52,8 @@ private:
     __aicore__ inline void CalculateUnroll(int32_t start, int32_t computeLen);
     __aicore__ inline void Calculate(int32_t start, int32_t end, int32_t computeLen);
     __aicore__ inline void CalculateUnrollRest(int32_t start, int32_t loopNum, int32_t restNum);
-    __aicore__ inline void GetCoreRange(int32_t coreIndex, int32_t coreNum, int32_t totalData, int32_t &start,
-                                        int32_t &end);
+    __aicore__ inline void GetCoreRange(int32_t coreIndex, int32_t coreNum, int32_t totalData, int32_t& start,
+                                        int32_t& end);
     __aicore__ inline void InitPruning();
     __aicore__ inline void ProcessEachTokenPruning(int32_t tokenIdx);
 
@@ -89,7 +89,7 @@ private:
     TBuf<> localAllFalseMaskUint8Buf_;
     TBuf<> localCompareResultBuf_;
 
-    TPipe *tPipe_{nullptr};
+    TPipe* tPipe_{nullptr};
     TBuf<> buffer_;
     LocalTensor<DataType> outTensor_;
     LocalTensor<float> localScalesFp32_;
@@ -118,8 +118,8 @@ __aicore__ inline void MoeUpdateExpert<UPDATE_EXPERT_ARGS>::Init(GM_ADDR expertI
                                                                  GM_ADDR expertScalesGM, GM_ADDR pruningThresholdGM,
                                                                  GM_ADDR activeMaskGM, GM_ADDR balancedExpertIdsOutGM,
                                                                  GM_ADDR balancedActiveMaskOutGM, GM_ADDR workspaceGM,
-                                                                 const MoeUpdateExpertTilingData *tilingData,
-                                                                 TPipe *tPipe)
+                                                                 const MoeUpdateExpertTilingData* tilingData,
+                                                                 TPipe* tPipe)
 {
     tPipe_ = tPipe;
 
@@ -138,9 +138,9 @@ __aicore__ inline void MoeUpdateExpert<UPDATE_EXPERT_ARGS>::Init(GM_ADDR expertI
         worldSize_ = tilingData->worldSize;
     }
 
-    expertIdsTensor_.SetGlobalBuffer((__gm__ DataType *)expertIdsGM_);
-    balancedExpertIdsTensor_.SetGlobalBuffer((__gm__ DataType *)balancedExpertIdsOutGM_);
-    eplbTableTensor_.SetGlobalBuffer((__gm__ int32_t *)eplbTableGM_);
+    expertIdsTensor_.SetGlobalBuffer((__gm__ DataType*)expertIdsGM_);
+    balancedExpertIdsTensor_.SetGlobalBuffer((__gm__ DataType*)balancedExpertIdsOutGM_);
+    eplbTableTensor_.SetGlobalBuffer((__gm__ int32_t*)eplbTableGM_);
 
     // 剪枝相关张量初始化
     if constexpr (EnablePruning) {
@@ -161,14 +161,14 @@ __aicore__ inline void MoeUpdateExpert<UPDATE_EXPERT_ARGS>::Init(GM_ADDR expertI
         isActiveMask_ = bool(tilingData->isActiveMask);
         if (isActiveMask_ == 1) {
             activeMaskGM_ = activeMaskGM;
-            activeMaskInTensor_.SetGlobalBuffer((__gm__ uint8_t *)activeMaskGM_);
+            activeMaskInTensor_.SetGlobalBuffer((__gm__ uint8_t*)activeMaskGM_);
         }
         expertScalesGM_ = expertScalesGM;
         pruningThresholdGM_ = pruningThresholdGM;
         balancedActiveMaskOutGM_ = balancedActiveMaskOutGM;
-        expertScalesTensor_.SetGlobalBuffer((__gm__ ScalesDataType *)expertScalesGM_);
-        preTuningThresholdTensor_.SetGlobalBuffer((__gm__ float *)pruningThresholdGM_);
-        balancedActiveMaskTensor_.SetGlobalBuffer((__gm__ bool *)balancedActiveMaskOutGM_);
+        expertScalesTensor_.SetGlobalBuffer((__gm__ ScalesDataType*)expertScalesGM_);
+        preTuningThresholdTensor_.SetGlobalBuffer((__gm__ float*)pruningThresholdGM_);
+        balancedActiveMaskTensor_.SetGlobalBuffer((__gm__ bool*)balancedActiveMaskOutGM_);
     }
 }
 
@@ -395,8 +395,8 @@ __aicore__ inline void MoeUpdateExpert<UPDATE_EXPERT_ARGS>::ProcessPruning(int32
 
 template <UPDATE_EXPERT_DECLARE>
 __aicore__ inline void MoeUpdateExpert<UPDATE_EXPERT_ARGS>::GetCoreRange(int32_t coreIndex, int32_t coreNum,
-                                                                         int32_t totalData, int32_t &start,
-                                                                         int32_t &end)
+                                                                         int32_t totalData, int32_t& start,
+                                                                         int32_t& end)
 {
     int32_t perCore = totalData / coreNum;
     int32_t remainder = totalData % coreNum;

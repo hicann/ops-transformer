@@ -82,7 +82,7 @@ struct Mc2WeightQuantBatchMatmulInfo {
     Mc2QuantType antiQuantType = Mc2QuantType::NONE;
     Mc2QuantType quantType = Mc2QuantType::PER_TENSOR;
     // 整改Base类时统一换成使用opName_
-    const char *opName;
+    const char* opName;
     ge::Format aFormat = ge::FORMAT_ND;
     ge::Format bFormat = ge::FORMAT_ND;
     uint64_t innerPrecise = 0;
@@ -119,7 +119,7 @@ class Mc2WeightQuantBatchMatmulV2Tiling : public TilingBaseClass {
 public:
     using TilingBaseClass::Reset;
 
-    explicit Mc2WeightQuantBatchMatmulV2Tiling(gert::TilingContext *context)
+    explicit Mc2WeightQuantBatchMatmulV2Tiling(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
 
@@ -132,12 +132,12 @@ protected:
     }
     ge::graphStatus GetPlatformInfo() override;
     ge::graphStatus GetShapeAttrsInfo() override;
-    void SetCommonTilingKeyElement(Mc2TilingKeyConfigure &tilingKeyConfigure) const;
+    void SetCommonTilingKeyElement(Mc2TilingKeyConfigure& tilingKeyConfigure) const;
 
     void Reset() {};
     void InitCompileInfo();
     // 算子名称
-    const char *opName_;
+    const char* opName_;
 
     // 伪量化输入信息
     std::unique_ptr<Mc2WeightQuantBatchMatmulInfo> matmulInfoPtr_;
@@ -146,43 +146,43 @@ protected:
     std::unique_ptr<Mc2WeightQuantBatchMatmulV2CompileInfo> compileInfoPtr_;
 };
 
-ge::graphStatus Mc2CheckPara(gert::TilingContext *context, platform_ascendc::SocVersion socVersion);
+ge::graphStatus Mc2CheckPara(gert::TilingContext* context, platform_ascendc::SocVersion socVersion);
 
-bool CheckTempLimit(Mc2WeightQuantBatchMatmulInfo *inputParams);
+bool CheckTempLimit(Mc2WeightQuantBatchMatmulInfo* inputParams);
 
-void GetDtype(Mc2WeightQuantBatchMatmulInfo &matmulInfo, const gert::TilingContext *context);
+void GetDtype(Mc2WeightQuantBatchMatmulInfo& matmulInfo, const gert::TilingContext* context);
 
-void GetAttrs(Mc2WeightQuantBatchMatmulInfo &matmulInfo, const gert::TilingContext *context);
+void GetAttrs(Mc2WeightQuantBatchMatmulInfo& matmulInfo, const gert::TilingContext* context);
 
-void GetInputs(Mc2WeightQuantBatchMatmulInfo &matmulInfo, const gert::TilingContext *context);
+void GetInputs(Mc2WeightQuantBatchMatmulInfo& matmulInfo, const gert::TilingContext* context);
 
-bool CheckInputShape(Mc2WeightQuantBatchMatmulInfo *inputParams, const gert::StorageShape *xShape,
-                     const gert::StorageShape *weightShape);
+bool CheckInputShape(Mc2WeightQuantBatchMatmulInfo* inputParams, const gert::StorageShape* xShape,
+                     const gert::StorageShape* weightShape);
 
-bool CheckDtype(gert::TilingContext *context, Mc2WeightQuantBatchMatmulInfo *inputParams,
+bool CheckDtype(gert::TilingContext* context, Mc2WeightQuantBatchMatmulInfo* inputParams,
                 platform_ascendc::SocVersion socVersion);
 
-bool CheckInputDtype(gert::TilingContext *context, Mc2WeightQuantBatchMatmulInfo *inputParams,
+bool CheckInputDtype(gert::TilingContext* context, Mc2WeightQuantBatchMatmulInfo* inputParams,
                      platform_ascendc::SocVersion socVersion);
 
-bool CheckAntiQuantDtype(gert::TilingContext *context, Mc2WeightQuantBatchMatmulInfo *inputParams,
+bool CheckAntiQuantDtype(gert::TilingContext* context, Mc2WeightQuantBatchMatmulInfo* inputParams,
                          platform_ascendc::SocVersion socVersion);
 
-bool CheckQuantDtype(gert::TilingContext *context, Mc2WeightQuantBatchMatmulInfo *inputParams);
+bool CheckQuantDtype(gert::TilingContext* context, Mc2WeightQuantBatchMatmulInfo* inputParams);
 
-bool CheckShapeDims(Mc2WeightQuantBatchMatmulInfo *inputParams, platform_ascendc::SocVersion socVersion);
+bool CheckShapeDims(Mc2WeightQuantBatchMatmulInfo* inputParams, platform_ascendc::SocVersion socVersion);
 
-bool CheckBiasShape(Mc2WeightQuantBatchMatmulInfo *inputParams, const gert::StorageShape *biasShape);
+bool CheckBiasShape(Mc2WeightQuantBatchMatmulInfo* inputParams, const gert::StorageShape* biasShape);
 
-bool CheckQuantShape(Mc2WeightQuantBatchMatmulInfo *inputParams, const gert::StorageShape *quantScaleShape,
-                     const gert::StorageShape *quantOffsetShape);
+bool CheckQuantShape(Mc2WeightQuantBatchMatmulInfo* inputParams, const gert::StorageShape* quantScaleShape,
+                     const gert::StorageShape* quantOffsetShape);
 
-bool CheckShape(gert::TilingContext *context, Mc2WeightQuantBatchMatmulInfo *inputParams,
+bool CheckShape(gert::TilingContext* context, Mc2WeightQuantBatchMatmulInfo* inputParams,
                 platform_ascendc::SocVersion socVersion);
 
-bool CheckAntiQuantShape(Mc2WeightQuantBatchMatmulInfo *inputParams, const gert::StorageShape *antiQuantScaleShape,
-                         const gert::StorageShape *antiQuantOffsetShape);
+bool CheckAntiQuantShape(Mc2WeightQuantBatchMatmulInfo* inputParams, const gert::StorageShape* antiQuantScaleShape,
+                         const gert::StorageShape* antiQuantOffsetShape);
 
-bool CheckAttr(gert::TilingContext *context, Mc2WeightQuantBatchMatmulInfo *inputParams);
+bool CheckAttr(gert::TilingContext* context, Mc2WeightQuantBatchMatmulInfo* inputParams);
 } // namespace optiling
 #endif // WEIGHT_QUANT_BATCH_MATMUL_V2_TILING_H

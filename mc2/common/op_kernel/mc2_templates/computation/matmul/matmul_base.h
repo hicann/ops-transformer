@@ -47,7 +47,7 @@ struct MC2MMContext {
     // 不同场景下额外的输入输出和偏移
     AdditionalGmAddrDataType additionalData;
     // mamtul的tiling
-    TilingDataType *tilingDataPtr;
+    TilingDataType* tilingDataPtr;
 };
 }; // namespace MC2KernelTemplate
 

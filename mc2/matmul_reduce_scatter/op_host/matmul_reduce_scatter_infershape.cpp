@@ -20,14 +20,14 @@
 
 using namespace ge;
 namespace ops {
-static ge::graphStatus InferShapeMatmulReduceScatter(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMatmulReduceScatter(gert::InferShapeContext* context)
 {
     OP_LOGE_IF(InferMatmulReduceScatterCommon(context) != GRAPH_SUCCESS, GRAPH_FAILED, context->GetNodeName(),
                "infer shape execute failed.");
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeMatmulReduceScatter(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMatmulReduceScatter(gert::InferDataTypeContext* context)
 {
     auto d_type = context->GetInputDataType(0);
     context->SetOutputDataType(0, d_type);

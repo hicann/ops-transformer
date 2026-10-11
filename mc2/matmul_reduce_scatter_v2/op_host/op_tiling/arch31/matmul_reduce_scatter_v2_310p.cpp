@@ -19,7 +19,7 @@
 #include "platform/platform_infos_def.h"
 
 namespace optiling {
-ge::graphStatus MatmulReduceScatterTilingV2Func(gert::TilingContext *context)
+ge::graphStatus MatmulReduceScatterTilingV2Func(gert::TilingContext* context)
 {
     OP_LOGI("MatmulReduceScatterTilingV2", "Start to do tiling in MatmulReduceScatterTilingV2Func 310p");
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);

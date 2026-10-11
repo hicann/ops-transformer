@@ -60,8 +60,8 @@ constexpr int DEBUG_HALF_WIDTH = 14;
 constexpr int DEBUG_HALF_PRECISION = 4;
 
 template <typename T>
-std::string Mc2DoPrintData(const LocalTensor<T> &tensor, size_t count, size_t stride, size_t elementsPerRow,
-                           const std::string &block_id, const std::string &core_type)
+std::string Mc2DoPrintData(const LocalTensor<T>& tensor, size_t count, size_t stride, size_t elementsPerRow,
+                           const std::string& block_id, const std::string& core_type)
 {
     auto data = tensor.GetPhyAddr();
     std::ostringstream oss;
@@ -79,8 +79,8 @@ std::string Mc2DoPrintData(const LocalTensor<T> &tensor, size_t count, size_t st
 }
 
 template <>
-std::string Mc2DoPrintData(const LocalTensor<uint8_t> &tensor, size_t count, size_t stride, size_t elementsPerRow,
-                           const std::string &block_id, const std::string &core_type)
+std::string Mc2DoPrintData(const LocalTensor<uint8_t>& tensor, size_t count, size_t stride, size_t elementsPerRow,
+                           const std::string& block_id, const std::string& core_type)
 {
     auto data = tensor.GetPhyAddr();
     std::ostringstream oss;
@@ -98,8 +98,8 @@ std::string Mc2DoPrintData(const LocalTensor<uint8_t> &tensor, size_t count, siz
 }
 
 template <>
-std::string Mc2DoPrintData(const LocalTensor<int8_t> &tensor, size_t count, size_t stride, size_t elementsPerRow,
-                           const std::string &block_id, const std::string &core_type)
+std::string Mc2DoPrintData(const LocalTensor<int8_t>& tensor, size_t count, size_t stride, size_t elementsPerRow,
+                           const std::string& block_id, const std::string& core_type)
 {
     auto data = tensor.GetPhyAddr();
     std::ostringstream oss;
@@ -117,8 +117,8 @@ std::string Mc2DoPrintData(const LocalTensor<int8_t> &tensor, size_t count, size
 }
 
 template <>
-std::string Mc2DoPrintData(const LocalTensor<half> &tensor, size_t count, size_t stride, size_t elementsPerRow,
-                           const std::string &block_id, const std::string &core_type)
+std::string Mc2DoPrintData(const LocalTensor<half>& tensor, size_t count, size_t stride, size_t elementsPerRow,
+                           const std::string& block_id, const std::string& core_type)
 {
     auto data = tensor.GetPhyAddr();
     std::ostringstream oss;
@@ -136,8 +136,8 @@ std::string Mc2DoPrintData(const LocalTensor<half> &tensor, size_t count, size_t
 }
 
 template <typename T>
-std::string Mc2DoPrintData(const GlobalTensor<T> &tensor, size_t count, size_t stride, size_t elementsPerRow,
-                           const std::string &block_id, const std::string &core_type)
+std::string Mc2DoPrintData(const GlobalTensor<T>& tensor, size_t count, size_t stride, size_t elementsPerRow,
+                           const std::string& block_id, const std::string& core_type)
 {
     auto data = tensor.GetPhyAddr();
     std::ostringstream oss;
@@ -154,8 +154,8 @@ std::string Mc2DoPrintData(const GlobalTensor<T> &tensor, size_t count, size_t s
     return oss.str();
 }
 
-std::string Mc2DoPrintData(const GlobalTensor<int8_t> &tensor, size_t count, size_t stride, size_t elementsPerRow,
-                           const std::string &block_id, const std::string &core_type)
+std::string Mc2DoPrintData(const GlobalTensor<int8_t>& tensor, size_t count, size_t stride, size_t elementsPerRow,
+                           const std::string& block_id, const std::string& core_type)
 {
     auto data = tensor.GetPhyAddr();
     std::ostringstream oss;
@@ -173,8 +173,8 @@ std::string Mc2DoPrintData(const GlobalTensor<int8_t> &tensor, size_t count, siz
 }
 
 template <>
-std::string Mc2DoPrintData(const GlobalTensor<half> &tensor, size_t count, size_t stride, size_t elementsPerRow,
-                           const std::string &block_id, const std::string &core_type)
+std::string Mc2DoPrintData(const GlobalTensor<half>& tensor, size_t count, size_t stride, size_t elementsPerRow,
+                           const std::string& block_id, const std::string& core_type)
 {
     auto data = tensor.GetPhyAddr();
     std::ostringstream oss;
@@ -337,7 +337,7 @@ __aicore__ inline T Min(T a, T b)
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPad2D(const LocalTensor<T> &dst, const GlobalTensor<T> &src, uint32_t dim1,
+__aicore__ inline void DataCopyPad2D(const LocalTensor<T>& dst, const GlobalTensor<T>& src, uint32_t dim1,
                                      uint32_t dim0, uint32_t fullDim0)
 {
     DataCopyExtParams params;
@@ -355,7 +355,7 @@ __aicore__ inline void DataCopyPad2D(const LocalTensor<T> &dst, const GlobalTens
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPad2D(const LocalTensor<T> &dst, const GlobalTensor<T> &src, uint32_t blockCount,
+__aicore__ inline void DataCopyPad2D(const LocalTensor<T>& dst, const GlobalTensor<T>& src, uint32_t blockCount,
                                      uint32_t blockLen, uint32_t dstInnerLength, uint32_t srcInnerLength)
 {
 #if defined(__CCE_KT_TEST__)
@@ -396,7 +396,7 @@ __aicore__ inline void DataCopyPad2D(const LocalTensor<T> &dst, const GlobalTens
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPad2D(const GlobalTensor<T> &dst, const LocalTensor<T> &src, uint32_t dim1,
+__aicore__ inline void DataCopyPad2D(const GlobalTensor<T>& dst, const LocalTensor<T>& src, uint32_t dim1,
                                      uint32_t dim0, uint32_t dstFullDim0)
 {
     DataCopyExtParams params;
@@ -424,7 +424,7 @@ __aicore__ inline void DataCopyPad2D(const GlobalTensor<T> &dst, const LocalTens
 }
 
 template <typename T>
-__aicore__ inline void DataCopyPad2D(const GlobalTensor<T> &dst, const LocalTensor<T> &src, uint32_t dim1,
+__aicore__ inline void DataCopyPad2D(const GlobalTensor<T>& dst, const LocalTensor<T>& src, uint32_t dim1,
                                      uint32_t dim0, uint32_t srcFullDim0, uint32_t dstFullDim0)
 {
     DataCopyExtParams params;

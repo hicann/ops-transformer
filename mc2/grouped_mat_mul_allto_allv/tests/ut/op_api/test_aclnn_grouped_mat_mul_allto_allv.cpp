@@ -55,7 +55,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, Test)
                         epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
                   OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -77,7 +77,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestGroupNullptr)
                               recvCounts, transGmmWeight, transMmWeight),
                         OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -104,7 +104,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestGroupInvalid)
                               epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
                         OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -127,7 +127,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestMmxInvalid)
                         epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
                   OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -140,8 +140,8 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestSendCountsTensorOptional)
     constexpr int64_t epWorldSize = 8;
     std::vector<int64_t> sendCountsList(32, 256);
     std::vector<int64_t> recvCountsList(32, 256);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -151,7 +151,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestSendCountsTensorOptional)
               epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
         OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -165,8 +165,8 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestRecvCountsTensorOptional)
     constexpr int64_t epWorldSize = 8;
     std::vector<int64_t> sendCountsList(32, 256);
     std::vector<int64_t> recvCountsList(32, 256);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -176,7 +176,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestRecvCountsTensorOptional)
               epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
         OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -189,7 +189,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestSendCountsNull)
     constexpr int64_t epWorldSize = 8;
     constexpr int64_t e = 4;
     std::vector<int64_t> recvCountsList(epWorldSize * e, 256);
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -199,7 +199,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestSendCountsNull)
                         epWorldSize, nullptr, recvCounts, transGmmWeight, transMmWeight),
                   OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -212,7 +212,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestRecvCountsNull)
     constexpr int64_t epWorldSize = 8;
     constexpr int64_t e = 4;
     std::vector<int64_t> sendCountsList(epWorldSize * e, 256);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -222,7 +222,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestRecvCountsNull)
                         epWorldSize, sendCounts, nullptr, transGmmWeight, transMmWeight),
                   OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -238,8 +238,8 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestWithValidSendRecvCounts)
     constexpr int64_t e = 4;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -249,7 +249,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestWithValidSendRecvCounts)
                         epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
                   OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     // After CheckSendAndRecv passes, aclnnInner is called which may fail in UT env
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -263,8 +263,8 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestRecvCountsEmpty)
     constexpr int64_t epWorldSize = 8;
     std::vector<int64_t> sendCountsList(32, 256);
     std::vector<int64_t> recvCountsList; // empty
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -274,7 +274,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestRecvCountsEmpty)
                         epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
                   OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -287,8 +287,8 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestSendCountsEmpty)
     constexpr int64_t epWorldSize = 8;
     std::vector<int64_t> sendCountsList; // empty
     std::vector<int64_t> recvCountsList(32, 256);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -298,7 +298,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestSendCountsEmpty)
                         epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
                   OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -310,8 +310,8 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestGmmxNull)
     constexpr int64_t epWorldSize = 8;
     std::vector<int64_t> sendCountsList(32, 256);
     std::vector<int64_t> recvCountsList(32, 256);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -321,7 +321,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestGmmxNull)
               epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
         OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -333,8 +333,8 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestGmmWeightNull)
     constexpr int64_t epWorldSize = 8;
     std::vector<int64_t> sendCountsList(32, 256);
     std::vector<int64_t> recvCountsList(32, 256);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -344,7 +344,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestGmmWeightNull)
                         epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
                   OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -357,8 +357,8 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestYNull)
     constexpr int64_t epWorldSize = 8;
     std::vector<int64_t> sendCountsList(32, 256);
     std::vector<int64_t> recvCountsList(32, 256);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     auto ut =
@@ -367,7 +367,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestYNull)
                         epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
                   OUTPUT(nullptr, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -381,8 +381,8 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestMmWeightInvalid)
     constexpr int64_t epWorldSize = 8;
     std::vector<int64_t> sendCountsList(32, 256);
     std::vector<int64_t> recvCountsList(32, 256);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     bool transGmmWeight = false;
     bool transMmWeight = false;
     TensorDesc yDesc = TensorDesc({4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -392,7 +392,7 @@ TEST_F(L2GroupedMatMulAlltoAllvTest, TestMmWeightInvalid)
               epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight),
         OUTPUT(yDesc, nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }

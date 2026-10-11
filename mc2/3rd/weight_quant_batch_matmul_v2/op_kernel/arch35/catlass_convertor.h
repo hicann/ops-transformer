@@ -247,19 +247,19 @@ DEVICE void InvokeActKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, G
     using Kernel = wqbmmv2<ProblemShape, BlockMmad, TileSchedulerTailResplit<SUB_BLOCK_NUM>>;
 
     typename BlockMmad::Arguments args{
-        .aGmAddr = (__gm__ DTYPE_X *)x,
+        .aGmAddr = (__gm__ DTYPE_X*)x,
         .strideA =
             XWeightStride<!params.transA, false, DTYPE_X, DTYPE_WEIGHT>{}(tilingDataIn.mSize, tilingDataIn.kSize),
-        .bGmAddr = (__gm__ DTYPE_WEIGHT *)weight,
+        .bGmAddr = (__gm__ DTYPE_WEIGHT*)weight,
         .strideB = XWeightStride<params.transB, params.isWeightNz, DTYPE_X, DTYPE_WEIGHT>{}(tilingDataIn.nSize,
                                                                                             tilingDataIn.kSize),
-        .antiquantScaleGmAddr = (__gm__ DTYPE_X *)antiquantScale,
+        .antiquantScaleGmAddr = (__gm__ DTYPE_X*)antiquantScale,
         .strideAntiquantScale = ScaleOffsetStride<params.transB, params.antiquantType>{}(
             tilingDataIn.nSize, tilingDataIn.kSize, tilingDataIn.groupSize),
-        .antiquantOffsetGmAddr = (__gm__ DTYPE_X *)antiquantOffset,
-        .biasGmAddr = (__gm__ DtypeBias *)bias,
+        .antiquantOffsetGmAddr = (__gm__ DTYPE_X*)antiquantOffset,
+        .biasGmAddr = (__gm__ DtypeBias*)bias,
         .strideBias = AscendC::Std::make_tuple(_1{}),
-        .cGmAddr = (__gm__ DTYPE_Y *)y,
+        .cGmAddr = (__gm__ DTYPE_Y*)y,
         .strideC = AscendC::Std::make_tuple(tilingDataIn.nSize, _1{}),
         .groupSize = tilingDataIn.groupSize,
     };

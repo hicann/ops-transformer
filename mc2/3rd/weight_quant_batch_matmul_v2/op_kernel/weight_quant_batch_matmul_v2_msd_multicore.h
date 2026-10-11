@@ -110,7 +110,7 @@ __aicore__ inline void CheckDataCopyNd2nzParams(uint32_t nValue, uint32_t dValue
                    { KERNEL_LOG(KERNEL_ERROR, "dstNzC0Stride should <= 16384"); });
 }
 
-__aicore__ inline void SetDataCopyNd2nzParams(Nd2NzParams &nd2nzParams, uint32_t nValue, uint32_t dValue,
+__aicore__ inline void SetDataCopyNd2nzParams(Nd2NzParams& nd2nzParams, uint32_t nValue, uint32_t dValue,
                                               uint32_t srcDValue, uint32_t dstNzC0Stride)
 {
     nd2nzParams.ndNum = 1;
@@ -158,8 +158,8 @@ __aicore__ inline void DataCopyPad2D(const GlobalTensor<T> dst, const LocalTenso
 }
 
 template <typename T>
-__aicore__ inline void RowMaxFixTmpTensor(const LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                          const LocalTensor<T> &tmpTensor, uint32_t m, uint32_t k)
+__aicore__ inline void RowMaxFixTmpTensor(const LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                          const LocalTensor<T>& tmpTensor, uint32_t m, uint32_t k)
 {
     // 假设k已对齐
     constexpr uint32_t elemsPerRepeat = 256 / sizeof(T);
@@ -201,8 +201,8 @@ __aicore__ inline void RowMaxFixTmpTensor(const LocalTensor<T> &dst, const Local
 }
 
 template <typename T>
-__aicore__ inline void RowSumFixTmpTensor(const LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                          const LocalTensor<T> &tmpTensor, uint32_t m, uint32_t k)
+__aicore__ inline void RowSumFixTmpTensor(const LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                          const LocalTensor<T>& tmpTensor, uint32_t m, uint32_t k)
 {
     // 假设k已对齐
     for (uint32_t idxM = 0; idxM < m; ++idxM) {
@@ -240,7 +240,7 @@ __aicore__ inline void RowSumFixTmpTensor(const LocalTensor<T> &dst, const Local
 }
 
 template <typename T>
-__aicore__ inline void RowMaxInplace(const LocalTensor<T> &dst, const LocalTensor<T> &src, uint32_t m, uint32_t k)
+__aicore__ inline void RowMaxInplace(const LocalTensor<T>& dst, const LocalTensor<T>& src, uint32_t m, uint32_t k)
 {
     // k must be aligned
     // numRepeatK > 1
@@ -290,7 +290,7 @@ __aicore__ inline void RowMaxInplace(const LocalTensor<T> &dst, const LocalTenso
 }
 
 template <typename T>
-__aicore__ inline void RowSumInplace(const LocalTensor<T> &dst, const LocalTensor<T> &src, uint32_t m, uint32_t k)
+__aicore__ inline void RowSumInplace(const LocalTensor<T>& dst, const LocalTensor<T>& src, uint32_t m, uint32_t k)
 {
     // k must be aligned
     // numRepeatK > 1
@@ -515,7 +515,7 @@ class Mc2PreprocessKernel {
 public:
     __aicore__ inline Mc2PreprocessKernel() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR workspace,
-                                const Mc2WeightQuantBatchMatmulV2MsdTilingData *tilingData, TPipe *tPipe);
+                                const Mc2WeightQuantBatchMatmulV2MsdTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
     TQue<QuePosition::VECIN, 1> inQue_;
@@ -531,9 +531,9 @@ public:
     GlobalTensor<float> reduceMaxWorkspaceGm_;
     GlobalTensor<float> reduceSumWorkspaceGm_;
 
-    TPipe *pipe;
+    TPipe* pipe;
 
-    const Mc2WeightQuantBatchMatmulV2MsdTilingData *tiling_;
+    const Mc2WeightQuantBatchMatmulV2MsdTilingData* tiling_;
 
     uint32_t curBlockIdx_;
 
@@ -549,7 +549,7 @@ public:
 
 template <typename T, PrecisionType precisionType>
 __aicore__ inline void Mc2PreprocessKernel<T, precisionType>::Init(
-    GM_ADDR x, GM_ADDR workspace, const Mc2WeightQuantBatchMatmulV2MsdTilingData *tilingData, TPipe *tPipe)
+    GM_ADDR x, GM_ADDR workspace, const Mc2WeightQuantBatchMatmulV2MsdTilingData* tilingData, TPipe* tPipe)
 {
     pipe = tPipe;
     tiling_ = tilingData;
@@ -574,13 +574,13 @@ __aicore__ inline void Mc2PreprocessKernel<T, precisionType>::Init(
     pipe->InitBuffer(outQueSum_, 1, 256);
     pipe->InitBuffer(sumTmp_, 256);
 
-    xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(x));
+    xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(x));
     uint32_t sizeA1A2 = CeilAlign(static_cast<uint32_t>(2 * mSize_ * kSize_), static_cast<uint32_t>(512));
-    workspaceXS8Global_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(workspace), sizeA1A2);
+    workspaceXS8Global_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(workspace), sizeA1A2);
 
     uint32_t sizeReduce = CeilAlign(static_cast<uint32_t>(8 * mSize_ * sizeof(float)), static_cast<uint32_t>(512));
-    reduceMaxWorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workspace + sizeA1A2));
-    reduceSumWorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workspace + sizeA1A2 + sizeReduce));
+    reduceMaxWorkspaceGm_.SetGlobalBuffer((__gm__ float*)(workspace + sizeA1A2));
+    reduceSumWorkspaceGm_.SetGlobalBuffer((__gm__ float*)(workspace + sizeA1A2 + sizeReduce));
 }
 
 template <typename T, PrecisionType precisionType>
@@ -729,13 +729,13 @@ public:
     __aicore__ inline Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                                const Mc2WeightQuantBatchMatmulV2MsdTilingData *tilingData, TPipe *tPipe);
+                                const Mc2WeightQuantBatchMatmulV2MsdTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessCube(uint32_t cubeSingleCoreN, uint32_t curCubeSingleCoreN);
     __aicore__ inline void LoadMaxSumToUb(uint32_t m);
-    __aicore__ inline void BL1PreLoad(TPipe *tPipe);
-    __aicore__ inline void BL1PreLoadNd(TPipe *tPipe);
-    __aicore__ inline void BL1PreLoadNz(TPipe *tPipe);
+    __aicore__ inline void BL1PreLoad(TPipe* tPipe);
+    __aicore__ inline void BL1PreLoadNd(TPipe* tPipe);
+    __aicore__ inline void BL1PreLoadNz(TPipe* tPipe);
     __aicore__ inline void LoadAntiQuantOffsetScaleToUb(uint32_t offsetN, uint32_t n);
 
     using InputXType = MatmulType<TPosition::GM, CubeFormat::ND, int8_t, aTrans>;
@@ -744,8 +744,8 @@ public:
     using InputBiasType = MatmulType<TPosition::GM, CubeFormat::ND, int32_t>;
     MatmulImpl<InputXType, InputWType, OutputYType, InputBiasType, CFG_MDL> mmObj;
 
-    TPipe *pipe_;
-    const Mc2WeightQuantBatchMatmulV2MsdTilingData *tiling_;
+    TPipe* pipe_;
+    const Mc2WeightQuantBatchMatmulV2MsdTilingData* tiling_;
 
     GlobalTensor<int8_t> workspaceXS8Global_;
     GlobalTensor<int32_t> workspaceCS32Global_;
@@ -799,7 +799,7 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
     precisionType>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR quantScale,
                          GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                         const Mc2WeightQuantBatchMatmulV2MsdTilingData *tilingData, TPipe *tPipe)
+                         const Mc2WeightQuantBatchMatmulV2MsdTilingData* tilingData, TPipe* tPipe)
 {
     tiling_ = tilingData;
     Mc2PreprocessKernel<xType, precisionType> op;
@@ -808,7 +808,7 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
     uint32_t m = tiling_->mSize;
     uint32_t k = tiling_->kSize;
     uint32_t n = tiling_->nSize;
-    wGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(weight), k * n);
+    wGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(weight), k * n);
     op.Init(x, workspace, tilingData, tPipe);
     op.Process();
     BL1PreLoad(tPipe);
@@ -825,29 +825,29 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
 
     uint64_t alignedOffset = 0;
     uint64_t alignedSize = CeilAlign(2 * m * k, static_cast<uint32_t>(512));
-    workspaceXS8Global_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(workspace), alignedSize);
+    workspaceXS8Global_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(workspace), alignedSize);
 
     alignedOffset += alignedSize;
     // 8 * m 为 reduce 大小
     alignedSize = CeilAlign(static_cast<uint64_t>(8 * m * sizeof(float)), static_cast<uint64_t>(512));
-    reduceMaxWorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workspace + alignedOffset));
+    reduceMaxWorkspaceGm_.SetGlobalBuffer((__gm__ float*)(workspace + alignedOffset));
 
     alignedOffset += alignedSize;
-    reduceSumWorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workspace + alignedOffset));
+    reduceSumWorkspaceGm_.SetGlobalBuffer((__gm__ float*)(workspace + alignedOffset));
 
     alignedOffset += alignedSize;
     alignedSize = tiling_->cubeBlockDimN *
                   CeilAlign(static_cast<uint64_t>(2 * m * tiling_->matmulTiling.singleCoreN * sizeof(int32_t)),
                             static_cast<uint64_t>(512));
     elemsC1C2 = alignedSize / tiling_->cubeBlockDimN / sizeof(float);
-    workspaceCS32Global_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(workspace + alignedOffset), alignedSize);
+    workspaceCS32Global_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(workspace + alignedOffset), alignedSize);
 
-    antiQuantScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(antiquantScale), n);
-    antiQuantOffsetGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(antiquantOffset), n);
+    antiQuantScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(antiquantScale), n);
+    antiQuantOffsetGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(antiquantOffset), n);
     if (tiling_->hasBias) {
-        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ biasType *>(bias), n);
+        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ biasType*>(bias), n);
     }
-    yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType *>(y), m * n);
+    yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType*>(y), m * n);
 
     uint32_t antiQuantOffsetCalcShape = 1024;
     if (tiling_->matmulTiling.singleCoreN > antiQuantOffsetCalcShape) {
@@ -893,7 +893,7 @@ template <typename xType, typename wType, typename biasType, typename yType, boo
           PrecisionType precisionType>
 __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
-    precisionType>::BL1PreLoad(TPipe *tPipe)
+    precisionType>::BL1PreLoad(TPipe* tPipe)
 {
     if ASCEND_IS_AIV {
         return;
@@ -917,7 +917,7 @@ template <typename xType, typename wType, typename biasType, typename yType, boo
           PrecisionType precisionType>
 __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
-    precisionType>::BL1PreLoadNd(TPipe *tPipe)
+    precisionType>::BL1PreLoadNd(TPipe* tPipe)
 {
     uint64_t weightOffset;
     uint32_t nValue;
@@ -976,7 +976,7 @@ template <typename xType, typename wType, typename biasType, typename yType, boo
           PrecisionType precisionType>
 __aicore__ inline void Mc2WeightQuantBatchMatmulV2MsdMultiCoreKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
-    precisionType>::BL1PreLoadNz(TPipe *tPipe)
+    precisionType>::BL1PreLoadNz(TPipe* tPipe)
 {
     uint64_t weightOffset;
     uint32_t hValue;

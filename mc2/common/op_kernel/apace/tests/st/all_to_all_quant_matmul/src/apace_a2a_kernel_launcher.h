@@ -17,7 +17,7 @@
 
 #include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_mx_quant_matmul_urma_impl.h"
 
-__global__ __aicore__ void AllToAllQuantMatmulKernelE4M3E4M3_Udma(__gm__ CommContext *hcommCtx, GM_ADDR aGM,
+__global__ __aicore__ void AllToAllQuantMatmulKernelE4M3E4M3_Udma(__gm__ CommContext* hcommCtx, GM_ADDR aGM,
                                                                   GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM,
                                                                   GM_ADDR cGM, allToAllMatmulTilingData tilingData)
 {
@@ -27,7 +27,7 @@ __global__ __aicore__ void AllToAllQuantMatmulKernelE4M3E4M3_Udma(__gm__ CommCon
     impl.Run();
 }
 
-__global__ __aicore__ void AllToAllQuantMatmulKernelE5M2E5M2_Udma(__gm__ CommContext *hcommCtx, GM_ADDR aGM,
+__global__ __aicore__ void AllToAllQuantMatmulKernelE5M2E5M2_Udma(__gm__ CommContext* hcommCtx, GM_ADDR aGM,
                                                                   GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM,
                                                                   GM_ADDR cGM, allToAllMatmulTilingData tilingData)
 {
@@ -37,7 +37,7 @@ __global__ __aicore__ void AllToAllQuantMatmulKernelE5M2E5M2_Udma(__gm__ CommCon
     impl.Run();
 }
 
-__global__ __aicore__ void AllToAllQuantMatmulKernelE4M3E5M2_Udma(__gm__ CommContext *hcommCtx, GM_ADDR aGM,
+__global__ __aicore__ void AllToAllQuantMatmulKernelE4M3E5M2_Udma(__gm__ CommContext* hcommCtx, GM_ADDR aGM,
                                                                   GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM,
                                                                   GM_ADDR cGM, allToAllMatmulTilingData tilingData)
 {
@@ -47,7 +47,7 @@ __global__ __aicore__ void AllToAllQuantMatmulKernelE4M3E5M2_Udma(__gm__ CommCon
     impl.Run();
 }
 
-__global__ __aicore__ void AllToAllQuantMatmulKernelE5M2E4M3_Udma(__gm__ CommContext *hcommCtx, GM_ADDR aGM,
+__global__ __aicore__ void AllToAllQuantMatmulKernelE5M2E4M3_Udma(__gm__ CommContext* hcommCtx, GM_ADDR aGM,
                                                                   GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM,
                                                                   GM_ADDR cGM, allToAllMatmulTilingData tilingData)
 {

@@ -23,7 +23,7 @@
 namespace optiling {
 class MoeDistributeDispatchSetupTilingBase : public MoeTilingBase {
 public:
-    explicit MoeDistributeDispatchSetupTilingBase(gert::TilingContext *context)
+    explicit MoeDistributeDispatchSetupTilingBase(gert::TilingContext* context)
         : MoeTilingBase(context),
           nodeName_(context->GetNodeName()) {};
     enum class TensorType {
@@ -33,9 +33,9 @@ public:
     };
 
 protected:
-    const char *socTilingName_;
+    const char* socTilingName_;
     std::string nodeName_;
-    MoeDistributeDispatchSetupTilingData *tilingData_ = nullptr;
+    MoeDistributeDispatchSetupTilingData* tilingData_ = nullptr;
     std::string groupEp_;
 
     uint64_t GetTilingKey() const override;
@@ -53,7 +53,7 @@ protected:
     const ge::graphStatus CheckOptionalInputTensorDim();
     const ge::graphStatus CheckOutputTensorDim();
     const ge::graphStatus CheckTensorDim();
-    ge::graphStatus CheckScaleWidth(const gert::StorageShape *xStorageShape, const gert::StorageShape *scalesShape);
+    ge::graphStatus CheckScaleWidth(const gert::StorageShape* xStorageShape, const gert::StorageShape* scalesShape);
     const ge::graphStatus CheckTensorShapeRelation();
     const ge::graphStatus CheckInputTensorDataType();
     const ge::graphStatus CheckOptionalInputTensorDataType();

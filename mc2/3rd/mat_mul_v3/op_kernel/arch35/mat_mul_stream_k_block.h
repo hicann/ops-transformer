@@ -61,7 +61,7 @@ class MatmulStreamKBlock : public Mc2MatmulAswBlock {
 public:
     __aicore__ inline MatmulStreamKBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-    __aicore__ inline void Init(const void *tilingData);
+    __aicore__ inline void Init(const void* tilingData);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx);
     __aicore__ inline uint64_t UpdateLoopIndex(uint64_t roundIdx);
     template <const bool ALIGN_FLAG>
@@ -77,7 +77,7 @@ public:
 };
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-__aicore__ inline void MatmulStreamKBlock::Init(const void *tilingData)
+__aicore__ inline void MatmulStreamKBlock::Init(const void* tilingData)
 {
     Mc2MatmulAswBlock::Init<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>(tilingData);
     // sk过程k方向切分块数

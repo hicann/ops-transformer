@@ -34,20 +34,20 @@ namespace Mc2WeightQuantBatchMatmulV2::Arch35 {
 template <typename xType>
 struct MxFp4NdScaleParams {
     uint64_t ubLoopExternalAxis;
-    __local_mem__ uint8_t *antiQuantScaleBasePhyAddr;
-    __local_mem__ xType *antiQuantScaleF16PhyAddr0;
-    __local_mem__ xType *antiQuantScaleF16PhyAddr1;
+    __local_mem__ uint8_t* antiQuantScaleBasePhyAddr;
+    __local_mem__ xType* antiQuantScaleF16PhyAddr0;
+    __local_mem__ xType* antiQuantScaleF16PhyAddr1;
 };
 
 template <typename xType, typename wType>
 struct MxFp4NdWeightParams {
     uint64_t ubLoopExternalAxis;
-    __local_mem__ wType *weightLowBitPhyAddr0;
-    __local_mem__ wType *weightLowBitPhyAddr1;
-    __local_mem__ xType *weightF16PhyAddr0;
-    __local_mem__ xType *weightF16PhyAddr1;
-    __local_mem__ xType *antiQuantScaleF16PhyAddr0;
-    __local_mem__ xType *antiQuantScaleF16PhyAddr1;
+    __local_mem__ wType* weightLowBitPhyAddr0;
+    __local_mem__ wType* weightLowBitPhyAddr1;
+    __local_mem__ xType* weightF16PhyAddr0;
+    __local_mem__ xType* weightF16PhyAddr1;
+    __local_mem__ xType* antiQuantScaleF16PhyAddr0;
+    __local_mem__ xType* antiQuantScaleF16PhyAddr1;
 };
 
 template <typename xType, typename wType>
@@ -58,9 +58,9 @@ struct Fp4NzParams {
     uint64_t innerDstStride;
     uint64_t groupDstStride;
     uint64_t loopN1DstStride;
-    __local_mem__ xType *antiQuantScaleBasePhyAddr;
-    __local_mem__ wType *weightLowBitPhyAddr;
-    __local_mem__ xType *weightHighBitPhyAddr;
+    __local_mem__ xType* antiQuantScaleBasePhyAddr;
+    __local_mem__ wType* weightLowBitPhyAddr;
+    __local_mem__ xType* weightHighBitPhyAddr;
 };
 
 static constexpr Reg::CastTrait CAST_BF16_TO_FP16_TRAIT = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
@@ -70,9 +70,9 @@ static constexpr Reg::CastTrait CAST_FP4_TO_BF16_TRAIT = {Reg::RegLayout::ZERO, 
                                                           Reg::MaskMergeMode::ZEROING, AscendC::RoundMode::UNKNOWN};
 
 template <typename xType>
-__aicore__ inline void MxScaleVf(RegTensor<uint8_t> &antiQuantScaleE8m0Vreg0,
-                                 RegTensor<uint8_t> &antiQuantScaleE8m0Vreg1, RegTensor<xType> &antiQuantScaleF16Vreg0,
-                                 RegTensor<xType> &antiQuantScaleF16Vreg1, Reg::MaskReg &maskAll)
+__aicore__ inline void MxScaleVf(RegTensor<uint8_t>& antiQuantScaleE8m0Vreg0,
+                                 RegTensor<uint8_t>& antiQuantScaleE8m0Vreg1, RegTensor<xType>& antiQuantScaleF16Vreg0,
+                                 RegTensor<xType>& antiQuantScaleF16Vreg1, Reg::MaskReg& maskAll)
 {
     RegTensor<uint8_t> zeroVreg;
     Reg::Duplicate(zeroVreg, 0);
@@ -91,27 +91,27 @@ __aicore__ inline void MxScaleVf(RegTensor<uint8_t> &antiQuantScaleE8m0Vreg0,
         // S1 S2 S3 S4 S5 S6 S7 S8 ..... S127 S128
         // antiQuantScaleF16Vreg1:
         // S128 S129 S130 S131 S132 S133 S134 S135 ..... S255 S256
-        Reg::ShiftRights((Reg::RegTensor<uint16_t> &)antiQuantScaleF16Vreg0,
-                         (Reg::RegTensor<uint16_t> &)antiQuantScaleE8m0Vreg0, SHIFT_FOR_BF16, maskAll);
-        Reg::ShiftRights((Reg::RegTensor<uint16_t> &)antiQuantScaleF16Vreg1,
-                         (Reg::RegTensor<uint16_t> &)antiQuantScaleE8m0Vreg1, SHIFT_FOR_BF16, maskAll);
+        Reg::ShiftRights((Reg::RegTensor<uint16_t>&)antiQuantScaleF16Vreg0,
+                         (Reg::RegTensor<uint16_t>&)antiQuantScaleE8m0Vreg0, SHIFT_FOR_BF16, maskAll);
+        Reg::ShiftRights((Reg::RegTensor<uint16_t>&)antiQuantScaleF16Vreg1,
+                         (Reg::RegTensor<uint16_t>&)antiQuantScaleE8m0Vreg1, SHIFT_FOR_BF16, maskAll);
     } else {
         // 需要转换为FP16格式时，先转换为BF16再转换为FP16
         RegTensor<uint16_t> antiQuantScaleBF16Vreg0;
         RegTensor<uint16_t> antiQuantScaleBF16Vreg1;
-        Reg::ShiftRights((Reg::RegTensor<uint16_t> &)antiQuantScaleBF16Vreg0,
-                         (Reg::RegTensor<uint16_t> &)antiQuantScaleE8m0Vreg0, SHIFT_FOR_BF16, maskAll);
-        Reg::ShiftRights((Reg::RegTensor<uint16_t> &)antiQuantScaleBF16Vreg1,
-                         (Reg::RegTensor<uint16_t> &)antiQuantScaleE8m0Vreg1, SHIFT_FOR_BF16, maskAll);
+        Reg::ShiftRights((Reg::RegTensor<uint16_t>&)antiQuantScaleBF16Vreg0,
+                         (Reg::RegTensor<uint16_t>&)antiQuantScaleE8m0Vreg0, SHIFT_FOR_BF16, maskAll);
+        Reg::ShiftRights((Reg::RegTensor<uint16_t>&)antiQuantScaleBF16Vreg1,
+                         (Reg::RegTensor<uint16_t>&)antiQuantScaleE8m0Vreg1, SHIFT_FOR_BF16, maskAll);
         Reg::Cast<xType, bfloat16_t, CAST_BF16_TO_FP16_TRAIT>(
-            antiQuantScaleF16Vreg0, (Reg::RegTensor<bfloat16_t> &)antiQuantScaleBF16Vreg0, maskAll);
+            antiQuantScaleF16Vreg0, (Reg::RegTensor<bfloat16_t>&)antiQuantScaleBF16Vreg0, maskAll);
         Reg::Cast<xType, bfloat16_t, CAST_BF16_TO_FP16_TRAIT>(
-            antiQuantScaleF16Vreg1, (Reg::RegTensor<bfloat16_t> &)antiQuantScaleBF16Vreg1, maskAll);
+            antiQuantScaleF16Vreg1, (Reg::RegTensor<bfloat16_t>&)antiQuantScaleBF16Vreg1, maskAll);
     }
 }
 
 template <typename xType, typename wType>
-__aicore__ inline void CastFp4ToF16(RegTensor<xType> &f16Vreg, RegTensor<wType> &fp4Vreg, Reg::MaskReg &maskAll)
+__aicore__ inline void CastFp4ToF16(RegTensor<xType>& f16Vreg, RegTensor<wType>& fp4Vreg, Reg::MaskReg& maskAll)
 {
     if constexpr (!IsSameType<typename Reg::TypeGet<xType>::T, vector_f16>::value) {
         // CAST_FP4_TO_BF16_TRAIT中设置RegLayout::ZERO 表示按照如下形式处理做cast：
@@ -127,7 +127,7 @@ __aicore__ inline void CastFp4ToF16(RegTensor<xType> &f16Vreg, RegTensor<wType> 
 }
 
 template <typename xType>
-__aicore__ inline void MxNkScaleVf(MxFp4NdScaleParams<xType> &mxFp4NdNkScaleParams)
+__aicore__ inline void MxNkScaleVf(MxFp4NdScaleParams<xType>& mxFp4NdNkScaleParams)
 {
     // NK mte2搬运的antiquantscale的标准大小为(128, 32), 按照4行的粒度处理，每次处理128个E8M0, 得到256个F16的数字
     RegTensor<uint8_t> antiQuantScaleE8m0Vreg0;
@@ -156,7 +156,7 @@ __aicore__ inline void MxNkScaleVf(MxFp4NdScaleParams<xType> &mxFp4NdNkScalePara
 }
 
 template <typename xType>
-__aicore__ inline void MxKnScaleVf(MxFp4NdScaleParams<xType> &mxFp4NdScaleParams)
+__aicore__ inline void MxKnScaleVf(MxFp4NdScaleParams<xType>& mxFp4NdScaleParams)
 {
     // KN mte2搬运的antiquantscale的标准大小为(4，256), 按照一行的粒度处理
     RegTensor<uint8_t> antiQuantScaleE8m0Vreg0;
@@ -184,8 +184,8 @@ __aicore__ inline void MxKnScaleVf(MxFp4NdScaleParams<xType> &mxFp4NdScaleParams
     }
 }
 
-template <typename xType, typename wType, const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void MxNkWeightVf(MxFp4NdWeightParams<xType, wType> &mxFp4NdNkWeightParams)
+template <typename xType, typename wType, const VecAntiQuantConfig& vecConfig>
+__aicore__ inline void MxNkWeightVf(MxFp4NdWeightParams<xType, wType>& mxFp4NdNkWeightParams)
 {
     // 每次处理一行， 一行为256个FP4的数， 分两条指令处理，每条指令处理128个FP4的数
     RegTensor<xType> antiQuantScaleF16Vreg0;
@@ -213,12 +213,12 @@ __aicore__ inline void MxNkWeightVf(MxFp4NdWeightParams<xType, wType> &mxFp4NdNk
         // Vn  1 2 3 4 5 6 7 8 9 a b c d e f g .....
         // Vd  1 2 x x x x x x 3 4 x x x x x x .....
         Reg::DataCopy<wType, Reg::LoadDist::DIST_UNPACK4_B8>(
-            weightFp4Vreg0, (__local_mem__ wType *)(mxFp4NdNkWeightParams.weightLowBitPhyAddr0 +
-                                                    ubLoopNIdx * (vecConfig.ubMte2InnerSize >> 1)));
+            weightFp4Vreg0, (__local_mem__ wType*)(mxFp4NdNkWeightParams.weightLowBitPhyAddr0 +
+                                                   ubLoopNIdx * (vecConfig.ubMte2InnerSize >> 1)));
 
         Reg::DataCopy<wType, Reg::LoadDist::DIST_UNPACK4_B8>(
-            weightFp4Vreg1, (__local_mem__ wType *)(mxFp4NdNkWeightParams.weightLowBitPhyAddr1 +
-                                                    ubLoopNIdx * (vecConfig.ubMte2InnerSize >> 1)));
+            weightFp4Vreg1, (__local_mem__ wType*)(mxFp4NdNkWeightParams.weightLowBitPhyAddr1 +
+                                                   ubLoopNIdx * (vecConfig.ubMte2InnerSize >> 1)));
 
         CastFp4ToF16<xType, wType>(weightF16Vreg0, weightFp4Vreg0, maskAll);
         CastFp4ToF16<xType, wType>(weightF16Vreg1, weightFp4Vreg1, maskAll);
@@ -231,8 +231,8 @@ __aicore__ inline void MxNkWeightVf(MxFp4NdWeightParams<xType, wType> &mxFp4NdNk
     }
 }
 
-template <typename xType, typename wType, const VecAntiQuantConfig &vecConfig>
-__aicore__ inline void MxKnWeightVf(MxFp4NdWeightParams<xType, wType> &mxFp4NdKnWeightParams)
+template <typename xType, typename wType, const VecAntiQuantConfig& vecConfig>
+__aicore__ inline void MxKnWeightVf(MxFp4NdWeightParams<xType, wType>& mxFp4NdKnWeightParams)
 {
     // 每次处理一行， 一行为256个FP4的数， 分两条指令处理，每条指令处理128个FP4的数
     RegTensor<xType> antiQuantScaleF16Vreg0;
@@ -252,14 +252,14 @@ __aicore__ inline void MxKnWeightVf(MxFp4NdWeightParams<xType, wType> &mxFp4NdKn
 
         for (uint16_t groupIdx = 0; groupIdx < MX_GROUPSIZE; groupIdx++) {
             Reg::DataCopy<wType, Reg::LoadDist::DIST_UNPACK4_B8>(
-                weightFp4Vreg0, (__local_mem__ wType *)(mxFp4NdKnWeightParams.weightLowBitPhyAddr0 +
-                                                        ubLoopKIdx * (vecConfig.ubMte2InnerSize >> 1) * MX_GROUPSIZE +
-                                                        groupIdx * (vecConfig.ubMte2InnerSize >> 1)));
+                weightFp4Vreg0, (__local_mem__ wType*)(mxFp4NdKnWeightParams.weightLowBitPhyAddr0 +
+                                                       ubLoopKIdx * (vecConfig.ubMte2InnerSize >> 1) * MX_GROUPSIZE +
+                                                       groupIdx * (vecConfig.ubMte2InnerSize >> 1)));
 
             Reg::DataCopy<wType, Reg::LoadDist::DIST_UNPACK4_B8>(
-                weightFp4Vreg1, (__local_mem__ wType *)(mxFp4NdKnWeightParams.weightLowBitPhyAddr1 +
-                                                        ubLoopKIdx * (vecConfig.ubMte2InnerSize >> 1) * MX_GROUPSIZE +
-                                                        groupIdx * (vecConfig.ubMte2InnerSize >> 1)));
+                weightFp4Vreg1, (__local_mem__ wType*)(mxFp4NdKnWeightParams.weightLowBitPhyAddr1 +
+                                                       ubLoopKIdx * (vecConfig.ubMte2InnerSize >> 1) * MX_GROUPSIZE +
+                                                       groupIdx * (vecConfig.ubMte2InnerSize >> 1)));
 
             CastFp4ToF16<xType, wType>(weightF16Vreg0, weightFp4Vreg0, maskAll);
             CastFp4ToF16<xType, wType>(weightF16Vreg1, weightFp4Vreg1, maskAll);
@@ -274,13 +274,13 @@ __aicore__ inline void MxKnWeightVf(MxFp4NdWeightParams<xType, wType> &mxFp4NdKn
 }
 
 template <typename xType, typename wType, uint64_t ubMte2KSize>
-__aicore__ inline void AntiQuantFp4NzKnVf(Fp4NzParams<xType, wType> &fp4NzParams)
+__aicore__ inline void AntiQuantFp4NzKnVf(Fp4NzParams<xType, wType>& fp4NzParams)
 {
     RegTensor<xType> antiQuantScaleVreg;
     RegTensor<wType> weightFp4Vreg;
     RegTensor<xType> weightF16Vreg;
     Reg::MaskReg maskAll = Reg::CreateMask<uint8_t, AscendC::Reg::MaskPattern::ALL>();
-    __local_mem__ xType *antiQuantScaleBasePhyAddr;
+    __local_mem__ xType* antiQuantScaleBasePhyAddr;
 
     for (uint16_t loopN1Idx = 0; loopN1Idx < fp4NzParams.loopN1; loopN1Idx++) {
         for (uint16_t loopGroupIdx = 0; loopGroupIdx < fp4NzParams.loopGroupNum; loopGroupIdx++) {
@@ -298,7 +298,7 @@ __aicore__ inline void AntiQuantFp4NzKnVf(Fp4NzParams<xType, wType> &fp4NzParams
                     Reg::CreateAddrReg<wType>(loopN1Idx, BLOCK_CUBE * ubMte2KSize >> 1, loopGroupIdx,
                                               MX_GROUPSIZE * BLOCK_CUBE >> 1, loopGroupInnerIdx, VEC_MAX_ELEM_B16 >> 1);
                 Reg::DataCopy<wType, Reg::LoadDist::DIST_UNPACK4_B8>(
-                    weightFp4Vreg, (__local_mem__ wType *)fp4NzParams.weightLowBitPhyAddr, weightFp4AddrReg);
+                    weightFp4Vreg, (__local_mem__ wType*)fp4NzParams.weightLowBitPhyAddr, weightFp4AddrReg);
 
                 CastFp4ToF16<xType, wType>(weightF16Vreg, weightFp4Vreg, maskAll);
                 Reg::Mul(weightF16Vreg, weightF16Vreg, antiQuantScaleVreg, maskAll);

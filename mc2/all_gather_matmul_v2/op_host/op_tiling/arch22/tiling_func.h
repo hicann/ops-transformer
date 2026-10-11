@@ -105,7 +105,7 @@ constexpr int32_t ALLGATHERV2_MATMUL_NPU91093_EIGHT_RANK_INT8_CODE_DEFAULT = 428
 constexpr int32_t ALLGATHERV2_MATMUL_NPU91093_FOUR_RANK_FP16_CODE_DEFAULT = 428930088;
 constexpr int32_t ALLGATHERV2_MATMUL_NPU91093_EIGHT_RANK_FP16_CODE_DEFAULT = 428377128;
 
-ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext *context);
+ge::graphStatus AllGatherMatmulTilingAIVModeFunc(gert::TilingContext* context);
 
 // Tiling Code Encode Map
 static MknConditionMap g_allGatherV2MatmulNPU910BEightRankINT4CodeMap = {

@@ -35,7 +35,7 @@ class FpMatmulAllToAllTilingBaseA3 : public MatmulAllToAllTilingBase {
     friend class FpMatmulAllToAllHelper;
 
 public:
-    explicit FpMatmulAllToAllTilingBaseA3(gert::TilingContext *context);
+    explicit FpMatmulAllToAllTilingBaseA3(gert::TilingContext* context);
     ~FpMatmulAllToAllTilingBaseA3() override = default;
     ge::graphStatus GetWorkspaceSize() override;
 
@@ -46,30 +46,30 @@ protected:
     ge::graphStatus PostTiling() override;
     uint64_t GetTilingKey() const override;
 
-    ge::graphStatus CheckA3NonQuantTensorDataType(const gert::TilingContext *context, const char *opName);
+    ge::graphStatus CheckA3NonQuantTensorDataType(const gert::TilingContext* context, const char* opName);
     ge::graphStatus CheckOpInputInfo();
     ge::graphStatus CheckBsRankSizeRange();
     ge::graphStatus InitTilingContextParameters();
     ge::graphStatus DoMMTiling();
 
     ge::graphStatus SetHcclTiling();
-    void SetTilingInfo(MatmulAlltoAllTilingInfoA3 &tilingInfo) const;
+    void SetTilingInfo(MatmulAlltoAllTilingInfoA3& tilingInfo) const;
 
 private:
     MatmulAlltoAllTilingDataA3 localTilingData_;
     std::string socVersionStr_;
 
-    void PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingDataA3 &matmulAlltoAllTilingDataA3);
-    void PrintMatmulAlltoAllTilingInfo(const std::string &opName, MatmulAlltoAllTilingInfoA3 &tilingInfo);
+    void PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingDataA3& matmulAlltoAllTilingDataA3);
+    void PrintMatmulAlltoAllTilingInfo(const std::string& opName, MatmulAlltoAllTilingInfoA3& tilingInfo);
 };
 
 class FpMatmulAllToAllHelper : public mc2_matmul_v3::Mc2MatmulV3BaseTiling {
 public:
-    FpMatmulAllToAllHelper(FpMatmulAllToAllTilingBaseA3 &matmulAlltoAllTilingA3, Mc2MatmulV3TilingData &data);
+    FpMatmulAllToAllHelper(FpMatmulAllToAllTilingBaseA3& matmulAlltoAllTilingA3, Mc2MatmulV3TilingData& data);
     ge::graphStatus GetShapeAttrsInfo() override;
 
 private:
-    FpMatmulAllToAllTilingBaseA3 &tilingProcesser_;
+    FpMatmulAllToAllTilingBaseA3& tilingProcesser_;
 };
 
 } // namespace MC2Tiling

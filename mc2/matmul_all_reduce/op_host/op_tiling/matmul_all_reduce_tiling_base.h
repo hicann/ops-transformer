@@ -120,7 +120,7 @@ enum class ParamValue {
 
 class MatmulAllReduceTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit MatmulAllReduceTilingBase(gert::TilingContext *context)
+    explicit MatmulAllReduceTilingBase(gert::TilingContext* context)
         : TilingBaseClass(context),
           mmrCtxInfo_(mmrCtxInfoSelf_),
           tilingData_(tilingDataSelf_)
@@ -132,15 +132,15 @@ public:
                                  0, context_->GetRawTilingData()->GetCapacity()) != EOK,
                         OP_LOGE(opName_, "fail to memset tiling data"), return;);
     }
-    MatmulAllReduceTilingBase(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo)
+    MatmulAllReduceTilingBase(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo)
         : TilingBaseClass(context),
           mmrCtxInfo_(*mmrCtxInfo),
           tilingData_(tilingDataSelf_)
     {
         Reset();
     }
-    MatmulAllReduceTilingBase(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                              Mc2Tiling::MatmulAllReduceTilingData *tilingData)
+    MatmulAllReduceTilingBase(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                              Mc2Tiling::MatmulAllReduceTilingData* tilingData)
         : TilingBaseClass(context),
           mmrCtxInfo_(*mmrCtxInfo),
           tilingData_(*tilingData)
@@ -149,7 +149,7 @@ public:
     }
     ~MatmulAllReduceTilingBase() override = default;
 
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -162,19 +162,19 @@ protected:
     ge::graphStatus DoLibApiTiling() override;
     ge::graphStatus GetWorkspaceSize() override;
     ge::graphStatus PostTiling() override;
-    virtual Mc2Tiling::RCSTiling &MutableRCSTilingData()
+    virtual Mc2Tiling::RCSTiling& MutableRCSTilingData()
     {
         return tilingData_.param;
     }
-    virtual Mc2Tiling::Mc2Msg &MutableMc2MsgData()
+    virtual Mc2Tiling::Mc2Msg& MutableMc2MsgData()
     {
         return tilingData_.msg;
     }
-    virtual AscendC::tiling::TCubeTiling &MutableTCubeTileTilingData()
+    virtual AscendC::tiling::TCubeTiling& MutableTCubeTileTilingData()
     {
         return tilingData_.matmulTiling;
     }
-    virtual AscendC::tiling::TCubeTiling &MutableTCubeTailTilingData()
+    virtual AscendC::tiling::TCubeTiling& MutableTCubeTailTilingData()
     {
         return tilingData_.tailTiling;
     }
@@ -185,14 +185,14 @@ protected:
     void DoAllReduceTiling(bool useHcclApi = false);
     void CalcAllReduceSendRecvParams();
     void DoRCSTiling();
-    void SetMCutSocVersion(SocVersion_2201 &socVersion_2201);
+    void SetMCutSocVersion(SocVersion_2201& socVersion_2201);
     void DoSplitMTiling();
     virtual CutResult GetTilingResult();
-    ge::graphStatus DoMatmulTiling(matmul_tiling::MultiCoreMatmulTiling &mm1, AscendC::tiling::TCubeTiling &cubeTiling);
-    void DoL2CacheTiling(Mc2Tiling::Mc2L2cacheTilePara &l2cacheTiling);
+    ge::graphStatus DoMatmulTiling(matmul_tiling::MultiCoreMatmulTiling& mm1, AscendC::tiling::TCubeTiling& cubeTiling);
+    void DoL2CacheTiling(Mc2Tiling::Mc2L2cacheTilePara& l2cacheTiling);
     void setUseBufferType();
     uint8_t CalcBufferTypeByWindowSize();
-    void CalcSendOffWithPadM(uint64_t &tileSendOff, uint64_t &tailSendOff);
+    void CalcSendOffWithPadM(uint64_t& tileSendOff, uint64_t& tailSendOff);
 
     void Reset();
     bool AnalyzeAttrs();
@@ -201,27 +201,27 @@ protected:
     void SetCommQuantScale();
     void GetAtomicAddData();
     bool CheckBiasShape(const uint64_t nValue) const;
-    virtual bool IsPerTensorDequantScale(const gert::Shape &dequantShape) const;
+    virtual bool IsPerTensorDequantScale(const gert::Shape& dequantShape) const;
     bool CheckDequantScaleShape(const uint64_t nValue) const;
-    bool CheckDequantScalePerBlock(const gert::StorageShape *dequantScaleShape) const;
+    bool CheckDequantScalePerBlock(const gert::StorageShape* dequantScaleShape) const;
     bool CheckPerblockShape(const uint64_t mValue, const uint64_t kValue) const;
     bool CheckPertokenScaleShape(const uint64_t mValue, const uint64_t kValue) const;
     bool CheckCommQuantScaleShape(const uint64_t nValue) const;
     bool CheckAntiQuantScaleShape(const uint64_t kValue, const uint64_t nValue);
     bool CheckAntiQuantOffsetValid() const;
-    bool CheckAntiQuantOffsetShape(const gert::StorageShape *scale) const;
+    bool CheckAntiQuantOffsetShape(const gert::StorageShape* scale) const;
     bool CheckA16W4Shape(const uint64_t kValue, const uint64_t nValue);
     bool CheckPlatformInfo() const;
     bool CheckMXScenarioScaleShape(const uint64_t dimZeroValue, const uint64_t kValue,
-                                   const gert::StorageShape *scaleShape, const bool isPertoken,
+                                   const gert::StorageShape* scaleShape, const bool isPertoken,
                                    const bool isMXfp4) const;
-    void GetScaleMNAndKIdx(const gert::StorageShape *scaleShape, bool isPertoken, uint64_t scaleDimNum, uint64_t &MN,
-                           uint64_t &K) const;
+    void GetScaleMNAndKIdx(const gert::StorageShape* scaleShape, bool isPertoken, uint64_t scaleDimNum, uint64_t& MN,
+                           uint64_t& K) const;
     AllReduceScenario GetAllReduceScenario(const ge::DataType aType, const ge::DataType bType,
-                                           const gert::StorageShape *dequantScale,
-                                           const gert::StorageShape *antiQuantScale) const;
+                                           const gert::StorageShape* dequantScale,
+                                           const gert::StorageShape* antiQuantScale) const;
     bool IsA16W8Scenario(const ge::DataType aType, const ge::DataType bType,
-                         const gert::StorageShape *antiQuantScale) const;
+                         const gert::StorageShape* antiQuantScale) const;
     bool AnalyzeInputs();
     bool SetArgs(ge::DataType aType, ge::DataType bType, ge::DataType cType, ge::DataType biasType, bool isBias);
     uint64_t GetNValue() const;
@@ -238,8 +238,8 @@ protected:
     ge::graphStatus CheckWeightQuantEmptyTensor();
     mc2tiling::HcclDataType GetDataType(ge::DataType type);
     virtual void DoEmptyTensorTiling() {};
-    virtual void GetL2CacheParm(uint64_t &l2CacheSize, uint64_t &singleMatrixSize, uint32_t &tileSize,
-                                uint32_t &tileLimit, bool useNewPara)
+    virtual void GetL2CacheParm(uint64_t& l2CacheSize, uint64_t& singleMatrixSize, uint32_t& tileSize,
+                                uint32_t& tileLimit, bool useNewPara)
     {
         (void)l2CacheSize;
         (void)singleMatrixSize;
@@ -247,8 +247,8 @@ protected:
         (void)tileLimit;
         (void)useNewPara;
     };
-    bool CalL2TilePara(L2TilePara &tileL2, uint64_t mValue, uint64_t kValue, uint64_t nValue, uint32_t cubeCoreNum);
-    void CalcL2TileBlock(L2TilePara &tileL2, uint64_t mValue, uint64_t nValue, uint64_t kValue, uint64_t blockBaseM,
+    bool CalL2TilePara(L2TilePara& tileL2, uint64_t mValue, uint64_t kValue, uint64_t nValue, uint32_t cubeCoreNum);
+    void CalcL2TileBlock(L2TilePara& tileL2, uint64_t mValue, uint64_t nValue, uint64_t kValue, uint64_t blockBaseM,
                          uint64_t blockBaseN, uint32_t tileSize, uint32_t tileLimit, uint64_t sizeA, uint64_t sizeB,
                          uint32_t cubeCoreNum) const;
     AntiQuantType GetAntiQuantType();
@@ -266,8 +266,8 @@ protected:
     bool isUbQuant_{false};
     bool enableL2Cache_{false};
     bool enableBiasConvert_{false};
-    const char *opName_;
-    const char *reduceOp_;
+    const char* opName_;
+    const char* reduceOp_;
     uint32_t rankSize_{0U};
     uint32_t libApiWorkSpaceSize_{0U};
     platform_ascendc::SocVersion socVersion_;
@@ -284,10 +284,10 @@ protected:
     uint32_t biasUbCnt_{0U}; // bias epilogue 的 N 方向 UB 切分粒度（CalcUbTiling 计算后暂存，子类写入 extTiling）
     AllReduceScenario scenario_{AllReduceScenario::INVALID};
     MMRCtxInfo mmrCtxInfoSelf_{};
-    MMRCtxInfo &mmrCtxInfo_;
+    MMRCtxInfo& mmrCtxInfo_;
     Mc2Tiling::MatmulAllReduceTilingData tilingDataSelf_{};
-    Mc2Tiling::MatmulAllReduceTilingData &tilingData_;
-    ge::graphStatus GetAndConvertCommMode(uint8_t &commMode) const;
+    Mc2Tiling::MatmulAllReduceTilingData& tilingData_;
+    ge::graphStatus GetAndConvertCommMode(uint8_t& commMode) const;
     uint8_t GetCommMode() const;
     ge::graphStatus CheckCommModeA2() const;
 };

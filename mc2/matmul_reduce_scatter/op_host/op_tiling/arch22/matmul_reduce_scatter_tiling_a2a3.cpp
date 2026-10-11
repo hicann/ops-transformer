@@ -25,8 +25,8 @@
 #include "../../../op_kernel/matmul_reduce_scatter_tiling.h"
 
 namespace optiling {
-CutResult MatmulReduceScatterTilingFuncA2A3::GetCutResult(MatmulReduceScatterTilingData &tilingData,
-                                                          mc2tiling::TilingArgs &args)
+CutResult MatmulReduceScatterTilingFuncA2A3::GetCutResult(MatmulReduceScatterTilingData& tilingData,
+                                                          mc2tiling::TilingArgs& args)
 {
     SocVersion_2201 socVersion_2201 =
         (tilingData.socParam.isA3 == 0) ? SocVersion_2201::SOC910_B : SocVersion_2201::SOC910_93;
@@ -39,8 +39,8 @@ CutResult MatmulReduceScatterTilingFuncA2A3::GetCutResult(MatmulReduceScatterTil
 }
 
 ge::graphStatus MatmulReduceScatterTilingFuncA2A3::CheckValidRank(
-    const std::map<uint32_t, std::vector<uint32_t>> VALID_RANK, MatmulReduceScatterTilingData *tilingData,
-    gert::TilingContext *context, uint32_t rankSize)
+    const std::map<uint32_t, std::vector<uint32_t>> VALID_RANK, MatmulReduceScatterTilingData* tilingData,
+    gert::TilingContext* context, uint32_t rankSize)
 {
     // distinguish between 910A2 and 910A3
     auto it = std::find(VALID_RANK.at(tilingData->socParam.isA3).begin(),
@@ -54,21 +54,21 @@ ge::graphStatus MatmulReduceScatterTilingFuncA2A3::CheckValidRank(
     return ge::GRAPH_SUCCESS;
 }
 
-std::string MatmulReduceScatterTilingFuncA2A3::GetRsConfig(MatmulReduceScatterTilingData &tilingData)
+std::string MatmulReduceScatterTilingFuncA2A3::GetRsConfig(MatmulReduceScatterTilingData& tilingData)
 {
     std::string rsConfig =
         (tilingData.socParam.isA3 == 0) ? "ReduceScatter=level0:fullmesh" : "ReduceScatter=level0:doublering";
     return rsConfig;
 }
 
-static ge::graphStatus MatmulReduceScatterTilingImplFuncA2A3(gert::TilingContext *context)
+static ge::graphStatus MatmulReduceScatterTilingImplFuncA2A3(gert::TilingContext* context)
 {
     MatmulReduceScatterTilingFuncA2A3 impl;
     return impl.MatmulReduceScatterTilingFunc(context);
 }
 
 struct MatmulReduceScatterCompileInfo {};
-static ge::graphStatus TilingParseForMatmulReduceScatter(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForMatmulReduceScatter(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

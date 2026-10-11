@@ -29,11 +29,11 @@ inline T1 CeilA2B(T1 a, T2 b)
 namespace GROUPED_MATMUL {
 
 template <typename T>
-uint8_t *CreateTensorList(const std::vector<uint64_t> &shapeInfos, char *Dtype, std::string name, std::string baseDir)
+uint8_t* CreateTensorList(const std::vector<uint64_t>& shapeInfos, char* Dtype, std::string name, std::string baseDir)
 {
     uint64_t tensorListDescCount = 1 + shapeInfos.size() * 3;
     std::vector<uint64_t> shapeSizeList;
-    uint64_t *tensorListDesc = (uint64_t *)AscendC::GmAlloc(tensorListDescCount * sizeof(uint64_t));
+    uint64_t* tensorListDesc = (uint64_t*)AscendC::GmAlloc(tensorListDescCount * sizeof(uint64_t));
     *tensorListDesc = (tensorListDescCount - shapeInfos.size()) * sizeof(uint64_t);
     uint64_t addrIndex = 0;
     uint16_t dimCount = 1;
@@ -49,7 +49,7 @@ uint8_t *CreateTensorList(const std::vector<uint64_t> &shapeInfos, char *Dtype, 
     for (size_t i = 0; i < shapeInfos.size(); i++) {
         addrIndex++;
         uint64_t dataSize = shapeSizeList[i] * sizeof(T);
-        uint8_t *dataPtr = (uint8_t *)AscendC::GmAlloc(CeilA2B(dataSize, 32) * 32);
+        uint8_t* dataPtr = (uint8_t*)AscendC::GmAlloc(CeilA2B(dataSize, 32) * 32);
         if (name != "y") {
             std::stringstream fileName;
             fileName << baseDir << Dtype << "_input_" << name << "_" << i << ".bin";
@@ -57,30 +57,30 @@ uint8_t *CreateTensorList(const std::vector<uint64_t> &shapeInfos, char *Dtype, 
         }
         *(tensorListDesc + addrIndex) = (uint64_t)dataPtr;
     }
-    return (uint8_t *)tensorListDesc;
+    return (uint8_t*)tensorListDesc;
 }
 
 template <typename T>
-void FreeTensorList(uint8_t *addr, const std::vector<uint64_t> &shapeInfos, char *Dtype, std::string name,
+void FreeTensorList(uint8_t* addr, const std::vector<uint64_t>& shapeInfos, char* Dtype, std::string name,
                     std::string baseDir)
 {
-    uint64_t dataPtrOffset = *((uint64_t *)addr);
-    uint8_t *dataAddr = addr + dataPtrOffset;
+    uint64_t dataPtrOffset = *((uint64_t*)addr);
+    uint8_t* dataAddr = addr + dataPtrOffset;
     for (size_t i = 0; i < shapeInfos.size(); i++) {
         uint64_t shapeSize = shapeInfos[i];
-        uint8_t *tensorAddr = (uint8_t *)(*((uint64_t *)(dataAddr) + i));
+        uint8_t* tensorAddr = (uint8_t*)(*((uint64_t*)(dataAddr) + i));
         if (name == "y") {
             std::stringstream fileName;
             fileName << baseDir << Dtype << "_output_" << name << "_" << i << ".bin";
             WriteFile(fileName.str(), tensorAddr, shapeSize * sizeof(T));
         }
-        AscendC::GmFree((void *)(tensorAddr));
+        AscendC::GmFree((void*)(tensorAddr));
     }
-    AscendC::GmFree((void *)addr);
+    AscendC::GmFree((void*)addr);
 }
 
 template <typename T>
-uint8_t *CreateTensorList(const std::vector<std::vector<uint64_t>> &shapeInfos, char *Dtype, std::string name,
+uint8_t* CreateTensorList(const std::vector<std::vector<uint64_t>>& shapeInfos, char* Dtype, std::string name,
                           std::string baseDir)
 {
     uint64_t tensorListDescCount = 1 + shapeInfos.size() * 2;
@@ -88,7 +88,7 @@ uint8_t *CreateTensorList(const std::vector<std::vector<uint64_t>> &shapeInfos, 
         tensorListDescCount += s.size();
     }
     std::vector<uint64_t> shapeSizeList;
-    uint64_t *tensorListDesc = (uint64_t *)AscendC::GmAlloc(tensorListDescCount * sizeof(uint64_t));
+    uint64_t* tensorListDesc = (uint64_t*)AscendC::GmAlloc(tensorListDescCount * sizeof(uint64_t));
     *tensorListDesc = (tensorListDescCount - shapeInfos.size()) * sizeof(uint64_t);
     uint64_t addrIndex = 0;
     for (size_t i = 0; i < shapeInfos.size(); i++) {
@@ -106,7 +106,7 @@ uint8_t *CreateTensorList(const std::vector<std::vector<uint64_t>> &shapeInfos, 
     for (size_t i = 0; i < shapeInfos.size(); i++) {
         addrIndex++;
         uint64_t dataSize = shapeSizeList[i] * sizeof(T);
-        uint8_t *dataPtr = (uint8_t *)AscendC::GmAlloc(CeilA2B(dataSize, 32) * 32);
+        uint8_t* dataPtr = (uint8_t*)AscendC::GmAlloc(CeilA2B(dataSize, 32) * 32);
         if (name != "y") {
             std::stringstream fileName;
             fileName << baseDir << Dtype << "_input_" << name << "_" << i << ".bin";
@@ -114,33 +114,33 @@ uint8_t *CreateTensorList(const std::vector<std::vector<uint64_t>> &shapeInfos, 
         }
         *(tensorListDesc + addrIndex) = (uint64_t)dataPtr;
     }
-    return (uint8_t *)tensorListDesc;
+    return (uint8_t*)tensorListDesc;
 }
 
 template <typename T>
-void FreeTensorList(uint8_t *addr, const std::vector<std::vector<uint64_t>> &shapeInfos, char *Dtype, std::string name,
+void FreeTensorList(uint8_t* addr, const std::vector<std::vector<uint64_t>>& shapeInfos, char* Dtype, std::string name,
                     std::string baseDir)
 {
     if (addr == nullptr) {
         return;
     }
-    uint64_t dataPtrOffset = *((uint64_t *)addr);
-    uint8_t *dataAddr = addr + dataPtrOffset;
+    uint64_t dataPtrOffset = *((uint64_t*)addr);
+    uint8_t* dataAddr = addr + dataPtrOffset;
     for (size_t i = 0; i < shapeInfos.size(); i++) {
         uint64_t shapeSize = 1;
         for (size_t j = 0; j < shapeInfos[i].size(); j++) {
             shapeSize *= shapeInfos[i][j];
         }
-        uint8_t *tensorAddr = (uint8_t *)(*((uint64_t *)(dataAddr) + i));
+        uint8_t* tensorAddr = (uint8_t*)(*((uint64_t*)(dataAddr) + i));
         if (name == "y") {
             std::stringstream fileName;
             fileName << baseDir << Dtype << "_output_" << name << "_" << i << ".bin";
             WriteFile(fileName.str(), tensorAddr, shapeSize * sizeof(T));
         }
-        AscendC::GmFree((void *)(tensorAddr));
+        AscendC::GmFree((void*)(tensorAddr));
     }
 
-    AscendC::GmFree((void *)addr);
+    AscendC::GmFree((void*)addr);
 }
 } // namespace GROUPED_MATMUL
 

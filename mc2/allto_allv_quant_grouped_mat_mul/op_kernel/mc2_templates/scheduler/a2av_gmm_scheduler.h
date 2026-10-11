@@ -36,7 +36,7 @@ public:
                                 GM_ADDR gmmxScaleGM, GM_ADDR gmmWeightScaleGM, GM_ADDR mmxScaleGM,
                                 GM_ADDR mmWeightScaleGM, GM_ADDR gmmyGM, GM_ADDR mmyOptionalGM,
                                 GM_ADDR permuteOutOptionalGM, GM_ADDR workspaceGM, GM_ADDR tilingGM,
-                                GmmArrayAddrType *gmmArrayAddrIn, GmmArrayAddrType *mmArrayAddrIn, TPipe *tPipe,
+                                GmmArrayAddrType* gmmArrayAddrIn, GmmArrayAddrType* mmArrayAddrIn, TPipe* tPipe,
                                 bool isA2avGmmFlag)
     {
         // init member variables
@@ -59,7 +59,7 @@ public:
         permuteOutGm_ = permuteOutOptionalGM;
         computeScaleGm_ = gmmxScaleGm_;
         // gmmX comm init
-        const void *hcclInitTiling = &(tilingData_->hcclA2avTilingInfo.hcclInitTiling);
+        const void* hcclInitTiling = &(tilingData_->hcclA2avTilingInfo.hcclInitTiling);
         uint64_t hcclCcTilingOffset = offsetof(TilingDataType, hcclA2avTilingInfo) +
                                       offsetof(MC2KernelTemplate::HcclA2avTilingInfo, a2avCcTiling);
         commOp.Init(hcclInitTiling, hcclCcTilingOffset, &tilingData_->taskTilingInfo, gmmxGM, commOutGm_, commOutGm_,
@@ -155,7 +155,7 @@ private:
     GM_ADDR gmmxScaleCommOutGm_ = nullptr;
     GM_ADDR computeScaleGm_ = nullptr;
     GM_ADDR computeWorkspaceGm_ = nullptr;
-    const TilingDataType *tilingData_ = nullptr;
+    const TilingDataType* tilingData_ = nullptr;
     uint32_t e_ = 0U;
     uint32_t expertNum_ = 1U;
     bool isPermuteOut_ = false;

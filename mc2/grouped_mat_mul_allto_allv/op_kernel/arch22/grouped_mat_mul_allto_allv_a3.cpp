@@ -31,10 +31,10 @@ using namespace Mc2GroupedMatmulTilingData;
 template <bool TILINGKEY_COMPUTE_MATMUL, bool TILINGKEY_GMM_WEIGHT_TRANS, bool TILINGKEY_SHARED_MM_WEIGHT_TRANS>
 __aicore__ inline void RunGmmA2avMtePath(GM_ADDR gmmxGM, GM_ADDR gmmweightGM, GM_ADDR mmxOptionalGM,
                                          GM_ADDR mmweightOptionalGM, GM_ADDR yGM, GM_ADDR mmyOptionalGM,
-                                         GM_ADDR userWorkspace, const GroupedMatMulAlltoAllvMteTilingData *tilingData,
-                                         AscendC::TPipe *pipe)
+                                         GM_ADDR userWorkspace, const GroupedMatMulAlltoAllvMteTilingData* tilingData,
+                                         AscendC::TPipe* pipe)
 {
-    const auto *taskTilingInfo = &tilingData->taskTilingInfo;
+    const auto* taskTilingInfo = &tilingData->taskTilingInfo;
     using CommOpType = GmmA2avMteOp<DTYPE_Y>;
     using ComputeOpType = CatlassGroupedMatmulOp<DTYPE_GMM_X, TILINGKEY_GMM_WEIGHT_TRANS, false>;
     using SharedGmmExpertOpType = CatlassGroupedMatmulOp<DTYPE_GMM_X, TILINGKEY_SHARED_MM_WEIGHT_TRANS, true>;
@@ -103,7 +103,7 @@ __global__ __aicore__ void grouped_mat_mul_allto_allv(GM_ADDR gmmxGM, GM_ADDR gm
         }
     } else {
         GET_TILING_DATA_WITH_STRUCT(QuantGmmA2avTilingData, tilingData, tilingGM);
-        QuantGmmA2avTilingData *tilingData_ = &tilingData;
+        QuantGmmA2avTilingData* tilingData_ = &tilingData;
 
         using HcclOpType = HcclA2avOp<DTYPE_Y, false, TILINGKEY_COMM_MODE>;
         using ComputeOpType =
@@ -140,7 +140,7 @@ __global__ __aicore__ void grouped_mat_mul_allto_allv(GM_ADDR gmmxGM, GM_ADDR gm
         }
 
         if ASCEND_IS_AIV {
-            const void *hcclInitTiling = &(tilingData_->hcclA2avTiling.hcclInitTiling);
+            const void* hcclInitTiling = &(tilingData_->hcclA2avTiling.hcclInitTiling);
             uint64_t hcclCcTilingOffset = offsetof(QuantGmmA2avTilingData, hcclA2avTiling) +
                                           offsetof(MC2KernelTemplate::HcclA2avTilingInfo, a2avCcTiling);
             HcclOpType hcclOp;

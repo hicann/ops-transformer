@@ -17,48 +17,48 @@ namespace fallback {
 using namespace ge;
 using namespace gert;
 
-const char *MoeDistributeCombineV2Info = "MoeDistributeCombineV2Fallback";
+const char* MoeDistributeCombineV2Info = "MoeDistributeCombineV2Fallback";
 
 namespace {
 struct CombineV2Params {
-    const gert::Tensor *expand_x = nullptr;
-    const gert::Tensor *expert_ids = nullptr;
-    const gert::Tensor *assist_info_for_combine = nullptr;
-    const gert::Tensor *ep_send_counts = nullptr;
-    const gert::Tensor *expert_scales = nullptr;
-    const gert::Tensor *tp_send_counts = nullptr;
-    const gert::Tensor *x_active_mask = nullptr;
-    const gert::Tensor *activation_scale = nullptr;
-    const gert::Tensor *weight_scale = nullptr;
-    const gert::Tensor *group_list = nullptr;
-    const gert::Tensor *shared_expert_x = nullptr;
-    const gert::Tensor *elastic_info = nullptr;
-    const gert::Tensor *ori_x = nullptr;
-    const gert::Tensor *const_expert_alpha_1 = nullptr;
-    const gert::Tensor *const_expert_alpha_2 = nullptr;
-    const gert::Tensor *const_expert_v = nullptr;
-    const gert::Tensor *x = nullptr;
-    const char *group_ep = nullptr;
-    const char *group_tp = nullptr;
-    const int64_t *ep_word_size = nullptr;
-    const int64_t *ep_rank_id = nullptr;
-    const int64_t *moe_expert_num = nullptr;
-    const int64_t *tp_word_size = nullptr;
-    const int64_t *tp_rank_id = nullptr;
-    const int64_t *expert_shard_type = nullptr;
-    const int64_t *shared_expert_num = nullptr;
-    const int64_t *shared_expert_rank_num = nullptr;
-    const int64_t *global_bs_ptr = nullptr;
-    const int64_t *out_dtype_ptr = nullptr;
-    const int64_t *comm_quant_mode_ptr = nullptr;
-    const int64_t *group_list_type_ptr = nullptr;
-    const int64_t *comm_alg_ptr = nullptr;
-    const int64_t *zero_expert_num = nullptr;
-    const int64_t *copy_expert_num = nullptr;
-    const int64_t *const_expert_num = nullptr;
+    const gert::Tensor* expand_x = nullptr;
+    const gert::Tensor* expert_ids = nullptr;
+    const gert::Tensor* assist_info_for_combine = nullptr;
+    const gert::Tensor* ep_send_counts = nullptr;
+    const gert::Tensor* expert_scales = nullptr;
+    const gert::Tensor* tp_send_counts = nullptr;
+    const gert::Tensor* x_active_mask = nullptr;
+    const gert::Tensor* activation_scale = nullptr;
+    const gert::Tensor* weight_scale = nullptr;
+    const gert::Tensor* group_list = nullptr;
+    const gert::Tensor* shared_expert_x = nullptr;
+    const gert::Tensor* elastic_info = nullptr;
+    const gert::Tensor* ori_x = nullptr;
+    const gert::Tensor* const_expert_alpha_1 = nullptr;
+    const gert::Tensor* const_expert_alpha_2 = nullptr;
+    const gert::Tensor* const_expert_v = nullptr;
+    const gert::Tensor* x = nullptr;
+    const char* group_ep = nullptr;
+    const char* group_tp = nullptr;
+    const int64_t* ep_word_size = nullptr;
+    const int64_t* ep_rank_id = nullptr;
+    const int64_t* moe_expert_num = nullptr;
+    const int64_t* tp_word_size = nullptr;
+    const int64_t* tp_rank_id = nullptr;
+    const int64_t* expert_shard_type = nullptr;
+    const int64_t* shared_expert_num = nullptr;
+    const int64_t* shared_expert_rank_num = nullptr;
+    const int64_t* global_bs_ptr = nullptr;
+    const int64_t* out_dtype_ptr = nullptr;
+    const int64_t* comm_quant_mode_ptr = nullptr;
+    const int64_t* group_list_type_ptr = nullptr;
+    const int64_t* comm_alg_ptr = nullptr;
+    const int64_t* zero_expert_num = nullptr;
+    const int64_t* copy_expert_num = nullptr;
+    const int64_t* const_expert_num = nullptr;
 };
 
-static bool CheckParamNotNull(const void *param, const char *name)
+static bool CheckParamNotNull(const void* param, const char* name)
 {
     if (param == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(MoeDistributeCombineV2Info, name);
@@ -74,7 +74,7 @@ static bool CheckParamNotNull(const void *param, const char *name)
         } \
     } while (0)
 
-static ge::graphStatus FetchInputs(const OpExecuteContext *ctx, CombineV2Params &p)
+static ge::graphStatus FetchInputs(const OpExecuteContext* ctx, CombineV2Params& p)
 {
     p.expand_x = ctx->GetInputTensor(static_cast<size_t>(ops::MoeDistributeCombineV2InputIdx::K_EXPAND_X));
     p.expert_ids = ctx->GetInputTensor(static_cast<size_t>(ops::MoeDistributeCombineV2InputIdx::K_EXPERT_IDS));
@@ -114,7 +114,7 @@ static ge::graphStatus FetchInputs(const OpExecuteContext *ctx, CombineV2Params 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus FetchAttrs(const OpExecuteContext *ctx, CombineV2Params &p)
+static ge::graphStatus FetchAttrs(const OpExecuteContext* ctx, CombineV2Params& p)
 {
     const auto attrs = ctx->GetAttrs();
     MC2_CHECK_PARAM_NOT_NULL(attrs, "attrs");
@@ -160,7 +160,7 @@ static ge::graphStatus FetchAttrs(const OpExecuteContext *ctx, CombineV2Params &
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus DispatchCombineV2(OpExecuteContext *host_api_ctx, const CombineV2Params &p)
+static ge::graphStatus DispatchCombineV2(OpExecuteContext* host_api_ctx, const CombineV2Params& p)
 {
     if (p.elastic_info != nullptr || p.ori_x != nullptr || p.const_expert_alpha_1 != nullptr ||
         p.const_expert_alpha_2 != nullptr || p.const_expert_v != nullptr || *p.zero_expert_num != 0 ||
@@ -193,7 +193,7 @@ static ge::graphStatus DispatchCombineV2(OpExecuteContext *host_api_ctx, const C
 
 } // namespace
 
-static graphStatus MoeDistributeCombineV2ExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus MoeDistributeCombineV2ExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_LOGD(MoeDistributeCombineV2Info, "start to fallback for moeDistributeCombineV2");
     if (host_api_ctx == nullptr) {

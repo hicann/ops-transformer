@@ -26,18 +26,18 @@ namespace ops {
 class Mc2GenTaskOpsUtils {
 public:
     static bool IsComputationOnly();
-    static int64_t GetAttachStreamIdByContext(const gert::ExeResGenerationContext *context, size_t idx = 0);
-    static ge::Status CommonKFCMc2CalcParamFunc(const gert::ExeResGenerationContext *context,
-                                                const ge::AscendString &name, const ge::AscendString &reuse_key);
-    static ge::Status CommonKFCMc2GenTask(const gert::ExeResGenerationContext *context,
-                                          std::vector<std::vector<uint8_t>> &tasks);
-    static ge::Status InsertHiddenInputsForAicoreTask(const gert::ExeResGenerationContext *context,
-                                                      ge::KernelLaunchInfo &aicore_task,
-                                                      size_t (*get_insert_idx)(const std::vector<ge::ArgDescInfo> &),
+    static int64_t GetAttachStreamIdByContext(const gert::ExeResGenerationContext* context, size_t idx = 0);
+    static ge::Status CommonKFCMc2CalcParamFunc(const gert::ExeResGenerationContext* context,
+                                                const ge::AscendString& name, const ge::AscendString& reuse_key);
+    static ge::Status CommonKFCMc2GenTask(const gert::ExeResGenerationContext* context,
+                                          std::vector<std::vector<uint8_t>>& tasks);
+    static ge::Status InsertHiddenInputsForAicoreTask(const gert::ExeResGenerationContext* context,
+                                                      ge::KernelLaunchInfo& aicore_task,
+                                                      size_t (*get_insert_idx)(const std::vector<ge::ArgDescInfo>&),
                                                       size_t input_cnt = 1U);
-    static ge::Status InsertHiddenInputForAicoreV1(const gert::ExeResGenerationContext *context,
-                                                   std::vector<std::vector<uint8_t>> &tasks);
-    static ge::Status CreateAicpuTaskV1(const gert::ExeResGenerationContext *context, ge::KernelLaunchInfo &aicpu_task);
+    static ge::Status InsertHiddenInputForAicoreV1(const gert::ExeResGenerationContext* context,
+                                                   std::vector<std::vector<uint8_t>>& tasks);
+    static ge::Status CreateAicpuTaskV1(const gert::ExeResGenerationContext* context, ge::KernelLaunchInfo& aicpu_task);
 };
 } // namespace ops
 #endif // OPS_TRANSFORMER_DEV_MC2_COMMON_INC_MC2_GEN_TASK_OPS_UTILS

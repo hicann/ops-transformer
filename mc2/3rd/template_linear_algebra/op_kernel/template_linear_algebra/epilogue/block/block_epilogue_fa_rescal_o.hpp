@@ -46,7 +46,7 @@ public:
     static constexpr uint32_t MULTIPLIER = 2;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource)
     {
         constexpr uint32_t LO_UB_TENSOR_OFFSET = 5 * UB_TILE_SIZE;
         constexpr uint32_t DM_UB_TENSOR_OFFSET = 7 * UB_TILE_SIZE + 4 * UB_LINE_SIZE;
@@ -93,7 +93,7 @@ public:
 
     CATLASS_DEVICE
     void subCoreCompute(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
-                        const LayoutOutput &layoutOutput, const LayoutInput &layoutInput, uint32_t nIdx,
+                        const LayoutOutput& layoutOutput, const LayoutInput& layoutInput, uint32_t nIdx,
                         uint32_t isLast)
     {
         uint32_t subM = layoutInput.shape(0);
@@ -234,7 +234,7 @@ public:
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
-                    const LayoutOutput &layoutOutput, const LayoutInput &layoutInput, GemmCoord actualBlockShape,
+                    const LayoutOutput& layoutOutput, const LayoutInput& layoutInput, GemmCoord actualBlockShape,
                     uint32_t nIdx, uint32_t isLast)
     {
         uint32_t mActual = actualBlockShape.m();

@@ -25,7 +25,7 @@ namespace MC2Tiling {
 
 class MoeDistributeCombineTeardownTilingBase : public optiling::MoeTilingBase {
 public:
-    explicit MoeDistributeCombineTeardownTilingBase(gert::TilingContext *context)
+    explicit MoeDistributeCombineTeardownTilingBase(gert::TilingContext* context)
         : optiling::MoeTilingBase(context),
           nodeName_(context->GetNodeName()) {};
 
@@ -49,8 +49,8 @@ protected:
     ge::graphStatus CheckOptionalInputTensorDim();
     ge::graphStatus CheckOutputTensorDim();
     ge::graphStatus CheckTensorDim();
-    ge::graphStatus CheckTokenMessageAndOutputWidth(const gert::StorageShape *quantExpandXStorageShape,
-                                                    const gert::StorageShape *xOutStorageShape, int64_t H) const;
+    ge::graphStatus CheckTokenMessageAndOutputWidth(const gert::StorageShape* quantExpandXStorageShape,
+                                                    const gert::StorageShape* xOutStorageShape, int64_t H) const;
     ge::graphStatus CheckTensorShapeRelation();
     ge::graphStatus CheckTensorShapeRelationSecondPart();
     ge::graphStatus CheckSharedExpertInputShape(int64_t Bs, int64_t H) const;
@@ -71,9 +71,9 @@ protected:
     void SetPlatformInfo();
     void PrintTilingDataInfo() const;
 
-    const char *socTilingName_{nullptr};
-    const char *nodeName_{nullptr};
-    MoeDistributeCombineTeardownTilingData *tilingData_{nullptr};
+    const char* socTilingName_{nullptr};
+    const char* nodeName_{nullptr};
+    MoeDistributeCombineTeardownTilingData* tilingData_{nullptr};
     std::string groupEp_;
 
     uint64_t GetTilingKey() const override;

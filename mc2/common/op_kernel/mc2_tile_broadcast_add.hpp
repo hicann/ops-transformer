@@ -29,9 +29,9 @@ struct TileRowBroadcastAdd {
     TileRowBroadcastAdd() {}
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut,
-                    AscendC::LocalTensor<ElementCompute> const &ubIn0,
-                    AscendC::LocalTensor<ElementCompute> const &ubIn1)
+    void operator()(AscendC::LocalTensor<ElementCompute> const& ubOut,
+                    AscendC::LocalTensor<ElementCompute> const& ubIn0,
+                    AscendC::LocalTensor<ElementCompute> const& ubIn1)
     {
         constexpr uint32_t maxRepeatTimes = 255;
         constexpr uint32_t eleNumPerBlk = BYTE_PER_BLK / sizeof(ElementCompute);

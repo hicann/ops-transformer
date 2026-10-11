@@ -32,14 +32,14 @@ enum class NnopbaseHcclServerType : uint32_t {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
-extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
-extern "C" void *NnopbaseGetUserHandle(void *executor);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
+extern "C" void NnopbaseSetUserHandle(void* executor, void* handle);
+extern "C" void* NnopbaseGetUserHandle(void* executor);
 
 // check nullptr
-static bool CheckNullStatus(const aclTensor *gmmX, const aclTensor *gmmWeight, const aclTensor *mmXOptional,
-                            const aclTensor *mmWeightOptional, const char *group, bool permuteOutFlag, aclTensor *gmmY,
-                            const aclTensor *mmYOptional, const aclTensor *permuteOutOptional)
+static bool CheckNullStatus(const aclTensor* gmmX, const aclTensor* gmmWeight, const aclTensor* mmXOptional,
+                            const aclTensor* mmWeightOptional, const char* group, bool permuteOutFlag, aclTensor* gmmY,
+                            const aclTensor* mmYOptional, const aclTensor* permuteOutOptional)
 {
     // 检查必选入参出参为非空
     OP_CHECK_NULL(gmmX, return false);
@@ -64,8 +64,8 @@ static bool CheckNullStatus(const aclTensor *gmmX, const aclTensor *gmmWeight, c
     return true;
 }
 
-static aclnnStatus CheckOptionalCountTensors(const aclTensor *sendCountsTensorOptional,
-                                             const aclTensor *recvCountsTensorOptional)
+static aclnnStatus CheckOptionalCountTensors(const aclTensor* sendCountsTensorOptional,
+                                             const aclTensor* recvCountsTensorOptional)
 {
     if (sendCountsTensorOptional == nullptr && recvCountsTensorOptional == nullptr) {
         return ACLNN_SUCCESS;
@@ -76,11 +76,11 @@ static aclnnStatus CheckOptionalCountTensors(const aclTensor *sendCountsTensorOp
 }
 
 // 入参校验
-static aclnnStatus CheckParams(const aclTensor *gmmX, const aclTensor *gmmWeight,
-                               const aclTensor *sendCountsTensorOptional, const aclTensor *recvCountsTensorOptional,
-                               const aclTensor *mmXOptional, const aclTensor *mmWeightOptional, const char *group,
-                               int64_t epWorldSize, bool permuteOutFlag, aclTensor *gmmY, aclTensor *mmYOptional,
-                               aclTensor *permuteOutOptional)
+static aclnnStatus CheckParams(const aclTensor* gmmX, const aclTensor* gmmWeight,
+                               const aclTensor* sendCountsTensorOptional, const aclTensor* recvCountsTensorOptional,
+                               const aclTensor* mmXOptional, const aclTensor* mmWeightOptional, const char* group,
+                               int64_t epWorldSize, bool permuteOutFlag, aclTensor* gmmY, aclTensor* mmYOptional,
+                               aclTensor* permuteOutOptional)
 {
     (void)epWorldSize; // Unused
     const aclnnStatus optionalCountRet = CheckOptionalCountTensors(sendCountsTensorOptional, recvCountsTensorOptional);
@@ -99,7 +99,7 @@ static aclnnStatus CheckParams(const aclTensor *gmmX, const aclTensor *gmmWeight
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckSendAndRecv(const aclIntArray *sendCounts, const aclIntArray *recvCounts)
+static aclnnStatus CheckSendAndRecv(const aclIntArray* sendCounts, const aclIntArray* recvCounts)
 {
     if (sendCounts == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnAlltoAllvGroupedMatMulGetWorkspaceSize", "sendCounts");
@@ -125,11 +125,11 @@ static aclnnStatus CheckSendAndRecv(const aclIntArray *sendCounts, const aclIntA
 }
 
 aclnnStatus aclnnAlltoAllvGroupedMatMulGetWorkspaceSize(
-    const aclTensor *gmmX, const aclTensor *gmmWeight, const aclTensor *sendCountsTensorOptional,
-    const aclTensor *recvCountsTensorOptional, const aclTensor *mmXOptional, const aclTensor *mmWeightOptional,
-    const char *group, int64_t epWorldSize, const aclIntArray *sendCounts, const aclIntArray *recvCounts,
-    bool transGmmWeight, bool transMmWeight, bool permuteOutFlag, aclTensor *gmmY, aclTensor *mmYOptional,
-    aclTensor *permuteOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* gmmX, const aclTensor* gmmWeight, const aclTensor* sendCountsTensorOptional,
+    const aclTensor* recvCountsTensorOptional, const aclTensor* mmXOptional, const aclTensor* mmWeightOptional,
+    const char* group, int64_t epWorldSize, const aclIntArray* sendCounts, const aclIntArray* recvCounts,
+    bool transGmmWeight, bool transMmWeight, bool permuteOutFlag, aclTensor* gmmY, aclTensor* mmYOptional,
+    aclTensor* permuteOutOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     auto ret_param =
         CheckParams(gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional, mmWeightOptional,
@@ -137,27 +137,27 @@ aclnnStatus aclnnAlltoAllvGroupedMatMulGetWorkspaceSize(
     CHECK_RET(ret_param == ACLNN_SUCCESS, ret_param);
     auto ret_send_and_recv = CheckSendAndRecv(sendCounts, recvCounts);
     CHECK_RET(ret_send_and_recv == ACLNN_SUCCESS, ret_send_and_recv);
-    const char *commMode = "ai_cpu";
-    char *str_commMode = const_cast<char *>(commMode);
+    const char* commMode = "ai_cpu";
+    char* str_commMode = const_cast<char*>(commMode);
     aclnnStatus ret = aclnnInnerAlltoAllvGroupedMatMulGetWorkspaceSize(
         gmmX, gmmWeight, sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional, mmWeightOptional,
-        const_cast<char *>(group), epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight, permuteOutFlag,
+        const_cast<char*>(group), epWorldSize, sendCounts, recvCounts, transGmmWeight, transMmWeight, permuteOutFlag,
         str_commMode, gmmY, mmYOptional, permuteOutOptional, workspaceSize, executor);
     OP_LOGD("AlltoAllvGroupedMatmul, aclnnInnerAlltoAllvGroupedMatMulGetWorkspaceSize ret %d.", ret);
     if (*executor != nullptr) {
         uint8_t commModeType = Mc2Comm::COMM_MODE_AICPU;
-        void *args = reinterpret_cast<void *>(static_cast<uint8_t>(commModeType));
+        void* args = reinterpret_cast<void*>(static_cast<uint8_t>(commModeType));
         NnopbaseSetUserHandle(*executor, args);
     }
     return ret;
 }
 
-aclnnStatus aclnnAlltoAllvGroupedMatMul(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnAlltoAllvGroupedMatMul(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {
         if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
-            void *arg = NnopbaseGetUserHandle(executor);
+            void* arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);
             if (commMode == Mc2Comm::COMM_MODE_AICPU) {

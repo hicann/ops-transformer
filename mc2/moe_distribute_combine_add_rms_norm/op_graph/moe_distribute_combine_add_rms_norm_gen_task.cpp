@@ -28,7 +28,7 @@
 
 namespace ops {
 
-static bool IsPlatform910B(const char *nodeName)
+static bool IsPlatform910B(const char* nodeName)
 {
     fe::PlatFormInfos platform_info;
     fe::OptionalInfos optional_info;
@@ -47,17 +47,17 @@ static bool IsPlatform910B(const char *nodeName)
     return supported_soc.count(short_soc_version) > 0;
 }
 
-ge::Status MoeDistributeCombineAddRmsNormCalcParamFunc(gert::ExeResGenerationContext *context)
+ge::Status MoeDistributeCombineAddRmsNormCalcParamFunc(gert::ExeResGenerationContext* context)
 {
     const ge::AscendString name = "aicpu kfc server";
     const ge::AscendString reuseKey = "kfc_stream";
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, name, reuseKey);
 }
 
-ge::Status MoeDistributeCombineAddRmsNormGenTaskFunc(const gert::ExeResGenerationContext *context,
-                                                     std::vector<std::vector<uint8_t>> &tasks)
+ge::Status MoeDistributeCombineAddRmsNormGenTaskFunc(const gert::ExeResGenerationContext* context,
+                                                     std::vector<std::vector<uint8_t>>& tasks)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OPS_LOG_I(nodeName, "MC2 Generate task start.");
     if (IsPlatform910B(nodeName)) {
         return Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallback(context, tasks);

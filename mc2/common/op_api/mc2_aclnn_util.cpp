@@ -17,7 +17,7 @@ namespace MC2Aclnn {
 
 static constexpr size_t MX_SCALE_MAX_DIM = 3;
 
-bool IsNeedScaleTrans(const aclTensor *mxScaleTensor)
+bool IsNeedScaleTrans(const aclTensor* mxScaleTensor)
 {
     if (mxScaleTensor->GetViewShape().GetDimNum() < MX_SCALE_MAX_DIM) {
         return Ops::Transformer::IsTransposeLastTwoDims(mxScaleTensor);
@@ -37,7 +37,7 @@ bool IsNeedScaleTrans(const aclTensor *mxScaleTensor)
     return transposeFlag;
 }
 
-bool IsTensorContiguous(const aclTensor *tensor)
+bool IsTensorContiguous(const aclTensor* tensor)
 {
     OP_CHECK_NULL(tensor, return false);
 

@@ -77,7 +77,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_F(MoeDistributeDispatchV2Arch35TilingTest, A5SmallWindowCcuFailed)
 {
-    const char *envValue = getenv("HCCL_BUFFSIZE");
+    const char* envValue = getenv("HCCL_BUFFSIZE");
     std::string originalEnv = envValue != nullptr ? envValue : "";
     setenv("HCCL_BUFFSIZE", "1", 1);
 

@@ -74,7 +74,7 @@ public:
 
     /// Construct
     CATLASS_DEVICE
-    BlockMmad(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = L1_PV_ADDR_START)
+    BlockMmad(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = L1_PV_ADDR_START)
     {
         // Allocate L1 memory space
         for (uint32_t i = 0; i < STAGES; i++) {
@@ -95,8 +95,8 @@ public:
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementA> gB,
                     AscendC::GlobalTensor<int32_t> gblockTable, AscendC::GlobalTensor<ElementC> gC, LayoutA layoutA,
-                    LayoutB layoutB, LayoutC layoutC, GemmCoord actualShape, uint32_t &nIdx, uint32_t &nLoop,
-                    uint32_t &blockSize, uint32_t kvSeqlen, Arch::CrossCoreFlag softmaxReady)
+                    LayoutB layoutB, LayoutC layoutC, GemmCoord actualShape, uint32_t& nIdx, uint32_t& nLoop,
+                    uint32_t& blockSize, uint32_t kvSeqlen, Arch::CrossCoreFlag softmaxReady)
     {
         uint32_t rowNum = actualShape.m();
         uint32_t stackSeqTile = actualShape.k();

@@ -24,7 +24,7 @@ namespace Mc2MatmulAiv {
 constexpr uint32_t SWIZZLE_BUFFER_NUM = 2U;
 
 inline __aicore__ void GetSwizzledBlockIdx(int32_t loopIdx, int32_t mLoop, int32_t nLoop, int32_t swizzleDirection,
-                                           int32_t swizzleCount, int64_t &mIdx, int64_t &nIdx)
+                                           int32_t swizzleCount, int64_t& mIdx, int64_t& nIdx)
 {
     uint32_t inBatchIdx = loopIdx % (mLoop * nLoop);
     if (swizzleDirection == 0) { // Zn

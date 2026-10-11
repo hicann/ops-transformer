@@ -78,20 +78,20 @@ public:
                   "TileShape is too large to fit in UB");
 
     struct Params {
-        __gm__ ElementScale *ptrScale{nullptr};
+        __gm__ ElementScale* ptrScale{nullptr};
         LayoutScale layoutScale{};
-        __gm__ ElementPerTokenScale *ptrPerTokenScale{nullptr};
+        __gm__ ElementPerTokenScale* ptrPerTokenScale{nullptr};
         LayoutPerTokenScale layoutPerTokenScale{};
-        __gm__ ElementD *ptrD{nullptr};
+        __gm__ ElementD* ptrD{nullptr};
         LayoutD layoutD{};
 
         CATLASS_DEVICE
         Params() {};
 
         CATLASS_DEVICE
-        Params(__gm__ ElementScale *ptrScale_, LayoutScale const &layoutScale_,
-               __gm__ ElementPerTokenScale *ptrPerTokenScale_, LayoutPerTokenScale const &layoutPerTokenScale_,
-               __gm__ ElementD *ptrD_, LayoutD const &layoutD_)
+        Params(__gm__ ElementScale* ptrScale_, LayoutScale const& layoutScale_,
+               __gm__ ElementPerTokenScale* ptrPerTokenScale_, LayoutPerTokenScale const& layoutPerTokenScale_,
+               __gm__ ElementD* ptrD_, LayoutD const& layoutD_)
             : ptrScale(ptrScale_),
               layoutScale(layoutScale_),
               ptrPerTokenScale(ptrPerTokenScale_),
@@ -102,7 +102,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{})
+    BlockEpilogue(Arch::Resource<ArchTag> const& resource, Params const& params = Params{})
         : params(params)
     {
         size_t ubOffset = 0;
@@ -159,15 +159,15 @@ public:
     }
 
     CATLASS_DEVICE
-    void UpdateParams(Params const &params_)
+    void UpdateParams(Params const& params_)
     {
         params = params_;
     }
 
     CATLASS_DEVICE
-    void operator()(GemmCoord const &blockShapeMNK, GemmCoord const &blockCoordMNK,
-                    GemmCoord const &actualBlockShapeMNK, AscendC::GlobalTensor<ElementC> const &gmBlockC,
-                    LayoutC const &layoutBlockC, Callback &&callback = Callback{})
+    void operator()(GemmCoord const& blockShapeMNK, GemmCoord const& blockCoordMNK,
+                    GemmCoord const& actualBlockShapeMNK, AscendC::GlobalTensor<ElementC> const& gmBlockC,
+                    LayoutC const& layoutBlockC, Callback&& callback = Callback{})
     {
         if (actualBlockShapeMNK.k() == 0) {
             return;
@@ -202,7 +202,7 @@ public:
             auto gmTileC = gmBlockC[layoutBlockC.GetOffset(tileOffsetInBlock)];
             auto layoutGmTileC = layoutBlockC.GetTileLayout(actualTileShape);
 
-            auto &ubC = ubCList[ubListId];
+            auto& ubC = ubCList[ubListId];
             LayoutC layoutUbC{actualTileShape, ubTileStride};
 
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
@@ -215,7 +215,7 @@ public:
             auto gmTileScale = gmScale[params.layoutScale.GetOffset(scaleTileOffset)];
             auto layoutGmTileScale = params.layoutScale.GetTileLayout(scaleTileShape);
 
-            auto &ubScale = ubScaleList[ubListId];
+            auto& ubScale = ubScaleList[ubListId];
             auto layoutUbScale = LayoutScale::template MakeLayoutInUb<ElementScale>(scaleTileShape);
 
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[ubListId]);
@@ -228,7 +228,7 @@ public:
             auto gmTilePerTokenScale = gmPerTokenScale[params.layoutPerTokenScale.GetOffset(perTokenScaleTileOffset)];
             auto layoutGmTilePerTokenScale = params.layoutPerTokenScale.GetTileLayout(perTokenScaleTileShape);
 
-            auto &ubPerTokenScale = ubPerTokenScaleList[ubListId];
+            auto& ubPerTokenScale = ubPerTokenScaleList[ubListId];
             auto layoutUbPerTokenScale =
                 LayoutScale::template MakeLayoutInUb<ElementPerTokenScale>(perTokenScaleTileShape);
 
@@ -256,7 +256,7 @@ public:
             tileOneBlkColumnBroadcastMul(ubPerTokenMul, ubMul, ubPerTokenScaleFp32Brcb);
             AscendC::PipeBarrier<PIPE_V>();
 
-            auto &ubD = ubDList[ubListId];
+            auto& ubD = ubDList[ubListId];
             LayoutD layoutUbD{actualTileShape, ubTileStride};
 
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventUbDMTE3VList[ubListId]);
@@ -366,20 +366,20 @@ public:
                   "TileShape is too large to fit in UB");
 
     struct Params {
-        __gm__ ElementScale *ptrScale{nullptr};
+        __gm__ ElementScale* ptrScale{nullptr};
         LayoutScale layoutScale{};
-        __gm__ ElementPerTokenScale *ptrPerTokenScale{nullptr};
+        __gm__ ElementPerTokenScale* ptrPerTokenScale{nullptr};
         LayoutPerTokenScale layoutPerTokenScale{};
-        __gm__ ElementD *ptrD{nullptr};
+        __gm__ ElementD* ptrD{nullptr};
         LayoutD layoutD{};
 
         CATLASS_DEVICE
         Params() {};
 
         CATLASS_DEVICE
-        Params(__gm__ ElementScale *ptrScale_, LayoutScale const &layoutScale_,
-               __gm__ ElementPerTokenScale *ptrPerTokenScale_, LayoutPerTokenScale const &layoutPerTokenScale_,
-               __gm__ ElementD *ptrD_, LayoutD const &layoutD_)
+        Params(__gm__ ElementScale* ptrScale_, LayoutScale const& layoutScale_,
+               __gm__ ElementPerTokenScale* ptrPerTokenScale_, LayoutPerTokenScale const& layoutPerTokenScale_,
+               __gm__ ElementD* ptrD_, LayoutD const& layoutD_)
             : ptrScale(ptrScale_),
               layoutScale(layoutScale_),
               ptrPerTokenScale(ptrPerTokenScale_),
@@ -390,7 +390,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{})
+    BlockEpilogue(Arch::Resource<ArchTag> const& resource, Params const& params = Params{})
         : params(params)
     {
         size_t ubOffset = 0;
@@ -443,15 +443,15 @@ public:
     }
 
     CATLASS_DEVICE
-    void UpdateParams(Params const &params_)
+    void UpdateParams(Params const& params_)
     {
         params = params_;
     }
 
     CATLASS_DEVICE
-    void operator()(GemmCoord const &blockShapeMNK, GemmCoord const &blockCoordMNK,
-                    GemmCoord const &actualBlockShapeMNK, AscendC::GlobalTensor<ElementC> const &gmBlockC,
-                    LayoutC const &layoutBlockC, Callback &&callback = Callback{})
+    void operator()(GemmCoord const& blockShapeMNK, GemmCoord const& blockCoordMNK,
+                    GemmCoord const& actualBlockShapeMNK, AscendC::GlobalTensor<ElementC> const& gmBlockC,
+                    LayoutC const& layoutBlockC, Callback&& callback = Callback{})
     {
         if (actualBlockShapeMNK.k() == 0) {
             return;
@@ -485,7 +485,7 @@ public:
             auto gmTileC = gmBlockC[layoutBlockC.GetOffset(tileOffsetInBlock)];
             auto layoutGmTileC = layoutBlockC.GetTileLayout(actualTileShape);
 
-            auto &ubC = ubCList[ubListId];
+            auto& ubC = ubCList[ubListId];
             LayoutC layoutUbC{actualTileShape, ubTileStride};
 
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
@@ -498,7 +498,7 @@ public:
             auto gmTileScale = gmScale[params.layoutScale.GetOffset(scaleTileOffset)];
             auto layoutGmTileScale = params.layoutScale.GetTileLayout(scaleTileShape);
 
-            auto &ubScale = ubScaleList[ubListId];
+            auto& ubScale = ubScaleList[ubListId];
             auto layoutUbScale = LayoutScale::template MakeLayoutInUb<ElementScale>(scaleTileShape);
 
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[ubListId]);
@@ -511,7 +511,7 @@ public:
             auto gmTilePerTokenScale = gmPerTokenScale[params.layoutPerTokenScale.GetOffset(perTokenScaleTileOffset)];
             auto layoutGmTilePerTokenScale = params.layoutPerTokenScale.GetTileLayout(perTokenScaleTileShape);
 
-            auto &ubPerTokenScale = ubPerTokenScaleList[ubListId];
+            auto& ubPerTokenScale = ubPerTokenScaleList[ubListId];
             auto layoutUbPerTokenScale =
                 LayoutScale::template MakeLayoutInUb<ElementPerTokenScale>(perTokenScaleTileShape);
 
@@ -536,7 +536,7 @@ public:
             tileOneBlkColumnBroadcastMul(ubPerTokenMul, ubMul, ubPerTokenScaleBrcb);
             AscendC::PipeBarrier<PIPE_V>();
 
-            auto &ubD = ubDList[ubListId];
+            auto& ubD = ubDList[ubListId];
             LayoutD layoutUbD{actualTileShape, ubTileStride};
 
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventUbDMTE3VList[ubListId]);

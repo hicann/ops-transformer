@@ -33,13 +33,13 @@ using Mc2WeightQuantBatchMatmulV2::Mc2QuantType;
 template <typename xType, typename wType, typename yType, class mmType>
 class MatmulAllReduceAddRmsNormWeightQuant : public MatmulAllReduceWeightQuant<xType, wType, yType, mmType> {
 public:
-    __aicore__ inline MatmulAllReduceAddRmsNormWeightQuant(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs,
-                                                           ArnGmAddrs *arnAddrs, MC2TilingHeader *tilingData,
-                                                           TPipe *tPipe)
+    __aicore__ inline MatmulAllReduceAddRmsNormWeightQuant(MC2GmAddrs* addrs, QuantGmAddrs* quantAddrs,
+                                                           ArnGmAddrs* arnAddrs, MC2TilingHeader* tilingData,
+                                                           TPipe* tPipe)
         : MatmulAllReduceWeightQuant<xType, wType, yType, mmType>(addrs, quantAddrs, arnAddrs, tilingData, tPipe)
     {
-        Mc2Tiling::WeightQuantMatmulAllReduceAddRmsNormTilingData *p =
-            (Mc2Tiling::WeightQuantMatmulAllReduceAddRmsNormTilingData *)tilingData;
+        Mc2Tiling::WeightQuantMatmulAllReduceAddRmsNormTilingData* p =
+            (Mc2Tiling::WeightQuantMatmulAllReduceAddRmsNormTilingData*)tilingData;
         arnTile_ = &p->addRMSNormTileTilingData;
         arnTail_ = &p->addRMSNormTailTilingData;
         arnTilineKey_ = &p->addRmsNormTilingeKeyData;
@@ -71,9 +71,9 @@ public:
     }
 
 private:
-    Mc2Tiling::AddRMSNormTilingeKeyData *arnTilineKey_;
-    Mc2Tiling::AddRMSNormTilingData *arnTile_;
-    Mc2Tiling::AddRMSNormTilingData *arnTail_;
+    Mc2Tiling::AddRMSNormTilingeKeyData* arnTilineKey_;
+    Mc2Tiling::AddRMSNormTilingData* arnTile_;
+    Mc2Tiling::AddRMSNormTilingData* arnTail_;
 };
 
 #define INVOKE_MC2_ARN_WEIGHT_QUANT_910_OP_IMPL(bTransFlag, quantType, offsetFlag) \
@@ -85,7 +85,7 @@ private:
         QuantGmAddrs quantAddrs = {antiquantScaleGM, antiquantOffsetGM, nullptr, nullptr}; \
         ArnGmAddrs arnAddrs = {residualGM, gammaGM, yGM, normOutGM}; \
         MatmulAllReduceAddRmsNormWeightQuant<DTYPE_X1, DTYPE_X2, DTYPE_Y, opType> op( \
-            &addrs, &quantAddrs, &arnAddrs, (MC2TilingHeader *)&tilingData, &tPipe); \
+            &addrs, &quantAddrs, &arnAddrs, (MC2TilingHeader*)&tilingData, &tPipe); \
         op.Init(); \
         op.Process(); \
     } while (0)

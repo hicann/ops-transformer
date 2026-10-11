@@ -22,7 +22,7 @@ namespace Mc2batch_matmul_v3_advanced {
 using namespace mc2_matmul_v3_advanced;
 class Mc2BatchMatMulV3Tiling : public Mc2MatMulV3Tiling {
 public:
-    explicit Mc2BatchMatMulV3Tiling(gert::TilingContext *context)
+    explicit Mc2BatchMatMulV3Tiling(gert::TilingContext* context)
         : Mc2MatMulV3Tiling(context) {};
 
     ~Mc2BatchMatMulV3Tiling() override = default;
@@ -30,13 +30,13 @@ public:
     ge::graphStatus DoTiling() override;
 
 protected:
-    ge::graphStatus GetBatchInfo(const gert::TilingContext &context, Mc2MatMulV3Args &args,
-                                 Mc2MatMulV3BatchInfo &batchInfo);
+    ge::graphStatus GetBatchInfo(const gert::TilingContext& context, Mc2MatMulV3Args& args,
+                                 Mc2MatMulV3BatchInfo& batchInfo);
 
 private:
-    void MergeBatchAndMAxis(Mc2MatMulV3Args &args, Mc2MatMulV3BatchInfo &batchInfo);
-    ge::graphStatus GetBmmBiasInfo(const gert::TilingContext &context, Mc2MatMulV3Args &args,
-                                   Mc2MatMulV3BatchInfo &batchInfo);
+    void MergeBatchAndMAxis(Mc2MatMulV3Args& args, Mc2MatMulV3BatchInfo& batchInfo);
+    ge::graphStatus GetBmmBiasInfo(const gert::TilingContext& context, Mc2MatMulV3Args& args,
+                                   Mc2MatMulV3BatchInfo& batchInfo);
 };
 } // namespace Mc2batch_matmul_v3_advanced
 } // namespace optiling

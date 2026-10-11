@@ -42,8 +42,8 @@ template <TemplateTypeClass>
 class QuantReduceScatterMte {
 public:
     __aicore__ inline QuantReduceScatterMte(){};
-    __aicore__ inline void Init(GM_ADDR context, GM_ADDR x, GM_ADDR scales, GM_ADDR output, TPipe *pipe,
-                                const QuantReduceScatterTilingData *tilingData);
+    __aicore__ inline void Init(GM_ADDR context, GM_ADDR x, GM_ADDR scales, GM_ADDR output, TPipe* pipe,
+                                const QuantReduceScatterTilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -51,10 +51,10 @@ private:
     __aicore__ inline void ReadDataBlockReduceSum(uint64_t curXOffset, uint64_t curScaleOffset, uint32_t xNum,
                                                   uint32_t scaleNum);
     __aicore__ inline void ExecuteReduceScatter();
-    __aicore__ inline void ParseTilingInfo(const QuantReduceScatterTilingData *tilingData);
-    __aicore__ inline void ComputeXPerBlock(const QuantReduceScatterTilingData *tilingData, TPipe *tPipe);
+    __aicore__ inline void ParseTilingInfo(const QuantReduceScatterTilingData* tilingData);
+    __aicore__ inline void ComputeXPerBlock(const QuantReduceScatterTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void ComputeBlockDistribution(uint64_t aivNum);
-    __aicore__ inline void InitSubModules(GM_ADDR x, GM_ADDR scales, GM_ADDR output, TPipe *tPipe, uint64_t aivNum);
+    __aicore__ inline void InitSubModules(GM_ADDR x, GM_ADDR scales, GM_ADDR output, TPipe* tPipe, uint64_t aivNum);
 
     MTECommunication<TemplateType> mteComm_; // MTE 通信相关实现
     VectorCompute<TemplateType> vecComp_;    // vector 计算相关实现
@@ -91,8 +91,8 @@ private:
 
 template <TemplateTypeClass>
 __aicore__ inline void QuantReduceScatterMte<TemplateType>::Init(GM_ADDR context, GM_ADDR x, GM_ADDR scales,
-                                                                 GM_ADDR output, TPipe *tPipe,
-                                                                 const QuantReduceScatterTilingData *tilingData)
+                                                                 GM_ADDR output, TPipe* tPipe,
+                                                                 const QuantReduceScatterTilingData* tilingData)
 {
     mteComm_.InitHcclContext(context, tilingData->quantReduceScatterTilingInfo.hcclBufferSize);
     ParseTilingInfo(tilingData);
@@ -105,9 +105,9 @@ __aicore__ inline void QuantReduceScatterMte<TemplateType>::Init(GM_ADDR context
 
 template <TemplateTypeClass>
 __aicore__ inline void QuantReduceScatterMte<TemplateType>::ParseTilingInfo(
-    const QuantReduceScatterTilingData *tilingData)
+    const QuantReduceScatterTilingData* tilingData)
 {
-    auto &&info = tilingData->quantReduceScatterTilingInfo;
+    auto&& info = tilingData->quantReduceScatterTilingInfo;
     totalWinSize_ = info.totalWinSize;
     quantMode_ = info.quantMode;
     xSize_ = info.bs * info.hiddenSize * sizeof(XType);
@@ -127,9 +127,9 @@ __aicore__ inline void QuantReduceScatterMte<TemplateType>::ParseTilingInfo(
 
 template <TemplateTypeClass>
 __aicore__ inline void QuantReduceScatterMte<TemplateType>::ComputeXPerBlock(
-    const QuantReduceScatterTilingData *tilingData, TPipe *tPipe)
+    const QuantReduceScatterTilingData* tilingData, TPipe* tPipe)
 {
-    auto &&info = tilingData->quantReduceScatterTilingInfo;
+    auto&& info = tilingData->quantReduceScatterTilingInfo;
 
     // 固定开销：不随 xPerBlock_ 变化的 buffer
     uint64_t mteCommFixedSpace = BUFFER_NUM * X_BLOCK_BYTES +             // scaleQueue_
@@ -221,7 +221,7 @@ __aicore__ inline void QuantReduceScatterMte<TemplateType>::ComputeBlockDistribu
 // 初始化 vecComp、mteComm 子模块参数并分配其 UB buffer，绑定 GM Tensor
 template <TemplateTypeClass>
 __aicore__ inline void QuantReduceScatterMte<TemplateType>::InitSubModules(GM_ADDR x, GM_ADDR scales, GM_ADDR output,
-                                                                           TPipe *tPipe, uint64_t aivNum)
+                                                                           TPipe* tPipe, uint64_t aivNum)
 {
     vecComp_.SetBlockSize(xPerBlock_);
     vecComp_.SetScaleNums(scaleNumsPerBlock_);
@@ -309,8 +309,8 @@ __aicore__ inline void QuantReduceScatterMte<TemplateType>::ExecuteReduceScatter
             // 获取对端Win区中数据区相关的地址
             GM_ADDR remoteDataSpaceGm = mteComm_.GetWinDataAddrGm(remoteRankId, mteComm_.winBufferFlags_);
 
-            remoteWinXTensor_.SetGlobalBuffer((__gm__ XType *)remoteDataSpaceGm);
-            remoteWinScaleTensor_.SetGlobalBuffer((__gm__ ScalesType *)(remoteDataSpaceGm + xSize_));
+            remoteWinXTensor_.SetGlobalBuffer((__gm__ XType*)remoteDataSpaceGm);
+            remoteWinScaleTensor_.SetGlobalBuffer((__gm__ ScalesType*)(remoteDataSpaceGm + xSize_));
 
             // 读取对端对应地址的 x 和 scale数据，进行反量化和求和
             // ReduceScatter过程，all2all仅需与rankId相关的数据，加上本卡偏移

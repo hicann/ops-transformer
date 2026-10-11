@@ -27,10 +27,10 @@ const std::set<std::string> NPUARCH_A5 = {std::to_string(static_cast<uint32_t>(O
 const std::set<std::string> NPUARCH_310P = {std::to_string(static_cast<uint32_t>(Ops::Base::DAV_2002))};
 
 // distinguish between 910B and 910_93
-bool IsTargetPlatformSocVersion(const char *nodeName, const std::set<std::string> &targetPlatform);
+bool IsTargetPlatformSocVersion(const char* nodeName, const std::set<std::string>& targetPlatform);
 
 // generally used
-bool IsTargetPlatformNpuArch(const char *nodeName, const std::set<std::string> &targetPlatform);
+bool IsTargetPlatformNpuArch(const char* nodeName, const std::set<std::string>& targetPlatform);
 
 } // namespace ops
 #endif // OPS_TRANSFORMER_MC2_PLATFORM_INFO_H

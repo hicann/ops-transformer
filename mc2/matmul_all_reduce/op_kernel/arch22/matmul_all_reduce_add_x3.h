@@ -23,7 +23,7 @@ template <class T>
 class MatmulAllReduceAddX3 {
 public:
     __aicore__ inline MatmulAllReduceAddX3() {}
-    __aicore__ inline void Init(GM_ADDR mmOutput, GM_ADDR add, uint64_t totalCnt, uint64_t tileCnt, TPipe *tPipe,
+    __aicore__ inline void Init(GM_ADDR mmOutput, GM_ADDR add, uint64_t totalCnt, uint64_t tileCnt, TPipe* tPipe,
                                 uint32_t coreNum)
     {
         pipe = tPipe;
@@ -35,8 +35,8 @@ public:
         this->tileNum = Ceil(this->blockCnt, tileCnt);
         this->tileCnt = tileCnt;
 
-        mmOutGm.SetGlobalBuffer((__gm__ T *)mmOutput + blockAddr, this->blockCnt);
-        addGm.SetGlobalBuffer((__gm__ T *)add + blockAddr, this->blockCnt);
+        mmOutGm.SetGlobalBuffer((__gm__ T*)mmOutput + blockAddr, this->blockCnt);
+        addGm.SetGlobalBuffer((__gm__ T*)add + blockAddr, this->blockCnt);
         pipe->InitBuffer(inQueueX, DOUBLE_BUFFER, tileCnt * sizeof(T));
         pipe->InitBuffer(inQueueY, DOUBLE_BUFFER, tileCnt * sizeof(T));
         pipe->InitBuffer(outQueueZ, DOUBLE_BUFFER, tileCnt * sizeof(T));
@@ -91,7 +91,7 @@ public:
         outQueueZ.FreeTensor(zLocal);
     }
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> inQueueX;
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> inQueueY;
     TQue<QuePosition::VECOUT, DOUBLE_BUFFER> outQueueZ;
@@ -106,7 +106,7 @@ public:
 
 template <class T>
 __aicore__ inline void Matmul_All_Reduce_Add_X3(GM_ADDR mmOutput, GM_ADDR add, uint64_t totalCnt, uint64_t tileCnt,
-                                                TPipe *tPipe)
+                                                TPipe* tPipe)
 {
     uint32_t coreNum = GetBlockNum() * GetTaskRation();
     if (g_coreType == AIC || (GetBlockIdx() >= coreNum)) {

@@ -27,7 +27,7 @@
 #include "mc2_comm_utils.h"
 
 namespace {
-const char *A_INNER_DEBUG = "AlltoAllvGroupedMatMul Tiling";
+const char* A_INNER_DEBUG = "AlltoAllvGroupedMatMul Tiling";
 constexpr size_t AIV_ATTR_COMM_MODE_INDEX = 7U;
 constexpr uint32_t AIV_SCHEDULE_MODE = 1U;
 constexpr uint32_t AIV_SYSTEM_WORKSPACE_SIZE = 16U * 1024U * 1024U;
@@ -37,7 +37,7 @@ constexpr uint32_t AIV_INPUT_BYTES = 2U;
 constexpr int64_t AIV_MAX_TOKEN_NUM = 5000000;
 constexpr int64_t AIV_MAX_DIMENSION = 65535;
 
-bool IsShapePresentAiv(const gert::StorageShape *shape)
+bool IsShapePresentAiv(const gert::StorageShape* shape)
 {
     return shape != nullptr && shape->GetStorageShape().GetDimNum() > 0;
 }
@@ -54,7 +54,7 @@ bool IsSupportedAivDType(ge::DataType dtype)
     return dtype == ge::DT_FLOAT16 || dtype == ge::DT_BF16;
 }
 
-uint32_t ResolveExpertOverlapMode(const int32_t *recvPrefix, uint32_t rankSize, uint32_t expertPerRank, uint32_t k,
+uint32_t ResolveExpertOverlapMode(const int32_t* recvPrefix, uint32_t rankSize, uint32_t expertPerRank, uint32_t k,
                                   uint32_t n)
 {
     const bool automatic =
@@ -62,7 +62,7 @@ uint32_t ResolveExpertOverlapMode(const int32_t *recvPrefix, uint32_t rankSize, 
     return automatic ? A2AVGMM_EXPERT_OVERLAP_ENABLED : A2AVGMM_EXPERT_OVERLAP_DISABLED;
 }
 
-void SetCocTiling(uint32_t m, uint32_t k, uint32_t n, uint64_t ubSize, AlltoAllvGmmCoCTiling &tiling)
+void SetCocTiling(uint32_t m, uint32_t k, uint32_t n, uint64_t ubSize, AlltoAllvGmmCoCTiling& tiling)
 {
     if (m > 64U) {
         tiling.m0 = 128U;
@@ -82,19 +82,19 @@ void SetCocTiling(uint32_t m, uint32_t k, uint32_t n, uint64_t ubSize, AlltoAllv
     tiling.swizzlDirect = 0U;
 }
 
-bool IsAivMode(const gert::TilingContext *context)
+bool IsAivMode(const gert::TilingContext* context)
 {
     if (context == nullptr || context->GetAttrs() == nullptr) {
         return false;
     }
-    const char *commMode = context->GetAttrs()->GetAttrPointer<char>(AIV_ATTR_COMM_MODE_INDEX);
+    const char* commMode = context->GetAttrs()->GetAttrPointer<char>(AIV_ATTR_COMM_MODE_INDEX);
     return commMode != nullptr && std::strcmp(commMode, "aiv") == 0;
 }
 
-ge::graphStatus FillAivTiling(gert::TilingContext *context)
+ge::graphStatus FillAivTiling(gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
-    auto *raw = context->GetRawTilingData();
+    const char* nodeName = context->GetNodeName();
+    auto* raw = context->GetRawTilingData();
     OP_TILING_CHECK(
         raw == nullptr || raw->GetData() == nullptr || raw->GetCapacity() < sizeof(AlltoAllvGmmAivTilingData),
         OP_LOGE(nodeName, "AIV tiling buffer actual=%zu required=%zu.",
@@ -103,25 +103,25 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
     OP_TILING_CHECK(context->SetScheduleMode(AIV_SCHEDULE_MODE) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Failed to set AIV schedule mode."), return ge::GRAPH_FAILED);
 
-    auto *tilingData = context->GetTilingData<AlltoAllvGmmAivTilingData>();
+    auto* tilingData = context->GetTilingData<AlltoAllvGmmAivTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
     *tilingData = {};
 
-    const auto *attrs = context->GetAttrs();
+    const auto* attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return ge::GRAPH_FAILED);
-    const char *group = attrs->GetAttrPointer<char>(optiling::ATTR_GROUP_INDEX);
-    const int64_t *epWorldSize = attrs->GetAttrPointer<int64_t>(optiling::ATTR_EP_WORLD_SIZE_INDEX);
-    const auto *sendCountsVector = attrs->GetAttrPointer<gert::ContinuousVector>(optiling::ATTR_SEND_COUNTS_INDEX);
-    const auto *recvCountsVector = attrs->GetAttrPointer<gert::ContinuousVector>(optiling::ATTR_RECV_COUNTS_INDEX);
-    const bool *transGmmWeight = attrs->GetAttrPointer<bool>(optiling::NON_QUANT_ATTR_TRANS_GMM_WEIGHT_INDEX);
-    const bool *transMmWeight = attrs->GetAttrPointer<bool>(optiling::NON_QUANT_ATTR_TRANS_MM_WEIGHT_INDEX);
-    const bool *permuteOutFlag = attrs->GetAttrPointer<bool>(optiling::NON_QUANT_ATTR_PERMUTE_OUT_FLAG_INDEX);
+    const char* group = attrs->GetAttrPointer<char>(optiling::ATTR_GROUP_INDEX);
+    const int64_t* epWorldSize = attrs->GetAttrPointer<int64_t>(optiling::ATTR_EP_WORLD_SIZE_INDEX);
+    const auto* sendCountsVector = attrs->GetAttrPointer<gert::ContinuousVector>(optiling::ATTR_SEND_COUNTS_INDEX);
+    const auto* recvCountsVector = attrs->GetAttrPointer<gert::ContinuousVector>(optiling::ATTR_RECV_COUNTS_INDEX);
+    const bool* transGmmWeight = attrs->GetAttrPointer<bool>(optiling::NON_QUANT_ATTR_TRANS_GMM_WEIGHT_INDEX);
+    const bool* transMmWeight = attrs->GetAttrPointer<bool>(optiling::NON_QUANT_ATTR_TRANS_MM_WEIGHT_INDEX);
+    const bool* permuteOutFlag = attrs->GetAttrPointer<bool>(optiling::NON_QUANT_ATTR_PERMUTE_OUT_FLAG_INDEX);
     OP_TILING_CHECK(group == nullptr || epWorldSize == nullptr || sendCountsVector == nullptr ||
                         recvCountsVector == nullptr || transGmmWeight == nullptr || transMmWeight == nullptr ||
                         permuteOutFlag == nullptr,
                     OP_LOGE(nodeName, "AIV attributes are incomplete."), return ge::GRAPH_FAILED);
 
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(nodeName, "AIV platform information is null."),
                     return ge::GRAPH_FAILED);
     std::string socVersion;
@@ -143,12 +143,12 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
                             static_cast<long long>(*epWorldSize), static_cast<long long>(rankSize)),
                     return ge::GRAPH_FAILED);
 
-    const auto *gmmXShape = context->GetInputShape(optiling::GMM_X_INDEX);
-    const auto *gmmWeightShape = context->GetInputShape(optiling::GMM_WEIGHT_INDEX);
-    const auto *gmmYShape = context->GetOutputShape(optiling::OUTPUT_GMM_Y_INDEX);
-    const auto *gmmXDesc = context->GetInputDesc(optiling::GMM_X_INDEX);
-    const auto *gmmWeightDesc = context->GetInputDesc(optiling::GMM_WEIGHT_INDEX);
-    const auto *gmmYDesc = context->GetOutputDesc(optiling::OUTPUT_GMM_Y_INDEX);
+    const auto* gmmXShape = context->GetInputShape(optiling::GMM_X_INDEX);
+    const auto* gmmWeightShape = context->GetInputShape(optiling::GMM_WEIGHT_INDEX);
+    const auto* gmmYShape = context->GetOutputShape(optiling::OUTPUT_GMM_Y_INDEX);
+    const auto* gmmXDesc = context->GetInputDesc(optiling::GMM_X_INDEX);
+    const auto* gmmWeightDesc = context->GetInputDesc(optiling::GMM_WEIGHT_INDEX);
+    const auto* gmmYDesc = context->GetOutputDesc(optiling::OUTPUT_GMM_Y_INDEX);
     OP_TILING_CHECK(gmmXShape == nullptr || gmmWeightShape == nullptr || gmmYShape == nullptr || gmmXDesc == nullptr ||
                         gmmWeightDesc == nullptr || gmmYDesc == nullptr,
                     OP_LOGE(nodeName, "Required GMM tensors are incomplete."), return ge::GRAPH_FAILED);
@@ -161,9 +161,9 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
                         gmmYDesc->GetStorageFormat() != ge::FORMAT_ND,
                     OP_LOGE(nodeName, "AIV mode supports ND GMM tensors only."), return ge::GRAPH_FAILED);
 
-    const auto &xShape = gmmXShape->GetStorageShape();
-    const auto &weightShape = gmmWeightShape->GetStorageShape();
-    const auto &yShape = gmmYShape->GetStorageShape();
+    const auto& xShape = gmmXShape->GetStorageShape();
+    const auto& weightShape = gmmWeightShape->GetStorageShape();
+    const auto& yShape = gmmYShape->GetStorageShape();
     OP_TILING_CHECK(xShape.GetDimNum() != 2 || weightShape.GetDimNum() != 3 || yShape.GetDimNum() != 2,
                     OP_LOGE(nodeName, "AIV GMM expects x/y to be 2D and weight to be 3D."), return ge::GRAPH_FAILED);
 
@@ -210,8 +210,8 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
                 "but send=%lu and recv=%lu.",
                 expectedCountNum, A2AVGMM_MAX_COUNT_NUM, countNum, recvCountsVector->GetSize()),
         return ge::GRAPH_FAILED);
-    const auto *sendCounts = static_cast<const int64_t *>(sendCountsVector->GetData());
-    const auto *recvCounts = static_cast<const int64_t *>(recvCountsVector->GetData());
+    const auto* sendCounts = static_cast<const int64_t*>(sendCountsVector->GetData());
+    const auto* recvCounts = static_cast<const int64_t*>(recvCountsVector->GetData());
     OP_TILING_CHECK(sendCounts == nullptr || recvCounts == nullptr, OP_LOGE(nodeName, "AIV counts data is null."),
                     return ge::GRAPH_FAILED);
 
@@ -230,9 +230,9 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
         maxExpertM = std::max(maxExpertM, expertM);
     }
 
-    const auto *mmXShape = context->GetOptionalInputShape(optiling::NON_QUANT_MM_X_INDEX);
-    const auto *mmWeightShape = context->GetOptionalInputShape(optiling::NON_QUANT_MM_WEIGHT_INDEX);
-    const auto *mmYShape = context->GetOutputShape(optiling::OUTPUT_MM_Y_INDEX);
+    const auto* mmXShape = context->GetOptionalInputShape(optiling::NON_QUANT_MM_X_INDEX);
+    const auto* mmWeightShape = context->GetOptionalInputShape(optiling::NON_QUANT_MM_WEIGHT_INDEX);
+    const auto* mmYShape = context->GetOutputShape(optiling::OUTPUT_MM_Y_INDEX);
     const bool hasMmX = IsShapePresentAiv(mmXShape);
     const bool hasMmWeight = IsShapePresentAiv(mmWeightShape);
     const bool hasMmY = IsShapePresentAiv(mmYShape);
@@ -243,18 +243,18 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
     uint32_t mmK = 0U;
     uint32_t mmN = 0U;
     if (hasMmX) {
-        const auto *mmXDesc = context->GetOptionalInputDesc(optiling::NON_QUANT_MM_X_INDEX);
-        const auto *mmWeightDesc = context->GetOptionalInputDesc(optiling::NON_QUANT_MM_WEIGHT_INDEX);
-        const auto *mmYDesc = context->GetOutputDesc(optiling::OUTPUT_MM_Y_INDEX);
+        const auto* mmXDesc = context->GetOptionalInputDesc(optiling::NON_QUANT_MM_X_INDEX);
+        const auto* mmWeightDesc = context->GetOptionalInputDesc(optiling::NON_QUANT_MM_WEIGHT_INDEX);
+        const auto* mmYDesc = context->GetOutputDesc(optiling::OUTPUT_MM_Y_INDEX);
         OP_TILING_CHECK(
             mmXDesc == nullptr || mmWeightDesc == nullptr || mmYDesc == nullptr || mmXDesc->GetDataType() != aivDtype ||
                 mmWeightDesc->GetDataType() != aivDtype || mmYDesc->GetDataType() != aivDtype ||
                 mmXDesc->GetStorageFormat() != ge::FORMAT_ND || mmWeightDesc->GetStorageFormat() != ge::FORMAT_ND ||
                 mmYDesc->GetStorageFormat() != ge::FORMAT_ND,
             OP_LOGE(nodeName, "AIV shared MM requires matching FP16/BF16 ND tensors."), return ge::GRAPH_FAILED);
-        const auto &mx = mmXShape->GetStorageShape();
-        const auto &mw = mmWeightShape->GetStorageShape();
-        const auto &my = mmYShape->GetStorageShape();
+        const auto& mx = mmXShape->GetStorageShape();
+        const auto& mw = mmWeightShape->GetStorageShape();
+        const auto& my = mmYShape->GetStorageShape();
         OP_TILING_CHECK(mx.GetDimNum() != 2 || mw.GetDimNum() != 2 || my.GetDimNum() != 2,
                         OP_LOGE(nodeName, "AIV shared MM tensors must be 2D."), return ge::GRAPH_FAILED);
         const int64_t localMmM = mx.GetDim(0);
@@ -271,13 +271,13 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
         mmN = static_cast<uint32_t>(localWeightN);
     }
 
-    const auto *permuteShape = context->GetOutputShape(optiling::OUTPUT_PERMUTE_OUT_INDEX);
+    const auto* permuteShape = context->GetOutputShape(optiling::OUTPUT_PERMUTE_OUT_INDEX);
     const bool hasPermute = IsShapePresentAiv(permuteShape);
     OP_TILING_CHECK(*permuteOutFlag != hasPermute, OP_LOGE(nodeName, "permuteOutFlag must match permuteOut presence."),
                     return ge::GRAPH_FAILED);
     if (hasPermute) {
-        const auto *permuteDesc = context->GetOutputDesc(optiling::OUTPUT_PERMUTE_OUT_INDEX);
-        const auto &shape = permuteShape->GetStorageShape();
+        const auto* permuteDesc = context->GetOutputDesc(optiling::OUTPUT_PERMUTE_OUT_INDEX);
+        const auto& shape = permuteShape->GetStorageShape();
         OP_TILING_CHECK(
             permuteDesc == nullptr || permuteDesc->GetDataType() != aivDtype ||
                 permuteDesc->GetStorageFormat() != ge::FORMAT_ND || shape.GetDimNum() != 2 ||
@@ -295,7 +295,7 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
     OP_TILING_CHECK(blockDim == 0U, OP_LOGE(nodeName, "AIV mixed block dimension is zero."), return ge::GRAPH_FAILED);
     context->SetBlockDim(blockDim);
 
-    auto &gmmInfo = tilingData->gmmInfo;
+    auto& gmmInfo = tilingData->gmmInfo;
     gmmInfo.M = maxExpertM;
     gmmInfo.K = static_cast<uint32_t>(inputK);
     gmmInfo.N = static_cast<uint32_t>(weightN);
@@ -343,7 +343,7 @@ ge::graphStatus FillAivTiling(gert::TilingContext *context)
     tilingData->recvTokenOffset = 0U;
     tilingData->userWorkspaceSize = workspace.totalBytes;
 
-    size_t *workspaceSizes = context->GetWorkspaceSizes(1);
+    size_t* workspaceSizes = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaceSizes == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "workspace"),
                     return ge::GRAPH_FAILED);
     uint64_t totalWorkspaceBytes = 0U;
@@ -415,7 +415,7 @@ bool AlltoAllvGmmTilingA3::NeedToCheckCounts() const
     return true;
 }
 
-ge::graphStatus AlltoAllvGmmTilingFuncA3::AlltoAllvGmmOpTilingFunc(gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTilingFuncA3::AlltoAllvGmmOpTilingFunc(gert::TilingContext* context)
 {
     AlltoAllvGmmTilingA3 tiling(context);
     OP_TILING_CHECK(tiling.Init(context) != ge::GRAPH_SUCCESS, OP_LOGE(A_INNER_DEBUG, "GMM tiling init failed."),

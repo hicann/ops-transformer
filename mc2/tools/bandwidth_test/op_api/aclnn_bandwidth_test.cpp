@@ -40,10 +40,10 @@ enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
-static bool CheckNotNull(const aclTensor *x, const aclTensor *dstRankId, char *group, aclTensor *y,
-                         aclTensor *receiveCnt)
+static bool CheckNotNull(const aclTensor* x, const aclTensor* dstRankId, char* group, aclTensor* y,
+                         aclTensor* receiveCnt)
 {
     OP_LOGD("aclnn_bandwidth_test CheckNotNull start");
     OP_CHECK_NULL(x, return false);
@@ -59,8 +59,8 @@ static bool CheckNotNull(const aclTensor *x, const aclTensor *dstRankId, char *g
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *dstRankId, char *group, int64_t worldSize,
-                               int64_t maxBs, int64_t mode, aclTensor *y, aclTensor *receiveCnt)
+static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* dstRankId, char* group, int64_t worldSize,
+                               int64_t maxBs, int64_t mode, aclTensor* y, aclTensor* receiveCnt)
 {
     OP_LOGD("aclnn_bandwidth_test CheckParams start");
     CHECK_RET(CheckNotNull(x, dstRankId, group, y, receiveCnt), ACLNN_ERR_PARAM_NULLPTR);
@@ -89,10 +89,10 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *dstRankId, c
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnBandwidthTestGetWorkspaceSize(const aclTensor *x, const aclTensor *dstRankId, char *group,
-                                               int64_t worldSize, int64_t maxBs, int64_t mode, char *commAlg,
-                                               int64_t aivNum, aclTensor *y, aclTensor *receiveCnt,
-                                               uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnBandwidthTestGetWorkspaceSize(const aclTensor* x, const aclTensor* dstRankId, char* group,
+                                               int64_t worldSize, int64_t maxBs, int64_t mode, char* commAlg,
+                                               int64_t aivNum, aclTensor* y, aclTensor* receiveCnt,
+                                               uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("aclnnBandwidthTestGetWorkspaceSize start");
     auto ret_param = CheckParams(x, dstRankId, group, worldSize, maxBs, mode, y, receiveCnt);
@@ -100,9 +100,9 @@ aclnnStatus aclnnBandwidthTestGetWorkspaceSize(const aclTensor *x, const aclTens
     aclnnStatus aclnnRet = ACLNN_ERR_INNER;
 
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-    aclTensor *mc2Context = nullptr;
+    aclTensor* mc2Context = nullptr;
     uint64_t hcclBuffSize = 0;
-    const char *opName = "bandwidth_test";
+    const char* opName = "bandwidth_test";
     auto ret = Mc2Aclnn::Mc2Context::GetMc2ContextTensor(group, opName, hcclBuffSize, mc2Context);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     aclnnRet =
@@ -117,7 +117,7 @@ aclnnStatus aclnnBandwidthTestGetWorkspaceSize(const aclTensor *x, const aclTens
     return aclnnRet;
 }
 
-aclnnStatus aclnnBandwidthTest(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnBandwidthTest(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     OP_LOGD("aclnnBandwidthTest start");
 

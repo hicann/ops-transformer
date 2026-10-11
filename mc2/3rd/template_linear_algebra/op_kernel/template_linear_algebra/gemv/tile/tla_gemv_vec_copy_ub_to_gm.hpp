@@ -35,7 +35,7 @@ struct VecCopyUBToGm<Arch::AtlasA2, Gemm::GemmType<Element, layout::VectorLayout
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,
-                    layout::VectorLayout const &layoutDst, layout::VectorLayout const &layoutSrc)
+                    layout::VectorLayout const& layoutDst, layout::VectorLayout const& layoutSrc)
     {
         AscendC::DataCopyExtParams params;
         params.blockCount = 1;
@@ -60,7 +60,7 @@ struct VecCopyUBToGm<Arch::AtlasA2, Gemm::GemmType<Element, layout::VectorLayout
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<Element> dstTensor, AscendC::LocalTensor<Element> srcTensor,
-                    layout::VectorLayout const &layoutDst, layout::VectorLayout const &layoutSrc)
+                    layout::VectorLayout const& layoutDst, layout::VectorLayout const& layoutSrc)
     {
         AscendC::SetAtomicAdd<Element>();
         AscendC::DataCopyExtParams params;

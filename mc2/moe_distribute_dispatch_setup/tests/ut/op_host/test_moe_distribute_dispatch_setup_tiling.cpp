@@ -39,12 +39,12 @@ struct HcclBuffSizeSetter {
 static HcclBuffSizeSetter hcclBuffSizeSetter;
 
 template <typename T>
-auto build_from(const T &value)
+auto build_from(const T& value)
 {
     return Ops::Transformer::AnyValue::CreateFrom<T>(value);
 }
 
-gert::StorageShape make_shape(const std::initializer_list<int64_t> &input_shape)
+gert::StorageShape make_shape(const std::initializer_list<int64_t>& input_shape)
 {
     if (input_shape.size() == 0) {
         return gert::StorageShape{};
@@ -94,11 +94,11 @@ struct MoeDistributeDispatchSetupTilingTestParam {
     std::initializer_list<int64_t> x_active_mask;
     ge::DataType scales_dtype;
     ge::DataType x_active_mask_dtype;
-    const char *groupEpOverride;
-    const char *commAlgOverride;
+    const char* groupEpOverride;
+    const char* commAlgOverride;
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MoeDistributeDispatchSetupTilingTestParam &param)
+inline std::ostream& operator<<(std::ostream& os, const MoeDistributeDispatchSetupTilingTestParam& param)
 {
     return os << param.caseName;
 }
@@ -3028,7 +3028,7 @@ static MoeDistributeDispatchSetupTilingTestParam test_cases[] = {
 struct MoeDistributeDispatchSetupCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatchSetupTilingTestParam &param)
+static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatchSetupTilingTestParam& param)
 {
     // 固定 4 个输入槽：x / expert_ids / scales / x_active_mask
     // 通过 inputInstanceNum 标记可选输入是否存在
@@ -3076,7 +3076,7 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatc
                                    outputInstanceNum, &compileInfo, param.socVersion);
 }
 
-static void ThreadFunc(const MoeDistributeDispatchSetupTilingTestParam *testCases, size_t testcase_num,
+static void ThreadFunc(const MoeDistributeDispatchSetupTilingTestParam* testCases, size_t testcase_num,
                        size_t thread_idx, size_t thread_num)
 {
     for (size_t idx = thread_idx; idx < testcase_num; idx += thread_num) {
@@ -3091,7 +3091,7 @@ static void ThreadFunc(const MoeDistributeDispatchSetupTilingTestParam *testCase
     }
 }
 
-static void TestMultiThread(const MoeDistributeDispatchSetupTilingTestParam *testCases, size_t testcase_num,
+static void TestMultiThread(const MoeDistributeDispatchSetupTilingTestParam* testCases, size_t testcase_num,
                             size_t thread_num)
 {
     std::thread threads[thread_num];

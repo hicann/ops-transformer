@@ -23,7 +23,7 @@ using namespace ge;
 
 namespace MC2Tiling {
 
-ge::graphStatus MoeDistributeCombineSetupTilingFunc(gert::TilingContext *context)
+ge::graphStatus MoeDistributeCombineSetupTilingFunc(gert::TilingContext* context)
 {
     OP_TILING_CHECK(
         context == nullptr,
@@ -32,7 +32,7 @@ ge::graphStatus MoeDistributeCombineSetupTilingFunc(gert::TilingContext *context
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingParseForMoeDistributeCombineSetup(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForMoeDistributeCombineSetup(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

@@ -53,21 +53,21 @@ public:
     {}
 
     template <class Element>
-    CATLASS_HOST_DEVICE static VectorLayout MakeLayoutInUb(TensorCoord const &tileShape)
+    CATLASS_HOST_DEVICE static VectorLayout MakeLayoutInUb(TensorCoord const& tileShape)
     {
         constexpr uint32_t ELE_NUM_PER_BLK = BytesToBits(BYTE_PER_BLK) / SizeOfBits<Element>::value;
         return VectorLayout{ELE_NUM_PER_BLK > (tileShape[0])};
     }
 
     CATLASS_HOST_DEVICE
-    LongIndex GetOffset(TensorCoord const &coord) const
+    LongIndex GetOffset(TensorCoord const& coord) const
     {
         return stride_[0] * coord[0];
     }
 
     /// Returns the layout of a tile.
     CATLASS_HOST_DEVICE
-    VectorLayout GetTileLayout(TensorCoord const &tileShape) const
+    VectorLayout GetTileLayout(TensorCoord const& tileShape) const
     {
         return VectorLayout(tileShape, stride());
     }
@@ -81,7 +81,7 @@ public:
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    Shape &shape()
+    Shape& shape()
     {
         return shape_;
     }
@@ -95,7 +95,7 @@ public:
 
     /// Returns the shape of the layout
     CATLASS_HOST_DEVICE
-    typename Shape::Index &shape(int idx)
+    typename Shape::Index& shape(int idx)
     {
         return shape_[idx];
     }
@@ -109,7 +109,7 @@ public:
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    Stride &stride()
+    Stride& stride()
     {
         return stride_;
     }
@@ -123,7 +123,7 @@ public:
 
     /// Returns the stride of the layout
     CATLASS_HOST_DEVICE
-    typename Stride::Index &stride(int idx)
+    typename Stride::Index& stride(int idx)
     {
         return stride_[idx];
     }

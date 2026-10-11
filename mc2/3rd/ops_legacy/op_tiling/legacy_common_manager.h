@@ -24,11 +24,11 @@ namespace MC2 {
 class LegacyCommonMgr {
 public:
     // 删除复制构造函数和赋值运算符
-    LegacyCommonMgr(const LegacyCommonMgr &) = delete;
-    LegacyCommonMgr &operator=(const LegacyCommonMgr &) = delete;
+    LegacyCommonMgr(const LegacyCommonMgr&) = delete;
+    LegacyCommonMgr& operator=(const LegacyCommonMgr&) = delete;
 
     // 获取单例实例
-    static LegacyCommonMgr &GetInstance()
+    static LegacyCommonMgr& GetInstance()
     {
         static LegacyCommonMgr instance;
         return instance;
@@ -41,7 +41,7 @@ public:
      * @return 函数指针
      */
     template <typename FuncType>
-    FuncType GetFunc(const char *symbolName) const
+    FuncType GetFunc(const char* symbolName) const
     {
         if (symbolName == nullptr || strlen(symbolName) == 0) {
             OP_LOGW("LegacyCommonMgr", "Invalid symbol name (null or empty).");
@@ -54,7 +54,7 @@ public:
 
         dlerror(); // 清除之前的错误
 
-        void *symbol = dlsym(handle_, symbolName);
+        void* symbol = dlsym(handle_, symbolName);
         if (symbol == nullptr) {
             OP_LOGW("LegacyCommonMgr", "Fail to find symbol %s.", symbolName);
             return nullptr;
@@ -68,10 +68,10 @@ private:
     LegacyCommonMgr();
     ~LegacyCommonMgr();
 
-    bool GetLegacyCommonSoPath(std::string &soPath) const;
+    bool GetLegacyCommonSoPath(std::string& soPath) const;
     std::string GetCpuArch() const;
 
-    void *handle_{nullptr};
+    void* handle_{nullptr};
 };
 } // namespace MC2
 } // namespace Ops

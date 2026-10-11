@@ -35,9 +35,9 @@ struct MC2PertokenDQuantContext {
 template <typename quantInputDataType, typename quantOutputDataType, bool isSmallK>
 class Fp8DynamicQuantPertoken {
 public:
-    __aicore__ inline Fp8DynamicQuantPertoken(TPipe *tPipe)
+    __aicore__ inline Fp8DynamicQuantPertoken(TPipe* tPipe)
         : tPipe_(tPipe){};
-    __aicore__ inline MC2PertokenDQuantContext *GetContextPtr();
+    __aicore__ inline MC2PertokenDQuantContext* GetContextPtr();
     __aicore__ inline void Init() {};
     __aicore__ inline void Process(uint32_t taskIndex);
 
@@ -97,7 +97,7 @@ protected:
         AscendC::WaitFlag<event>(eventID);
     }
 
-    TPipe *tPipe_;
+    TPipe* tPipe_;
     MC2PertokenDQuantContext context_;
 
     GlobalTensor<quantInputDataType> quantInputGM_;
@@ -127,10 +127,10 @@ protected:
     __aicore__ inline void ProcessOneTokenRegBase();
     __aicore__ inline void ProcessOneTokenSmallK();
     __aicore__ inline void ProcessOneTokenLargeK();
-    __aicore__ inline void CalculateMaxRegBase(__local_mem__ quantInputDataType *xAddr, uint64_t kAxisSize,
-                                               __local_mem__ float *maxAddr);
-    __aicore__ inline void DoQuantRegBase(__local_mem__ quantInputDataType *xAddr,
-                                          __local_mem__ quantOutputDataType *yAddr, uint64_t dataCount, float scale);
+    __aicore__ inline void CalculateMaxRegBase(__local_mem__ quantInputDataType* xAddr, uint64_t kAxisSize,
+                                               __local_mem__ float* maxAddr);
+    __aicore__ inline void DoQuantRegBase(__local_mem__ quantInputDataType* xAddr,
+                                          __local_mem__ quantOutputDataType* yAddr, uint64_t dataCount, float scale);
     __aicore__ inline void Init(GM_ADDR quantInputAddr, GM_ADDR quantOutputAddr, GM_ADDR quantOutputScaleAddr,
                                 GM_ADDR transposeDstAddr);
     __aicore__ inline void Process();
@@ -138,7 +138,7 @@ protected:
 };
 
 template <typename quantInputDataType, typename quantOutputDataType, bool isSmallK>
-__aicore__ inline MC2PertokenDQuantContext *
+__aicore__ inline MC2PertokenDQuantContext*
 Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDataType, isSmallK>::GetContextPtr()
 {
     return &context_;
@@ -182,12 +182,12 @@ __aicore__ inline void Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDa
 
     SetMaxValue();
 
-    quantInputGM_.SetGlobalBuffer((__gm__ quantInputDataType *)quantInputAddr);
-    quantOutputGM_.SetGlobalBuffer((__gm__ quantOutputDataType *)quantOutputAddr);
-    quantOutputScaleGM_.SetGlobalBuffer((__gm__ float *)quantOutputScaleAddr);
+    quantInputGM_.SetGlobalBuffer((__gm__ quantInputDataType*)quantInputAddr);
+    quantOutputGM_.SetGlobalBuffer((__gm__ quantOutputDataType*)quantOutputAddr);
+    quantOutputScaleGM_.SetGlobalBuffer((__gm__ float*)quantOutputScaleAddr);
     if (transposeDstAddr != nullptr) {
         this->isTransOut_ = true;
-        transOutGM_.SetGlobalBuffer((__gm__ quantInputDataType *)transposeDstAddr);
+        transOutGM_.SetGlobalBuffer((__gm__ quantInputDataType*)transposeDstAddr);
     } else {
         this->isTransOut_ = false;
     }
@@ -319,9 +319,9 @@ Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDataType, isSmallK>::Proc
         }
         AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(transOutEvent[bufIdx]);
         // 求最大值
-        __local_mem__ quantInputDataType *xAddr =
-            (__local_mem__ quantInputDataType *)rawInputTensor[bufIdx].GetPhyAddr();
-        __local_mem__ float *maxValueAddr = (__local_mem__ float *)maxValueData.GetPhyAddr();
+        __local_mem__ quantInputDataType* xAddr =
+            (__local_mem__ quantInputDataType*)rawInputTensor[bufIdx].GetPhyAddr();
+        __local_mem__ float* maxValueAddr = (__local_mem__ float*)maxValueData.GetPhyAddr();
         uint64_t totalKSize = context_.blockNum * perBlockDataOffsetInUB;
         CalculateMaxRegBase(xAddr, totalKSize, maxValueAddr);
         SyncFunc<AscendC::HardEvent::V_S>();
@@ -332,7 +332,7 @@ Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDataType, isSmallK>::Proc
         SyncFunc<AscendC::HardEvent::S_V>();
         // 做量化
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(quantOutEvent[bufIdx]);
-        __local_mem__ quantOutputDataType *yAddr = (__local_mem__ quantOutputDataType *)quantOut[bufIdx].GetPhyAddr();
+        __local_mem__ quantOutputDataType* yAddr = (__local_mem__ quantOutputDataType*)quantOut[bufIdx].GetPhyAddr();
         for (uint32_t k = 0; k < context_.blockNum; ++k) {
             DoQuantRegBase(xAddr + k * perBlockDataOffsetInUB, yAddr + k * perBlockQuantDataOffsetInUB,
                            perBlockDataOffsetInUB, scale);
@@ -414,8 +414,8 @@ Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDataType, isSmallK>::Proc
         AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(rawInputEvent[1]);
 
         // 非连续K循环处理
-        __local_mem__ quantInputDataType *xAddr = (__local_mem__ quantInputDataType *)rawInputTensor.GetPhyAddr();
-        __local_mem__ float *maxValueAddr = (__local_mem__ float *)maxValueData.GetPhyAddr();
+        __local_mem__ quantInputDataType* xAddr = (__local_mem__ quantInputDataType*)rawInputTensor.GetPhyAddr();
+        __local_mem__ float* maxValueAddr = (__local_mem__ float*)maxValueData.GetPhyAddr();
         maxValue = 0.0f;
         maxValuePerRank = 0.0f;
         for (uint32_t k = 0; k < context_.blockNum; ++k) {
@@ -452,7 +452,7 @@ Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDataType, isSmallK>::Proc
         SyncFunc<AscendC::HardEvent::S_V>();
         // 量化
         quantOutputQue_.DeQue();
-        __local_mem__ quantOutputDataType *yAddr = (__local_mem__ quantOutputDataType *)quantOut.GetPhyAddr();
+        __local_mem__ quantOutputDataType* yAddr = (__local_mem__ quantOutputDataType*)quantOut.GetPhyAddr();
         for (uint32_t k = 0; k < context_.blockNum; ++k) {
             DoQuantRegBase(xAddr + k * perBlockDataOffsetInUB, yAddr + k * perBlockQuantDataOffsetInUB,
                            perBlockDataOffsetInUB, scale);
@@ -480,7 +480,7 @@ Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDataType, isSmallK>::Proc
 
 template <typename quantInputDataType, typename quantOutputDataType, bool isSmallK>
 __aicore__ inline void Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDataType, isSmallK>::CalculateMaxRegBase(
-    __local_mem__ quantInputDataType *xAddr, uint64_t kAxisSize, __local_mem__ float *maxAddr)
+    __local_mem__ quantInputDataType* xAddr, uint64_t kAxisSize, __local_mem__ float* maxAddr)
 {
     __VEC_SCOPE__
     {
@@ -518,7 +518,7 @@ __aicore__ inline void Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDa
 
 template <typename quantInputDataType, typename quantOutputDataType, bool isSmallK>
 __aicore__ inline void Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDataType, isSmallK>::DoQuantRegBase(
-    __local_mem__ quantInputDataType *xAddr, __local_mem__ quantOutputDataType *yAddr, uint64_t dataCount, float scale)
+    __local_mem__ quantInputDataType* xAddr, __local_mem__ quantOutputDataType* yAddr, uint64_t dataCount, float scale)
 {
     __VEC_SCOPE__
     {
@@ -565,9 +565,9 @@ __aicore__ inline void Fp8DynamicQuantPertoken<quantInputDataType, quantOutputDa
                 AscendC::Reg::RegTensor<uint16_t> vregPackedHalf;
                 AscendC::Reg::Cast<int16_t, float, castTraitF32ToI16>(vregYInt16, vregScaledX, preg2);
                 AscendC::Reg::Cast<half, int16_t, castTraitI16ToF16>(vregYFp16, vregYInt16, preg2);
-                AscendC::Reg::Pack(vregPackedHalf, (AscendC::Reg::RegTensor<uint32_t> &)vregYFp16);
+                AscendC::Reg::Pack(vregPackedHalf, (AscendC::Reg::RegTensor<uint32_t>&)vregYFp16);
                 AscendC::Reg::Cast<int4x2_t, half, castTraitF16ToI8>(
-                    (AscendC::Reg::RegTensor<int4x2_t> &)vregY, (AscendC::Reg::RegTensor<half> &)vregPackedHalf, preg2);
+                    (AscendC::Reg::RegTensor<int4x2_t>&)vregY, (AscendC::Reg::RegTensor<half>&)vregPackedHalf, preg2);
                 addr = yAddr + (j * VL) / 2;
             }
             // 5. 存储量化结果

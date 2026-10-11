@@ -13,7 +13,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "../../../op_kernel/allto_all_all_gather_batch_mat_mul_tiling_struct.h"
 
-inline void InitAllGatherMatmulTilingData(uint8_t *tiling, optiling::AlltoAllAllGatherBatchMatMulTilingData *constData)
+inline void InitAllGatherMatmulTilingData(uint8_t* tiling, optiling::AlltoAllAllGatherBatchMatMulTilingData* constData)
 {
     memcpy(constData, tiling, sizeof(optiling::AlltoAllAllGatherBatchMatMulTilingData));
 }

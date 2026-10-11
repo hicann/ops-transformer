@@ -39,7 +39,7 @@ uint64_t Mc2GetShapeSizeWithDataType(uint64_t shapeSize, ge::DataType dtype)
     }
 }
 
-bool Mc2CheckOptionalInputByShape(const gert::StorageShape *storageShape)
+bool Mc2CheckOptionalInputByShape(const gert::StorageShape* storageShape)
 {
     return storageShape != nullptr && storageShape->GetStorageShape().GetShapeSize() != 0;
 }
@@ -80,7 +80,7 @@ matmul_tiling::DataType Mc2GetMatmulTilingDtype(ge::DataType dtype)
     return it != DTYPE_MAP.end() ? it->second : matmul_tiling::DataType::DT_FLOAT16;
 }
 
-ge::Format Mc2GetInputStorageFormat(const gert::TilingContext *context, size_t id)
+ge::Format Mc2GetInputStorageFormat(const gert::TilingContext* context, size_t id)
 {
     auto desc = context->GetInputDesc(id);
     OP_TILING_CHECK(

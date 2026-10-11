@@ -35,12 +35,12 @@ template <bool AICSync, AscendC::HcclServerType ServerType, typename ContextType
 class HcclCommunicator {
 public:
     // 通信器构造方法
-    __aicore__ inline HcclCommunicator(TilingDataType *tiling)
+    __aicore__ inline HcclCommunicator(TilingDataType* tiling)
         : tiling_(tiling){};
     // 初始化通信器参数
     __aicore__ inline void Init();
     // 获取上下文指针
-    __aicore__ inline ContextType *GetContextPtr();
+    __aicore__ inline ContextType* GetContextPtr();
     // 提前准备通信任务，与Process方法配套使用，一次PrepareAll多次Process
     __aicore__ inline void PrepareAll(uint32_t taskCnt);
     // 执行一次通信任务，与PrepareAll方法配套使用
@@ -55,7 +55,7 @@ public:
     __aicore__ inline void Process();
     // 释放通信器资源
     __aicore__ inline void End();
-    __aicore__ inline void SetOpStateDump(Mc2Kernel::OpStateDump &rt)
+    __aicore__ inline void SetOpStateDump(Mc2Kernel::OpStateDump& rt)
     {
         opStateDump_ = rt;
     }
@@ -65,7 +65,7 @@ private:
         COMMUNICATION_WAIT_ONE,
         COMMUNICATION_SEND_ONE
     };
-    TilingDataType *tiling_;
+    TilingDataType* tiling_;
     AscendC::Hccl<ServerType> hccl_;
     ContextType context_;
     Primitive<AscendC::Hccl<ServerType>> primitive_;
@@ -110,7 +110,7 @@ HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, Se
 
 template <bool AICSync, AscendC::HcclServerType ServerType, typename ContextType, typename TilingDataType,
           template <typename> class Primitive, uint32_t SendCnt, uint32_t RecvCnt>
-__aicore__ inline ContextType *
+__aicore__ inline ContextType*
 HcclCommunicator<AICSync, ServerType, ContextType, TilingDataType, Primitive, SendCnt, RecvCnt>::GetContextPtr()
 {
     return &context_;

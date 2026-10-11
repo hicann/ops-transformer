@@ -88,7 +88,7 @@ struct WorkspaceLayout {
     int64_t gmm1TileStatusElementCount{0};
 
     int64_t workspaceSize{0};
-    HOST_DEVICE explicit WorkspaceLayout(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE explicit WorkspaceLayout(const MegaMoeTilingData* tilingData)
     {
         uint32_t rankNumPerServer =
             tilingData->rankNumPerServer == 0U ? tilingData->epWorldSize : tilingData->rankNumPerServer;
@@ -96,13 +96,13 @@ struct WorkspaceLayout {
         Initialize(tilingData, serverNum);
     }
 
-    HOST_DEVICE WorkspaceLayout(const MegaMoeTilingData *tilingData, uint32_t serverNum)
+    HOST_DEVICE WorkspaceLayout(const MegaMoeTilingData* tilingData, uint32_t serverNum)
     {
         Initialize(tilingData, serverNum);
     }
 
 private:
-    HOST_DEVICE void Initialize(const MegaMoeTilingData *tilingData, uint32_t serverNum)
+    HOST_DEVICE void Initialize(const MegaMoeTilingData* tilingData, uint32_t serverNum)
     {
         workspaceSize = 0;
         // Tiling admits only MTE and URMA. Each path preserves its original allocation order.
@@ -113,7 +113,7 @@ private:
         }
     }
 
-    HOST_DEVICE void InitializeMte(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeMte(const MegaMoeTilingData* tilingData)
     {
         InitializeDispatchBuffers(tilingData);
         // tkw=0 且 combine 去重：dispatch 把 LAST 行整 token 权重段落 revWeights 区、merge 读回乘权，
@@ -143,7 +143,7 @@ private:
         }
     }
 
-    HOST_DEVICE void InitializeUrma(const MegaMoeTilingData *tilingData, uint32_t serverNum)
+    HOST_DEVICE void InitializeUrma(const MegaMoeTilingData* tilingData, uint32_t serverNum)
     {
         InitializeDispatchBuffers(tilingData);
         InitializeDispatchRevWeights(tilingData);
@@ -164,7 +164,7 @@ private:
         }
     }
 
-    HOST_DEVICE void InitializeDispatchBuffers(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeDispatchBuffers(const MegaMoeTilingData* tilingData)
     {
         dispatchRevDataOffset = workspaceSize;
         // dispatchRevData 按 GMM1 激活的实际物理字节数分配：FP8 每字节 1 个元素，FP4 每字节 2 个元素。
@@ -181,7 +181,7 @@ private:
             Ops::Base::CeilAlign(SIZE_INT_8 * tilingData->maxOutputSize * dispatchScaleElementsPerToken, ALIGN_512);
     }
 
-    HOST_DEVICE void InitializeDispatchRevWeights(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeDispatchRevWeights(const MegaMoeTilingData* tilingData)
     {
         // dispatch 接收侧权重区，两种场景共用、MTE 与 URMA 两条初始化路径都必须调用：
         // tkw=1 的权重预取；tkw=0 且 combine 去重——dispatch 侧把 LAST 行
@@ -197,7 +197,7 @@ private:
         }
     }
 
-    HOST_DEVICE void InitializeActivationBuffers(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeActivationBuffers(const MegaMoeTilingData* tilingData)
     {
         activationQuantDataOffset = workspaceSize;
         workspaceSize += Ops::Base::CeilAlign(
@@ -212,7 +212,7 @@ private:
                                  ALIGN_512);
     }
 
-    HOST_DEVICE void InitializeRoutingMetadata(const MegaMoeTilingData *tilingData, int64_t expertRecvTokenCountBytes)
+    HOST_DEVICE void InitializeRoutingMetadata(const MegaMoeTilingData* tilingData, int64_t expertRecvTokenCountBytes)
     {
         expertRecvTokenCountOffset = workspaceSize;
         workspaceSize += Ops::Base::CeilAlign(expertRecvTokenCountBytes, ALIGN_512);
@@ -221,7 +221,7 @@ private:
         workspaceSize += Ops::Base::CeilAlign(tilingData->maxOutputSize * ALIGN_32, ALIGN_512);
     }
 
-    HOST_DEVICE void InitializeMteSyncFlags(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeMteSyncFlags(const MegaMoeTilingData* tilingData)
     {
         // Keep all scalar flags contiguous for ResetFlagList.
         int64_t flagRegionBeginOffset = workspaceSize;
@@ -271,7 +271,7 @@ private:
         flagResetElementCount = (workspaceSize - flagRegionBeginOffset) / SIZE_INT_32;
     }
 
-    HOST_DEVICE void InitializeUrmaSyncFlags(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeUrmaSyncFlags(const MegaMoeTilingData* tilingData)
     {
         // Keep all scalar flags contiguous for ResetFlagList.
         int64_t flagRegionBeginOffset = workspaceSize;
@@ -292,7 +292,7 @@ private:
         flagResetElementCount = (workspaceSize - flagRegionBeginOffset) / SIZE_INT_32;
     }
 
-    HOST_DEVICE void InitializeRoutingFlags(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeRoutingFlags(const MegaMoeTilingData* tilingData)
     {
         int64_t moeExpertCount = static_cast<int64_t>(tilingData->moeExpertPerRank);
         int64_t maxWavesPerExpert =
@@ -306,7 +306,7 @@ private:
         workspaceSize += SIZE_INT_32 * INT_CACHELINE * moeExpertCount * tilingData->aicNum;
     }
 
-    HOST_DEVICE void InitializeGmmIntermediateBuffers(const MegaMoeTilingData *tilingData, bool reserveCumsum,
+    HOST_DEVICE void InitializeGmmIntermediateBuffers(const MegaMoeTilingData* tilingData, bool reserveCumsum,
                                                       bool alignGmm2Output)
     {
         if (reserveCumsum) {
@@ -334,7 +334,7 @@ private:
 
     // 去重 rowDesc 表：每个接收行一条定长描述符。无需清零——prepass 在 dispatch 读取前
     // 覆盖写全部有效行，超出实际接收计数的行不会被读取。
-    HOST_DEVICE void InitializeDedupRowDesc(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeDedupRowDesc(const MegaMoeTilingData* tilingData)
     {
         if (tilingData->topoType == TOPO_TYPE_MTE && tilingData->dedupMode != 0) {
             dedupRowDescOffset = workspaceSize;
@@ -344,7 +344,7 @@ private:
         }
     }
 
-    HOST_DEVICE void InitializeGmm1TileStatus(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeGmm1TileStatus(const MegaMoeTilingData* tilingData)
     {
         // GMM1 tile 状态位区（仅 prefetch 路径分配，用于 AIC→AIV 软同步）。
         // 每个 tile 状态和末尾 allDone 状态都独占一条 64B cache line。
@@ -359,7 +359,7 @@ private:
         }
     }
 
-    HOST_DEVICE void InitializeUrmaDispatchBuffers(const MegaMoeTilingData *tilingData, uint32_t serverNum)
+    HOST_DEVICE void InitializeUrmaDispatchBuffers(const MegaMoeTilingData* tilingData, uint32_t serverNum)
     {
         maskSlotOffset = workspaceSize;
         // 远端 mask 槽的 count 位于全卡共用的容量尾部，本地发送暂存必须使用相同槽宽。
@@ -383,7 +383,7 @@ private:
         workspaceSize += static_cast<int64_t>(tilingData->aicNum) * relayFlagSnapshotBytesPerBlock;
     }
 
-    HOST_DEVICE void InitializeSharedExpertGmmOutputs(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeSharedExpertGmmOutputs(const MegaMoeTilingData* tilingData)
     {
         // sharedExpertResult：共享专家 GMM2 输出 [sharedExpertNum × bs × h]。
         sharedExpertResultOffset = workspaceSize;
@@ -395,7 +395,7 @@ private:
             SIZE_BF_16 * tilingData->bs * tilingData->sharedExpertNum * tilingData->hiddenDim, ALIGN_512);
     }
 
-    HOST_DEVICE void InitializeMteSharedExpertInput(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeMteSharedExpertInput(const MegaMoeTilingData* tilingData)
     {
         // MTE 共享专家使用逐 token 交织数据 [Align256(data) | Align32(scale)]，仅独立量化时分配。
         sharedExpertInputOffset = workspaceSize;
@@ -406,7 +406,7 @@ private:
             Ops::Base::CeilAlign(static_cast<int64_t>(tilingData->bs) * recordBytes, static_cast<int64_t>(ALIGN_512));
     }
 
-    HOST_DEVICE void InitializeUrmaSharedExpertInput(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeUrmaSharedExpertInput(const MegaMoeTilingData* tilingData)
     {
         // URMA layered kernel 仍使用连续 data/scale，两块地址契约保持不变。
         sharedExpertInputDataOffset = workspaceSize;
@@ -419,7 +419,7 @@ private:
             ALIGN_512);
     }
 
-    HOST_DEVICE void InitializeSharedExpertActivationBuffers(const MegaMoeTilingData *tilingData)
+    HOST_DEVICE void InitializeSharedExpertActivationBuffers(const MegaMoeTilingData* tilingData)
     {
         // sharedExpertActivationData：SwiGLU 量化输出 [sharedExpertNum × bs × hiddenDim / 2] FP8。
         sharedExpertActivationDataOffset = workspaceSize;
@@ -487,7 +487,7 @@ private:
     }
 
 public:
-    HOST_DEVICE void Bind(GM_ADDR base, const WorkspaceLayout &layout)
+    HOST_DEVICE void Bind(GM_ADDR base, const WorkspaceLayout& layout)
     {
         dispatchRevDataPtr = ResolveWorkspaceAddress(base, layout.dispatchRevDataOffset);
         dispatchRevScalePtr = ResolveWorkspaceAddress(base, layout.dispatchRevScaleOffset);

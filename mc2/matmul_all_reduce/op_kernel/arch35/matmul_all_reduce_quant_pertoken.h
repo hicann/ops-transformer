@@ -34,12 +34,12 @@ template <typename XType, typename WType, typename YType, class MmType, Mc2CoreT
           int commMode>
 class MatmulAllReduceQuantPerToken : public MatmulAllReduceBase<XType, YType, CoreType, basedA2aRsAg, commMode> {
 public:
-    __aicore__ inline MatmulAllReduceQuantPerToken(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs, ArnGmAddrs *arnAddrs,
-                                                   MC2TilingHeader *tilingData, TPipe *tPipe)
+    __aicore__ inline MatmulAllReduceQuantPerToken(MC2GmAddrs* addrs, QuantGmAddrs* quantAddrs, ArnGmAddrs* arnAddrs,
+                                                   MC2TilingHeader* tilingData, TPipe* tPipe)
         : MatmulAllReduceBase<XType, YType, CoreType, basedA2aRsAg, commMode>(addrs, quantAddrs, arnAddrs, tilingData,
                                                                               tPipe)
     {
-        mc2TilingData_ = (Mc2Tiling::QuantMatmulAllReduceTilingDataA5 *)tilingData;
+        mc2TilingData_ = (Mc2Tiling::QuantMatmulAllReduceTilingDataA5*)tilingData;
         this->tileInfo_.mmTiling = &mc2TilingData_->tilematmulTiling.matmulTiling;
         this->tailInfo_.mmTiling = &mc2TilingData_->tailmatmulTiling.matmulTiling;
     }
@@ -57,10 +57,10 @@ public:
     }
 
 protected:
-    __aicore__ inline void InnerProcess(bool tailFlag, uint32_t turnCnt, const MC2TileInfo &tileInfo)
+    __aicore__ inline void InnerProcess(bool tailFlag, uint32_t turnCnt, const MC2TileInfo& tileInfo)
     {
         MmType mmOp;
-        const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *tiling =
+        const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* tiling =
             (tailFlag ? &mc2TilingData_->tailmatmulTiling : &mc2TilingData_->tilematmulTiling);
         const uint64_t pertokenOffset = sizeof(float) * tiling->matmulTiling.M;
         for (uint32_t i = 0U; i < turnCnt; ++i) {
@@ -87,7 +87,7 @@ protected:
     }
 
 private:
-    Mc2Tiling::QuantMatmulAllReduceTilingDataA5 *mc2TilingData_;
+    Mc2Tiling::QuantMatmulAllReduceTilingDataA5* mc2TilingData_;
 };
 
 #define INVOKE_BATCH_MATMUL_QUANT_PERTOKEN_IMPL(templateClass, coreType, basedA2aRsAg, commMode, scaleType, isATrans, \
@@ -100,7 +100,7 @@ private:
                                      Y_FORMAT, isATrans, isBTrans, DTYPE_LOC_LOCAL, \
                                      Mc2QuantBatchMatmulV3::Mc2QuantBmmAswBlock, MM_CFG_NO_PRELOAD_OPEN_UNIT_FLAG>; \
         MatmulAllReduceQuantPerToken<DTYPE_X1, DTYPE_X2, DTYPE_Y, OpType, coreType, basedA2aRsAg, commMode> op( \
-            &addrs, &quantAddrs, nullptr, (MC2TilingHeader *)&tilingData, &tPipe); \
+            &addrs, &quantAddrs, nullptr, (MC2TilingHeader*)&tilingData, &tPipe); \
         op.Init(); \
         op.Process(); \
     } while (0)

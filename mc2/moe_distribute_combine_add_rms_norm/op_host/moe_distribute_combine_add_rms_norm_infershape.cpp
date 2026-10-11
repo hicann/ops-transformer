@@ -25,13 +25,13 @@ static constexpr uint32_t IDX_FIVE = 5;
 static constexpr uint32_t IDX_EIGHT = 8;
 static constexpr uint32_t IDX_THIRTEEN = 13;
 
-static ge::graphStatus InferShapeCheck(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeCheck(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         return GRAPH_FAILED;
     }
 
-    static const char *OUTPUT_NAMES[] = {"y", "rstdOut", "x"};
+    static const char* OUTPUT_NAMES[] = {"y", "rstdOut", "x"};
     for (uint32_t i = 0; i < IDX_THREE; ++i) {
         if (context->GetOutputShape(i) == nullptr) {
             OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), OUTPUT_NAMES[i]);
@@ -39,7 +39,7 @@ static ge::graphStatus InferShapeCheck(gert::InferShapeContext *context)
         }
     }
 
-    static const char *INPUT_NAMES[] = {"expand_x",       "expert_ids",    "assist_info_for_combine",
+    static const char* INPUT_NAMES[] = {"expand_x",       "expert_ids",    "assist_info_for_combine",
                                         "ep_send_counts", "expert_scales", "residual_x",
                                         "gamma",          "tp_send_counts"};
     for (uint32_t i = 0; i < IDX_EIGHT; ++i) {
@@ -52,20 +52,20 @@ static ge::graphStatus InferShapeCheck(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeCombineAddRmsNormInferShape(gert::InferShapeContext *context)
+static ge::graphStatus MoeDistributeCombineAddRmsNormInferShape(gert::InferShapeContext* context)
 {
     if (InferShapeCheck(context) == GRAPH_FAILED) {
         return GRAPH_FAILED;
     }
 
     OP_LOGD(context->GetNodeName(), "Begin to do Infershape of MoeDistributeCombineAddRmsNormInferShape.");
-    const gert::Shape *residualX = context->GetInputShape(IDX_FIVE);
+    const gert::Shape* residualX = context->GetInputShape(IDX_FIVE);
     OPS_CHECK_NULL_WITH_CONTEXT(context, residualX);
-    gert::Shape *x1OutShape = context->GetOutputShape(IDX_ZERO);
+    gert::Shape* x1OutShape = context->GetOutputShape(IDX_ZERO);
     OPS_CHECK_NULL_WITH_CONTEXT(context, x1OutShape);
-    gert::Shape *rstdOutShape = context->GetOutputShape(IDX_ONE);
+    gert::Shape* rstdOutShape = context->GetOutputShape(IDX_ONE);
     OPS_CHECK_NULL_WITH_CONTEXT(context, rstdOutShape);
-    gert::Shape *x2OutShape = context->GetOutputShape(IDX_TWO);
+    gert::Shape* x2OutShape = context->GetOutputShape(IDX_TWO);
     OPS_CHECK_NULL_WITH_CONTEXT(context, x2OutShape);
 
     size_t dimNum = residualX->GetDimNum();
@@ -86,7 +86,7 @@ static ge::graphStatus MoeDistributeCombineAddRmsNormInferShape(gert::InferShape
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeCombineAddRmsNormInferDataType(gert::InferDataTypeContext *context)
+static ge::graphStatus MoeDistributeCombineAddRmsNormInferDataType(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
         return GRAPH_FAILED;

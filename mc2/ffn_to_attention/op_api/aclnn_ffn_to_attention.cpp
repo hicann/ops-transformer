@@ -29,12 +29,12 @@ enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
 // check nullptr
-static bool CheckNullStatus(const aclTensor *x, const aclTensor *sessionIds, const aclTensor *microBatchIds,
-                            const aclTensor *tokenIds, const aclTensor *expertOffsets, const aclTensor *actualTokenNum,
-                            const char *group)
+static bool CheckNullStatus(const aclTensor* x, const aclTensor* sessionIds, const aclTensor* microBatchIds,
+                            const aclTensor* tokenIds, const aclTensor* expertOffsets, const aclTensor* actualTokenNum,
+                            const char* group)
 {
     // 检查必选入参出参为非空
     OP_CHECK_NULL(x, return false);
@@ -52,9 +52,9 @@ static bool CheckNullStatus(const aclTensor *x, const aclTensor *sessionIds, con
 }
 
 // 入参校验
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *sessionIds, const aclTensor *microBatchIds,
-                               const aclTensor *tokenIds, const aclTensor *expertOffsets,
-                               const aclTensor *actualTokenNum, const char *group)
+static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* sessionIds, const aclTensor* microBatchIds,
+                               const aclTensor* tokenIds, const aclTensor* expertOffsets,
+                               const aclTensor* actualTokenNum, const char* group)
 {
     CHECK_RET(CheckNullStatus(x, sessionIds, microBatchIds, tokenIds, expertOffsets, actualTokenNum, group),
               ACLNN_ERR_PARAM_NULLPTR);
@@ -69,13 +69,13 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *sessionIds, 
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnFFNToAttentionGetWorkspaceSize(const aclTensor *x, const aclTensor *sessionIds,
-                                                const aclTensor *microBatchIds, const aclTensor *tokenIds,
-                                                const aclTensor *expertOffsets, const aclTensor *actualTokenNum,
-                                                const aclTensor *attnRankTable, const char *group, int64_t worldSize,
-                                                const aclIntArray *tokenInfoTableShape,
-                                                const aclIntArray *tokenDataShape, uint64_t *workspaceSize,
-                                                aclOpExecutor **executor)
+aclnnStatus aclnnFFNToAttentionGetWorkspaceSize(const aclTensor* x, const aclTensor* sessionIds,
+                                                const aclTensor* microBatchIds, const aclTensor* tokenIds,
+                                                const aclTensor* expertOffsets, const aclTensor* actualTokenNum,
+                                                const aclTensor* attnRankTable, const char* group, int64_t worldSize,
+                                                const aclIntArray* tokenInfoTableShape,
+                                                const aclIntArray* tokenDataShape, uint64_t* workspaceSize,
+                                                aclOpExecutor** executor)
 {
     auto retParam = CheckParams(x, sessionIds, microBatchIds, tokenIds, expertOffsets, actualTokenNum, group);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
@@ -86,7 +86,7 @@ aclnnStatus aclnnFFNToAttentionGetWorkspaceSize(const aclTensor *x, const aclTen
     return ret;
 }
 
-aclnnStatus aclnnFFNToAttention(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnFFNToAttention(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {
         NnopbaseSetHcclServerType(executor, NNOPBASE_HCCL_SERVER_TYPE_MTE);

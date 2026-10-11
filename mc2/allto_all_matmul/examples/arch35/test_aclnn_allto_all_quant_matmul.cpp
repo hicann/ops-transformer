@@ -36,7 +36,7 @@ constexpr int g_ndev = 2;
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -46,8 +46,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -74,7 +74,7 @@ struct Args {
     aclrtContext context;
 };
 
-int launchOneThreadAlltoAllQuantMatmul(Args &args)
+int launchOneThreadAlltoAllQuantMatmul(Args& args)
 {
     int ret;
     ret = aclrtSetCurrentContext(args.context);
@@ -90,25 +90,25 @@ int launchOneThreadAlltoAllQuantMatmul(Args &args)
     std::vector<int64_t> x2ScaleShape = {128};
     std::vector<int64_t> outShape = {32 / g_ndev, 128};
     std::vector<int64_t> allToAllOutShape = {32 / g_ndev, 64 * g_ndev};
-    void *x1DeviceAddr = nullptr;
-    void *x2DeviceAddr = nullptr;
-    void *biasDeviceAddr = nullptr;
-    void *x2ScaleDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
-    void *allToAllOutDeviceAddr = nullptr;
-    aclTensor *x1 = nullptr;
-    aclTensor *x2 = nullptr;
-    aclTensor *bias = nullptr;
-    aclTensor *x1ScaleOptional = nullptr;
-    aclTensor *x2Scale = nullptr;
-    aclTensor *commScaleOptional = nullptr;
-    aclTensor *x1OffsetOptional = nullptr;
-    aclTensor *x2OffsetOptional = nullptr;
-    aclTensor *out = nullptr;
-    aclTensor *allToAllOut = nullptr;
+    void* x1DeviceAddr = nullptr;
+    void* x2DeviceAddr = nullptr;
+    void* biasDeviceAddr = nullptr;
+    void* x2ScaleDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
+    void* allToAllOutDeviceAddr = nullptr;
+    aclTensor* x1 = nullptr;
+    aclTensor* x2 = nullptr;
+    aclTensor* bias = nullptr;
+    aclTensor* x1ScaleOptional = nullptr;
+    aclTensor* x2Scale = nullptr;
+    aclTensor* commScaleOptional = nullptr;
+    aclTensor* x1OffsetOptional = nullptr;
+    aclTensor* x2OffsetOptional = nullptr;
+    aclTensor* out = nullptr;
+    aclTensor* allToAllOut = nullptr;
 
     int64_t a2aAxes[2] = {-2, -1};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(a2aAxes, static_cast<uint64_t>(2));
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(a2aAxes, static_cast<uint64_t>(2));
     uint64_t workspaceSize = 0;
     int64_t x1QuantMode = 7;
     int64_t x2QuantMode = 2;
@@ -116,8 +116,8 @@ int launchOneThreadAlltoAllQuantMatmul(Args &args)
     int64_t commQuantDtype = -1;
     int64_t x1QuantDtype = 35;
     int64_t groupSize = 0;
-    aclOpExecutor *executor;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor;
+    void* workspaceAddr = nullptr;
 
     long long x1ShapeSize = GetShapeSize(x1Shape);
     long long x2ShapeSize = GetShapeSize(x2Shape);
@@ -211,7 +211,7 @@ int launchOneThreadAlltoAllQuantMatmul(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // 本样例基于Atlas A5实现，必须在Atlas A5上运行
     int ret = aclInit(nullptr);

@@ -82,7 +82,7 @@ ge::graphStatus MatmulAllReduceTiling910::GetWorkspaceSize()
     OP_LOGI(opName_, "select max workspace size to context, myWorkSpaceSize_:%lu, workspaceSize_:%lu", myWorkSpaceSize_,
             workspaceSize_);
     myWorkSpaceSize_ = std::max(myWorkSpaceSize_, workspaceSize_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     workspaces[0] = myWorkSpaceSize_;
     return ge::GRAPH_SUCCESS;
 }
@@ -98,7 +98,7 @@ ge::graphStatus MatmulAllReduceTiling910::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingDataSize);
 
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&matmulAllReduce910TilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&matmulAllReduce910TilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -138,22 +138,22 @@ ge::graphStatus MatmulAllReduceTiling910::Do910Tiling()
     }
 }
 
-Mc2Tiling::Mc2Msg &MatmulAllReduceTiling910::MutableMc2MsgData()
+Mc2Tiling::Mc2Msg& MatmulAllReduceTiling910::MutableMc2MsgData()
 {
     return matmulAllReduce910TilingData_.msg;
 }
 
-Mc2Tiling::RCSTiling &MatmulAllReduceTiling910::MutableRCSTilingData()
+Mc2Tiling::RCSTiling& MatmulAllReduceTiling910::MutableRCSTilingData()
 {
     return matmulAllReduce910TilingData_.param;
 }
 
-AscendC::tiling::TCubeTiling &MatmulAllReduceTiling910::MutableTCubeTileTilingData()
+AscendC::tiling::TCubeTiling& MatmulAllReduceTiling910::MutableTCubeTileTilingData()
 {
     return matmulAllReduce910TilingData_.tilematmulTiling.matmulTiling;
 }
 
-AscendC::tiling::TCubeTiling &MatmulAllReduceTiling910::MutableTCubeTailTilingData()
+AscendC::tiling::TCubeTiling& MatmulAllReduceTiling910::MutableTCubeTailTilingData()
 {
     return matmulAllReduce910TilingData_.tailmatmulTiling.matmulTiling;
 }
@@ -269,20 +269,20 @@ ge::graphStatus MatmulAllReduceTiling910::CheckInput()
     return CheckAxisSize();
 }
 
-MatmulAllReduceTiling910::MatmulAllReduceTiling910(gert::TilingContext *context)
+MatmulAllReduceTiling910::MatmulAllReduceTiling910(gert::TilingContext* context)
     : MatmulAllReduceTilingBase(context),
       matmulAllReduce910TilingData_(matmulAllReduce910TilingDataSelf_)
 {}
 
-MatmulAllReduceTiling910::MatmulAllReduceTiling910(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                                                   MatmulAllReduce910TilingData *out)
+MatmulAllReduceTiling910::MatmulAllReduceTiling910(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                                                   MatmulAllReduce910TilingData* out)
     : MatmulAllReduceTilingBase(context, mmrCtxInfo),
       matmulAllReduce910TilingData_(*out)
 {}
 
 ge::graphStatus TilingTransferHelper::GetShapeAttrsInfo()
 {
-    auto &&tilingArgs = tilingProcesser_.args_;
+    auto&& tilingArgs = tilingProcesser_.args_;
     args_.opName = tilingProcesser_.opName_;
     args_.isATrans = tilingArgs.isATrans;
     args_.isBTrans = tilingArgs.isBTrans;
@@ -318,8 +318,8 @@ MatmulTPLParam TilingTransferHelper::GetMatmulTPLParam()
     return param;
 }
 
-TilingTransferHelper::TilingTransferHelper(MatmulAllReduceTiling910 &matmulAllReduceTiling910,
-                                           Mc2MatmulV3TilingData &data)
+TilingTransferHelper::TilingTransferHelper(MatmulAllReduceTiling910& matmulAllReduceTiling910,
+                                           Mc2MatmulV3TilingData& data)
     : Mc2MatmulV3BaseTiling(matmulAllReduceTiling910.context_, &data),
       tilingProcesser_(matmulAllReduceTiling910)
 {}
@@ -329,8 +329,8 @@ CutResult MatmulAllReduceTiling910::GetTilingResult()
     CutResult mCutAllreduce;
     SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B;
     SetMCutSocVersion(socVersion_2201);
-    const gert::StorageShape *commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
-    const gert::StorageShape *commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
+    const gert::StorageShape* commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
+    const gert::StorageShape* commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
     if ((commQuantScaleShape1 != nullptr) && (commQuantScaleShape2 != nullptr)) { // low-bit comm
         OP_LOGD(opName_, "TileCnt enter comm quant.");
         MMPlusQuantAllReduce quantAllReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_,

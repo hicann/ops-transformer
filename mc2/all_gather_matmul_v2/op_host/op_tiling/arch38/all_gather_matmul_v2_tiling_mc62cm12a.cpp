@@ -23,7 +23,7 @@ using namespace AscendC;
 using namespace ge;
 
 namespace optiling {
-ge::graphStatus AllGatherMatmulTilingV2Func(gert::TilingContext *context)
+ge::graphStatus AllGatherMatmulTilingV2Func(gert::TilingContext* context)
 {
     OP_LOGI("AllGatherMatmulTilingV2", "Start to do tiling in AllGatherMatmulTilingV2Func mc62cm12a");
     return Ops::Transformer::OpTiling::TilingRegistryArch::GetInstance().DoTilingImpl(context);

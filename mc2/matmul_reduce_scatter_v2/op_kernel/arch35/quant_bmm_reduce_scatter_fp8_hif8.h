@@ -44,26 +44,26 @@ public:
     __aicore__ inline QuantBMMReduceScatter() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR x1ScaleGM, GM_ADDR x2ScaleGM,
                                 GM_ADDR cGM, GM_ADDR contextGM, GM_ADDR workspaceGM,
-                                Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData *tilingData, TPipe *tpipe);
+                                Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData* tilingData, TPipe* tpipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void InnerProcess();
     __aicore__ inline void MatMulReduceScatterSerial();
     __aicore__ inline void MatMulComputReduceScatter(GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM,
-                                                     DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling,
+                                                     DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& qBMmtiling,
                                                      uint32_t tileCnt, GM_ADDR gmToFloat, bool isLast, bool isTail);
     __aicore__ inline void MatMulComputReduceScatterPertensor(
-        GM_ADDR aGM, GM_ADDR cGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling, uint32_t tileCnt,
+        GM_ADDR aGM, GM_ADDR cGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& qBMmtiling, uint32_t tileCnt,
         GM_ADDR gmToFloat, bool isLast, bool isTail);
     __aicore__ inline void MatMulComputReduceScatterPerblock(
-        GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling,
+        GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& qBMmtiling,
         uint32_t tileCnt, GM_ADDR gmToFloat, bool isTail);
     __aicore__ inline void PostProcess(); // 计算后处理，等待通信结束，并终止hcclserver
 
 private:
-    Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData *tilingData_;
-    TPipe *tPipe_{nullptr};
+    Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData* tilingData_;
+    TPipe* tPipe_{nullptr};
     GM_ADDR aGM_{nullptr};
     GM_ADDR bGM_{nullptr};
     GM_ADDR cGM_{nullptr};
@@ -96,10 +96,10 @@ using QuantBMMReduceScatterPeerOnly =
 QUANT_RS_TEMPLATE_IMPL_PARAMS
 __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR x1ScaleGM, GM_ADDR x2ScaleGM, GM_ADDR cGM, GM_ADDR contextGM,
-    GM_ADDR workspaceGM, Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData *tilingData, TPipe *tPipe)
+    GM_ADDR workspaceGM, Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData* tilingData, TPipe* tPipe)
 {
     tilingData_ = tilingData;
-    const void *hcclInitTilingV2 = &(tilingData_->mc2InitTiling);
+    const void* hcclInitTilingV2 = &(tilingData_->mc2InitTiling);
     uint64_t hcclCcTilingOffset = offsetof(Mc2Tiling::QuantBatchMatmulV3ReduceScatterTilingData, mc2CcTiling);
     hccl_.InitV2(contextGM, hcclInitTilingV2);
     hccl_.SetCcTilingV2(hcclCcTilingOffset);
@@ -113,7 +113,7 @@ __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::Ini
     x1ScaleGM_ = x1ScaleGM;
     x2ScaleGM_ = x2ScaleGM;
     rankId_ = hccl_.GetRankId();
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     if constexpr (IS_MX_DFX) {
         // 初始化状态打点(写入magicNum+COMM_INIT阶段)，HCCL初始化期间崩溃dump显示INIT
 #if MC2_DFX_ENABLE
@@ -131,7 +131,7 @@ __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::Ini
 QUANT_RS_TEMPLATE_IMPL_PARAMS
 __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::PostProcess()
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     // 等待reducescatter执行完成
     if ((GetBlockIdx() == 0) && (g_coreType == AIC)) {
         for (uint32_t i = 0; i < cfg.tileCnt + cfg.tailCnt; i++) {
@@ -156,9 +156,9 @@ __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::Pro
 QUANT_RS_TEMPLATE_IMPL_PARAMS
 __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::MatMulReduceScatterSerial()
 {
-    auto &&qBMmtiling = tilingData_->quantBmmV3TileTiling;
-    auto &&tiling = qBMmtiling.matmulTiling;
-    auto &&cfg = tilingData_->param;
+    auto&& qBMmtiling = tilingData_->quantBmmV3TileTiling;
+    auto&& tiling = qBMmtiling.matmulTiling;
+    auto&& cfg = tilingData_->param;
     auto cWork = (debugMode_ == MC2_DEBUG_ONLY_CUBE) ? cGM_ : gmToFloat_;
     auto recvBuffer = (debugMode_ == MC2_DEBUG_ONLY_CUBE) ? gmToFloat_ : cGM_;
 
@@ -183,8 +183,8 @@ __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::Mat
 QUANT_RS_TEMPLATE_IMPL_PARAMS
 __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::InnerProcess()
 {
-    auto &&tiling = tilingData_->quantBmmV3TileTiling.matmulTiling;
-    auto &&cfg = tilingData_->param;
+    auto&& tiling = tilingData_->quantBmmV3TileTiling.matmulTiling;
+    auto&& cfg = tilingData_->param;
     uint64_t aSize = static_cast<uint64_t>(tiling.M) * static_cast<uint64_t>(tiling.Ka);
     uint64_t cSize = static_cast<uint64_t>(tiling.M) * static_cast<uint64_t>(tiling.N);
 
@@ -227,14 +227,14 @@ __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::Inn
 
 QUANT_RS_TEMPLATE_IMPL_PARAMS
 __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::MatMulComputReduceScatterPertensor(
-    GM_ADDR aGM, GM_ADDR cGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling, uint32_t tileCnt,
+    GM_ADDR aGM, GM_ADDR cGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& qBMmtiling, uint32_t tileCnt,
     GM_ADDR gmToFloat, bool isLast, bool isTail)
 {
     if ASCEND_IS_AIV {
         return;
     }
-    auto &&cfg = tilingData_->param;
-    auto &&tiling = qBMmtiling.matmulTiling;
+    auto&& cfg = tilingData_->param;
+    auto&& tiling = qBMmtiling.matmulTiling;
     if (GetBlockIdx() >= tiling.usedCoreNum) {
         for (uint32_t i = 0; i < tileCnt; i++) {
             AscendC::CrossCoreSetFlag<0, PIPE_FIX>(3);
@@ -244,7 +244,7 @@ __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::Mat
     }
     // 如果尾块的当前核数大于主块使用核数，计算尾块当前核的preCoreNum_
     if (isTail && (GetBlockIdx() >= tilingData_->quantBmmV3TileTiling.matmulTiling.usedCoreNum)) {
-        auto &&tileTiling = tilingData_->quantBmmV3TileTiling.matmulTiling;
+        auto&& tileTiling = tilingData_->quantBmmV3TileTiling.matmulTiling;
         uint64_t headSliceM = (cfg.rankM / cfg.rankDim - cfg.tailM * cfg.tailCnt) / cfg.tileCnt;
         uint64_t mCnt = DequantBmm::CeilDiv(headSliceM, tileTiling.baseM) * cfg.rankDim;
         uint64_t nCnt = DequantBmm::CeilDiv(tileTiling.N, tileTiling.baseN);
@@ -285,11 +285,11 @@ __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::Mat
 
 QUANT_RS_TEMPLATE_IMPL_PARAMS
 __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::MatMulComputReduceScatterPerblock(
-    GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling,
+    GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& qBMmtiling,
     uint32_t tileCnt, GM_ADDR gmToFloat, bool isTail)
 {
-    auto &&cfg = tilingData_->param;
-    auto &&tiling = qBMmtiling.matmulTiling;
+    auto&& cfg = tilingData_->param;
+    auto&& tiling = qBMmtiling.matmulTiling;
     auto recvCount = static_cast<uint64_t>(tiling.M) * static_cast<uint64_t>(tiling.N);
     auto aOffset = static_cast<uint64_t>(tiling.M) * static_cast<uint64_t>(tiling.Ka) * sizeof(AType);
     auto cOffset = recvCount * sizeof(CType);
@@ -331,7 +331,7 @@ __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::Mat
 
 QUANT_RS_TEMPLATE_IMPL_PARAMS
 __aicore__ inline void QuantBMMReduceScatter<QUANT_RS_TEMPLATE_FUNC_PARAMS>::MatMulComputReduceScatter(
-    GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qBMmtiling,
+    GM_ADDR aGM, GM_ADDR cGM, GM_ADDR x1ScaleGM, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& qBMmtiling,
     uint32_t tileCnt, GM_ADDR gmToFloat, bool isLast, bool isTail)
 {
     if constexpr (IsPerBlock) {

@@ -67,10 +67,10 @@ __global__ __aicore__ void allto_all_all_gather_batch_mat_mul(GM_ADDR xGM, GM_AD
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     GET_TILING_DATA(tilingData, tilingGM);
     REGISTER_TILING_DEFAULT(AlltoAllAllGatherBatchMatMulTilingData);
-    auto tiling = (__gm__ AlltoAllAllGatherBatchMatMulTilingData *)tilingGM;
-    __gm__ void *hcclInitTiling = (__gm__ void *)(&(tiling->hcclInitTiling));
-    __gm__ void *allGatherCcTiling = (__gm__ void *)(&(tiling->allGatherCcTiling));
-    __gm__ void *alltoAllCcTiling = (__gm__ void *)(&(tiling->alltoAllCcTiling));
+    auto tiling = (__gm__ AlltoAllAllGatherBatchMatMulTilingData*)tilingGM;
+    __gm__ void* hcclInitTiling = (__gm__ void*)(&(tiling->hcclInitTiling));
+    __gm__ void* allGatherCcTiling = (__gm__ void*)(&(tiling->allGatherCcTiling));
+    __gm__ void* alltoAllCcTiling = (__gm__ void*)(&(tiling->alltoAllCcTiling));
 
     if constexpr (XShard == 1) {
         AlltoAllAllGatherBatchMatMul_IMPL_CLASS(XShard, WeightTransPose, IsBias, Y2Need, Y3Need);

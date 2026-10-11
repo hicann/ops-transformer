@@ -25,12 +25,12 @@ OP_TYPE_REGISTER(Mc2WeightQuantBatchMatmulV2);
 constexpr int64_t TYPE_FP16 = 1;
 constexpr int64_t TYPE_BF16 = 27;
 
-const aclTensor *Mc2WeightQuantBatchMatmulV2(const aclTensor *x, const aclTensor *weight,
-                                             const aclTensor *antiquantScale, const aclTensor *antiquantOffsetOptional,
-                                             const aclTensor *quantScaleOptional, const aclTensor *quantOffsetOptional,
-                                             const aclTensor *biasOptional, bool transposeX, bool transposeWeight,
+const aclTensor* Mc2WeightQuantBatchMatmulV2(const aclTensor* x, const aclTensor* weight,
+                                             const aclTensor* antiquantScale, const aclTensor* antiquantOffsetOptional,
+                                             const aclTensor* quantScaleOptional, const aclTensor* quantOffsetOptional,
+                                             const aclTensor* biasOptional, bool transposeX, bool transposeWeight,
                                              int antiquantGroupSize, int64_t dtype, int innerPrecise,
-                                             aclOpExecutor *executor)
+                                             aclOpExecutor* executor)
 {
     L0_DFX(Mc2WeightQuantBatchMatmulV2, x, weight, antiquantScale, antiquantOffsetOptional, quantScaleOptional,
            quantOffsetOptional, biasOptional, transposeX, transposeWeight, antiquantGroupSize, dtype, innerPrecise);

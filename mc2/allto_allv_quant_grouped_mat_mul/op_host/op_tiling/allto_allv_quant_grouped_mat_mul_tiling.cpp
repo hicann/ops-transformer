@@ -34,14 +34,14 @@ using namespace Ops::Transformer::OpTiling;
 namespace optiling {
 struct AlltoAllvGmmCompileInfo {};
 
-static ge::graphStatus TilingParseForAlltoAllvGmm(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForAlltoAllvGmm(gert::TilingParseContext* context)
 {
     auto compileInfo = context->GetCompiledInfo<AlltoAllvGmmCompileInfo>();
     OPS_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus AlltoAllvGmmTilingFunc(gert::TilingContext *context)
+static ge::graphStatus AlltoAllvGmmTilingFunc(gert::TilingContext* context)
 {
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }

@@ -49,9 +49,9 @@ struct MNConfig {
 template <typename ComputeType>
 class GMMProcess {
 private:
-    ComputeType &computeOp; // inernal computation operator
-    const GMMAllReduceCoreTiling *__restrict tilingData;
-    TPipe *pipe;
+    ComputeType& computeOp; // inernal computation operator
+    const GMMAllReduceCoreTiling* __restrict tilingData;
+    TPipe* pipe;
     uint32_t blockIdx;
     uint32_t subBlockIdx;
     uint32_t coreIdx;
@@ -64,17 +64,17 @@ private:
 
 public:
     /** @brief constructor */
-    __aicore__ inline GMMProcess(ComputeType &computeOp_)
+    __aicore__ inline GMMProcess(ComputeType& computeOp_)
         : computeOp(computeOp_)
     {}
 
-    __aicore__ inline void Init(const GMMAllReduceCoreTiling *__restrict tiling, TPipe *tPipe);
+    __aicore__ inline void Init(const GMMAllReduceCoreTiling* __restrict tiling, TPipe* tPipe);
 
-    __aicore__ inline void Process(HcclServer &hcclServer);
+    __aicore__ inline void Process(HcclServer& hcclServer);
 };
 
 template <typename ComputeType>
-__aicore__ inline void GMMProcess<ComputeType>::Init(const GMMAllReduceCoreTiling *__restrict tiling, TPipe *tPipe)
+__aicore__ inline void GMMProcess<ComputeType>::Init(const GMMAllReduceCoreTiling* __restrict tiling, TPipe* tPipe)
 {
     blockIdx = GetBlockIdx();
     subBlockIdx = GetSubBlockIdx();
@@ -90,12 +90,12 @@ __aicore__ inline void GMMProcess<ComputeType>::Init(const GMMAllReduceCoreTilin
 }
 
 template <typename ComputeType>
-__aicore__ inline void GMMProcess<ComputeType>::Process(HcclServer &hcclServer)
+__aicore__ inline void GMMProcess<ComputeType>::Process(HcclServer& hcclServer)
 {
     // aicore function
-    auto &ubM = tilingData->baseParams.mList;
-    auto &ubK = tilingData->baseParams.kList;
-    auto &ubN = tilingData->baseParams.nList;
+    auto& ubM = tilingData->baseParams.mList;
+    auto& ubK = tilingData->baseParams.kList;
+    auto& ubN = tilingData->baseParams.nList;
     MNConfig mnConfig;
     mnConfig.baseM = baseM;
     mnConfig.baseN = baseN;
@@ -153,16 +153,16 @@ public:
     using BiasT = typename mmType::BiasT::T;
 
     /** @brief constructor */
-    __aicore__ inline GMMCompute(typename mmType::MT &mm_)
+    __aicore__ inline GMMCompute(typename mmType::MT& mm_)
         : mm(mm_)
     {}
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace);
 
-    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig &mnConfig);
+    __aicore__ inline void MMCompute(uint32_t groupIdx, MNConfig& mnConfig);
 
 private:
-    typename mmType::MT &mm; // matmul operator
+    typename mmType::MT& mm; // matmul operator
     bool hasBias = false;
     GM_ADDR xTensorPtr;
     GM_ADDR weightTensorPtr;
@@ -186,11 +186,11 @@ __aicore__ inline void GMMCompute<mmType, sync>::Init(GM_ADDR x, GM_ADDR weight,
     if (bias != nullptr && GetTensorAddr<BiasT>(0, biasTensorPtr) != nullptr) {
         hasBias = true;
     }
-    workspaceGm.SetGlobalBuffer((__gm__ CT *)workspace);
+    workspaceGm.SetGlobalBuffer((__gm__ CT*)workspace);
 }
 
 template <class mmType, bool sync>
-__aicore__ inline void GMMCompute<mmType, sync>::MMCompute(uint32_t groupIdx, MNConfig &mnConfig)
+__aicore__ inline void GMMCompute<mmType, sync>::MMCompute(uint32_t groupIdx, MNConfig& mnConfig)
 {
     uint32_t curSingleN = mnConfig.singleN;
     if (mnConfig.nIdx == mnConfig.numBlocksN - 1) {

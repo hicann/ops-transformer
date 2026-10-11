@@ -18,16 +18,16 @@ namespace MatmulAllReduceUT {
 
 namespace {
 
-void RunMatmulAllReduceUt(op::SocVersion soc, const TensorDesc &x1, const TensorDesc &x2, const aclTensor *bias,
-                          const TensorDesc &output, aclnnStatus expectResult)
+void RunMatmulAllReduceUt(op::SocVersion soc, const TensorDesc& x1, const TensorDesc& x2, const aclTensor* bias,
+                          const TensorDesc& output, aclnnStatus expectResult)
 {
     op::SetPlatformSocVersion(soc);
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut =
         OP_API_UT(aclnnMatmulAllReduce, INPUT(x1, x2, bias, group, reduceOp, commTurn, streamMode), OUTPUT(output));
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -66,7 +66,7 @@ TEST_P(AclnnMatmulAllReduceTest, param)
                               param.commTurn, param.streamMode),
                         OUTPUT(param.output));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(ACLNN_ERR_PARAM_INVALID, aclnnRet);

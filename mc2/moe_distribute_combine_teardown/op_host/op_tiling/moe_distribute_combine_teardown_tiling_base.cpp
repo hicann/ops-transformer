@@ -86,7 +86,7 @@ namespace MC2Tiling {
 
 void MoeDistributeCombineTeardownTilingBase::PrintTilingDataInfo() const
 {
-    const MoeDistributeCombineTeardownInfo &info = tilingData_->moeDistributeCombineTeardownInfo;
+    const MoeDistributeCombineTeardownInfo& info = tilingData_->moeDistributeCombineTeardownInfo;
     OP_LOGD(nodeName_, "epWorldSize is %u.", info.epWorldSize);
     OP_LOGD(nodeName_, "epRankId is %u.", info.epRankId);
     OP_LOGD(nodeName_, "expertShardType is %u.", info.expertShardType);
@@ -132,10 +132,10 @@ void MoeDistributeCombineTeardownTilingBase::SetAttrToTilingData()
     }
     tilingData_->moeDistributeCombineTeardownInfo.moeExpertPerRankNum = localMoeExpertNum;
 
-    auto *xActiveMaskStorageShape = context_->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
+    auto* xActiveMaskStorageShape = context_->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
     tilingData_->moeDistributeCombineTeardownInfo.isActiveMask = (xActiveMaskStorageShape != nullptr);
 
-    auto *sharedExpertXShape = context_->GetOptionalInputShape(SHARED_EXPERT_X_INDEX);
+    auto* sharedExpertXShape = context_->GetOptionalInputShape(SHARED_EXPERT_X_INDEX);
     tilingData_->moeDistributeCombineTeardownInfo.hasSharedExpertX = (sharedExpertXShape != nullptr);
 }
 
@@ -242,7 +242,7 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckAttrsNullptr()
 ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckOneTensorDim(std::string name, TensorType tensortype,
                                                                           uint32_t index, uint32_t dims)
 {
-    const gert::StorageShape *StorageShape;
+    const gert::StorageShape* StorageShape;
     if (tensortype == INPUT) {
         StorageShape = context_->GetInputShape(index);
     } else if (tensortype == OUTPUT) {
@@ -340,7 +340,7 @@ ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTensorDim()
 }
 
 ge::graphStatus MoeDistributeCombineTeardownTilingBase::CheckTokenMessageAndOutputWidth(
-    const gert::StorageShape *quantExpandXStorageShape, const gert::StorageShape *xOutStorageShape, int64_t H) const
+    const gert::StorageShape* quantExpandXStorageShape, const gert::StorageShape* xOutStorageShape, int64_t H) const
 {
     // 校验tokenMsgSize
     const int64_t tempTokenMsgSize = ops::CeilAlign(
@@ -863,7 +863,7 @@ void MoeDistributeCombineTeardownTilingBase::SetPlatformInfo()
 
 ge::graphStatus MoeDistributeCombineTeardownTilingBase::SetWorkspace()
 {
-    size_t *workspace = context_->GetWorkspaceSizes(1);
+    size_t* workspace = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspace == nullptr, OP_LOGE(nodeName_, "get workspace failed"), return ge::GRAPH_FAILED);
     workspace[0] = static_cast<size_t>(SYSTEM_NEED_WORKSPACE) + SDMA_NEED_WORKSPACE; // 可能的URMA适配点
     OP_LOGD(nodeName_, "workspace[0] size is %lu", workspace[0]);

@@ -29,11 +29,11 @@ namespace Mc2WeightQuantBatchMatmulV2::Arch35 {
 
 template <typename yType>
 struct LocalAddressYParam {
-    __local_mem__ int32_t *yOriginPhyAddr;
-    __local_mem__ float *cScalePhyAddr;
-    __local_mem__ float *kScalePhyAddr;
-    __local_mem__ float *biasPhyAddr;
-    __local_mem__ yType *yPhyAddr;
+    __local_mem__ int32_t* yOriginPhyAddr;
+    __local_mem__ float* cScalePhyAddr;
+    __local_mem__ float* kScalePhyAddr;
+    __local_mem__ float* biasPhyAddr;
+    __local_mem__ yType* yPhyAddr;
 };
 
 static constexpr Reg::CastTrait C32_TO_FP32_TRAIT = {Reg::RegLayout::UNKNOWN, Reg::SatMode::UNKNOWN,
@@ -43,7 +43,7 @@ static constexpr Reg::CastTrait FP32_TO_F16 = {Reg::RegLayout::ZERO, Reg::SatMod
                                                AscendC::RoundMode::CAST_RINT};
 
 template <typename yType, bool hasBias>
-__aicore__ inline void AntiQuantYB32(LocalAddressYParam<yType> &localAddressParam, uint64_t nRealL0Size,
+__aicore__ inline void AntiQuantYB32(LocalAddressYParam<yType>& localAddressParam, uint64_t nRealL0Size,
                                      uint64_t nRealVRegSize, uint16_t ubLoopN, uint16_t ubLoopM)
 {
     __VEC_SCOPE__

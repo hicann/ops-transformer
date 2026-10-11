@@ -45,8 +45,8 @@ public:
     __aicore__ inline AllGatherQuantBmm() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR dequantGM1, GM_ADDR dequantGM2, GM_ADDR biasGM,
                                 GM_ADDR scaleGM, GM_ADDR cGM, GM_ADDR gatherOut, GM_ADDR workspaceGM, GM_ADDR contextGM,
-                                Mc2Tiling::AllGatherMatmulTilingDataFp8 *tilingData, __gm__ void *mc2InitTiling,
-                                __gm__ void *mc2CcTiling, TPipe *tPipe);
+                                Mc2Tiling::AllGatherMatmulTilingDataFp8* tilingData, __gm__ void* mc2InitTiling,
+                                __gm__ void* mc2CcTiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
@@ -62,12 +62,12 @@ private:
     __aicore__ inline void QuantMatmulGatherCompute(); /* 远端计算 */
     __aicore__ inline void PostProcess();              /* 后处理 */
     __aicore__ inline void MatmulKernelComputeGather(GM_ADDR aGM,
-                                                     DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qMmv3Tiling,
+                                                     DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& qMmv3Tiling,
                                                      uint32_t count, bool isLast, bool isTail);
 
 private:
-    Mc2Tiling::AllGatherMatmulTilingDataFp8 *tilingData_;
-    TPipe *tPipe_;
+    Mc2Tiling::AllGatherMatmulTilingDataFp8* tilingData_;
+    TPipe* tPipe_;
     GM_ADDR cGM_;
     GM_ADDR aGM_;
     GM_ADDR bGM_;
@@ -111,10 +111,10 @@ template <typename AType, typename BType, typename BiasType, typename X2ScaleTyp
 __aicore__ inline void
 AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, IsMxFp4, ServerMode>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR dequantGM1, GM_ADDR dequantGM2, GM_ADDR biasGM, GM_ADDR scaleGM, GM_ADDR cGM,
-    GM_ADDR gatherOut, GM_ADDR workspaceGM, GM_ADDR contextGM, Mc2Tiling::AllGatherMatmulTilingDataFp8 *tilingData,
-    __gm__ void *mc2InitTiling, __gm__ void *mc2CcTiling, TPipe *tPipe)
+    GM_ADDR gatherOut, GM_ADDR workspaceGM, GM_ADDR contextGM, Mc2Tiling::AllGatherMatmulTilingDataFp8* tilingData,
+    __gm__ void* mc2InitTiling, __gm__ void* mc2CcTiling, TPipe* tPipe)
 {
-    auto &&cfg = tilingData->param;
+    auto&& cfg = tilingData->param;
 
     context_ = contextGM;
     tilingData_ = tilingData;
@@ -164,7 +164,7 @@ template <typename AType, typename BType, typename BiasType, typename X2ScaleTyp
 __aicore__ inline void
 AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, IsMxFp4, ServerMode>::AllGatherCommit()
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     uint32_t tileCnt = cfg.tileCnt;                                                          // 整块个数
     uint32_t tailCnt = cfg.tailCnt;                                                          // 尾块个数
     uint32_t tilingM = tilingData_->quantBmmv3TileTiling.matmulTiling.M / (cfg.rankDim - 1); // 整块M轴大小
@@ -238,12 +238,12 @@ template <typename AType, typename BType, typename BiasType, typename X2ScaleTyp
 __aicore__ inline void AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, IsMxFp4,
                                          ServerMode>::QuantMatmulLocalCompute()
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     // 当N=0时，跳过本地计算
     if (cfg.rankN == 0) {
         return;
     }
-    auto &&qBMMLocalTiling = tilingData_->quantBmmv3LocalTiling; // QuantBatchMatmulV3TilingData 本地核切分tiling参数
+    auto&& qBMMLocalTiling = tilingData_->quantBmmv3LocalTiling; // QuantBatchMatmulV3TilingData 本地核切分tiling参数
     uint32_t tilingKa = tilingData_->quantBmmv3TileTiling.matmulTiling.Ka; // 整块K轴大小
 
     MatMulASWKernel<AType, BType, X2ScaleType, BiasType, CType, CubeFormat::ND, CubeFormat::ND, CubeFormat::ND, ATrans,
@@ -275,10 +275,10 @@ template <typename AType, typename BType, typename BiasType, typename X2ScaleTyp
 __aicore__ inline void
 AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, IsMxFp4,
                   ServerMode>::MatmulKernelComputeGather(GM_ADDR aGM,
-                                                         DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &qMmv3Tiling,
+                                                         DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& qMmv3Tiling,
                                                          uint32_t count, bool isLast, bool isTail)
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     cfg.rankID = rankId_;
 
     // 尾块使用独立 tiling，需将preCoreNum_归零，避免沿用整块累计值导致核偏移计算溢出
@@ -342,7 +342,7 @@ template <typename AType, typename BType, typename BiasType, typename X2ScaleTyp
 __aicore__ inline void
 AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, IsMxFp4, ServerMode>::QuantMatmulCompute()
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     // 计算本片的块
     // 未用到的AIC核不需要参与计算
     if ((GetBlockIdx() < tilingData_->quantBmmv3LocalTiling.matmulTiling.usedCoreNum) && (cfg.rankN != 0)) {
@@ -368,7 +368,7 @@ template <typename AType, typename BType, typename BiasType, typename X2ScaleTyp
 __aicore__ inline void AllGatherQuantBmm<AType, BType, BiasType, X2ScaleType, CType, ATrans, BTrans, IsMxFp4,
                                          ServerMode>::QuantMatmulGatherCompute()
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     // 处理gather主块
     if (debugMode_ == MC2_DEBUG_ONLY_CUBE) {
         MatmulKernelComputeGather(aGM_, tilingData_->quantBmmv3TileTiling, cfg.tileCnt, cfg.tailM ? false : true,

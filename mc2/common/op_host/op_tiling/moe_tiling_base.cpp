@@ -21,7 +21,7 @@ namespace optiling {
 ge::graphStatus MoeTilingBase::GetPlatformInfo()
 {
     auto platformInfo = context_->GetPlatformInfo();
-    const char *nodeName = context_->GetNodeName();
+    const char* nodeName = context_->GetNodeName();
     OP_TILING_CHECK(nodeName == nullptr, OP_LOGE(nodeName, "Fail to get nodeName."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(nodeName, "fail to get platform info"), return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
@@ -49,7 +49,7 @@ ge::graphStatus MoeTilingBase::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeTilingBase::CheckSharedExpertAttrValue(const char *nodeName, const uint32_t sharedExpertNum,
+ge::graphStatus MoeTilingBase::CheckSharedExpertAttrValue(const char* nodeName, const uint32_t sharedExpertNum,
                                                           const uint32_t sharedExpertRankNum)
 {
     // 共享专家卡数>=共享专家数且可以整除

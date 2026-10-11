@@ -33,20 +33,20 @@ template <typename xType, typename wType, typename yType, class mmType, Mc2CoreT
 class MatmulAllReduceAddRmsNormQuantBF16
     : public MatmulAllReduceQuantBF16<xType, wType, yType, mmType, coreType, false> {
 public:
-    __aicore__ inline MatmulAllReduceAddRmsNormQuantBF16(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs,
-                                                         ArnGmAddrs *arnAddrs, MC2TilingHeader *tilingData,
-                                                         TPipe *tPipe)
+    __aicore__ inline MatmulAllReduceAddRmsNormQuantBF16(MC2GmAddrs* addrs, QuantGmAddrs* quantAddrs,
+                                                         ArnGmAddrs* arnAddrs, MC2TilingHeader* tilingData,
+                                                         TPipe* tPipe)
         : MatmulAllReduceQuantBF16<xType, wType, yType, mmType, coreType, false>(addrs, quantAddrs, arnAddrs,
                                                                                  tilingData, tPipe)
     {
-        Mc2Tiling::QuantMatmulAllReduceAddRmsNormTilingData *p =
-            (Mc2Tiling::QuantMatmulAllReduceAddRmsNormTilingData *)tilingData;
+        Mc2Tiling::QuantMatmulAllReduceAddRmsNormTilingData* p =
+            (Mc2Tiling::QuantMatmulAllReduceAddRmsNormTilingData*)tilingData;
         arnTile_ = &p->addRMSNormTileTilingData;
         arnTail_ = &p->addRMSNormTailTilingData;
         arnTilineKey_ = &p->addRmsNormTilingeKeyData;
     }
 
-    __aicore__ inline void Process(mmType &opTile, mmType &opTail)
+    __aicore__ inline void Process(mmType& opTile, mmType& opTail)
     {
         this->InnerProcess(opTile, false, this->paramInTiling_->tileCnt, this->tileInfo_);
         if (this->tailFlag_) {
@@ -68,9 +68,9 @@ public:
     }
 
 private:
-    Mc2Tiling::AddRMSNormTilingeKeyData *arnTilineKey_;
-    Mc2Tiling::AddRMSNormTilingData *arnTile_;
-    Mc2Tiling::AddRMSNormTilingData *arnTail_;
+    Mc2Tiling::AddRMSNormTilingeKeyData* arnTilineKey_;
+    Mc2Tiling::AddRMSNormTilingData* arnTile_;
+    Mc2Tiling::AddRMSNormTilingData* arnTail_;
 };
 
 #define REG_MM_OBJ_FOR_ARN(opTile, opTail) \
@@ -88,7 +88,7 @@ private:
         opType opTile, opTail; \
         regObjCb(opTile, opTail); \
         MatmulAllReduceAddRmsNormQuantBF16<DTYPE_X1, DTYPE_X2, DTYPE_Y, opType, coreType> op( \
-            &addrs, &quantAddrs, &arnAddrs, (MC2TilingHeader *)&tilingData, &tPipe); \
+            &addrs, &quantAddrs, &arnAddrs, (MC2TilingHeader*)&tilingData, &tPipe); \
         op.Init(); \
         op.Process(opTile, opTail); \
     } while (0)

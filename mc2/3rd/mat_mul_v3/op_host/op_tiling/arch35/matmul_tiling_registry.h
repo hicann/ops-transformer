@@ -31,18 +31,18 @@
 
 namespace optiling {
 struct Mc2MMRegisterCfg {
-    const char *opType{nullptr};
+    const char* opType{nullptr};
     NpuArch npuArch{Ops::Base::DAV_RESV};
     std::vector<int32_t> priorities{}; // 0 base
 };
 
 template <typename T>
-std::unique_ptr<Mc2MatMulBaseTiling> MM_TILING_CLASS(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg)
+std::unique_ptr<Mc2MatMulBaseTiling> MM_TILING_CLASS(gert::TilingContext* context, Mc2MatMulTilingCfg& cfg)
 {
     return std::unique_ptr<T>(new (std::nothrow) T(context, cfg));
 }
 
-using Mc2MMTilingClassCase = std::unique_ptr<Mc2MatMulBaseTiling> (*)(gert::TilingContext *, Mc2MatMulTilingCfg &);
+using Mc2MMTilingClassCase = std::unique_ptr<Mc2MatMulBaseTiling> (*)(gert::TilingContext*, Mc2MatMulTilingCfg&);
 
 class Mc2MMTilingCases {
 public:
@@ -61,7 +61,7 @@ public:
                    return);
     }
 
-    const std::map<int32_t, Mc2MMTilingClassCase> &GetTilingCases()
+    const std::map<int32_t, Mc2MMTilingClassCase>& GetTilingCases()
     {
         return cases_;
     }
@@ -76,16 +76,16 @@ public:
     Mc2MMTilingRegistry() = default;
 
 #ifdef ASCENDC_OP_TEST
-    static Mc2MMTilingRegistry &GetInstance();
+    static Mc2MMTilingRegistry& GetInstance();
 #else
-    static Mc2MMTilingRegistry &GetInstance()
+    static Mc2MMTilingRegistry& GetInstance()
     {
         static Mc2MMTilingRegistry registryImpl_;
         return registryImpl_;
     }
 #endif
 
-    std::shared_ptr<Mc2MMTilingCases> RegisterOp(const std::string &opType, NpuArch npuArch)
+    std::shared_ptr<Mc2MMTilingCases> RegisterOp(const std::string& opType, NpuArch npuArch)
     {
         auto socIter = registryMap_.find(npuArch);
         if (socIter == registryMap_.end()) {
@@ -105,14 +105,14 @@ public:
         return registryMap_[npuArch][opType];
     }
 
-    ge::graphStatus DoTilingImpl(gert::TilingContext *context, Mc2MatMulTilingCfg &tilingCfg,
-                                 const Mc2MMRegisterCfg &registerCfg)
+    ge::graphStatus DoTilingImpl(gert::TilingContext* context, Mc2MatMulTilingCfg& tilingCfg,
+                                 const Mc2MMRegisterCfg& registerCfg)
     {
         if (context == nullptr || tilingCfg.compileInfo == nullptr || tilingCfg.args == nullptr) {
             OPS_LOG_E(context, "DoTilingImpl failed, context or tilingCfg or args is null.");
             return ge::GRAPH_FAILED;
         }
-        const char *opType = registerCfg.opType == nullptr ? context->GetNodeType() : registerCfg.opType;
+        const char* opType = registerCfg.opType == nullptr ? context->GetNodeType() : registerCfg.opType;
         auto tilingTemplateRegistryMap = GetTilingTemplates(opType, registerCfg.npuArch);
         OPS_LOG_D(context, "registry map find by opType %s, soc version %d", opType,
                   static_cast<int32_t>(registerCfg.npuArch));
@@ -146,7 +146,7 @@ public:
         return ge::GRAPH_FAILED;
     }
 
-    const std::map<int32_t, Mc2MMTilingClassCase> &GetTilingTemplates(const std::string &opType, NpuArch npuArch)
+    const std::map<int32_t, Mc2MMTilingClassCase>& GetTilingTemplates(const std::string& opType, NpuArch npuArch)
     {
         auto socIter = registryMap_.find(npuArch);
         OPS_ERR_IF(socIter == registryMap_.end(),
@@ -172,7 +172,7 @@ public:
     {}
 
     template <typename T>
-    Mc2MMRegister &tiling(int32_t priority, NpuArch npuArch)
+    Mc2MMRegister& tiling(int32_t priority, NpuArch npuArch)
     {
         auto tilingCases = Mc2MMTilingRegistry::GetInstance().RegisterOp(opType_, npuArch);
         OPS_ERR_IF(tilingCases == nullptr,

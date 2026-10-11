@@ -14,12 +14,12 @@
 #include "opdev/make_op_executor.h"
 
 namespace l0op {
-const aclTensor *Mc2WeightQuantBatchMatmulV2(const aclTensor *x, const aclTensor *weight,
-                                             const aclTensor *antiquantScale, const aclTensor *antiquantOffsetOptional,
-                                             const aclTensor *quantScaleOptional, const aclTensor *quantOffsetOptional,
-                                             const aclTensor *biasOptional, bool transposeX, bool transposeWeight,
+const aclTensor* Mc2WeightQuantBatchMatmulV2(const aclTensor* x, const aclTensor* weight,
+                                             const aclTensor* antiquantScale, const aclTensor* antiquantOffsetOptional,
+                                             const aclTensor* quantScaleOptional, const aclTensor* quantOffsetOptional,
+                                             const aclTensor* biasOptional, bool transposeX, bool transposeWeight,
                                              int antiquantGroupSize, int64_t dtype, int innerPrecise,
-                                             aclOpExecutor *executor);
+                                             aclOpExecutor* executor);
 }
 
 #endif // OP_API_OP_API_COMMON_INC_LEVEL0_OP_WEIGHT_QUANT_BATCH_MATMUL_V2_H

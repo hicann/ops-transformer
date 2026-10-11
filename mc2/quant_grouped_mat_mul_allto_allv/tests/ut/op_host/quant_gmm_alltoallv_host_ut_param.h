@@ -17,21 +17,21 @@
 
 namespace QuantGmmAlltoAllvUT {
 
-inline int64_t SafeStoll(const std::string &str, int64_t defaultValue = 0)
+inline int64_t SafeStoll(const std::string& str, int64_t defaultValue = 0)
 {
     try {
         return std::stoll(str);
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         std::cerr << "[WARN] SafeStoll failed for \"" << str << "\", using default: " << defaultValue << std::endl;
         return defaultValue;
     }
 }
 
-inline uint64_t SafeStoull(const std::string &str, uint64_t defaultValue = 0)
+inline uint64_t SafeStoull(const std::string& str, uint64_t defaultValue = 0)
 {
     try {
         return std::stoull(str);
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         std::cerr << "[WARN] SafeStoull failed for \"" << str << "\", using default: " << defaultValue << std::endl;
         return defaultValue;
     }
@@ -101,7 +101,7 @@ struct QuantGmmAlltoAllvTilingUtParam {
     ge::graphStatus expectResult = ge::GRAPH_FAILED;
     uint64_t expectTilingKey = 0;
 
-    explicit QuantGmmAlltoAllvTilingUtParam(const csv_map &csvMap)
+    explicit QuantGmmAlltoAllvTilingUtParam(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "caseName");
 
@@ -168,7 +168,7 @@ struct QuantGmmAlltoAllvTilingUtParam {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const QuantGmmAlltoAllvTilingUtParam &param)
+inline std::ostream& operator<<(std::ostream& os, const QuantGmmAlltoAllvTilingUtParam& param)
 {
     return os << param.case_name;
 }

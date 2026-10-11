@@ -165,15 +165,15 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzKernel<xType, wType, b
                     uint64_t xIndex = indexX0 + indexX1 + indexX2 + indexX3;
                     uint64_t weightIndex = indexWeight0 + indexWeight1 + indexWeight2 + indexWeight3;
                     uint64_t yIndex = indexY0 + indexY1 + indexY2 + batchY3Index;
-                    this->xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(this->xGM_ + offsetX * xIndex),
+                    this->xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(this->xGM_ + offsetX * xIndex),
                                                    xSize);
                     this->wGlobal_.SetGlobalBuffer(
-                        reinterpret_cast<__gm__ wType *>(this->weightGM_ + offsetWeight * weightIndex), weightSize);
-                    this->yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType *>(this->yGM_ + offsetY * yIndex),
+                        reinterpret_cast<__gm__ wType*>(this->weightGM_ + offsetWeight * weightIndex), weightSize);
+                    this->yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType*>(this->yGM_ + offsetY * yIndex),
                                                    ySize);
                     if (this->tiling_->biasWithBatch && this->biasFlag_) {
                         this->biasGlobal_.SetGlobalBuffer(
-                            reinterpret_cast<__gm__ biasType *>(this->biasGM_ + offsetBias * yIndex),
+                            reinterpret_cast<__gm__ biasType*>(this->biasGM_ + offsetBias * yIndex),
                             this->tiling_->nSize);
                     }
                     this->OneProcess();

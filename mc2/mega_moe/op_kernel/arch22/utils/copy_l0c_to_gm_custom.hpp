@@ -35,13 +35,13 @@ struct CopyL0CToGmPerChannel {
     CopyL0CToGmPerChannel() = default;
 
     CATLASS_DEVICE
-    CopyL0CToGmPerChannel(Params const &params_)
+    CopyL0CToGmPerChannel(Params const& params_)
         : params(params_) {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementDst> const &dst, AscendC::LocalTensor<ElementSrc> const &src,
-                    AscendC::LocalTensor<uint64_t> cbufWorkspace, LayoutDst const &dstLayout,
-                    LayoutSrc const &srcLayout, uint8_t unitFlag = 0)
+    void operator()(AscendC::GlobalTensor<ElementDst> const& dst, AscendC::LocalTensor<ElementSrc> const& src,
+                    AscendC::LocalTensor<uint64_t> cbufWorkspace, LayoutDst const& dstLayout,
+                    LayoutSrc const& srcLayout, uint8_t unitFlag = 0)
     {
         AscendC::FixpipeParamsV220 intriParams;
 

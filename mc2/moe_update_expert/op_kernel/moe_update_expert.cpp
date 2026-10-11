@@ -38,7 +38,7 @@ __global__ __aicore__ void moe_update_expert(GM_ADDR expertIdsGM, GM_ADDR eplbTa
                                              GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(MoeUpdateExpertTilingData);
-    auto tiling = (__gm__ MoeUpdateExpertTilingData *)tilingGM;
+    auto tiling = (__gm__ MoeUpdateExpertTilingData*)tilingGM;
     GET_TILING_DATA(tilingData, tilingGM);
 
     TPipe pipe;

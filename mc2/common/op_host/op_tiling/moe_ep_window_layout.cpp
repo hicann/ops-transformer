@@ -27,7 +27,7 @@ uint64_t AlignMoeEpWin(uint64_t value)
 }
 
 ge::graphStatus ResolveMoeEpTopology(uint32_t epWorldSize, int64_t requestedNetworkMode, int64_t rankNumPerServer,
-                                     MoeEpTopology &topology)
+                                     MoeEpTopology& topology)
 {
     if ((requestedNetworkMode != MOE_EP_NETWORK_DIRECT && requestedNetworkMode != MOE_EP_NETWORK_HYBRID) ||
         rankNumPerServer <= 0 || epWorldSize % static_cast<uint64_t>(rankNumPerServer) != 0UL) {
@@ -41,7 +41,7 @@ ge::graphStatus ResolveMoeEpTopology(uint32_t epWorldSize, int64_t requestedNetw
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams &params, MoeEpWindowLayout &layout)
+ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams& params, MoeEpWindowLayout& layout)
 {
     std::memset(&layout, 0, sizeof(layout));
 
@@ -107,7 +107,7 @@ ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams &params, Moe
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckMoeEpWindowCapacity(uint64_t requiredBytes, uint64_t cclBufferSize, const char *nodeName)
+ge::graphStatus CheckMoeEpWindowCapacity(uint64_t requiredBytes, uint64_t cclBufferSize, const char* nodeName)
 {
     if (requiredBytes > cclBufferSize) {
         OP_LOGE(nodeName, "ccl_buffer_size is not enough, need %lu bytes, but got %lu bytes.", requiredBytes,
@@ -117,7 +117,7 @@ ge::graphStatus CheckMoeEpWindowCapacity(uint64_t requiredBytes, uint64_t cclBuf
     return ge::GRAPH_SUCCESS;
 }
 
-MoeEpDumpMetadata BuildMoeEpDumpMetadata(const MoeEpWindowLayoutParams &params, const MoeEpWindowLayout &layout,
+MoeEpDumpMetadata BuildMoeEpDumpMetadata(const MoeEpWindowLayoutParams& params, const MoeEpWindowLayout& layout,
                                          uint32_t aivNum)
 {
     MoeEpDumpMetadata metadata{};

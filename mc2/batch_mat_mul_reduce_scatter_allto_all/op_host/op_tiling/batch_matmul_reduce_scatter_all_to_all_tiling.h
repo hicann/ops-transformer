@@ -44,7 +44,7 @@ struct ReduceScatterAlltoAllBatchInfo {
 };
 
 struct ReduceScatterAlltoAllMatmulInfo {
-    const char *opName = nullptr;
+    const char* opName = nullptr;
     bool isWeightTrans = false;
     bool isBias = false;
     ge::DataType aType = ge::DT_FLOAT16;
@@ -58,9 +58,9 @@ struct ReduceScatterAlltoAllMatmulInfo {
 
 class BatchMatMulReduceScatterAlltoAllTiling : public Mc2batch_mat_mul_v3::Mc2BatchMatmulV3BaseTiling {
 public:
-    BatchMatMulReduceScatterAlltoAllTiling(gert::TilingContext *context, Mc2BatchMatmulTilingData &bmmTilingData,
-                                           ReduceScatterAlltoAllBatchInfo &BMMV3BatchInfo,
-                                           ReduceScatterAlltoAllMatmulInfo &MMV3ArgsInfo)
+    BatchMatMulReduceScatterAlltoAllTiling(gert::TilingContext* context, Mc2BatchMatmulTilingData& bmmTilingData,
+                                           ReduceScatterAlltoAllBatchInfo& BMMV3BatchInfo,
+                                           ReduceScatterAlltoAllMatmulInfo& MMV3ArgsInfo)
         : Mc2BatchMatmulV3BaseTiling(context, bmmTilingData),
           BMMV3BatchInfo_(BMMV3BatchInfo),
           MMV3ArgsInfo_(MMV3ArgsInfo)

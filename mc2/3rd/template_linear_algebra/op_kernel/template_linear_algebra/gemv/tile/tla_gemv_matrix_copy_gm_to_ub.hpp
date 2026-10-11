@@ -39,7 +39,7 @@ struct MatrixCopyGmToUB<Arch::AtlasA2, Gemm::GemmType<Element, layout::RowMajor>
 
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<Element> dstTensor, AscendC::GlobalTensor<Element> srcTensor,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         uint32_t m_catlassual = layoutSrc.shape(0);
         uint32_t n_catlassual = layoutSrc.shape(1);
@@ -103,8 +103,8 @@ struct MatrixCopyGmToUB<Arch::AtlasA2, Gemm::GemmType<Element, layout::ColumnMaj
     MatrixCopyGmToUB() {};
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<Element> const &dstTensor, AscendC::GlobalTensor<Element> const &srcTensor,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+    void operator()(AscendC::LocalTensor<Element> const& dstTensor, AscendC::GlobalTensor<Element> const& srcTensor,
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         uint32_t m_catlassual = layoutSrc.shape(0);
         uint32_t n_catlassual = layoutSrc.shape(1);

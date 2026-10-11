@@ -82,40 +82,40 @@ protected:
     }
 };
 
-std::unordered_map<std::string, std::function<void(TilingParamss &tilingParams, const std::string &valueStr)>>
+std::unordered_map<std::string, std::function<void(TilingParamss& tilingParams, const std::string& valueStr)>>
     g_infershapeParamsStrHandlers = {
         {"BSK",
-         [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.BSK = std::stoi(valueStr); }},
-        {"BS", [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.BS = std::stoi(valueStr); }},
-        {"K", [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.K = std::stoi(valueStr); }},
-        {"H1", [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.H1 = std::stoi(valueStr); }},
-        {"H2", [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.H2 = std::stoi(valueStr); }},
-        {"A", [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.A = std::stoi(valueStr); }},
-        {"N1", [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.N1 = std::stoi(valueStr); }},
-        {"N2", [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.N2 = std::stoi(valueStr); }},
-        {"epWorldSize", [](TilingParamss &tilingParams,
-                           const std::string &valueStr) { tilingParams.epWorldSize = std::stoi(valueStr); }},
-        {"e", [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.e = std::stoi(valueStr); }},
-        {"gmmWeightDim1", [](TilingParamss &tilingParams,
-                             const std::string &valueStr) { tilingParams.gmmWeightDim1 = std::stoi(valueStr); }},
+         [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.BSK = std::stoi(valueStr); }},
+        {"BS", [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.BS = std::stoi(valueStr); }},
+        {"K", [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.K = std::stoi(valueStr); }},
+        {"H1", [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.H1 = std::stoi(valueStr); }},
+        {"H2", [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.H2 = std::stoi(valueStr); }},
+        {"A", [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.A = std::stoi(valueStr); }},
+        {"N1", [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.N1 = std::stoi(valueStr); }},
+        {"N2", [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.N2 = std::stoi(valueStr); }},
+        {"epWorldSize", [](TilingParamss& tilingParams,
+                           const std::string& valueStr) { tilingParams.epWorldSize = std::stoi(valueStr); }},
+        {"e", [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.e = std::stoi(valueStr); }},
+        {"gmmWeightDim1", [](TilingParamss& tilingParams,
+                             const std::string& valueStr) { tilingParams.gmmWeightDim1 = std::stoi(valueStr); }},
         {"yDim1",
-         [](TilingParamss &tilingParams, const std::string &valueStr) { tilingParams.yDim1 = std::stoi(valueStr); }},
-        {"mmWeightDim0", [](TilingParamss &tilingParams,
-                            const std::string &valueStr) { tilingParams.mmWeightDim0 = std::stoi(valueStr); }},
-        {"transGmmWeight", [](TilingParamss &tilingParams,
-                              const std::string &valueStr) { tilingParams.transGmmWeight = valueStr == "true"; }},
-        {"transMmWeight", [](TilingParamss &tilingParams,
-                             const std::string &valueStr) { tilingParams.transMmWeight = valueStr == "true"; }},
-        {"permuteOutFlag", [](TilingParamss &tilingParams, const std::string &valueStr) {
+         [](TilingParamss& tilingParams, const std::string& valueStr) { tilingParams.yDim1 = std::stoi(valueStr); }},
+        {"mmWeightDim0", [](TilingParamss& tilingParams,
+                            const std::string& valueStr) { tilingParams.mmWeightDim0 = std::stoi(valueStr); }},
+        {"transGmmWeight", [](TilingParamss& tilingParams,
+                              const std::string& valueStr) { tilingParams.transGmmWeight = valueStr == "true"; }},
+        {"transMmWeight", [](TilingParamss& tilingParams,
+                             const std::string& valueStr) { tilingParams.transMmWeight = valueStr == "true"; }},
+        {"permuteOutFlag", [](TilingParamss& tilingParams, const std::string& valueStr) {
              tilingParams.permuteOutFlag = valueStr == "true";
          }}};
 
-std::unordered_map<std::string, std::function<void(TilingParamss &tilingParams, const std::vector<int64_t> valueVec)>>
+std::unordered_map<std::string, std::function<void(TilingParamss& tilingParams, const std::vector<int64_t> valueVec)>>
     g_infershapeParamsVecHandlers = {
         {"sendCounts",
-         [](TilingParamss &tilingParams, const std::vector<int64_t> valueVec) { tilingParams.sendCounts = valueVec; }},
+         [](TilingParamss& tilingParams, const std::vector<int64_t> valueVec) { tilingParams.sendCounts = valueVec; }},
         {"recvCounts",
-         [](TilingParamss &tilingParams, const std::vector<int64_t> valueVec) { tilingParams.recvCounts = valueVec; }}};
+         [](TilingParamss& tilingParams, const std::vector<int64_t> valueVec) { tilingParams.recvCounts = valueVec; }}};
 
 TEST_P(AlltoAllvGroupedMatMulInfershape, InferdatatypeTest)
 {
@@ -125,22 +125,22 @@ TEST_P(AlltoAllvGroupedMatMulInfershape, InferdatatypeTest)
     auto tilingParam = TilingParamss{};
     auto tilingDtypes = TilingDTypes{};
 
-    for (auto &kv : testParam.tilingInputDtypesPair) {
+    for (auto& kv : testParam.tilingInputDtypesPair) {
         if (kv.first >= 0 && kv.first < tilingDtypes.inputDtypes.size()) {
             tilingDtypes.inputDtypes[kv.first] = kv.second;
         }
     }
-    for (auto &kv : testParam.tilingOutputDtypesPair) {
+    for (auto& kv : testParam.tilingOutputDtypesPair) {
         if (kv.first >= 0 && kv.first < tilingDtypes.outputDtypes.size()) {
             tilingDtypes.outputDtypes[kv.first] = kv.second;
         }
     }
 
-    std::vector<void *> input_dtypes_ptrs(inputNum);
+    std::vector<void*> input_dtypes_ptrs(inputNum);
     for (int64_t i = 0; i < inputNum; i++) {
         input_dtypes_ptrs[i] = &tilingDtypes.inputDtypes[i];
     }
-    std::vector<void *> output_dtypes_ptrs(outputNum);
+    std::vector<void*> output_dtypes_ptrs(outputNum);
 
     auto contextHolder =
         gert::InferDataTypeContextFaker()
@@ -169,12 +169,12 @@ TEST_P(AlltoAllvGroupedMatMulInfershape, infershapeTest)
 {
     auto testParam = GetParam();
     auto tilingParams = TilingParamss{};
-    for (auto &kv : testParam.tilingParamsStrPair) {
+    for (auto& kv : testParam.tilingParamsStrPair) {
         if (g_infershapeParamsStrHandlers.count(kv.first) != 0) {
             g_infershapeParamsStrHandlers[kv.first](tilingParams, kv.second);
         }
     }
-    for (auto &kv : testParam.tilingParamsVecPair) {
+    for (auto& kv : testParam.tilingParamsVecPair) {
         if (g_infershapeParamsVecHandlers.count(kv.first) != 0) {
             g_infershapeParamsVecHandlers[kv.first](tilingParams, kv.second);
         }
@@ -210,7 +210,7 @@ TEST_P(AlltoAllvGroupedMatMulInfershape, infershapeTest)
 static TestParams testParams[] = {{"Test_sample", {{"permuteOutFlag", "true"}}, {}, {}, {}, ge::GRAPH_SUCCESS}};
 
 INSTANTIATE_TEST_SUITE_P(AlltoAllvGroupedMatMul, AlltoAllvGroupedMatMulInfershape, testing::ValuesIn(testParams),
-                         [](const testing::TestParamInfo<AlltoAllvGroupedMatMulInfershape::ParamType> &info) {
+                         [](const testing::TestParamInfo<AlltoAllvGroupedMatMulInfershape::ParamType>& info) {
                              return info.param.test_name;
                          });
 } // namespace AlltoAllvGroupedMatMulUT

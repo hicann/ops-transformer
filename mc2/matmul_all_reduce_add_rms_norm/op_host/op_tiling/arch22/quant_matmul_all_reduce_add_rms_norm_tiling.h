@@ -26,7 +26,7 @@ class QuantMatmulAllReduceAddRmsNormTiling : public TilingBaseClass {
     friend class QuantMMNTilingTransferHelper;
 
 public:
-    explicit QuantMatmulAllReduceAddRmsNormTiling(gert::TilingContext *context);
+    explicit QuantMatmulAllReduceAddRmsNormTiling(gert::TilingContext* context);
     ~QuantMatmulAllReduceAddRmsNormTiling() override = default;
 
 protected:
@@ -38,7 +38,7 @@ protected:
     uint64_t GetTilingKey() const override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
-    ge::graphStatus CheckMRNInput(const MRNCtxInfo &mrnCtxInfo);
+    ge::graphStatus CheckMRNInput(const MRNCtxInfo& mrnCtxInfo);
 
 private:
     bool HasTail() const;
@@ -52,12 +52,12 @@ private:
 
 class QuantMMNTilingTransferHelper : public QuantMatmulAllReduceTiling {
 public:
-    QuantMMNTilingTransferHelper(QuantMatmulAllReduceAddRmsNormTiling &quantMatmulAllReduceAddRmsNormTiling,
-                                 Mc2Tiling::QuantMatmulAllReduceTilingData &data);
+    QuantMMNTilingTransferHelper(QuantMatmulAllReduceAddRmsNormTiling& quantMatmulAllReduceAddRmsNormTiling,
+                                 Mc2Tiling::QuantMatmulAllReduceTilingData& data);
     ge::graphStatus GetShapeAttrsInfo() override;
 
 private:
-    QuantMatmulAllReduceAddRmsNormTiling &tilingProcesser_;
+    QuantMatmulAllReduceAddRmsNormTiling& tilingProcesser_;
 };
 } // namespace optiling
 #endif // _QUANT_MATMUL_ALL_REDUCE_ADD_RMS_NORM_TILING_H_

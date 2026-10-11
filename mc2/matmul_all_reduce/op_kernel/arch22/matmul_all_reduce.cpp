@@ -49,12 +49,12 @@
         if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) { \
             GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingData, tilingGM); \
             templateClass<DTYPE_X1, DTYPE_X2, FORMAT_X1, FORMAT_X2, DTYPE_Y, DTYPE_Y, int8_t, __VA_ARGS__> matmul; \
-            const Mc2Tiling::QuantMatmulAllReduceTilingData *QuantMatmulAllReduceTiling = &tilingData; \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingData = &(QuantMatmulAllReduceTiling->tilematmulTiling); \
-            const AscendC::tiling::TCubeTiling *mmTilingTile = &(qBmmV3TilingData->matmulTiling); \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingDataTail = \
+            const Mc2Tiling::QuantMatmulAllReduceTilingData* QuantMatmulAllReduceTiling = &tilingData; \
+            const Mc2QuantBatchMatmulV3TilingData* qBmmV3TilingData = &(QuantMatmulAllReduceTiling->tilematmulTiling); \
+            const AscendC::tiling::TCubeTiling* mmTilingTile = &(qBmmV3TilingData->matmulTiling); \
+            const Mc2QuantBatchMatmulV3TilingData* qBmmV3TilingDataTail = \
                 &(QuantMatmulAllReduceTiling->tailmatmulTiling); \
-            const AscendC::tiling::TCubeTiling *mmTilingTail = &(qBmmV3TilingDataTail->matmulTiling); \
+            const AscendC::tiling::TCubeTiling* mmTilingTail = &(qBmmV3TilingDataTail->matmulTiling); \
             REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), opTile.mm, mmTilingTile, opTail.mm, mmTilingTail); \
             matmul.Init(aGM, bGM, biasGM, addGM, dequantGM, commQuantScale1GM, commQuantScale2GM, cGM, userWS, \
                         &tilingData, &tPipe); \
@@ -82,12 +82,12 @@
         if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) { \
             GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingData, tilingGM); \
             templateClass<DTYPE_X1, DTYPE_X2, FORMAT_X1, FORMAT_X2, scaleType, DTYPE_Y, int8_t, __VA_ARGS__> matmul; \
-            const Mc2Tiling::QuantMatmulAllReduceTilingData *QuantMatmulAllReduceTiling = &tilingData; \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingData = &(QuantMatmulAllReduceTiling->tilematmulTiling); \
-            const AscendC::tiling::TCubeTiling *mmTilingTile = &(qBmmV3TilingData->matmulTiling); \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingDataTail = \
+            const Mc2Tiling::QuantMatmulAllReduceTilingData* QuantMatmulAllReduceTiling = &tilingData; \
+            const Mc2QuantBatchMatmulV3TilingData* qBmmV3TilingData = &(QuantMatmulAllReduceTiling->tilematmulTiling); \
+            const AscendC::tiling::TCubeTiling* mmTilingTile = &(qBmmV3TilingData->matmulTiling); \
+            const Mc2QuantBatchMatmulV3TilingData* qBmmV3TilingDataTail = \
                 &(QuantMatmulAllReduceTiling->tailmatmulTiling); \
-            const AscendC::tiling::TCubeTiling *mmTilingTail = &(qBmmV3TilingDataTail->matmulTiling); \
+            const AscendC::tiling::TCubeTiling* mmTilingTail = &(qBmmV3TilingDataTail->matmulTiling); \
             REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), opTile.mm, mmTilingTile, opTail.mm, mmTilingTail); \
             matmul.Init(aGM, bGM, biasGM, addGM, dequantGM, pertokenGM, commQuantScale1GM, commQuantScale2GM, cGM, \
                         userWS, &tilingData, &tPipe); \
@@ -108,7 +108,7 @@ __global__ __aicore__ void fp_matmul_all_reduce(GM_ADDR aGM, GM_ADDR bGM, GM_ADD
                                                 GM_ADDR antiquantScaleGM, GM_ADDR antiquantOffsetGM, GM_ADDR dequantGM,
                                                 GM_ADDR pertokenGM, GM_ADDR commQuantScale1GM,
                                                 GM_ADDR commQuantScale2GM, GM_ADDR cGM, GM_ADDR workspaceGM,
-                                                GM_ADDR tilingGM, TPipe &tPipe, GM_ADDR userWS)
+                                                GM_ADDR tilingGM, TPipe& tPipe, GM_ADDR userWS)
 {
 #if defined(MC2_QUANT_FP16)
 #elif defined(MC2_QUANT_BF16)
@@ -131,7 +131,7 @@ __global__ __aicore__ void quant_matmul_allreduce(GM_ADDR aGM, GM_ADDR bGM, GM_A
                                                   GM_ADDR antiquantScaleGM, GM_ADDR antiquantOffsetGM,
                                                   GM_ADDR dequantGM, GM_ADDR pertokenGM, GM_ADDR commQuantScale1GM,
                                                   GM_ADDR commQuantScale2GM, GM_ADDR cGM, GM_ADDR workspaceGM,
-                                                  GM_ADDR tilingGM, TPipe &tPipe, GM_ADDR userWS)
+                                                  GM_ADDR tilingGM, TPipe& tPipe, GM_ADDR userWS)
 {
 #if defined(MC2_QUANT_FP16)
     if constexpr (INT8_COMM == MATMUL_ALLREDUCE_INT8_COMM_F && TRANS == QUANT_BATCH_MATMUL_V3_NOT_TRANS &&
@@ -236,7 +236,7 @@ __global__ __aicore__ void weight_quant_matmul_allreduce(GM_ADDR aGM, GM_ADDR bG
                                                          GM_ADDR dequantGM, GM_ADDR pertokenGM,
                                                          GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM,
                                                          GM_ADDR cGM, GM_ADDR workspaceGM, GM_ADDR tilingGM,
-                                                         TPipe &tPipe, GM_ADDR userWS)
+                                                         TPipe& tPipe, GM_ADDR userWS)
 {
 #if defined(MC2_WEIGHT_QUANT)
     if constexpr (EMPTY_INPUT == MATMUL_ALLREDUCE_EMPTY_INPUT_T &&

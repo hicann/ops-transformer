@@ -34,8 +34,8 @@ __aicore__ inline T CeilDiv(const T dividend, const T divisor)
 
 // coreCount is nonzero, as required by the callers' tiling validation.
 // The first total % coreCount cores receive one extra item.
-__aicore__ inline void SplitCoreRange(uint32_t total, uint32_t coreCount, uint32_t coreIndex, uint32_t &count,
-                                      uint32_t &begin, uint32_t &end)
+__aicore__ inline void SplitCoreRange(uint32_t total, uint32_t coreCount, uint32_t coreIndex, uint32_t& count,
+                                      uint32_t& begin, uint32_t& end)
 {
     count = total / coreCount;
     uint32_t remainder = total % coreCount;

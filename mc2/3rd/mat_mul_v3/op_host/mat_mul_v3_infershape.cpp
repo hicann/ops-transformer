@@ -26,8 +26,8 @@ constexpr int64_t BLOCK_SIZE = 16;
 constexpr int64_t UNKNOWN_DIM = -1;
 constexpr int64_t UNKNOWN_DIM_NUM = -2;
 
-void InferComplementedInput(Shape &shape_x1_new, Shape &shape_x2_new, bool &shape_x1_reshape_flag,
-                            bool &shape_x2_reshape_flag)
+void InferComplementedInput(Shape& shape_x1_new, Shape& shape_x2_new, bool& shape_x1_reshape_flag,
+                            bool& shape_x2_reshape_flag)
 {
     if (shape_x1_new.GetDimNum() == 1 && shape_x1_new.GetDim(0) > 0) {
         shape_x1_reshape_flag = true;
@@ -46,7 +46,7 @@ void InferComplementedInput(Shape &shape_x1_new, Shape &shape_x2_new, bool &shap
     }
 }
 
-static void InferComplementedOutput(bool shape_x1_reshape_flag, bool shape_x2_reshape_flag, Shape &shape_out)
+static void InferComplementedOutput(bool shape_x1_reshape_flag, bool shape_x2_reshape_flag, Shape& shape_out)
 {
     size_t dim_num = shape_out.GetDimNum();
     if (dim_num >= MATMUL_MIN_SHAPE_SIZE) {
@@ -60,12 +60,12 @@ static void InferComplementedOutput(bool shape_x1_reshape_flag, bool shape_x2_re
     }
 }
 
-bool CheckIsUnknownDimNum(const gert::Shape &shape)
+bool CheckIsUnknownDimNum(const gert::Shape& shape)
 {
     return shape.GetDimNum() == 1 && shape.GetDim(0) == UNKNOWN_DIM_NUM;
 }
 
-void UpdateUnknowDimNumToUnkownRank(gert::Shape &shape)
+void UpdateUnknowDimNumToUnkownRank(gert::Shape& shape)
 {
     if (CheckIsUnknownDimNum(shape)) {
         shape.SetDimNum(MATMUL_MIN_SHAPE_SIZE);
@@ -74,7 +74,7 @@ void UpdateUnknowDimNumToUnkownRank(gert::Shape &shape)
     }
 }
 
-bool UpdateOutputShapeByBias(const std::string &op_name, gert::Shape *shape_out, const gert::Shape *shape_bias)
+bool UpdateOutputShapeByBias(const std::string& op_name, gert::Shape* shape_out, const gert::Shape* shape_bias)
 {
     if (shape_bias != nullptr && shape_bias->GetDimNum() > 0) {
         Shape shape_bias_new(*shape_bias);
@@ -94,7 +94,7 @@ bool UpdateOutputShapeByBias(const std::string &op_name, gert::Shape *shape_out,
     return true;
 }
 
-static ge::graphStatus InferShapeForMatMulV3(InferShapeContext *context)
+static ge::graphStatus InferShapeForMatMulV3(InferShapeContext* context)
 {
     auto op_name = context->GetNodeName();
     auto shape_x1 = context->GetInputShape(0);
@@ -118,8 +118,8 @@ static ge::graphStatus InferShapeForMatMulV3(InferShapeContext *context)
         return ge::GRAPH_SUCCESS;
     }
 
-    const bool *trans_a = attrs->GetAttrPointer<bool>(0);
-    const bool *trans_b = attrs->GetAttrPointer<bool>(1);
+    const bool* trans_a = attrs->GetAttrPointer<bool>(0);
+    const bool* trans_b = attrs->GetAttrPointer<bool>(1);
     OP_CHECK_IF(trans_a == nullptr || trans_b == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "attrs"),
                 return ge::GRAPH_FAILED);
 

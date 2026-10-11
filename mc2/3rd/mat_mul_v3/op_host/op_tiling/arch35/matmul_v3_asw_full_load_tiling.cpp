@@ -44,18 +44,18 @@ const static std::map<NpuArch, ABL1FullLoadExtraCondFunc> ABL1FullLoadExtraCondF
     {Ops::Base::DAV_3510, ABL1FullLoadExtraCond91095},
 };
 
-using CheckBL1FullLoadFunc = bool (Mc2MatMulV3AswFullLoadTiling::*)(bool &, uint64_t, uint64_t);
+using CheckBL1FullLoadFunc = bool (Mc2MatMulV3AswFullLoadTiling::*)(bool&, uint64_t, uint64_t);
 const static std::map<NpuArch, CheckBL1FullLoadFunc> CheckBL1FullLoadMap = {
     {Ops::Base::DAV_3510, &Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoad91095},
 };
 
 // ------------------------------ GetStepSmallK -------------------------------------------//
-uint64_t GetStepSmallKDefault(const Mc2MatMulV3Args & /* args */, const Mc2MatMulV3RunInfo &runInfo, bool isBL1FullLoad)
+uint64_t GetStepSmallKDefault(const Mc2MatMulV3Args& /* args */, const Mc2MatMulV3RunInfo& runInfo, bool isBL1FullLoad)
 {
     return isBL1FullLoad ? runInfo.stepKa : runInfo.stepKb;
 }
 
-uint64_t GetStepSmallK91095(const Mc2MatMulV3Args &args, const Mc2MatMulV3RunInfo &runInfo, bool isBL1FullLoad)
+uint64_t GetStepSmallK91095(const Mc2MatMulV3Args& args, const Mc2MatMulV3RunInfo& runInfo, bool isBL1FullLoad)
 {
     uint64_t stepBigK = runInfo.stepKa;
     uint64_t stepSmallK = runInfo.stepKb;
@@ -85,13 +85,13 @@ uint64_t GetStepSmallK91095(const Mc2MatMulV3Args &args, const Mc2MatMulV3RunInf
     return stepSmallK;
 }
 
-using GetStepSmallKFunc = uint64_t (*)(const Mc2MatMulV3Args &, const Mc2MatMulV3RunInfo &, bool);
+using GetStepSmallKFunc = uint64_t (*)(const Mc2MatMulV3Args&, const Mc2MatMulV3RunInfo&, bool);
 
 const static std::map<NpuArch, GetStepSmallKFunc> GetStepSmallKFuncMap = {
     {Ops::Base::DAV_3510, GetStepSmallK91095},
 };
 
-void ResetLoadBalance(Mc2MatMulV3RunInfo &runInfo)
+void ResetLoadBalance(Mc2MatMulV3RunInfo& runInfo)
 {
     // 全载模板需重置负载均衡计算
     runInfo.mBaseTailSplitCnt = 1UL;
@@ -166,7 +166,7 @@ uint64_t Mc2MatMulV3AswFullLoadTiling::GetStepSmallK(bool isBL1FullLoad) const
     return iter(args_, runInfo_, isBL1FullLoad);
 }
 
-bool Mc2MatMulV3AswFullLoadTiling::CheckAL1FullLoad(bool &isKFullLoad) const
+bool Mc2MatMulV3AswFullLoadTiling::CheckAL1FullLoad(bool& isKFullLoad) const
 {
     if (args_.nValue < CACHELINE) {
         return false;
@@ -246,7 +246,7 @@ void Mc2MatMulV3AswFullLoadTiling::DoAL1FullLoad(bool isKFullLoad, uint64_t bBat
     return;
 }
 
-bool Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoadDefault(bool &isKFullLoad, uint64_t kAlignedValue,
+bool Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoadDefault(bool& isKFullLoad, uint64_t kAlignedValue,
                                                            uint64_t nAlignedValue) const
 {
     // NZ以及其他平台走高级api, 若不随路就返回
@@ -263,7 +263,7 @@ bool Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoadDefault(bool &isKFullLoad, ui
     return true;
 }
 
-bool Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoad91095(bool &isKFullLoad, uint64_t kAlignedValue,
+bool Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoad91095(bool& isKFullLoad, uint64_t kAlignedValue,
                                                          uint64_t nAlignedValue)
 {
     if (l0C2Out_ != Mc2MatMulV3L0C2Out::ON_THE_FLY) {
@@ -300,7 +300,7 @@ bool Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoad91095(bool &isKFullLoad, uint
     return true;
 }
 
-bool Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoad(bool &isKFullLoad)
+bool Mc2MatMulV3AswFullLoadTiling::CheckBL1FullLoad(bool& isKFullLoad)
 {
     if (args_.mValue < CACHELINE) {
         return false;

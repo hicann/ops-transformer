@@ -16,7 +16,7 @@
 
 namespace mc2tiling {
 // 根据ascendc提供的aic aiv数量，按照aic:aiv=1:2比例设置逻辑核数量，以aic和aiv/2较小的值为基点
-inline uint64_t GetNumBlocks(const uint64_t aicNum, const uint64_t aivNum, const char *debugDesc)
+inline uint64_t GetNumBlocks(const uint64_t aicNum, const uint64_t aivNum, const char* debugDesc)
 {
     uint64_t halfAivNum = aivNum / 2; // aic:aiv按照1：2配比
     uint64_t numBlocks = std::min(aicNum, halfAivNum);

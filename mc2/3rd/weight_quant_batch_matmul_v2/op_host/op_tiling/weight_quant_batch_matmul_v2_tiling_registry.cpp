@@ -49,12 +49,12 @@ REGISTER_OPS_TILING_TEMPLATE(Mc2WeightQuantBatchMatmulV2, Mc2WeightQuantBatchMat
 REGISTER_OPS_TILING_TEMPLATE(Mc2WeightQuantBatchMatmulV2, Mc2WeightQuantBatchMatmulV2TilingFixpipe, FIXPIPE_PRIORITY);
 REGISTER_OPS_TILING_TEMPLATE(Mc2WeightQuantBatchMatmulV2, Mc2WeightQuantBatchMatmulV2WeightNz, WEIGHT_NZ_PRIORITY);
 
-static ge::graphStatus Mc2WeightQuantBatchMatmulV2TilingFunc(gert::TilingContext *context)
+static ge::graphStatus Mc2WeightQuantBatchMatmulV2TilingFunc(gert::TilingContext* context)
 {
     platform_ascendc::SocVersion socVersion;
     bool supportMmadS8S4 = false;
     OP_LOGE_IF(context == nullptr, ge::GRAPH_FAILED, "Mc2WeightQuantBatchMatmulV2", "tilingContext is null");
-    auto compileInfoPtr = reinterpret_cast<const Mc2WeightQuantBatchMatmulV2CompileInfo *>(context->GetCompileInfo());
+    auto compileInfoPtr = reinterpret_cast<const Mc2WeightQuantBatchMatmulV2CompileInfo*>(context->GetCompileInfo());
     if (compileInfoPtr == nullptr) {
         auto platformInfoPtr = context->GetPlatformInfo();
         OP_LOGE_IF(platformInfoPtr == nullptr, ge::GRAPH_FAILED, context->GetNodeName(), "platformInfoPtr is null");
@@ -104,7 +104,7 @@ static ge::graphStatus Mc2WeightQuantBatchMatmulV2TilingFunc(gert::TilingContext
     }
 }
 
-static ge::graphStatus Mc2TilingParseForWeightQuantBatchMatmulV2(gert::TilingParseContext *context)
+static ge::graphStatus Mc2TilingParseForWeightQuantBatchMatmulV2(gert::TilingParseContext* context)
 {
     OP_LOGE_IF(context == nullptr, ge::GRAPH_FAILED, "Mc2WeightQuantBatchMatmulV2", "tilingParseContext is null");
     auto platformInfoPtr = context->GetPlatformInfo();

@@ -88,9 +88,9 @@ public:
         EpilogueParams epilogueParams;
     };
 
-    __aicore__ inline void Init(const Params &params);
-    __aicore__ inline void Run(const Params &params);
-    __aicore__ inline void operator()(const Params &params)
+    __aicore__ inline void Init(const Params& params);
+    __aicore__ inline void Run(const Params& params);
+    __aicore__ inline void operator()(const Params& params)
     {
         Run(params);
     }
@@ -114,29 +114,29 @@ private:
         TRANS_B, asc::te::frame_layout_format<asc::te::scaleb_dn_layout_ptn, AscendC::Std::Int<SCALE_C0>>,
         asc::te::frame_layout_format<asc::te::scaleb_nd_layout_ptn, AscendC::Std::Int<SCALE_C0>>>;
 
-    __aicore__ inline void ResetGmAddr(const Params &params);
-    __aicore__ inline void ProcessSingleBatch(const Params &params, BlockScheduler &bs, uint64_t restBatch,
+    __aicore__ inline void ResetGmAddr(const Params& params);
+    __aicore__ inline void ProcessSingleBatch(const Params& params, BlockScheduler& bs, uint64_t restBatch,
                                               bool isTailRound);
 
-    __aicore__ inline void ProcessWithBatch(const Params &params, BlockScheduler &bs);
-    __aicore__ inline void AddBatchOffset(const Params &params, uint64_t aBatchElementStride,
+    __aicore__ inline void ProcessWithBatch(const Params& params, BlockScheduler& bs);
+    __aicore__ inline void AddBatchOffset(const Params& params, uint64_t aBatchElementStride,
                                           uint64_t bBatchElementStride, uint64_t cBatchStride,
                                           uint64_t scaleABatchStride, uint64_t scaleBBatchStride,
                                           uint64_t biasBatchStride);
 
     template <typename TensorB>
-    __aicore__ inline void SetBL2Cache(const ProblemShape &problemShape, uint64_t currentBasicBlockM,
-                                       uint64_t currentBasicBlockN, uint32_t bMustHitL2, TensorB &gmB);
+    __aicore__ inline void SetBL2Cache(const ProblemShape& problemShape, uint64_t currentBasicBlockM,
+                                       uint64_t currentBasicBlockN, uint32_t bMustHitL2, TensorB& gmB);
 
     BlockMmad mmadOp_;
     BlockEpilogue epilogueOp_;
 
-    __gm__ AType *aGmAddr_;
-    __gm__ BType *bGmAddr_;
-    __gm__ CType *cGmAddr_;
-    __gm__ BiasType *biasGmAddr_ = nullptr; // optional input
-    __gm__ AscendC::fp8_e8m0_t *scaleAGmAddr_;
-    __gm__ AscendC::fp8_e8m0_t *scaleBGmAddr_;
+    __gm__ AType* aGmAddr_;
+    __gm__ BType* bGmAddr_;
+    __gm__ CType* cGmAddr_;
+    __gm__ BiasType* biasGmAddr_ = nullptr; // optional input
+    __gm__ AscendC::fp8_e8m0_t* scaleAGmAddr_;
+    __gm__ AscendC::fp8_e8m0_t* scaleBGmAddr_;
 
     uint64_t batchCOffset_{0};
     uint64_t batchAOffset_{0};
@@ -148,13 +148,13 @@ private:
 };
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Run(const Params &params)
+__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Run(const Params& params)
 {
     if constexpr (IS_ATOMIC_ADD) {
         AscendC::SetAtomicAdd<float>();
     }
-    const auto &problemShape = params.problemShape;
-    const auto &qbmmParams = params.qbmmParams;
+    const auto& problemShape = params.problemShape;
+    const auto& qbmmParams = params.qbmmParams;
     Init(params);
     BlockScheduler bs(problemShape, params.schParams);
 
@@ -189,10 +189,10 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Run(const Param
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
 template <typename TensorB>
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::SetBL2Cache(const ProblemShape &problemShape,
+__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::SetBL2Cache(const ProblemShape& problemShape,
                                                                              uint64_t currentBasicBlockM,
                                                                              uint64_t currentBasicBlockN,
-                                                                             uint32_t bMustHitL2, TensorB &gmB)
+                                                                             uint32_t bMustHitL2, TensorB& gmB)
 {
     // 0xff: 256 cache line alignment for FP4 B matrix GM streaming
     // 0x7f: 128 cache line alignment for FP8 B matrix GM streaming
@@ -204,9 +204,9 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::SetBL2Cache(con
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Init(const Params &params)
+__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Init(const Params& params)
 {
-    const auto &qbmmParams = params.qbmmParams;
+    const auto& qbmmParams = params.qbmmParams;
     if (qbmmParams.isBias == 1) {
         if (qbmmParams.biasThreeDim == 1) {
             isBiasThreeDim_ = true;
@@ -217,24 +217,24 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::Init(const Para
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ResetGmAddr(const Params &params)
+__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ResetGmAddr(const Params& params)
 {
-    aGmAddr_ = reinterpret_cast<__gm__ AType *>(params.mmadParams.aGmAddr);
-    bGmAddr_ = reinterpret_cast<__gm__ BType *>(params.mmadParams.bGmAddr);
-    cGmAddr_ = reinterpret_cast<__gm__ CType *>(params.mmadParams.cGmAddr);
-    scaleAGmAddr_ = reinterpret_cast<__gm__ AscendC::fp8_e8m0_t *>(params.mmadParams.scaleAGmAddr);
-    scaleBGmAddr_ = reinterpret_cast<__gm__ AscendC::fp8_e8m0_t *>(params.mmadParams.scaleBGmAddr);
+    aGmAddr_ = reinterpret_cast<__gm__ AType*>(params.mmadParams.aGmAddr);
+    bGmAddr_ = reinterpret_cast<__gm__ BType*>(params.mmadParams.bGmAddr);
+    cGmAddr_ = reinterpret_cast<__gm__ CType*>(params.mmadParams.cGmAddr);
+    scaleAGmAddr_ = reinterpret_cast<__gm__ AscendC::fp8_e8m0_t*>(params.mmadParams.scaleAGmAddr);
+    scaleBGmAddr_ = reinterpret_cast<__gm__ AscendC::fp8_e8m0_t*>(params.mmadParams.scaleBGmAddr);
     if (isBias_) {
-        biasGmAddr_ = reinterpret_cast<__gm__ BiasType *>(params.mmadParams.biasGmAddr);
+        biasGmAddr_ = reinterpret_cast<__gm__ BiasType*>(params.mmadParams.biasGmAddr);
     }
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessWithBatch(const Params &params,
-                                                                                  BlockScheduler &bs)
+__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessWithBatch(const Params& params,
+                                                                                  BlockScheduler& bs)
 {
-    const auto &qbmmParams = params.qbmmParams;
-    const auto &problemShape = params.problemShape;
+    const auto& qbmmParams = params.qbmmParams;
+    const auto& problemShape = params.problemShape;
     const auto m = asc::te::get<MNK_M>(problemShape);
     const auto n = asc::te::get<MNK_N>(problemShape);
     const auto k = asc::te::get<MNK_K>(problemShape);
@@ -319,7 +319,7 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessWithBatc
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
 __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::AddBatchOffset(
-    const Params &params, uint64_t aBatchElementStride, uint64_t bBatchElementStride, uint64_t cBatchStride,
+    const Params& params, uint64_t aBatchElementStride, uint64_t bBatchElementStride, uint64_t cBatchStride,
     uint64_t scaleABatchStride, uint64_t scaleBBatchStride, uint64_t biasBatchStride)
 {
     ResetGmAddr(params);
@@ -335,12 +335,12 @@ __aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::AddBatchOffset(
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessSingleBatch(const Params &params,
-                                                                                    BlockScheduler &bs,
+__aicore__ inline void GemmUniversal<QBMM_MX_KERNEL_TEM_PARAMS>::ProcessSingleBatch(const Params& params,
+                                                                                    BlockScheduler& bs,
                                                                                     uint64_t restBatch,
                                                                                     bool isTailRound)
 {
-    const auto &problemShape = params.problemShape;
+    const auto& problemShape = params.problemShape;
     const auto m = asc::te::get<MNK_M>(problemShape);
     const auto n = asc::te::get<MNK_N>(problemShape);
     const auto k = asc::te::get<MNK_K>(problemShape);

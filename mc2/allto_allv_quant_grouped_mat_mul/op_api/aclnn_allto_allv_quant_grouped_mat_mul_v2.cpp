@@ -55,10 +55,10 @@ static constexpr size_t TWO_DIMS = 2U;
 static constexpr size_t THREE_DIMS = 3U;
 static constexpr uint32_t RANK_DIM_BOUNDARY = 8;
 
-static bool CheckNullStatus(const aclTensor *sendCountsTensorOptional, const aclTensor *recvCountsTensorOptional,
-                            const aclTensor *mmXOptional, const aclTensor *mmWeightOptional,
-                            const aclTensor *mmXScaleOptional, const aclTensor *mmWeightScaleOptional,
-                            bool permuteOutFlag, const aclTensor *mmYOptional, const aclTensor *permuteOutOptional)
+static bool CheckNullStatus(const aclTensor* sendCountsTensorOptional, const aclTensor* recvCountsTensorOptional,
+                            const aclTensor* mmXOptional, const aclTensor* mmWeightOptional,
+                            const aclTensor* mmXScaleOptional, const aclTensor* mmWeightScaleOptional,
+                            bool permuteOutFlag, const aclTensor* mmYOptional, const aclTensor* permuteOutOptional)
 {
     // // 检查必选入参出参为非空
     if ((sendCountsTensorOptional != nullptr) || (recvCountsTensorOptional != nullptr)) {
@@ -73,8 +73,8 @@ static bool CheckNullStatus(const aclTensor *sendCountsTensorOptional, const acl
 }
 
 // 检查必要输入是否为空/quantMode为1或6，必须非空/1或6
-static bool CheckNotNull(const aclTensor *gmmX, const aclTensor *gmmWeight, const aclTensor *gmmY,
-                         const aclTensor *gmmXScale, const aclTensor *gmmWeightScale, int64_t gmmXQuantMode,
+static bool CheckNotNull(const aclTensor* gmmX, const aclTensor* gmmWeight, const aclTensor* gmmY,
+                         const aclTensor* gmmXScale, const aclTensor* gmmWeightScale, int64_t gmmXQuantMode,
                          int64_t gmmWeightQuantMode)
 {
     if (gmmX == nullptr) {
@@ -108,7 +108,7 @@ static bool CheckNotNull(const aclTensor *gmmX, const aclTensor *gmmWeight, cons
     return true;
 }
 
-static bool CheckGmmWeightValid(const aclTensor *gmmWeight)
+static bool CheckGmmWeightValid(const aclTensor* gmmWeight)
 {
     if (gmmWeight == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "In AlltoAllvQuantGroupedMatmul, input gmmWeight should not be null.");
@@ -123,7 +123,7 @@ static bool CheckGmmWeightValid(const aclTensor *gmmWeight)
     return true;
 }
 
-static bool CheckMmWeightValid(const aclTensor *mmWeightOptional)
+static bool CheckMmWeightValid(const aclTensor* mmWeightOptional)
 {
     if (mmWeightOptional == nullptr) {
         return false;
@@ -144,7 +144,7 @@ static bool CheckMmWeightValid(const aclTensor *mmWeightOptional)
  * @param gmmWeight 输入tensor，要求viewShape为[e, H, N, K]（4维）
  * @return 返回新创建的tensor指针，viewShape变为[e, N, H, K]
  */
-static const aclTensor *TransGmmWeightTensor(const aclTensor *gmmWeight)
+static const aclTensor* TransGmmWeightTensor(const aclTensor* gmmWeight)
 {
     uint64_t storageShapeDimNum = gmmWeight->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDim(storageShapeDimNum);
@@ -187,7 +187,7 @@ static const aclTensor *TransGmmWeightTensor(const aclTensor *gmmWeight)
  * @param gmmWeightScale 输入tensor，MX量化时viewShape为[e, H, N, 2]
  * @return 返回tensor指针，MX量化时viewShape变为[e, N, H, 2]
  */
-static const aclTensor *TransGmmWeightScaleTensor(const aclTensor *gmmWeightScale)
+static const aclTensor* TransGmmWeightScaleTensor(const aclTensor* gmmWeightScale)
 {
     // pertensor量化场景：gmmWeightScale shape [1]，dimNum == 1，不需要转置处理
     if (gmmWeightScale->GetViewShape().GetDimNum() < 4) {
@@ -233,7 +233,7 @@ static const aclTensor *TransGmmWeightScaleTensor(const aclTensor *gmmWeightScal
  * @param mmWeightOptional 输入tensor，要求viewShape为[K, N]（2维）
  * @return 返回新创建的tensor指针，viewShape变为[N, K]
  */
-static const aclTensor *TransMmWeightOptionalTensor(const aclTensor *mmWeightOptional)
+static const aclTensor* TransMmWeightOptionalTensor(const aclTensor* mmWeightOptional)
 {
     uint64_t storageShapeDimNum = mmWeightOptional->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDim(storageShapeDimNum);
@@ -276,7 +276,7 @@ static const aclTensor *TransMmWeightOptionalTensor(const aclTensor *mmWeightOpt
  * @param mmWeightScale 输入tensor，MX量化时viewShape为[CeilDiv(H2, 64), N2, 2]
  * @return 返回tensor指针，MX量化时viewShape变为[N2, CeilDiv(H2, 64), 2]
  */
-static const aclTensor *TransMmWeightScaleTensor(const aclTensor *mmWeightScale)
+static const aclTensor* TransMmWeightScaleTensor(const aclTensor* mmWeightScale)
 {
     // pertensor量化场景：mmWeightScale shape [1]，dimNum == 1，不需要转置处理
     if (mmWeightScale->GetViewShape().GetDimNum() < 3) {
@@ -316,7 +316,7 @@ static const aclTensor *TransMmWeightScaleTensor(const aclTensor *mmWeightScale)
                            storageShapeDimNum, mmWeightScale->GetTensor()->GetAddr());
 }
 
-bool IsTransposeTwoDims(const aclTensor *tensor, int64_t firstDimIndex, int64_t secondDimIndex)
+bool IsTransposeTwoDims(const aclTensor* tensor, int64_t firstDimIndex, int64_t secondDimIndex)
 {
     if (tensor == nullptr || tensor->GetViewShape().GetDimNum() < 2) {
         return false;
@@ -343,9 +343,9 @@ bool IsTransposeTwoDims(const aclTensor *tensor, int64_t firstDimIndex, int64_t 
     return (stride2 != shape1 * stride1);
 }
 
-static aclnnStatus CheckWeightScaleTransposeConsistency(const aclTensor *gmmWeight, const aclTensor *gmmWeightScale,
-                                                        const aclTensor *mmWeightOptional,
-                                                        const aclTensor *mmWeightScaleOptional)
+static aclnnStatus CheckWeightScaleTransposeConsistency(const aclTensor* gmmWeight, const aclTensor* gmmWeightScale,
+                                                        const aclTensor* mmWeightOptional,
+                                                        const aclTensor* mmWeightScaleOptional)
 {
     // pertensor量化场景：weightScale dimNum < 4，不需要转置，跳过校验
     if (gmmWeight != nullptr && gmmWeightScale != nullptr && gmmWeightScale->GetViewShape().GetDimNum() >= 4) {
@@ -378,14 +378,14 @@ static aclnnStatus CheckWeightScaleTransposeConsistency(const aclTensor *gmmWeig
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParams(const aclTensor *gmmX, const aclTensor *gmmWeight, const aclTensor *gmmXScale,
-                               const aclTensor *gmmWeightScale, const aclTensor *sendCountsTensorOptional,
-                               const aclTensor *recvCountsTensorOptional, const aclTensor *mmXOptional,
-                               const aclTensor *mmWeightOptional, const aclTensor *mmXScaleOptional,
-                               const aclTensor *mmWeightScaleOptional, int64_t gmmXQuantMode,
+static aclnnStatus CheckParams(const aclTensor* gmmX, const aclTensor* gmmWeight, const aclTensor* gmmXScale,
+                               const aclTensor* gmmWeightScale, const aclTensor* sendCountsTensorOptional,
+                               const aclTensor* recvCountsTensorOptional, const aclTensor* mmXOptional,
+                               const aclTensor* mmWeightOptional, const aclTensor* mmXScaleOptional,
+                               const aclTensor* mmWeightScaleOptional, int64_t gmmXQuantMode,
                                int64_t gmmWeightQuantMode, int64_t mmXQuantMode, int64_t mmWeightQuantMode,
-                               const char *group, int64_t epWorldSize, bool permuteOutFlag, const aclTensor *gmmY,
-                               const aclTensor *mmYOptional, const aclTensor *permuteOutOptional)
+                               const char* group, int64_t epWorldSize, bool permuteOutFlag, const aclTensor* gmmY,
+                               const aclTensor* mmYOptional, const aclTensor* permuteOutOptional)
 {
     // 检查空状态
     CHECK_RET(CheckNullStatus(sendCountsTensorOptional, recvCountsTensorOptional, mmXOptional, mmWeightOptional,
@@ -399,22 +399,22 @@ static aclnnStatus CheckParams(const aclTensor *gmmX, const aclTensor *gmmWeight
 }
 
 extern "C" aclnnStatus aclnnInnerAlltoAllvQuantGroupedMatMulGetWorkspaceSize(
-    const aclTensor *gmmX, const aclTensor *gmmWeight, const aclTensor *gmmXScale, const aclTensor *gmmWeightScale,
-    const aclTensor *sendCountsTensorOptional, const aclTensor *recvCountsTensorOptional, const aclTensor *mmXOptional,
-    const aclTensor *mmWeightOptional, const aclTensor *mmXScaleOptional, const aclTensor *mmWeightScaleOptional,
-    const char *group, int64_t epWorldSize, const aclIntArray *sendCounts, const aclIntArray *recvCounts,
+    const aclTensor* gmmX, const aclTensor* gmmWeight, const aclTensor* gmmXScale, const aclTensor* gmmWeightScale,
+    const aclTensor* sendCountsTensorOptional, const aclTensor* recvCountsTensorOptional, const aclTensor* mmXOptional,
+    const aclTensor* mmWeightOptional, const aclTensor* mmXScaleOptional, const aclTensor* mmWeightScaleOptional,
+    const char* group, int64_t epWorldSize, const aclIntArray* sendCounts, const aclIntArray* recvCounts,
     int64_t gmmXQuantMode, int64_t gmmWeightQuantMode, bool transGmmWeight, bool transMmWeight, bool permuteOutFlag,
     int64_t mmXQuantMode, int64_t mmWeightQuantMode, int64_t groupSize, int64_t yDtype, int64_t mmDtype,
-    const char *commMode, aclTensor *gmmY, aclTensor *mmYOptional, aclTensor *permuteOutOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const char* commMode, aclTensor* gmmY, aclTensor* mmYOptional, aclTensor* permuteOutOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern "C" aclnnStatus aclnnInnerAlltoAllvQuantGroupedMatMul(void *workspace, uint64_t workspaceSize,
-                                                             aclOpExecutor *executor, aclrtStream stream);
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
-extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
-extern "C" void *NnopbaseGetUserHandle(void *executor);
+extern "C" aclnnStatus aclnnInnerAlltoAllvQuantGroupedMatMul(void* workspace, uint64_t workspaceSize,
+                                                             aclOpExecutor* executor, aclrtStream stream);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
+extern "C" void NnopbaseSetUserHandle(void* executor, void* handle);
+extern "C" void* NnopbaseGetUserHandle(void* executor);
 
-static aclnnStatus CheckAndHandleCommMode(const char *group, const char *commModeStr, uint8_t &commModeEnum)
+static aclnnStatus CheckAndHandleCommMode(const char* group, const char* commModeStr, uint8_t& commModeEnum)
 {
     const size_t maxLength = 7UL;
     // 获取通信引擎参数
@@ -433,16 +433,16 @@ static aclnnStatus CheckAndHandleCommMode(const char *group, const char *commMod
 }
 
 extern "C" aclnnStatus InnerAlltoAllvQuantGroupedMatMulV2GetWorkspaceSize(
-    const aclTensor *gmmX, const aclTensor *gmmWeight, const aclTensor *gmmXScale, const aclTensor *gmmWeightScale,
-    const aclTensor *sendCountsTensorOptional, const aclTensor *recvCountsTensorOptional, const aclTensor *mmXOptional,
-    const aclTensor *mmWeightOptional, const aclTensor *mmXScaleOptional, const aclTensor *mmWeightScaleOptional,
-    const char *group, const char *commMode, int64_t epWorldSize, const aclIntArray *sendCounts,
-    const aclIntArray *recvCounts, int64_t gmmXQuantMode, int64_t gmmWeightQuantMode, bool transGmmWeight,
+    const aclTensor* gmmX, const aclTensor* gmmWeight, const aclTensor* gmmXScale, const aclTensor* gmmWeightScale,
+    const aclTensor* sendCountsTensorOptional, const aclTensor* recvCountsTensorOptional, const aclTensor* mmXOptional,
+    const aclTensor* mmWeightOptional, const aclTensor* mmXScaleOptional, const aclTensor* mmWeightScaleOptional,
+    const char* group, const char* commMode, int64_t epWorldSize, const aclIntArray* sendCounts,
+    const aclIntArray* recvCounts, int64_t gmmXQuantMode, int64_t gmmWeightQuantMode, bool transGmmWeight,
     bool transMmWeight, bool permuteOutFlag, int64_t mmXQuantMode, int64_t mmWeightQuantMode, int64_t groupSize,
-    aclTensor *gmmY, aclTensor *mmYOptional, aclTensor *permuteOutOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    aclTensor* gmmY, aclTensor* mmYOptional, aclTensor* permuteOutOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
-    char *str_commMode = const_cast<char *>(commMode);
+    char* str_commMode = const_cast<char*>(commMode);
     int64_t yDtype = gmmY->GetDataType();
     int64_t mmDtype = mmYOptional == nullptr ? 0 : mmYOptional->GetDataType();
     uint8_t commModeEnum = 0;
@@ -455,7 +455,7 @@ extern "C" aclnnStatus InnerAlltoAllvQuantGroupedMatMulV2GetWorkspaceSize(
         mmWeightQuantMode, groupSize, yDtype, mmDtype, str_commMode, gmmY, mmYOptional, permuteOutOptional,
         workspaceSize, executor);
     if (*executor != nullptr) {
-        void *args = reinterpret_cast<void *>(static_cast<uint8_t>(commModeEnum));
+        void* args = reinterpret_cast<void*>(static_cast<uint8_t>(commModeEnum));
         NnopbaseSetUserHandle(*executor, args);
     }
     OP_LOGD("AlltoAllvQuantGroupedMatmul, aclnnInnerAlltoAllvQuantGroupedMatMulGetWorkspaceSize ret %d.", ret);
@@ -463,14 +463,14 @@ extern "C" aclnnStatus InnerAlltoAllvQuantGroupedMatMulV2GetWorkspaceSize(
 }
 
 extern "C" aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2GetWorkspaceSize(
-    const aclTensor *gmmX, const aclTensor *gmmWeight, const aclTensor *gmmXScale, const aclTensor *gmmWeightScale,
-    const aclTensor *sendCountsTensorOptional, const aclTensor *recvCountsTensorOptional, const aclTensor *mmXOptional,
-    const aclTensor *mmWeightOptional, const aclTensor *mmXScaleOptional, const aclTensor *mmWeightScaleOptional,
+    const aclTensor* gmmX, const aclTensor* gmmWeight, const aclTensor* gmmXScale, const aclTensor* gmmWeightScale,
+    const aclTensor* sendCountsTensorOptional, const aclTensor* recvCountsTensorOptional, const aclTensor* mmXOptional,
+    const aclTensor* mmWeightOptional, const aclTensor* mmXScaleOptional, const aclTensor* mmWeightScaleOptional,
     int64_t gmmXQuantMode, int64_t gmmWeightQuantMode, int64_t mmXQuantMode, int64_t mmWeightQuantMode,
-    const char *group, const char *commMode, int64_t epWorldSize, const aclIntArray *sendCounts,
-    const aclIntArray *recvCounts, bool transGmmWeight, bool transMmWeight, int64_t groupSize, bool permuteOutFlag,
-    aclTensor *gmmY, aclTensor *mmYOptional, aclTensor *permuteOutOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const char* group, const char* commMode, int64_t epWorldSize, const aclIntArray* sendCounts,
+    const aclIntArray* recvCounts, bool transGmmWeight, bool transMmWeight, int64_t groupSize, bool permuteOutFlag,
+    aclTensor* gmmY, aclTensor* mmYOptional, aclTensor* permuteOutOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     // 处理非连续Tensor，目前支持转置的gmmWeight涉及该处理
     CHECK_RET(CheckGmmWeightValid(gmmWeight), ACLNN_ERR_PARAM_NULLPTR);
@@ -498,8 +498,8 @@ extern "C" aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2GetWorkspaceSize(
     }
 
     // 保存原始指针用于一致性校验
-    const aclTensor *originalMmWeightOptional = mmWeightOptional;
-    const aclTensor *originalMmWeightScaleOptional = mmWeightScaleOptional;
+    const aclTensor* originalMmWeightOptional = mmWeightOptional;
+    const aclTensor* originalMmWeightScaleOptional = mmWeightScaleOptional;
     if (CheckMmWeightValid(mmWeightOptional)) {
         bool notContiguous = IsTransposeTwoDims(mmWeightOptional, -1, -2);
         auto transMmWeightOptional = mmWeightOptional;
@@ -555,12 +555,12 @@ extern "C" aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2GetWorkspaceSize(
     return ret;
 }
 
-extern "C" aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(void *workspace, uint64_t workspaceSize,
-                                                          aclOpExecutor *executor, aclrtStream stream)
+extern "C" aclnnStatus aclnnAlltoAllvQuantGroupedMatMulV2(void* workspace, uint64_t workspaceSize,
+                                                          aclOpExecutor* executor, aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {
         if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
-            void *arg = NnopbaseGetUserHandle(executor);
+            void* arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);
             if (commMode == Mc2Comm::COMM_MODE_AICPU) {

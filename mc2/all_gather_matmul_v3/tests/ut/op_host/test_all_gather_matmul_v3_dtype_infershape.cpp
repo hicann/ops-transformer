@@ -40,7 +40,7 @@ TEST_P(AllGatherMatmulV3InferDataTypeTest, param)
 
     // def 输入顺序: context(0) x1(1) x2(2) bias(3) x1_scale(4) x2_scale(5)，仅放入已实例化的输入
     ge::DataType contextDtype = ge::DT_INT32;
-    std::vector<void *> inputDataTypes;
+    std::vector<void*> inputDataTypes;
     inputDataTypes.emplace_back(&contextDtype);
     inputDataTypes.emplace_back(&param.x1);
     inputDataTypes.emplace_back(&param.x2);

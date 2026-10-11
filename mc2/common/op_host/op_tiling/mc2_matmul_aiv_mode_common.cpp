@@ -14,7 +14,7 @@
 
 namespace mc2tiling {
 
-AivPlatformInfo GetAivPlatformInfo(const gert::TilingContext *context)
+AivPlatformInfo GetAivPlatformInfo(const gert::TilingContext* context)
 {
     auto platform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     AivPlatformInfo info{platform.GetCoreNumAiv(), 0U};
@@ -22,7 +22,7 @@ AivPlatformInfo GetAivPlatformInfo(const gert::TilingContext *context)
     return info;
 }
 
-AivScaleDtypeResult CheckAivMatmulScaleDtype(const gert::Tensor *scale, ge::DataType outputType)
+AivScaleDtypeResult CheckAivMatmulScaleDtype(const gert::Tensor* scale, ge::DataType outputType)
 {
     if (scale == nullptr) {
         return {false, false};

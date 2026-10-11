@@ -203,8 +203,8 @@ ge::graphStatus MoeDistributeDispatchTeardownTilingBase::GetRequiredAttrAndSetTi
 }
 
 ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckSharedExpertAttributes(
-    const int64_t *expertShardTypePtr, const int64_t *sharedExpertNumPtr, const int64_t *sharedExpertRankNumPtr,
-    const int64_t *epWorldSizePtr)
+    const int64_t* expertShardTypePtr, const int64_t* sharedExpertNumPtr, const int64_t* sharedExpertRankNumPtr,
+    const int64_t* epWorldSizePtr)
 {
     OP_TILING_CHECK(
         (*expertShardTypePtr != 0),
@@ -328,15 +328,15 @@ ge::graphStatus MoeDistributeDispatchTeardownTilingBase::GetOptionalAttrAndSetTi
 
 const ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckTensorShape()
 {
-    const gert::StorageShape *xShape = context_->GetInputShape(INPUT_X_INDEX);
-    const gert::StorageShape *yShape = context_->GetInputShape(INPUT_Y_INDEX);
-    const gert::StorageShape *expertIdsShape = context_->GetInputShape(INPUT_EXPERT_IDS_INDEX);
-    const gert::StorageShape *commCmdInfoShape = context_->GetInputShape(INPUT_COMM_CMD_INFO_INDEX);
-    const gert::StorageShape *expandXOutShape = context_->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
-    const gert::StorageShape *dynamicScalesOutShape = context_->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
-    const gert::StorageShape *assitInfoForCombineOutShape =
+    const gert::StorageShape* xShape = context_->GetInputShape(INPUT_X_INDEX);
+    const gert::StorageShape* yShape = context_->GetInputShape(INPUT_Y_INDEX);
+    const gert::StorageShape* expertIdsShape = context_->GetInputShape(INPUT_EXPERT_IDS_INDEX);
+    const gert::StorageShape* commCmdInfoShape = context_->GetInputShape(INPUT_COMM_CMD_INFO_INDEX);
+    const gert::StorageShape* expandXOutShape = context_->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
+    const gert::StorageShape* dynamicScalesOutShape = context_->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
+    const gert::StorageShape* assitInfoForCombineOutShape =
         context_->GetOutputShape(OUTPUT_ASSIST_INFO_FOR_COMBINE_INDEX);
-    const gert::StorageShape *expertTokenNumsOutShape = context_->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    const gert::StorageShape* expertTokenNumsOutShape = context_->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
 
     OP_TILING_CHECK((xShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(nodeName_, "x"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((yShape == nullptr), OP_LOGE_WITH_INVALID_INPUT(nodeName_, "y"), return ge::GRAPH_FAILED);
@@ -368,10 +368,10 @@ const ge::graphStatus MoeDistributeDispatchTeardownTilingBase::CheckTensorShape(
 
 const bool MoeDistributeDispatchTeardownTilingBase::CheckInputTensorShapeDim()
 {
-    const gert::StorageShape *xShape = context_->GetInputShape(INPUT_X_INDEX);
-    const gert::StorageShape *yShape = context_->GetInputShape(INPUT_Y_INDEX);
-    const gert::StorageShape *expertIdsShape = context_->GetInputShape(INPUT_EXPERT_IDS_INDEX);
-    const gert::StorageShape *commCmdInfoShape = context_->GetInputShape(INPUT_COMM_CMD_INFO_INDEX);
+    const gert::StorageShape* xShape = context_->GetInputShape(INPUT_X_INDEX);
+    const gert::StorageShape* yShape = context_->GetInputShape(INPUT_Y_INDEX);
+    const gert::StorageShape* expertIdsShape = context_->GetInputShape(INPUT_EXPERT_IDS_INDEX);
+    const gert::StorageShape* commCmdInfoShape = context_->GetInputShape(INPUT_COMM_CMD_INFO_INDEX);
 
     OP_TILING_CHECK(xShape->GetStorageShape().GetDimNum() != TWO_DIMS,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(nodeName_, "x",
@@ -397,11 +397,11 @@ const bool MoeDistributeDispatchTeardownTilingBase::CheckInputTensorShapeDim()
 
 const bool MoeDistributeDispatchTeardownTilingBase::CheckOutputTensorShapeDim() const
 {
-    const gert::StorageShape *expandXOutShape = context_->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
-    const gert::StorageShape *dynamicScalesOutShape = context_->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
-    const gert::StorageShape *assitInfoForCombineOutShape =
+    const gert::StorageShape* expandXOutShape = context_->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
+    const gert::StorageShape* dynamicScalesOutShape = context_->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
+    const gert::StorageShape* assitInfoForCombineOutShape =
         context_->GetOutputShape(OUTPUT_ASSIST_INFO_FOR_COMBINE_INDEX);
-    const gert::StorageShape *expertTokenNumsOutShape = context_->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    const gert::StorageShape* expertTokenNumsOutShape = context_->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
     OP_TILING_CHECK(
         expandXOutShape->GetStorageShape().GetDimNum() != TWO_DIMS,
         OP_LOGE_FOR_INVALID_SHAPEDIM(nodeName_, "expandXOut",
@@ -437,10 +437,10 @@ const bool MoeDistributeDispatchTeardownTilingBase::CheckOutputTensorShapeDim() 
 
 const bool MoeDistributeDispatchTeardownTilingBase::CheckTensorShapeRelation()
 {
-    const gert::StorageShape *xShape = context_->GetInputShape(INPUT_X_INDEX);
-    const gert::StorageShape *expertIdsShape = context_->GetInputShape(INPUT_EXPERT_IDS_INDEX);
-    const gert::StorageShape *expandXOutShape = context_->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
-    const gert::StorageShape *dynamicScalesOutShape = context_->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
+    const gert::StorageShape* xShape = context_->GetInputShape(INPUT_X_INDEX);
+    const gert::StorageShape* expertIdsShape = context_->GetInputShape(INPUT_EXPERT_IDS_INDEX);
+    const gert::StorageShape* expandXOutShape = context_->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
+    const gert::StorageShape* dynamicScalesOutShape = context_->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
 
     auto bs1 = xShape->GetStorageShape().GetDim(DIM_ZERO);
     auto bs2 = expertIdsShape->GetStorageShape().GetDim(DIM_ZERO);
@@ -478,15 +478,15 @@ const bool MoeDistributeDispatchTeardownTilingBase::CheckTensorShapeRelation()
 
 const bool MoeDistributeDispatchTeardownTilingBase::CheckTensorShapeSize()
 {
-    const gert::StorageShape *xShape = context_->GetInputShape(INPUT_X_INDEX);
-    const gert::StorageShape *yShape = context_->GetInputShape(INPUT_Y_INDEX);
-    const gert::StorageShape *expertIdsShape = context_->GetInputShape(INPUT_EXPERT_IDS_INDEX);
-    const gert::StorageShape *commCmdInfoShape = context_->GetInputShape(INPUT_COMM_CMD_INFO_INDEX);
-    const gert::StorageShape *expandXOutShape = context_->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
-    const gert::StorageShape *dynamicScalesOutShape = context_->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
-    const gert::StorageShape *assitInfoForCombineOutShape =
+    const gert::StorageShape* xShape = context_->GetInputShape(INPUT_X_INDEX);
+    const gert::StorageShape* yShape = context_->GetInputShape(INPUT_Y_INDEX);
+    const gert::StorageShape* expertIdsShape = context_->GetInputShape(INPUT_EXPERT_IDS_INDEX);
+    const gert::StorageShape* commCmdInfoShape = context_->GetInputShape(INPUT_COMM_CMD_INFO_INDEX);
+    const gert::StorageShape* expandXOutShape = context_->GetOutputShape(OUTPUT_EXPAND_X_INDEX);
+    const gert::StorageShape* dynamicScalesOutShape = context_->GetOutputShape(OUTPUT_DYNAMIC_SCALES_INDEX);
+    const gert::StorageShape* assitInfoForCombineOutShape =
         context_->GetOutputShape(OUTPUT_ASSIST_INFO_FOR_COMBINE_INDEX);
-    const gert::StorageShape *expertTokenNumsOutShape = context_->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    const gert::StorageShape* expertTokenNumsOutShape = context_->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
 
     auto bs = xShape->GetStorageShape().GetDim(DIM_ZERO);
     OP_TILING_CHECK(((bs <= 0) || (bs > MAX_BS)),
@@ -816,7 +816,7 @@ void MoeDistributeDispatchTeardownTilingBase::SetHcommCfg()
     mc2CcTilingConfig.SetCommEngine(3); // AIV_UB-MEM or AIV_URMA
     mc2CcTilingConfig.GetTiling(tilingData_->mc2InitTiling);
     mc2CcTilingConfig.GetTiling(tilingData_->mc2CcTiling);
-    reinterpret_cast<Mc2CcTilingInner *>(&tilingData_->mc2CcTiling)->protocal = 1; // 0: UB-MEM, 1: URMA
+    reinterpret_cast<Mc2CcTilingInner*>(&tilingData_->mc2CcTiling)->protocal = 1; // 0: UB-MEM, 1: URMA
 }
 
 void MoeDistributeDispatchTeardownTilingBase::SetPlatformInfo()
@@ -836,7 +836,7 @@ void MoeDistributeDispatchTeardownTilingBase::SetPlatformInfo()
 
 ge::graphStatus MoeDistributeDispatchTeardownTilingBase::SetWorkSpace()
 {
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
+    size_t* workSpaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName_, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
     workSpaces[0] = static_cast<uint64_t>(SYSTEM_NEED_WORKSPACE +
                                           tilingData_->moeDistributeDispatchTeardownInfo.aivNum * ALIGN_512);
@@ -845,7 +845,7 @@ ge::graphStatus MoeDistributeDispatchTeardownTilingBase::SetWorkSpace()
 
 const void MoeDistributeDispatchTeardownTilingBase::PrintTilingDataInfo()
 {
-    const MoeDistributeDispatchTeardownInfo &info = tilingData_->moeDistributeDispatchTeardownInfo;
+    const MoeDistributeDispatchTeardownInfo& info = tilingData_->moeDistributeDispatchTeardownInfo;
     OP_LOGD(nodeName_, "epWorldSize is %u.", info.epWorldSize);
     OP_LOGD(nodeName_, "epRankId is %u.", info.epRankId);
     OP_LOGD(nodeName_, "expertShardType is %u.", info.expertShardType);

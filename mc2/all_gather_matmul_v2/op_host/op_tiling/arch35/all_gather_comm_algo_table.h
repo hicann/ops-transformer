@@ -21,9 +21,9 @@
 
 namespace Mc2Tiling {
 
-inline constexpr const char *ALLGATHER_DEFAULT_ALGO_NAME = "AllGather=level0:fullmesh";
+inline constexpr const char* ALLGATHER_DEFAULT_ALGO_NAME = "AllGather=level0:fullmesh";
 
-const Mc2Hcom::CommAlgoEntry *GetAllGatherCommAlgoTable(uint32_t &count);
+const Mc2Hcom::CommAlgoEntry* GetAllGatherCommAlgoTable(uint32_t& count);
 
 } // namespace Mc2Tiling
 

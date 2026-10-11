@@ -49,22 +49,22 @@ public:
     __aicore__ inline MatmulAllReduceQuantPertokenInt8() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR addGM, GM_ADDR dequantScaleGM,
                                 GM_ADDR pertokenScaleGM, GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM,
-                                GM_ADDR cGM, GM_ADDR workspaceGM, Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR cGM, GM_ADDR workspaceGM, Mc2Tiling::QuantMatmulAllReduceTilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void Process(
-        BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true> &opTile,
-        BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true> &opTail);
+        BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true>& opTile,
+        BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true>& opTail);
 
 private:
     __aicore__ inline void InnerProcess(
-        BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true> &op,
-        uint32_t tileCnt, uint32_t padM, Mc2QuantBatchMatmulV3TilingData *mmTiling, uint32_t isAdd,
+        BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true>& op,
+        uint32_t tileCnt, uint32_t padM, Mc2QuantBatchMatmulV3TilingData* mmTiling, uint32_t isAdd,
         uint32_t needUbBuffer, bool isTailFlag);
     __aicore__ inline void PrepareInit();
     __aicore__ inline uint32_t SendCountCheck(uint32_t prepareIndex);
 
-    Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData_;
-    TPipe *tPipe_;
+    Mc2Tiling::QuantMatmulAllReduceTilingData* tilingData_;
+    TPipe* tPipe_;
     GM_ADDR aGM_;
     GM_ADDR bGM_;
     GM_ADDR biasGM_;
@@ -103,8 +103,8 @@ template <typename xType, typename wType, int fFormat, int wFormat, typename sca
           typename commType, bool aTrans, bool bTrans>
 __aicore__ inline void
 MatmulAllReduceQuantPertokenInt8<xType, wType, fFormat, wFormat, scaleType, yType, commType, aTrans, bTrans>::
-    InnerProcess(BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true> &op,
-                 uint32_t tileCnt, uint32_t curPadM, Mc2QuantBatchMatmulV3TilingData *mmTiling, uint32_t isAdd,
+    InnerProcess(BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true>& op,
+                 uint32_t tileCnt, uint32_t curPadM, Mc2QuantBatchMatmulV3TilingData* mmTiling, uint32_t isAdd,
                  uint32_t needUbBuffer, bool isTailFlag)
 {
     const uint64_t aOffset = CalcShapeOffset(sizeof(xType), mmTiling->matmulTiling.M, mmTiling->matmulTiling.Ka);
@@ -166,9 +166,9 @@ __aicore__ inline void
 MatmulAllReduceQuantPertokenInt8<xType, wType, fFormat, wFormat, scaleType, yType, commType, aTrans, bTrans>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR addGM, GM_ADDR dequantScaleGM, GM_ADDR pertokenScaleGM,
     GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM, GM_ADDR cGM, GM_ADDR workspaceGM,
-    Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData, TPipe *tPipe)
+    Mc2Tiling::QuantMatmulAllReduceTilingData* tilingData, TPipe* tPipe)
 {
-    __gm__ HcclCombinOpParam *context = (__gm__ HcclCombinOpParam *)(GetHcclContext<0>());
+    __gm__ HcclCombinOpParam* context = (__gm__ HcclCombinOpParam*)(GetHcclContext<0>());
     OOMInit(context);
     hccl_.Init(GetHcclContext<0>());
     cGM_ = cGM;
@@ -212,7 +212,7 @@ template <typename xType, typename wType, int fFormat, int wFormat, typename sca
 __aicore__ inline void MatmulAllReduceQuantPertokenInt8<xType, wType, fFormat, wFormat, scaleType, yType, commType,
                                                         aTrans, bTrans>::PrepareInit()
 {
-    auto &&mc2Tiling = tilingData_->param;
+    auto&& mc2Tiling = tilingData_->param;
     uint32_t rankNum = mc2Tiling.rankDim;
     uint32_t tileM = tilingData_->tilematmulTiling.matmulTiling.M; // 头块pad大小更新
     tilePadM = tileM;
@@ -293,10 +293,10 @@ template <typename xType, typename wType, int fFormat, int wFormat, typename sca
           typename commType, bool aTrans, bool bTrans>
 __aicore__ inline void
 MatmulAllReduceQuantPertokenInt8<xType, wType, fFormat, wFormat, scaleType, yType, commType, aTrans, bTrans>::Process(
-    BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true> &opTile,
-    BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true> &opTail)
+    BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true>& opTile,
+    BmmDequantPertoken<xType, wType, fFormat, wFormat, scaleType, yType, aTrans, bTrans, true>& opTail)
 {
-    auto &&mc2Tiling = tilingData_->param;
+    auto&& mc2Tiling = tilingData_->param;
     // all2all allGather prepare + InnerProcess
     PrepareInit();
     InnerProcess(opTile, mc2Tiling.tileCnt, tilePadM, &tilingData_->tilematmulTiling, mc2Tiling.isAdd,

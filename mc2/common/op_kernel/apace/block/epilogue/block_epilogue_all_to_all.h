@@ -50,14 +50,14 @@ public:
     __aicore__ inline BlockEpilogueAlltoAll() {}
     __aicore__ inline ~BlockEpilogueAlltoAll() {}
 
-    __aicore__ inline void Init(const Params &params)
+    __aicore__ inline void Init(const Params& params)
     {
         m_ = params.m;
         n_ = params.n;
         ubBaseOffset_ = params.ubBaseOffset;
-        cGmAddr_ = reinterpret_cast<__gm__ TypeC *>(params.cGmAddr);
+        cGmAddr_ = reinterpret_cast<__gm__ TypeC*>(params.cGmAddr);
 
-        winContext_ = (__gm__ Apace::HcclOpParam *)params.hcclContext;
+        winContext_ = (__gm__ Apace::HcclOpParam*)params.hcclContext;
         rankId_ = Apace::GetRankId(winContext_);
         tpWorldSize_ = Apace::GetRankDim(winContext_);
         if (tpWorldSize_ > 0) {
@@ -65,13 +65,13 @@ public:
         }
     }
 
-    __aicore__ inline void operator()(int64_t mPos, int64_t nPos, const BlockShape &singleShape)
+    __aicore__ inline void operator()(int64_t mPos, int64_t nPos, const BlockShape& singleShape)
     {
         CommProcess(mPos, nPos, singleShape);
     }
 
 public:
-    static __aicore__ uint64_t GetRequiredUBSize(const BlockShape &singleShape)
+    static __aicore__ uint64_t GetRequiredUBSize(const BlockShape& singleShape)
     {
         // 计算当前单次tile alltoall所需UB 空间
         int64_t singleN = asc::te::get<IDX_N_TILEIDX>(singleShape);
@@ -81,7 +81,7 @@ public:
     }
 
 private:
-    __aicore__ inline void CommProcess(int64_t mPos, int64_t nPos, const BlockShape &singleShape);
+    __aicore__ inline void CommProcess(int64_t mPos, int64_t nPos, const BlockShape& singleShape);
 
 private:
     uint64_t m_{0};
@@ -91,9 +91,9 @@ private:
     uint32_t rankId_{0};
     uint64_t ubBaseOffset_{0};
 
-    __gm__ TypeC *cGmAddr_{nullptr};
+    __gm__ TypeC* cGmAddr_{nullptr};
 
-    __gm__ Apace::HcclOpParam *winContext_{nullptr};
+    __gm__ Apace::HcclOpParam* winContext_{nullptr};
 
     decltype(asc::te::make_copy(asc::te::copy_gm_to_ub{})) copyGM2UB_;
     decltype(asc::te::make_copy(asc::te::copy_ub_to_gm{})) copyUB2GM_;
@@ -101,7 +101,7 @@ private:
 
 template <typename TypeC_, typename LayoutC_>
 __aicore__ inline void BlockEpilogueAlltoAll<TypeC_, LayoutC_>::CommProcess(int64_t mPos, int64_t nPos,
-                                                                            const BlockShape &singleShape)
+                                                                            const BlockShape& singleShape)
 {
     int64_t singleM = asc::te::get<IDX_M_TILEIDX>(singleShape);
     int64_t singleN = asc::te::get<IDX_N_TILEIDX>(singleShape);
@@ -152,7 +152,7 @@ __aicore__ inline void BlockEpilogueAlltoAll<TypeC_, LayoutC_>::CommProcess(int6
             }
 
             GM_ADDR remoteWinAddr = Apace::GetBaseWindAddrByRankId(winContext_, dstRankId);
-            __gm__ TypeC *remoteGmAddr = reinterpret_cast<__gm__ TypeC *>(remoteWinAddr);
+            __gm__ TypeC* remoteGmAddr = reinterpret_cast<__gm__ TypeC*>(remoteWinAddr);
 
             auto layoutTensorRemote = asc::te::frame_layout_format<LayoutC, TypeC>{}(m_, static_cast<int64_t>(n_));
             auto gmRemote =

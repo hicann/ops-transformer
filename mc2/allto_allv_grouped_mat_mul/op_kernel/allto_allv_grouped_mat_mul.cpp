@@ -56,8 +56,8 @@ __global__ __aicore__ void allto_allv_grouped_mat_mul(GM_ADDR gmmxGM, GM_ADDR gm
         constexpr bool isFp16 = std::is_same_v<DTYPE_GMM_X, half> && std::is_same_v<DTYPE_GMM_WEIGHT, half> &&
                                 std::is_same_v<DTYPE_GMM_Y, half>;
         if constexpr (isBf16 || isFp16) {
-            const __gm__ AlltoAllvGmmAivTilingData *aivTilingData =
-                reinterpret_cast<const __gm__ AlltoAllvGmmAivTilingData *>(tilingGM);
+            const __gm__ AlltoAllvGmmAivTilingData* aivTilingData =
+                reinterpret_cast<const __gm__ AlltoAllvGmmAivTilingData*>(tilingGM);
             AlltoAllvGroupedMatMulAivMode::Run<DTYPE_GMM_X, TILINGKEY_GMM_WEIGHT_TRANSPOSE,
                                                TILINGKEY_MM_WEIGHT_TRANSPOSE>(
                 gmmxGM, gmmweightGM, mmxOptionalGM, mmweightOptionalGM, gmmyGM, mmyOptionalGM, permuteOutOptionalGM,

@@ -212,7 +212,7 @@ ge::graphStatus Mc2WeightQuantBatchMatmulV2TilingSplitK::PostTiling()
     uint32_t usedAivNum = tilingData_->vecBlockDimK * tilingData_->vecBlockDimN;
     context_->SetBlockDim(
         std::max(usedAicNum, CalcTschBlockDim(usedAivNum, compileInfoPtr_->aicNum, compileInfoPtr_->aivNum)));
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     workspaces[0] = workspaceSize_;
 
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),

@@ -38,7 +38,7 @@ template <typename BlockMmad, typename BlockPrologue>
 struct A8W4BlockContext {
     // AIC and AIV compile different pointer types; AIV1 carries no compute object.
     using Block = Std::conditional_t<g_coreType == AscendC::AIC, BlockMmad, BlockPrologue>;
-    Block *block = nullptr;
+    Block* block = nullptr;
 };
 
 // 根据数据类型路径选择对应的 BlockMmad 实现。
@@ -296,7 +296,7 @@ struct Config {
         LayoutBiasType bias;
     };
 
-    __aicore__ static inline void FinalizeProblemConfig(ProblemConfig &config, const BlockJobContext &blockJob,
+    __aicore__ static inline void FinalizeProblemConfig(ProblemConfig& config, const BlockJobContext& blockJob,
                                                         uint32_t gmm1TileM)
     {
         config.blockNum = blockJob.totalJobs;
@@ -306,8 +306,8 @@ struct Config {
         config.blockMmadTiling = SelectBlockMmadTilingConfig(config.m, config.k, config.tileM);
     }
 
-    __aicore__ static inline ProblemConfig BuildGmm1ProblemConfig(const ProblemShape &problemShape,
-                                                                  const BlockJobContext &blockJob, uint32_t gmm1TileM)
+    __aicore__ static inline ProblemConfig BuildGmm1ProblemConfig(const ProblemShape& problemShape,
+                                                                  const BlockJobContext& blockJob, uint32_t gmm1TileM)
     {
         ProblemConfig config;
         config.m = Get<M_VALUE>(problemShape);
@@ -320,8 +320,8 @@ struct Config {
         return config;
     }
 
-    __aicore__ static inline ProblemConfig BuildGmm2ProblemConfig(const ProblemShape &problemShape,
-                                                                  const BlockJobContext &blockJob, uint32_t gmm1TileM)
+    __aicore__ static inline ProblemConfig BuildGmm2ProblemConfig(const ProblemShape& problemShape,
+                                                                  const BlockJobContext& blockJob, uint32_t gmm1TileM)
     {
         ProblemConfig config;
         config.m = Get<M_VALUE>(problemShape);
@@ -334,7 +334,7 @@ struct Config {
         return config;
     }
 
-    __aicore__ static inline LayoutBundle BuildLayouts(const ProblemConfig &config)
+    __aicore__ static inline LayoutBundle BuildLayouts(const ProblemConfig& config)
     {
         LayoutBundle layouts;
         layouts.a = MakeLayoutA{}(config.m, config.k);
@@ -346,7 +346,7 @@ struct Config {
         return layouts;
     }
 
-    __aicore__ static inline LayoutBundle BuildLayouts(const ProblemConfig &config, const StridedAConfig &aConfig)
+    __aicore__ static inline LayoutBundle BuildLayouts(const ProblemConfig& config, const StridedAConfig& aConfig)
     {
         LayoutBundle layouts;
         auto aShape = Te::make_shape(Te::make_shape(Te::_1{}, config.m), Te::make_shape(Te::_1{}, config.k));
@@ -374,7 +374,7 @@ struct BlockMmadInitConfig {
     uint64_t kL1 = 0U;
     uint64_t scaleKL1 = 0U;
 
-    __aicore__ inline bool operator!=(const BlockMmadInitConfig &other) const
+    __aicore__ inline bool operator!=(const BlockMmadInitConfig& other) const
     {
         return problemK != other.problemK || tileM != other.tileM || tileN != other.tileN || kL1 != other.kL1 ||
                scaleKL1 != other.scaleKL1;
@@ -394,9 +394,9 @@ struct BlockMmadContext<BlockMmad, Blaze::Gemm::GroupedMatmulWithScaleMx<>> {
     BlockMmad blockMmad;
 
     template <GmmStage Stage, typename ProblemConfig>
-    __aicore__ inline void Init(const ProblemConfig &config)
+    __aicore__ inline void Init(const ProblemConfig& config)
     {
-        const auto &tiling = config.blockMmadTiling;
+        const auto& tiling = config.blockMmadTiling;
         // tiling.tileN is the full MMAD output width (gate + up, currently 256).
         // QGMM concat takes one half (128) and doubles it internally; GMM2 uses the full width.
         const uint32_t tileN = Stage == GmmStage::GMM1 ? tiling.tileN / ACTIVATION_N_HALF : tiling.tileN;
@@ -425,8 +425,8 @@ private:
  * B 与 scaleB 的物理行跨度不同，二者必须独立判定 128B cache-line 对齐，不能共用一个结果。
  */
 template <bool IsWeightNz, typename MatmulConfig, typename TensorB, typename TensorScaleB>
-__aicore__ inline void SetWaveWeightL2CacheHint(const typename MatmulConfig::ProblemConfig &config,
-                                                bool coversWholeExpert, TensorB &gmB, TensorScaleB &gmScaleB)
+__aicore__ inline void SetWaveWeightL2CacheHint(const typename MatmulConfig::ProblemConfig& config,
+                                                bool coversWholeExpert, TensorB& gmB, TensorScaleB& gmScaleB)
 {
     constexpr uint64_t cacheLineBytes = 128U;
     // coversWholeExpert 防止跨 Wave 复用；m <= tileM 防止同一 problem 内跨 M tile 复用。
@@ -460,13 +460,13 @@ __aicore__ inline void SetWaveWeightL2CacheHint(const typename MatmulConfig::Pro
 template <typename Scheduler, typename TensorA, typename TensorB, typename TensorScaleA, typename TensorScaleB,
           typename TensorBias, typename TensorC>
 struct GroupMatmulWorkSet {
-    Scheduler &scheduler;
-    TensorA &gmA;
-    TensorB &gmB;
-    TensorScaleA &gmScaleA;
-    TensorScaleB &gmScaleB;
-    TensorBias &gmBias;
-    TensorC &gmC;
+    Scheduler& scheduler;
+    TensorA& gmA;
+    TensorB& gmB;
+    TensorScaleA& gmScaleA;
+    TensorScaleB& gmScaleB;
+    TensorBias& gmBias;
+    TensorC& gmC;
 };
 
 } // namespace GmmKernel

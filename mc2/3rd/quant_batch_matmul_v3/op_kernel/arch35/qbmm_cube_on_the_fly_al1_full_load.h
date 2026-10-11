@@ -30,7 +30,7 @@ class MatmulAswKernelAL1FullLoad : public MatMulASWKernel<LOCAL_TEMPLATE_FUNC_PA
 public:
     __aicore__ inline MatmulAswKernelAL1FullLoad() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale,
-                                GM_ADDR cGM, GM_ADDR workspace, const void *tilingData, TPipe *pipe);
+                                GM_ADDR cGM, GM_ADDR workspace, const void* tilingData, TPipe* pipe);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessWithoutBatch();
     __aicore__ inline void SetScaleTensor();
@@ -56,7 +56,7 @@ protected:
         matmul::MatmulImpl<aType, bType, cType, biasMatmulType, MM_CFG_NO_PRELOAD_OPEN_UNIT_FLAG>>::type;
     MmType mm_;
     TQue<QuePosition::A1, 1> InQueueAL1_;
-    TPipe *pipe_;
+    TPipe* pipe_;
     LocalTensor<x1Type> al1Local_;
     TQue<QuePosition::A1, 1> InQueueScaleA_;
     LocalTensor<fp8_e8m0_t> scaleALocal_;
@@ -69,14 +69,14 @@ __aicore__ inline void MatmulAswKernelAL1FullLoad<LOCAL_TEMPLATE_FUNC_PARAMS>::I
                                                                                     GM_ADDR bias, GM_ADDR scale,
                                                                                     GM_ADDR perTokenScale, GM_ADDR cGM,
                                                                                     GM_ADDR workSpace,
-                                                                                    const void *tilingData, TPipe *pipe)
+                                                                                    const void* tilingData, TPipe* pipe)
 {
     if ASCEND_IS_AIV {
         return;
     }
     pipe_ = pipe;
     this->blockIdx_ = GetBlockIdx();
-    this->quantBmmTilingData_ = static_cast<const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *>(tilingData);
+    this->quantBmmTilingData_ = static_cast<const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams*>(tilingData);
     this->UpdateGlobalAddr(aGM, bGM, bias, scale, perTokenScale, cGM, workSpace);
 }
 

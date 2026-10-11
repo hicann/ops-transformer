@@ -66,7 +66,7 @@ class CommBase {
 public:
     __aicore__ explicit CommBase(){};
 
-    __aicore__ inline void SetArgs(uint32_t *rank, int32_t rank_size, MatmulAlltoAllTilingData info)
+    __aicore__ inline void SetArgs(uint32_t* rank, int32_t rank_size, MatmulAlltoAllTilingData info)
     {
         block_id = GetBlockIdx();
         core_num = GetBlockNum();
@@ -75,7 +75,7 @@ public:
         this->rank_size = rank_size;
 
         auto contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-        winContext_ = (__gm__ HcclA2CombineOpParam *)contextGM0;
+        winContext_ = (__gm__ HcclA2CombineOpParam*)contextGM0;
         *rank = static_cast<uint32_t>(winContext_->rankId);
         this->rank = winContext_->rankId;
 
@@ -91,7 +91,7 @@ public:
         }
     }
 
-    __aicore__ inline void SetTiling(MatmulAlltoAllTilingData &info)
+    __aicore__ inline void SetTiling(MatmulAlltoAllTilingData& info)
     {
         m0 = info.cocTiling.m0;
         k0 = info.cocTiling.k0;
@@ -128,20 +128,20 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void CopyGmToUbufAlignB16(LocalTensor<T> ubTensor, __gm__ T *src, uint16_t nBurst,
+    __aicore__ inline void CopyGmToUbufAlignB16(LocalTensor<T> ubTensor, __gm__ T* src, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
         Mc2AivDataCopy::CopyGmToUbufAlignB16(ubTensor, src, nBurst, lenBurst, srcStride, dstStride);
     }
 
     template <typename T>
-    __aicore__ inline void CopyUbufToGmAlignB16(__gm__ T *dst, LocalTensor<T> ubTensor, uint16_t nBurst,
+    __aicore__ inline void CopyUbufToGmAlignB16(__gm__ T* dst, LocalTensor<T> ubTensor, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
         Mc2AivDataCopy::CopyUbufToGmAlignB16(dst, ubTensor, nBurst, lenBurst, srcStride, dstStride);
     }
 
-    __aicore__ inline void CheckBuffFlag(__gm__ int32_t *buff, int32_t flag)
+    __aicore__ inline void CheckBuffFlag(__gm__ int32_t* buff, int32_t flag)
     {
         SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
         WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
@@ -156,7 +156,7 @@ public:
         }
     }
 
-    __aicore__ inline void SetBuffFlag(__gm__ int32_t *buff, int32_t flag)
+    __aicore__ inline void SetBuffFlag(__gm__ int32_t* buff, int32_t flag)
     {
         SetFlag<HardEvent::MTE3_S>(EVENT_ID2);
         WaitFlag<HardEvent::MTE3_S>(EVENT_ID2);
@@ -168,7 +168,7 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void CopyGMToGM(__gm__ T *gm_src, __gm__ T *gm_dst, int64_t copy_size)
+    __aicore__ inline void CopyGMToGM(__gm__ T* gm_src, __gm__ T* gm_dst, int64_t copy_size)
     {
         LocalTensor<T> ubTensor = uBuf_.template Get<T>();
         LocalTensor<T> copyTensor0 = ubTensor;
@@ -197,7 +197,7 @@ public:
     {
         for (int32_t idx = 0; idx < num_flags; ++idx) {
             if (core_idx == 0 && aiv_idx == 0) {
-                SetBuffFlag((__gm__ int32_t *)buff[rank] + FLAG_OFFSET + idx, 0);
+                SetBuffFlag((__gm__ int32_t*)buff[rank] + FLAG_OFFSET + idx, 0);
             }
         }
     }
@@ -205,10 +205,10 @@ public:
     __aicore__ inline void CrossRankSyncV1(int32_t flag_idx, int32_t flag_data)
     {
         if (core_idx == 0 && aiv_idx == 0) {
-            SetBuffFlag((__gm__ int32_t *)buff[rank] + FLAG_OFFSET + flag_idx, flag_data);
+            SetBuffFlag((__gm__ int32_t*)buff[rank] + FLAG_OFFSET + flag_idx, flag_data);
         }
         if (core_idx < rank_size && aiv_idx == 0) {
-            CheckBuffFlag((__gm__ int32_t *)buff[core_idx] + FLAG_OFFSET + flag_idx, flag_data);
+            CheckBuffFlag((__gm__ int32_t*)buff[core_idx] + FLAG_OFFSET + flag_idx, flag_data);
         }
     }
 
@@ -220,7 +220,7 @@ public:
     int32_t rank;
     int32_t rank_size;
     GM_ADDR buff[8];
-    __gm__ HcclA2CombineOpParam *winContext_{nullptr};
+    __gm__ HcclA2CombineOpParam* winContext_{nullptr};
     TBuf<AscendC::TPosition::VECCALC> uBuf_;
 
     int32_t m0;

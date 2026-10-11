@@ -31,9 +31,9 @@
 // AlltoAllQuantMatmulTilingData 与 Apace::hcommAllToAllMatmulTilingData 需与其保持相同的
 // mc2InitTiling/mc2CcTiling/dumpInfo 前缀（即 dumpInfo 偏移一致），
 // 调整任一结构体前缀时必须同步维护该约束
-inline void AlltoAllMatmulExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+inline void AlltoAllMatmulExceptionImplWrapper(aclrtExceptionInfo* args, void* userdata)
 {
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     if (std::strstr(socName, "Ascend950") == nullptr) {
         return;
     }

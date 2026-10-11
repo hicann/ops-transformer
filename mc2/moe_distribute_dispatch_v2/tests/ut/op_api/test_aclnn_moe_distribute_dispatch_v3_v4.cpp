@@ -77,7 +77,7 @@ TEST_F(L2AclnnMoeDistributeDispatchV3V4Test, TestAclnnMoeDistributeDispatchV3Get
               shareExpertRankNum, quantMode, globalBs, expertTokenNumsType, "test", 0, 0, 0),
         OUTPUT(expandX, dynamicScales, expandIdx, expertTokensNums, epRecvCounts, tpRecvCounts, expandScales));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 
@@ -125,7 +125,7 @@ TEST_F(L2AclnnMoeDistributeDispatchV3V4Test, TestAclnnMoeDistributeDispatchV4Get
               0, 0),
         OUTPUT(expandX, dynamicScales, expandIdx, expertTokensNums, epRecvCounts, tpRecvCounts, expandScales));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 

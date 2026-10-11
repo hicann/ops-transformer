@@ -22,7 +22,7 @@ template <class T>
 class MatmulAllReduceAddX3 {
 public:
     __aicore__ inline MatmulAllReduceAddX3() {}
-    __aicore__ inline void Init(GM_ADDR mmOutput, GM_ADDR add, uint64_t totalCnt, uint64_t tileCnt, TPipe *tPipe,
+    __aicore__ inline void Init(GM_ADDR mmOutput, GM_ADDR add, uint64_t totalCnt, uint64_t tileCnt, TPipe* tPipe,
                                 uint32_t coreNum)
     {
         pipe_ = tPipe;
@@ -34,8 +34,8 @@ public:
         this->tileNum_ = Ceil(this->blockCnt_, tileCnt);
         this->tileCnt_ = tileCnt;
 
-        mmOutGm_.SetGlobalBuffer((__gm__ T *)mmOutput + blockAddr, this->blockCnt_);
-        addGm_.SetGlobalBuffer((__gm__ T *)add + blockAddr, this->blockCnt_);
+        mmOutGm_.SetGlobalBuffer((__gm__ T*)mmOutput + blockAddr, this->blockCnt_);
+        addGm_.SetGlobalBuffer((__gm__ T*)add + blockAddr, this->blockCnt_);
         pipe_->InitBuffer(inQueueX_, DOUBLE_BUFFER, tileCnt * sizeof(T));
         pipe_->InitBuffer(inQueueY_, DOUBLE_BUFFER, tileCnt * sizeof(T));
         pipe_->InitBuffer(outQueueZ_, DOUBLE_BUFFER, tileCnt * sizeof(T));
@@ -96,7 +96,7 @@ public:
         outQueueZ_.FreeTensor(zLocal);
     }
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> inQueueX_;
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> inQueueY_;
     TQue<QuePosition::VECOUT, DOUBLE_BUFFER> outQueueZ_;
@@ -114,7 +114,7 @@ public:
 
 template <class T>
 __aicore__ inline void MatmulAllReduceAddX3Kernel(GM_ADDR mmOutput, GM_ADDR add, uint64_t totalCnt, uint64_t tileCnt,
-                                                  TPipe *tPipe)
+                                                  TPipe* tPipe)
 {
     uint32_t coreNum = GetBlockNum() * GetTaskRation();
     if (g_coreType == AIC || (GetBlockIdx() >= coreNum)) {
@@ -139,7 +139,7 @@ public:
     __aicore__ inline MatmulAllReduceEpilogue() {}
 
     __aicore__ inline void Init(GM_ADDR mmOutput, GM_ADDR bias, GM_ADDR add, uint64_t mTileValue, uint64_t nValue,
-                                uint64_t biasUbCnt, bool hasAdd, TPipe *tPipe, uint32_t coreNum)
+                                uint64_t biasUbCnt, bool hasAdd, TPipe* tPipe, uint32_t coreNum)
     {
         pipe_ = tPipe;
         mTileValue_ = mTileValue;
@@ -163,10 +163,10 @@ public:
             myRowEnd_ = 0;
         }
 
-        mmOutGm_.SetGlobalBuffer((__gm__ T *)mmOutput, mTileValue_ * nValue_);
-        biasGm_.SetGlobalBuffer((__gm__ T *)bias, nValue_);
+        mmOutGm_.SetGlobalBuffer((__gm__ T*)mmOutput, mTileValue_ * nValue_);
+        biasGm_.SetGlobalBuffer((__gm__ T*)bias, nValue_);
         if (hasAdd_) {
-            addGm_.SetGlobalBuffer((__gm__ T *)add, mTileValue_ * nValue_);
+            addGm_.SetGlobalBuffer((__gm__ T*)add, mTileValue_ * nValue_);
         }
 
         // UB buffer 初始化，每个 buffer 大小 = biasUbCnt * sizeof(T)
@@ -248,7 +248,7 @@ public:
         }
     }
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> inQueueX_;   // mmOut
     TQue<QuePosition::VECIN, DOUBLE_BUFFER> inQueueY_;   // x3 (仅 hasAdd 时使用)
     TQue<QuePosition::VECOUT, DOUBLE_BUFFER> outQueueZ_; // result
@@ -268,7 +268,7 @@ public:
 
 template <class T>
 __aicore__ inline void MatmulAllReduceEpilogueKernel(GM_ADDR mmOutput, GM_ADDR bias, GM_ADDR add, uint64_t mTileValue,
-                                                     uint64_t nValue, uint64_t biasUbCnt, bool hasAdd, TPipe *tPipe)
+                                                     uint64_t nValue, uint64_t biasUbCnt, bool hasAdd, TPipe* tPipe)
 {
     uint32_t coreNum = GetBlockNum() * GetTaskRation();
     if (g_coreType == AIC || (GetBlockIdx() >= coreNum)) {

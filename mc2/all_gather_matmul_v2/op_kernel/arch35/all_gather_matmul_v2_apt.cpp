@@ -38,12 +38,12 @@ using namespace AllGatherMatmulImpl;
         using biasType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, typename BiasType<BIAS_DTYPE>::type>; \
         using cType = MatmulType<AscendC::TPosition::GM, CubeFormat::ND, C_DTYPE>; \
         REGISTER_TILING_DEFAULT(Mc2Tiling::AllGatherMatmulTilingDataV2); \
-        auto tiling = (__gm__ Mc2Tiling::AllGatherMatmulTilingDataV2 *)tilingGM; \
-        __gm__ void *mc2InitTiling = (__gm__ void *)(&(tiling->mc2InitTiling)); \
-        __gm__ void *mc2CcTiling = (__gm__ void *)(&(tiling->mc2CcTiling)); \
+        auto tiling = (__gm__ Mc2Tiling::AllGatherMatmulTilingDataV2*)tilingGM; \
+        __gm__ void* mc2InitTiling = (__gm__ void*)(&(tiling->mc2InitTiling)); \
+        __gm__ void* mc2CcTiling = (__gm__ void*)(&(tiling->mc2CcTiling)); \
         GET_TILING_DATA(tilingData, tilingGM); \
         templateClass<aType, bType, biasType, cType, hcclCommType> op; \
-        op.Init(aGM, bGM, biasGM, cGM, (__gm__ uint8_t *)context, workspaceGM, gatherOut, &tilingData, mc2InitTiling, \
+        op.Init(aGM, bGM, biasGM, cGM, (__gm__ uint8_t*)context, workspaceGM, gatherOut, &tilingData, mc2InitTiling, \
                 mc2CcTiling, &pipe); \
         op.Process(); \
     } while (0)
@@ -51,12 +51,12 @@ using namespace AllGatherMatmulImpl;
 #define INVOKE_ALL_GATHER_QUANT_BATCHMATMUL_OP_IMPL(templateClass, isMxFp4, hcclCommType, ...) \
     do { \
         REGISTER_TILING_DEFAULT(Mc2Tiling::AllGatherMatmulTilingDataFp8); \
-        auto tiling = (__gm__ Mc2Tiling::AllGatherMatmulTilingDataFp8 *)tilingGM; \
-        __gm__ void *mc2InitTiling = (__gm__ void *)(&(tiling->mc2InitTiling)); \
-        __gm__ void *mc2CcTiling = (__gm__ void *)(&(tiling->mc2CcTiling)); \
+        auto tiling = (__gm__ Mc2Tiling::AllGatherMatmulTilingDataFp8*)tilingGM; \
+        __gm__ void* mc2InitTiling = (__gm__ void*)(&(tiling->mc2InitTiling)); \
+        __gm__ void* mc2CcTiling = (__gm__ void*)(&(tiling->mc2CcTiling)); \
         GET_TILING_DATA(tilingData, tilingGM); \
         templateClass<DTYPE_X1, DTYPE_X2, DTYPE_BIAS, uint64_t, DTYPE_Y, __VA_ARGS__, isMxFp4, hcclCommType> op; \
-        op.Init(aGM, bGM, scaleInv1, scaleInv2, biasGM, scale, cGM, gatherOut, workspaceGM, (__gm__ uint8_t *)context, \
+        op.Init(aGM, bGM, scaleInv1, scaleInv2, biasGM, scale, cGM, gatherOut, workspaceGM, (__gm__ uint8_t*)context, \
                 &tilingData, mc2InitTiling, mc2CcTiling, &pipe); \
         op.Process(); \
     } while (0)
@@ -64,12 +64,12 @@ using namespace AllGatherMatmulImpl;
 #define INVOKE_ALL_GATHER_QUANT_BATCHMATMUL_MX_OP_IMPL(templateClass, isMxFp4, hcclCommType, ...) \
     do { \
         REGISTER_TILING_DEFAULT(Mc2Tiling::AllGatherMatmulTilingDataFp8); \
-        auto tiling = (__gm__ Mc2Tiling::AllGatherMatmulTilingDataFp8 *)tilingGM; \
-        __gm__ void *mc2InitTiling = (__gm__ void *)(&(tiling->mc2InitTiling)); \
-        __gm__ void *mc2CcTiling = (__gm__ void *)(&(tiling->mc2CcTiling)); \
+        auto tiling = (__gm__ Mc2Tiling::AllGatherMatmulTilingDataFp8*)tilingGM; \
+        __gm__ void* mc2InitTiling = (__gm__ void*)(&(tiling->mc2InitTiling)); \
+        __gm__ void* mc2CcTiling = (__gm__ void*)(&(tiling->mc2CcTiling)); \
         GET_TILING_DATA(tilingData, tilingGM); \
         templateClass<DTYPE_X1, DTYPE_X2, DTYPE_BIAS, fp8_e8m0_t, DTYPE_Y, __VA_ARGS__, isMxFp4, hcclCommType> op; \
-        op.Init(aGM, bGM, scaleInv1, scaleInv2, biasGM, scale, cGM, gatherOut, workspaceGM, (__gm__ uint8_t *)context, \
+        op.Init(aGM, bGM, scaleInv1, scaleInv2, biasGM, scale, cGM, gatherOut, workspaceGM, (__gm__ uint8_t*)context, \
                 &tilingData, mc2InitTiling, mc2CcTiling, &pipe); \
         op.Process(); \
     } while (0)
@@ -81,7 +81,7 @@ __global__ __aicore__ void all_gather_matmul_v2(GM_ADDR aGM, GM_ADDR bGM, GM_ADD
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     TPipe pipe;
-    __gm__ HcclCombinOpParam *context = (__gm__ HcclCombinOpParam *)(GetHcclContext<0>());
+    __gm__ HcclCombinOpParam* context = (__gm__ HcclCombinOpParam*)(GetHcclContext<0>());
 
 #if (((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_HIFLOAT8)) || \
      (((ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X1 == DT_FLOAT8_E5M2)) && \

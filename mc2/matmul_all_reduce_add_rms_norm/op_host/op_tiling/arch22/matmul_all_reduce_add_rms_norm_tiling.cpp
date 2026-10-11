@@ -25,8 +25,8 @@ namespace {
 constexpr char MRN[] = "MatmulAllReduceAddRmsNorm";
 constexpr char IMRN[] = "InplaceMatmulAllReduceAddRmsNorm";
 } // namespace
-MMNTilingTransferHelper::MMNTilingTransferHelper(MatmulAllReduceAddRmsNormTiling &MatmulAllReduceAddRmsNormTiling,
-                                                 Mc2Tiling::MatmulAllReduce910TilingData &data)
+MMNTilingTransferHelper::MMNTilingTransferHelper(MatmulAllReduceAddRmsNormTiling& MatmulAllReduceAddRmsNormTiling,
+                                                 Mc2Tiling::MatmulAllReduce910TilingData& data)
     : MatmulAllReduceTiling910(MatmulAllReduceAddRmsNormTiling.context_,
                                &MatmulAllReduceAddRmsNormTiling.mrnCtxInfo_.mmrCtxInfo, &data),
       tilingProcesser_(MatmulAllReduceAddRmsNormTiling)
@@ -40,7 +40,7 @@ bool MatmulAllReduceAddRmsNormTiling::HasTail() const
 {
     return hasTail_;
 }
-ge::graphStatus MatmulAllReduceAddRmsNormTiling::CheckMRNInput(const MRNCtxInfo &mrnCtxInfo)
+ge::graphStatus MatmulAllReduceAddRmsNormTiling::CheckMRNInput(const MRNCtxInfo& mrnCtxInfo)
 {
     // x1和residual数据类型是否相同
     auto x1Type = mrnCtxInfo.mmrCtxInfo.x1->GetDataType();
@@ -119,7 +119,7 @@ bool MatmulAllReduceAddRmsNormTiling::IsCapable()
 {
     return helper_->IsCapable();
 }
-MatmulAllReduceAddRmsNormTiling::MatmulAllReduceAddRmsNormTiling(gert::TilingContext *context)
+MatmulAllReduceAddRmsNormTiling::MatmulAllReduceAddRmsNormTiling(gert::TilingContext* context)
     : TilingBaseClass(context)
 {
     helper_ = std::move(std::unique_ptr<MMNTilingTransferHelper>(
@@ -140,7 +140,7 @@ ge::graphStatus MatmulAllReduceAddRmsNormTiling::GetWorkspaceSize()
     const auto arnWorkSpace = tilingOutAddRmsNormTile_.workSpaceSize - SYS_WORKSPACE_SIZE;
     const auto myWorkSpace = mc2WorkSpace + arnWorkSpace;
     OP_LOGI(helper_->opName_, " Workspace %lu with detail: mc2: %lu arn: %u", myWorkSpace, mc2WorkSpace, arnWorkSpace);
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     workspaces[0] = myWorkSpace;
     return ge::GRAPH_SUCCESS;
 }
@@ -155,7 +155,7 @@ ge::graphStatus MatmulAllReduceAddRmsNormTiling::PostTiling()
                     OP_LOGE(helper_->opName_, "tiling data size[%zu] is not aligned to 8", tilingDataSize),
                     return ge::GRAPH_FAILED);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -190,12 +190,12 @@ uint64_t MatmulAllReduceAddRmsNormTiling::GetTilingKey() const
 }
 
 struct DefaultCompileInfo {};
-static ge::graphStatus DefaultTilingParseFunc(gert::TilingParseContext *context)
+static ge::graphStatus DefaultTilingParseFunc(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 };
-static ge::graphStatus DefaultTilingFunc(gert::TilingContext *context)
+static ge::graphStatus DefaultTilingFunc(gert::TilingContext* context)
 {
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }

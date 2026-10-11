@@ -93,7 +93,7 @@ __aicore__ inline constexpr uint32_t GetVectorRegSize()
 class Mc2QuantBmmAswBlock {
 public:
     __aicore__ inline Mc2QuantBmmAswBlock() {}
-    __aicore__ inline void Init(const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *tilingData, uint32_t blockIdx);
+    __aicore__ inline void Init(const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* tilingData, uint32_t blockIdx);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx);
     __aicore__ inline void UpdateBasicIndex4AL1FullLoad(uint64_t roundIdx);
     template <bool bTrans, CubeFormat formatX2 = CubeFormat::ND>
@@ -113,7 +113,7 @@ public:
     ASWOffsetParam offset_;
     PerBlockUBParam ubParams_;
     PerBlockMmParam mmParams_;
-    const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *tilingData_;
+    const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* tilingData_;
 
 private:
     const uint64_t WINDOW_LEN = 4;
@@ -121,7 +121,7 @@ private:
     uint32_t blockIdx_;
 };
 
-__aicore__ inline void Mc2QuantBmmAswBlock::Init(const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *tilingData,
+__aicore__ inline void Mc2QuantBmmAswBlock::Init(const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* tilingData,
                                                  uint32_t blockIdx)
 {
     params_.mSplitAddrOffset = 0UL;

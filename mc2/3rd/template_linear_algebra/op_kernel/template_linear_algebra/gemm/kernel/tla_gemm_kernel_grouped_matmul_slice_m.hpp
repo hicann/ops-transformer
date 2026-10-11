@@ -47,12 +47,12 @@ public:
         // Data members
         GemmCoord problemShape;
         uint32_t problemCount;
-        __gm__ ElementGroupList *ptrGroupList;
-        __gm__ ElementA *ptrA;
+        __gm__ ElementGroupList* ptrGroupList;
+        __gm__ ElementA* ptrA;
         LayoutA layoutA;
-        __gm__ ElementB *ptrB;
+        __gm__ ElementB* ptrB;
         LayoutB layoutB;
-        __gm__ ElementC *ptrC;
+        __gm__ ElementC* ptrC;
         LayoutC layoutC;
 
         // Methods
@@ -60,16 +60,16 @@ public:
         Params() {}
 
         CATLASS_DEVICE
-        Params(GemmCoord const &problemShape_, uint32_t problemCount_, GM_ADDR ptrGroupList_, GM_ADDR ptrA_,
-               LayoutA const &layoutA_, GM_ADDR ptrB_, LayoutB const &layoutB_, GM_ADDR ptrC_, LayoutC const &layoutC_)
+        Params(GemmCoord const& problemShape_, uint32_t problemCount_, GM_ADDR ptrGroupList_, GM_ADDR ptrA_,
+               LayoutA const& layoutA_, GM_ADDR ptrB_, LayoutB const& layoutB_, GM_ADDR ptrC_, LayoutC const& layoutC_)
             : problemShape(problemShape_),
               problemCount(problemCount_),
-              ptrGroupList(reinterpret_cast<__gm__ ElementGroupList *>(ptrGroupList_)),
-              ptrA(reinterpret_cast<__gm__ ElementA *>(ptrA_)),
+              ptrGroupList(reinterpret_cast<__gm__ ElementGroupList*>(ptrGroupList_)),
+              ptrA(reinterpret_cast<__gm__ ElementA*>(ptrA_)),
               layoutA(layoutA_),
-              ptrB(reinterpret_cast<__gm__ ElementB *>(ptrB_)),
+              ptrB(reinterpret_cast<__gm__ ElementB*>(ptrB_)),
               layoutB(layoutB_),
-              ptrC(reinterpret_cast<__gm__ ElementC *>(ptrC_)),
+              ptrC(reinterpret_cast<__gm__ ElementC*>(ptrC_)),
               layoutC(layoutC_)
         {}
     };
@@ -79,10 +79,10 @@ public:
     GroupedMatmulSliceM() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params const &params);
+    CATLASS_DEVICE void operator()(Params const& params);
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const& params)
     {
         BlockScheduler blockScheduler;
         Arch::Resource<ArchTag> resource;
@@ -160,7 +160,7 @@ public:
     }
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const& params)
     {}
 };
 

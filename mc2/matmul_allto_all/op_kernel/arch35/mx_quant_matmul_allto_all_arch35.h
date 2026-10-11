@@ -63,20 +63,20 @@ __aicore__ inline T1 CeilDiv(T1 a, T2 b)
 template <typename SchedulerType, typename SchedulerContextType, typename MatmulAlltoAllTilingDataType>
 class MxQuantMatmulAlltoAllArch35 {
 public:
-    __aicore__ inline MxQuantMatmulAlltoAllArch35(SchedulerType *pipeLine)
+    __aicore__ inline MxQuantMatmulAlltoAllArch35(SchedulerType* pipeLine)
         : pipeLine_(pipeLine){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR x1Scale, GM_ADDR x2Scale,
-                                GM_ADDR workspaceGM, MatmulAlltoAllTilingDataType *tilingData, AscendC::TPipe *tPipe);
+                                GM_ADDR workspaceGM, MatmulAlltoAllTilingDataType* tilingData, AscendC::TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     static constexpr uint64_t MXFP_GROUP_SIZE = 64UL;
     static constexpr uint64_t NUM_TWO = 2UL;
 
-    SchedulerType *pipeLine_;
+    SchedulerType* pipeLine_;
     SchedulerContextType pipeLineContext_;
-    MatmulAlltoAllTilingDataType *tilingData_;
-    AscendC::TPipe *tPipe_;
+    MatmulAlltoAllTilingDataType* tilingData_;
+    AscendC::TPipe* tPipe_;
     GM_ADDR x1_;
     GM_ADDR x2_;
     GM_ADDR y_;
@@ -96,11 +96,11 @@ template <typename SchedulerType, typename SchedulerContextType, typename Matmul
 __aicore__ inline void
 MxQuantMatmulAlltoAllArch35<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataType>::Init(
     GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR x1Scale, GM_ADDR x2Scale, GM_ADDR workspaceGM,
-    MatmulAlltoAllTilingDataType *tilingData, AscendC::TPipe *tPipe)
+    MatmulAlltoAllTilingDataType* tilingData, AscendC::TPipe* tPipe)
 {
     // 获取tilingdata数据
     tilingData_ = tilingData;
-    auto &&mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
     // 管道初始化
     tPipe_ = tPipe;
     x1_ = x1;
@@ -122,7 +122,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename Matmul
 __aicore__ inline void
 MxQuantMatmulAlltoAllArch35<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataType>::Process()
 {
-    auto &&mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
     // 启动主块流水
     if (mc2Tiling_.tileCnt > 0) {
         ProcessTile(mc2Tiling_.tileCnt);
@@ -142,7 +142,7 @@ __aicore__ inline void MxQuantMatmulAlltoAllArch35<SchedulerType, SchedulerConte
                                                    MatmulAlltoAllTilingDataType>::ProcessTile(uint32_t taskCnt)
 {
     // x1,x2,y,bias,x1_scale主轮地址偏移
-    auto &&mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
     pipeLineContext_.computationContext->baseData.aGM = x1_;
     pipeLineContext_.computationContext->baseData.bGM = x2_;
     pipeLineContext_.computationContext->baseData.cGM = tempComputeOutGM_;
@@ -197,7 +197,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename Matmul
 __aicore__ inline void MxQuantMatmulAlltoAllArch35<SchedulerType, SchedulerContextType,
                                                    MatmulAlltoAllTilingDataType>::ProcessTail(uint32_t taskCnt)
 {
-    auto &&mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->quantMatmulAlltoAllTilingInfo;
 
     // 使用封装的 ComputeGMAddr 函数，自动处理 fp4/fp8 差异
     pipeLineContext_.computationContext->baseData.aGM =

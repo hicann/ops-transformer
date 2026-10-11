@@ -21,8 +21,8 @@
 namespace optiling {
 class MoeDistributeCombineV3TilingFuncA5 : public MoeDistributeCombineV3TilingFuncBase {
 public:
-    ge::graphStatus MoeDistributeCombineV2TilingFuncNew(gert::TilingContext *context,
-                                                        const CombineV2Config &config) override;
+    ge::graphStatus MoeDistributeCombineV2TilingFuncNew(gert::TilingContext* context,
+                                                        const CombineV2Config& config) override;
 };
 } // namespace optiling
 #endif

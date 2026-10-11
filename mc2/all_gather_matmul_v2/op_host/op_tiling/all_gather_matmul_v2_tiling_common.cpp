@@ -28,9 +28,9 @@ using namespace AscendC;
 using namespace ge;
 
 namespace optiling {
-ge::graphStatus AllGatherMatmulTilingV2Func(gert::TilingContext *context);
+ge::graphStatus AllGatherMatmulTilingV2Func(gert::TilingContext* context);
 struct AllGatherMatmulCompileInfo {};
-ge::graphStatus TilingParseForAllGatherMatmulV2(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForAllGatherMatmulV2(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
@@ -45,9 +45,9 @@ IMPL_OP_OPTILING(AllGatherMatmulV2)
 // dump 回调按算子仅注册一次，dfxInfoOffset 取自 AllGatherMatmulTilingDataV2；
 // AllGatherMatmulTilingDataFp8 需与其保持相同的 mc2InitTiling/mc2CcTiling/dumpInfo
 // 前缀（即 dumpInfo 偏移一致），调整任一结构体前缀时必须同步维护该约束
-inline void AllGatherMatmulV2ExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+inline void AllGatherMatmulV2ExceptionImplWrapper(aclrtExceptionInfo* args, void* userdata)
 {
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     if (std::strstr(socName, "Ascend950") == nullptr) {
         return;
     }

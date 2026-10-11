@@ -368,7 +368,7 @@ uint64_t Mc2QuantBatchMatmulV3BasicTiling::GetTotalCnt(uint64_t baseM, uint64_t 
     return totalCnt;
 }
 
-void Mc2QuantBatchMatmulV3BasicTiling::DivisibleCoreLayout(uint64_t mCnt, uint64_t nCnt, uint64_t &calcOrder,
+void Mc2QuantBatchMatmulV3BasicTiling::DivisibleCoreLayout(uint64_t mCnt, uint64_t nCnt, uint64_t& calcOrder,
                                                            uint64_t round) const
 {
     bool rowFirstDivisible = false;
@@ -440,7 +440,7 @@ loadSize = m * ceil(N / baseN) + n * ceil(M / baseM)
 calcSingleCoreMN = (baseM * baseN) * round
 */
 int8_t Mc2QuantBatchMatmulV3BasicTiling::CheckLoadAndCalcSize(uint64_t baseM, uint64_t baseN, uint64_t bestRound,
-                                                              uint64_t round, uint64_t &bestLoadSize) const
+                                                              uint64_t round, uint64_t& bestLoadSize) const
 {
     uint64_t curLoadSize = inputParams_.mSize * ops::CeilDiv(inputParams_.nSize, baseN) +
                            inputParams_.nSize * inputParams_.GetTotalBaseMCnt(baseM);
@@ -496,7 +496,7 @@ bool Mc2QuantBatchMatmulV3BasicTiling::CheckTrans(bool isCheckTrans, bool isSmal
     return false;
 }
 
-void Mc2QuantBatchMatmulV3BasicTiling::Int4LowerAxisAlign(uint64_t &baseM, uint64_t &baseN) const
+void Mc2QuantBatchMatmulV3BasicTiling::Int4LowerAxisAlign(uint64_t& baseM, uint64_t& baseN) const
 {
     if (inputParams_.aDtype != ge::DT_INT4) {
         return;
@@ -510,7 +510,7 @@ void Mc2QuantBatchMatmulV3BasicTiling::Int4LowerAxisAlign(uint64_t &baseM, uint6
     return;
 }
 
-void Mc2QuantBatchMatmulV3BasicTiling::ModifyBase(uint64_t &baseM, uint64_t &baseN) const
+void Mc2QuantBatchMatmulV3BasicTiling::ModifyBase(uint64_t& baseM, uint64_t& baseN) const
 {
     if (baseM > inputParams_.GetMatmulApiMSize()) {
         uint64_t m0 = inputParams_.transA ? ONE_BLK_SIZE : BLOCK_CUBE;
@@ -527,7 +527,7 @@ void Mc2QuantBatchMatmulV3BasicTiling::ModifyBase(uint64_t &baseM, uint64_t &bas
 // 2.在计算访存比相同情况下，同地址访问冲突可接受的情况下，L2缓存数据量少更新
 // 3.m,n差不多大时，选择baseM大的，减少MTE1
 // basicMetrics: round数，coreClash, firstL2Load, minL1LoadSize
-void Mc2QuantBatchMatmulV3BasicTiling::CompareBase(std::vector<uint64_t> &basicMetrics, uint64_t baseM, uint64_t baseN)
+void Mc2QuantBatchMatmulV3BasicTiling::CompareBase(std::vector<uint64_t>& basicMetrics, uint64_t baseM, uint64_t baseN)
 {
     // 遍历base候选解有可能相同，剪枝
     if (baseM == basicTiling_.baseM && baseN == basicTiling_.baseN) {
@@ -592,7 +592,7 @@ bool Mc2QuantBatchMatmulV3BasicTiling::CheckCalcAndMemRatio(uint64_t baseM, uint
 }
 
 // MTE2 bound场景下，是否需要减少第一轮L2加载量而交换baseM/N
-bool Mc2QuantBatchMatmulV3BasicTiling::CheckL2Load(std::vector<uint64_t> &basicMetrics, uint64_t coreClash,
+bool Mc2QuantBatchMatmulV3BasicTiling::CheckL2Load(std::vector<uint64_t>& basicMetrics, uint64_t coreClash,
                                                    uint64_t firstL2Load) const
 {
     // base从小到大遍历，因此走进该函数时，当前baseM > baseN
@@ -676,7 +676,7 @@ bool Mc2QuantBatchMatmulV3BasicTiling::GetBaseK(uint64_t baseM, uint64_t baseN)
     return false;
 }
 
-void Mc2QuantBatchMatmulV3BasicTiling::CalcClashAndFirstL2Load(uint64_t &coreClash, uint64_t &firstL2Load,
+void Mc2QuantBatchMatmulV3BasicTiling::CalcClashAndFirstL2Load(uint64_t& coreClash, uint64_t& firstL2Load,
                                                                uint64_t mCnt, uint64_t nCnt, uint64_t round) const
 {
     uint64_t calcOrder = GetCalcOrder(mCnt, nCnt, inputParams_.GetTotalMatmulApiMSize(basicTiling_.baseM),
@@ -687,7 +687,7 @@ void Mc2QuantBatchMatmulV3BasicTiling::CalcClashAndFirstL2Load(uint64_t &coreCla
     firstL2Load = std::get<2>(coreDist) * basicTiling_.baseM + std::get<3>(coreDist) * basicTiling_.baseN;
 }
 
-void Mc2QuantBatchMatmulV3BasicTiling::InitBasicMetrics(std::vector<uint64_t> &basicMetrics)
+void Mc2QuantBatchMatmulV3BasicTiling::InitBasicMetrics(std::vector<uint64_t>& basicMetrics)
 {
     uint64_t mCnt = inputParams_.GetTotalBaseMCnt(basicTiling_.baseM);
     uint64_t nCnt = ops::CeilDiv(inputParams_.nSize, basicTiling_.baseN);
@@ -718,7 +718,7 @@ bool Mc2QuantBatchMatmulV3BasicTiling::IsMNSmallForMultiCores(uint64_t coreNum) 
     return true;
 }
 
-void Mc2QuantBatchMatmulV3BasicTiling::ModifyNZBase(uint64_t &baseN, uint64_t coreNum) const
+void Mc2QuantBatchMatmulV3BasicTiling::ModifyNZBase(uint64_t& baseN, uint64_t coreNum) const
 {
     // 小m时尽可能用满核，缩短fixp
     if (inputParams_.mSize <= BLOCK_CUBE) {
@@ -787,7 +787,7 @@ void Mc2QuantBatchMatmulV3BasicTiling::ProcessMNSmallShape(uint64_t baseM, uint6
     }
 }
 
-bool Mc2QuantBatchMatmulV3BasicTiling::SetBase(const std::vector<uint64_t> &mBases, const std::vector<uint64_t> &nBases)
+bool Mc2QuantBatchMatmulV3BasicTiling::SetBase(const std::vector<uint64_t>& mBases, const std::vector<uint64_t>& nBases)
 {
     // default base in milan, 也用于大shape下剪枝小base块
     basicTiling_.baseM = BASIC_BLOCK_SIZE_128;
@@ -966,7 +966,7 @@ bool Mc2QuantBatchMatmulV3BasicTiling::CalcL1Tiling()
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3BasicTiling::GetStepK(uint64_t &stepKa, uint64_t &stepKb) const
+bool Mc2QuantBatchMatmulV3BasicTiling::GetStepK(uint64_t& stepKa, uint64_t& stepKb) const
 {
     OP_TILING_CHECK(
         stepKa == 0 || stepKb == 0,
@@ -1000,7 +1000,7 @@ bool Mc2QuantBatchMatmulV3BasicTiling::GetStepK(uint64_t &stepKa, uint64_t &step
     return true;
 }
 
-void Mc2QuantBatchMatmulV3BasicTiling::ModifyStepKForKOuter(uint64_t &stepKa, uint64_t &stepKb) const
+void Mc2QuantBatchMatmulV3BasicTiling::ModifyStepKForKOuter(uint64_t& stepKa, uint64_t& stepKb) const
 {
     if (std::min(stepKa, stepKb) % HALF_FACTOR != 0) { // 保证调整完还是倍数关系
         return;
@@ -1028,7 +1028,7 @@ void Mc2QuantBatchMatmulV3BasicTiling::ModifyStepKForKOuter(uint64_t &stepKa, ui
     }
 }
 
-void Mc2QuantBatchMatmulV3BasicTiling::CorrectStepK(uint64_t &bigStepK, uint64_t &smallStepK, uint64_t minStepK) const
+void Mc2QuantBatchMatmulV3BasicTiling::CorrectStepK(uint64_t& bigStepK, uint64_t& smallStepK, uint64_t minStepK) const
 {
     smallStepK = minStepK;
     uint64_t times = bigStepK / smallStepK;
@@ -1050,8 +1050,8 @@ uint64_t Mc2QuantBatchMatmulV3BasicTiling::GetTotalSize(uint64_t m, uint64_t k, 
 }
 
 bool Mc2QuantBatchMatmulV3BasicTiling::IsTileClash(uint64_t outSplit, uint64_t innerSplit,
-                                                   std::tuple<uint64_t, uint64_t> &tileClash,
-                                                   const std::tuple<uint64_t, uint64_t, uint64_t> &params) const
+                                                   std::tuple<uint64_t, uint64_t>& tileClash,
+                                                   const std::tuple<uint64_t, uint64_t, uint64_t>& params) const
 {
     uint64_t outBase = std::get<0>(params);
     uint64_t innerBase = std::get<1>(params);
@@ -1094,7 +1094,7 @@ uint64_t Mc2QuantBatchMatmulV3BasicTiling::GetCalcOrder(uint64_t mCnt, uint64_t 
 
 void Mc2QuantBatchMatmulV3BasicTiling::CalcTileCnt(uint64_t outOriShape, uint64_t innerOriShape, uint64_t outBase,
                                                    uint64_t innerBase,
-                                                   std::vector<std::tuple<uint64_t, uint64_t>> &tileCnt) const
+                                                   std::vector<std::tuple<uint64_t, uint64_t>>& tileCnt) const
 {
     uint64_t maxTileBlock = 625; // 625 is 25x25, m n方向base块个数的乘积
     uint64_t outTile;
@@ -1130,9 +1130,9 @@ bool Mc2QuantBatchMatmulV3BasicTiling::CheckTileTail(uint64_t outTail, uint64_t 
 }
 
 bool Mc2QuantBatchMatmulV3BasicTiling::CheckTileClash(
-    const std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> &tileInfo,
-    const std::tuple<uint64_t, uint64_t, uint64_t> &params,
-    std::vector<std::tuple<uint64_t, uint64_t>> &tileClash) const
+    const std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>& tileInfo,
+    const std::tuple<uint64_t, uint64_t, uint64_t>& params,
+    std::vector<std::tuple<uint64_t, uint64_t>>& tileClash) const
 {
     uint64_t outTail = std::get<OUT_TAIL_INDEX>(tileInfo);
     uint64_t innerTail = std::get<INNER_TAIL_INDEX>(tileInfo);
@@ -1145,9 +1145,9 @@ bool Mc2QuantBatchMatmulV3BasicTiling::CheckTileClash(
            IsTileClash(outTail, innerTail, tileClash[L2_TAIL_INDEX], params);
 }
 
-uint64_t Mc2QuantBatchMatmulV3BasicTiling::CalcTile(uint64_t &outTile, uint64_t &innerTile, uint64_t &outL2Split,
-                                                    uint64_t &innerL2Split,
-                                                    const std::tuple<uint64_t, uint64_t, double> &params) const
+uint64_t Mc2QuantBatchMatmulV3BasicTiling::CalcTile(uint64_t& outTile, uint64_t& innerTile, uint64_t& outL2Split,
+                                                    uint64_t& innerL2Split,
+                                                    const std::tuple<uint64_t, uint64_t, double>& params) const
 {
     uint64_t outOriShape = outL2Split;
     uint64_t innerOriShape = innerL2Split;
@@ -1384,7 +1384,7 @@ uint64_t Mc2QuantBatchMatmulV3BasicTiling::GetTilingKey() const
 
 void Mc2QuantBatchMatmulV3BasicTiling::PrintBasicTiling() const
 {
-    const BasicTiling &tiling = basicTiling_;
+    const BasicTiling& tiling = basicTiling_;
     std::stringstream ss;
     ss << "m_size_per_npu: " << inputParams_.mSizePerNpu << "m_size: " << inputParams_.mSize
        << " n_size: " << inputParams_.nSize << " k_size: " << inputParams_.kSize

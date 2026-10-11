@@ -24,17 +24,17 @@ namespace MegaMoeImpl {
 namespace Activation {
 
 template <typename InputType>
-__simd_callee__ inline void LoadSwiGluInputAsFp32(AscendC::Reg::RegTensor<float> &dstReg,
-                                                  AscendC::Reg::RegTensor<InputType> &inputReg, __ubuf__ InputType *src,
+__simd_callee__ inline void LoadSwiGluInputAsFp32(AscendC::Reg::RegTensor<float>& dstReg,
+                                                  AscendC::Reg::RegTensor<InputType>& inputReg, __ubuf__ InputType* src,
                                                   AscendC::Reg::MaskReg computeMask)
 {
     AscendC::Reg::LoadAlign<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(inputReg, src);
     AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(dstReg, inputReg, computeMask);
 }
 
-__simd_callee__ inline void StoreSwiGluFp32AsBf16(__ubuf__ bfloat16_t *dst,
-                                                  AscendC::Reg::RegTensor<bfloat16_t> &outputReg,
-                                                  AscendC::Reg::RegTensor<float> &srcReg,
+__simd_callee__ inline void StoreSwiGluFp32AsBf16(__ubuf__ bfloat16_t* dst,
+                                                  AscendC::Reg::RegTensor<bfloat16_t>& outputReg,
+                                                  AscendC::Reg::RegTensor<float>& srcReg,
                                                   AscendC::Reg::MaskReg computeMask, AscendC::Reg::MaskReg storeMask)
 {
     AscendC::Reg::Cast<bfloat16_t, float, CAST_FP32_TO_BF16>(outputReg, srcReg, computeMask);
@@ -43,10 +43,10 @@ __simd_callee__ inline void StoreSwiGluFp32AsBf16(__ubuf__ bfloat16_t *dst,
 
 template <bool IsStep>
 __simd_callee__ inline void ComputeSwiGluRegFlow(
-    AscendC::Reg::RegTensor<float> &outputFp32Reg, AscendC::Reg::RegTensor<float> &gateFp32Reg,
-    AscendC::Reg::RegTensor<float> &upFp32Reg, AscendC::Reg::RegTensor<float> &negReg,
-    AscendC::Reg::RegTensor<float> &expReg, AscendC::Reg::RegTensor<float> &denominatorReg,
-    AscendC::Reg::RegTensor<float> &sigmoidReg, AscendC::Reg::MaskReg computeMask, float clampLimit)
+    AscendC::Reg::RegTensor<float>& outputFp32Reg, AscendC::Reg::RegTensor<float>& gateFp32Reg,
+    AscendC::Reg::RegTensor<float>& upFp32Reg, AscendC::Reg::RegTensor<float>& negReg,
+    AscendC::Reg::RegTensor<float>& expReg, AscendC::Reg::RegTensor<float>& denominatorReg,
+    AscendC::Reg::RegTensor<float>& sigmoidReg, AscendC::Reg::MaskReg computeMask, float clampLimit)
 {
     if constexpr (!IsStep) {
         AscendC::Reg::Mins(gateFp32Reg, gateFp32Reg, clampLimit, computeMask);
@@ -67,14 +67,14 @@ __simd_callee__ inline void ComputeSwiGluRegFlow(
 template <typename InputType, bool TopkWeightsPrefetch, bool IsStep>
 __simd_vf__ inline void RunSwiGLU(GatedActivationTileContext<InputType> context, float clampLimit)
 {
-    __ubuf__ InputType *gate = context.gate;
-    __ubuf__ InputType *up = context.up;
-    __ubuf__ bfloat16_t *output = context.output;
-    __ubuf__ float *topkWeights = context.topkWeights;
-    __ubuf__ InputType *gateTail = context.gateTail;
-    __ubuf__ InputType *upTail = context.upTail;
-    __ubuf__ bfloat16_t *outputTail = context.outputTail;
-    __ubuf__ bfloat16_t *additionalPaddingOutput = context.additionalPaddingOutput;
+    __ubuf__ InputType* gate = context.gate;
+    __ubuf__ InputType* up = context.up;
+    __ubuf__ bfloat16_t* output = context.output;
+    __ubuf__ float* topkWeights = context.topkWeights;
+    __ubuf__ InputType* gateTail = context.gateTail;
+    __ubuf__ InputType* upTail = context.upTail;
+    __ubuf__ bfloat16_t* outputTail = context.outputTail;
+    __ubuf__ bfloat16_t* additionalPaddingOutput = context.additionalPaddingOutput;
 
     const uint32_t inputRowStrideElements = context.inputRowStrideElements;
     const uint32_t outputRowStrideElements = context.outputRowStrideElements;

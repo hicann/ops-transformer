@@ -35,7 +35,7 @@ constexpr size_t HF32_ATTR_NUM = 4UL;
 constexpr size_t HF32_ATTR_INDEX = 3UL;
 constexpr size_t BIAS_IDX = 2UL;
 
-inline void GetFormat(const gert::TilingContext &context, Mc2MatMulV3Args &args)
+inline void GetFormat(const gert::TilingContext& context, Mc2MatMulV3Args& args)
 {
     ge::Format formatA = static_cast<ge::Format>(ge::GetPrimaryFormat(context.GetInputDesc(0)->GetStorageFormat()));
     ge::Format formatB = static_cast<ge::Format>(ge::GetPrimaryFormat(context.GetInputDesc(1)->GetStorageFormat()));
@@ -45,7 +45,7 @@ inline void GetFormat(const gert::TilingContext &context, Mc2MatMulV3Args &args)
     args.outFormat = (formatOut != ge::FORMAT_FRACTAL_NZ) ? ge::FORMAT_ND : formatOut;
 }
 
-inline void GetDtype(const gert::TilingContext &context, Mc2MatMulV3Args &args)
+inline void GetDtype(const gert::TilingContext& context, Mc2MatMulV3Args& args)
 {
     args.aType = context.GetInputDesc(0)->GetDataType();
     args.bType = context.GetInputDesc(1)->GetDataType();
@@ -63,7 +63,7 @@ inline void GetDtype(const gert::TilingContext &context, Mc2MatMulV3Args &args)
     OP_LOGD(args.opName, "Mc2MatMulV3 Hf32 flag is: %d", args.isHf32);
 }
 
-ge::graphStatus GetInputDims(const gert::Shape &storageShape, const gert::Shape &oriShape, uint64_t dtypeSize,
+ge::graphStatus GetInputDims(const gert::Shape& storageShape, const gert::Shape& oriShape, uint64_t dtypeSize,
                              ge::Format format, int64_t (&dims)[TWO_BATCH_DIM])
 {
     const size_t dimNum = storageShape.GetDimNum();
@@ -91,7 +91,7 @@ ge::graphStatus GetInputDims(const gert::Shape &storageShape, const gert::Shape 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IsValidDtype(const Mc2MatMulV3Args &args)
+ge::graphStatus IsValidDtype(const Mc2MatMulV3Args& args)
 {
     std::vector<ge::DataType> dtype = {args.aType, args.bType, args.cType};
     if (args.hasBias) {
@@ -105,7 +105,7 @@ ge::graphStatus IsValidDtype(const Mc2MatMulV3Args &args)
         {ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT},
         {ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_BF16} // david supports bias-bf16
     };
-    for (auto &supported : dtypeSuportList) {
+    for (auto& supported : dtypeSuportList) {
         if (std::equal(dtype.begin(), dtype.end(), supported.begin())) {
             return ge::GRAPH_SUCCESS;
         }
@@ -123,7 +123,7 @@ ge::graphStatus IsValidDtype(const Mc2MatMulV3Args &args)
     }
 }
 
-ge::graphStatus OpSpecificCheck(const gert::TilingContext &context, const Mc2MatMulV3Args &args)
+ge::graphStatus OpSpecificCheck(const gert::TilingContext& context, const Mc2MatMulV3Args& args)
 {
     const bool isMatMulV3 = (strcmp(context.GetNodeType(), "Mc2MatMulV3") == 0);
     const bool isBatchMatMulV3 = (strcmp(context.GetNodeType(), "Mc2BatchMatMulV3") == 0);
@@ -134,7 +134,7 @@ ge::graphStatus OpSpecificCheck(const gert::TilingContext &context, const Mc2Mat
 
     // check input dim num equals to 2
     if (isMatMulV3) {
-        auto isMatrix = [](const gert::Shape &oriShape) { return oriShape.GetDimNum() == TWO_BATCH_DIM; };
+        auto isMatrix = [](const gert::Shape& oriShape) { return oriShape.GetDimNum() == TWO_BATCH_DIM; };
         if (!isMatrix(context.GetInputShape(0)->GetOriginShape()) ||
             !isMatrix(context.GetInputShape(1)->GetOriginShape())) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
@@ -147,8 +147,8 @@ ge::graphStatus OpSpecificCheck(const gert::TilingContext &context, const Mc2Mat
 
     // check bias
     if (args.hasBias) {
-        const gert::Shape &biasShape = context.GetInputShape(BIAS_IDX)->GetOriginShape();
-        const gert::Shape &cShape = context.GetOutputShape(0)->GetOriginShape();
+        const gert::Shape& biasShape = context.GetInputShape(BIAS_IDX)->GetOriginShape();
+        const gert::Shape& cShape = context.GetOutputShape(0)->GetOriginShape();
         const int64_t biasValue = biasShape[biasShape.GetDimNum() - 1];
         const int64_t nOriValue = cShape[cShape.GetDimNum() - 1];
         if (biasValue != nOriValue) {
@@ -162,7 +162,7 @@ ge::graphStatus OpSpecificCheck(const gert::TilingContext &context, const Mc2Mat
     return IsValidDtype(args);
 }
 
-ge::graphStatus GetShape(const gert::TilingContext &context, Mc2MatMulV3Args &args)
+ge::graphStatus GetShape(const gert::TilingContext& context, Mc2MatMulV3Args& args)
 {
     // get transpose
     args.isATrans = *((context.GetAttrs())->GetAttrPointer<bool>(0));
@@ -206,7 +206,7 @@ ge::graphStatus GetShape(const gert::TilingContext &context, Mc2MatMulV3Args &ar
         return ge::GRAPH_FAILED;
     }
     // check output dim num
-    const gert::Shape &cShape = context.GetOutputShape(0)->GetOriginShape();
+    const gert::Shape& cShape = context.GetOutputShape(0)->GetOriginShape();
     const size_t cDimNum = cShape.GetDimNum();
     if (cDimNum < TWO_BATCH_DIM) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(args.opName, "output", (std::to_string(cDimNum) + "D").c_str(),
@@ -270,10 +270,10 @@ ge::graphStatus Mc2MatMulV3Tiling::DoTiling()
     if (GetShapeAttrsInfo() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    Mc2MatMulTilingCfg tilingCfg(false, context_->GetCompileInfo(), reinterpret_cast<void *>(&args_));
+    Mc2MatMulTilingCfg tilingCfg(false, context_->GetCompileInfo(), reinterpret_cast<void*>(&args_));
     OPS_CHECK_NULL_WITH_CONTEXT(context_, tilingCfg.compileInfo);
     platform_ascendc::SocVersion socVersion =
-        reinterpret_cast<const Mc2MatmulV3CompileInfo *>(tilingCfg.compileInfo)->socVersion;
+        reinterpret_cast<const Mc2MatmulV3CompileInfo*>(tilingCfg.compileInfo)->socVersion;
     auto platformInfo = context_->GetPlatformInfo();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     NpuArch npuArch = ascendcPlatform.GetCurNpuArch();

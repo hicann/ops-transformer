@@ -25,14 +25,14 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnMoeDistributeDispatchV2GetWorkspaceSize(
-    const aclTensor *x, const aclTensor *expertIds, const aclTensor *scalesOptional,
-    const aclTensor *xActiveMaskOptional, const aclTensor *expertScalesOptional, const char *groupEp,
-    int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, const char *groupTp, int64_t tpWorldSize,
+    const aclTensor* x, const aclTensor* expertIds, const aclTensor* scalesOptional,
+    const aclTensor* xActiveMaskOptional, const aclTensor* expertScalesOptional, const char* groupEp,
+    int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, const char* groupTp, int64_t tpWorldSize,
     int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum, int64_t sharedExpertRankNum, int64_t quantMode,
-    int64_t globalBs, int64_t expertTokenNumsType, const char *commAlg, aclTensor *expandXOut,
-    aclTensor *dynamicScalesOut, aclTensor *assistInfoForCombineOut, aclTensor *expertTokenNumsOut,
-    aclTensor *epRecvCountsOut, aclTensor *tpRecvCountsOut, aclTensor *expandScalesOut, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    int64_t globalBs, int64_t expertTokenNumsType, const char* commAlg, aclTensor* expandXOut,
+    aclTensor* dynamicScalesOut, aclTensor* assistInfoForCombineOut, aclTensor* expertTokenNumsOut,
+    aclTensor* epRecvCountsOut, aclTensor* tpRecvCountsOut, aclTensor* expandScalesOut, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     OP_LOGD("aclnn_dispatch v2 WorkspaceSize start");
     aclnnStatus getWorkspaceSizesRes = aclnnMoeDistributeDispatchGetWorkspaceSizeBase(
@@ -45,7 +45,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2GetWorkspaceSize(
     return getWorkspaceSizesRes;
 }
 
-aclnnStatus aclnnMoeDistributeDispatchV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMoeDistributeDispatchV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                          aclrtStream stream)
 {
     OP_LOGD("aclnn_dispatch v2 start");

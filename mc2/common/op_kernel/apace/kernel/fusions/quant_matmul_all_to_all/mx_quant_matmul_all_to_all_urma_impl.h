@@ -46,9 +46,9 @@ public:
     /**
      * @brief 初始化算子状态和参数
      */
-    __aicore__ inline void Init(__gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM,
+    __aicore__ inline void Init(__gm__ CommContext* hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM,
                                 GM_ADDR scaleBGM, GM_ADDR biasGM, GM_ADDR cGM,
-                                const MatmulAllToAllTilingData *tilingData);
+                                const MatmulAllToAllTilingData* tilingData);
 
     /**
      * @brief 执行算子逻辑（包含 AIC/AIV 分离逻辑）
@@ -84,8 +84,8 @@ public:
 
 private:
     // ---------------- 通信相关组件与参数 ----------------
-    __gm__ CommUbmemContext *barrierCtx_{nullptr};
-    __gm__ CommUdmaContext *udmaCtx_{nullptr};
+    __gm__ CommUbmemContext* barrierCtx_{nullptr};
+    __gm__ CommUdmaContext* udmaCtx_{nullptr};
     CollectiveComm<CommCollectiveOp::AllToAll, CommMode::GET, CType, TeamBarrier> allToAll_;
     TeamBarrier teamBarrier_;
     Apace::Basic::BufferChannel bufferChannel_;
@@ -124,12 +124,12 @@ private:
 
     static constexpr uint16_t MTE1_MTE2_EVENT_FLAG = 6;
     static constexpr uint64_t SIZE_SHIFT = Blaze::Gemm::IsFp4<AType>() ? 1 : 0;
-    const MatmulAllToAllTilingData *tilingData_{nullptr};
+    const MatmulAllToAllTilingData* tilingData_{nullptr};
 
     // ---------------- 私有方法 ----------------
     __aicore__ inline void InitBaseParams();
-    __aicore__ inline void SetupParams(const QuantMatmulTilingData &mmTile, uint32_t batchSize,
-                                       uint32_t batchRankOffset, bool isLocal, Params &params);
+    __aicore__ inline void SetupParams(const QuantMatmulTilingData& mmTile, uint32_t batchSize,
+                                       uint32_t batchRankOffset, bool isLocal, Params& params);
     __aicore__ inline void RunMatmul();
     __aicore__ inline void RunLocalMatmul();
     __aicore__ inline void RunAllToAll();
@@ -141,8 +141,8 @@ private:
 
 template <typename AType, typename BType, typename CType, bool LocalDelay>
 __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::Init(
-    __gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM, GM_ADDR biasGM,
-    GM_ADDR cGM, const MatmulAllToAllTilingData *tilingData)
+    __gm__ CommContext* hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM, GM_ADDR biasGM,
+    GM_ADDR cGM, const MatmulAllToAllTilingData* tilingData)
 {
     tilingData_ = tilingData;
 
@@ -225,7 +225,7 @@ __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::In
 
 template <typename AType, typename BType, typename CType, bool LocalDelay>
 __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::SetupParams(
-    const QuantMatmulTilingData &mmTile, uint32_t batchSize, uint32_t batchRankOffset, bool isLocal, Params &params)
+    const QuantMatmulTilingData& mmTile, uint32_t batchSize, uint32_t batchRankOffset, bool isLocal, Params& params)
 {
     // problemShape 语义为 [M, N, K, Batch]：M 为当前 tiling 的 tile 行数（主/尾/local块不同），
     // N/K 每卡固定，Batch 等于参与计算的 rank 数
@@ -379,8 +379,8 @@ __aicore__ inline void MatmulAllToAllMxImpl<AType, BType, CType, LocalDelay>::Ru
     if (GetBlockIdx() < baseParams_.rankSize) {
         allToAll_.Finalize();
     }
-    dcci(reinterpret_cast<__gm__ void *>(udmaCtx_->commBufferAddrs),
-         static_cast<uint64_t>(CacheLine::ENTIRE_DATA_CACHE), static_cast<uint64_t>(DcciDst::CACHELINE_OUT));
+    dcci(reinterpret_cast<__gm__ void*>(udmaCtx_->commBufferAddrs), static_cast<uint64_t>(CacheLine::ENTIRE_DATA_CACHE),
+         static_cast<uint64_t>(DcciDst::CACHELINE_OUT));
 }
 
 } // namespace Apace

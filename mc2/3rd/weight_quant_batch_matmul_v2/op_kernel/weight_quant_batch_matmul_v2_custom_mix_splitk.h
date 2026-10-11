@@ -60,7 +60,7 @@ public:
     __aicore__ inline Mc2WeightQuantBatchMatmulV2MixSplitKKernel(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                                const Mc2WeightQuantBatchMatmulV2TilingData *tilingData, TPipe *tPipe);
+                                const Mc2WeightQuantBatchMatmulV2TilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void UpdateGlobalAddr(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                             GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y,
                                             GM_ADDR workspace);
@@ -155,9 +155,9 @@ Mc2WeightQuantBatchMatmulV2MixSplitKKernel<xType, wType, biasType, yType, aTrans
 {
     // 当前cv绑核固定，需要四份
     uint64_t weithCacheSize = 4 * this->weightCacheSizeAlign_ * sizeof(xType);
-    this->weightCache_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(workspace));
+    this->weightCache_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(workspace));
 
-    this->matmulAtomicAddResult_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspace + weithCacheSize));
+    this->matmulAtomicAddResult_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace + weithCacheSize));
 }
 
 template <typename xType, typename wType, typename biasType, typename yType, bool aTrans, bool bTrans,
@@ -166,7 +166,7 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2MixSplitKKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset,
     quantType>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR quantScale,
                      GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                     const Mc2WeightQuantBatchMatmulV2TilingData *tilingData, TPipe *tPipe)
+                     const Mc2WeightQuantBatchMatmulV2TilingData* tilingData, TPipe* tPipe)
 {
     this->BaseInit(tilingData, tPipe);
     this->InitInput(x, weight, antiquantScale, antiquantOffset, quantScale, quantOffset, bias, y);

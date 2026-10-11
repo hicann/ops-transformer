@@ -46,9 +46,9 @@ int64_t CheckAndGetGroupSize(at::IntArrayRef groupSizeList)
     return groups;
 }
 
-static void CheckNpuAlltoAllQuantMatmulInputs(const at::Tensor &x1, const at::Tensor &x2, int64_t worldSize,
-                                              const c10::optional<at::Tensor> &x1ScaleOptional,
-                                              const c10::optional<at::Tensor> &x2ScaleOptional)
+static void CheckNpuAlltoAllQuantMatmulInputs(const at::Tensor& x1, const at::Tensor& x2, int64_t worldSize,
+                                              const c10::optional<at::Tensor>& x1ScaleOptional,
+                                              const c10::optional<at::Tensor>& x2ScaleOptional)
 {
     TORCH_CHECK(x1.dim() == DIM_TWO,
                 "The x1 input of alltoallquantmatmul is required to be 2D, but the actual x1 input is ", x1.dim(),
@@ -104,7 +104,7 @@ static at::ScalarType GetOutputScalarType(c10::optional<int64_t> yDtype)
     return at::kFloat;
 }
 
-static aclDataType GetTensorAclDtype(c10::optional<int64_t> dtype, const at::Tensor &tensor)
+static aclDataType GetTensorAclDtype(c10::optional<int64_t> dtype, const at::Tensor& tensor)
 {
     if (dtype.has_value() && dtype.value() != -1) {
         return GetAclDataType(dtype.value());
@@ -113,9 +113,9 @@ static aclDataType GetTensorAclDtype(c10::optional<int64_t> dtype, const at::Ten
 }
 
 std::tuple<at::Tensor, at::Tensor> NpuAlltoAllQuantMatmul(
-    const at::Tensor &context, const at::Tensor &x1, const at::Tensor &x2, int64_t hcclBufferSize, std::string group,
-    int64_t worldSize, const c10::optional<at::Tensor> &biasOptional, const c10::optional<at::Tensor> &x1ScaleOptional,
-    const c10::optional<at::Tensor> &x2ScaleOptional, c10::optional<int64_t> x1QuantMode,
+    const at::Tensor& context, const at::Tensor& x1, const at::Tensor& x2, int64_t hcclBufferSize, std::string group,
+    int64_t worldSize, const c10::optional<at::Tensor>& biasOptional, const c10::optional<at::Tensor>& x1ScaleOptional,
+    const c10::optional<at::Tensor>& x2ScaleOptional, c10::optional<int64_t> x1QuantMode,
     c10::optional<int64_t> x2QuantMode, c10::IntArrayRef groupSizes, c10::optional<int64_t> x1Dtype,
     c10::optional<int64_t> x2Dtype, c10::optional<int64_t> x1ScaleDtype, c10::optional<int64_t> x2ScaleDtype,
     c10::optional<int64_t> yDtype, std::string commMode, c10::optional<int64_t> precisionMode)
@@ -139,16 +139,16 @@ std::tuple<at::Tensor, at::Tensor> NpuAlltoAllQuantMatmul(
 
     std::string commModeStr(commMode);
     std::string groupStr(group);
-    char *commModePtr = const_cast<char *>(commModeStr.c_str());
-    char *groupPtr = const_cast<char *>(groupStr.c_str());
+    char* commModePtr = const_cast<char*>(commModeStr.c_str());
+    char* groupPtr = const_cast<char*>(groupStr.c_str());
     int64_t x1QuantModeVal = x1QuantMode.has_value() ? x1QuantMode.value() : DYN_PERTOKEN_QUANT_MODE;
     int64_t x2QuantModeVal = x2QuantMode.has_value() ? x2QuantMode.value() : PERCHANNEL_QUANT_MODE;
     int64_t precisionModeVal = precisionMode.has_value() ? precisionMode.value() : 0;
 
     aclDataType x1AclDtype = GetTensorAclDtype(x1Dtype, x1);
     aclDataType x2AclDtype = GetTensorAclDtype(x2Dtype, x2);
-    const at::Tensor &x1ScaleReal = x1ScaleOptional.value_or(at::Tensor());
-    const at::Tensor &x2ScaleReal = x2ScaleOptional.value_or(at::Tensor());
+    const at::Tensor& x1ScaleReal = x1ScaleOptional.value_or(at::Tensor());
+    const at::Tensor& x2ScaleReal = x2ScaleOptional.value_or(at::Tensor());
     aclDataType x1ScaleAclDtype = GetTensorAclDtype(x1ScaleDtype, x1ScaleReal);
     aclDataType x2ScaleAclDtype = GetTensorAclDtype(x2ScaleDtype, x2ScaleReal);
 

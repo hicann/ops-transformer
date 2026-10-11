@@ -44,7 +44,7 @@ TEST_F(AclnnAllGatherMatmulNullptrTest, TestAllGatherFirstApiX2NonContiguousWith
 
     // 预期：由于 x2 是非连续的（非转置），应该返回 ACLNN_ERR_PARAM_INVALID
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -58,7 +58,7 @@ TEST_F(AclnnAllGatherMatmulNullptrTest, TestStreamModeInvalid)
     auto ut = OP_API_UT(aclnnAllGatherMatmul, INPUT(x1Desc, x2Desc, nullptr, "test_all_gather_group", 0, 8, 0),
                         OUTPUT(outDesc, gatherOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -73,7 +73,7 @@ TEST_F(AclnnAllGatherMatmulNullptrTest, TestAscend910A5Platform)
     auto ut = OP_API_UT(aclnnAllGatherMatmul, INPUT(x1Desc, x2Desc, nullptr, "test_all_gather_group", 0, 8, 1),
                         OUTPUT(outDesc, gatherOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_SUCCESS);
     op::SetPlatformNpuArch(Ops::Base::DAV_3103);

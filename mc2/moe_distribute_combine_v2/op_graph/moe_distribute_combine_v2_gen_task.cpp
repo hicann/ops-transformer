@@ -25,7 +25,7 @@
 
 namespace ops {
 static const size_t ATTR_INDEX_COMM_ALG_DISTRIBUTE_COMBINE_V2 = 14;
-ge::Status MoeDistributeCombineV2CalcParamFunc(gert::ExeResGenerationContext *context)
+ge::Status MoeDistributeCombineV2CalcParamFunc(gert::ExeResGenerationContext* context)
 {
     if ((IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5)) &&
         (Mc2Arch35GenTaskOpsUtils::GetCommAlg(context, ATTR_INDEX_COMM_ALG_DISTRIBUTE_COMBINE_V2) != COMM_ALG_MTE)) {
@@ -36,10 +36,10 @@ ge::Status MoeDistributeCombineV2CalcParamFunc(gert::ExeResGenerationContext *co
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, "aicpu kfc server", "kfc_stream");
 }
 
-ge::Status MoeDistributeCombineV2GenTaskFunc(const gert::ExeResGenerationContext *context,
-                                             std::vector<std::vector<uint8_t>> &tasks)
+ge::Status MoeDistributeCombineV2GenTaskFunc(const gert::ExeResGenerationContext* context,
+                                             std::vector<std::vector<uint8_t>>& tasks)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     if (IsTargetPlatformSocVersion(nodeName, PLATFORM_A2)) {
         OPS_LOG_D(nodeName, "Do A2 gen task.");
         return Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallback(context, tasks);

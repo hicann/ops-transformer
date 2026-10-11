@@ -71,9 +71,9 @@ public:
         scaleDivFloatTensor_ = scaleDivFloatTensor;
     }
 
-    __aicore__ inline void QuantInit(uint32_t &scaleNum_, uint32_t &hExpandXAlign32Size_, uint32_t &hExpandXAlignSize_,
-                                     uint32_t &scaleNumAlignSize_, uint32_t &hFloatAlign256Size_,
-                                     uint32_t &tokenScaleCnt_, uint32_t axisH)
+    __aicore__ inline void QuantInit(uint32_t& scaleNum_, uint32_t& hExpandXAlign32Size_, uint32_t& hExpandXAlignSize_,
+                                     uint32_t& scaleNumAlignSize_, uint32_t& hFloatAlign256Size_,
+                                     uint32_t& tokenScaleCnt_, uint32_t axisH)
     {
         axisH_ = axisH;
         if constexpr (QuantMode == INT8_COMM_QUANT) {
@@ -104,7 +104,7 @@ public:
 #endif
     }
 
-    __aicore__ inline void Int8QuantProcess(LocalTensor<ExpandXType> &outLocal, LocalTensor<ExpandXType> &inLocal)
+    __aicore__ inline void Int8QuantProcess(LocalTensor<ExpandXType>& outLocal, LocalTensor<ExpandXType>& inLocal)
     {
         castLocalTensor_ = outLocal.template ReinterpretCast<int8_t>(); // 长度为int8H_Align + scaleNum
         scaleDivTensor_ = castLocalTensor_[hAlign32Size_].template ReinterpretCast<ExpandXType>(); // 偏移前面的int8
@@ -130,7 +130,7 @@ public:
         SyncFunc<AscendC::HardEvent::V_MTE3>();
     }
 
-    __aicore__ inline void Int8DequantProcess(LocalTensor<XType> &inLocal, LocalTensor<XType> &outLocal)
+    __aicore__ inline void Int8DequantProcess(LocalTensor<XType>& inLocal, LocalTensor<XType>& outLocal)
     {
         castLocalTensor_ = inLocal.template ReinterpretCast<int8_t>();
         scaleDivTensor_ = inLocal[hAlign32Size_ / INT8_DIVIVE];
@@ -149,7 +149,7 @@ public:
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
     template <bool ApplyExpertScale = true>
-    __aicore__ inline void Int8DequantProcessA5(LocalTensor<XType> &inLocal, LocalTensor<float> &sumFinalTensor,
+    __aicore__ inline void Int8DequantProcessA5(LocalTensor<XType>& inLocal, LocalTensor<float>& sumFinalTensor,
                                                 float scaleVal)
     {
         LocalTensor<int8_t> tokenInt8Tensor = inLocal.template ReinterpretCast<int8_t>();
@@ -160,9 +160,9 @@ public:
         Brcb(scaleDupLocalTensor_, scaleDivFloatTensor_, repeatNum_, {1, BLOCK_NUM});
         PipeBarrier<PIPE_V>();
 
-        __ubuf__ int8_t *tokenPtr0 = (__ubuf__ int8_t *)tokenInt8Tensor.GetPhyAddr();
-        __ubuf__ float *dyScaleFp32Ptr = (__ubuf__ float *)scaleDupLocalTensor_.GetPhyAddr();
-        __ubuf__ float *sumFinalDstPtr = (__ubuf__ float *)sumFinalTensor.GetPhyAddr();
+        __ubuf__ int8_t* tokenPtr0 = (__ubuf__ int8_t*)tokenInt8Tensor.GetPhyAddr();
+        __ubuf__ float* dyScaleFp32Ptr = (__ubuf__ float*)scaleDupLocalTensor_.GetPhyAddr();
+        __ubuf__ float* sumFinalDstPtr = (__ubuf__ float*)sumFinalTensor.GetPhyAddr();
 
         uint32_t fp32RepeatSize = Quant::GetVRegSizeDispatch() / sizeof(float);
         uint32_t elementsPerRepeat = fp32RepeatSize * INT8_DIVIVE;
@@ -253,15 +253,15 @@ public:
             }
         }
     }
-    __aicore__ inline void QuantMxFp8(LocalTensor<ExpandXType> &outLocal, LocalTensor<ExpandXType> &inLocal)
+    __aicore__ inline void QuantMxFp8(LocalTensor<ExpandXType>& outLocal, LocalTensor<ExpandXType>& inLocal)
     {
         uint32_t mxScaleNum = Align2(Ceil32(axisH_));
-        __ubuf__ ExpandXType *srcAddr = (__ubuf__ ExpandXType *)inLocal.GetPhyAddr();
-        __ubuf__ uint16_t *maxExpAddr = (__ubuf__ uint16_t *)floatLocalTemp_.GetPhyAddr();
-        __ubuf__ uint16_t *halfScaleLocalAddr = (__ubuf__ uint16_t *)floatLocalTemp_[Align32(mxScaleNum)].GetPhyAddr();
-        __ubuf__ int8_t *outLocalAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
-        __ubuf__ uint16_t *mxScaleLocalAddr =
-            (__ubuf__ uint16_t *)outLocal[Align256<uint32_t>(axisH_) / INT8_DIVIVE].GetPhyAddr();
+        __ubuf__ ExpandXType* srcAddr = (__ubuf__ ExpandXType*)inLocal.GetPhyAddr();
+        __ubuf__ uint16_t* maxExpAddr = (__ubuf__ uint16_t*)floatLocalTemp_.GetPhyAddr();
+        __ubuf__ uint16_t* halfScaleLocalAddr = (__ubuf__ uint16_t*)floatLocalTemp_[Align32(mxScaleNum)].GetPhyAddr();
+        __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
+        __ubuf__ uint16_t* mxScaleLocalAddr =
+            (__ubuf__ uint16_t*)outLocal[Align256<uint32_t>(axisH_) / INT8_DIVIVE].GetPhyAddr();
         Quant::ComputeMaxExp(srcAddr, maxExpAddr, axisH_); // 计算最大Exp
         if constexpr (QuantMode == MXFP8_E5M2_COMM_QUANT) {
             // 计算scales并填充
@@ -279,17 +279,17 @@ public:
     }
 
     template <typename T, bool ApplyExpertScale = true>
-    __aicore__ inline void DeQuantMxFp8(LocalTensor<XType> &inLocal, LocalTensor<float> &sumTensor,
-                                        LocalTensor<float> &sumFinalTensor, float scaleVal)
+    __aicore__ inline void DeQuantMxFp8(LocalTensor<XType>& inLocal, LocalTensor<float>& sumTensor,
+                                        LocalTensor<float>& sumFinalTensor, float scaleVal)
     {
         LocalTensor<T> castFp8LocalTensor_ = inLocal.template ReinterpretCast<T>();
         // bf16/fp16量化为mxfp8后，字节差2倍
         LocalTensor<fp8_e8m0_t> scaleDivFp8Tensor_ =
             inLocal[Align256<uint32_t>(axisH_) / INT8_DIVIVE].template ReinterpretCast<fp8_e8m0_t>();
-        __ubuf__ float *dyScaleFp32Ptr = (__ubuf__ float *)scaleDupLocalTensor_.GetPhyAddr(); // 大小是h*2字节
-        __ubuf__ fp8_e8m0_t *srcPtr0 = (__ubuf__ fp8_e8m0_t *)scaleDivFp8Tensor_.GetPhyAddr();
-        __ubuf__ T *tokenPtr0 = (__ubuf__ T *)castFp8LocalTensor_.GetPhyAddr();
-        __ubuf__ float *sumFinalDstPtr = (__ubuf__ float *)sumFinalTensor.GetPhyAddr();
+        __ubuf__ float* dyScaleFp32Ptr = (__ubuf__ float*)scaleDupLocalTensor_.GetPhyAddr(); // 大小是h*2字节
+        __ubuf__ fp8_e8m0_t* srcPtr0 = (__ubuf__ fp8_e8m0_t*)scaleDivFp8Tensor_.GetPhyAddr();
+        __ubuf__ T* tokenPtr0 = (__ubuf__ T*)castFp8LocalTensor_.GetPhyAddr();
+        __ubuf__ float* sumFinalDstPtr = (__ubuf__ float*)sumFinalTensor.GetPhyAddr();
         uint32_t fp32RepeatSize = Quant::GetVRegSizeDispatch() / sizeof(float); // 64
         uint16_t repeatTimes = Ceil(quantScaleNum_, fp32RepeatSize);
         uint16_t fp32RepeatTimes = Ceil(axisH_, fp32RepeatSize * INT8_DIVIVE);
@@ -321,8 +321,8 @@ public:
                 maskReg = AscendC::Reg::UpdateMask<float>(quantScaleNum_);
                 Reg::DataCopy<fp8_e8m0_t, Reg::LoadDist::DIST_UNPACK4_B8>(vSrcReg, srcPtr0 + i * fp32RepeatSize);
                 // cast e8m0 to FP32
-                Reg::ShiftLefts((AscendC::Reg::RegTensor<uint32_t> &)dyScaleFp32Reg,
-                                (AscendC::Reg::RegTensor<uint32_t> &)vSrcReg, expShift, maskReg);
+                Reg::ShiftLefts((AscendC::Reg::RegTensor<uint32_t>&)dyScaleFp32Reg,
+                                (AscendC::Reg::RegTensor<uint32_t>&)vSrcReg, expShift, maskReg);
                 Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(dyScaleFp32Ptr + i * fp32RepeatSize * INT8_DIVIVE,
                                                                      dyScaleFp32Reg, dyScaleFp32Reg, maskReg);
             }
@@ -356,7 +356,7 @@ public:
         }
     }
 #endif
-    __aicore__ inline void QuantProcess(LocalTensor<ExpandXType> &outLocal, LocalTensor<ExpandXType> &inLocal)
+    __aicore__ inline void QuantProcess(LocalTensor<ExpandXType>& outLocal, LocalTensor<ExpandXType>& inLocal)
     {
         if constexpr (QuantMode == INT8_COMM_QUANT) {
             Int8QuantProcess(outLocal, inLocal);
@@ -367,8 +367,8 @@ public:
         }
 #endif
     }
-    __aicore__ inline void DeQuantProcess(LocalTensor<XType> &inLocal, LocalTensor<XType> &outLocal,
-                                          LocalTensor<float> &sumTensor, LocalTensor<float> &sumFinalTensor,
+    __aicore__ inline void DeQuantProcess(LocalTensor<XType>& inLocal, LocalTensor<XType>& outLocal,
+                                          LocalTensor<float>& sumTensor, LocalTensor<float>& sumFinalTensor,
                                           float scaleVal)
     {
         if constexpr (QuantMode == INT8_COMM_QUANT) {
@@ -388,9 +388,9 @@ public:
 #endif
     }
 
-    __aicore__ inline void DeQuantProcessWithoutExpertScale(LocalTensor<XType> &inLocal, LocalTensor<XType> &outLocal,
-                                                            LocalTensor<float> &sumTensor,
-                                                            LocalTensor<float> &sumFinalTensor)
+    __aicore__ inline void DeQuantProcessWithoutExpertScale(LocalTensor<XType>& inLocal, LocalTensor<XType>& outLocal,
+                                                            LocalTensor<float>& sumTensor,
+                                                            LocalTensor<float>& sumFinalTensor)
     {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         if constexpr (QuantMode == INT8_COMM_QUANT) {

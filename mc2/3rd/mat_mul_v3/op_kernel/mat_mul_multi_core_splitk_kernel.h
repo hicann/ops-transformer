@@ -19,7 +19,7 @@
 namespace Mc2MatmulV3 {
 
 template <class C_T>
-__aicore__ inline void ClearOutput(GlobalTensor<C_T> &cGlobal, const TCubeTiling &tiling, TPipe &pipe)
+__aicore__ inline void ClearOutput(GlobalTensor<C_T>& cGlobal, const TCubeTiling& tiling, TPipe& pipe)
 {
     // Init output
     uint64_t c0Size = 32 / sizeof(C_T); // 清零数据32B对齐
@@ -47,7 +47,7 @@ __aicore__ inline void ClearOutput(GlobalTensor<C_T> &cGlobal, const TCubeTiling
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
 __aicore__ inline void Mc2MatMulBlockMultiCoreSplitK(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM,
-                                                     const TCubeTiling &tiling)
+                                                     const TCubeTiling& tiling)
 {
     using A_T = typename A_TYPE::T;
     using B_T = typename B_TYPE::T;
@@ -55,9 +55,9 @@ __aicore__ inline void Mc2MatMulBlockMultiCoreSplitK(GM_ADDR aGM, GM_ADDR bGM, G
     GlobalTensor<A_T> aGlobal;
     GlobalTensor<B_T> bGlobal;
     GlobalTensor<C_T> cGlobal;
-    aGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM), tiling.M * tiling.Ka);
-    bGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM), tiling.Kb * tiling.N);
-    cGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM), tiling.M * tiling.N);
+    aGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ A_T*>(aGM), tiling.M * tiling.Ka);
+    bGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ B_T*>(bGM), tiling.Kb * tiling.N);
+    cGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ C_T*>(cGM), tiling.M * tiling.N);
     TPipe pipe;
     ClearOutput<C_T>(cGlobal, tiling, pipe);
 
@@ -104,12 +104,12 @@ __aicore__ inline void Mc2MatMulBlockMultiCoreSplitK(GM_ADDR aGM, GM_ADDR bGM, G
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, FIXPIPE_OPT_SELECT FIXPIPE_OPT>
 __aicore__ inline void Mc2MatMulMultiCoreSplitK(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM,
-                                                const Mc2MatmulV3TilingData &matmulTilingData, GM_ADDR workspaceGM)
+                                                const Mc2MatmulV3TilingData& matmulTilingData, GM_ADDR workspaceGM)
 {
     if ASCEND_IS_AIV {
         return;
     }
-    const TCubeTiling &tiling = matmulTilingData.matmulTiling;
+    const TCubeTiling& tiling = matmulTilingData.matmulTiling;
     if ASCEND_IS_AIC {
         Mc2MatMulBlockMultiCoreSplitK<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>(aGM, bGM, cGM, biasGM, tiling);
         return;

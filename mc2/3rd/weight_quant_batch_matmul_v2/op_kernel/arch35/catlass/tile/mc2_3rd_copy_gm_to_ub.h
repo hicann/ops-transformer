@@ -19,7 +19,7 @@ using AscendC::GlobalTensor;
 using AscendC::LocalTensor;
 
 template <typename T>
-DEVICE void CopyGmToUbIntervalDataCopy(const LocalTensor<T> &dst, const GlobalTensor<T> &src, uint32_t blockCount,
+DEVICE void CopyGmToUbIntervalDataCopy(const LocalTensor<T>& dst, const GlobalTensor<T>& src, uint32_t blockCount,
                                        uint32_t blockLen, uint32_t dstInnerLength, uint32_t srcInnerLength)
 {
 #if defined(__CCE_KT_TEST__)

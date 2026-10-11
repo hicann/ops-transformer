@@ -53,7 +53,7 @@ struct AllGatherMatmulTilingDataFp8 {
       ((ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN) || (ORIG_DTYPE_X2 == DT_FLOAT8_E5M2))) || \
      ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && (ORIG_DTYPE_X1 == DT_FLOAT4_E2M1)))
 struct MC2TileInfo {
-    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *mmTiling;
+    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* mmTiling;
     uint64_t aOffset;
     uint64_t aAddrOffset;
     uint64_t cOffset;

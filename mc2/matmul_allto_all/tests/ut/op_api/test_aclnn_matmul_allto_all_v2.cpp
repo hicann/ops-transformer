@@ -51,8 +51,8 @@ struct MatmulAlltoAllV2AclnnTestParam {
     aclFormat biasFormat;
     aclFormat outputFormat;
     vector<int64_t> alltoAllAxesOptional;
-    char *group;
-    const char *commMode; // 新增：通信引擎参数
+    char* group;
+    const char* commMode; // 新增：通信引擎参数
     bool transposeX1;
     bool transposeX2;
     aclnnStatus aclnnStatusUt;
@@ -881,19 +881,19 @@ static MatmulAlltoAllV2AclnnTestParam g_v2_casesParams_a5[] = {
      false,
      ACLNN_ERR_PARAM_NULLPTR}};
 
-static aclTensor *CreateAclTensor(const std::vector<int64_t> &shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensor(const std::vector<int64_t>& shape, aclDataType dataType, aclFormat format)
 {
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
         strides[i] = shape[i + 1] * strides[i + 1];
     }
-    aclTensor *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
+    aclTensor* tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
                                         shape.size(), nullptr);
     assert(tensor != nullptr);
     return tensor;
 }
 
-static void TestV2OneParamCase(const MatmulAlltoAllV2AclnnTestParam &param)
+static void TestV2OneParamCase(const MatmulAlltoAllV2AclnnTestParam& param)
 {
     std::cout << "run case " << param.caseName << std::endl;
     vector<int64_t> x1Shape = param.x1Shape;
@@ -909,21 +909,21 @@ static void TestV2OneParamCase(const MatmulAlltoAllV2AclnnTestParam &param)
     aclFormat biasFormat = param.biasFormat;
     aclFormat outputFormat = param.outputFormat;
     vector<int64_t> axesAcl = param.alltoAllAxesOptional;
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
-    const char *group = param.group;
-    const char *commMode = param.commMode;
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    const char* group = param.group;
+    const char* commMode = param.commMode;
     bool transposeX1 = param.transposeX1;
     bool transposeX2 = param.transposeX2;
     aclnnStatus retStatus = param.aclnnStatusUt;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet;
 
     if (param.x1Null || param.x2Null || param.outputNull) {
-        aclTensor *x1Ptr = param.x1Null ? nullptr : CreateAclTensor(x1Shape, x1Dtype, x1Format);
-        aclTensor *x2Ptr = param.x2Null ? nullptr : CreateAclTensor(x2Shape, x2Dtype, x2Format);
-        aclTensor *outputPtr = param.outputNull ? nullptr : CreateAclTensor(outputShape, outputDtype, outputFormat);
-        aclTensor *biasPtr = biasShape.empty() ? nullptr : CreateAclTensor(biasShape, biasDtype, biasFormat);
+        aclTensor* x1Ptr = param.x1Null ? nullptr : CreateAclTensor(x1Shape, x1Dtype, x1Format);
+        aclTensor* x2Ptr = param.x2Null ? nullptr : CreateAclTensor(x2Shape, x2Dtype, x2Format);
+        aclTensor* outputPtr = param.outputNull ? nullptr : CreateAclTensor(outputShape, outputDtype, outputFormat);
+        aclTensor* biasPtr = biasShape.empty() ? nullptr : CreateAclTensor(biasShape, biasDtype, biasFormat);
         auto ut =
             OP_API_UT(aclnnMatmulAlltoAllV2,
                       INPUT(x1Ptr, x2Ptr, biasPtr, alltoAllAxesOptional, group, commMode, transposeX1, transposeX2),

@@ -74,7 +74,7 @@ ge::graphStatus Mc2WeightQuantBatchMatmulV2Msd::PostTiling()
     OP_LOGD(opName_, "set blkDim %d", blkDim);
     errno_t ret =
         memcpy_s(context_->GetTilingData<Mc2WeightQuantBatchMatmulV2MsdTilingData>(),
-                 context_->GetRawTilingData()->GetCapacity(), reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                 context_->GetRawTilingData()->GetCapacity(), reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -461,7 +461,7 @@ uint64_t Mc2WeightQuantBatchMatmulV2Msd::GetTilingKey() const
 // 6、计算Workspace 大小
 ge::graphStatus Mc2WeightQuantBatchMatmulV2Msd::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "failed to get workspace size"), return ge::GRAPH_FAILED);
     workspaces[0] = 64 * 1024 * 1024; // workspace 固定使用 64 * 1024 * 1024
     return ge::GRAPH_SUCCESS;

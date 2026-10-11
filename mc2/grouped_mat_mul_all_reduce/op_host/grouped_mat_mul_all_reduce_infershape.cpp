@@ -43,8 +43,8 @@ static ge::graphStatus CheckSplitItemGmmAr(int32_t splitItem)
     }
 }
 
-static graphStatus CheckDims(const gert::InferShapeContext *context, const gert::Shape *xShape,
-                             const gert::Shape *weightShape, int32_t splitItem)
+static graphStatus CheckDims(const gert::InferShapeContext* context, const gert::Shape* xShape,
+                             const gert::Shape* weightShape, int32_t splitItem)
 {
     auto result = GRAPH_SUCCESS;
 
@@ -75,10 +75,10 @@ static graphStatus CheckDims(const gert::InferShapeContext *context, const gert:
     return result;
 }
 
-static graphStatus UpdateShapeYMultiDimGMMAllReduce(gert::InferShapeContext *context, size_t yIndex,
-                                                    const gert::Shape *xShape, const gert::Shape *weightShape)
+static graphStatus UpdateShapeYMultiDimGMMAllReduce(gert::InferShapeContext* context, size_t yIndex,
+                                                    const gert::Shape* xShape, const gert::Shape* weightShape)
 {
-    gert::Shape *yShape = context->GetOutputShape(yIndex);
+    gert::Shape* yShape = context->GetOutputShape(yIndex);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
     *yShape = *xShape;
     size_t dimY = yShape->GetDimNum();
@@ -86,9 +86,9 @@ static graphStatus UpdateShapeYMultiDimGMMAllReduce(gert::InferShapeContext *con
     return GRAPH_SUCCESS;
 }
 
-static graphStatus UpdateShapeYGMMAllReduce(gert::InferShapeContext *context, size_t yIndex, int64_t dim0, int64_t dim1)
+static graphStatus UpdateShapeYGMMAllReduce(gert::InferShapeContext* context, size_t yIndex, int64_t dim0, int64_t dim1)
 {
-    gert::Shape *yShape = context->GetOutputShape(yIndex);
+    gert::Shape* yShape = context->GetOutputShape(yIndex);
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
     auto xShape = context->GetInputShape(INDEX_IN_X);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
@@ -98,14 +98,14 @@ static graphStatus UpdateShapeYGMMAllReduce(gert::InferShapeContext *context, si
     return GRAPH_SUCCESS;
 }
 
-static graphStatus CheckSplitItem0(gert::InferShapeContext *context, size_t &idx)
+static graphStatus CheckSplitItem0(gert::InferShapeContext* context, size_t& idx)
 {
     while (1) {
-        const gert::Shape *xShape = context->GetDynamicInputShape(INDEX_IN_X, idx);
+        const gert::Shape* xShape = context->GetDynamicInputShape(INDEX_IN_X, idx);
         if (xShape == nullptr) {
             break;
         }
-        const gert::Shape *weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
+        const gert::Shape* weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
         OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
         OPS_CHECK(CheckDims(context, xShape, weightShape, 0) == GRAPH_FAILED,
                   VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "Invalid dims of x or weight."),
@@ -118,15 +118,15 @@ static graphStatus CheckSplitItem0(gert::InferShapeContext *context, size_t &idx
     return GRAPH_SUCCESS;
 }
 
-static graphStatus CheckSplitItem1(gert::InferShapeContext *context, size_t &idx)
+static graphStatus CheckSplitItem1(gert::InferShapeContext* context, size_t& idx)
 {
-    const gert::Tensor *groupListTensor = context->GetInputTensor(context->GetComputeNodeInputNum());
+    const gert::Tensor* groupListTensor = context->GetInputTensor(context->GetComputeNodeInputNum());
     OP_CHECK_NULL_WITH_CONTEXT(context, groupListTensor);
-    const gert::Shape *xShape = context->GetDynamicInputShape(INDEX_IN_X, 0);
+    const gert::Shape* xShape = context->GetDynamicInputShape(INDEX_IN_X, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
     int64_t preOffset = 0;
     while (1) {
-        const gert::Shape *weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
+        const gert::Shape* weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
         if (weightShape == nullptr) {
             break;
         }
@@ -149,16 +149,16 @@ static graphStatus CheckSplitItem1(gert::InferShapeContext *context, size_t &idx
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferCombinedOutputM(gert::InferShapeContext *context, size_t &idx, const int32_t *splitItem,
-                                        const gert::Shape *w0Shape)
+static graphStatus InferCombinedOutputM(gert::InferShapeContext* context, size_t& idx, const int32_t* splitItem,
+                                        const gert::Shape* w0Shape)
 {
     int64_t m = 0;
     while (1) {
-        const gert::Shape *xShape = context->GetDynamicInputShape(INDEX_IN_X, idx);
+        const gert::Shape* xShape = context->GetDynamicInputShape(INDEX_IN_X, idx);
         if (xShape == nullptr) {
             break;
         }
-        const gert::Shape *weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
+        const gert::Shape* weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
         OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
         OPS_CHECK(CheckDims(context, xShape, weightShape, *splitItem) == GRAPH_FAILED,
                   VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "Invalid dims of x or weight."),
@@ -172,11 +172,11 @@ static graphStatus InferCombinedOutputM(gert::InferShapeContext *context, size_t
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferMAxisShape(gert::InferShapeContext *context)
+static graphStatus InferMAxisShape(gert::InferShapeContext* context)
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int32_t *splitItem = attrs->GetAttrPointer<int32_t>(INDEX_ATTR_SPLIT_ITEM);
+    const int32_t* splitItem = attrs->GetAttrPointer<int32_t>(INDEX_ATTR_SPLIT_ITEM);
     OP_CHECK_NULL_WITH_CONTEXT(context, splitItem);
     OPS_CHECK(
         CheckSplitItemGmmAr(*splitItem) != GRAPH_SUCCESS,
@@ -198,10 +198,10 @@ static graphStatus InferMAxisShape(gert::InferShapeContext *context)
             return GRAPH_FAILED;
         }
     } else if (*splitItem == IN_SPLIT_OUT_SPLIT) {
-        const gert::Shape *xShape = context->GetDynamicInputShape(INDEX_IN_X, 0);
+        const gert::Shape* xShape = context->GetDynamicInputShape(INDEX_IN_X, 0);
         OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
         while (1) {
-            const gert::Shape *weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
+            const gert::Shape* weightShape = context->GetDynamicInputShape(INDEX_IN_WEIGHT, idx);
             if (weightShape == nullptr) {
                 break;
             }
@@ -218,7 +218,7 @@ static graphStatus InferMAxisShape(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-static graphStatus InferDataTypeGroupedMatMulAllReduce(gert::InferDataTypeContext *context)
+static graphStatus InferDataTypeGroupedMatMulAllReduce(gert::InferDataTypeContext* context)
 {
     auto x0Dtype = context->GetDynamicInputDataType(INDEX_IN_X, 0);
     auto w0Dtype = context->GetDynamicInputDataType(INDEX_IN_WEIGHT, 0);
@@ -247,9 +247,9 @@ static graphStatus InferDataTypeGroupedMatMulAllReduce(gert::InferDataTypeContex
         idxWeight++;
     }
 
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int32_t *splitItem = attrs->GetAttrPointer<int32_t>(INDEX_ATTR_SPLIT_ITEM);
+    const int32_t* splitItem = attrs->GetAttrPointer<int32_t>(INDEX_ATTR_SPLIT_ITEM);
     if (nullptr == splitItem) {
         return GRAPH_FAILED;
     }

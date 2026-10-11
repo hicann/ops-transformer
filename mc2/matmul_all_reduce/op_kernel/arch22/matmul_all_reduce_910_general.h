@@ -31,11 +31,11 @@ using namespace AscendC;
 template <typename xType, typename wType, typename yType, class mmType, Mc2CoreType coreType>
 class MatmulAllReduce910General : public MatmulAllReduceBase<xType, yType, coreType> {
 public:
-    __aicore__ inline MatmulAllReduce910General(MC2GmAddrs *addrs, ArnGmAddrs *arnAddrs, MC2TilingHeader *tilingData,
-                                                TPipe *tPipe)
+    __aicore__ inline MatmulAllReduce910General(MC2GmAddrs* addrs, ArnGmAddrs* arnAddrs, MC2TilingHeader* tilingData,
+                                                TPipe* tPipe)
         : MatmulAllReduceBase<xType, yType, coreType>(addrs, nullptr, arnAddrs, tilingData, tPipe)
     {
-        mc2TilingData_ = (Mc2Tiling::MatmulAllReduce910TilingData *)tilingData;
+        mc2TilingData_ = (Mc2Tiling::MatmulAllReduce910TilingData*)tilingData;
         this->tileInfo_.mmTiling = &mc2TilingData_->tilematmulTiling.matmulTiling;
         this->tailInfo_.mmTiling = &mc2TilingData_->tailmatmulTiling.matmulTiling;
     }
@@ -55,9 +55,9 @@ public:
     }
 
 protected:
-    __aicore__ inline void InnerProcess(bool tailFlag, uint32_t tileCnt, const MC2TileInfo &tileInfo)
+    __aicore__ inline void InnerProcess(bool tailFlag, uint32_t tileCnt, const MC2TileInfo& tileInfo)
     {
-        const Mc2MatmulV3TilingData *tiling =
+        const Mc2MatmulV3TilingData* tiling =
             (tailFlag ? &mc2TilingData_->tailmatmulTiling : &mc2TilingData_->tilematmulTiling);
 
         mmType mmOp;
@@ -78,7 +78,7 @@ protected:
     }
 
 private:
-    Mc2Tiling::MatmulAllReduce910TilingData *mc2TilingData_;
+    Mc2Tiling::MatmulAllReduce910TilingData* mc2TilingData_;
 };
 
 #define INVOKE_MC2_910_OP_IMPL_HELPER(opTemplateClass, bTransFlag, coreType) \
@@ -90,7 +90,7 @@ private:
         using opType = opTemplateClass<aType, bType, cType, biasType, Mc2MatmulBaseBlock, MM_CFG_NO_PRELOAD>; \
         MC2GmAddrs addrs = {aGM, bGM, biasGM, addGM, cGM, workspaceGM, cGM}; \
         MatmulAllReduce910General<DTYPE_X1, DTYPE_X2, DTYPE_Y, opType, coreType> op( \
-            &addrs, nullptr, (MC2TilingHeader *)&tilingData, &tPipe); \
+            &addrs, nullptr, (MC2TilingHeader*)&tilingData, &tPipe); \
         op.Init(); \
         op.Process(); \
     } while (0)

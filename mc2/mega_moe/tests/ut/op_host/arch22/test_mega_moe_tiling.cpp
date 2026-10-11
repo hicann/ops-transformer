@@ -159,7 +159,7 @@ TEST_F(MegaMoeArch22TilingTest, ActivationParamValidationWithLargeIntermediateHi
         {"situglu", {std::numeric_limits<float>::quiet_NaN()}, ge::GRAPH_FAILED},
         {"situglu", {1.0f, std::numeric_limits<float>::infinity()}, ge::GRAPH_FAILED},
     };
-    for (const auto &activationCase : activationCases) {
+    for (const auto& activationCase : activationCases) {
         gert::TilingContextPara tilingContextPara(
             "MegaMoe", inputs,
             {

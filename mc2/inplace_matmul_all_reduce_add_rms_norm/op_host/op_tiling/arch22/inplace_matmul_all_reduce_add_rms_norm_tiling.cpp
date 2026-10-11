@@ -25,12 +25,12 @@ constexpr char IMRN[] = "InplaceMatmulAllReduceAddRmsNorm";
 } // namespace
 
 struct DefaultCompileInfo {};
-static ge::graphStatus DefaultTilingParseFunc(gert::TilingParseContext *context)
+static ge::graphStatus DefaultTilingParseFunc(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 };
-static ge::graphStatus DefaultTilingFunc(gert::TilingContext *context)
+static ge::graphStatus DefaultTilingFunc(gert::TilingContext* context)
 {
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }

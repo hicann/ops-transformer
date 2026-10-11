@@ -39,7 +39,7 @@ constexpr uint32_t ATTR_MOE_EXPERT_NUM_INDEX = 3;
 constexpr uint32_t ATTR_QUANT_MODE_INDEX = 10;
 constexpr uint32_t ATTR_GLOBAL_BS_INDEX = 11;
 constexpr uint32_t ATTR_EXPERT_TOKEN_NUMS_TYPE_INDEX = 12;
-const char *K_INNER_DEBUG = "MoeDistributeDispatch";
+const char* K_INNER_DEBUG = "MoeDistributeDispatch";
 
 constexpr uint32_t ATTR_GROUP_EP_INDEX = 0;
 constexpr uint32_t ATTR_TP_WORLD_SIZE_INDEX = 5;
@@ -57,7 +57,7 @@ constexpr uint32_t USER_WORKSPACE_A2 = 1 * 1024 * 1024; // moeExpertNum_ * sizeo
 } // namespace
 namespace optiling {
 
-static void MoeDistributeDispatchA2SetTiling(gert::TilingContext *context, MoeDistributeDispatchA2Info &info,
+static void MoeDistributeDispatchA2SetTiling(gert::TilingContext* context, MoeDistributeDispatchA2Info& info,
                                              const bool isLayered, const int32_t bs)
 {
     auto attrs = context->GetAttrs();
@@ -98,8 +98,8 @@ static void MoeDistributeDispatchA2SetTiling(gert::TilingContext *context, MoeDi
     OP_LOGD(K_INNER_DEBUG, "maxMoeExpertNum=%d", info.maxMoeExpertNum);
 }
 
-static ge::graphStatus MoeDistributeDispatchA2CheckAttrAndSetTiling(gert::TilingContext *context,
-                                                                    MoeDistributeDispatchA2Info &info,
+static ge::graphStatus MoeDistributeDispatchA2CheckAttrAndSetTiling(gert::TilingContext* context,
+                                                                    MoeDistributeDispatchA2Info& info,
                                                                     const bool isLayered)
 {
     auto attrs = context->GetAttrs();
@@ -115,7 +115,7 @@ static ge::graphStatus MoeDistributeDispatchA2CheckAttrAndSetTiling(gert::Tiling
     auto quantModePtr = attrs->GetAttrPointer<int64_t>(ATTR_QUANT_MODE_INDEX);
     auto globalBsPtr = attrs->GetAttrPointer<int64_t>(ATTR_GLOBAL_BS_INDEX);
     auto expertTokenNumsTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_EXPERT_TOKEN_NUMS_TYPE_INDEX);
-    const gert::StorageShape *expertIdStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
+    const gert::StorageShape* expertIdStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_INNER_DEBUG, "expertIdShape"),
                     return GRAPH_FAILED);
     int32_t bs = expertIdStorageShape->GetStorageShape().GetDim(0);
@@ -164,14 +164,14 @@ static ge::graphStatus MoeDistributeDispatchA2CheckAttrAndSetTiling(gert::Tiling
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeDispatchA2CheckShapeAndSetTiling(gert::TilingContext *context,
-                                                                     MoeDistributeDispatchA2Info &info)
+static ge::graphStatus MoeDistributeDispatchA2CheckShapeAndSetTiling(gert::TilingContext* context,
+                                                                     MoeDistributeDispatchA2Info& info)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGI(nodeName, "MoeDistributeDispatchA2 MoeDistributeDispatchA2CheckShapeAndSetTiling.");
-    const gert::StorageShape *xStorageShape = context->GetInputShape(X_INDEX);
-    const gert::StorageShape *expertIdStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
-    const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
+    const gert::StorageShape* xStorageShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* expertIdStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
+    const gert::StorageShape* scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
 
     OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_INNER_DEBUG, "xShape"), return GRAPH_FAILED);
     OP_TILING_CHECK(expertIdStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_INNER_DEBUG, "expertIdShape"),
@@ -214,8 +214,8 @@ static ge::graphStatus MoeDistributeDispatchA2CheckShapeAndSetTiling(gert::Tilin
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeDispatchA2GetPlatformInfoAndSetTiling(gert::TilingContext *context,
-                                                                          MoeDistributeDispatchA2Info &info)
+static ge::graphStatus MoeDistributeDispatchA2GetPlatformInfoAndSetTiling(gert::TilingContext* context,
+                                                                          MoeDistributeDispatchA2Info& info)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -235,7 +235,7 @@ static bool MoeDistributeDispatchA2IsLayered()
     return mc2tiling::IsHcclPcieLayered(K_INNER_DEBUG);
 }
 
-static uint64_t MoeDistributeDispatchA2CalcTilingKey(gert::TilingContext *context, const bool isLayered)
+static uint64_t MoeDistributeDispatchA2CalcTilingKey(gert::TilingContext* context, const bool isLayered)
 {
     uint32_t tilingKeyQuantMode = TILINGKEY_NO_QUANT;
     bool scaleMode = false; // A2 & A3
@@ -245,15 +245,15 @@ static uint64_t MoeDistributeDispatchA2CalcTilingKey(gert::TilingContext *contex
     if (isLayered) {
         layeredMode = TILINGKEY_TPL_AICPU;
     }
-    const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
+    const gert::StorageShape* scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
     scaleMode = (scalesStorageShape != nullptr);
     uint64_t tilingKey = GET_TPL_TILING_KEY(tilingKeyQuantMode, scaleMode, fullMesh, layeredMode, TILINGKEY_TPL_A2);
     OP_LOGD(K_INNER_DEBUG, "tilingKey=%lu", tilingKey);
     return tilingKey;
 }
 
-static ge::graphStatus MoeDistributeDispatchA2CheckWinSize(const gert::TilingContext *context, const char *nodeName,
-                                                           MoeDistributeDispatchA2Info &info, bool isLayered)
+static ge::graphStatus MoeDistributeDispatchA2CheckWinSize(const gert::TilingContext* context, const char* nodeName,
+                                                           MoeDistributeDispatchA2Info& info, bool isLayered)
 {
     // 为避免兼容性问题，校验失败时不直接返回错误，而是输出警告日志
     auto groupEp = context->GetAttrs()->GetAttrPointer<char>(ATTR_GROUP_EP_INDEX);
@@ -269,7 +269,7 @@ static ge::graphStatus MoeDistributeDispatchA2CheckWinSize(const gert::TilingCon
     uint64_t minHcclBuffSize = 0ULL;
     constexpr uint64_t sizeofDtypeX = 2ULL; // token数据类型为float16/bfloat16，每个元素字节数为2
     constexpr uint64_t BUFFER_NUM = 2UL;
-    constexpr const char *HCCL_BUFFSIZE_HINT =
+    constexpr const char* HCCL_BUFFSIZE_HINT =
         "Please increase the HCCL_BUFFSIZE environment variable or provide an HcclCommConfig with a larger "
         "hcclBufferSize when creating the communication domain.";
     if (isLayered) {
@@ -304,9 +304,9 @@ static ge::graphStatus MoeDistributeDispatchA2CheckWinSize(const gert::TilingCon
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeDispatchA2TilingFuncImpl(gert::TilingContext *context)
+static ge::graphStatus MoeDistributeDispatchA2TilingFuncImpl(gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGI(nodeName, "Enter MoeDistributeDispatchA2 tiling func.");
 
     // 涉及SyncAll，设置batch mode模式，所有核同时启动
@@ -315,11 +315,11 @@ static ge::graphStatus MoeDistributeDispatchA2TilingFuncImpl(gert::TilingContext
     MC2_CHECK_LOG_RET(nodeName, ret);
 
     // 1. tilingData
-    MoeDistributeDispatchA2TilingData *tilingData = context->GetTilingData<MoeDistributeDispatchA2TilingData>();
+    MoeDistributeDispatchA2TilingData* tilingData = context->GetTilingData<MoeDistributeDispatchA2TilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITHOUT_REPORT(nodeName, "tilingData is nullptr."),
                     return ge::GRAPH_FAILED);
     OP_LOGI(nodeName, "MoeDistributeDispatchA2 get tilingData.");
-    MoeDistributeDispatchA2Info &info = tilingData->moeDistributeDispatchInfo;
+    MoeDistributeDispatchA2Info& info = tilingData->moeDistributeDispatchInfo;
     OP_LOGI(nodeName, "MoeDistributeDispatchA2 get tilingData info.");
 
     bool isLayered = MoeDistributeDispatchA2IsLayered();
@@ -348,7 +348,7 @@ static ge::graphStatus MoeDistributeDispatchA2TilingFuncImpl(gert::TilingContext
     uint64_t tilingKey = MoeDistributeDispatchA2CalcTilingKey(context, isLayered);
     context->SetTilingKey(tilingKey);
     // 2. workspace
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE_WITHOUT_REPORT(nodeName, "workSpaces is nullptr."),
                     return ge::GRAPH_FAILED);
     workSpaces[0] = SYSTEM_NEED_WORKSPACE + USER_WORKSPACE_A2;
@@ -369,10 +369,10 @@ static ge::graphStatus MoeDistributeDispatchA2TilingFuncImpl(gert::TilingContext
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeDispatchTilingA2A3::MoeDistributeDispatchTilingFunc(gert::TilingContext *context)
+ge::graphStatus MoeDistributeDispatchTilingA2A3::MoeDistributeDispatchTilingFunc(gert::TilingContext* context)
 {
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
-    fe::PlatFormInfos &platformInfo = *platformInfoPtr;
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos& platformInfo = *platformInfoPtr;
 
     std::string socVersion;
     (void)platformInfo.GetPlatformResWithLock("version", "Short_SoC_version", socVersion);
@@ -385,8 +385,8 @@ ge::graphStatus MoeDistributeDispatchTilingA2A3::MoeDistributeDispatchTilingFunc
     return ret;
 }
 
-ge::graphStatus MoeDistributeDispatchTilingA2A3::CheckEpWorldSizeAttrs(const char *nodeName,
-                                                                       MoeDistributeDispatchTilingData &tilingData)
+ge::graphStatus MoeDistributeDispatchTilingA2A3::CheckEpWorldSizeAttrs(const char* nodeName,
+                                                                       MoeDistributeDispatchTilingData& tilingData)
 {
     uint32_t epWorldSize = tilingData.moeDistributeDispatchInfo.epWorldSize;
 

@@ -71,7 +71,7 @@ __aicore__ inline void WeightL2PrefetchAicRange(GM_ADDR weightList, bool isPerEx
     AscendC::GlobalTensor<uint8_t> weightGm;
     for (uint32_t expertIdx = firstExpert; expertIdx < lastExpert; ++expertIdx) {
         // per-expert 模式取列表项；stacked 模式按专家字节步进（与 gmGroupOffsetB 同源）。
-        __gm__ uint8_t *regionBase = GetTensorAddr<uint8_t>(isPerExpertWeightTensor ? expertIdx : 0U, weightList);
+        __gm__ uint8_t* regionBase = GetTensorAddr<uint8_t>(isPerExpertWeightTensor ? expertIdx : 0U, weightList);
         if (!isPerExpertWeightTensor) {
             regionBase += static_cast<uint64_t>(expertIdx) * bytesPerExpert;
         }

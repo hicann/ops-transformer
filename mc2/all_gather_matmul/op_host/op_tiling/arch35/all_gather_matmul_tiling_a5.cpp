@@ -20,9 +20,9 @@
 
 namespace optiling {
 
-ge::graphStatus AllGatherMatmulTilingA5::CheckValidRank(Mc2Tiling::AllGatherMatmulTilingData *tilingData,
+ge::graphStatus AllGatherMatmulTilingA5::CheckValidRank(Mc2Tiling::AllGatherMatmulTilingData* tilingData,
                                                         const std::map<uint32_t, std::vector<uint32_t>> VALID_RANK,
-                                                        gert::TilingContext *context, uint32_t rankSize)
+                                                        gert::TilingContext* context, uint32_t rankSize)
 {
     auto it = std::find(VALID_RANK.at(0).begin(), VALID_RANK.at(0).end(), rankSize);
     OP_TILING_CHECK(it == VALID_RANK.at(0).end(),
@@ -33,19 +33,19 @@ ge::graphStatus AllGatherMatmulTilingA5::CheckValidRank(Mc2Tiling::AllGatherMatm
     return ge::GRAPH_SUCCESS;
 }
 
-void AllGatherMatmulTilingA5::SetSocParam(Mc2Tiling::AllGatherMatmulTilingData *tilingData,
-                                          [[maybe_unused]] const char *group)
+void AllGatherMatmulTilingA5::SetSocParam(Mc2Tiling::AllGatherMatmulTilingData* tilingData,
+                                          [[maybe_unused]] const char* group)
 {
     tilingData->socParam.isA3 = 0U;
     tilingData->socParam.isStep = 0U;
     tilingData->socParam.isND2NZ = 1U;
 }
 
-std::string AllGatherMatmulTilingA5::GetAlgConfig(Mc2Tiling::AllGatherMatmulTilingData *tilingData,
-                                                  const mc2tiling::TilingArgs &args)
+std::string AllGatherMatmulTilingA5::GetAlgConfig(Mc2Tiling::AllGatherMatmulTilingData* tilingData,
+                                                  const mc2tiling::TilingArgs& args)
 {
     uint32_t algoCount = 0;
-    const Mc2Hcom::CommAlgoEntry *algoEntries = Mc2Tiling::GetAllGatherCommAlgoTable(algoCount);
+    const Mc2Hcom::CommAlgoEntry* algoEntries = Mc2Tiling::GetAllGatherCommAlgoTable(algoCount);
     // 单轮通信量 = 每轮切分的 tileM × K × dtypeSize，
     // MCSpliteM 各分支结束时 args.mValue 即单轮 tileM，覆盖 formulate/enableSplitK/commTurn 全部路径；
     // 用于选择器按表项 [minBytes, maxBytes] 区间过滤，算法表为空时回退默认算法 ALLGATHER_DEFAULT_ALGO_NAME
@@ -59,8 +59,8 @@ std::string AllGatherMatmulTilingA5::GetAlgConfig(Mc2Tiling::AllGatherMatmulTili
     return algConfig;
 }
 
-CutResult AllGatherMatmulTilingA5::GetCutResult(Mc2Tiling::AllGatherMatmulTilingData &tilingData,
-                                                mc2tiling::TilingArgs &args)
+CutResult AllGatherMatmulTilingA5::GetCutResult(Mc2Tiling::AllGatherMatmulTilingData& tilingData,
+                                                mc2tiling::TilingArgs& args)
 {
     AllGatherPlusMMA5 tileFormulate(args, args.rankDim, KernelType::ALL_GATHER);
     tileFormulate.GetTiling();
@@ -68,14 +68,14 @@ CutResult AllGatherMatmulTilingA5::GetCutResult(Mc2Tiling::AllGatherMatmulTiling
     return mCutGather;
 }
 
-static ge::graphStatus AllGatherMatmulTilingFuncA5(gert::TilingContext *context)
+static ge::graphStatus AllGatherMatmulTilingFuncA5(gert::TilingContext* context)
 {
     AllGatherMatmulTilingA5 impl;
     return impl.AllGatherMatmulTilingFunc(context);
 }
 
 struct AllGatherMatmulCompileInfo {};
-static ge::graphStatus TilingParseForAllGatherMatmul([[maybe_unused]] gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForAllGatherMatmul([[maybe_unused]] gert::TilingParseContext* context)
 {
     return ge::GRAPH_SUCCESS;
 }

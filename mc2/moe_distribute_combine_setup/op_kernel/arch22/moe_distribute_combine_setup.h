@@ -53,9 +53,9 @@ class MoeDistributeCombineSetup {
 public:
     __aicore__ inline MoeDistributeCombineSetup(){};
     __aicore__ inline void Init(GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR assistInfoForCombine, GM_ADDR quantExpandX,
-                                GM_ADDR commCmdInfoOut, GM_ADDR workspaceGM, TPipe *pipe,
-                                const MoeDistributeCombineSetupTilingData *tilingData, __gm__ void *mc2InitTiling,
-                                __gm__ void *mc2CcTiling);
+                                GM_ADDR commCmdInfoOut, GM_ADDR workspaceGM, TPipe* pipe,
+                                const MoeDistributeCombineSetupTilingData* tilingData, __gm__ void* mc2InitTiling,
+                                __gm__ void* mc2CcTiling);
     __aicore__ inline void Process();
 
 private:
@@ -72,7 +72,7 @@ private:
     {
         return (GM_ADDR)((epRankId_ == rankId) ?
                              epWinContext_->localWindowsIn :
-                             ((HcclRankRelationResV2 *)(epWinContext_->remoteRes[rankId].nextDevicePtr))->windowsIn) +
+                             ((HcclRankRelationResV2*)(epWinContext_->remoteRes[rankId].nextDevicePtr))->windowsIn) +
                winDataSizeOffset_ + expertLocalId * expertPerSizeOnWin_;
     }
 
@@ -85,11 +85,11 @@ private:
     {
         return (GM_ADDR)((epRankId_ == rankId) ?
                              epWinContext_->localWindowsExp :
-                             ((HcclRankRelationResV2 *)(epWinContext_->remoteRes[rankId].nextDevicePtr))->windowsExp) +
+                             ((HcclRankRelationResV2*)(epWinContext_->remoteRes[rankId].nextDevicePtr))->windowsExp) +
                COMBINE_STATE_OFFSET + dataState_ * WIN_STATE_OFFSET;
     }
 
-    TPipe *tpipe_{nullptr};
+    TPipe* tpipe_{nullptr};
     GlobalTensor<ExpandIdxType> assistInfoForCombineGM_;
     GlobalTensor<int32_t> sdmaStatusGlobal_;
     GM_ADDR dataCmdInfoGM_;
@@ -112,7 +112,7 @@ private:
     uint32_t sharedExpertRankNum_{0}; // 共享专家卡数
     uint32_t moeExpertPerRankNum_{0}; // 每张卡部署的moe专家数
     uint32_t moeSendNum_{0};          // moeExpertPerRankNum_ * worldSize_
-    __gm__ HcclOpResParam *epWinContext_{nullptr};
+    __gm__ HcclOpResParam* epWinContext_{nullptr};
     uint32_t epDataOffsetOnWin_{0};
     uint32_t epStateOffsetOnWin_{0};
     uint32_t axisHExpandXTypeSize_{0};
@@ -133,34 +133,34 @@ private:
     bool isShardExpert_{false};
     uint32_t batchWriteInfoCnt_{0}; // 记录当前核使用的batchWriteInfo数量
 
-    __gm__ HcclOpResParam *hcclContext_ = nullptr;
+    __gm__ HcclOpResParam* hcclContext_ = nullptr;
     Hccl<HCCL_SERVER_TYPE_AICPU> hccl_;
 };
 
 template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Init(
     GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR assistInfoForCombine, GM_ADDR quantExpandX, GM_ADDR commCmdInfoOut,
-    GM_ADDR workspaceGM, TPipe *pipe, const MoeDistributeCombineSetupTilingData *tilingData, __gm__ void *mc2InitTiling,
-    __gm__ void *mc2CcTiling)
+    GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeCombineSetupTilingData* tilingData, __gm__ void* mc2InitTiling,
+    __gm__ void* mc2CcTiling)
 {
     tpipe_ = pipe;
     coreIdx_ = GetBlockIdx();
     epRankId_ = tilingData->moeDistributeCombineSetupInfo.epRankId;
-    hcclContext_ = (__gm__ HcclOpResParam *)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
+    hcclContext_ = (__gm__ HcclOpResParam*)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
     auto contextGM = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-    epWinContext_ = (__gm__ HcclOpResParam *)contextGM;
+    epWinContext_ = (__gm__ HcclOpResParam*)contextGM;
     GlobalTensor<int32_t> selfDataStatusTensor;
     GM_ADDR statusDataSpaceGm = (GM_ADDR)epWinContext_->localWindowsExp;
-    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t *)(statusDataSpaceGm + STATE_WIN_OFFSET + coreIdx_ * 512));
+    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t*)(statusDataSpaceGm + STATE_WIN_OFFSET + coreIdx_ * 512));
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(selfDataStatusTensor);
     sdmaStateGM_ = statusDataSpaceGm + SDMA_STATUS_WIN_OFFSET;
-    sdmaStatusGlobal_.SetGlobalBuffer((__gm__ int32_t *)sdmaStateGM_);
+    sdmaStatusGlobal_.SetGlobalBuffer((__gm__ int32_t*)sdmaStateGM_);
     InitStatusTargetSum();
 
     dataState_ = selfDataStatusTensor(0);
     commCmdInfoOutGM_ = commCmdInfoOut;
     expandXGM_ = expandX;
-    assistInfoForCombineGM_.SetGlobalBuffer((__gm__ int32_t *)assistInfoForCombine);
+    assistInfoForCombineGM_.SetGlobalBuffer((__gm__ int32_t*)assistInfoForCombine);
     axisH_ = tilingData->moeDistributeCombineSetupInfo.h;
     axisA_ = tilingData->moeDistributeCombineSetupInfo.a;
     aivNum_ = tilingData->moeDistributeCombineSetupInfo.aivNum;
@@ -178,8 +178,8 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Init(
     epWindowGM_ = GetWinAddrByRankId(epRankId_);
     epStatusSpaceGm_ = GetWinStateAddrByRankId(epRankId_);
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
-    OOMCheckAddrRange<ExpandXType>((__gm__ ExpandXType *)(epWindowGM_), totalWinSize_);
-    OOMCheckAddrRange<float>((__gm__ float *)(epStatusSpaceGm_), STATE_SIZE);
+    OOMCheckAddrRange<ExpandXType>((__gm__ ExpandXType*)(epWindowGM_), totalWinSize_);
+    OOMCheckAddrRange<float>((__gm__ float*)(epStatusSpaceGm_), STATE_SIZE);
 #endif
     epDataOffsetOnWin_ = epRankId_ * moeExpertPerRankNum_ * static_cast<uint32_t>(expertPerSizeOnWin_);
     epStateOffsetOnWin_ = epRankId_ * stateOffset_;
@@ -275,10 +275,10 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Dispatch(
             ExpertAlltoAllDispatch(curTokenNum, preCount, ep, expertIdx);
 
             // 确保cache中的数据已刷新到GM地址上
-            __gm__ BatchWriteItem *sendInfo = reinterpret_cast<__gm__ BatchWriteItem *>(
+            __gm__ BatchWriteItem* sendInfo = reinterpret_cast<__gm__ BatchWriteItem*>(
                 dataCmdInfoGM_ + batchWriteItemStartCnt * sizeof(BatchWriteItem));
             GlobalTensor<int64_t> tempTensor;
-            tempTensor.SetGlobalBuffer((__gm__ int64_t *)sendInfo);
+            tempTensor.SetGlobalBuffer((__gm__ int64_t*)sendInfo);
             DataCacheCleanAndInvalid<int64_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(tempTensor);
 
             PipeBarrier<PIPE_ALL>();
@@ -316,7 +316,7 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::ExpertAll
     batchItemInfoU64(4) = reinterpret_cast<uint64_t>(sourceAddr);
     batchItemInfoU64(5) = reinterpret_cast<uint64_t>(dstAddr);
     GlobalTensor<uint32_t> itemTensor;
-    itemTensor.SetGlobalBuffer((__gm__ uint32_t *)(batchWriteItemAddr));
+    itemTensor.SetGlobalBuffer((__gm__ uint32_t*)(batchWriteItemAddr));
     DataCopyPad(itemTensor, batchItemInfo, batchItemCopyOutParams);
     batchWriteInfoCnt_ += 1U;
 }
@@ -342,20 +342,20 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::SetStatus
         GlobalTensor<uint32_t> lengthTensor_;
         GlobalTensor<uint64_t> dataTypeTensor_;
 
-        dataTypeTensor_.SetGlobalBuffer((__gm__ uint64_t *)(batchWriteItemAddr + i * sizeof(BatchWriteItem)));
+        dataTypeTensor_.SetGlobalBuffer((__gm__ uint64_t*)(batchWriteItemAddr + i * sizeof(BatchWriteItem)));
 
         lengthTensor_.SetGlobalBuffer(
-            (__gm__ uint32_t *)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 7));
+            (__gm__ uint32_t*)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 7));
 
         localBufTensorLow_.SetGlobalBuffer(
-            (__gm__ uint32_t *)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 8));
+            (__gm__ uint32_t*)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 8));
         localBufTensorHigh_.SetGlobalBuffer(
-            (__gm__ uint32_t *)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 9));
+            (__gm__ uint32_t*)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 9));
 
         remoteBufTensorLow_.SetGlobalBuffer(
-            (__gm__ uint32_t *)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 10));
+            (__gm__ uint32_t*)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 10));
         remoteBufTensorHigh_.SetGlobalBuffer(
-            (__gm__ uint32_t *)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 11));
+            (__gm__ uint32_t*)(batchWriteItemAddr + i * sizeof(BatchWriteItem) + sizeof(uint32_t) * 11));
 
         // 可以组装多个通信任务，实现批量发送
         uint64_t sourceAddr = (uint64_t)(sdmaStateGM_);
@@ -372,10 +372,10 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::SetStatus
         dataTypeTensor_.SetValue(0, HcclDataType::HCCL_DATA_TYPE_FP32);
 
         // 确保cache中的数据已刷新到GM地址上
-        __gm__ BatchWriteItem *sendInfo =
-            reinterpret_cast<__gm__ BatchWriteItem *>(batchWriteItemAddr + i * sizeof(BatchWriteItem));
+        __gm__ BatchWriteItem* sendInfo =
+            reinterpret_cast<__gm__ BatchWriteItem*>(batchWriteItemAddr + i * sizeof(BatchWriteItem));
         GlobalTensor<int64_t> tempTensor;
-        tempTensor.SetGlobalBuffer((__gm__ int64_t *)sendInfo);
+        tempTensor.SetGlobalBuffer((__gm__ int64_t*)sendInfo);
         DataCacheCleanAndInvalid<int64_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(tempTensor);
         hccl_.BatchWrite<true>((GM_ADDR)sendInfo, 1,
                                epIdx % queuePerCore_); // 每个目标rank对应的queueid要与发数据时的保持一致

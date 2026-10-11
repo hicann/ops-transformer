@@ -36,11 +36,11 @@ constexpr uint32_t INT8_COMM_QUANT = 2U;
 
 namespace optiling {
 
-ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineA5TilingCheckAttr(gert::TilingContext *context,
-                                                                                    uint32_t &commQuantMode)
+ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineA5TilingCheckAttr(gert::TilingContext* context,
+                                                                                    uint32_t& commQuantMode)
 {
-    const char *nodeName = context->GetNodeName();
-    MoeDistributeCombineTilingData *tilingData = context->GetTilingData<MoeDistributeCombineTilingData>();
+    const char* nodeName = context->GetNodeName();
+    MoeDistributeCombineTilingData* tilingData = context->GetTilingData<MoeDistributeCombineTilingData>();
     std::string groupEp = "";
     std::string groupTp = "";
     uint32_t tpWorldSize = 1;
@@ -85,16 +85,16 @@ ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineA5TilingCheckA
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineA5TilingFuncImpl(gert::TilingContext *context)
+ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineA5TilingFuncImpl(gert::TilingContext* context)
 {
     // 涉及SyncAll，设置batch mode模式，所有核同时启动
     uint32_t batch_mode = 1U;
     auto ret = context->SetScheduleMode(batch_mode);
     MC2_CHECK_LOG_RET(context->GetNodeName(), ret);
 
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGD(nodeName, "Enter MoeDistributeCombine Tiling func");
-    MoeDistributeCombineTilingData *tilingData = context->GetTilingData<MoeDistributeCombineTilingData>();
+    MoeDistributeCombineTilingData* tilingData = context->GetTilingData<MoeDistributeCombineTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE(nodeName, "tilingData is nullptr."), return ge::GRAPH_FAILED);
     uint32_t commQuantMode;
 
@@ -127,7 +127,7 @@ ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineA5TilingFuncIm
     return ge::GRAPH_SUCCESS;
 }
 
-bool MoeDistributeCombineTilingA5::CheckEpWorldSize(const char *nodeName, uint32_t epWorldSize)
+bool MoeDistributeCombineTilingA5::CheckEpWorldSize(const char* nodeName, uint32_t epWorldSize)
 {
     // 为支持在 A5 上的验证，放开 epWorldSize 为 2 或 4 的校验
     // 检验epWorldSize是否是2的倍数
@@ -143,8 +143,8 @@ bool MoeDistributeCombineTilingA5::CheckEpWorldSize(const char *nodeName, uint32
     return true;
 }
 
-ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineTilingFuncImpl(std::string &socVersion,
-                                                                                 gert::TilingContext *context)
+ge::graphStatus MoeDistributeCombineTilingA5::MoeDistributeCombineTilingFuncImpl(std::string& socVersion,
+                                                                                 gert::TilingContext* context)
 {
     ge::graphStatus ret = MoeDistributeCombineA5TilingFuncImpl(context);
     return ret;

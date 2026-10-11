@@ -95,7 +95,7 @@ constexpr uint32_t RANK_DIM_BOUNDARY = 8;
 
 class AlltoAllvQuantGmmTilingBase : public Ops::Transformer::OpTiling::TilingBaseClass {
 public:
-    explicit AlltoAllvQuantGmmTilingBase(gert::TilingContext *context)
+    explicit AlltoAllvQuantGmmTilingBase(gert::TilingContext* context)
         : Ops::Transformer::OpTiling::TilingBaseClass(context) {};
 
 protected:
@@ -116,17 +116,17 @@ protected:
     uint64_t l0cSize_;
     uint64_t libApiWorkSpaceSize_;
     // attr ptr
-    const char *groupPtr_;
-    const int64_t *epWorldSizePtr_;
-    const gert::ContinuousVector *sendCountsPtr_;
-    const gert::ContinuousVector *recvCountsPtr_;
-    const bool *transGmmWeightPtr_;
-    const bool *transMmWeightPtr_;
-    const bool *permuteOutFlagPtr_;
-    const int64_t *gmmXQuantModePtr_;
-    const int64_t *gmmWeightQuantModePtr_;
-    const int64_t *mmXQuantModePtr_;
-    const int64_t *mmWeightQuantModePtr_;
+    const char* groupPtr_;
+    const int64_t* epWorldSizePtr_;
+    const gert::ContinuousVector* sendCountsPtr_;
+    const gert::ContinuousVector* recvCountsPtr_;
+    const bool* transGmmWeightPtr_;
+    const bool* transMmWeightPtr_;
+    const bool* permuteOutFlagPtr_;
+    const int64_t* gmmXQuantModePtr_;
+    const int64_t* gmmWeightQuantModePtr_;
+    const int64_t* mmXQuantModePtr_;
+    const int64_t* mmWeightQuantModePtr_;
     // shape
     uint64_t bsk_ = 0;
     uint64_t h1_ = 0;
@@ -138,13 +138,13 @@ protected:
     uint64_t n2_ = 0;
     uint64_t k_ = 0;
     // attr
-    const char *group_;
+    const char* group_;
     uint64_t epWorldSize_ = 0;
     bool transGmmWeight_ = false;
     bool transMmWeight_ = false;
     bool permuteOutFlag_ = false;
-    const int64_t *sendCounts = nullptr;
-    const int64_t *recvCounts = nullptr;
+    const int64_t* sendCounts = nullptr;
+    const int64_t* recvCounts = nullptr;
     // data type
     ge::DataType gmmXDataType_;
     ge::DataType gmmWeightDataType_;

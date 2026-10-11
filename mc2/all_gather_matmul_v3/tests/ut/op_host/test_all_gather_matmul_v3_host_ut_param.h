@@ -29,7 +29,7 @@ struct AllGatherMatmulV3InferShapeUtParam : public AllGatherMatmulV3HostUtParamB
     std::vector<uint32_t> outputInstance;
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    explicit AllGatherMatmulV3InferShapeUtParam(const csv_map &csvMap)
+    explicit AllGatherMatmulV3InferShapeUtParam(const csv_map& csvMap)
         : AllGatherMatmulV3HostUtParamBase(csvMap)
     {
         // def 输入顺序: context(0) x1(1) x2(2) bias(3) x1_scale(4) x2_scale(5)，context 恒实例化
@@ -66,7 +66,7 @@ struct AllGatherMatmulV3InferDataTypeUtParam : public AllGatherMatmulV3HostUtPar
     ge::DataType expectYDtype = ge::DT_UNDEFINED;
     ge::DataType expectGatherOutDtype = ge::DT_UNDEFINED;
 
-    explicit AllGatherMatmulV3InferDataTypeUtParam(const csv_map &csvMap)
+    explicit AllGatherMatmulV3InferDataTypeUtParam(const csv_map& csvMap)
         : AllGatherMatmulV3HostUtParamBase(csvMap)
     {
         GetDataTypeGE(csvMap, "x1_dtype", this->x1);

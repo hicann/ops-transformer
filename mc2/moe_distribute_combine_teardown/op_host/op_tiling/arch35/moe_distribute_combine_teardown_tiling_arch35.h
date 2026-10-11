@@ -22,7 +22,7 @@ namespace MC2Tiling {
 
 class MoeDistributeCombineTeardownTilingA5 : public MoeDistributeCombineTeardownTilingBase {
 public:
-    explicit MoeDistributeCombineTeardownTilingA5(gert::TilingContext *context)
+    explicit MoeDistributeCombineTeardownTilingA5(gert::TilingContext* context)
         : MoeDistributeCombineTeardownTilingBase(context)
     {
         socTilingName_ = "MoeDistributeCombineTeardownA5";

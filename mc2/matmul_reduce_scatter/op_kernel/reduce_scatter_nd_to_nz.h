@@ -36,8 +36,8 @@ namespace AscendC {
 using namespace matmul;
 
 template <class T>
-__aicore__ inline void MatrixBtoNZMc2(GM_ADDR workspace, GM_ADDR src, const MatmulReduceScatterTilingData *tilingData,
-                                      bool isTransposeB, TBuf<TPosition::VECCALC> &tmpBuf)
+__aicore__ inline void MatrixBtoNZMc2(GM_ADDR workspace, GM_ADDR src, const MatmulReduceScatterTilingData* tilingData,
+                                      bool isTransposeB, TBuf<TPosition::VECCALC>& tmpBuf)
 {
     if (g_coreType == AIV) {
         if (block_idx >= tilingData->tileTiling.usedCoreNum) {

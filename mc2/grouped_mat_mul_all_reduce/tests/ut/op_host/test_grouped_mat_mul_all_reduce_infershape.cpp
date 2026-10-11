@@ -35,7 +35,7 @@ protected:
 };
 
 template <typename T>
-std::string Shape2String(const T &shape)
+std::string Shape2String(const T& shape)
 {
     std::ostringstream oss;
     oss << "[";
@@ -66,16 +66,16 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime0)
     gert::StorageShape yShape1 = {{}, {}};
     gert::StorageShape yShape2 = {{}, {}};
     gert::StorageShape yShape3 = {{}, {}};
-    std::vector<gert::Tensor *> inputShapeRef(8);
-    inputShapeRef[0] = (gert::Tensor *)&xShape0;
-    inputShapeRef[1] = (gert::Tensor *)&xShape1;
-    inputShapeRef[2] = (gert::Tensor *)&xShape2;
-    inputShapeRef[3] = (gert::Tensor *)&xShape3;
-    inputShapeRef[4] = (gert::Tensor *)&weightShape0;
-    inputShapeRef[5] = (gert::Tensor *)&weightShape1;
-    inputShapeRef[6] = (gert::Tensor *)&weightShape2;
-    inputShapeRef[7] = (gert::Tensor *)&weightShape3;
-    std::vector<gert::StorageShape *> outputShapeRef(4);
+    std::vector<gert::Tensor*> inputShapeRef(8);
+    inputShapeRef[0] = (gert::Tensor*)&xShape0;
+    inputShapeRef[1] = (gert::Tensor*)&xShape1;
+    inputShapeRef[2] = (gert::Tensor*)&xShape2;
+    inputShapeRef[3] = (gert::Tensor*)&xShape3;
+    inputShapeRef[4] = (gert::Tensor*)&weightShape0;
+    inputShapeRef[5] = (gert::Tensor*)&weightShape1;
+    inputShapeRef[6] = (gert::Tensor*)&weightShape2;
+    inputShapeRef[7] = (gert::Tensor*)&weightShape3;
+    std::vector<gert::StorageShape*> outputShapeRef(4);
     outputShapeRef[0] = &yShape0;
     outputShapeRef[1] = &yShape1;
     outputShapeRef[2] = &yShape2;
@@ -123,17 +123,17 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime0MultiDim)
     gert::StorageShape yShape2 = {{}, {}};
     gert::StorageShape yShape3 = {{}, {}};
 
-    std::vector<gert::Tensor *> inputShapeRef(8);
-    inputShapeRef[0] = (gert::Tensor *)&xShape0;
-    inputShapeRef[1] = (gert::Tensor *)&xShape1;
-    inputShapeRef[2] = (gert::Tensor *)&xShape2;
-    inputShapeRef[3] = (gert::Tensor *)&xShape3;
-    inputShapeRef[4] = (gert::Tensor *)&weightShape0;
-    inputShapeRef[5] = (gert::Tensor *)&weightShape1;
-    inputShapeRef[6] = (gert::Tensor *)&weightShape2;
-    inputShapeRef[7] = (gert::Tensor *)&weightShape3;
+    std::vector<gert::Tensor*> inputShapeRef(8);
+    inputShapeRef[0] = (gert::Tensor*)&xShape0;
+    inputShapeRef[1] = (gert::Tensor*)&xShape1;
+    inputShapeRef[2] = (gert::Tensor*)&xShape2;
+    inputShapeRef[3] = (gert::Tensor*)&xShape3;
+    inputShapeRef[4] = (gert::Tensor*)&weightShape0;
+    inputShapeRef[5] = (gert::Tensor*)&weightShape1;
+    inputShapeRef[6] = (gert::Tensor*)&weightShape2;
+    inputShapeRef[7] = (gert::Tensor*)&weightShape3;
 
-    std::vector<gert::StorageShape *> outputShapeRef(4);
+    std::vector<gert::StorageShape*> outputShapeRef(4);
     outputShapeRef[0] = &yShape0;
     outputShapeRef[1] = &yShape1;
     outputShapeRef[2] = &yShape2;
@@ -186,16 +186,16 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime1)
 
     int64_t valueSize = 4;
     size_t size = static_cast<size_t>(valueSize) * sizeof(int64_t);
-    int64_t *dataInt64 = new int64_t[4];
+    int64_t* dataInt64 = new int64_t[4];
     dataInt64[0] = 1;
     dataInt64[1] = 3;
     dataInt64[2] = 6;
     dataInt64[3] = 10;
-    uint8_t *data = reinterpret_cast<uint8_t *>(dataInt64);
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataInt64);
 
     ge::DataType constDtype = ge::DT_INT64;
-    uint8_t *groupListTensorHolder = new uint8_t[sizeof(gert::Tensor) + size];
-    auto inputTensor = reinterpret_cast<gert::Tensor *>(groupListTensorHolder);
+    uint8_t* groupListTensorHolder = new uint8_t[sizeof(gert::Tensor) + size];
+    auto inputTensor = reinterpret_cast<gert::Tensor*>(groupListTensorHolder);
     std::memcpy(inputTensor + 1, data, size);
     gert::Tensor tensor({{valueSize}, {valueSize}},         // shape
                         {ge::FORMAT_ND, ge::FORMAT_ND, {}}, // format
@@ -204,15 +204,15 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime1)
                         nullptr);
     std::memcpy(inputTensor, &tensor, sizeof(gert::Tensor));
 
-    std::vector<gert::Tensor *> inputShapeRef(6);
-    inputShapeRef[0] = (gert::Tensor *)&xShape0;
-    inputShapeRef[1] = (gert::Tensor *)&weightShape0;
-    inputShapeRef[2] = (gert::Tensor *)&weightShape1;
-    inputShapeRef[3] = (gert::Tensor *)&weightShape2;
-    inputShapeRef[4] = (gert::Tensor *)&weightShape3;
-    inputShapeRef[5] = (gert::Tensor *)groupListTensorHolder;
+    std::vector<gert::Tensor*> inputShapeRef(6);
+    inputShapeRef[0] = (gert::Tensor*)&xShape0;
+    inputShapeRef[1] = (gert::Tensor*)&weightShape0;
+    inputShapeRef[2] = (gert::Tensor*)&weightShape1;
+    inputShapeRef[3] = (gert::Tensor*)&weightShape2;
+    inputShapeRef[4] = (gert::Tensor*)&weightShape3;
+    inputShapeRef[5] = (gert::Tensor*)groupListTensorHolder;
 
-    std::vector<gert::StorageShape *> outputShapeRef(4);
+    std::vector<gert::StorageShape*> outputShapeRef(4);
     outputShapeRef[0] = &yShape0;
     outputShapeRef[1] = &yShape1;
     outputShapeRef[2] = &yShape2;
@@ -231,7 +231,7 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime1)
                              .Build();
 
     auto context = contextHolder.GetContext();
-    ASSERT_NE(context, (gert::InferShapeContext *)nullptr);
+    ASSERT_NE(context, (gert::InferShapeContext*)nullptr);
     ASSERT_EQ(inferShapeFunc(context), ge::GRAPH_SUCCESS);
 
     auto outputShape0 = context->GetOutputShape(0);
@@ -268,16 +268,16 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime1NonIncreasingGroupList)
 
     int64_t valueSize = 4;
     size_t size = static_cast<size_t>(valueSize) * sizeof(int64_t);
-    int64_t *dataInt64 = new int64_t[4];
+    int64_t* dataInt64 = new int64_t[4];
     dataInt64[0] = 10;
     dataInt64[1] = 6;
     dataInt64[2] = 3;
     dataInt64[3] = 1;
-    uint8_t *data = reinterpret_cast<uint8_t *>(dataInt64);
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataInt64);
 
     ge::DataType constDtype = ge::DT_INT64;
-    uint8_t *groupListTensorHolder = new uint8_t[sizeof(gert::Tensor) + size];
-    auto inputTensor = reinterpret_cast<gert::Tensor *>(groupListTensorHolder);
+    uint8_t* groupListTensorHolder = new uint8_t[sizeof(gert::Tensor) + size];
+    auto inputTensor = reinterpret_cast<gert::Tensor*>(groupListTensorHolder);
     std::memcpy(inputTensor + 1, data, size);
     gert::Tensor tensor({{valueSize}, {valueSize}},         // shape
                         {ge::FORMAT_ND, ge::FORMAT_ND, {}}, // format
@@ -286,15 +286,15 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime1NonIncreasingGroupList)
                         nullptr);
     std::memcpy(inputTensor, &tensor, sizeof(gert::Tensor));
 
-    std::vector<gert::Tensor *> inputShapeRef(6);
-    inputShapeRef[0] = (gert::Tensor *)&xShape0;
-    inputShapeRef[1] = (gert::Tensor *)&weightShape0;
-    inputShapeRef[2] = (gert::Tensor *)&weightShape1;
-    inputShapeRef[3] = (gert::Tensor *)&weightShape2;
-    inputShapeRef[4] = (gert::Tensor *)&weightShape3;
-    inputShapeRef[5] = (gert::Tensor *)groupListTensorHolder;
+    std::vector<gert::Tensor*> inputShapeRef(6);
+    inputShapeRef[0] = (gert::Tensor*)&xShape0;
+    inputShapeRef[1] = (gert::Tensor*)&weightShape0;
+    inputShapeRef[2] = (gert::Tensor*)&weightShape1;
+    inputShapeRef[3] = (gert::Tensor*)&weightShape2;
+    inputShapeRef[4] = (gert::Tensor*)&weightShape3;
+    inputShapeRef[5] = (gert::Tensor*)groupListTensorHolder;
 
-    std::vector<gert::StorageShape *> outputShapeRef(4);
+    std::vector<gert::StorageShape*> outputShapeRef(4);
     outputShapeRef[0] = &yShape0;
     outputShapeRef[1] = &yShape1;
     outputShapeRef[2] = &yShape2;
@@ -336,17 +336,17 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime2)
     gert::StorageShape weightShape3 = {{14, 10}, {}};
     gert::StorageShape yShape0 = {{}, {}};
 
-    std::vector<gert::Tensor *> inputShapeRef(8);
-    inputShapeRef[0] = (gert::Tensor *)&xShape0;
-    inputShapeRef[1] = (gert::Tensor *)&xShape1;
-    inputShapeRef[2] = (gert::Tensor *)&xShape2;
-    inputShapeRef[3] = (gert::Tensor *)&xShape3;
-    inputShapeRef[4] = (gert::Tensor *)&weightShape0;
-    inputShapeRef[5] = (gert::Tensor *)&weightShape1;
-    inputShapeRef[6] = (gert::Tensor *)&weightShape2;
-    inputShapeRef[7] = (gert::Tensor *)&weightShape3;
+    std::vector<gert::Tensor*> inputShapeRef(8);
+    inputShapeRef[0] = (gert::Tensor*)&xShape0;
+    inputShapeRef[1] = (gert::Tensor*)&xShape1;
+    inputShapeRef[2] = (gert::Tensor*)&xShape2;
+    inputShapeRef[3] = (gert::Tensor*)&xShape3;
+    inputShapeRef[4] = (gert::Tensor*)&weightShape0;
+    inputShapeRef[5] = (gert::Tensor*)&weightShape1;
+    inputShapeRef[6] = (gert::Tensor*)&weightShape2;
+    inputShapeRef[7] = (gert::Tensor*)&weightShape3;
 
-    std::vector<gert::StorageShape *> outputShapeRef(1);
+    std::vector<gert::StorageShape*> outputShapeRef(1);
     outputShapeRef[0] = &yShape0;
 
     auto contextHolder = gert::InferShapeContextFaker()
@@ -383,16 +383,16 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime3)
 
     int64_t valueSize = 4;
     size_t size = static_cast<size_t>(valueSize) * sizeof(int64_t);
-    int64_t *dataInt64 = new int64_t[4];
+    int64_t* dataInt64 = new int64_t[4];
     dataInt64[0] = 1;
     dataInt64[1] = 3;
     dataInt64[2] = 6;
     dataInt64[3] = 10;
-    uint8_t *data = reinterpret_cast<uint8_t *>(dataInt64);
+    uint8_t* data = reinterpret_cast<uint8_t*>(dataInt64);
 
     ge::DataType constDtype = ge::DT_INT64;
-    uint8_t *groupListTensorHolder = new uint8_t[sizeof(gert::Tensor) + size];
-    auto inputTensor = reinterpret_cast<gert::Tensor *>(groupListTensorHolder);
+    uint8_t* groupListTensorHolder = new uint8_t[sizeof(gert::Tensor) + size];
+    auto inputTensor = reinterpret_cast<gert::Tensor*>(groupListTensorHolder);
     std::memcpy(inputTensor + 1, data, size);
     gert::Tensor tensor({{valueSize}, {valueSize}},         // shape
                         {ge::FORMAT_ND, ge::FORMAT_ND, {}}, // format
@@ -401,15 +401,15 @@ TEST_F(GroupedMatMulAllReduceInfershape, Runtime3)
                         nullptr);
     std::memcpy(inputTensor, &tensor, sizeof(gert::Tensor));
 
-    std::vector<gert::Tensor *> inputShapeRef(6);
-    inputShapeRef[0] = (gert::Tensor *)&xShape0;
-    inputShapeRef[1] = (gert::Tensor *)&weightShape0;
-    inputShapeRef[2] = (gert::Tensor *)&weightShape1;
-    inputShapeRef[3] = (gert::Tensor *)&weightShape2;
-    inputShapeRef[4] = (gert::Tensor *)&weightShape3;
-    inputShapeRef[5] = (gert::Tensor *)groupListTensorHolder;
+    std::vector<gert::Tensor*> inputShapeRef(6);
+    inputShapeRef[0] = (gert::Tensor*)&xShape0;
+    inputShapeRef[1] = (gert::Tensor*)&weightShape0;
+    inputShapeRef[2] = (gert::Tensor*)&weightShape1;
+    inputShapeRef[3] = (gert::Tensor*)&weightShape2;
+    inputShapeRef[4] = (gert::Tensor*)&weightShape3;
+    inputShapeRef[5] = (gert::Tensor*)groupListTensorHolder;
 
-    std::vector<gert::StorageShape *> outputShapeRef(1);
+    std::vector<gert::StorageShape*> outputShapeRef(1);
     outputShapeRef[0] = &yShape0;
 
     auto contextHolder = gert::InferShapeContextFaker()
@@ -446,11 +446,11 @@ TEST_F(GroupedMatMulAllReduceInfershape, InferShapeFor2dim)
     gert::StorageShape biasShape = {{128}, {128}};
     gert::StorageShape groupListShape = {{}, {}};
     gert::StorageShape outputShape = {{}, {}};
-    std::vector<gert::Tensor *> inputShapeRef(4);
-    inputShapeRef[0] = (gert::Tensor *)&xShape;
-    inputShapeRef[1] = (gert::Tensor *)&weightShape;
-    inputShapeRef[2] = (gert::Tensor *)&biasShape;
-    inputShapeRef[3] = (gert::Tensor *)&groupListShape;
+    std::vector<gert::Tensor*> inputShapeRef(4);
+    inputShapeRef[0] = (gert::Tensor*)&xShape;
+    inputShapeRef[1] = (gert::Tensor*)&weightShape;
+    inputShapeRef[2] = (gert::Tensor*)&biasShape;
+    inputShapeRef[3] = (gert::Tensor*)&groupListShape;
     auto contextHolder = gert::InferShapeContextFaker()
                              .SetOpType("GroupedMatMulAllReduce")
                              .NodeIoNum(4, 1)
@@ -480,11 +480,11 @@ TEST_F(GroupedMatMulAllReduceInfershape, InferShapeFor3dim)
     gert::StorageShape biasShape = {{128}, {128}};
     gert::StorageShape groupListShape = {{}, {}};
     gert::StorageShape outputShape = {{}, {}};
-    std::vector<gert::Tensor *> inputShapeRef(4);
-    inputShapeRef[0] = (gert::Tensor *)&xShape;
-    inputShapeRef[1] = (gert::Tensor *)&weightShape;
-    inputShapeRef[2] = (gert::Tensor *)&biasShape;
-    inputShapeRef[3] = (gert::Tensor *)&groupListShape;
+    std::vector<gert::Tensor*> inputShapeRef(4);
+    inputShapeRef[0] = (gert::Tensor*)&xShape;
+    inputShapeRef[1] = (gert::Tensor*)&weightShape;
+    inputShapeRef[2] = (gert::Tensor*)&biasShape;
+    inputShapeRef[3] = (gert::Tensor*)&groupListShape;
 
     auto contextHolder = gert::InferShapeContextFaker()
                              .SetOpType("GroupedMatMulAllReduce")
@@ -515,11 +515,11 @@ TEST_F(GroupedMatMulAllReduceInfershape, InferShapeForinvalidK)
     gert::StorageShape biasShape = {{128}, {128}};
     gert::StorageShape groupListShape = {{}, {}};
     gert::StorageShape outputShape = {{}, {}};
-    std::vector<gert::Tensor *> inputShapeRef(4);
-    inputShapeRef[0] = (gert::Tensor *)&xShape;
-    inputShapeRef[1] = (gert::Tensor *)&weightShape;
-    inputShapeRef[2] = (gert::Tensor *)&biasShape;
-    inputShapeRef[3] = (gert::Tensor *)&groupListShape;
+    std::vector<gert::Tensor*> inputShapeRef(4);
+    inputShapeRef[0] = (gert::Tensor*)&xShape;
+    inputShapeRef[1] = (gert::Tensor*)&weightShape;
+    inputShapeRef[2] = (gert::Tensor*)&biasShape;
+    inputShapeRef[3] = (gert::Tensor*)&groupListShape;
     auto contextHolder = gert::InferShapeContextFaker()
                              .SetOpType("GroupedMatMulAllReduce")
                              .NodeIoNum(4, 1)
@@ -548,11 +548,11 @@ TEST_F(GroupedMatMulAllReduceInfershape, InferShapeForzeroK)
     gert::StorageShape biasShape = {{128}, {128}};
     gert::StorageShape groupListShape = {{}, {}};
     gert::StorageShape outputShape = {{}, {}};
-    std::vector<gert::Tensor *> inputShapeRef(4);
-    inputShapeRef[0] = (gert::Tensor *)&xShape;
-    inputShapeRef[1] = (gert::Tensor *)&weightShape;
-    inputShapeRef[2] = (gert::Tensor *)&biasShape;
-    inputShapeRef[3] = (gert::Tensor *)&groupListShape;
+    std::vector<gert::Tensor*> inputShapeRef(4);
+    inputShapeRef[0] = (gert::Tensor*)&xShape;
+    inputShapeRef[1] = (gert::Tensor*)&weightShape;
+    inputShapeRef[2] = (gert::Tensor*)&biasShape;
+    inputShapeRef[3] = (gert::Tensor*)&groupListShape;
     auto contextHolder = gert::InferShapeContextFaker()
                              .SetOpType("GroupedMatMulAllReduce")
                              .NodeIoNum(4, 1)
@@ -610,7 +610,7 @@ TEST_F(GroupedMatMulAllReduceInfershape, InferDtypeTestRuntime2)
     ge::DataType weightDtype2 = ge::DT_FLOAT16;
     ge::DataType weightDtype3 = ge::DT_FLOAT16;
     ge::DataType yDtype = ge::DT_UNDEFINED;
-    std::vector<void *> inputDtypeRef(8);
+    std::vector<void*> inputDtypeRef(8);
     inputDtypeRef[0] = &xDtype0;
     inputDtypeRef[1] = &xDtype1;
     inputDtypeRef[2] = &xDtype2;

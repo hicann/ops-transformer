@@ -20,7 +20,7 @@ namespace optiling {
 
 class Mc2WeightQuantBatchMatmulV2Checker4MmadS8S4 {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2Checker4MmadS8S4(gert::TilingContext *context)
+    explicit Mc2WeightQuantBatchMatmulV2Checker4MmadS8S4(gert::TilingContext* context)
         : context_(context)
     {}
 
@@ -33,11 +33,11 @@ private:
     bool CheckDtype();
     bool CheckAttr();
     bool CheckShape();
-    bool CheckInputShape(const gert::StorageShape *xShape, const gert::StorageShape *weightShape);
-    bool CheckAntiQuantShape(const gert::StorageShape *antiQuantScaleShape,
-                             const gert::StorageShape *antiQuantOffsetShape);
+    bool CheckInputShape(const gert::StorageShape* xShape, const gert::StorageShape* weightShape);
+    bool CheckAntiQuantShape(const gert::StorageShape* antiQuantScaleShape,
+                             const gert::StorageShape* antiQuantOffsetShape);
 
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     Mc2WeightQuantBatchMatmulInfo inputParams_;
 };
 } // namespace optiling

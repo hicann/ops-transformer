@@ -20,7 +20,7 @@
 
 namespace Ops {
 namespace Transformer {
-static std::string TensorDesc2String(const gert::StorageShape *shape, const gert::CompileTimeTensorDesc *tensor)
+static std::string TensorDesc2String(const gert::StorageShape* shape, const gert::CompileTimeTensorDesc* tensor)
 {
     if (shape == nullptr || tensor == nullptr) {
         return "nil ";
@@ -40,7 +40,7 @@ static std::string TensorDesc2String(const gert::StorageShape *shape, const gert
     return oss.str();
 }
 
-std::string DebugTilingContext(const gert::TilingContext *context)
+std::string DebugTilingContext(const gert::TilingContext* context)
 {
     std::ostringstream oss;
     for (size_t i = 0; i < context->GetComputeNodeInfo()->GetInputsNum(); ++i) {
@@ -55,11 +55,11 @@ std::string DebugTilingContext(const gert::TilingContext *context)
     return oss.str();
 }
 
-std::string DebugTilingData(gert::TilingContext *context)
+std::string DebugTilingData(gert::TilingContext* context)
 {
     auto tiling_data = context->GetRawTilingData();
     auto data_size = tiling_data->GetDataSize();
-    auto data = reinterpret_cast<const int32_t *>(tiling_data->GetData());
+    auto data = reinterpret_cast<const int32_t*>(tiling_data->GetData());
     size_t len = data_size / sizeof(int32_t);
     std::ostringstream oss;
     for (size_t i = 0; i < len; i++) {

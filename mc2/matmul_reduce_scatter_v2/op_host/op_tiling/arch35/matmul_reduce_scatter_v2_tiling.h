@@ -28,7 +28,7 @@ using namespace mc2_matmul_v3_advanced;
 
 class MatmulReduceScatterV2Tiling : public MatmulReduceScatterTilingBase {
 public:
-    explicit MatmulReduceScatterV2Tiling(gert::TilingContext *context)
+    explicit MatmulReduceScatterV2Tiling(gert::TilingContext* context)
         : MatmulReduceScatterTilingBase(context),
           matmulReduceScatterV2TilingData_(&matmulReduceScatterV2TilingDataSelf_)
     {
@@ -44,21 +44,21 @@ protected:
     void PrintAllTilingData() const;
     CutResult GetTilingResult() override;
     ge::graphStatus SetMc2Hcomm();
-    ge::graphStatus DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg &tilingCfg, Mc2MMRegisterCfg &registerCfg,
-                                     Mc2MatMulV3TilingData &tilingData);
-    inline Mc2MatMulV3TilingData &MutableMC2MmV3TileTilingData() const
+    ge::graphStatus DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg& tilingCfg, Mc2MMRegisterCfg& registerCfg,
+                                     Mc2MatMulV3TilingData& tilingData);
+    inline Mc2MatMulV3TilingData& MutableMC2MmV3TileTilingData() const
     {
         return matmulReduceScatterV2TilingData_->mC2Mmv3TileTilingData;
     }
-    inline Mc2MatMulV3TilingData &MutableMC2MmV3TailTilingData() const
+    inline Mc2MatMulV3TilingData& MutableMC2MmV3TailTilingData() const
     {
         return matmulReduceScatterV2TilingData_->mC2Mmv3TailTilingData;
     }
 
 private:
     Mc2Tiling::MatmulReduceScatterV2TilingData matmulReduceScatterV2TilingDataSelf_;
-    Mc2Tiling::MatmulReduceScatterV2TilingData
-        *matmulReduceScatterV2TilingData_; // 用于存储matmulReduceScatter算子的tiling结果
+    Mc2Tiling::MatmulReduceScatterV2TilingData*
+        matmulReduceScatterV2TilingData_; // 用于存储matmulReduceScatter算子的tiling结果
     Mc2MatMulV3Args mmV3Args_;
     Mc2MatmulV3CompileInfo compileInfo_;
 };

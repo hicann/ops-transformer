@@ -34,10 +34,10 @@ struct Mc2QuantBatchMatmulV3BitField {
 
 class Mc2QuantBatchMatmulV3HashInput {
 public:
-    explicit Mc2QuantBatchMatmulV3HashInput(const Mc2QuantBatchMatmulInfo &params,
-                                            const Ops::Transformer::OpTiling::AiCoreParams &aicoreParams);
+    explicit Mc2QuantBatchMatmulV3HashInput(const Mc2QuantBatchMatmulInfo& params,
+                                            const Ops::Transformer::OpTiling::AiCoreParams& aicoreParams);
     ~Mc2QuantBatchMatmulV3HashInput() = default;
-    bool operator==(const Mc2QuantBatchMatmulV3HashInput &params) const
+    bool operator==(const Mc2QuantBatchMatmulV3HashInput& params) const
     {
         return memcmp(this, &params, sizeof(params)) == 0;
     }
@@ -70,19 +70,19 @@ private:
 
 class Mc2QuantBatchMatmulV3HashItem {
 public:
-    explicit Mc2QuantBatchMatmulV3HashItem(const Mc2QuantBatchMatmulInfo &params,
-                                           const Ops::Transformer::OpTiling::AiCoreParams &aicoreParams)
+    explicit Mc2QuantBatchMatmulV3HashItem(const Mc2QuantBatchMatmulInfo& params,
+                                           const Ops::Transformer::OpTiling::AiCoreParams& aicoreParams)
         : hashKey_(params, aicoreParams)
     {}
-    const Mc2QuantBatchMatmulV3HashInput &input() const
+    const Mc2QuantBatchMatmulV3HashInput& input() const
     {
         return hashKey_;
     }
-    const BasicTiling &GetTiling() const
+    const BasicTiling& GetTiling() const
     {
         return tiling_;
     }
-    void SetTiling(const BasicTiling &tiling)
+    void SetTiling(const BasicTiling& tiling)
     {
         tiling_ = tiling;
     }

@@ -83,12 +83,12 @@ bool Mc2GroupedQbmmTiling::AnalyzeAttrs()
             OP_LOGE_FOR_INVALID_VALUE(inputParams_.opName, "attrs", std::to_string(attrs->GetAttrNum()).c_str(),
                                       (std::string("should be > ") + std::to_string(ATTR_INDEX_ACT_TYPE + 1)).c_str()),
             return false);
-        const int64_t *splitItemPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SPLIT_ITEM);
-        const bool *transposeWeightPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_W);
-        const bool *transposeXPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_X);
-        const int64_t *groupTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPTYPE);
-        const int64_t *groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE); // 通路保证非负数
-        const int64_t *actTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_ACT_TYPE);
+        const int64_t* splitItemPtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_SPLIT_ITEM);
+        const bool* transposeWeightPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_W);
+        const bool* transposeXPtr = attrs->GetAttrPointer<bool>(ATTR_INDEX_TRANS_X);
+        const int64_t* groupTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUPTYPE);
+        const int64_t* groupListTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_GROUP_LIST_TYPE); // 通路保证非负数
+        const int64_t* actTypePtr = attrs->GetAttrPointer<int64_t>(ATTR_INDEX_ACT_TYPE);
 
         inputParams_.transB = transposeWeightPtr != nullptr ? *transposeWeightPtr : false;
         inputParams_.transA = transposeXPtr != nullptr ? *transposeXPtr : false;
@@ -257,8 +257,8 @@ bool Mc2GroupedQbmmTiling::AnalyzeDtype()
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::CheckQuantParamsForMXTypeM(const gert::Shape &xScaleShape,
-                                                      const gert::Shape &wScaleShape) const
+bool Mc2GroupedQbmmTiling::CheckQuantParamsForMXTypeM(const gert::Shape& xScaleShape,
+                                                      const gert::Shape& wScaleShape) const
 {
     auto xScaleDimNum = xScaleShape.GetDimNum();
     auto wScaleDimNum = wScaleShape.GetDimNum();
@@ -309,8 +309,8 @@ bool Mc2GroupedQbmmTiling::CheckQuantParamsForMXTypeM(const gert::Shape &xScaleS
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::CheckQuantParamsForMXTypeK(const gert::Shape &xScaleShape,
-                                                      const gert::Shape &wScaleShape) const
+bool Mc2GroupedQbmmTiling::CheckQuantParamsForMXTypeK(const gert::Shape& xScaleShape,
+                                                      const gert::Shape& wScaleShape) const
 {
     auto xScaleDimNum = xScaleShape.GetDimNum();
     auto wScaleDimNum = wScaleShape.GetDimNum();
@@ -368,13 +368,13 @@ bool Mc2GroupedQbmmTiling::CheckQuantParamsForMXTypeK(const gert::Shape &xScaleS
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::CheckQuantParamsForMxQuantMode(const gert::StorageShape *xScaleStorageShape,
-                                                          const gert::Shape &wScaleShape) const
+bool Mc2GroupedQbmmTiling::CheckQuantParamsForMxQuantMode(const gert::StorageShape* xScaleStorageShape,
+                                                          const gert::Shape& wScaleShape) const
 {
     // 多数参数在CheckQuantParamsForMxQuantMode函数调用前已有非空校验
     OP_CHECK_IF(xScaleStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "xScale"),
                 return false);
-    auto &xScaleShape = xScaleStorageShape->GetStorageShape();
+    auto& xScaleShape = xScaleStorageShape->GetStorageShape();
     if (inputParams_.groupType == SPLIT_M) {
         OP_CHECK_IF(!CheckQuantParamsForMXTypeM(xScaleShape, wScaleShape),
                     OP_LOGE(inputParams_.opName, "CheckQuantParamsForMXTypeM failed."), return false);
@@ -385,7 +385,7 @@ bool Mc2GroupedQbmmTiling::CheckQuantParamsForMxQuantMode(const gert::StorageSha
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::CheckQuantParamsForNonKGroupQuantMode(const gert::Shape &wScaleShape) const
+bool Mc2GroupedQbmmTiling::CheckQuantParamsForNonKGroupQuantMode(const gert::Shape& wScaleShape) const
 {
     auto wScaleDimNum = wScaleShape.GetDimNum();
     // dim num 1 for the shape (g,), dim num 2 for the shape (g,1) or (g,n)
@@ -416,9 +416,9 @@ bool Mc2GroupedQbmmTiling::CheckFp4Shape() const
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::CheckBiasShape(const gert::StorageShape *biasStorageShape) const
+bool Mc2GroupedQbmmTiling::CheckBiasShape(const gert::StorageShape* biasStorageShape) const
 {
-    auto &biasShape = biasStorageShape->GetStorageShape();
+    auto& biasShape = biasStorageShape->GetStorageShape();
     OP_CHECK_IF(biasStorageShape->GetStorageShape().GetDimNum() != BIAS_DIMS,
                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
                     inputParams_.opName, "bias",
@@ -438,8 +438,8 @@ bool Mc2GroupedQbmmTiling::CheckBiasShape(const gert::StorageShape *biasStorageS
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::CheckQuantParams(const gert::StorageShape *xScaleStorageShape,
-                                            const gert::Shape &wScaleShape) const
+bool Mc2GroupedQbmmTiling::CheckQuantParams(const gert::StorageShape* xScaleStorageShape,
+                                            const gert::Shape& wScaleShape) const
 {
     // 非k分组量化校验
     if (inputParams_.bQuantMode != QuantMode::MX_PERGROUP_MODE && inputParams_.bQuantMode != QuantMode::PERGROUP_MODE &&
@@ -456,7 +456,7 @@ bool Mc2GroupedQbmmTiling::CheckQuantParams(const gert::StorageShape *xScaleStor
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::CheckShapeForWeightNz(const gert::Shape &wShape) const
+bool Mc2GroupedQbmmTiling::CheckShapeForWeightNz(const gert::Shape& wShape) const
 {
     auto wDimNum = wShape.GetDimNum();
     OP_CHECK_IF(wDimNum != WEIGHTNZ_DIM_NUM,
@@ -523,7 +523,7 @@ bool Mc2GroupedQbmmTiling::CheckShapeForWeightNz(const gert::Shape &wShape) cons
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::CheckActiveModeDtype(const gert::StorageShape *xScaleStorageShape) const
+bool Mc2GroupedQbmmTiling::CheckActiveModeDtype(const gert::StorageShape* xScaleStorageShape) const
 {
     OP_CHECK_IF((inputParams_.aDtype != ge::DT_INT8) || (inputParams_.bDtype != ge::DT_INT8),
                 OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
@@ -568,7 +568,7 @@ bool Mc2GroupedQbmmTiling::CheckActiveModeDtype(const gert::StorageShape *xScale
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::CheckActiveMode(const gert::Shape &wScaleShape, const gert::StorageShape *xScaleStorageShape)
+bool Mc2GroupedQbmmTiling::CheckActiveMode(const gert::Shape& wScaleShape, const gert::StorageShape* xScaleStorageShape)
 {
     OP_CHECK_IF(inputParams_.actType == GMMActType::GMM_ACT_TYPE_GELU_ERR_FUNC,
                 OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "actType",
@@ -583,7 +583,7 @@ bool Mc2GroupedQbmmTiling::CheckActiveMode(const gert::Shape &wScaleShape, const
                 OP_LOGE(context_->GetNodeName(), "CheckActiveModeDtype failed."), return false);
     auto wScaleDims = wScaleShape.GetDimNum();
     if (xScaleStorageShape != nullptr) {
-        auto &xScaleShape = xScaleStorageShape->GetStorageShape();
+        auto& xScaleShape = xScaleStorageShape->GetStorageShape();
         auto xScaleDims = xScaleShape.GetDimNum();
         OP_CHECK_IF(xScaleDims != 1,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
@@ -626,18 +626,18 @@ bool Mc2GroupedQbmmTiling::AnalyzeInputs()
     auto xStorageShape = context_->GetDynamicInputShape(X_INDEX, 0);
 
     OP_CHECK_IF(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "x"), return false);
-    const gert::Shape &xShape = xStorageShape->GetOriginShape();
+    const gert::Shape& xShape = xStorageShape->GetOriginShape();
 
     auto wStorageShape = context_->GetDynamicInputShape(WEIGHT_INDEX, 0);
     OP_CHECK_IF(wStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "weight"), return false);
-    const gert::Shape &wShape = wStorageShape->GetOriginShape();
-    const gert::Shape &weightNzStorageShape = wStorageShape->GetStorageShape();
+    const gert::Shape& wShape = wStorageShape->GetOriginShape();
+    const gert::Shape& weightNzStorageShape = wStorageShape->GetStorageShape();
 
     // 全量化scale必须有值，目前无输出int32等不需要scale的场景
     auto scaleStorageShape = context_->GetDynamicInputShape(SCALE_INDEX, 0);
     OP_CHECK_IF(scaleStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "scale"),
                 return false);
-    const gert::Shape &wScaleShape = scaleStorageShape->GetOriginShape();
+    const gert::Shape& wScaleShape = scaleStorageShape->GetOriginShape();
     auto scaleDimNum = wScaleShape.GetDimNum();
     OP_CHECK_IF(scaleDimNum < 1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "scale",
@@ -673,8 +673,8 @@ bool Mc2GroupedQbmmTiling::AnalyzeInputs()
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::SetQuantMode(const gert::Shape &wScaleShape, const gert::StorageShape *xScaleStorageShape,
-                                        const gert::Shape &wShape)
+bool Mc2GroupedQbmmTiling::SetQuantMode(const gert::Shape& wScaleShape, const gert::StorageShape* xScaleStorageShape,
+                                        const gert::Shape& wShape)
 {
     auto wScaleDims = wScaleShape.GetDimNum();
     if (IsMicroScaling()) {
@@ -693,7 +693,7 @@ bool Mc2GroupedQbmmTiling::SetQuantMode(const gert::Shape &wScaleShape, const ge
     if (xScaleStorageShape != nullptr) {
         // split_m: pertoken (M,), pertensor（g,1) 2维或（g,）1维;
         // split_k: pertoken (g, M), pertensor（g,1) 2维或（g,) 1维
-        auto &xScaleShape = xScaleStorageShape->GetStorageShape();
+        auto& xScaleShape = xScaleStorageShape->GetStorageShape();
         auto xScaleDims = xScaleShape.GetDimNum();
         if (inputParams_.aDtype != ge::DT_INT8 &&
             ((xScaleDims == 2 && xScaleShape[xScaleDims - 1] == 1) || // 2:（g,1) 2维
@@ -708,8 +708,8 @@ bool Mc2GroupedQbmmTiling::SetQuantMode(const gert::Shape &wScaleShape, const ge
     return true;
 }
 
-void Mc2GroupedQbmmTiling::SetPerGroupQuantMode(const gert::Shape &xScaleShape, const gert::Shape &wScaleShape,
-                                                const gert::Shape &wShape)
+void Mc2GroupedQbmmTiling::SetPerGroupQuantMode(const gert::Shape& xScaleShape, const gert::Shape& wScaleShape,
+                                                const gert::Shape& wShape)
 {
     if (inputParams_.aDtype == ge::DT_INT8) {
         return;
@@ -763,7 +763,7 @@ bool Mc2GroupedQbmmTiling::SetGroupNum(uint32_t groupListIndex)
     auto groupListStorageShape = context_->GetOptionalInputShape(groupListIndex);
     OP_CHECK_IF(groupListStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "groupList"),
                 return false);
-    const gert::Shape &groupListShape = groupListStorageShape->GetStorageShape();
+    const gert::Shape& groupListShape = groupListStorageShape->GetStorageShape();
     OP_CHECK_IF(groupListShape.GetDimNum() != 1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(inputParams_.opName, "groupList",
                                                          (std::to_string(groupListShape.GetDimNum()) + "D").c_str(),
@@ -778,7 +778,7 @@ bool Mc2GroupedQbmmTiling::SetGroupNum(uint32_t groupListIndex)
     return true;
 }
 
-bool Mc2GroupedQbmmTiling::SetMKN(const gert::Shape &xShape, const gert::Shape &wShape)
+bool Mc2GroupedQbmmTiling::SetMKN(const gert::Shape& xShape, const gert::Shape& wShape)
 {
     uint32_t wDimNum = static_cast<uint32_t>(wShape.GetDimNum());
     OP_CHECK_IF(
@@ -947,7 +947,7 @@ uint64_t Mc2GroupedQbmmTiling::GetTilingKey() const
 
 ge::graphStatus Mc2GroupedQbmmTiling::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = SYS_WORKSPACE_SIZE;
     return ge::GRAPH_SUCCESS;
@@ -960,7 +960,7 @@ ge::graphStatus Mc2GroupedQbmmTiling::PostTiling()
                 OP_LOGE(context_->GetNodeName(), "tiling data size[%zu] is not aligned to 8", sizeof(tilingData_)),
                 return ge::GRAPH_FAILED);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), sizeof(tilingData_));
+                           reinterpret_cast<void*>(&tilingData_), sizeof(tilingData_));
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret = %d", ret);
         return ge::GRAPH_FAILED;
@@ -971,7 +971,7 @@ ge::graphStatus Mc2GroupedQbmmTiling::PostTiling()
 
 void Mc2GroupedQbmmTiling::PrintQuantParams()
 {
-    GMMQuantParams &params = tilingData_.gmmQuantParams;
+    GMMQuantParams& params = tilingData_.gmmQuantParams;
     std::ostringstream oss;
     oss << "GMMQuantParams: groupNum = " << params.groupNum << ", activeType = " << params.activeType
         << ", aQuantMode = " << params.aQuantMode << ", bQuantMode = " << params.bQuantMode

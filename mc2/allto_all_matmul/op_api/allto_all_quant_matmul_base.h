@@ -22,15 +22,15 @@ extern "C" {
 #endif
 
 __attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllQuantMatmulBaseGetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, const aclTensor *x1ScaleOptional,
-    const aclTensor *x2Scale, const aclTensor *commScaleOptional, const aclTensor *x1OffsetOptional,
-    const aclTensor *x2OffsetOptional, const char *group, const char *commMode, const aclIntArray *alltoAllAxesOptional,
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional, const aclTensor* x1ScaleOptional,
+    const aclTensor* x2Scale, const aclTensor* commScaleOptional, const aclTensor* x1OffsetOptional,
+    const aclTensor* x2OffsetOptional, const char* group, const char* commMode, const aclIntArray* alltoAllAxesOptional,
     int64_t x1QuantMode, int64_t x2QuantMode, int64_t commQuantMode, int64_t commQuantDtype, int64_t x1QuantDtype,
-    int64_t groupSize, bool transposeX1, bool transposeX2, const aclTensor *output,
-    const aclTensor *alltoAllOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t groupSize, bool transposeX1, bool transposeX2, const aclTensor* output,
+    const aclTensor* alltoAllOutOptional, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-__attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllQuantMatmulBase(void *workspace, uint64_t workspaceSize,
-                                                                                aclOpExecutor *executor,
+__attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllQuantMatmulBase(void* workspace, uint64_t workspaceSize,
+                                                                                aclOpExecutor* executor,
                                                                                 aclrtStream stream);
 
 #ifdef __cplusplus

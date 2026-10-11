@@ -31,7 +31,7 @@ struct TileBroadcastInplaceByColumn {
     TileBroadcastInplaceByColumn() {}
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<ElementCompute> const &ubInOut)
+    void operator()(AscendC::LocalTensor<ElementCompute> const& ubInOut)
     {
         constexpr uint32_t eleNumPerBlk = BYTE_PER_BLK / sizeof(ElementCompute);
         constexpr uint32_t blkNumPerRow = TileShape::COLUMN / eleNumPerBlk;

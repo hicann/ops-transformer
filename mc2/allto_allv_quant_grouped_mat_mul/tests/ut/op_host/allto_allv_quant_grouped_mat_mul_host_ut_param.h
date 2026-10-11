@@ -38,7 +38,7 @@ struct AlltoAllvQuantGroupedMatMulTilingUTParamBase {
     // Expected result
     ge::graphStatus expectedStatus;
 
-    AlltoAllvQuantGroupedMatMulTilingUTParamBase(const csv_map &csvMap)
+    AlltoAllvQuantGroupedMatMulTilingUTParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->gmm_x_quant_mode = stoi(ReadMap(csvMap, "gmm_x_quant_mode"));
@@ -63,7 +63,7 @@ struct AlltoAllvQuantGroupedMatMulTilingUTParamBase {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AlltoAllvQuantGroupedMatMulTilingUTParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const AlltoAllvQuantGroupedMatMulTilingUTParamBase& param)
 {
     return os << param.case_name;
 }
@@ -85,7 +85,7 @@ struct AlltoAllvQuantGroupedMatMulTilingUTParam : public AlltoAllvQuantGroupedMa
     gert::TilingContextPara::TensorDescription mm_y = TD_DEFAULT;
     gert::TilingContextPara::TensorDescription permute_out = TD_DEFAULT;
 
-    AlltoAllvQuantGroupedMatMulTilingUTParam(const csv_map &csvMap)
+    AlltoAllvQuantGroupedMatMulTilingUTParam(const csv_map& csvMap)
         : AlltoAllvQuantGroupedMatMulTilingUTParamBase(csvMap)
     {
         GetTensorGE(csvMap, "gmm_x_shape", "gmm_x_dtype", "gmm_x_format", gmm_x);

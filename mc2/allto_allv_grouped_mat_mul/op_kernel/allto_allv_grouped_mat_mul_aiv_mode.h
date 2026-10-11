@@ -36,7 +36,7 @@ struct ElementRange {
 template <typename PrefixPtr>
 A2AVGMM_AIV_MODE_HOST_DEVICE bool BuildExpertMetaForIndex(PrefixPtr recvPrefix, uint32_t rankSize,
                                                           uint32_t expertPerRank, uint32_t expertIdx,
-                                                          uint64_t tokenCapacity, ExpertMeta &expert)
+                                                          uint64_t tokenCapacity, ExpertMeta& expert)
 {
     if (recvPrefix == nullptr || rankSize == 0U || expertPerRank == 0U || expertIdx >= expertPerRank) {
         return false;
@@ -72,7 +72,7 @@ template <typename PrefixPtr>
 A2AVGMM_AIV_MODE_HOST_DEVICE bool GetDestinationSourceTokenOffset(PrefixPtr recvPrefix, uint32_t rankSize,
                                                                   uint32_t expertPerRank, uint32_t expertIdx,
                                                                   uint32_t sourceRank, uint64_t tokenCapacity,
-                                                                  uint64_t &tokenOffset)
+                                                                  uint64_t& tokenOffset)
 {
     if (recvPrefix == nullptr || rankSize == 0U || expertPerRank == 0U || expertIdx >= expertPerRank ||
         sourceRank >= rankSize) {
@@ -97,7 +97,7 @@ A2AVGMM_AIV_MODE_HOST_DEVICE bool GetDestinationSourceTokenOffset(PrefixPtr recv
 }
 
 A2AVGMM_AIV_MODE_HOST_DEVICE bool PartitionElements(uint64_t totalElements, uint32_t workerIdx, uint32_t workerNum,
-                                                    ElementRange &range)
+                                                    ElementRange& range)
 {
     if (workerNum == 0U || workerIdx >= workerNum) {
         range = {};
@@ -114,7 +114,7 @@ A2AVGMM_AIV_MODE_HOST_DEVICE bool PartitionElements(uint64_t totalElements, uint
     return true;
 }
 
-A2AVGMM_AIV_MODE_HOST_DEVICE bool GetProducerWorkerCount(uint32_t aivCoreNum, uint32_t taskRatio, uint32_t &workerNum)
+A2AVGMM_AIV_MODE_HOST_DEVICE bool GetProducerWorkerCount(uint32_t aivCoreNum, uint32_t taskRatio, uint32_t& workerNum)
 {
     workerNum = 0U;
     if (aivCoreNum == 0U || taskRatio == 0U || aivCoreNum % taskRatio != 0U) {
@@ -135,11 +135,11 @@ namespace detail {
 
 constexpr uint32_t kFlagBufferBytes = kCopyFlagBufferBytes;
 
-__aicore__ inline int32_t LoadInvocationEpoch(const AlltoAllvGroupedMatMulAiv::PeerWindowContext &context,
-                                              const AlltoAllvGroupedMatMulAiv::A2avWindowLayout &layout,
-                                              AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer)
+__aicore__ inline int32_t LoadInvocationEpoch(const AlltoAllvGroupedMatMulAiv::PeerWindowContext& context,
+                                              const AlltoAllvGroupedMatMulAiv::A2avWindowLayout& layout,
+                                              AscendC::TBuf<AscendC::TPosition::VECCALC>& flagBuffer)
 {
-    __gm__ int32_t *epochAddress = AlltoAllvGroupedMatMulAiv::GetFlagAddress(
+    __gm__ int32_t* epochAddress = AlltoAllvGroupedMatMulAiv::GetFlagAddress(
         context.Window(context.RankId()), layout.controlOffset, AlltoAllvGroupedMatMulAiv::kEpochOffset);
     return AlltoAllvGroupedMatMulAiv::LoadFlag(epochAddress, flagBuffer);
 }
@@ -174,7 +174,7 @@ __aicore__ inline void WaitAicRoutedDataReady()
     AscendC::CrossCoreWaitFlag<0x2>(kRoutedReadyFlag);
 }
 
-__aicore__ inline bool ShouldUseExpertOverlap(const __gm__ AlltoAllvGmmAivTilingData &tiling)
+__aicore__ inline bool ShouldUseExpertOverlap(const __gm__ AlltoAllvGmmAivTilingData& tiling)
 {
     if (tiling.expertOverlapMode != A2AVGMM_EXPERT_OVERLAP_ENABLED || tiling.gmmInfo.expertPerRank < 2U ||
         tiling.gmmInfo.expertPerRank > A2AVGMM_MAX_EXPERT_OVERLAP_LOCAL_EXPERT_NUM) {
@@ -197,9 +197,9 @@ __aicore__ inline bool ShouldUseExpertOverlap(const __gm__ AlltoAllvGmmAivTiling
                                                                             nonEmptyExperts >= 2U;
 }
 
-__aicore__ inline bool GetPeerSourceTokenOffset(AscendC::GlobalTensor<int32_t> &peerPrefix, uint32_t rankSize,
+__aicore__ inline bool GetPeerSourceTokenOffset(AscendC::GlobalTensor<int32_t>& peerPrefix, uint32_t rankSize,
                                                 uint32_t expertPerRank, uint32_t destinationRank, uint32_t expertIdx,
-                                                uint64_t &tokenOffset, uint32_t &tokenCount)
+                                                uint64_t& tokenOffset, uint32_t& tokenCount)
 {
     if (rankSize == 0U || expertPerRank == 0U || destinationRank >= rankSize || expertIdx >= expertPerRank) {
         return false;
@@ -223,8 +223,8 @@ __aicore__ inline bool GetPeerSourceTokenOffset(AscendC::GlobalTensor<int32_t> &
 template <typename T>
 __aicore__ inline bool BuildDeviceWindowLayout(uint64_t inputTokens, uint32_t hiddenSize, uint32_t countNum,
                                                uint32_t rankSize, uint32_t expertPerRank, uint64_t windowBytes,
-                                               AlltoAllvGroupedMatMulAiv::RuntimeControlLayout &control,
-                                               AlltoAllvGroupedMatMulAiv::A2avWindowLayout &layout)
+                                               AlltoAllvGroupedMatMulAiv::RuntimeControlLayout& control,
+                                               AlltoAllvGroupedMatMulAiv::A2avWindowLayout& layout)
 {
     if (sizeof(T) != AlltoAllvGroupedMatMulAiv::kInputElementBytes || inputTokens > 0xffffffffULL ||
         !AlltoAllvGroupedMatMulAiv::BuildRuntimeControlLayout(rankSize, expertPerRank, control)) {
@@ -235,7 +235,7 @@ __aicore__ inline bool BuildDeviceWindowLayout(uint64_t inputTokens, uint32_t hi
 }
 
 template <typename T>
-__aicore__ inline uint32_t GetCopyQueueBytes(const __gm__ AlltoAllvGmmAivTilingData &tiling)
+__aicore__ inline uint32_t GetCopyQueueBytes(const __gm__ AlltoAllvGmmAivTilingData& tiling)
 {
     const uint64_t payloadBytes = static_cast<uint64_t>(tiling.gmmCocTiling.ubMoveNum) * sizeof(T);
     if (payloadBytes == 0U || payloadBytes % 32U != 0U ||
@@ -246,13 +246,13 @@ __aicore__ inline uint32_t GetCopyQueueBytes(const __gm__ AlltoAllvGmmAivTilingD
 }
 
 template <typename T>
-__aicore__ inline bool CopyInitialWindowPayload(GM_ADDR gmmx, const __gm__ AlltoAllvGmmAivTilingData &tiling,
-                                                const AlltoAllvGroupedMatMulAiv::PeerWindowContext &context,
-                                                const AlltoAllvGroupedMatMulAiv::A2avWindowLayout &layout,
+__aicore__ inline bool CopyInitialWindowPayload(GM_ADDR gmmx, const __gm__ AlltoAllvGmmAivTilingData& tiling,
+                                                const AlltoAllvGroupedMatMulAiv::PeerWindowContext& context,
+                                                const AlltoAllvGroupedMatMulAiv::A2avWindowLayout& layout,
                                                 uint32_t taskIdx, uint32_t subBlockIdx,
-                                                AscendC::TBuf<AscendC::TPosition::VECCALC> &copyBuffer,
-                                                AscendC::TBuf<AscendC::TPosition::VECCALC> &copyBuffer1,
-                                                AscendC::TBuf<AscendC::TPosition::VECCALC> &countBuffer)
+                                                AscendC::TBuf<AscendC::TPosition::VECCALC>& copyBuffer,
+                                                AscendC::TBuf<AscendC::TPosition::VECCALC>& copyBuffer1,
+                                                AscendC::TBuf<AscendC::TPosition::VECCALC>& countBuffer)
 {
     if (tiling.countNum == 0U || tiling.countNum > A2AVGMM_MAX_COUNT_NUM) {
         return false;
@@ -270,16 +270,16 @@ __aicore__ inline bool CopyInitialWindowPayload(GM_ADDR gmmx, const __gm__ Allto
     }
 
     AscendC::GlobalTensor<T> input;
-    input.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(gmmx));
+    input.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(gmmx));
     AscendC::GlobalTensor<T> localWindow;
-    localWindow.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(context.Window(context.RankId())));
+    localWindow.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(context.Window(context.RankId())));
     AlltoAllvGroupedMatMulAiv::CopyLocalGmToWindow(localWindow[range.offset], input[range.offset], range.count,
                                                    tiling.gmmCocTiling.ubMoveNum, copyBuffer, copyBuffer1);
 
     if (taskIdx == 0U && subBlockIdx == 0U) {
         AscendC::GlobalTensor<int32_t> windowPrefix;
         windowPrefix.SetGlobalBuffer(
-            reinterpret_cast<__gm__ int32_t *>(context.Window(context.RankId()) + layout.countsOffset));
+            reinterpret_cast<__gm__ int32_t*>(context.Window(context.RankId()) + layout.countsOffset));
         AscendC::LocalTensor<int32_t> localPrefix = countBuffer.Get<int32_t>();
         constexpr uint32_t countsPerBatch = kFlagBufferBytes / sizeof(int32_t);
         for (uint32_t offset = 0U; offset < tiling.countNum; offset += countsPerBatch) {
@@ -300,12 +300,12 @@ __aicore__ inline bool CopyInitialWindowPayload(GM_ADDR gmmx, const __gm__ Allto
 }
 
 template <typename T>
-__aicore__ inline bool CopyExpertFromSource(GM_ADDR recvBuffer, const __gm__ AlltoAllvGmmAivTilingData &tiling,
-                                            const AlltoAllvGroupedMatMulAiv::PeerWindowContext &context,
-                                            const AlltoAllvGroupedMatMulAiv::A2avWindowLayout &layout,
+__aicore__ inline bool CopyExpertFromSource(GM_ADDR recvBuffer, const __gm__ AlltoAllvGmmAivTilingData& tiling,
+                                            const AlltoAllvGroupedMatMulAiv::PeerWindowContext& context,
+                                            const AlltoAllvGroupedMatMulAiv::A2avWindowLayout& layout,
                                             uint32_t expertIdx, uint32_t sourceRank,
-                                            AscendC::TBuf<AscendC::TPosition::VECCALC> &copyBuffer,
-                                            AscendC::TBuf<AscendC::TPosition::VECCALC> &copyBuffer1)
+                                            AscendC::TBuf<AscendC::TPosition::VECCALC>& copyBuffer,
+                                            AscendC::TBuf<AscendC::TPosition::VECCALC>& copyBuffer1)
 {
     uint64_t destinationTokenOffset = 0U;
     if (!GetDestinationSourceTokenOffset(tiling.recvPrefix, tiling.gmmInfo.rankSize, tiling.gmmInfo.expertPerRank,
@@ -314,7 +314,7 @@ __aicore__ inline bool CopyExpertFromSource(GM_ADDR recvBuffer, const __gm__ All
     }
 
     AscendC::GlobalTensor<int32_t> peerPrefix;
-    peerPrefix.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(context.Window(sourceRank) + layout.countsOffset));
+    peerPrefix.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(context.Window(sourceRank) + layout.countsOffset));
     uint64_t sourceTokenOffset = 0U;
     uint32_t sourceTokenCount = 0U;
     if (!GetPeerSourceTokenOffset(peerPrefix, tiling.gmmInfo.rankSize, tiling.gmmInfo.expertPerRank, context.RankId(),
@@ -341,9 +341,9 @@ __aicore__ inline bool CopyExpertFromSource(GM_ADDR recvBuffer, const __gm__ All
     const uint64_t elementCount = AlltoAllvGroupedMatMulAiv::MulU32ToU64(sourceTokenCount, tiling.gmmInfo.K);
 
     AscendC::GlobalTensor<T> peerInput;
-    peerInput.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(context.Window(sourceRank)));
+    peerInput.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(context.Window(sourceRank)));
     AscendC::GlobalTensor<T> destination;
-    destination.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(recvBuffer));
+    destination.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(recvBuffer));
     AlltoAllvGroupedMatMulAiv::CopyPeerGmToLocalGm(destination[destinationElementOffset],
                                                    peerInput[sourceElementOffset], elementCount,
                                                    tiling.gmmCocTiling.ubMoveNum, copyBuffer, copyBuffer1);
@@ -352,7 +352,7 @@ __aicore__ inline bool CopyExpertFromSource(GM_ADDR recvBuffer, const __gm__ All
 
 template <typename T, bool GMM_TRANSPOSE_B, bool MM_TRANSPOSE_B>
 __aicore__ inline void ProcessAic(GM_ADDR gmmweight, GM_ADDR mmx, GM_ADDR mmweight, GM_ADDR gmmy, GM_ADDR mmy,
-                                  GM_ADDR recvBuffer, const __gm__ AlltoAllvGmmAivTilingData &tiling)
+                                  GM_ADDR recvBuffer, const __gm__ AlltoAllvGmmAivTilingData& tiling)
 {
     AscendC::SetLoadDataPaddingValue(0);
     AscendC::SetAtomicNone();
@@ -423,13 +423,13 @@ __aicore__ inline void ProcessAic(GM_ADDR gmmweight, GM_ADDR mmx, GM_ADDR mmweig
 }
 
 template <typename T>
-__aicore__ inline void ProcessAiv(GM_ADDR gmmx, GM_ADDR recvBuffer, const __gm__ AlltoAllvGmmAivTilingData &tiling,
-                                  const AlltoAllvGroupedMatMulAiv::PeerWindowContext &context,
-                                  const AlltoAllvGroupedMatMulAiv::A2avWindowLayout &layout,
-                                  const AlltoAllvGroupedMatMulAiv::RuntimeControlLayout &control,
-                                  AscendC::TBuf<AscendC::TPosition::VECCALC> &copyBuffer,
-                                  AscendC::TBuf<AscendC::TPosition::VECCALC> &copyBuffer1,
-                                  AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer)
+__aicore__ inline void ProcessAiv(GM_ADDR gmmx, GM_ADDR recvBuffer, const __gm__ AlltoAllvGmmAivTilingData& tiling,
+                                  const AlltoAllvGroupedMatMulAiv::PeerWindowContext& context,
+                                  const AlltoAllvGroupedMatMulAiv::A2avWindowLayout& layout,
+                                  const AlltoAllvGroupedMatMulAiv::RuntimeControlLayout& control,
+                                  AscendC::TBuf<AscendC::TPosition::VECCALC>& copyBuffer,
+                                  AscendC::TBuf<AscendC::TPosition::VECCALC>& copyBuffer1,
+                                  AscendC::TBuf<AscendC::TPosition::VECCALC>& flagBuffer)
 {
     const uint32_t taskIdx = AscendC::GetBlockIdx();
     const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
@@ -524,7 +524,7 @@ __aicore__ inline void ProcessAiv(GM_ADDR gmmx, GM_ADDR recvBuffer, const __gm__
 
 template <typename T, bool GMM_TRANSPOSE_B, bool MM_TRANSPOSE_B>
 __aicore__ inline void Run(GM_ADDR gmmx, GM_ADDR gmmweight, GM_ADDR mmx, GM_ADDR mmweight, GM_ADDR gmmy, GM_ADDR mmy,
-                           GM_ADDR permuteOut, GM_ADDR userWorkspace, const __gm__ AlltoAllvGmmAivTilingData &tiling)
+                           GM_ADDR permuteOut, GM_ADDR userWorkspace, const __gm__ AlltoAllvGmmAivTilingData& tiling)
 {
     GM_ADDR recvBuffer = tiling.gmmInfo.hasPermuteOut != 0U && permuteOut != nullptr ?
                              permuteOut :

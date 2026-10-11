@@ -88,7 +88,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, Params const &params)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource, Params const& params)
         : params(params)
     {
         ubC = resource.ubBuf.template GetBufferByByte<ElementC>(0);
@@ -108,8 +108,8 @@ public:
     }
 
     CATLASS_DEVICE
-    void operator()(TensorCoord const &blockOffsetMN, TensorCoord const &actualBlockShapeMN,
-                    AscendC::GlobalTensor<ElementCompute> const &gmBlockC, LayoutC const &layoutBlockC)
+    void operator()(TensorCoord const& blockOffsetMN, TensorCoord const& actualBlockShapeMN,
+                    AscendC::GlobalTensor<ElementCompute> const& gmBlockC, LayoutC const& layoutBlockC)
     {
         TensorCoord actualBlockShape = actualBlockShapeMN;
         TensorCoord blockOffset = blockOffsetMN;
@@ -127,13 +127,13 @@ public:
 
         // Get the data and layout of y
         AscendC::GlobalTensor<ElementY> gmY;
-        gmY.SetGlobalBuffer(reinterpret_cast<__gm__ ElementY *>(params.ptrY));
+        gmY.SetGlobalBuffer(reinterpret_cast<__gm__ ElementY*>(params.ptrY));
         auto gmSubblockY = gmY[params.layoutY.GetOffset(blockOffset + subblockOffset)];
         auto layoutSubblockY = params.layoutY.GetTileLayout(actualSubblockShape);
 
         // Get the data and layout of Z
         AscendC::GlobalTensor<ElementZ> gmZ;
-        gmZ.SetGlobalBuffer(reinterpret_cast<__gm__ ElementZ *>(params.ptrZ));
+        gmZ.SetGlobalBuffer(reinterpret_cast<__gm__ ElementZ*>(params.ptrZ));
         auto gmSubblockZ = gmZ[params.layoutZ.GetOffset(blockOffset + subblockOffset)];
         auto layoutSubblockZ = params.layoutZ.GetTileLayout(actualSubblockShape);
 

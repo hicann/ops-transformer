@@ -31,19 +31,19 @@ __aicore__ inline T1 CeilDiv(T1 a, T2 b)
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType, bool IsMxFp4>
 class AlltoAllMxQuantMatmulArch35 {
 public:
-    __aicore__ inline AlltoAllMxQuantMatmulArch35(SchedulerType *pipeLine, uint64_t x1HcclDataType)
+    __aicore__ inline AlltoAllMxQuantMatmulArch35(SchedulerType* pipeLine, uint64_t x1HcclDataType)
         : pipeLine_(pipeLine),
           x1HcclDataType_(x1HcclDataType){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out, GM_ADDR x1_scale,
-                                GM_ADDR x2_scale, GM_ADDR workspaceGM, AlltoAllMatmulTilingDataType *tilingData,
-                                AscendC::TPipe *tPipe);
+                                GM_ADDR x2_scale, GM_ADDR workspaceGM, AlltoAllMatmulTilingDataType* tilingData,
+                                AscendC::TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
-    SchedulerType *pipeLine_;
+    SchedulerType* pipeLine_;
     SchedulerContextType pipeLineContext_;
-    AlltoAllMatmulTilingDataType *tilingData_;
-    AscendC::TPipe *tPipe_;
+    AlltoAllMatmulTilingDataType* tilingData_;
+    AscendC::TPipe* tPipe_;
     GM_ADDR x1_;
     GM_ADDR x2_;
     GM_ADDR y_;
@@ -73,11 +73,11 @@ template <typename SchedulerType, typename SchedulerContextType, typename AlltoA
 __aicore__ inline void
 AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType, IsMxFp4>::Init(
     GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out, GM_ADDR x1_scale, GM_ADDR x2_scale,
-    GM_ADDR workspaceGM, AlltoAllMatmulTilingDataType *tilingData, AscendC::TPipe *tPipe)
+    GM_ADDR workspaceGM, AlltoAllMatmulTilingDataType* tilingData, AscendC::TPipe* tPipe)
 {
     // 获取tilingdata数据
     tilingData_ = tilingData;
-    auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     tPipe_ = tPipe;
     x1_ = x1;
     x2_ = x2;
@@ -123,7 +123,7 @@ AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulT
         return;
     }
 
-    auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
 
     if (mc2Tiling_.rankDim == 0) {
         return;
@@ -149,7 +149,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename AlltoA
 __aicore__ inline void
 AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType, IsMxFp4>::ProcessScale()
 {
-    auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
 
     uint64_t rankKdivByGroupSize = CeilDiv(mc2Tiling_.rankK, MXFP_GROUP_SIZE) * NUM_TWO;
     // x1Scale通信相关地址
@@ -182,7 +182,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename AlltoA
 __aicore__ inline void AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType,
                                                    IsMxFp4>::ProcessTile(uint32_t taskCnt)
 {
-    auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     // 复用的变量
     uint64_t tileMMultiRankK = static_cast<uint64_t>(mc2Tiling_.tileM) * rankForComm_;
 
@@ -235,7 +235,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename AlltoA
 __aicore__ inline void AlltoAllMxQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType,
                                                    IsMxFp4>::ProcessTail(uint32_t taskCnt)
 {
-    auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     uint64_t tailMMultiRankK = static_cast<uint64_t>(mc2Tiling_.tailM) * rankForComm_;
     uint64_t tileCntMultitileMMultiRankK =
         static_cast<uint64_t>(mc2Tiling_.tileCnt) * static_cast<uint64_t>(mc2Tiling_.tileM) * rankForComm_;

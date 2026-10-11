@@ -20,7 +20,7 @@
 namespace ops {
 constexpr uint32_t VERSION_SIZE = 32;
 
-bool IsTargetPlatformSocVersion(const char *nodeName, const std::set<std::string> &targetPlatform)
+bool IsTargetPlatformSocVersion(const char* nodeName, const std::set<std::string>& targetPlatform)
 {
     fe::PlatFormInfos platform_info;
     fe::OptionalInfos optional_info;
@@ -38,7 +38,7 @@ bool IsTargetPlatformSocVersion(const char *nodeName, const std::set<std::string
     return targetPlatform.count(short_soc_version) > 0;
 }
 
-bool IsTargetPlatformNpuArch(const char *nodeName, const std::set<std::string> &targetPlatform)
+bool IsTargetPlatformNpuArch(const char* nodeName, const std::set<std::string>& targetPlatform)
 {
     char versionValNpuArch[VERSION_SIZE];
     if (rtGetSocSpec("version", "NpuArch", versionValNpuArch, VERSION_SIZE) != RT_ERROR_NONE) {

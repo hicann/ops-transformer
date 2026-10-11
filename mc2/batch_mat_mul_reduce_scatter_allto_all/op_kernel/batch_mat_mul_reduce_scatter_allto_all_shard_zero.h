@@ -33,11 +33,11 @@ template <typename BMMRSATAT> // Batch_Mat_Mul_Reduce_Scatter_All_To_All_Type缩
 class BatchMatMulReduceScatterAlltoAllShard0 {
 public:
     __aicore__ inline BatchMatMulReduceScatterAlltoAllShard0(){};
-    __aicore__ inline void Init(__gm__ uint8_t *xGM, __gm__ uint8_t *weightGM, __gm__ uint8_t *biasGM,
-                                __gm__ uint8_t *yGM, __gm__ uint8_t *workspaceGM,
-                                const BatchMatMulReduceScatterAlltoAllTilingData *tiling, TPipe *tPipe,
-                                __gm__ void *hcclInitTiling, __gm__ void *reduceScatterCcTiling,
-                                __gm__ void *alltoAllCcTiling);
+    __aicore__ inline void Init(__gm__ uint8_t* xGM, __gm__ uint8_t* weightGM, __gm__ uint8_t* biasGM,
+                                __gm__ uint8_t* yGM, __gm__ uint8_t* workspaceGM,
+                                const BatchMatMulReduceScatterAlltoAllTilingData* tiling, TPipe* tPipe,
+                                __gm__ void* hcclInitTiling, __gm__ void* reduceScatterCcTiling,
+                                __gm__ void* alltoAllCcTiling);
     __aicore__ inline void Process();
 
     using X_T = typename BMMRSATAT::xType;
@@ -85,8 +85,8 @@ private:
     static constexpr uint64_t FP32_DATASIZE = 4;
     static constexpr uint64_t MAX_BLOCK_CNT = 4095;
 
-    TPipe *pipe = nullptr;
-    const BatchMatMulReduceScatterAlltoAllTilingData *tilingData = nullptr;
+    TPipe* pipe = nullptr;
+    const BatchMatMulReduceScatterAlltoAllTilingData* tilingData = nullptr;
     Mc2BatchMatmulTilingData localTileTiling;
     Mc2BatchMatmulTilingData localTailTiling;
     Mc2BatchMatmulTilingData nonLocalTileTiling;
@@ -167,9 +167,9 @@ private:
 
 template <typename BMMRSATAT>
 __aicore__ inline void BatchMatMulReduceScatterAlltoAllShard0<BMMRSATAT>::Init(
-    __gm__ uint8_t *x, __gm__ uint8_t *weight, __gm__ uint8_t *bias, __gm__ uint8_t *y, __gm__ uint8_t *workspace,
-    const BatchMatMulReduceScatterAlltoAllTilingData *tiling, TPipe *tPipe, __gm__ void *hcclInitTiling,
-    __gm__ void *reduceScatterCcTiling, __gm__ void *alltoAllCcTiling)
+    __gm__ uint8_t* x, __gm__ uint8_t* weight, __gm__ uint8_t* bias, __gm__ uint8_t* y, __gm__ uint8_t* workspace,
+    const BatchMatMulReduceScatterAlltoAllTilingData* tiling, TPipe* tPipe, __gm__ void* hcclInitTiling,
+    __gm__ void* reduceScatterCcTiling, __gm__ void* alltoAllCcTiling)
 {
     tmpBlockIdx = GetBlockIdx(); // 用于vector分核
 
@@ -192,23 +192,23 @@ __aicore__ inline void BatchMatMulReduceScatterAlltoAllShard0<BMMRSATAT>::Init(
     localECnt = localE.tileCnt + localE.tailCnt;
     nonLocalECnt = nonLocalE.tileCnt + nonLocalE.tailCnt;
 
-    xGM.SetGlobalBuffer((__gm__ X_T *)x);
-    weightGM.SetGlobalBuffer((__gm__ X_T *)weight);
-    yGM.SetGlobalBuffer((__gm__ X_T *)y);
+    xGM.SetGlobalBuffer((__gm__ X_T*)x);
+    weightGM.SetGlobalBuffer((__gm__ X_T*)weight);
+    yGM.SetGlobalBuffer((__gm__ X_T*)y);
     if constexpr (NEED_BIAS) {
-        biasGM.SetGlobalBuffer((__gm__ BIAS_T *)bias);
+        biasGM.SetGlobalBuffer((__gm__ BIAS_T*)bias);
     }
 
-    mmOutGM.SetGlobalBuffer((__gm__ X_T *)workspace);
+    mmOutGM.SetGlobalBuffer((__gm__ X_T*)workspace);
     uint64_t localBmmOut = MAX(localE.tileLen, localE.tailLen) * MAX(localC.tileLen, localC.tailLen) * H;
     uint64_t nonLocalBmmOut =
         MAX(nonLocalE.tileLen, nonLocalE.tailLen) * MAX(nonLocalC.tileLen, nonLocalC.tailLen) * epMinusOne * H;
-    reshapeLocalOutGM.SetGlobalBuffer((__gm__ X_T *)mmOutGM.GetPhyAddr() + MAX(localBmmOut, nonLocalBmmOut));
-    reshapeNonLocalOutGM.SetGlobalBuffer((__gm__ X_T *)reshapeLocalOutGM.GetPhyAddr() + E_ep * C * H);
-    reduceScatterLocalOutGM.SetGlobalBuffer((__gm__ X_T *)reshapeNonLocalOutGM.GetPhyAddr() +
+    reshapeLocalOutGM.SetGlobalBuffer((__gm__ X_T*)mmOutGM.GetPhyAddr() + MAX(localBmmOut, nonLocalBmmOut));
+    reshapeNonLocalOutGM.SetGlobalBuffer((__gm__ X_T*)reshapeLocalOutGM.GetPhyAddr() + E_ep * C * H);
+    reduceScatterLocalOutGM.SetGlobalBuffer((__gm__ X_T*)reshapeNonLocalOutGM.GetPhyAddr() +
                                             (epMinusOne * E_ep * C * H));
-    reduceScatterNonLocalOutGM.SetGlobalBuffer((__gm__ X_T *)reduceScatterLocalOutGM.GetPhyAddr() + (E_ep * C * H_tp));
-    addTransposeOutGM.SetGlobalBuffer((__gm__ X_T *)reduceScatterNonLocalOutGM.GetPhyAddr() +
+    reduceScatterNonLocalOutGM.SetGlobalBuffer((__gm__ X_T*)reduceScatterLocalOutGM.GetPhyAddr() + (E_ep * C * H_tp));
+    addTransposeOutGM.SetGlobalBuffer((__gm__ X_T*)reduceScatterNonLocalOutGM.GetPhyAddr() +
                                       (epMinusOne * E_ep * C * H_tp));
 
     if (pipe != nullptr) {
@@ -353,8 +353,8 @@ __aicore__ inline void BatchMatMulReduceScatterAlltoAllShard0<BMMRSATAT>::NonLoc
                 // 如果是第一次，仅prepare RS的任务0
                 if ASCEND_IS_AIV {
                     reduceScatterHandleList[rsDoneCnt++] = hcclReduceScatter.ReduceScatter<false>(
-                        (__gm__ uint8_t *)reshapeNonLocalOutGM[reshapeOutCOffset].GetPhyAddr(),
-                        (__gm__ uint8_t *)reduceScatterNonLocalOutGM[reduceScatterOutCOffset].GetPhyAddr(), rsDataCnt,
+                        (__gm__ uint8_t*)reshapeNonLocalOutGM[reshapeOutCOffset].GetPhyAddr(),
+                        (__gm__ uint8_t*)reduceScatterNonLocalOutGM[reduceScatterOutCOffset].GetPhyAddr(), rsDataCnt,
                         hcclDataType, HcclReduceOp::HCCL_REDUCE_SUM, 0, 1);
                 }
             } else {
@@ -363,8 +363,8 @@ __aicore__ inline void BatchMatMulReduceScatterAlltoAllShard0<BMMRSATAT>::NonLoc
                 if ASCEND_IS_AIV {
                     hcclReduceScatter.InterHcclGroupSync(HCCL_GROUP_ID_0, alltoallList[alltoallDoneCnt - 1]);
                     reduceScatterHandleList[rsDoneCnt++] = hcclReduceScatter.ReduceScatter<true>(
-                        (__gm__ uint8_t *)reshapeNonLocalOutGM[reshapeOutCOffset].GetPhyAddr(),
-                        (__gm__ uint8_t *)reduceScatterNonLocalOutGM[reduceScatterOutCOffset].GetPhyAddr(), rsDataCnt,
+                        (__gm__ uint8_t*)reshapeNonLocalOutGM[reshapeOutCOffset].GetPhyAddr(),
+                        (__gm__ uint8_t*)reduceScatterNonLocalOutGM[reduceScatterOutCOffset].GetPhyAddr(), rsDataCnt,
                         hcclDataType, HcclReduceOp::HCCL_REDUCE_SUM, 0, 1);
                 }
             }
@@ -374,8 +374,8 @@ __aicore__ inline void BatchMatMulReduceScatterAlltoAllShard0<BMMRSATAT>::NonLoc
                     // 将所有AlltoAll任务prepare但不下发，因为要等前面的trans完成才能做AlltoAll
                     // 所以实际下发会等到计算部分的trans做完后手动下发
                     alltoallList[alltoallDoneCnt++] = hcclAlltoAll.AlltoAllV<false>(
-                        (__gm__ uint8_t *)addTransposeOutGM[addTransposeCOffset].GetPhyAddr(), alltoallVSendCount,
-                        alltoallVSendStride, hcclDataType, (__gm__ uint8_t *)yGM[yGMCOffset].GetPhyAddr(),
+                        (__gm__ uint8_t*)addTransposeOutGM[addTransposeCOffset].GetPhyAddr(), alltoallVSendCount,
+                        alltoallVSendStride, hcclDataType, (__gm__ uint8_t*)yGM[yGMCOffset].GetPhyAddr(),
                         alltoallVSendCount, alltoallVRecvStride, hcclDataType, 1);
                 }
             } else {
@@ -451,9 +451,9 @@ __aicore__ inline void BatchMatMulReduceScatterAlltoAllShard0<BMMRSATAT>::NonLoc
                         cAddrOffset *= H;
 
                         pipe->Reset();
-                        bmmV3.Init((__gm__ uint8_t *)xGM[aAddrOffset].GetPhyAddr(),
-                                   (__gm__ uint8_t *)weightGM[bAddrOffset].GetPhyAddr(),
-                                   (__gm__ uint8_t *)mmOutGM[cAddrOffset].GetPhyAddr(), nullptr, nullptr, nullptr,
+                        bmmV3.Init((__gm__ uint8_t*)xGM[aAddrOffset].GetPhyAddr(),
+                                   (__gm__ uint8_t*)weightGM[bAddrOffset].GetPhyAddr(),
+                                   (__gm__ uint8_t*)mmOutGM[cAddrOffset].GetPhyAddr(), nullptr, nullptr, nullptr,
                                    (isCTail ? &nonLocalTailTiling : &nonLocalTileTiling), pipe);
                         bmmV3.Process();
                     }
@@ -532,21 +532,21 @@ __aicore__ inline void BatchMatMulReduceScatterAlltoAllShard0<BMMRSATAT>::LocalC
             if (firstFlag) {
                 if ASCEND_IS_AIV {
                     reduceScatterHandleList[rsDoneCnt++] = hcclReduceScatter.ReduceScatter<false>(
-                        (__gm__ uint8_t *)reshapeLocalOutGM[reshapeOutCOffset].GetPhyAddr(),
-                        (__gm__ uint8_t *)reduceScatterLocalOutGM[reduceScatterOutCOffset].GetPhyAddr(), rsDataCnt,
+                        (__gm__ uint8_t*)reshapeLocalOutGM[reshapeOutCOffset].GetPhyAddr(),
+                        (__gm__ uint8_t*)reduceScatterLocalOutGM[reduceScatterOutCOffset].GetPhyAddr(), rsDataCnt,
                         hcclDataType, HcclReduceOp::HCCL_REDUCE_SUM, 0, 1);
                     firstFlag = false;
                     alltoallList[alltoallDoneCnt++] = hcclAlltoAll.AlltoAllV<false>(
-                        (__gm__ uint8_t *)addTransposeOutGM[nonLocalLastAddTransposeOffset].GetPhyAddr(),
+                        (__gm__ uint8_t*)addTransposeOutGM[nonLocalLastAddTransposeOffset].GetPhyAddr(),
                         alltoallVSendCount, alltoallVSendStride, hcclDataType,
-                        (__gm__ uint8_t *)yGM[nonLocalLastYGMOffset].GetPhyAddr(), alltoallVSendCount,
+                        (__gm__ uint8_t*)yGM[nonLocalLastYGMOffset].GetPhyAddr(), alltoallVSendCount,
                         alltoallVRecvStride, hcclDataType, 1);
                 }
             } else {
                 if ASCEND_IS_AIV {
                     reduceScatterHandleList[rsDoneCnt++] = hcclReduceScatter.ReduceScatter<false>(
-                        (__gm__ uint8_t *)reshapeLocalOutGM[reshapeOutCOffset].GetPhyAddr(),
-                        (__gm__ uint8_t *)reduceScatterLocalOutGM[reduceScatterOutCOffset].GetPhyAddr(), rsDataCnt,
+                        (__gm__ uint8_t*)reshapeLocalOutGM[reshapeOutCOffset].GetPhyAddr(),
+                        (__gm__ uint8_t*)reduceScatterLocalOutGM[reduceScatterOutCOffset].GetPhyAddr(), rsDataCnt,
                         hcclDataType, HcclReduceOp::HCCL_REDUCE_SUM, 0, 1);
                 }
             }
@@ -604,9 +604,9 @@ __aicore__ inline void BatchMatMulReduceScatterAlltoAllShard0<BMMRSATAT>::LocalC
                     uint64_t cAddrOffset = cCalcOffset + i * validCLen;
                     cAddrOffset *= H;
                     pipe->Reset();
-                    bmmV3.Init((__gm__ uint8_t *)xGM[aAddrOffset].GetPhyAddr(),
-                               (__gm__ uint8_t *)weightGM[bAddrOffset].GetPhyAddr(),
-                               (__gm__ uint8_t *)mmOutGM[cAddrOffset].GetPhyAddr(), nullptr, nullptr, nullptr,
+                    bmmV3.Init((__gm__ uint8_t*)xGM[aAddrOffset].GetPhyAddr(),
+                               (__gm__ uint8_t*)weightGM[bAddrOffset].GetPhyAddr(),
+                               (__gm__ uint8_t*)mmOutGM[cAddrOffset].GetPhyAddr(), nullptr, nullptr, nullptr,
                                (isCTail ? &localTailTiling : &localTileTiling), pipe);
                     bmmV3.Process();
                 }

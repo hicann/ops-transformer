@@ -27,7 +27,7 @@ static constexpr size_t DISPATCH_OUTPUT_EXPAND_IDX_INDEX = 1;
 static constexpr size_t DISPATCH_OUTPUT_COMM_CMD_INFO_INDEX = 2;
 static constexpr size_t DISPATCH_INPUT_ATTR_QUANT_MODE_INDEX = 7;
 
-static ge::graphStatus InferDataTypeMoeDistributeDispatchSetup(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMoeDistributeDispatchSetup(gert::InferDataTypeContext* context)
 {
     OPS_LOG_D(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeDispatchSetup.");
     auto xDtype = context->GetInputDataType(DISPATCH_INPUT_X_INDEX);

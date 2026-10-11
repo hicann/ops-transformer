@@ -66,14 +66,14 @@ struct AivAicpuOpParam {
 // Rich Communications Services
 class HcclServer {
 public:
-    __gm__ AivAicpuOpParam *msgSndWorkArea;
-    __gm__ AivAicpuOpParam *msgRcvRspArea;
+    __gm__ AivAicpuOpParam* msgSndWorkArea;
+    __gm__ AivAicpuOpParam* msgRcvRspArea;
     uint8_t debugMode_;
 
     __aicore__ inline void Init(GM_ADDR win, uint8_t debugMode)
     {
-        msgSndWorkArea = reinterpret_cast<__gm__ AivAicpuOpParam *>(win);
-        msgRcvRspArea = reinterpret_cast<__gm__ AivAicpuOpParam *>(win + sizeof(AivAicpuOpParam));
+        msgSndWorkArea = reinterpret_cast<__gm__ AivAicpuOpParam*>(win);
+        msgRcvRspArea = reinterpret_cast<__gm__ AivAicpuOpParam*>(win + sizeof(AivAicpuOpParam));
         debugMode_ = debugMode;
     }
 
@@ -119,8 +119,8 @@ constexpr uint32_t HCCL_PARAM_SIZE = sizeof(AivAicpuOpParam); // must aligned by
 class HcclServer {
 public:
     __aicore__ inline HcclServer() = default;
-    __ubuf__ AivAicpuOpParam *msgSndWorkArea;
-    __ubuf__ AivAicpuOpParam *msgRcvRspArea;
+    __ubuf__ AivAicpuOpParam* msgSndWorkArea;
+    __ubuf__ AivAicpuOpParam* msgRcvRspArea;
     GlobalTensor<uint8_t> msgSndGlobalTensor;
     LocalTensor<uint8_t> msgSndLocalTensor;
     GlobalTensor<uint8_t> msgRcvGlobalTensor;
@@ -152,7 +152,7 @@ public:
         DataCopy(global, local, sizeInBytes);
     }
 
-    __aicore__ inline void Init(GM_ADDR win, uint8_t debugMode, TBuf<TPosition::VECCALC> &tmpBuf)
+    __aicore__ inline void Init(GM_ADDR win, uint8_t debugMode, TBuf<TPosition::VECCALC>& tmpBuf)
     {
         debugMode_ = debugMode;
         uint32_t offset = 0;
@@ -162,14 +162,14 @@ public:
         // use ubuf hold the result
         msgSndLocalTensor = tmpBuf.Get<uint8_t>();
         msgRcvLocalTensor = tmpBuf.Get<uint8_t>();
-        msgSndWorkArea = reinterpret_cast<__ubuf__ AivAicpuOpParam *>(msgSndLocalTensor.GetPhyAddr());
-        msgRcvRspArea = reinterpret_cast<__ubuf__ AivAicpuOpParam *>(msgRcvLocalTensor.GetPhyAddr());
+        msgSndWorkArea = reinterpret_cast<__ubuf__ AivAicpuOpParam*>(msgSndLocalTensor.GetPhyAddr());
+        msgRcvRspArea = reinterpret_cast<__ubuf__ AivAicpuOpParam*>(msgRcvLocalTensor.GetPhyAddr());
     }
 
-    __aicore__ inline void InitSoftSync(GM_ADDR softSyncOffset, uint32_t usedCoreNum, TBuf<TPosition::VECCALC> &tmpBuf)
+    __aicore__ inline void InitSoftSync(GM_ADDR softSyncOffset, uint32_t usedCoreNum, TBuf<TPosition::VECCALC>& tmpBuf)
     {
         const int32_t ELEMENT_CNT = DEFAULT_C0_SIZE / sizeof(int32_t);
-        syncGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(softSyncOffset), usedCoreNum * ELEMENT_CNT);
+        syncGlobalTensor.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(softSyncOffset), usedCoreNum * ELEMENT_CNT);
         syncLocalTensor = tmpBuf.Get<int32_t>();
         // clear soft sync global tensor
         Duplicate(syncLocalTensor, 0, usedCoreNum * ELEMENT_CNT);

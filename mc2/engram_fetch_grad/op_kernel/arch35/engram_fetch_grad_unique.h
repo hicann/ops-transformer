@@ -26,7 +26,7 @@ constexpr uint32_t DIRECT_FLAG_UB_OFFSET = 4U;
 constexpr uint32_t UNIQUE_DIFF_UB_OFFSET = 2U;
 
 template <AscendC::HardEvent event>
-__aicore__ inline void SyncFunc(AscendC::TPipe &pipe)
+__aicore__ inline void SyncFunc(AscendC::TPipe& pipe)
 {
     int32_t eventID = static_cast<int32_t>(pipe.FetchEventID(event));
     AscendC::SetFlag<event>(eventID);
@@ -50,9 +50,9 @@ public:
 
     __aicore__ inline void Init(uint32_t aivId, uint32_t totalBlocks, uint32_t rankId, uint32_t numRanks,
                                 int32_t numEntriesPerRank, int64_t hiddenDim, int64_t hiddenBytes, int32_t inputDtype,
-                                int32_t outputDtype, AscendC::TPipe *pipe, AscendC::TBuf<> &entryBuf,
-                                AscendC::TBuf<> &gradBuf, AscendC::TBuf<> &indicesBuf, AscendC::TBuf<> &tempBuf,
-                                AscendC::TBuf<> &statusBuf, AscendC::TBuf<> &castBuf, AscendC::TBuf<> &accumBuf);
+                                int32_t outputDtype, AscendC::TPipe* pipe, AscendC::TBuf<>& entryBuf,
+                                AscendC::TBuf<>& gradBuf, AscendC::TBuf<>& indicesBuf, AscendC::TBuf<>& tempBuf,
+                                AscendC::TBuf<>& statusBuf, AscendC::TBuf<>& castBuf, AscendC::TBuf<>& accumBuf);
 
     __aicore__ inline void ZeroGradUnique(uint32_t numRecv, GM_ADDR gradUniqueOutGM);
 
@@ -64,11 +64,11 @@ public:
 
     __aicore__ inline void WriteNumUniqueZero(GM_ADDR numUniqueOutGM);
 
-    __aicore__ inline void SetCastBuf(AscendC::TBuf<> &castBuf)
+    __aicore__ inline void SetCastBuf(AscendC::TBuf<>& castBuf)
     {
         castBuf_ = &castBuf;
     }
-    __aicore__ inline void SetAccumBuf(AscendC::TBuf<> &accumBuf)
+    __aicore__ inline void SetAccumBuf(AscendC::TBuf<>& accumBuf)
     {
         accumBuf_ = &accumBuf;
     }
@@ -152,11 +152,11 @@ private:
                                                      GM_ADDR recvGradGM, GM_ADDR coreStartGM, GM_ADDR segCountGM,
                                                      GM_ADDR sortCompanionGM);
     __aicore__ inline void WriteNumUnique(GM_ADDR segCountGM, GM_ADDR numUniqueOutGM);
-    __aicore__ inline void LoadCoreRange(uint32_t numRecv, GM_ADDR coreStartGM, GM_ADDR segCountGM, uint32_t &start,
-                                         uint32_t &end, int32_t &preCoreOffset);
-    __aicore__ inline uint32_t ProcessScatterBatch(uint32_t cur, uint32_t end, int32_t &runningOffset,
-                                                   int32_t &runningUniqueOffset, int32_t &prevEntry,
-                                                   bool &isFirstElement, GM_ADDR recvLocalEntryOutGM,
+    __aicore__ inline void LoadCoreRange(uint32_t numRecv, GM_ADDR coreStartGM, GM_ADDR segCountGM, uint32_t& start,
+                                         uint32_t& end, int32_t& preCoreOffset);
+    __aicore__ inline uint32_t ProcessScatterBatch(uint32_t cur, uint32_t end, int32_t& runningOffset,
+                                                   int32_t& runningUniqueOffset, int32_t& prevEntry,
+                                                   bool& isFirstElement, GM_ADDR recvLocalEntryOutGM,
                                                    GM_ADDR uniqueLocalEntryOutGM, GM_ADDR gradUniqueOutGM,
                                                    GM_ADDR recvGradGM, GM_ADDR sortCompanionGM);
     __aicore__ inline void ChunkedScatterRange(uint32_t start, uint32_t end, int32_t preCoreOffset,
@@ -166,37 +166,37 @@ private:
                                            GM_ADDR recvLocalEntryOutGM, GM_ADDR uniqueLocalEntryOutGM,
                                            GM_ADDR recvGradGM, GM_ADDR sortCompanionGM, GM_ADDR gradUniqueOutGM);
     __aicore__ inline void ProcessChunkTile(uint32_t subStart, uint32_t subLen, uint32_t chunkIdx,
-                                            uint32_t chunkSrcElems, AscendC::LocalTensor<uint8_t> &gradRaw,
-                                            uint32_t &accumCursor, GM_ADDR gradUniqueOutGM);
+                                            uint32_t chunkSrcElems, AscendC::LocalTensor<uint8_t>& gradRaw,
+                                            uint32_t& accumCursor, GM_ADDR gradUniqueOutGM);
     __aicore__ inline void ProcessAccumRowChunk(int32_t pos, uint32_t subStart, uint32_t chunkIdx,
-                                                uint32_t chunkSrcElems, AscendC::LocalTensor<uint8_t> &gradRaw,
-                                                AscendC::LocalTensor<float> &castChunk, GM_ADDR gradUniqueOutGM);
+                                                uint32_t chunkSrcElems, AscendC::LocalTensor<uint8_t>& gradRaw,
+                                                AscendC::LocalTensor<float>& castChunk, GM_ADDR gradUniqueOutGM);
     __aicore__ inline void FlushAccumChunk(uint32_t chunkIdx, GM_ADDR gradUniqueOutGM);
     __aicore__ inline uint32_t ProcessBatchUnique(uint32_t cur, uint32_t batchLen, int32_t runningOffset,
-                                                  int32_t &prevEntry, bool &isFirstElement, int32_t &inclusiveSum,
+                                                  int32_t& prevEntry, bool& isFirstElement, int32_t& inclusiveSum,
                                                   GM_ADDR recvLocalEntryOutGM, GM_ADDR sortCompanionGM, bool emitLists,
                                                   bool sparseCompact);
-    __aicore__ inline void WriteBatchUnique(uint32_t tileUniqueCnt, int32_t &runningUniqueOffset,
+    __aicore__ inline void WriteBatchUnique(uint32_t tileUniqueCnt, int32_t& runningUniqueOffset,
                                             GM_ADDR uniqueLocalEntryOutGM);
 
     __aicore__ inline void FlushAccum(GM_ADDR gradUniqueOutGM);
-    __aicore__ inline void AccumulateSubBatch(AscendC::LocalTensor<float> &gradFp32, uint32_t rowStrideFloats,
+    __aicore__ inline void AccumulateSubBatch(AscendC::LocalTensor<float>& gradFp32, uint32_t rowStrideFloats,
                                               uint32_t subStart, uint32_t subLen, GM_ADDR gradUniqueOutGM);
-    __aicore__ inline void AccumulateDirectSubBatch(AscendC::LocalTensor<uint8_t> &gradRaw, uint32_t subStart,
-                                                    uint32_t subLen, AscendC::LocalTensor<float> &castRow,
+    __aicore__ inline void AccumulateDirectSubBatch(AscendC::LocalTensor<uint8_t>& gradRaw, uint32_t subStart,
+                                                    uint32_t subLen, AscendC::LocalTensor<float>& castRow,
                                                     GM_ADDR gradUniqueOutGM);
-    __aicore__ inline void ProcessNonDirectRow(int32_t pos, uint32_t subStart, AscendC::LocalTensor<uint8_t> &gradRaw,
-                                               AscendC::LocalTensor<float> &castRow, GM_ADDR gradUniqueOutGM,
+    __aicore__ inline void ProcessNonDirectRow(int32_t pos, uint32_t subStart, AscendC::LocalTensor<uint8_t>& gradRaw,
+                                               AscendC::LocalTensor<float>& castRow, GM_ADDR gradUniqueOutGM,
                                                int32_t compactIdx);
-    __aicore__ inline void AccumulateDupListWalk(uint32_t subStart, uint32_t subLen, uint32_t &cursor,
-                                                 AscendC::LocalTensor<uint8_t> &gradRaw,
-                                                 AscendC::LocalTensor<float> &castRow, GM_ADDR gradUniqueOutGM);
-    __aicore__ inline void EmitRunsFromDupList(uint32_t subStart, uint32_t subLen, uint32_t &cursor,
-                                               AscendC::LocalTensor<uint8_t> &gradRaw, GM_ADDR gradUniqueOutGM);
+    __aicore__ inline void AccumulateDupListWalk(uint32_t subStart, uint32_t subLen, uint32_t& cursor,
+                                                 AscendC::LocalTensor<uint8_t>& gradRaw,
+                                                 AscendC::LocalTensor<float>& castRow, GM_ADDR gradUniqueOutGM);
+    __aicore__ inline void EmitRunsFromDupList(uint32_t subStart, uint32_t subLen, uint32_t& cursor,
+                                               AscendC::LocalTensor<uint8_t>& gradRaw, GM_ADDR gradUniqueOutGM);
     __aicore__ inline void ProcessDirectSubBatchLoopV2(uint32_t batchLen, uint32_t maxGradPerBatch,
-                                                       AscendC::LocalTensor<uint8_t> &gradBase, GM_ADDR recvGradGM,
+                                                       AscendC::LocalTensor<uint8_t>& gradBase, GM_ADDR recvGradGM,
                                                        GM_ADDR gradUniqueOutGM);
-    __aicore__ inline void FlushDirectRun(AscendC::LocalTensor<uint8_t> &gradRaw, uint32_t runStart, uint32_t runLen,
+    __aicore__ inline void FlushDirectRun(AscendC::LocalTensor<uint8_t>& gradRaw, uint32_t runStart, uint32_t runLen,
                                           int32_t compactFirst, GM_ADDR gradUniqueOutGM);
     __aicore__ inline void CastToFP32(AscendC::LocalTensor<float> outT, AscendC::LocalTensor<uint8_t> gradRaw,
                                       uint32_t count);
@@ -218,14 +218,14 @@ private:
     uint32_t numRecv_{0};
     int32_t inputDtype_{0};
     int32_t outputDtype_{0};
-    AscendC::TPipe *pipe_{nullptr};
-    AscendC::TBuf<> *entryBuf_{nullptr};
-    AscendC::TBuf<> *gradBuf_{nullptr};
-    AscendC::TBuf<> *indicesBuf_{nullptr};
-    AscendC::TBuf<> *tempBuf_{nullptr};
-    AscendC::TBuf<> *statusBuf_{nullptr};
-    AscendC::TBuf<> *castBuf_{nullptr};
-    AscendC::TBuf<> *accumBuf_{nullptr};
+    AscendC::TPipe* pipe_{nullptr};
+    AscendC::TBuf<>* entryBuf_{nullptr};
+    AscendC::TBuf<>* gradBuf_{nullptr};
+    AscendC::TBuf<>* indicesBuf_{nullptr};
+    AscendC::TBuf<>* tempBuf_{nullptr};
+    AscendC::TBuf<>* statusBuf_{nullptr};
+    AscendC::TBuf<>* castBuf_{nullptr};
+    AscendC::TBuf<>* accumBuf_{nullptr};
     uint32_t gradSubBatch_{Mc2Kernel::GRAD_SUB_BATCH};
     uint32_t entryBufBytes_{Mc2Kernel::ENTRY_BUF_BYTES};
 
@@ -248,10 +248,10 @@ private:
 __aicore__ inline void EngramFetchGradUnique::Init(uint32_t aivId, uint32_t totalBlocks, uint32_t rankId,
                                                    uint32_t numRanks, int32_t numEntriesPerRank, int64_t hiddenDim,
                                                    int64_t hiddenBytes, int32_t inputDtype, int32_t outputDtype,
-                                                   AscendC::TPipe *pipe, AscendC::TBuf<> &entryBuf,
-                                                   AscendC::TBuf<> &gradBuf, AscendC::TBuf<> &indicesBuf,
-                                                   AscendC::TBuf<> &tempBuf, AscendC::TBuf<> &statusBuf,
-                                                   AscendC::TBuf<> &castBuf, AscendC::TBuf<> &accumBuf)
+                                                   AscendC::TPipe* pipe, AscendC::TBuf<>& entryBuf,
+                                                   AscendC::TBuf<>& gradBuf, AscendC::TBuf<>& indicesBuf,
+                                                   AscendC::TBuf<>& tempBuf, AscendC::TBuf<>& statusBuf,
+                                                   AscendC::TBuf<>& castBuf, AscendC::TBuf<>& accumBuf)
 {
     aivId_ = aivId;
     totalBlocks_ = totalBlocks;
@@ -323,7 +323,7 @@ __aicore__ inline void EngramFetchGradUnique::WriteNumUniqueZero(GM_ADDR numUniq
         return;
     }
     AscendC::GlobalTensor<int32_t> numUniqueGM;
-    numUniqueGM.SetGlobalBuffer((__gm__ int32_t *)numUniqueOutGM);
+    numUniqueGM.SetGlobalBuffer((__gm__ int32_t*)numUniqueOutGM);
     AscendC::LocalTensor<int32_t> tmp = statusBuf_->Get<int32_t>();
     tmp.SetValue(0, 0);
     SyncFunc<AscendC::HardEvent::S_MTE3>(*pipe_);
@@ -361,7 +361,7 @@ __aicore__ inline void EngramFetchGradUnique::ZeroGradUnique(uint32_t numRecv, G
         // output buffers, exposed by generalization cases).
         uint32_t chunkBytes = tileFloats * sizeof(float);
         AscendC::GlobalTensor<uint8_t> dstGM;
-        dstGM.SetGlobalBuffer((__gm__ uint8_t *)gradUniqueOutGM);
+        dstGM.SetGlobalBuffer((__gm__ uint8_t*)gradUniqueOutGM);
         for (uint64_t off = start; off < end; off += chunkBytes) {
             uint64_t thisLen = end - off;
             if (thisLen > chunkBytes) {
@@ -384,7 +384,7 @@ __aicore__ inline void EngramFetchGradUnique::CountUniquesParallel(uint32_t numR
     }
 
     AscendC::GlobalTensor<int32_t> sortedEntryGM;
-    sortedEntryGM.SetGlobalBuffer((__gm__ int32_t *)recvLocalEntryOutGM);
+    sortedEntryGM.SetGlobalBuffer((__gm__ int32_t*)recvLocalEntryOutGM);
 
     uint32_t start = rawStart;
     int32_t boundaryEntry = 0;
@@ -468,9 +468,9 @@ __aicore__ inline void EngramFetchGradUnique::CountUniquesParallel(uint32_t numR
     mySegCount_ = static_cast<int32_t>(localUniqueCount);
     SyncFunc<AscendC::HardEvent::S_MTE3>(*pipe_);
     AscendC::GlobalTensor<int32_t> coreStartGMT;
-    coreStartGMT.SetGlobalBuffer((__gm__ int32_t *)coreStartGM);
+    coreStartGMT.SetGlobalBuffer((__gm__ int32_t*)coreStartGM);
     AscendC::GlobalTensor<int32_t> segCountGMT;
-    segCountGMT.SetGlobalBuffer((__gm__ int32_t *)segCountGM);
+    segCountGMT.SetGlobalBuffer((__gm__ int32_t*)segCountGM);
     AscendC::DataCopyParams cntParams{1U, static_cast<uint16_t>(sizeof(int32_t)), 0U, 0U};
     AscendC::DataCopyPad(coreStartGMT[aivId_], cntUb, cntParams);
     AscendC::DataCopyPad(segCountGMT[aivId_], cntUb[Mc2Kernel::STATE_OFFSET / sizeof(int32_t)], cntParams);
@@ -535,7 +535,7 @@ __aicore__ inline void EngramFetchGradUnique::ChunkColumnPass(uint32_t chunkIdx,
     bool isFirstElement = true;
     if (start > 0U) {
         AscendC::GlobalTensor<int32_t> sortedEntryGM;
-        sortedEntryGM.SetGlobalBuffer((__gm__ int32_t *)recvLocalEntryOutGM);
+        sortedEntryGM.SetGlobalBuffer((__gm__ int32_t*)recvLocalEntryOutGM);
         AscendC::LocalTensor<int32_t> prevUb = tempBuf_->Get<int32_t>();
         AscendC::DataCopyPadExtParams<int32_t> prevPad{false, 0, 0, 0};
         AscendC::DataCopyExtParams prevParams{1U, static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U};
@@ -579,7 +579,7 @@ __aicore__ inline void EngramFetchGradUnique::ChunkColumnPass(uint32_t chunkIdx,
                 }
                 GM_ADDR gradAddr = recvGradGM + static_cast<uint64_t>(recvIdx) * hiddenBytes_ + srcByteOff;
                 AscendC::GlobalTensor<uint8_t> gradSrcGM;
-                gradSrcGM.SetGlobalBuffer((__gm__ uint8_t *)gradAddr);
+                gradSrcGM.SetGlobalBuffer((__gm__ uint8_t*)gradAddr);
                 AscendC::DataCopyExtParams gradParams{1U, chunkSrcBytes, 0U, 0U, 0U};
                 AscendC::DataCopyPad(gradRaw[static_cast<uint64_t>(j) * chunkInStride_], gradSrcGM, gradParams,
                                      gradPad);
@@ -610,8 +610,8 @@ __aicore__ inline void EngramFetchGradUnique::ChunkColumnPass(uint32_t chunkIdx,
 }
 __aicore__ inline void EngramFetchGradUnique::ProcessChunkTile(uint32_t subStart, uint32_t subLen, uint32_t chunkIdx,
                                                                uint32_t chunkSrcElems,
-                                                               AscendC::LocalTensor<uint8_t> &gradRaw,
-                                                               uint32_t &accumCursor, GM_ADDR gradUniqueOutGM)
+                                                               AscendC::LocalTensor<uint8_t>& gradRaw,
+                                                               uint32_t& accumCursor, GM_ADDR gradUniqueOutGM)
 {
     bool directAllowed = (inputDtype_ == outputDtype_);
     uint32_t outDtypeSize = GetDtypeSize(outputDtype_);
@@ -641,7 +641,7 @@ __aicore__ inline void EngramFetchGradUnique::ProcessChunkTile(uint32_t subStart
             uint64_t gmByteOffset =
                 static_cast<uint64_t>(compactIdx) * static_cast<uint64_t>(hiddenDim_) * outDtypeSize + outByteOff;
             AscendC::GlobalTensor<uint8_t> dstGM;
-            dstGM.SetGlobalBuffer((__gm__ uint8_t *)(gradUniqueOutGM + gmByteOffset));
+            dstGM.SetGlobalBuffer((__gm__ uint8_t*)(gradUniqueOutGM + gmByteOffset));
             AscendC::DataCopyParams params{1U, static_cast<uint16_t>(chunkSrcBytes), 0U, 0U};
             AscendC::DataCopyPad(dstGM, gradRaw[j * chunkInStride_], params);
         }
@@ -649,8 +649,8 @@ __aicore__ inline void EngramFetchGradUnique::ProcessChunkTile(uint32_t subStart
 }
 __aicore__ inline void EngramFetchGradUnique::ProcessAccumRowChunk(int32_t pos, uint32_t subStart, uint32_t chunkIdx,
                                                                    uint32_t chunkSrcElems,
-                                                                   AscendC::LocalTensor<uint8_t> &gradRaw,
-                                                                   AscendC::LocalTensor<float> &castChunk,
+                                                                   AscendC::LocalTensor<uint8_t>& gradRaw,
+                                                                   AscendC::LocalTensor<float>& castChunk,
                                                                    GM_ADDR gradUniqueOutGM)
 {
     AscendC::LocalTensor<float> accumBase = accumBuf_->Get<float>();
@@ -712,7 +712,7 @@ __aicore__ inline void EngramFetchGradUnique::FlushAccumChunk(uint32_t chunkIdx,
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(flushEvtVMte3Arr_[bufIdx]);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(flushEvtVMte3Arr_[bufIdx]);
         AscendC::GlobalTensor<float> dstGM;
-        dstGM.SetGlobalBuffer((__gm__ float *)(gradUniqueOutGM + gmByteOffset));
+        dstGM.SetGlobalBuffer((__gm__ float*)(gradUniqueOutGM + gmByteOffset));
         AscendC::DataCopyParams params{1U, static_cast<uint16_t>(chunkOutBytes), 0U, 0U};
         AscendC::DataCopyPad(dstGM, accum, params);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(flushEvtMte3VArr_[bufIdx]);
@@ -735,7 +735,7 @@ __aicore__ inline void EngramFetchGradUnique::FlushAccumChunk(uint32_t chunkIdx,
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(flushEvtVMte3Arr_[bufIdx]);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(flushEvtVMte3Arr_[bufIdx]);
         AscendC::GlobalTensor<uint8_t> dstGM;
-        dstGM.SetGlobalBuffer((__gm__ uint8_t *)(gradUniqueOutGM + gmByteOffset));
+        dstGM.SetGlobalBuffer((__gm__ uint8_t*)(gradUniqueOutGM + gmByteOffset));
         AscendC::DataCopyParams params{1U, static_cast<uint16_t>(chunkOutBytes), 0U, 0U};
         AscendC::DataCopyPad(dstGM, flushCastBuf, params);
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(flushEvtMte3VArr_[bufIdx]);
@@ -745,12 +745,12 @@ __aicore__ inline void EngramFetchGradUnique::FlushAccumChunk(uint32_t chunkIdx,
 }
 
 __aicore__ inline void EngramFetchGradUnique::LoadCoreRange(uint32_t numRecv, GM_ADDR coreStartGM, GM_ADDR segCountGM,
-                                                            uint32_t &start, uint32_t &end, int32_t &preCoreOffset)
+                                                            uint32_t& start, uint32_t& end, int32_t& preCoreOffset)
 {
     AscendC::GlobalTensor<int32_t> coreStartGMT;
-    coreStartGMT.SetGlobalBuffer((__gm__ int32_t *)coreStartGM);
+    coreStartGMT.SetGlobalBuffer((__gm__ int32_t*)coreStartGM);
     AscendC::GlobalTensor<int32_t> segCountGMT;
-    segCountGMT.SetGlobalBuffer((__gm__ int32_t *)segCountGM);
+    segCountGMT.SetGlobalBuffer((__gm__ int32_t*)segCountGM);
 
     AscendC::LocalTensor<int32_t> ub = tempBuf_->Get<int32_t>();
     uint32_t totalBytes = totalBlocks_ * static_cast<uint32_t>(sizeof(int32_t));
@@ -818,7 +818,7 @@ __aicore__ inline void EngramFetchGradUnique::FlushAccum(GM_ADDR gradUniqueOutGM
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(flushEvtVMte3Arr_[bufIdx]);
 
         AscendC::GlobalTensor<float> dstGM;
-        dstGM.SetGlobalBuffer((__gm__ float *)(gradUniqueOutGM + gmByteOffset));
+        dstGM.SetGlobalBuffer((__gm__ float*)(gradUniqueOutGM + gmByteOffset));
         uint32_t totalBytes = static_cast<uint32_t>(hiddenDim_) * sizeof(float);
         uint32_t numBlocks = (totalBytes + Mc2Kernel::MAX_BLOCK_BYTES - 1U) / Mc2Kernel::MAX_BLOCK_BYTES;
         for (uint32_t b = 0; b < numBlocks; b++) {
@@ -864,7 +864,7 @@ __aicore__ inline void EngramFetchGradUnique::FlushAccum(GM_ADDR gradUniqueOutGM
 
         if (outputDtype_ == Mc2Kernel::ENGRAM_DT_BFLOAT16) {
             AscendC::GlobalTensor<bfloat16_t> dstGM;
-            dstGM.SetGlobalBuffer((__gm__ bfloat16_t *)(gradUniqueOutGM + gmByteOffset));
+            dstGM.SetGlobalBuffer((__gm__ bfloat16_t*)(gradUniqueOutGM + gmByteOffset));
             uint32_t totalBytes = static_cast<uint32_t>(hiddenDim_) * sizeof(bfloat16_t);
             uint32_t numBlocks = (totalBytes + Mc2Kernel::MAX_BLOCK_BYTES - 1U) / Mc2Kernel::MAX_BLOCK_BYTES;
             AscendC::LocalTensor<bfloat16_t> outT = flushCastBuf.ReinterpretCast<bfloat16_t>();
@@ -879,7 +879,7 @@ __aicore__ inline void EngramFetchGradUnique::FlushAccum(GM_ADDR gradUniqueOutGM
             }
         } else {
             AscendC::GlobalTensor<half> dstGM;
-            dstGM.SetGlobalBuffer((__gm__ half *)(gradUniqueOutGM + gmByteOffset));
+            dstGM.SetGlobalBuffer((__gm__ half*)(gradUniqueOutGM + gmByteOffset));
             uint32_t totalBytes = static_cast<uint32_t>(hiddenDim_) * sizeof(half);
             uint32_t numBlocks = (totalBytes + Mc2Kernel::MAX_BLOCK_BYTES - 1U) / Mc2Kernel::MAX_BLOCK_BYTES;
             AscendC::LocalTensor<half> outT = flushCastBuf.ReinterpretCast<half>();
@@ -911,7 +911,7 @@ __aicore__ inline void EngramFetchGradUnique::CastToFP32(AscendC::LocalTensor<fl
     }
 }
 
-__aicore__ inline void EngramFetchGradUnique::AccumulateSubBatch(AscendC::LocalTensor<float> &gradFp32,
+__aicore__ inline void EngramFetchGradUnique::AccumulateSubBatch(AscendC::LocalTensor<float>& gradFp32,
                                                                  uint32_t rowStrideFloats, uint32_t subStart,
                                                                  uint32_t subLen, GM_ADDR gradUniqueOutGM)
 {
@@ -948,9 +948,9 @@ __aicore__ inline void EngramFetchGradUnique::AccumulateSubBatch(AscendC::LocalT
     }
 }
 
-__aicore__ inline void EngramFetchGradUnique::AccumulateDirectSubBatch(AscendC::LocalTensor<uint8_t> &gradRaw,
+__aicore__ inline void EngramFetchGradUnique::AccumulateDirectSubBatch(AscendC::LocalTensor<uint8_t>& gradRaw,
                                                                        uint32_t subStart, uint32_t subLen,
-                                                                       AscendC::LocalTensor<float> &castRow,
+                                                                       AscendC::LocalTensor<float>& castRow,
                                                                        GM_ADDR gradUniqueOutGM)
 {
     AscendC::LocalTensor<float> accumBase = accumBuf_->Get<float>();
@@ -987,7 +987,7 @@ __aicore__ inline void EngramFetchGradUnique::AccumulateDirectSubBatch(AscendC::
     }
 }
 
-__aicore__ inline void EngramFetchGradUnique::FlushDirectRun(AscendC::LocalTensor<uint8_t> &gradRaw, uint32_t runStart,
+__aicore__ inline void EngramFetchGradUnique::FlushDirectRun(AscendC::LocalTensor<uint8_t>& gradRaw, uint32_t runStart,
                                                              uint32_t runLen, int32_t compactFirst,
                                                              GM_ADDR gradUniqueOutGM)
 {
@@ -995,7 +995,7 @@ __aicore__ inline void EngramFetchGradUnique::FlushDirectRun(AscendC::LocalTenso
     uint32_t hb = static_cast<uint32_t>(hiddenBytes_);
     uint64_t gmByteOffset = static_cast<uint64_t>(compactFirst) * static_cast<uint64_t>(hiddenDim_) * outDtypeSize;
     AscendC::GlobalTensor<uint8_t> dstGM;
-    dstGM.SetGlobalBuffer((__gm__ uint8_t *)(gradUniqueOutGM + gmByteOffset));
+    dstGM.SetGlobalBuffer((__gm__ uint8_t*)(gradUniqueOutGM + gmByteOffset));
     if (inRowStride_ == hb) {
         uint32_t totalBytes = runLen * hb;
         AscendC::DataCopyParams params{1U, static_cast<uint16_t>(totalBytes), 0U, 0U};
@@ -1017,15 +1017,15 @@ __aicore__ inline void EngramFetchGradUnique::FlushDirectRun(AscendC::LocalTenso
 }
 
 __aicore__ inline uint32_t EngramFetchGradUnique::ProcessBatchUnique(
-    uint32_t cur, uint32_t batchLen, int32_t runningOffset, int32_t &prevEntry, bool &isFirstElement,
-    int32_t &inclusiveSum, GM_ADDR recvLocalEntryOutGM, GM_ADDR sortCompanionGM, bool emitLists, bool sparseCompact)
+    uint32_t cur, uint32_t batchLen, int32_t runningOffset, int32_t& prevEntry, bool& isFirstElement,
+    int32_t& inclusiveSum, GM_ADDR recvLocalEntryOutGM, GM_ADDR sortCompanionGM, bool emitLists, bool sparseCompact)
 {
     AscendC::LocalTensor<int32_t> entryUb = indicesBuf_->Get<int32_t>();
 
     AscendC::GlobalTensor<int32_t> sortedEntryGM;
     AscendC::GlobalTensor<int32_t> compGM;
-    sortedEntryGM.SetGlobalBuffer((__gm__ int32_t *)recvLocalEntryOutGM);
-    compGM.SetGlobalBuffer((__gm__ int32_t *)sortCompanionGM);
+    sortedEntryGM.SetGlobalBuffer((__gm__ int32_t*)recvLocalEntryOutGM);
+    compGM.SetGlobalBuffer((__gm__ int32_t*)sortCompanionGM);
     if (cur >= numRecv_) {
         return 0;
     }
@@ -1224,11 +1224,11 @@ __aicore__ inline uint32_t EngramFetchGradUnique::ProcessBatchUnique(
     return tileUniqueCnt;
 }
 
-__aicore__ inline void EngramFetchGradUnique::WriteBatchUnique(uint32_t tileUniqueCnt, int32_t &runningUniqueOffset,
+__aicore__ inline void EngramFetchGradUnique::WriteBatchUnique(uint32_t tileUniqueCnt, int32_t& runningUniqueOffset,
                                                                GM_ADDR uniqueLocalEntryOutGM)
 {
     AscendC::GlobalTensor<int32_t> uniqueEntryOutGM;
-    uniqueEntryOutGM.SetGlobalBuffer((__gm__ int32_t *)uniqueLocalEntryOutGM);
+    uniqueEntryOutGM.SetGlobalBuffer((__gm__ int32_t*)uniqueLocalEntryOutGM);
     SyncFunc<AscendC::HardEvent::S_MTE3>(*pipe_);
     AscendC::DataCopyParams ueParams{1U, static_cast<uint16_t>(tileUniqueCnt * sizeof(int32_t)), 0U, 0U};
     AscendC::DataCopyPad(uniqueEntryOutGM[runningUniqueOffset], UniqueUb(), ueParams);
@@ -1237,8 +1237,8 @@ __aicore__ inline void EngramFetchGradUnique::WriteBatchUnique(uint32_t tileUniq
 }
 
 __aicore__ inline void EngramFetchGradUnique::ProcessNonDirectRow(int32_t pos, uint32_t subStart,
-                                                                  AscendC::LocalTensor<uint8_t> &gradRaw,
-                                                                  AscendC::LocalTensor<float> &castRow,
+                                                                  AscendC::LocalTensor<uint8_t>& gradRaw,
+                                                                  AscendC::LocalTensor<float>& castRow,
                                                                   GM_ADDR gradUniqueOutGM, int32_t compactIdx)
 {
     AscendC::LocalTensor<float> accumBase = accumBuf_->Get<float>();
@@ -1284,9 +1284,9 @@ __aicore__ inline void EngramFetchGradUnique::ProcessNonDirectRow(int32_t pos, u
     accumDirty_ = true;
 }
 __aicore__ inline void EngramFetchGradUnique::AccumulateDupListWalk(uint32_t subStart, uint32_t subLen,
-                                                                    uint32_t &cursor,
-                                                                    AscendC::LocalTensor<uint8_t> &gradRaw,
-                                                                    AscendC::LocalTensor<float> &castRow,
+                                                                    uint32_t& cursor,
+                                                                    AscendC::LocalTensor<uint8_t>& gradRaw,
+                                                                    AscendC::LocalTensor<float>& castRow,
                                                                     GM_ADDR gradUniqueOutGM)
 {
     uint32_t subEnd = subStart + subLen;
@@ -1316,8 +1316,8 @@ __aicore__ inline void EngramFetchGradUnique::AccumulateDupListWalk(uint32_t sub
         cursor++;
     }
 }
-__aicore__ inline void EngramFetchGradUnique::EmitRunsFromDupList(uint32_t subStart, uint32_t subLen, uint32_t &cursor,
-                                                                  AscendC::LocalTensor<uint8_t> &gradRaw,
+__aicore__ inline void EngramFetchGradUnique::EmitRunsFromDupList(uint32_t subStart, uint32_t subLen, uint32_t& cursor,
+                                                                  AscendC::LocalTensor<uint8_t>& gradRaw,
                                                                   GM_ADDR gradUniqueOutGM)
 {
     uint32_t subEnd = subStart + subLen;
@@ -1353,7 +1353,7 @@ __aicore__ inline void EngramFetchGradUnique::EmitRunsFromDupList(uint32_t subSt
     }
 }
 __aicore__ inline void EngramFetchGradUnique::ProcessDirectSubBatchLoopV2(uint32_t batchLen, uint32_t maxGradPerBatch,
-                                                                          AscendC::LocalTensor<uint8_t> &gradBase,
+                                                                          AscendC::LocalTensor<uint8_t>& gradBase,
                                                                           GM_ADDR recvGradGM, GM_ADDR gradUniqueOutGM)
 {
     constexpr uint32_t kBufs = 4U;
@@ -1402,7 +1402,7 @@ __aicore__ inline void EngramFetchGradUnique::ProcessDirectSubBatchLoopV2(uint32
             GM_ADDR gradAddr = recvGradGM + static_cast<uint64_t>(recvIdx) * hiddenBytes_;
             AscendC::DataCopyExtParams gradParams{1U, static_cast<uint32_t>(hiddenBytes_), 0U, 0U, 0U};
             AscendC::GlobalTensor<uint8_t> gradSrcGM;
-            gradSrcGM.SetGlobalBuffer((__gm__ uint8_t *)gradAddr);
+            gradSrcGM.SetGlobalBuffer((__gm__ uint8_t*)gradAddr);
             AscendC::DataCopyPad(gradRaw[static_cast<uint64_t>(j) * inRowStride_], gradSrcGM, gradParams, gradPad);
         }
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(evtMte2V[b]);
@@ -1434,8 +1434,8 @@ __aicore__ inline void EngramFetchGradUnique::ProcessDirectSubBatchLoopV2(uint32
 }
 
 __aicore__ inline uint32_t EngramFetchGradUnique::ProcessScatterBatch(
-    uint32_t cur, uint32_t end, int32_t &runningOffset, int32_t &runningUniqueOffset, int32_t &prevEntry,
-    bool &isFirstElement, GM_ADDR recvLocalEntryOutGM, GM_ADDR uniqueLocalEntryOutGM, GM_ADDR gradUniqueOutGM,
+    uint32_t cur, uint32_t end, int32_t& runningOffset, int32_t& runningUniqueOffset, int32_t& prevEntry,
+    bool& isFirstElement, GM_ADDR recvLocalEntryOutGM, GM_ADDR uniqueLocalEntryOutGM, GM_ADDR gradUniqueOutGM,
     GM_ADDR recvGradGM, GM_ADDR sortCompanionGM)
 {
     uint32_t batchLen = end - cur;
@@ -1524,7 +1524,7 @@ __aicore__ inline uint32_t EngramFetchGradUnique::ProcessScatterBatch(
                 GM_ADDR gradAddr = recvGradGM + static_cast<uint64_t>(recvIdx) * hiddenBytes_;
                 AscendC::DataCopyExtParams gradParams{1U, static_cast<uint32_t>(hiddenBytes_), 0U, 0U, 0U};
                 AscendC::GlobalTensor<uint8_t> gradSrcGM;
-                gradSrcGM.SetGlobalBuffer((__gm__ uint8_t *)gradAddr);
+                gradSrcGM.SetGlobalBuffer((__gm__ uint8_t*)gradAddr);
                 AscendC::DataCopyPad(gradRaw[static_cast<uint64_t>(j) * inRowStride_], gradSrcGM, gradParams, gradPad);
             }
 
@@ -1638,7 +1638,7 @@ __aicore__ inline void EngramFetchGradUnique::ScatterAccumulateParallel(uint32_t
     bool isFirstElement = true;
     if (start > 0U) {
         AscendC::GlobalTensor<int32_t> sortedEntryGM;
-        sortedEntryGM.SetGlobalBuffer((__gm__ int32_t *)recvLocalEntryOutGM);
+        sortedEntryGM.SetGlobalBuffer((__gm__ int32_t*)recvLocalEntryOutGM);
         AscendC::LocalTensor<int32_t> prevUb = tempBuf_->Get<int32_t>();
         AscendC::DataCopyPadExtParams<int32_t> prevPad{false, 0, 0, 0};
         AscendC::DataCopyExtParams prevParams{1U, static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U};
@@ -1661,7 +1661,7 @@ __aicore__ inline void EngramFetchGradUnique::WriteNumUnique(GM_ADDR segCountGM,
     // Sum per-core segCount on core 0 and plain-write (do NOT atomic-add: numUniqueOutGM is
     // at::empty/uninitialized, so SetAtomicAdd would accumulate onto garbage -> wrong numUnique).
     AscendC::GlobalTensor<int32_t> segCountGMT;
-    segCountGMT.SetGlobalBuffer((__gm__ int32_t *)segCountGM);
+    segCountGMT.SetGlobalBuffer((__gm__ int32_t*)segCountGM);
     AscendC::LocalTensor<int32_t> segCountUb = tempBuf_->Get<int32_t>();
     AscendC::DataCopyPadExtParams<int32_t> scPad{false, 0, 0, 0};
     AscendC::DataCopyExtParams scParams{1U, static_cast<uint32_t>(totalBlocks_ * sizeof(int32_t)), 0U, 0U, 0U};
@@ -1678,7 +1678,7 @@ __aicore__ inline void EngramFetchGradUnique::WriteNumUnique(GM_ADDR segCountGM,
         tmp.SetValue(0, numUnique);
         SyncFunc<AscendC::HardEvent::S_MTE3>(*pipe_);
         AscendC::GlobalTensor<int32_t> numUniqueGM;
-        numUniqueGM.SetGlobalBuffer((__gm__ int32_t *)numUniqueOutGM);
+        numUniqueGM.SetGlobalBuffer((__gm__ int32_t*)numUniqueOutGM);
         AscendC::DataCopyParams p{1U, static_cast<uint16_t>(sizeof(int32_t)), 0U, 0U};
         AscendC::DataCopyPad(numUniqueGM, tmp, p);
         SyncFunc<AscendC::HardEvent::MTE3_S>(*pipe_);

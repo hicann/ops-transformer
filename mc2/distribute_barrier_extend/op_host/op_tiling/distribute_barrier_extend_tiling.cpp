@@ -22,7 +22,7 @@ using namespace AscendC;
 using namespace ge;
 
 namespace optiling {
-static ge::graphStatus DistributeBarrierExtendTilingFunc(gert::TilingContext *context)
+static ge::graphStatus DistributeBarrierExtendTilingFunc(gert::TilingContext* context)
 {
     DistributeBarrierConfig config;
     config.contextIndex = INPUT_CONTEXT_EXTEND_INDEX; // 根据disributeBarrierExtend算子原型标志位初始化context索引
@@ -35,16 +35,16 @@ static ge::graphStatus DistributeBarrierExtendTilingFunc(gert::TilingContext *co
     config.attrWorldSizeIndex =
         ATTR_WORLD_SIZE_INDEX; // 根据disributeBarrierExtend算子原型标志位设置attrWorldSizeIndex索引
     config.isMc2Context = true;
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGD(nodeName, "Enter DistributeBarrierExtend tiling");
     ge::graphStatus ret = optiling::DistributeBarrierExtendTilingFuncNew(context, config);
     return ret;
 }
 
 struct DistributeBarrierExtendCompileInfo {};
-ge::graphStatus TilingParseForDistributeBarrierExtend(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForDistributeBarrierExtend(gert::TilingParseContext* context)
 {
-    const gert::TilingParseContext *const_context = context;
+    const gert::TilingParseContext* const_context = context;
     // 避免未使用变量警告
     (void)const_context;
     (void)context;

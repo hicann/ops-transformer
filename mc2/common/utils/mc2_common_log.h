@@ -54,7 +54,7 @@ struct ErrorResult {
         return nullptr;
     }
     template <typename T>
-    operator T *() const
+    operator T*() const
     {
         return nullptr;
     }
@@ -79,11 +79,11 @@ struct ErrorResult {
     }
 };
 
-inline std::vector<char> CreateErrorMsg(const char *format, ...) __attribute__((format(printf, 1, 2)));
+inline std::vector<char> CreateErrorMsg(const char* format, ...) __attribute__((format(printf, 1, 2)));
 
 inline std::vector<char> CreateErrorMsg();
 
-inline std::vector<char> CreateErrorMsg(const char *format, ...)
+inline std::vector<char> CreateErrorMsg(const char* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -178,8 +178,8 @@ inline std::vector<char> CreateErrorMsg()
 // MC2_CHECK_EQ_ERR — 等值断言，返回 ::ErrorResult()，上报 EZ9999
 #define MC2_CHECK_EQ_RET(opName, x, y) \
     do { \
-        const auto &_mc2_x_ = (x); \
-        const auto &_mc2_y_ = (y); \
+        const auto& _mc2_x_ = (x); \
+        const auto& _mc2_y_ = (y); \
         if (_mc2_x_ != _mc2_y_) { \
             std::stringstream _mc2_ss_; \
             _mc2_ss_ << "Assert (" << #x << " == " << #y << ")failed, expect " << _mc2_y_ << " actual " << _mc2_x_; \
@@ -191,14 +191,14 @@ inline std::vector<char> CreateErrorMsg()
 namespace ops {
 #define OPS_CHECK_NULL_WITH_CONTEXT(context, ptr) \
     if ((ptr) == nullptr) { \
-        const char *name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
+        const char* name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
         OP_LOGE_WITHOUT_REPORT(name, "%s is nullptr!", #ptr); \
         REPORT_INNER_ERR_MSG("EZ9999", "op[%s], %s is nullptr!", name, #ptr); \
         return ge::GRAPH_FAILED; \
     }
 #define OPS_CHECK_NULL_WITH_CONTEXT_RET(context, ptr, ret) \
     if ((ptr) == nullptr) { \
-        const char *name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
+        const char* name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
         OP_LOGE_WITHOUT_REPORT(name, "%s is nullptr!", #ptr); \
         REPORT_INNER_ERR_MSG("EZ9999", "op[%s], %s is nullptr!", name, #ptr); \
         return ret; \

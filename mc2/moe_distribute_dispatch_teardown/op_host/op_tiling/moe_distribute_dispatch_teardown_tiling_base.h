@@ -23,22 +23,22 @@
 namespace optiling {
 class MoeDistributeDispatchTeardownTilingBase : public MoeTilingBase {
 public:
-    explicit MoeDistributeDispatchTeardownTilingBase(gert::TilingContext *context)
+    explicit MoeDistributeDispatchTeardownTilingBase(gert::TilingContext* context)
         : MoeTilingBase(context),
           nodeName_(context->GetNodeName()) {};
 
 protected:
-    const char *socTilingName_;
-    const char *nodeName_;
-    MoeDistributeDispatchTeardownTilingData *tilingData_ = nullptr;
+    const char* socTilingName_;
+    const char* nodeName_;
+    MoeDistributeDispatchTeardownTilingData* tilingData_ = nullptr;
     std::string groupEp_;
 
     uint64_t GetTilingKey() const override;
 
     const ge::graphStatus CheckRequiredAttrValue() const;
     ge::graphStatus GetRequiredAttrAndSetTilingData();
-    ge::graphStatus CheckSharedExpertAttributes(const int64_t *expertShardTypePtr, const int64_t *sharedExpertNumPtr,
-                                                const int64_t *sharedExpertRankNumPtr, const int64_t *epWorldSizePtr);
+    ge::graphStatus CheckSharedExpertAttributes(const int64_t* expertShardTypePtr, const int64_t* sharedExpertNumPtr,
+                                                const int64_t* sharedExpertRankNumPtr, const int64_t* epWorldSizePtr);
     const ge::graphStatus CheckOptionalAttrValue();
     ge::graphStatus GetOptionalAttrAndSetTilingData();
 

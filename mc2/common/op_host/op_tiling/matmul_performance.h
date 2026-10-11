@@ -77,7 +77,7 @@ public:
             mmShapeInfo_.cyclePerMicroSec = MatmulPerformance::CYCLE_PER_MICRO_SEC;
         }
     }
-    void SetCalcType(const mc2tiling::TilingArgs &args)
+    void SetCalcType(const mc2tiling::TilingArgs& args)
     {
         if ((npuArch_ == Ops::Base::DAV_3510) && ((args.aType == matmul_tiling::DataType::DT_HIFLOAT8) ||
                                                   (args.aType == matmul_tiling::DataType::DT_FLOAT8_E4M3FN) ||
@@ -95,7 +95,7 @@ public:
         }
     }
     // Constructor
-    explicit MatmulPerformanceModel(const mc2tiling::TilingArgs &args, NpuArch npuArch = Ops::Base::DAV_2201,
+    explicit MatmulPerformanceModel(const mc2tiling::TilingArgs& args, NpuArch npuArch = Ops::Base::DAV_2201,
                                     SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B)
         : calcType_(MatmulCalcType::FP16),
           npuArch_(npuArch)
@@ -141,8 +141,8 @@ public:
     // 耗时 = M * k * N / 频率 / 每cycle多少计算  /核数 / 利用率
     void GetMachineParameters();
     void CheckKvalueAlignVersion310P();
-    void FindCubeUtil(uint64_t mSize, uint64_t rankTileNum, bool flagAllReduce, uint64_t *maxTileLen = nullptr);
-    double FindCubeUtilByL2Usage(uint64_t mSize, uint64_t rankTileNum, uint64_t *maxTileLen = nullptr);
+    void FindCubeUtil(uint64_t mSize, uint64_t rankTileNum, bool flagAllReduce, uint64_t* maxTileLen = nullptr);
+    double FindCubeUtilByL2Usage(uint64_t mSize, uint64_t rankTileNum, uint64_t* maxTileLen = nullptr);
     double FindCubeUtilQuantVersion310P() const;
     double FindCubeUtilVersion310P() const;
     void ChangeCubeUtilByKAlign();

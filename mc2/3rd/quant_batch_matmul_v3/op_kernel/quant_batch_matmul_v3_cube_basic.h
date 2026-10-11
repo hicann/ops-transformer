@@ -27,10 +27,10 @@ public:
     __aicore__ inline void InitInputs(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale, GM_ADDR bias, GM_ADDR y);
 
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale, GM_ADDR bias, GM_ADDR y, GM_ADDR workSpace,
-                                const Mc2QuantBatchMatmulV3TilingData *__restrict tilingData, TPipe *tPipe);
+                                const Mc2QuantBatchMatmulV3TilingData* __restrict tilingData, TPipe* tPipe);
 
     __aicore__ inline void Process();
-    __aicore__ inline UPDATE_TYPE &GetUpdateObj()
+    __aicore__ inline UPDATE_TYPE& GetUpdateObj()
     {
         return update_;
     }
@@ -54,13 +54,13 @@ protected:
     GlobalTensor<yType> yGlobal_;
     GlobalTensor<int32_t> biasGlobal_; // aic内计算的bias int32类型
     bool isPerTensor_;
-    TPipe *pipe_;
+    TPipe* pipe_;
 };
 
 template <TemplateBasicType>
 __aicore__ inline void Mc2QuantBatchMatmulV3BaseKernel<TemplateBasicValue>::Init(
     GM_ADDR x1, GM_ADDR x2, GM_ADDR scale, GM_ADDR bias, GM_ADDR y, GM_ADDR workSpace,
-    const Mc2QuantBatchMatmulV3TilingData *__restrict tilingData, TPipe *tPipe)
+    const Mc2QuantBatchMatmulV3TilingData* __restrict tilingData, TPipe* tPipe)
 {
     block_.Init(tilingData);
     update_.template Init<x1Format, x2Format, aTrans, bTrans>(&tilingData->matmulTiling, block_.params_);
@@ -77,19 +77,18 @@ __aicore__ inline void Mc2QuantBatchMatmulV3BaseKernel<TemplateBasicValue>::Init
                                                                                        GM_ADDR scale, GM_ADDR bias,
                                                                                        GM_ADDR y)
 {
-    x1Global_.SetGlobalBuffer((__gm__ x1Type *)x1);
-    x2Global_.SetGlobalBuffer((__gm__ x2Type *)x2);
+    x1Global_.SetGlobalBuffer((__gm__ x1Type*)x1);
+    x2Global_.SetGlobalBuffer((__gm__ x2Type*)x2);
     // 双页表
     if (block_.matmulTilingData_->M <= block_.matmulTilingData_->baseM) {
         x2Global_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
     }
-    scaleGlobal_.SetGlobalBuffer(
-        reinterpret_cast<__gm__ uint64_t *>(scale)); // int64/uint64 -> uint64, 硬件不关心符号位
+    scaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ uint64_t*>(scale)); // int64/uint64 -> uint64, 硬件不关心符号位
     if (isPerTensor_) {
-        scaleScalar_ = *((__gm__ uint64_t *)scale);
+        scaleScalar_ = *((__gm__ uint64_t*)scale);
     }
-    biasGlobal_.SetGlobalBuffer((__gm__ int32_t *)bias); // 不存在时也可以set，真正计算时需要判断
-    yGlobal_.SetGlobalBuffer((__gm__ yType *)y);
+    biasGlobal_.SetGlobalBuffer((__gm__ int32_t*)bias); // 不存在时也可以set，真正计算时需要判断
+    yGlobal_.SetGlobalBuffer((__gm__ yType*)y);
 }
 
 template <TemplateBasicType>

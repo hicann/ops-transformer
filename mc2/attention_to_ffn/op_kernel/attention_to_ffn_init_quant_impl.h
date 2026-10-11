@@ -22,7 +22,7 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::QuantInit
     tpipe_->InitBuffer(xInQueue_, BUFFER_NUM, hSize_);       // 14K *2
     tpipe_->InitBuffer(xOutQueue_, BUFFER_NUM, hCommuSize_); // 7K *2 + 256B
     if (isScales_) {                                         // 输入smoothScale参数
-        scalesGMTensor_.SetGlobalBuffer((__gm__ float *)(scales));
+        scalesGMTensor_.SetGlobalBuffer((__gm__ float*)(scales));
     }
     uint32_t hFp32Size = axisH_ * sizeof(float);
     tpipe_->InitBuffer(receiveDataCastFloatBuf_, hFp32Size); // H * 4
@@ -31,11 +31,11 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::QuantInit
 
 template <TemplateAttentionToFFNTypeClass>
 __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::InitByTinglingData(
-    const AttentionToFFNTilingData *tilingData)
+    const AttentionToFFNTilingData* tilingData)
 {
     aivId_ = GetBlockIdx();
     auto contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-    winContext_ = (__gm__ HcclOpResParam *)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
+    winContext_ = (__gm__ HcclOpResParam*)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
     rankId_ = winContext_->localUsrRankId;
     axisX_ = tilingData->attentionToFFNInfo.X;
     axisBS_ = tilingData->attentionToFFNInfo.BS;
@@ -94,18 +94,18 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::InitWindo
 template <TemplateAttentionToFFNTypeClass>
 __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::Init(
     GM_ADDR x, GM_ADDR sessionId, GM_ADDR microBatchId, GM_ADDR layerId, GM_ADDR expertIds, GM_ADDR expertRankTable,
-    GM_ADDR scales, GM_ADDR activeMask, GM_ADDR workspaceGM, TPipe *pipe, const AttentionToFFNTilingData *tilingData)
+    GM_ADDR scales, GM_ADDR activeMask, GM_ADDR workspaceGM, TPipe* pipe, const AttentionToFFNTilingData* tilingData)
 {
     tpipe_ = pipe;
     InitByTinglingData(tilingData);
 
-    xGMTensor_.SetGlobalBuffer((__gm__ XType *)x);
-    sessionIdGMTensor_.SetGlobalBuffer((__gm__ int32_t *)sessionId);
-    microBatchIdGMTensor_.SetGlobalBuffer((__gm__ int32_t *)microBatchId);
-    layerIdGMTensor_.SetGlobalBuffer((__gm__ int32_t *)layerId);
-    expertIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t *)expertIds);
-    expertRankTableGMTensor_.SetGlobalBuffer((__gm__ int32_t *)expertRankTable);
-    activeMaskGMTensor_.SetGlobalBuffer((__gm__ bool *)activeMask);
+    xGMTensor_.SetGlobalBuffer((__gm__ XType*)x);
+    sessionIdGMTensor_.SetGlobalBuffer((__gm__ int32_t*)sessionId);
+    microBatchIdGMTensor_.SetGlobalBuffer((__gm__ int32_t*)microBatchId);
+    layerIdGMTensor_.SetGlobalBuffer((__gm__ int32_t*)layerId);
+    expertIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t*)expertIds);
+    expertRankTableGMTensor_.SetGlobalBuffer((__gm__ int32_t*)expertRankTable);
+    activeMaskGMTensor_.SetGlobalBuffer((__gm__ bool*)activeMask);
     ReadSessionMetadata();
 
     uint32_t expertIdsAlign = Ceil(expertIdsCnt_ * sizeof(int32_t), UB_ALIGN) * UB_ALIGN; // 约束32对齐
@@ -159,7 +159,7 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::ActiveMas
 
 template <TemplateAttentionToFFNTypeClass>
 __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::ReduceMaxInplace(
-    const LocalTensor<float> &srcLocal, uint32_t count)
+    const LocalTensor<float>& srcLocal, uint32_t count)
 {
     uint64_t repsFp32 = count >> 6;       // 6 is count / elemPerRefFp32
     uint64_t offsetsFp32 = repsFp32 << 6; // 6 is repsFp32 * elemPerRefFp32

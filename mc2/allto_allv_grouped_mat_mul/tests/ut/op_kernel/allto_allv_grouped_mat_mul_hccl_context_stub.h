@@ -30,7 +30,7 @@ struct HcclCombineOpParam {
     // kernel must be compilable against both fixed and runtime dynamic modes.
     uint8_t res[8328];
     uint8_t multiFlag;
-    IbVerbsData *data;
+    IbVerbsData* data;
 };
 
 namespace HcclContextDef {
@@ -44,8 +44,8 @@ struct HcclRankRelationResV2 {
 };
 
 struct RemoteResPtr {
-    HcclRankRelationResV2 *nextHostPtr;
-    HcclRankRelationResV2 *nextDevicePtr;
+    HcclRankRelationResV2* nextHostPtr;
+    HcclRankRelationResV2* nextDevicePtr;
 };
 
 struct HcclOpResParam {
@@ -64,11 +64,11 @@ struct HcclOpResParam {
 
 } // namespace HcclContextDef
 
-inline HcclContextDef::HcclRankRelationResV2 *GetRemoteRankAddrs(HcclContextDef::HcclOpResParam *context,
+inline HcclContextDef::HcclRankRelationResV2* GetRemoteRankAddrs(HcclContextDef::HcclOpResParam* context,
                                                                  uint32_t rankId)
 {
-    auto *remoteRes =
-        reinterpret_cast<HcclContextDef::RemoteResPtr *>(reinterpret_cast<uintptr_t>(context) + context->rWinStart);
+    auto* remoteRes =
+        reinterpret_cast<HcclContextDef::RemoteResPtr*>(reinterpret_cast<uintptr_t>(context) + context->rWinStart);
     return remoteRes[rankId].nextDevicePtr;
 }
 

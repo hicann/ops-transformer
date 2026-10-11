@@ -25,7 +25,7 @@ template <typename T>
 class KernelAddRmsNormMergeN {
 public:
     __aicore__ inline KernelAddRmsNormMergeN() {}
-    __aicore__ inline void Init(GM_ADDR gammaGM, Mc2Tiling::AddRMSNormTilingData &tiling, TPipe *pipe,
+    __aicore__ inline void Init(GM_ADDR gammaGM, Mc2Tiling::AddRMSNormTilingData& tiling, TPipe* pipe,
                                 uint32_t numBlocks)
     {
         ASSERT(numBlocks != 0 && "Block dim can not be zero!");
@@ -49,7 +49,7 @@ public:
         this->gmBlockSize_ = rowWork_ * numCol_;
 
         // get start index for current core, core parallel
-        gamma_.SetGlobalBuffer((__gm__ T *)gammaGM, numCol_);
+        gamma_.SetGlobalBuffer((__gm__ T*)gammaGM, numCol_);
 
         // pipe alloc memory to queue, the unit is Bytes
         pipe->InitBuffer(inQueueX_, DOUBLE_BUFFER_QUEUE, ubFactor_ * sizeof(T));
@@ -62,14 +62,14 @@ public:
     }
 
     __aicore__ inline void ComputeProcess(GM_ADDR normOutGM, GM_ADDR residualGM, GM_ADDR yGM,
-                                          Mc2Tiling::AddRMSNormTilingData &tilingData, uint32_t addRmsNormCount,
+                                          Mc2Tiling::AddRMSNormTilingData& tilingData, uint32_t addRmsNormCount,
                                           uint32_t rcvCnt)
     {
         uint64_t cOffset = CalcShapeOffset(sizeof(T), tilingData.num_row, tilingData.num_col); // 偏移*size
         for (; addRmsNormCount <= rcvCnt; ++addRmsNormCount) {
-            normOut_.SetGlobalBuffer((__gm__ T *)normOutGM + gmBlockOffset_, gmBlockSize_);
-            residual_.SetGlobalBuffer((__gm__ T *)residualGM + gmBlockOffset_, gmBlockSize_);
-            y_.SetGlobalBuffer((__gm__ T *)yGM + gmBlockOffset_, gmBlockSize_);
+            normOut_.SetGlobalBuffer((__gm__ T*)normOutGM + gmBlockOffset_, gmBlockSize_);
+            residual_.SetGlobalBuffer((__gm__ T*)residualGM + gmBlockOffset_, gmBlockSize_);
+            y_.SetGlobalBuffer((__gm__ T*)yGM + gmBlockOffset_, gmBlockSize_);
             Process();
             normOutGM += cOffset;
             residualGM += cOffset;
@@ -92,7 +92,7 @@ public:
         inQueueGamma_.FreeTensor(gammaLocal);
     }
 
-    __aicore__ inline void SubProcess(uint32_t i_o, uint32_t calc_row_num, LocalTensor<T> &gammaLocal)
+    __aicore__ inline void SubProcess(uint32_t i_o, uint32_t calc_row_num, LocalTensor<T>& gammaLocal)
     {
         uint32_t gm_bias = i_o * rowFactor_ * numCol_;
         uint32_t elementNum = calc_row_num * numColAlign_;
@@ -169,7 +169,7 @@ private:
         inQueueGamma_.EnQue(gammaLocal);
     }
 
-    __aicore__ inline void BroadCastGamma(LocalTensor<T> &gammaLocal)
+    __aicore__ inline void BroadCastGamma(LocalTensor<T>& gammaLocal)
     {
         const uint32_t srcShape[2] = {1, numColAlign_};
         const uint32_t dstShape[2] = {rowFactor_, numColAlign_};

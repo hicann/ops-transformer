@@ -112,7 +112,7 @@ __aicore__ inline void TPipeSetWaitFlag()
 }
 
 template <class T>
-__aicore__ inline void GetSizeC0(uint64_t &c0Size)
+__aicore__ inline void GetSizeC0(uint64_t& c0Size)
 {
     if (sizeof(T) == sizeof(float)) {
         c0Size = 8;
@@ -188,9 +188,9 @@ __aicore__ inline void WaitFlagDevLocal(int64_t flagID)
 }
 
 template <class A_T, class B_T, class C_T, class BiasT>
-__aicore__ inline void SetL2CacheEnable(const Mc2L2cacheUseInfo &l2EnableInfo, GlobalTensor<A_T> &aGlobal,
-                                        GlobalTensor<B_T> &bGlobal, GlobalTensor<C_T> &cGlobal,
-                                        GlobalTensor<BiasT> &biasGlobal)
+__aicore__ inline void SetL2CacheEnable(const Mc2L2cacheUseInfo& l2EnableInfo, GlobalTensor<A_T>& aGlobal,
+                                        GlobalTensor<B_T>& bGlobal, GlobalTensor<C_T>& cGlobal,
+                                        GlobalTensor<BiasT>& biasGlobal)
 {
     if ((l2EnableInfo.l2CacheFlag & ALL_L2_CACHE_ENABLE) == 0) {
         if (l2EnableInfo.l2CacheFlag & C_L2_DISABLE) {
@@ -200,7 +200,7 @@ __aicore__ inline void SetL2CacheEnable(const Mc2L2cacheUseInfo &l2EnableInfo, G
 }
 
 template <class T>
-__aicore__ inline void CopyGmToUbufAlign(const LocalTensor<T> &dst, const GlobalTensor<T> &src, uint16_t nBurst,
+__aicore__ inline void CopyGmToUbufAlign(const LocalTensor<T>& dst, const GlobalTensor<T>& src, uint16_t nBurst,
                                          uint32_t lenBurst, uint8_t leftPaddingNum, uint8_t rightPaddingNum,
                                          uint32_t srcGap, uint32_t dstGap)
 {
@@ -210,7 +210,7 @@ __aicore__ inline void CopyGmToUbufAlign(const LocalTensor<T> &dst, const Global
 }
 
 template <typename T>
-__aicore__ inline void CopyUbufToGmAlign(const GlobalTensor<T> &dst, const LocalTensor<T> &src, uint16_t nBurst,
+__aicore__ inline void CopyUbufToGmAlign(const GlobalTensor<T>& dst, const LocalTensor<T>& src, uint16_t nBurst,
                                          uint32_t lenBurst, uint32_t srcGap, uint32_t dstGap)
 {
     DataCopyExtParams dataCopyExtParams{nBurst, lenBurst, srcGap, dstGap, 0};
@@ -218,8 +218,8 @@ __aicore__ inline void CopyUbufToGmAlign(const GlobalTensor<T> &dst, const Local
 }
 
 template <typename T>
-__aicore__ inline void CopyCast(const LocalTensor<float> &ubSrc, const LocalTensor<T> &ubDst,
-                                const GlobalTensor<float> &src, const GlobalTensor<T> &dst, uint64_t offset,
+__aicore__ inline void CopyCast(const LocalTensor<float>& ubSrc, const LocalTensor<T>& ubDst,
+                                const GlobalTensor<float>& src, const GlobalTensor<T>& dst, uint64_t offset,
                                 uint16_t nBurst, uint16_t lenBurst, uint32_t gap, uint8_t pingpongEventId)
 {
     CopyGmToUbufAlign<float>(ubSrc, src[offset], nBurst, lenBurst * sizeof(float), 0, 0, gap * sizeof(float), 0);
@@ -235,8 +235,8 @@ __aicore__ inline void CopyCast(const LocalTensor<float> &ubSrc, const LocalTens
 #ifdef DBCAST
 // v220
 template <typename T>
-__aicore__ inline void Cast32to16V220(__gm__ T *dst, __gm__ float *src, uint64_t size, uint32_t nCoreUse, uint32_t n,
-                                      TBuf<TPosition::VECCALC> &tmpBuf)
+__aicore__ inline void Cast32to16V220(__gm__ T* dst, __gm__ float* src, uint64_t size, uint32_t nCoreUse, uint32_t n,
+                                      TBuf<TPosition::VECCALC>& tmpBuf)
 {
     uint16_t dataSize = static_cast<uint16_t>(TOTAL_UB_SIZE / NUM_TWO / sizeof(float));
     uint16_t dataSize1 = static_cast<uint16_t>(TOTAL_UB_SIZE / NUM_TWO / sizeof(T));
@@ -250,8 +250,8 @@ __aicore__ inline void Cast32to16V220(__gm__ T *dst, __gm__ float *src, uint64_t
 
     GlobalTensor<float> gmSrc;
     GlobalTensor<T> gmDst;
-    gmSrc.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(src), size);
-    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(dst), size);
+    gmSrc.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(src), size);
+    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(dst), size);
 
     uint8_t pingpongEventId = 0;
 
@@ -327,8 +327,8 @@ __aicore__ inline void Cast32to16V220(__gm__ T *dst, __gm__ float *src, uint64_t
 }
 
 template <typename T>
-__aicore__ inline void UnAlignedCast32to16V220(__gm__ T *dst, __gm__ float *src, uint32_t offset, uint32_t size,
-                                               TBuf<TPosition::VECCALC> &tmpBuf)
+__aicore__ inline void UnAlignedCast32to16V220(__gm__ T* dst, __gm__ float* src, uint32_t offset, uint32_t size,
+                                               TBuf<TPosition::VECCALC>& tmpBuf)
 {
     uint32_t dataSize = TOTAL_UB_SIZE / NUM_TWO / sizeof(float);
     uint32_t dataSize1 = TOTAL_UB_SIZE / NUM_TWO / sizeof(T);
@@ -342,8 +342,8 @@ __aicore__ inline void UnAlignedCast32to16V220(__gm__ T *dst, __gm__ float *src,
 
     GlobalTensor<float> gmSrc;
     GlobalTensor<T> gmDst;
-    gmSrc.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(src), size);
-    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(dst), size);
+    gmSrc.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(src), size);
+    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(dst), size);
 
     uint32_t repeat = size / dataSize;
     uint32_t tail = size % dataSize;
@@ -387,8 +387,8 @@ __aicore__ inline void UnAlignedCast32to16V220(__gm__ T *dst, __gm__ float *src,
 #endif
 
 template <typename T1, typename T2>
-__aicore__ inline void CopyRemovePad(const GlobalTensor<T2> &outputGlobal, const GlobalTensor<T1> &inputGlobal,
-                                     const LocalTensor<T1> &srcUb, const LocalTensor<T2> &castDstUb, uint32_t nBurst,
+__aicore__ inline void CopyRemovePad(const GlobalTensor<T2>& outputGlobal, const GlobalTensor<T1>& inputGlobal,
+                                     const LocalTensor<T1>& srcUb, const LocalTensor<T2>& castDstUb, uint32_t nBurst,
                                      uint32_t inputWidth, uint32_t outputWidth)
 {
     CopyGmToUbufAlign<T1>(srcUb, inputGlobal, static_cast<uint16_t>(nBurst), inputWidth * sizeof(T1), 0, 0, 0, 0);
@@ -403,7 +403,7 @@ __aicore__ inline void CopyRemovePad(const GlobalTensor<T2> &outputGlobal, const
 
 template <typename T1, typename T2>
 __aicore__ inline void RemovePaddingImpl(GlobalTensor<T2> outputGlobal, GlobalTensor<T1> inputGlobal, uint32_t height,
-                                         uint32_t width, uint32_t outputWidth, TBuf<TPosition::VECCALC> &tmpBuf)
+                                         uint32_t width, uint32_t outputWidth, TBuf<TPosition::VECCALC>& tmpBuf)
 {
     LocalTensor<T1> srcUb = tmpBuf.Get<T1>();
     LocalTensor<T2> castDstUb = srcUb.template ReinterpretCast<T2>();
@@ -419,8 +419,8 @@ __aicore__ inline void RemovePaddingImpl(GlobalTensor<T2> outputGlobal, GlobalTe
             for (uint32_t index = 0; index < castTimes; ++index) {
                 WaitFlag<HardEvent::MTE3_MTE2>(static_cast<event_t>(0));
                 UnAlignedCast32to16V220(
-                    (__gm__ T2 *)(outputGlobal[index * maxWidthLen + mIndex * outputWidth].GetPhyAddr()),
-                    (__gm__ float *)(inputGlobal[index * maxWidthLen + mIndex * width].GetPhyAddr()), 0, maxWidthLen,
+                    (__gm__ T2*)(outputGlobal[index * maxWidthLen + mIndex * outputWidth].GetPhyAddr()),
+                    (__gm__ float*)(inputGlobal[index * maxWidthLen + mIndex * width].GetPhyAddr()), 0, maxWidthLen,
                     tmpBuf);
                 SetFlag<HardEvent::MTE3_MTE2>(static_cast<event_t>(0));
             }

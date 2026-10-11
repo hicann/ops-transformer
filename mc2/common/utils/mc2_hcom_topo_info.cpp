@@ -45,7 +45,7 @@ const std::string COMM_GET_HCCL_BUFFER_NAME = "HcclGetHcclBuffer";
 
 static const string GetLibPath()
 {
-    const char *ascendPath = std::getenv("ASCEND_HOME_PATH");
+    const char* ascendPath = std::getenv("ASCEND_HOME_PATH");
     if (ascendPath == nullptr) {
         OP_LOGE("", "Ascend home path doesn't exist.");
         return "";
@@ -63,7 +63,7 @@ static const string GetLibPath()
 }
 
 template <typename T>
-T GetHcclLibFunc(void *handle, const std::string &funcName)
+T GetHcclLibFunc(void* handle, const std::string& funcName)
 {
     T func = reinterpret_cast<T>(dlsym(handle, funcName.c_str()));
     if (func == nullptr) {
@@ -72,7 +72,7 @@ T GetHcclLibFunc(void *handle, const std::string &funcName)
     return func;
 }
 
-MC2HcomTopology::MC2HcomTopology(const char *libPath)
+MC2HcomTopology::MC2HcomTopology(const char* libPath)
 {
     handle_ = dlopen(libPath, RTLD_NOW);
     if (handle_ == nullptr) {
@@ -121,14 +121,14 @@ MC2HcomTopology::MC2HcomTopology(const char *libPath)
     OP_LOGI("", "Init MC2HcomTopoLogy Success.");
 }
 
-MC2HcomTopology &MC2HcomTopology::GetInstance()
+MC2HcomTopology& MC2HcomTopology::GetInstance()
 {
     static const std::string libPathStr = GetLibPath();
     static MC2HcomTopology loader(libPathStr.c_str());
     return loader;
 }
 
-HcclResult MC2HcomTopology::CallHcomGetCommHandleByGroup(const char *group, HcclComm *commHandle) const
+HcclResult MC2HcomTopology::CallHcomGetCommHandleByGroup(const char* group, HcclComm* commHandle) const
 {
     if (getCommHandle_ == nullptr) {
         OP_LOGE("", "Failed to get comm handle, func load failed.");
@@ -137,7 +137,7 @@ HcclResult MC2HcomTopology::CallHcomGetCommHandleByGroup(const char *group, Hccl
     return static_cast<HcclResult>(getCommHandle_(group, commHandle));
 }
 
-HcclResult MC2HcomTopology::CallCommGetNetLayers(HcclComm comm, uint32_t **netLayer, uint32_t *netLayerNum) const
+HcclResult MC2HcomTopology::CallCommGetNetLayers(HcclComm comm, uint32_t** netLayer, uint32_t* netLayerNum) const
 {
     if (getNetLayers_ == nullptr) {
         OP_LOGE("", "Failed to get net layers, func load failed.");
@@ -147,7 +147,7 @@ HcclResult MC2HcomTopology::CallCommGetNetLayers(HcclComm comm, uint32_t **netLa
 }
 
 HcclResult MC2HcomTopology::CallCommGetInstTopoTypeByNetLayer(HcclComm comm, uint32_t netLayer,
-                                                              uint32_t *topoType) const
+                                                              uint32_t* topoType) const
 {
     if (getTopoTypeByLayer_ == nullptr) {
         OP_LOGE("", "Failed to get topo type, func load failed.");
@@ -162,7 +162,7 @@ HcclResult MC2HcomTopology::CallCommGetInstTopoTypeByNetLayer(HcclComm comm, uin
 }
 
 #ifdef BUILD_OPEN_PROJECT
-HcclResult MC2HcomTopology::CallHcomGetRankSizeEx(const char *group, uint32_t *ranksize, uint32_t flag) const
+HcclResult MC2HcomTopology::CallHcomGetRankSizeEx(const char* group, uint32_t* ranksize, uint32_t flag) const
 {
     if (getRankSize_ == nullptr) {
         OP_LOGE("", "Failed to get rank size, func load failed.");
@@ -177,7 +177,7 @@ HcclResult MC2HcomTopology::CallHcomGetRankSizeEx(const char *group, uint32_t *r
     return static_cast<HcclResult>(getRankSize_(comm, ranksize));
 }
 
-HcclResult MC2HcomTopology::CallHcomGetL0TopoTypeEx(const char *group, CommTopo *topoType, uint32_t flag) const
+HcclResult MC2HcomTopology::CallHcomGetL0TopoTypeEx(const char* group, CommTopo* topoType, uint32_t flag) const
 {
     if (getTopoTypeByLayer_ == nullptr) {
         OP_LOGE("", "Failed to get topo type, func load failed.");
@@ -192,7 +192,7 @@ HcclResult MC2HcomTopology::CallHcomGetL0TopoTypeEx(const char *group, CommTopo 
     return static_cast<HcclResult>(getTopoTypeByLayer_(comm, 0, topoType));
 }
 #else
-HcclResult MC2HcomTopology::CallCommGetInstSizeByNetLayer(HcclComm comm, uint32_t netLayer, uint32_t *rankNum) const
+HcclResult MC2HcomTopology::CallCommGetInstSizeByNetLayer(HcclComm comm, uint32_t netLayer, uint32_t* rankNum) const
 {
     if (getInstSize_ == nullptr) {
         OP_LOGE("", "Failed to get inst size, func load failed.");
@@ -202,13 +202,13 @@ HcclResult MC2HcomTopology::CallCommGetInstSizeByNetLayer(HcclComm comm, uint32_
 }
 #endif
 
-HcclResult MC2HcomTopology::CallCommGetCCLBufSizeCfg(HcclComm comm, uint64_t *cclBufferSize) const
+HcclResult MC2HcomTopology::CallCommGetCCLBufSizeCfg(HcclComm comm, uint64_t* cclBufferSize) const
 {
     if (getHcclBuffer_ == nullptr) {
         OP_LOGE("", "Failed to get hccl buffer, func load failed.");
         return HCCL_E_PTR;
     }
-    void *buffer = nullptr;
+    void* buffer = nullptr;
     uint64_t size = 0;
     HcclResult ret = static_cast<HcclResult>(getHcclBuffer_(comm, &buffer, &size));
     if (ret == HCCL_SUCCESS) {
@@ -217,7 +217,7 @@ HcclResult MC2HcomTopology::CallCommGetCCLBufSizeCfg(HcclComm comm, uint64_t *cc
     return ret;
 }
 
-HcclResult MC2HcomTopology::CallCommGetHcclBuffer(HcclComm comm, void **buffer, uint64_t *size) const
+HcclResult MC2HcomTopology::CallCommGetHcclBuffer(HcclComm comm, void** buffer, uint64_t* size) const
 {
     if (getHcclBuffer_ == nullptr) {
         OP_LOGE("", "Failed to get inst size, func load failed.");
@@ -226,7 +226,7 @@ HcclResult MC2HcomTopology::CallCommGetHcclBuffer(HcclComm comm, void **buffer, 
     return static_cast<HcclResult>(getHcclBuffer_(comm, buffer, size));
 }
 
-HcclResult MC2HcomTopology::CommGetCclBufferSizeByGroup(const char *group, uint64_t *cclBufferSize, HcclComm *hcclComm)
+HcclResult MC2HcomTopology::CommGetCclBufferSizeByGroup(const char* group, uint64_t* cclBufferSize, HcclComm* hcclComm)
 {
     if (group == nullptr || cclBufferSize == nullptr || hcclComm == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("", "group, cclBufferSize, hcclComm");
@@ -247,7 +247,7 @@ HcclResult MC2HcomTopology::CommGetCclBufferSizeByGroup(const char *group, uint6
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CommGetHcclBufferByGroup(const char *group, void **buffer, uint64_t *size)
+HcclResult MC2HcomTopology::CommGetHcclBufferByGroup(const char* group, void** buffer, uint64_t* size)
 {
     if (group == nullptr || buffer == nullptr || size == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("", "group, buffer, size");
@@ -270,7 +270,7 @@ HcclResult MC2HcomTopology::CommGetHcclBufferByGroup(const char *group, void **b
 }
 
 #ifdef BUILD_OPEN_PROJECT
-HcclResult MC2HcomTopology::CommGetGroupLocalWindowSize(const char *group, uint64_t *cclBufferSize)
+HcclResult MC2HcomTopology::CommGetGroupLocalWindowSize(const char* group, uint64_t* cclBufferSize)
 {
     if (ge::HcomTopoInfo::Instance().GetGroupLocalWindowSize(group, *cclBufferSize) != ge::GRAPH_SUCCESS) {
         OP_LOGD("", "Get winSize from GetGroupLocalWindowSize=%lu", *cclBufferSize);
@@ -281,7 +281,7 @@ HcclResult MC2HcomTopology::CommGetGroupLocalWindowSize(const char *group, uint6
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CommGetInstSizeByGroup(const char *group, uint32_t *rankNum)
+HcclResult MC2HcomTopology::CommGetInstSizeByGroup(const char* group, uint32_t* rankNum)
 {
     if (group == nullptr || rankNum == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("", "group, rankNum");
@@ -295,7 +295,7 @@ HcclResult MC2HcomTopology::CommGetInstSizeByGroup(const char *group, uint32_t *
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::TryGetGroupTopoType(const char *group, uint32_t *topoType)
+HcclResult MC2HcomTopology::TryGetGroupTopoType(const char* group, uint32_t* topoType)
 {
     if (group == nullptr || topoType == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("", "group, topoType");
@@ -311,7 +311,7 @@ HcclResult MC2HcomTopology::TryGetGroupTopoType(const char *group, uint32_t *top
     return HCCL_SUCCESS;
 }
 #else
-HcclResult MC2HcomTopology::CommGetGroupLocalWindowSize(const char *group, uint64_t *cclBufferSize)
+HcclResult MC2HcomTopology::CommGetGroupLocalWindowSize(const char* group, uint64_t* cclBufferSize)
 {
     uint32_t ret = ge::HcomTopoInfo::Instance().GetGroupLocalWindowSize(group, *cclBufferSize);
     if (ret != ge::GRAPH_SUCCESS) {
@@ -321,7 +321,7 @@ HcclResult MC2HcomTopology::CommGetGroupLocalWindowSize(const char *group, uint6
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CommGetInstSizeByGroup(const char *group, uint32_t *rankNum)
+HcclResult MC2HcomTopology::CommGetInstSizeByGroup(const char* group, uint32_t* rankNum)
 {
     int64_t rankSize = *rankNum;
     uint32_t ret = ge::HcomTopoInfo::Instance().GetGroupRankSize(group, rankSize);
@@ -332,7 +332,7 @@ HcclResult MC2HcomTopology::CommGetInstSizeByGroup(const char *group, uint32_t *
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::TryGetGroupTopoType(const char *group, uint32_t *topoType)
+HcclResult MC2HcomTopology::TryGetGroupTopoType(const char* group, uint32_t* topoType)
 {
     ge::HcomTopoInfo::TopoInfo topoInfo;
     if (!ge::HcomTopoInfo::Instance().TryGetGroupTopoInfo(group, topoInfo)) {
@@ -346,7 +346,7 @@ HcclResult MC2HcomTopology::TryGetGroupTopoType(const char *group, uint32_t *top
 }
 #endif
 
-HcclResult MC2HcomTopology::CommGetNetLayersByGroup(const char *group, std::vector<uint32_t> &layers)
+HcclResult MC2HcomTopology::CommGetNetLayersByGroup(const char* group, std::vector<uint32_t>& layers)
 {
     if (group == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("", "group");
@@ -359,7 +359,7 @@ HcclResult MC2HcomTopology::CommGetNetLayersByGroup(const char *group, std::vect
                 static_cast<int>(ret));
         return ret;
     }
-    uint32_t *layerList = nullptr;
+    uint32_t* layerList = nullptr;
     uint32_t layerNum = 0;
     ret = GetInstance().CallCommGetNetLayers(comm, &layerList, &layerNum);
     if (ret != HCCL_SUCCESS) {
@@ -379,7 +379,7 @@ HcclResult MC2HcomTopology::CommGetNetLayersByGroup(const char *group, std::vect
     return HCCL_SUCCESS;
 }
 
-HcclResult MC2HcomTopology::CommGetTopoTypeByLayer(const char *group, uint32_t layer, uint32_t *topoType)
+HcclResult MC2HcomTopology::CommGetTopoTypeByLayer(const char* group, uint32_t layer, uint32_t* topoType)
 {
     if (group == nullptr || topoType == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("", "group, topoType");

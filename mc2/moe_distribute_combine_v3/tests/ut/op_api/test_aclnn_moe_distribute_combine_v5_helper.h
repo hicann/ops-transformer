@@ -20,20 +20,20 @@ extern "C" {
 #endif
 
 ACLNN_API aclnnStatus aclnnMoeDistributeCombineV5GetWorkspaceSize(
-    const aclTensor *context, const aclTensor *expandX, const aclTensor *expertIds,
-    const aclTensor *assistInfoForCombine, const aclTensor *epSendCounts, const aclTensor *expertScales,
-    const aclTensor *tpSendCountsOptional, const aclTensor *xActiveMaskOptional,
-    const aclTensor *activationScaleOptional, const aclTensor *weightScaleOptional, const aclTensor *groupListOptional,
-    const aclTensor *expandScalesOptional, const aclTensor *sharedExpertXOptional, const aclTensor *elasticInfoOptional,
-    const aclTensor *oriXOptional, const aclTensor *constExpertAlpha1Optional,
-    const aclTensor *constExpertAlpha2Optional, const aclTensor *constExpertVOptional,
-    const aclTensor *performanceInfoOptional, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
+    const aclTensor* context, const aclTensor* expandX, const aclTensor* expertIds,
+    const aclTensor* assistInfoForCombine, const aclTensor* epSendCounts, const aclTensor* expertScales,
+    const aclTensor* tpSendCountsOptional, const aclTensor* xActiveMaskOptional,
+    const aclTensor* activationScaleOptional, const aclTensor* weightScaleOptional, const aclTensor* groupListOptional,
+    const aclTensor* expandScalesOptional, const aclTensor* sharedExpertXOptional, const aclTensor* elasticInfoOptional,
+    const aclTensor* oriXOptional, const aclTensor* constExpertAlpha1Optional,
+    const aclTensor* constExpertAlpha2Optional, const aclTensor* constExpertVOptional,
+    const aclTensor* performanceInfoOptional, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
     int64_t cclBufferSize, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t outDtype, int64_t commQuantMode, int64_t groupListType,
-    const char *commAlg, int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, aclTensor *xOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const char* commAlg, int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, aclTensor* xOut,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
-ACLNN_API aclnnStatus aclnnMoeDistributeCombineV5(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeDistributeCombineV5(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                   aclrtStream stream);
 
 #ifdef __cplusplus

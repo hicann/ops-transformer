@@ -38,7 +38,7 @@ struct AlltoAllMatmulTilingValue {
 
 class AlltoAllMatmulTiling910b : public AllToAllMatmulTilingBase {
 public:
-    explicit AlltoAllMatmulTiling910b(gert::TilingContext *context);
+    explicit AlltoAllMatmulTiling910b(gert::TilingContext* context);
     ~AlltoAllMatmulTiling910b() override = default;
 
 protected:
@@ -48,34 +48,34 @@ protected:
     ge::graphStatus PostTiling() override;
     uint64_t GetTilingKey() const override;
 
-    void CalcQuantWorkspaceSize(const CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
-    void CalcQuantTokenNumPerUb(const CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
-    ge::graphStatus CheckOpInputInfo(AlltoAllMatmulInfo &info);
-    ge::graphStatus CheckAndSetAttrsInfo(AlltoAllMatmulInfo &info);
-    ge::graphStatus CheckTensorDataType(AlltoAllMatmulInfo &info);
-    ge::graphStatus CheckQuantScaleDataType(const AlltoAllMatmulInfo &info, ge::DataType x1Dtype, ge::DataType x2Dtype);
-    ge::graphStatus CheckQuantScaleShape(const AlltoAllMatmulInfo &info, int64_t tokenSize);
-    ge::graphStatus CheckQuantMatrixShape(const AlltoAllMatmulInfo &info, int64_t tokenSize);
-    ge::graphStatus CheckX2ScaleShape(const AlltoAllMatmulInfo &info);
-    ge::graphStatus CheckShapeInfo(AlltoAllMatmulInfo &info);
-    ge::graphStatus DoMmCommTiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
+    void CalcQuantWorkspaceSize(const CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
+    void CalcQuantTokenNumPerUb(const CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
+    ge::graphStatus CheckOpInputInfo(AlltoAllMatmulInfo& info);
+    ge::graphStatus CheckAndSetAttrsInfo(AlltoAllMatmulInfo& info);
+    ge::graphStatus CheckTensorDataType(AlltoAllMatmulInfo& info);
+    ge::graphStatus CheckQuantScaleDataType(const AlltoAllMatmulInfo& info, ge::DataType x1Dtype, ge::DataType x2Dtype);
+    ge::graphStatus CheckQuantScaleShape(const AlltoAllMatmulInfo& info, int64_t tokenSize);
+    ge::graphStatus CheckQuantMatrixShape(const AlltoAllMatmulInfo& info, int64_t tokenSize);
+    ge::graphStatus CheckX2ScaleShape(const AlltoAllMatmulInfo& info);
+    ge::graphStatus CheckShapeInfo(AlltoAllMatmulInfo& info);
+    ge::graphStatus DoMmCommTiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
     // basic和A4W4的tiling
-    void DoTwoRankTiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
-    void DoFourRankTiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
-    void DoEightRankTiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
+    void DoTwoRankTiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
+    void DoFourRankTiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
+    void DoEightRankTiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
     // A16W8的tiling
-    void AlltoAllMatmulNPU910BTwoRankA16W8Tiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
-    void AlltoAllMatmulNPU910BFourRankA16W8Tiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
-    void AlltoAllMatmulNPU910BEightRankA16W8Tiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
+    void AlltoAllMatmulNPU910BTwoRankA16W8Tiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
+    void AlltoAllMatmulNPU910BFourRankA16W8Tiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
+    void AlltoAllMatmulNPU910BEightRankA16W8Tiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
     // A16W4的tiling
-    void AlltoAllMatmulNPU910BTwoRankA16W4Tiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
-    void AlltoAllMatmulNPU910BFourRankA16W4Tiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
-    void AlltoAllMatmulNPU910BEightRankA16W4Tiling(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
-    void CalTilingParam(CoCTiling &cocTilingData, const std::map<int *, AlltoAllMatmulTilingValue> &TilingParamMap,
-                        AlltoAllMatmulInfo &info);
-    void DecodeTilingData(int32_t code, CoCTiling &cocTilingData);
-    ge::graphStatus SetHcclTiling(AlltoAllMatmulTilingData *tilingData);
-    void PrintAlltoAllMatmulTilingData(CoCTiling &cocTilingData, AlltoAllMatmulInfo &info);
+    void AlltoAllMatmulNPU910BTwoRankA16W4Tiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
+    void AlltoAllMatmulNPU910BFourRankA16W4Tiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
+    void AlltoAllMatmulNPU910BEightRankA16W4Tiling(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
+    void CalTilingParam(CoCTiling& cocTilingData, const std::map<int*, AlltoAllMatmulTilingValue>& TilingParamMap,
+                        AlltoAllMatmulInfo& info);
+    void DecodeTilingData(int32_t code, CoCTiling& cocTilingData);
+    ge::graphStatus SetHcclTiling(AlltoAllMatmulTilingData* tilingData);
+    void PrintAlltoAllMatmulTilingData(CoCTiling& cocTilingData, AlltoAllMatmulInfo& info);
 
 private:
     bool x2Transpose = false;

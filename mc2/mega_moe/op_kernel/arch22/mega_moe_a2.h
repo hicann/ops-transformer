@@ -157,7 +157,7 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Init(GM_ADDR contextGM, GM_ADDR
     tilingGM_ = tilingGM;
 
     if constexpr (kRoutingIsQuant) {
-        auto tiling = (__gm__ MegaMoeTilingDataQuant *)tilingGM;
+        auto tiling = (__gm__ MegaMoeTilingDataQuant*)tilingGM;
         GET_TILING_DATA_WITH_STRUCT(MegaMoeTilingDataQuant, tilingData, tilingGM);
 
         aivNum_ = tilingData.common.aivNum;
@@ -177,7 +177,7 @@ __aicore__ inline void MegaMoeA2<MegaMoeFuncA2>::Init(GM_ADDR contextGM, GM_ADDR
         activationParams1_ = tilingData.common.activationParams1;
         activationParams2_ = tilingData.common.activationParams2;
     } else {
-        auto tiling = (__gm__ MegaMoeTilingDataNonQuant *)tilingGM;
+        auto tiling = (__gm__ MegaMoeTilingDataNonQuant*)tilingGM;
         GET_TILING_DATA_WITH_STRUCT(MegaMoeTilingDataNonQuant, tilingData, tilingGM);
 
         aivNum_ = tilingData.common.aivNum;

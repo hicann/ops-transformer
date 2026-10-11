@@ -39,7 +39,7 @@ public:
     static constexpr uint32_t STAGES = 2;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, uint32_t kvSplitCoreNum_)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource, uint32_t kvSplitCoreNum_)
     {
         kvSplitCoreNum = kvSplitCoreNum_;
 

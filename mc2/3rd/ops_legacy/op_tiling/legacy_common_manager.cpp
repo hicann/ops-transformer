@@ -50,14 +50,14 @@ LegacyCommonMgr::~LegacyCommonMgr()
     if (handle_ != nullptr) {
         int ret = dlclose(handle_);
         if (ret != 0) {
-            const char *err = dlerror();
+            const char* err = dlerror();
             OP_LOGE("LegacyCommonMgr", "Fail to dlclose handle, reason: %s.", err ? err : "unknown error");
         }
         handle_ = nullptr;
     }
 }
 
-bool LegacyCommonMgr::GetLegacyCommonSoPath(std::string &soPath) const
+bool LegacyCommonMgr::GetLegacyCommonSoPath(std::string& soPath) const
 {
     // 考虑自定义算子包场景，无法根据当前so所在路径取找，只能通过环境变量去找
     char oppParentPath[PATH_MAX] = {0};

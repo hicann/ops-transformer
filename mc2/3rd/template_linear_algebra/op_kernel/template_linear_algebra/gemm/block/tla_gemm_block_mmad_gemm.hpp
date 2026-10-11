@@ -69,7 +69,7 @@ public:
     static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only support RowMajor yet!");
 
     CATLASS_DEVICE
-    BlockGemm(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0)
+    BlockGemm(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
     {
         uint32_t l1AOffset = l1BufAddrStart;
         uint32_t l1BOffset = l1BufAddrStart + L1ASize * STAGES;
@@ -104,12 +104,12 @@ public:
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementA> const &gmA, LayoutA const &layoutA,
-                    AscendC::GlobalTensor<ElementB> const &gmB, LayoutB const &layoutB,
-                    AscendC::GlobalTensor<ElementC> const &gmC, LayoutC const &layoutC,
-                    AscendC::GlobalTensor<ElementA> const &gmNextBlockA,
-                    AscendC::GlobalTensor<ElementB> const &gmNextBlockB, GemmCoord const &actualShape,
-                    GemmCoord const &actualShapeNext, bool isFirstBlock, bool hasNextBlock, uint32_t singleIdx)
+    void operator()(AscendC::GlobalTensor<ElementA> const& gmA, LayoutA const& layoutA,
+                    AscendC::GlobalTensor<ElementB> const& gmB, LayoutB const& layoutB,
+                    AscendC::GlobalTensor<ElementC> const& gmC, LayoutC const& layoutC,
+                    AscendC::GlobalTensor<ElementA> const& gmNextBlockA,
+                    AscendC::GlobalTensor<ElementB> const& gmNextBlockB, GemmCoord const& actualShape,
+                    GemmCoord const& actualShapeNext, bool isFirstBlock, bool hasNextBlock, uint32_t singleIdx)
     {
         uint32_t K = actualShape.k();
         uint32_t maxKPerBlock = L1TileShape::K;

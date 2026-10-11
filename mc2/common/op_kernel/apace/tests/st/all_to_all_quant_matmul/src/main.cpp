@@ -52,7 +52,7 @@ inline uint64_t CeilDiv(uint32_t a, uint32_t b)
     return (a + b - 1) / b;
 }
 
-void printUsage(const std::string &programName)
+void printUsage(const std::string& programName)
 {
     std::cerr << "Usage: " << programName << " m k n rankNum [mode] [headMSize] [bufferCount]" << std::endl;
     std::cerr << "Args: " << std::endl;
@@ -68,8 +68,8 @@ void printUsage(const std::string &programName)
     std::cerr << "         " << programName << " 2048 8192 3584 4 perf 512 4" << std::endl;
 }
 
-void parseArguments(int argc, char *argv[], int &m, int &k, int &n, int &rankNum, std::string &mode, int &headMSize,
-                    int &bufferCount)
+void parseArguments(int argc, char* argv[], int& m, int& k, int& n, int& rankNum, std::string& mode, int& headMSize,
+                    int& bufferCount)
 {
     if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
         printUsage(argv[0]);
@@ -83,7 +83,7 @@ void parseArguments(int argc, char *argv[], int &m, int &k, int &n, int &rankNum
         k = std::stoi(argv[2]);
         n = std::stoi(argv[3]);
         rankNum = std::stoi(argv[4]);
-    } catch (const std::invalid_argument &) {
+    } catch (const std::invalid_argument&) {
         throw std::invalid_argument("ERROR: m k n rankNum must be Integer");
     }
 
@@ -116,10 +116,10 @@ void parseArguments(int argc, char *argv[], int &m, int &k, int &n, int &rankNum
     }
 }
 
-int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::string &mode, int headMSizeArg,
+int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::string& mode, int headMSizeArg,
                       int bufferCountArg)
 {
-    const char *ipport = "tcp://127.0.0.1:8998";
+    const char* ipport = "tcp://127.0.0.1:8998";
     INFO_LOG("rankNum=%d, rankId=%d, ipport=%s, mode=%s, headMSize=%d, bufferCount=%d", rankNum, rankId, ipport,
              mode.c_str(), headMSizeArg, bufferCountArg);
 
@@ -181,9 +181,9 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
 
     CommChannelBuilder builder(comm);
     CommContext hostCtx = {};
-    const char *ctxTag = "all_to_all_quant_matmul";
+    const char* ctxTag = "all_to_all_quant_matmul";
 
-    CommContext *devContext = reinterpret_cast<CommContext *>(
+    CommContext* devContext = reinterpret_cast<CommContext*>(
         builder.CreateDeviceContext(&hostCtx, sizeof(CommContext), ctxTag, &hostCtx.udmaCtx, &hostCtx.ubmemCtx));
     if (devContext == nullptr) {
         ERROR_LOG("rank %d CreateDeviceContext failed", rankId);
@@ -229,11 +229,11 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
     GM_ADDR deviceScaleB = nullptr;
     GM_ADDR deviceOutput = nullptr;
 
-    ACL_CHECK(aclrtMalloc((void **)&deviceA, sizeA, ACL_MEM_MALLOC_HUGE_ONLY));
-    ACL_CHECK(aclrtMalloc((void **)&deviceB, sizeB, ACL_MEM_MALLOC_HUGE_ONLY));
-    ACL_CHECK(aclrtMalloc((void **)&deviceScaleA, sizeScaleA, ACL_MEM_MALLOC_HUGE_ONLY));
-    ACL_CHECK(aclrtMalloc((void **)&deviceScaleB, sizeScaleB, ACL_MEM_MALLOC_HUGE_ONLY));
-    ACL_CHECK(aclrtMalloc((void **)&deviceOutput, sizeOutput, ACL_MEM_MALLOC_HUGE_ONLY));
+    ACL_CHECK(aclrtMalloc((void**)&deviceA, sizeA, ACL_MEM_MALLOC_HUGE_ONLY));
+    ACL_CHECK(aclrtMalloc((void**)&deviceB, sizeB, ACL_MEM_MALLOC_HUGE_ONLY));
+    ACL_CHECK(aclrtMalloc((void**)&deviceScaleA, sizeScaleA, ACL_MEM_MALLOC_HUGE_ONLY));
+    ACL_CHECK(aclrtMalloc((void**)&deviceScaleB, sizeScaleB, ACL_MEM_MALLOC_HUGE_ONLY));
+    ACL_CHECK(aclrtMalloc((void**)&deviceOutput, sizeOutput, ACL_MEM_MALLOC_HUGE_ONLY));
 
     ACL_CHECK(aclrtMemcpy(deviceA, sizeA, hostA.data(), sizeA, ACL_MEMCPY_HOST_TO_DEVICE));
     ACL_CHECK(aclrtMemcpy(deviceB, sizeB, hostB.data(), sizeB, ACL_MEMCPY_HOST_TO_DEVICE));
@@ -255,15 +255,15 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
         size_t boostSize = static_cast<size_t>(BOOST_ELEM_COUNT) * sizeof(uint16_t);
         GM_ADDR boostIn = nullptr;
         GM_ADDR boostOut = nullptr;
-        ACL_CHECK(aclrtMalloc((void **)&boostIn, boostSize, ACL_MEM_MALLOC_HUGE_ONLY));
-        ACL_CHECK(aclrtMalloc((void **)&boostOut, boostSize, ACL_MEM_MALLOC_HUGE_ONLY));
+        ACL_CHECK(aclrtMalloc((void**)&boostIn, boostSize, ACL_MEM_MALLOC_HUGE_ONLY));
+        ACL_CHECK(aclrtMalloc((void**)&boostOut, boostSize, ACL_MEM_MALLOC_HUGE_ONLY));
         std::vector<uint16_t> boostHost(BOOST_ELEM_COUNT, 0x3F00);
         ACL_CHECK(aclrtMemcpy(boostIn, boostSize, boostHost.data(), boostSize, ACL_MEMCPY_HOST_TO_DEVICE));
 
         constexpr int64_t CACHE_FLUSH_ELEM_COUNT = 128LL * 1024 * 1024;
         size_t cacheFlushSize = static_cast<size_t>(CACHE_FLUSH_ELEM_COUNT) * sizeof(uint16_t);
         GM_ADDR cacheFlush = nullptr;
-        ACL_CHECK(aclrtMalloc((void **)&cacheFlush, cacheFlushSize, ACL_MEM_MALLOC_HUGE_ONLY));
+        ACL_CHECK(aclrtMalloc((void**)&cacheFlush, cacheFlushSize, ACL_MEM_MALLOC_HUGE_ONLY));
         std::vector<uint16_t> cacheFlushHost(CACHE_FLUSH_ELEM_COUNT, 0x0000);
         ACL_CHECK(
             aclrtMemcpy(cacheFlush, cacheFlushSize, cacheFlushHost.data(), cacheFlushSize, ACL_MEMCPY_HOST_TO_DEVICE));
@@ -312,13 +312,13 @@ int runAllToAllMatmul(int rankNum, int rankId, int m, int k, int n, const std::s
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int m, k, n, rankNum, headMSize, bufferCount;
     std::string mode;
     try {
         parseArguments(argc, argv, m, k, n, rankNum, mode, headMSize, bufferCount);
-    } catch (const std::invalid_argument &e) {
+    } catch (const std::invalid_argument& e) {
         std::cerr << e.what() << std::endl;
         printUsage(argv[0]);
         return -1;

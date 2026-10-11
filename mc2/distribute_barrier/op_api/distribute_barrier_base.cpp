@@ -39,19 +39,19 @@ using namespace op;
 #ifdef __cplusplus
 extern "C" {
 #endif
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
-extern aclnnStatus aclnnInnerDistributeBarrierExtend(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerDistributeBarrierExtend(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                      aclrtStream stream);
 
-extern aclnnStatus aclnnInnerDistributeBarrierExtendGetWorkspaceSize(const aclTensor *context, const aclTensor *xRef,
-                                                                     const aclTensor *timeOut,
-                                                                     const aclTensor *elasticInfo, const char *group,
-                                                                     int64_t worldSize, uint64_t *workspaceSize,
-                                                                     aclOpExecutor **executor);
+extern aclnnStatus aclnnInnerDistributeBarrierExtendGetWorkspaceSize(const aclTensor* context, const aclTensor* xRef,
+                                                                     const aclTensor* timeOut,
+                                                                     const aclTensor* elasticInfo, const char* group,
+                                                                     int64_t worldSize, uint64_t* workspaceSize,
+                                                                     aclOpExecutor** executor);
 
 // check nullptr
-bool BarrierCheckNullStatus(const aclTensor *xRef, const char *group)
+bool BarrierCheckNullStatus(const aclTensor* xRef, const char* group)
 {
     // 检查必选入参出参为非空
     OP_CHECK_NULL(xRef, return false);
@@ -63,7 +63,7 @@ bool BarrierCheckNullStatus(const aclTensor *xRef, const char *group)
 }
 
 // 入参校验
-aclnnStatus BarrierCheckParams(const aclTensor *xRef, const char *group)
+aclnnStatus BarrierCheckParams(const aclTensor* xRef, const char* group)
 {
     CHECK_RET(BarrierCheckNullStatus(xRef, group), ACLNN_ERR_PARAM_NULLPTR);
     auto groupStrnLen = strnlen(group, HCCL_GROUP_NAME_MAX);
@@ -75,14 +75,14 @@ aclnnStatus BarrierCheckParams(const aclTensor *xRef, const char *group)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus aclnnDistributeBarrierGetWorkspaceSizeBase(const aclTensor *xRef, const aclTensor *timeOut,
-                                                       const aclTensor *elasticInfo, const char *group,
-                                                       int64_t worldSize, uint64_t *workspaceSize,
-                                                       aclOpExecutor **executor)
+aclnnStatus aclnnDistributeBarrierGetWorkspaceSizeBase(const aclTensor* xRef, const aclTensor* timeOut,
+                                                       const aclTensor* elasticInfo, const char* group,
+                                                       int64_t worldSize, uint64_t* workspaceSize,
+                                                       aclOpExecutor** executor)
 {
     auto retParam = BarrierCheckParams(xRef, group);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
-    aclTensor *mc2Context = nullptr;
+    aclTensor* mc2Context = nullptr;
     aclnnStatus getWorkspaceSizesRes = ACLNN_ERR_INNER;
     aclnnStatus ret = ACLNN_ERR_INNER;
 
@@ -90,14 +90,14 @@ aclnnStatus aclnnDistributeBarrierGetWorkspaceSizeBase(const aclTensor *xRef, co
     if (group != nullptr) {
         (void)strncpy_s(groupBuf, HCCL_GROUP_NAME_MAX, group, HCCL_GROUP_NAME_MAX - 1);
     }
-    aclTensor *xRefBuf = const_cast<aclTensor *>(xRef);
+    aclTensor* xRefBuf = const_cast<aclTensor*>(xRef);
     if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
         getWorkspaceSizesRes = aclnnInnerDistributeBarrierGetWorkspaceSize(xRefBuf, timeOut, elasticInfo, groupBuf,
                                                                            worldSize, workspaceSize, executor);
     } else {
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
         uint64_t hcclBuffSize = 0;
-        const char *opName = "distribute_barrier_extend";
+        const char* opName = "distribute_barrier_extend";
         ret = Mc2Aclnn::Mc2Context::GetMc2ContextTensor(group, opName, hcclBuffSize, mc2Context);
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
         getWorkspaceSizesRes = aclnnInnerDistributeBarrierExtendGetWorkspaceSize(
@@ -107,7 +107,7 @@ aclnnStatus aclnnDistributeBarrierGetWorkspaceSizeBase(const aclTensor *xRef, co
     return getWorkspaceSizesRes;
 }
 
-aclnnStatus aclnnDistributeBarrierBase(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnDistributeBarrierBase(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                        aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {

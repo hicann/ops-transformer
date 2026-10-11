@@ -18,17 +18,17 @@ namespace MatmulAllReduceUT {
 
 namespace {
 
-void RunMatmulAllReduceV3Ut(op::SocVersion soc, const TensorDesc &x1, const TensorDesc &x2, const aclTensor *bias,
-                            const aclTensor *x3, const TensorDesc &output, const char *commMode,
+void RunMatmulAllReduceV3Ut(op::SocVersion soc, const TensorDesc& x1, const TensorDesc& x2, const aclTensor* bias,
+                            const aclTensor* x3, const TensorDesc& output, const char* commMode,
                             aclnnStatus expectResult)
 {
     op::SetPlatformSocVersion(soc);
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnMatmulAllReduceV3,
                         INPUT(x1, x2, bias, x3, group, reduceOp, commMode, commTurn, streamMode), OUTPUT(output));
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -66,7 +66,7 @@ TEST_P(AclnnMatmulAllReduceV3Test, param)
                               param.commMode.c_str(), param.commTurn, param.streamMode),
                         OUTPUT(param.output));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(ACLNN_ERR_PARAM_INVALID, aclnnRet);
@@ -122,12 +122,12 @@ TEST_F(AclnnMatmulAllReduceV3ExtraTest, Dav3510NullCommMode)
     TensorDesc x1 = {{16, 32}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc x2 = {{32, 16}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc output = {{16, 16}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut =
         OP_API_UT(aclnnMatmulAllReduceV3,
                   INPUT(x1, x2, nullptr, nullptr, group, reduceOp, nullptr, commTurn, streamMode), OUTPUT(output));

@@ -14,9 +14,9 @@
 #include <cstdint>
 #include "common/utils/mc2_comm_algo_selector.h"
 namespace Mc2Tiling {
-inline constexpr const char *REDUCE_SCATTER_DEFAULT_ALGO_NAME = "ReduceScatter=level0:fullmesh";
+inline constexpr const char* REDUCE_SCATTER_DEFAULT_ALGO_NAME = "ReduceScatter=level0:fullmesh";
 
-const Mc2Hcom::CommAlgoEntry *GetReduceScatterCommAlgoTable(uint32_t &count);
+const Mc2Hcom::CommAlgoEntry* GetReduceScatterCommAlgoTable(uint32_t& count);
 
 } // namespace Mc2Tiling
 

@@ -62,7 +62,7 @@ uint8_t Mc2TilingUtils::GetDebugStepSize()
     return debugStepSize;
 }
 
-matmul_tiling::DataType ConvertGeTypeToMmType(const std::string &opName, ge::DataType type)
+matmul_tiling::DataType ConvertGeTypeToMmType(const std::string& opName, ge::DataType type)
 {
     static const std::map<ge::DataType, matmul_tiling::DataType> GE_TO_MM_MAP = {
         {ge::DT_BF16, matmul_tiling::DataType::DT_BFLOAT16},
@@ -84,7 +84,7 @@ matmul_tiling::DataType ConvertGeTypeToMmType(const std::string &opName, ge::Dat
     return matmul_tiling::DataType::DT_MAX;
 }
 
-ge::DataType ConvertMmTypeToGeType(const std::string &opName, matmul_tiling::DataType type)
+ge::DataType ConvertMmTypeToGeType(const std::string& opName, matmul_tiling::DataType type)
 {
     static const std::map<matmul_tiling::DataType, ge::DataType> MM_TO_GE_MAP = {
         {matmul_tiling::DataType::DT_BFLOAT16, ge::DT_BF16},
@@ -106,7 +106,7 @@ ge::DataType ConvertMmTypeToGeType(const std::string &opName, matmul_tiling::Dat
     return ge::DT_MAX;
 }
 
-uint64_t GetDataTypeSize(const std::string &opName, ge::DataType type)
+uint64_t GetDataTypeSize(const std::string& opName, ge::DataType type)
 {
     static const std::map<ge::DataType, int64_t> DATA_TYPE_SIZE_MAP = {
         {ge::DT_BF16, 2},     {ge::DT_FLOAT16, 2},       {ge::DT_FLOAT, 4},
@@ -122,7 +122,7 @@ uint64_t GetDataTypeSize(const std::string &opName, ge::DataType type)
     return 0;
 }
 
-HcclDataType ConvertGeTypeToHcclType(const std::string &opName, ge::DataType type)
+HcclDataType ConvertGeTypeToHcclType(const std::string& opName, ge::DataType type)
 {
     static const std::map<ge::DataType, HcclDataType> HCCL_DATA_TYPE_MAP = {
         {ge::DataType::DT_INT8, HcclDataType::HCCL_DATA_TYPE_INT8},
@@ -169,7 +169,7 @@ bool IsDeterministic()
     return true;
 }
 
-uint8_t Mc2GetCommAlgo(int64_t rankDim, uint64_t mValue, const char *group, const gert::TilingContext *context)
+uint8_t Mc2GetCommAlgo(int64_t rankDim, uint64_t mValue, const char* group, const gert::TilingContext* context)
 {
     auto platformInfo = context->GetPlatformInfo();
     if (platformInfo == nullptr) {
@@ -251,13 +251,13 @@ bool CheckDataTypeVaild(ge::DataType type, std::initializer_list<ge::DataType> s
     return std::find(supportDtypeList.begin(), supportDtypeList.end(), type) != supportDtypeList.end();
 }
 
-ge::graphStatus ParseCommAlgWithEnvFallback(const char *entityName, const char *commAlg, bool &isLayered)
+ge::graphStatus ParseCommAlgWithEnvFallback(const char* entityName, const char* commAlg, bool& isLayered)
 {
     if (commAlg == nullptr || strlen(commAlg) == 0 || strcmp(commAlg, "0") == 0) {
         OP_LOGW(entityName, "Attr commAlg is invalid, please configure fullmesh or hierarchy.");
 
-        const char *hcclIntraPcieEnable = getenv("HCCL_INTRA_PCIE_ENABLE");
-        const char *hcclIntraRoceEnable = getenv("HCCL_INTRA_ROCE_ENABLE");
+        const char* hcclIntraPcieEnable = getenv("HCCL_INTRA_PCIE_ENABLE");
+        const char* hcclIntraRoceEnable = getenv("HCCL_INTRA_ROCE_ENABLE");
         if (hcclIntraPcieEnable != nullptr && hcclIntraRoceEnable != nullptr && strcmp(hcclIntraPcieEnable, "1") == 0 &&
             strcmp(hcclIntraRoceEnable, "0") == 0) {
             OP_LOGD(entityName,
@@ -282,10 +282,10 @@ ge::graphStatus ParseCommAlgWithEnvFallback(const char *entityName, const char *
     return ge::GRAPH_FAILED;
 }
 
-bool IsHcclPcieLayered(const char *entityName)
+bool IsHcclPcieLayered(const char* entityName)
 {
-    const char *hcclIntraPcieEnable = getenv("HCCL_INTRA_PCIE_ENABLE");
-    const char *hcclIntraRoceEnable = getenv("HCCL_INTRA_ROCE_ENABLE");
+    const char* hcclIntraPcieEnable = getenv("HCCL_INTRA_PCIE_ENABLE");
+    const char* hcclIntraRoceEnable = getenv("HCCL_INTRA_ROCE_ENABLE");
 
     if (hcclIntraPcieEnable == nullptr || hcclIntraRoceEnable == nullptr) {
         OP_LOGD(entityName, "ENV HCCL_INTRA_PCIE_ENABLE or HCCL_INTRA_ROCE_ENABLE don't set");
@@ -299,8 +299,8 @@ bool IsHcclPcieLayered(const char *entityName)
     return false;
 }
 
-void UpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args &mmV3Args, const TilingArgs &args,
-                        const char *opName)
+void UpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args& mmV3Args, const TilingArgs& args,
+                        const char* opName)
 {
     mmV3Args.opName = opName;
     mmV3Args.isATrans = args.isATrans;
@@ -321,7 +321,7 @@ void UpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args &mmV3A
     mmV3Args.bDtypeSize = GetDataTypeSize(opName, mmV3Args.bType);
 }
 
-ge::graphStatus GetMatmulV3PriorityPolicy(const NpuArch npuArch, std::vector<int32_t> &priorities, const char *opName)
+ge::graphStatus GetMatmulV3PriorityPolicy(const NpuArch npuArch, std::vector<int32_t>& priorities, const char* opName)
 {
     const static std::map<NpuArch, std::vector<int32_t>> MATMUL_V3_PRIOR_MAP = {
         {Ops::Base::DAV_3510, {optiling::mc2_matmul_v3_advanced::strategy::BASE}},
@@ -338,7 +338,7 @@ ge::graphStatus GetMatmulV3PriorityPolicy(const NpuArch npuArch, std::vector<int
     return ge::GRAPH_SUCCESS;
 }
 
-uint32_t Mc2TilingUtils::GetCommSets(const char *group)
+uint32_t Mc2TilingUtils::GetCommSets(const char* group)
 {
     uint32_t commSets = 0;
     if (Mc2Hcom::MC2HcomTopology::TryGetGroupTopoType(group, &commSets) != HCCL_SUCCESS) {
@@ -349,10 +349,10 @@ uint32_t Mc2TilingUtils::GetCommSets(const char *group)
     return commSets;
 }
 
-ge::graphStatus Mc2TilingUtils::CommonParamCheck(const gert::TilingContext *context)
+ge::graphStatus Mc2TilingUtils::CommonParamCheck(const gert::TilingContext* context)
 {
-    const gert::StorageShape *aShape = context->GetInputShape(0);
-    const gert::StorageShape *bShape = context->GetInputShape(1);
+    const gert::StorageShape* aShape = context->GetInputShape(0);
+    const gert::StorageShape* bShape = context->GetInputShape(1);
     OP_TILING_CHECK(aShape == nullptr || bShape == nullptr,
                     OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "aShape, bShape"), return ge::GRAPH_FAILED);
 
@@ -398,7 +398,7 @@ mc2tiling::HcclDataType Mc2TilingUtils::GetDataType(ge::DataType type)
 uint64_t Mc2TilingUtils::GetMaxWindowSize()
 {
     uint64_t defaultWindowSize = 200;
-    const char *envValue = getenv(HCCL_BUFFSIZE);
+    const char* envValue = getenv(HCCL_BUFFSIZE);
     if (envValue == nullptr) {
         OP_LOGD("", "Env HCCL_BUFFSIZE don't set");
     } else {
@@ -420,7 +420,7 @@ uint64_t Mc2TilingUtils::GetMaxWindowSize()
     return maxWindowSize;
 }
 
-bool GetRankSize(const std::string &opName, const char *group, int64_t &rankSize)
+bool GetRankSize(const std::string& opName, const char* group, int64_t& rankSize)
 {
     uint32_t rankNum = static_cast<uint32_t>(rankSize);
     if (Mc2Hcom::MC2HcomTopology::CommGetInstSizeByGroup(group, &rankNum) != HCCL_SUCCESS) {
@@ -441,8 +441,8 @@ bool Mc2TilingUtils::CheckRankSize(NpuArch npuArch, uint32_t rankSize)
     return false;
 }
 
-bool Mc2TilingUtils::InferGroupSize(Mc2MatmulShapeInfo &mmInfo, uint64_t &groupSizeM, uint64_t &groupSizeN,
-                                    uint64_t &groupSizeK)
+bool Mc2TilingUtils::InferGroupSize(Mc2MatmulShapeInfo& mmInfo, uint64_t& groupSizeM, uint64_t& groupSizeN,
+                                    uint64_t& groupSizeK)
 {
     // calculate groupSizeM
     if (groupSizeM == 0) {

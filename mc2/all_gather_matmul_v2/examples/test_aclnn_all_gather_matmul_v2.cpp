@@ -33,7 +33,7 @@
 
 constexpr int DEV_NUM = 2;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -43,8 +43,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -67,7 +67,7 @@ struct Args {
     aclrtContext context;
 };
 
-int LaunchOneThreadAllGatherMmV2(Args &args)
+int LaunchOneThreadAllGatherMmV2(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret: %d\n", ret); return ret);
@@ -83,22 +83,22 @@ int LaunchOneThreadAllGatherMmV2(Args &args)
     std::vector<int64_t> biasShape = {128};
     std::vector<int64_t> outShape = {32 * DEV_NUM, 128};
     std::vector<int64_t> gatherOutShape = {32 * DEV_NUM, 256};
-    void *x1DeviceAddr = nullptr;
-    void *x2DeviceAddr = nullptr;
-    void *x1ScaleDeviceAddr = nullptr;
-    void *x2ScaleDeviceAddr = nullptr;
-    void *biasDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
-    void *gatherOutDeviceAddr = nullptr;
-    aclTensor *x1 = nullptr;
-    aclTensor *x2 = nullptr;
-    aclTensor *x1Scale = nullptr;
-    aclTensor *x2Scale = nullptr;
-    aclTensor *bias = nullptr;
-    aclTensor *quantScale = nullptr;
-    aclTensor *out = nullptr;
-    aclTensor *gatherOut = nullptr;
-    aclTensor *amax = nullptr;
+    void* x1DeviceAddr = nullptr;
+    void* x2DeviceAddr = nullptr;
+    void* x1ScaleDeviceAddr = nullptr;
+    void* x2ScaleDeviceAddr = nullptr;
+    void* biasDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
+    void* gatherOutDeviceAddr = nullptr;
+    aclTensor* x1 = nullptr;
+    aclTensor* x2 = nullptr;
+    aclTensor* x1Scale = nullptr;
+    aclTensor* x2Scale = nullptr;
+    aclTensor* bias = nullptr;
+    aclTensor* quantScale = nullptr;
+    aclTensor* out = nullptr;
+    aclTensor* gatherOut = nullptr;
+    aclTensor* amax = nullptr;
 
     int64_t gatherIndex = 0;
     int64_t commTurn = 0;
@@ -106,8 +106,8 @@ int LaunchOneThreadAllGatherMmV2(Args &args)
     int64_t blockSize = 0;
     int64_t groupSize = 0;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     long long x1ShapeSize = GetShapeSize(x1Shape);
     long long x2ShapeSize = GetShapeSize(x2Shape);
@@ -220,7 +220,7 @@ int LaunchOneThreadAllGatherMmV2(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclInit failed. ret = %d \n", ret); return ret);

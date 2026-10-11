@@ -28,7 +28,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -38,8 +38,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -72,7 +72,7 @@ constexpr int64_t N1 = 4096;
 constexpr int64_t N2 = 4096;
 constexpr int64_t A = BS * K;
 
-int LaunchOneThreadAlltoAllvQuantGroupedMatMul(Args &args)
+int LaunchOneThreadAlltoAllvQuantGroupedMatMul(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret: %d\n", ret); return ret);
@@ -92,34 +92,34 @@ int LaunchOneThreadAlltoAllvQuantGroupedMatMul(Args &args)
     std::vector<int64_t> sendCountsList(EP_WORLD_SIZE * e, BS * K / (EP_WORLD_SIZE * e));
     std::vector<int64_t> recvCountsList(EP_WORLD_SIZE * e, BS * K / (EP_WORLD_SIZE * e));
 
-    void *gmmXDeviceAddr = nullptr;
-    void *gmmWDeviceAddr = nullptr;
-    void *gmmYDeviceAddr = nullptr;
-    void *permuteDeviceAddr = nullptr;
-    void *mmXDeviceAddr = nullptr;
-    void *mmWDeviceAddr = nullptr;
-    void *mmYDeviceAddr = nullptr;
-    void *gmmXScaleDeviceAddr = nullptr;
-    void *gmmWScaleDeviceAddr = nullptr;
-    void *mmXScaleDeviceAddr = nullptr;
-    void *mmWScaleDeviceAddr = nullptr;
+    void* gmmXDeviceAddr = nullptr;
+    void* gmmWDeviceAddr = nullptr;
+    void* gmmYDeviceAddr = nullptr;
+    void* permuteDeviceAddr = nullptr;
+    void* mmXDeviceAddr = nullptr;
+    void* mmWDeviceAddr = nullptr;
+    void* mmYDeviceAddr = nullptr;
+    void* gmmXScaleDeviceAddr = nullptr;
+    void* gmmWScaleDeviceAddr = nullptr;
+    void* mmXScaleDeviceAddr = nullptr;
+    void* mmWScaleDeviceAddr = nullptr;
 
-    aclTensor *gmmX = nullptr;
-    aclTensor *gmmW = nullptr;
-    aclTensor *gmmY = nullptr;
-    aclTensor *mmX = nullptr;
-    aclTensor *mmW = nullptr;
-    aclTensor *mmY = nullptr;
-    aclTensor *permute = nullptr;
-    aclTensor *gmmXScale = nullptr;
-    aclTensor *gmmWScale = nullptr;
-    aclTensor *mmXScale = nullptr;
-    aclTensor *mmWScale = nullptr;
+    aclTensor* gmmX = nullptr;
+    aclTensor* gmmW = nullptr;
+    aclTensor* gmmY = nullptr;
+    aclTensor* mmX = nullptr;
+    aclTensor* mmW = nullptr;
+    aclTensor* mmY = nullptr;
+    aclTensor* permute = nullptr;
+    aclTensor* gmmXScale = nullptr;
+    aclTensor* gmmWScale = nullptr;
+    aclTensor* mmXScale = nullptr;
+    aclTensor* mmWScale = nullptr;
     int64_t groupSize = 0;
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     long long gmmXShapeSize = GetShapeSize(gmmXShape);
     long long gmmWShapeSize = GetShapeSize(gmmWShape);
@@ -170,8 +170,8 @@ int LaunchOneThreadAlltoAllvQuantGroupedMatMul(Args &args)
     ret = CreateAclTensor(mmWScaleHostData, scaleShape, &mmWScaleDeviceAddr, ACL_FLOAT, &mmWScale);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
 
     // 调用第一阶段接口
     ret = aclnnAlltoAllvQuantGroupedMatMulGetWorkspaceSize(gmmX, gmmW, gmmXScale, gmmWScale,
@@ -267,7 +267,7 @@ int LaunchOneThreadAlltoAllvQuantGroupedMatMul(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // 本样例基于Atlas A5实现
     int ret = aclInit(nullptr);

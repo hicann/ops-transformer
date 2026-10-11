@@ -26,12 +26,12 @@ using namespace matmul;
 using namespace Mc2MatmulV3Advanced;
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE = Mc2MatmulAswBlock,
-          const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD>
+          const MatmulConfig& MM_CFG = MM_CFG_NO_PRELOAD>
 class MC2MatmulAswKernelDerive : public Mc2MatmulAswKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG> {
 public:
     __aicore__ inline MC2MatmulAswKernelDerive() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetGM,
-                                GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe, Mc2Tiling::RCSTiling cfg,
+                                GM_ADDR workspaceGM, const void* tilingData, TPipe* pipe, Mc2Tiling::RCSTiling cfg,
                                 bool isTail, bool isGather);
     __aicore__ inline void InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, bool isGather);
     __aicore__ inline void UpdateSlice(uint32_t idx, bool isTail);
@@ -41,17 +41,17 @@ public:
     bool ownRedirect_ = false;
 };
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetGM, GM_ADDR workspaceGM,
-    const void *tilingData, TPipe *pipe, Mc2Tiling::RCSTiling cfg, bool isTail, bool isGather)
+    const void* tilingData, TPipe* pipe, Mc2Tiling::RCSTiling cfg, bool isTail, bool isGather)
 {
     this->pipe_ = pipe;
     this->block_.template Init<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>(tilingData);
     this->block_.InitForMC2(tilingData, cfg, isTail, isGather);
     InitInputs(aGM, bGM, cGM, biasGM, isGather);
     if (offsetGM != nullptr) {
-        this->cOwnGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ typename C_TYPE::T *>(offsetGM),
+        this->cOwnGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ typename C_TYPE::T*>(offsetGM),
                                           static_cast<uint64_t>(this->block_.rankMN_));
         this->ownRedirect_ = true;
     }
@@ -59,7 +59,7 @@ __aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYP
     this->mm_.Init(&this->block_.matmulTilingData_->tCubeTiling, this->pipe_);
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::InitInputs(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, bool isGather)
 {
@@ -69,22 +69,22 @@ __aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYP
     using BiasT = typename BIAS_TYPE::T;
 
     uint32_t adjustVal = isGather ? this->block_.cfg_.rankDim : 1;
-    this->aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM),
+    this->aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T*>(aGM),
                                    static_cast<uint64_t>(this->block_.rankMK_ * adjustVal));
-    this->bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM), static_cast<uint64_t>(this->block_.rankKN_));
-    this->cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM),
+    this->bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T*>(bGM), static_cast<uint64_t>(this->block_.rankKN_));
+    this->cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T*>(cGM),
                                    static_cast<uint64_t>(this->block_.rankMN_ * adjustVal));
-    this->biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM), this->block_.cfg_.rankN);
+    this->biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT*>(biasGM), this->block_.cfg_.rankN);
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::UpdateSlice(
     uint32_t idx, bool isTail)
 {
     this->block_.UpdateOffset(idx, isTail);
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void MC2MatmulAswKernelDerive<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process(
     bool isLast, uint8_t enAtomic)
 {

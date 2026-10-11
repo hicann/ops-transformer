@@ -47,7 +47,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestAclnnMatmulReduceScatterFirstApi)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -62,7 +62,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestAclnnMatmulReduceScatterFirstApi2)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -77,7 +77,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestAclnnMatmulReduceScatterFirstApi3)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -92,7 +92,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestSixApiA5)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -107,7 +107,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestStreamModeInvalid)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 0), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -130,12 +130,12 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestSecondApiWithWorkspace)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     ASSERT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 
     uint64_t fakeWorkspaceSize = std::max(workspaceSize, (uint64_t)1024);
-    void *fakeWorkspace = malloc(fakeWorkspaceSize);
+    void* fakeWorkspace = malloc(fakeWorkspaceSize);
     ASSERT_NE(fakeWorkspace, nullptr);
     aclnnStatus ret = aclnnMatmulReduceScatter(fakeWorkspace, fakeWorkspaceSize, executor, nullptr);
     // UT 模式下内部函数可能返回非零错误码
@@ -153,7 +153,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestNullX1)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(nullptr, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -168,7 +168,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestNullX2)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, nullptr, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -183,7 +183,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestNullOutput)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -199,7 +199,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestBf16Dtype)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -215,7 +215,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestDtypeMismatch)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -231,7 +231,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestEmptyKDim)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -246,7 +246,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestNoBias)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, nullptr, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -262,7 +262,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestKDimMismatch)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -278,7 +278,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestKBelowMin)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -294,7 +294,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestNDimMismatch)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -310,14 +310,14 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestKAboveMax)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
 
 TEST_F(L2AclnnMatmulReduceScatterTest, TestDebugEnvVar)
 {
-    const char *envValue = getenv("ASCEND_MC2_DEBUG_MODE");
+    const char* envValue = getenv("ASCEND_MC2_DEBUG_MODE");
     std::string originalStr = (envValue != nullptr) ? std::string(envValue) : "";
     setenv("ASCEND_MC2_DEBUG_MODE", "0", 1);
     TensorDesc x1Desc = TensorDesc({16, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -328,7 +328,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestDebugEnvVar)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
     if (originalStr.empty()) {
@@ -340,7 +340,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestDebugEnvVar)
 
 TEST_F(L2AclnnMatmulReduceScatterTest, TestDebugEnvVarMode4)
 {
-    const char *envValue = getenv("ASCEND_MC2_DEBUG_MODE");
+    const char* envValue = getenv("ASCEND_MC2_DEBUG_MODE");
     std::string originalStr = (envValue != nullptr) ? std::string(envValue) : "";
     setenv("ASCEND_MC2_DEBUG_MODE", "4", 1);
     TensorDesc x1Desc = TensorDesc({16, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
@@ -351,7 +351,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestDebugEnvVarMode4)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
     if (originalStr.empty()) {
@@ -371,7 +371,7 @@ TEST_F(L2AclnnMatmulReduceScatterTest, TestKMinBoundary)
     auto ut =
         OP_API_UT(aclnnMatmulReduceScatter, INPUT(x1Desc, x2Desc, bias, "test_group", "sum", 8, 1), OUTPUT(outDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }

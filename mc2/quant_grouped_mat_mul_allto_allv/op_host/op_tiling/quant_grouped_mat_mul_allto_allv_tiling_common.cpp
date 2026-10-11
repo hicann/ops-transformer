@@ -43,13 +43,13 @@ const std::vector<uint32_t> QUANT_GMM_WEIGHT_SCALE_DTYPE_LIST = {
 };
 const std::vector<uint32_t> QUANT_GMM_Y_DTYPE_LIST = {ge::DT_FLOAT16, ge::DT_BF16};
 
-bool QuantGroupedMatmulAllToAllvTilingCommon::IsContains(const std::vector<uint32_t> &list, uint32_t value)
+bool QuantGroupedMatmulAllToAllvTilingCommon::IsContains(const std::vector<uint32_t>& list, uint32_t value)
 {
     return std::count(list.begin(), list.end(), value) > 0;
 }
 
-ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckShapeDimensions(const gert::StorageShape *shape,
-                                                                              uint64_t dims, const char *shapeName)
+ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckShapeDimensions(const gert::StorageShape* shape,
+                                                                              uint64_t dims, const char* shapeName)
 {
     uint64_t dimNum = shape->GetStorageShape().GetDimNum();
     OP_TILING_CHECK(
@@ -179,9 +179,9 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetLocalParamsG
                     return ge::GRAPH_FAILED);
     localParams_.gmmYDtype = localParams_.yDtype;
 
-    const gert::StorageShape *gmmXStorageShape = context_->GetInputShape(GMM_X_INDEX);
-    const gert::StorageShape *gmmWeightStorageShape = context_->GetInputShape(GMM_WEIGHT_INDEX);
-    const gert::StorageShape *yStorageShape = context_->GetOutputShape(OUTPUT_Y_INDEX);
+    const gert::StorageShape* gmmXStorageShape = context_->GetInputShape(GMM_X_INDEX);
+    const gert::StorageShape* gmmWeightStorageShape = context_->GetInputShape(GMM_WEIGHT_INDEX);
+    const gert::StorageShape* yStorageShape = context_->GetOutputShape(OUTPUT_Y_INDEX);
     OP_TILING_CHECK(gmmXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmX"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(gmmWeightStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmWeight"),
                     return ge::GRAPH_FAILED);
@@ -232,9 +232,9 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetLocalParamsM
                                               "(DT_FLOAT16, DT_BF16)"),
                     return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *mmXStorageShape = context_->GetOptionalInputShape(MM_X_OPTIONAL_INDEX);
-    const gert::StorageShape *mmWeightStorageShape = context_->GetOptionalInputShape(MM_WEIGHT_OPTIONAL_INDEX);
-    const gert::StorageShape *mmYStorageShape = context_->GetOutputShape(OUTPUT_MM_Y_OPTIONAL_INDEX);
+    const gert::StorageShape* mmXStorageShape = context_->GetOptionalInputShape(MM_X_OPTIONAL_INDEX);
+    const gert::StorageShape* mmWeightStorageShape = context_->GetOptionalInputShape(MM_WEIGHT_OPTIONAL_INDEX);
+    const gert::StorageShape* mmYStorageShape = context_->GetOutputShape(OUTPUT_MM_Y_OPTIONAL_INDEX);
     OP_TILING_CHECK(mmXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "mmX"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(mmWeightStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "mmWeight"),
                     return ge::GRAPH_FAILED);
@@ -273,7 +273,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetLocalParamsM
 
 ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetLocalParamsAttr()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return ge::GRAPH_FAILED);
 
     auto gmmXQuantModeptr = attrs->GetAttrPointer<int64_t>(ATTR_GMM_X_QUANT_MODE_INDEX);
@@ -474,8 +474,8 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsRelationGmm(
                                   Ops::Base::ToString(localParams_.gmmWeightScaleDtype).c_str(), "(DT_FLOAT)"),
         return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *gmmXScaleStorageShape = context_->GetRequiredInputShape(GMM_X_SCALE_INDEX);
-    const gert::StorageShape *gmmWeightScaleStorageShape = context_->GetRequiredInputShape(GMM_WEIGHT_SCALE_INDEX);
+    const gert::StorageShape* gmmXScaleStorageShape = context_->GetRequiredInputShape(GMM_X_SCALE_INDEX);
+    const gert::StorageShape* gmmWeightScaleStorageShape = context_->GetRequiredInputShape(GMM_WEIGHT_SCALE_INDEX);
     OP_TILING_CHECK(gmmXScaleStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmXScale"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(gmmWeightScaleStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmWeightScale"),
@@ -564,8 +564,8 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsRelationMm()
                                   Ops::Base::ToString(localParams_.mmWeightScaleDtype).c_str(), "(DT_FLOAT)"),
         return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *mmXScaleStorageShape = context_->GetOptionalInputShape(MM_X_SCALE_OPTIONAL_INDEX);
-    const gert::StorageShape *mmWeightScaleStorageShape =
+    const gert::StorageShape* mmXScaleStorageShape = context_->GetOptionalInputShape(MM_X_SCALE_OPTIONAL_INDEX);
+    const gert::StorageShape* mmWeightScaleStorageShape =
         context_->GetOptionalInputShape(MM_WEIGHT_SCALE_OPTIONAL_INDEX);
     OP_TILING_CHECK(mmXScaleStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "mmXScale"),
                     return ge::GRAPH_FAILED);
@@ -607,8 +607,8 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsRelationMm()
 
 ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsAttrEpAndSetLocalParams()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
-    const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
+    const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "group", "null", "not null"),
                     return ge::GRAPH_FAILED);
     int64_t rankDim = 0;
@@ -622,7 +622,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsAttrEpAndSet
         rankDim = *epWorldSizePtr;
     }
     std::string supportRankSizeRange;
-    for (const auto &v : SUPPORT_RANK_SIZE) {
+    for (const auto& v : SUPPORT_RANK_SIZE) {
         supportRankSizeRange += (std::to_string(v) + " ");
     }
     OP_TILING_CHECK(
@@ -659,7 +659,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsAttrEpAndSet
 
 ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetSendRecvCountsAttr()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     uint64_t expertNum = localParams_.ep * localParams_.epWorldSize;
     auto sendCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_SEND_COUNTS_INDEX);
     auto recvCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_RECV_COUNTS_INDEX);
@@ -679,8 +679,8 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckAndSetSendRecvCoun
         OP_LOGE_FOR_INVALID_LISTSIZE(opName_, "sendCounts", std::to_string(sendCountsSize), std::to_string(expertNum)),
         return ge::GRAPH_FAILED);
 
-    const int64_t *sendCounts = static_cast<const int64_t *>(sendCountsPtr->GetData());
-    const int64_t *recvCounts = static_cast<const int64_t *>(recvCountsPtr->GetData());
+    const int64_t* sendCounts = static_cast<const int64_t*>(sendCountsPtr->GetData());
+    const int64_t* recvCounts = static_cast<const int64_t*>(recvCountsPtr->GetData());
     uint64_t sendCountsSum = std::accumulate(sendCounts, sendCounts + sendCountsSize, 0ULL);
     OP_TILING_CHECK(sendCountsSum != localParams_.A,
                     OP_LOGE_FOR_INVALID_VALUE(opName_, "sendCountsSum", std::to_string(sendCountsSum),
@@ -791,7 +791,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::CheckParamsRelationAndS
 
 ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::GetPlatformInfo()
 {
-    fe::PlatFormInfos *platformInfo = context_->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context_->GetPlatformInfo();
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "Failed to get platform info."), return ge::GRAPH_FAILED);
     platform_ascendc::PlatformAscendC ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     libApiWorkSpaceSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
@@ -921,13 +921,13 @@ uint32_t QuantGroupedMatmulAllToAllvTilingCommon::GetCommModeIndex() const
     return GmmA2AvAttrIndex::ATTR_COMM_MODE_INDEX;
 }
 
-ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::QuantGetAndConvertCommMode(gert::TilingContext *context,
-                                                                                    uint8_t &commMode) const
+ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::QuantGetAndConvertCommMode(gert::TilingContext* context,
+                                                                                    uint8_t& commMode) const
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attrs"),
                     return ge::GRAPH_FAILED);
-    const char *commModeStr = attrs->GetAttrPointer<char>(GetCommModeIndex());
+    const char* commModeStr = attrs->GetAttrPointer<char>(GetCommModeIndex());
     OP_TILING_CHECK(commModeStr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "comm_mode"),
                     return ge::GRAPH_FAILED);
     const size_t maxLength = 7UL;
@@ -999,7 +999,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-void PrintGmmA2avWorkspaceInfo(const GmmA2avWorkspaceInfo &workspaceInfo, const char *opName_)
+void PrintGmmA2avWorkspaceInfo(const GmmA2avWorkspaceInfo& workspaceInfo, const char* opName_)
 {
     std::stringstream ss;
     ss << "workspaceInfo: ";
@@ -1009,8 +1009,8 @@ void PrintGmmA2avWorkspaceInfo(const GmmA2avWorkspaceInfo &workspaceInfo, const 
     OP_LOGD(opName_, "%s", ss.str().c_str());
 }
 
-void PrintTaskTilingInfo(const MC2KernelTemplate::TaskTilingInfo &taskTilingInfo,
-                         const QuantGmmAlltoAllvParamsInfo &localParams, const char *opName_)
+void PrintTaskTilingInfo(const MC2KernelTemplate::TaskTilingInfo& taskTilingInfo,
+                         const QuantGmmAlltoAllvParamsInfo& localParams, const char* opName_)
 {
     std::stringstream ss;
     ss << "TaskTilingInfo: ";
@@ -1042,11 +1042,11 @@ void PrintTaskTilingInfo(const MC2KernelTemplate::TaskTilingInfo &taskTilingInfo
     OP_LOGI(opName_, "%s", ss.str().c_str());
 }
 
-void PrintGMMQuantTilingData(const MC2KernelTemplate::GMMQuantTilingData &data, const char *opName_)
+void PrintGMMQuantTilingData(const MC2KernelTemplate::GMMQuantTilingData& data, const char* opName_)
 {
-    const auto &mm = data.mmTilingData;
-    const auto &quantParams = data.gmmQuantParams;
-    const auto &gmmArray = data.gmmArray;
+    const auto& mm = data.mmTilingData;
+    const auto& quantParams = data.gmmQuantParams;
+    const auto& gmmArray = data.gmmArray;
 
     std::stringstream ss;
     ss << "MM Tiling: M=" << mm.M << ", N=" << mm.N << ", K=" << mm.Ka << ", usedCoreNum=" << mm.usedCoreNum
@@ -1071,7 +1071,7 @@ void PrintGMMQuantTilingData(const MC2KernelTemplate::GMMQuantTilingData &data, 
     OP_LOGI(opName_, "QuantGmmA2AvTiling TilingParams:\n%s", ss.str().c_str());
 }
 
-void QuantGroupedMatmulAllToAllvTilingCommon::PrintQuantGmmA2avTilingData(QuantGmmA2avTilingData &outTilingData)
+void QuantGroupedMatmulAllToAllvTilingCommon::PrintQuantGmmA2avTilingData(QuantGmmA2avTilingData& outTilingData)
 {
     PrintGmmA2avWorkspaceInfo(outTilingData.workspaceInfo, opName_);
     PrintTaskTilingInfo(outTilingData.taskTilingInfo, localParams_, opName_);
@@ -1085,7 +1085,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::PostTiling()
 {
     PrintQuantGmmA2avTilingData(localTilingData_);
     context_->SetBlockDim(localParams_.aicCoreNum);
-    QuantGmmA2avTilingData *outTilingData = context_->GetTilingData<QuantGmmA2avTilingData>();
+    QuantGmmA2avTilingData* outTilingData = context_->GetTilingData<QuantGmmA2avTilingData>();
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
     OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get tiling data from context"),
                     return ge::GRAPH_FAILED);
@@ -1097,7 +1097,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::PostTiling()
                     OP_LOGE(opName_, "Tiling data size[%zu] is not aligned to 8", sizeof(localTilingData_)),
                     return ge::GRAPH_FAILED);
     errno_t ret =
-        memcpy_s(outTilingData, tilingBufCap, reinterpret_cast<void *>(&localTilingData_), sizeof(localTilingData_));
+        memcpy_s(outTilingData, tilingBufCap, reinterpret_cast<void*>(&localTilingData_), sizeof(localTilingData_));
     if (ret != EOK) {
         OP_LOGE(opName_, "postTiling: memcpy_s failed with ret=%d.", ret);
         return ge::GRAPH_FAILED;
@@ -1108,7 +1108,7 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::PostTiling()
 
 ge::graphStatus QuantGroupedMatmulAllToAllvTilingCommon::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "Failed to get workspace."), return ge::GRAPH_FAILED);
     workspaces[0] = workSpaceSize_;
     OP_LOGD(opName_, "Workspaces[0] size=%ld", workspaces[0]);

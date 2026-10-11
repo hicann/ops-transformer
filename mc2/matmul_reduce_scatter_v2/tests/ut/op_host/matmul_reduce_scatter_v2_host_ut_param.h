@@ -38,7 +38,7 @@ struct MatmulReduceScatterV2HostUtParamBase {
     std::string comm_mode;
     ge::graphStatus expectResult;
 
-    MatmulReduceScatterV2HostUtParamBase(const csv_map &csvMap)
+    MatmulReduceScatterV2HostUtParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->group = ReadMap(csvMap, "group");
@@ -56,13 +56,13 @@ struct MatmulReduceScatterV2HostUtParamBase {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MatmulReduceScatterV2HostUtParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const MatmulReduceScatterV2HostUtParamBase& param)
 {
     return os << param.case_name;
 }
 
 template <typename T>
-inline std::string GetCaseInfoString(const testing::TestParamInfo<T> &info)
+inline std::string GetCaseInfoString(const testing::TestParamInfo<T>& info)
 {
     return info.param.case_name;
 }
@@ -83,7 +83,7 @@ struct MatmulReduceScatterV2TilingUtParam : public MatmulReduceScatterV2HostUtPa
     uint64_t expectTilingKey;
     std::string expectTilingDataHash;
 
-    MatmulReduceScatterV2TilingUtParam(const csv_map &csvMap)
+    MatmulReduceScatterV2TilingUtParam(const csv_map& csvMap)
         : MatmulReduceScatterV2HostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "x1_shape", "x1_dtype", "x1_format", x1));

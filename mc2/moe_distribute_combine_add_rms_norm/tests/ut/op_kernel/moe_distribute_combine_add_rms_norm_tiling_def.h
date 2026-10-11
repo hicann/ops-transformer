@@ -14,7 +14,7 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "../../../../../mc2/moe_distribute_combine_v2/op_kernel/moe_distribute_combine_v2_tiling.h"
 
-inline void InitMoeDistributeCombineAddRmsNormTilingData(uint8_t *tiling, MoeDistributeCombineV2TilingData *constData)
+inline void InitMoeDistributeCombineAddRmsNormTilingData(uint8_t* tiling, MoeDistributeCombineV2TilingData* constData)
 {
     memcpy(constData, tiling, sizeof(MoeDistributeCombineV2TilingData));
 }
@@ -40,7 +40,7 @@ struct float16_t {
         (*this) = f;
     }
 
-    float16_t &operator=(float f);
+    float16_t& operator=(float f);
 
     operator float() const;
     float f()
@@ -48,7 +48,7 @@ struct float16_t {
         return (float)(*this);
     }
 
-    float16_t &operator+=(float16_t a)
+    float16_t& operator+=(float16_t a)
     {
         (*this) = float(f() + a.f());
         return *this;

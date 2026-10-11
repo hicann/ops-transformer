@@ -55,7 +55,7 @@ public:
     BlockGemv() {}
     /// Construct
     CATLASS_DEVICE
-    BlockGemv(Arch::Resource<ArchTag> &resource, uint32_t UBufAddrStart = 0)
+    BlockGemv(Arch::Resource<ArchTag>& resource, uint32_t UBufAddrStart = 0)
     {
         uint32_t UbAOffset = UBufAddrStart;
         uint32_t UbXOffset = UBufAddrStart + Abuf_SIZE_;
@@ -94,10 +94,10 @@ public:
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementA> const &gmA, LayoutA const &layoutA,
-                    AscendC::GlobalTensor<ElementX> const &gmX, LayoutX const &layoutX,
-                    AscendC::GlobalTensor<ElementY> const &gmY, LayoutY const &layoutY,
-                    AscendC::GlobalTensor<ElementY> const &gmYCopy, GemvCoord const &actualShape, float alpha,
+    void operator()(AscendC::GlobalTensor<ElementA> const& gmA, LayoutA const& layoutA,
+                    AscendC::GlobalTensor<ElementX> const& gmX, LayoutX const& layoutX,
+                    AscendC::GlobalTensor<ElementY> const& gmY, LayoutY const& layoutY,
+                    AscendC::GlobalTensor<ElementY> const& gmYCopy, GemvCoord const& actualShape, float alpha,
                     float beta)
     {
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>((event_t)(UbOutEventList[UbOutListId]));

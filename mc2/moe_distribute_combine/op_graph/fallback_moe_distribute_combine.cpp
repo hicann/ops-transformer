@@ -17,49 +17,49 @@ namespace fallback {
 using namespace ge;
 using namespace gert;
 
-const char *moeDistributeCombineInfo = "MoeDistributeCombineFallback";
+const char* moeDistributeCombineInfo = "MoeDistributeCombineFallback";
 
 namespace {
 struct OpInput {
-    const gert::Tensor *expandX;
-    const gert::Tensor *expertIds;
-    const gert::Tensor *expandIdx;
-    const gert::Tensor *epSendCounts;
-    const gert::Tensor *expertScales;
+    const gert::Tensor* expandX;
+    const gert::Tensor* expertIds;
+    const gert::Tensor* expandIdx;
+    const gert::Tensor* epSendCounts;
+    const gert::Tensor* expertScales;
 };
 
 struct OpOptionalInput {
-    const gert::Tensor *tpSendCounts;
-    const gert::Tensor *xActiveMask;
-    const gert::Tensor *activationScale;
-    const gert::Tensor *weightScale;
-    const gert::Tensor *groupList;
-    const gert::Tensor *expandScales;
+    const gert::Tensor* tpSendCounts;
+    const gert::Tensor* xActiveMask;
+    const gert::Tensor* activationScale;
+    const gert::Tensor* weightScale;
+    const gert::Tensor* groupList;
+    const gert::Tensor* expandScales;
 };
 
 struct OpOutput {
-    const gert::Tensor *y;
+    const gert::Tensor* y;
 };
 
 struct OpAttrs {
-    const char *groupEp;
-    const int64_t *epWorldSize;
-    const int64_t *epRankId;
-    const int64_t *moeExpertNum;
-    const char *groupTp;
-    const int64_t *tpWorldSize;
-    const int64_t *tpRankId;
-    const int64_t *expertShardType;
-    const int64_t *sharedExpertNum;
-    const int64_t *sharedExpertRankNum;
-    const int64_t *globalBs;
-    const int64_t *outDtype;
-    const int64_t *commQuantMode;
-    const int64_t *groupListType;
+    const char* groupEp;
+    const int64_t* epWorldSize;
+    const int64_t* epRankId;
+    const int64_t* moeExpertNum;
+    const char* groupTp;
+    const int64_t* tpWorldSize;
+    const int64_t* tpRankId;
+    const int64_t* expertShardType;
+    const int64_t* sharedExpertNum;
+    const int64_t* sharedExpertRankNum;
+    const int64_t* globalBs;
+    const int64_t* outDtype;
+    const int64_t* commQuantMode;
+    const int64_t* groupListType;
 };
 
 // 获取必选输入
-graphStatus MoeDistributeCombineGetOpInput(OpExecuteContext *host_api_ctx, OpInput &opInput)
+graphStatus MoeDistributeCombineGetOpInput(OpExecuteContext* host_api_ctx, OpInput& opInput)
 {
     opInput.expandX = host_api_ctx->GetInputTensor(static_cast<size_t>(ops::MoeDistributeCombineInputIdx::K_EXPAND_X));
     OP_CHECK_IF(opInput.expandX == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "expandX"),
@@ -88,7 +88,7 @@ graphStatus MoeDistributeCombineGetOpInput(OpExecuteContext *host_api_ctx, OpInp
 }
 
 // 获取可选输入
-graphStatus MoeDistributeCombineGetOpOptionalInput(OpExecuteContext *host_api_ctx, OpOptionalInput &opOptionalInput)
+graphStatus MoeDistributeCombineGetOpOptionalInput(OpExecuteContext* host_api_ctx, OpOptionalInput& opOptionalInput)
 {
     opOptionalInput.tpSendCounts =
         host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(ops::MoeDistributeCombineInputIdx::K_TP_SEND_COUNTS));
@@ -109,7 +109,7 @@ graphStatus MoeDistributeCombineGetOpOptionalInput(OpExecuteContext *host_api_ct
 }
 
 // 获取输出
-graphStatus MoeDistributeCombineGetOpOutput(OpExecuteContext *host_api_ctx, OpOutput &opOutput)
+graphStatus MoeDistributeCombineGetOpOutput(OpExecuteContext* host_api_ctx, OpOutput& opOutput)
 {
     opOutput.y = host_api_ctx->GetOutputTensor(static_cast<size_t>(ops::MoeDistributeCombineOutputIdx::K_Y));
     OP_CHECK_IF(opOutput.y == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "y"),
@@ -118,7 +118,7 @@ graphStatus MoeDistributeCombineGetOpOutput(OpExecuteContext *host_api_ctx, OpOu
 }
 
 // 获取通信分组属性
-graphStatus MoeDistributeCombineGetCommGroupAttrs(const gert::RuntimeAttrs *attrs, OpAttrs &opAttrs)
+graphStatus MoeDistributeCombineGetCommGroupAttrs(const gert::RuntimeAttrs* attrs, OpAttrs& opAttrs)
 {
     opAttrs.groupEp = attrs->GetStr(static_cast<size_t>(ops::MoeDistributeCombineAttrIdx::K_GROUP_EP));
     OP_CHECK_IF(opAttrs.groupEp == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "groupEp"),
@@ -152,7 +152,7 @@ graphStatus MoeDistributeCombineGetCommGroupAttrs(const gert::RuntimeAttrs *attr
 }
 
 // 获取专家与量化属性
-graphStatus MoeDistributeCombineGetExpertQuantAttrs(const gert::RuntimeAttrs *attrs, OpAttrs &opAttrs)
+graphStatus MoeDistributeCombineGetExpertQuantAttrs(const gert::RuntimeAttrs* attrs, OpAttrs& opAttrs)
 {
     opAttrs.expertShardType = attrs->GetInt(static_cast<size_t>(ops::MoeDistributeCombineAttrIdx::K_EXPERT_SHARD_TYPE));
     OP_CHECK_IF(opAttrs.expertShardType == nullptr,
@@ -187,7 +187,7 @@ graphStatus MoeDistributeCombineGetExpertQuantAttrs(const gert::RuntimeAttrs *at
 }
 
 // 获取属性
-graphStatus MoeDistributeCombineGetOpAttrs(OpExecuteContext *host_api_ctx, OpAttrs &opAttrs)
+graphStatus MoeDistributeCombineGetOpAttrs(OpExecuteContext* host_api_ctx, OpAttrs& opAttrs)
 {
     const auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "attrs"),
@@ -203,7 +203,7 @@ graphStatus MoeDistributeCombineGetOpAttrs(OpExecuteContext *host_api_ctx, OpAtt
 
 } // namespace
 
-static graphStatus MoeDistributeCombineExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus MoeDistributeCombineExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_LOGD(moeDistributeCombineInfo, "start to fallback for moeDistributeCombine");
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeCombineInfo, "host_api_ctx"),

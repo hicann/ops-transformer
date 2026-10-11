@@ -37,12 +37,12 @@ using Mc2WeightQuantBatchMatmulV2::Mc2QuantType;
 template <typename xType, typename wType, typename yType, class mmType>
 class MatmulAllReduceWeightQuant : public MatmulAllReduceBase<xType, yType, Mc2CoreType::ON_CUBE_AND_VECTOR> {
 public:
-    __aicore__ inline MatmulAllReduceWeightQuant(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs, ArnGmAddrs *arnAddrs,
-                                                 MC2TilingHeader *tilingData, TPipe *tPipe)
+    __aicore__ inline MatmulAllReduceWeightQuant(MC2GmAddrs* addrs, QuantGmAddrs* quantAddrs, ArnGmAddrs* arnAddrs,
+                                                 MC2TilingHeader* tilingData, TPipe* tPipe)
         : MatmulAllReduceBase<xType, yType, Mc2CoreType::ON_CUBE_AND_VECTOR>(addrs, quantAddrs, arnAddrs, tilingData,
                                                                              tPipe)
     {
-        mc2TilingData_ = (Mc2Tiling::WeightQuantMatmulAllReduceTilingData *)tilingData;
+        mc2TilingData_ = (Mc2Tiling::WeightQuantMatmulAllReduceTilingData*)tilingData;
         this->tileInfo_.mmTiling = &mc2TilingData_->tilematmulTiling.matmulTiling;
         this->tailInfo_.mmTiling = &mc2TilingData_->tailmatmulTiling.matmulTiling;
     }
@@ -61,9 +61,9 @@ public:
     }
 
 protected:
-    __aicore__ inline void InnerProcess(bool tailFlag, uint32_t tileCnt, const MC2TileInfo &tileInfo)
+    __aicore__ inline void InnerProcess(bool tailFlag, uint32_t tileCnt, const MC2TileInfo& tileInfo)
     {
-        const Mc2WeightQuantBatchMatmulV2TilingData *tiling =
+        const Mc2WeightQuantBatchMatmulV2TilingData* tiling =
             (tailFlag ? &mc2TilingData_->tailmatmulTiling : &mc2TilingData_->tilematmulTiling);
         for (uint32_t i = 0U; i < tileCnt; ++i) {
             if (this->addFlag_ || i == 0U) {
@@ -82,7 +82,7 @@ protected:
     }
 
 private:
-    Mc2Tiling::WeightQuantMatmulAllReduceTilingData *mc2TilingData_;
+    Mc2Tiling::WeightQuantMatmulAllReduceTilingData* mc2TilingData_;
     mmType mmOp_;
 };
 
@@ -94,7 +94,7 @@ private:
         MC2GmAddrs addrs = {aGM, bGM, biasGM, addGM, cGM, workspaceGM, cGM}; \
         QuantGmAddrs quantAddrs = {antiquantScaleGM, antiquantOffsetGM, nullptr, nullptr}; \
         MatmulAllReduceWeightQuant<DTYPE_X1, DTYPE_X2, DTYPE_Y, opType> op(&addrs, &quantAddrs, nullptr, \
-                                                                           (MC2TilingHeader *)&tilingData, &tPipe); \
+                                                                           (MC2TilingHeader*)&tilingData, &tPipe); \
         op.Init(); \
         op.Process(); \
     } while (0)

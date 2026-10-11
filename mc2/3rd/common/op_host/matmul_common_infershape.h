@@ -22,11 +22,11 @@
 
 namespace Ops {
 namespace Transformer {
-ge::graphStatus InferShapeForBatchMatMul(gert::InferShapeContext *context, const int32_t attr_adj_idx,
+ge::graphStatus InferShapeForBatchMatMul(gert::InferShapeContext* context, const int32_t attr_adj_idx,
                                          const size_t input_bias_index, const bool is_x2_packed = false);
-ge::graphStatus InferShapeRangeForBatchMatMul(gert::InferShapeRangeContext *context, const int32_t attr_adj_idx,
+ge::graphStatus InferShapeRangeForBatchMatMul(gert::InferShapeRangeContext* context, const int32_t attr_adj_idx,
                                               const size_t input_bias_index);
-bool CheckIsUnknownDimNum(const gert::Shape &shape);
+bool CheckIsUnknownDimNum(const gert::Shape& shape);
 } // namespace Transformer
 } // namespace Ops
 

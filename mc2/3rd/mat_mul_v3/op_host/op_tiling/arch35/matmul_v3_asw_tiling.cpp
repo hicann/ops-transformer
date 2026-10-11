@@ -116,9 +116,9 @@ const std::vector<std::tuple<uint64_t, uint64_t, uint64_t>> X1_LOOKUP_TABLE = {
     {176, 12, 84}, {160, 11, 96}, {144, 9, 107}, {128, 7, 116}, {112, 1, 123}};
 
 // 查找X1在表2中的位置信息
-bool FindX1Info(uint64_t x1, uint64_t &startIndex, uint64_t &count)
+bool FindX1Info(uint64_t x1, uint64_t& startIndex, uint64_t& count)
 {
-    for (const auto &entry : X1_LOOKUP_TABLE) {
+    for (const auto& entry : X1_LOOKUP_TABLE) {
         if (std::get<0>(entry) == x1) {
             startIndex = std::get<NUM_TWO>(entry);
             count = std::get<1>(entry);
@@ -154,7 +154,7 @@ void Mc2MatMulV3AswTiling::CalcTailBasicBlock()
     }
 }
 
-void Mc2MatMulV3AswTiling::GetOuterAxisTailCnt(bool nLoadBalance, uint64_t &baseTailSplitCnt, uint64_t &tailMain)
+void Mc2MatMulV3AswTiling::GetOuterAxisTailCnt(bool nLoadBalance, uint64_t& baseTailSplitCnt, uint64_t& tailMain)
 {
     uint64_t aicNum = compileInfo_.aicNum;
     uint64_t x = args_.mValue;
@@ -231,7 +231,7 @@ void Mc2MatMulV3AswTiling::OptimizeEdgeBasicBlock()
 }
 
 // 计算singleX=√(m * n)/coreNum
-void Mc2MatMulV3AswTiling::CalcSingleX(uint64_t &higherSingleX, uint64_t &lowerSingleX)
+void Mc2MatMulV3AswTiling::CalcSingleX(uint64_t& higherSingleX, uint64_t& lowerSingleX)
 {
     double data = static_cast<double>(args_.mValue * args_.nValue) / compileInfo_.aicNum;
 
@@ -375,7 +375,7 @@ uint64_t Mc2MatMulV3AswTiling::UpdateBaseBlock(uint64_t baseBlock, bool isMLarge
     }
 }
 
-void Mc2MatMulV3AswTiling::CalcLargeSingleSide(uint64_t maxMN, uint64_t &targetBase, bool isMLarger)
+void Mc2MatMulV3AswTiling::CalcLargeSingleSide(uint64_t maxMN, uint64_t& targetBase, bool isMLarger)
 {
     // ceil(核数*0.9)
     uint64_t minCoreNum = (compileInfo_.aicNum + 1UL) * NUM_NINE / NUM_TEN;
@@ -410,7 +410,7 @@ void Mc2MatMulV3AswTiling::HandleLargeSingleSide(uint64_t minMN, uint64_t maxMN,
 }
 
 // 两边都比较大场景处理
-bool Mc2MatMulV3AswTiling::UpdateBothBaseBlock(double balance, CalcParams &params, uint64_t currentBaseM,
+bool Mc2MatMulV3AswTiling::UpdateBothBaseBlock(double balance, CalcParams& params, uint64_t currentBaseM,
                                                uint64_t currentBaseN, uint64_t baseK)
 {
     // 调整base块后如果负载均衡率大于重复搬运率比值-1+0.03
@@ -429,7 +429,7 @@ bool Mc2MatMulV3AswTiling::UpdateBothBaseBlock(double balance, CalcParams &param
     return false;
 }
 
-bool Mc2MatMulV3AswTiling::CalcBestBalance(CalcParams &params, bool isMLarger)
+bool Mc2MatMulV3AswTiling::CalcBestBalance(CalcParams& params, bool isMLarger)
 {
     uint64_t startIndex;
     uint64_t count;

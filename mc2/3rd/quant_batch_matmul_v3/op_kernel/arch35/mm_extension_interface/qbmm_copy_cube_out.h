@@ -18,7 +18,7 @@
 
 namespace AscendC {
 
-template <typename IMPL, class A_TYPE, class B_TYPE, class C_TYPE, const auto &MM_CFG, McgShfMode FIXPIPE_MODE>
+template <typename IMPL, class A_TYPE, class B_TYPE, class C_TYPE, const auto& MM_CFG, McgShfMode FIXPIPE_MODE>
 class QBmmCustomCopyCubeOut {
     using DstT = typename C_TYPE::T;
     using SrcT = typename GetMmDstType<typename A_TYPE::T>::Type;
@@ -36,9 +36,9 @@ public:
     __aicore__ inline QBmmCustomCopyCubeOut() = default;
 
     template <bool enSequentialWrite = false, typename ScheduleContext = int>
-    __aicore__ inline void Copy(const GlobalTensor<DstT> &gm, const LocalTensor<SrcT> &co1Local, int32_t curRow,
+    __aicore__ inline void Copy(const GlobalTensor<DstT>& gm, const LocalTensor<SrcT>& co1Local, int32_t curRow,
                                 int32_t curCol, int32_t baseHeight, int32_t baseWidth, int32_t baseBlockHeight,
-                                int32_t baseBlockWidth, const ScheduleContext &context = 0)
+                                int32_t baseBlockWidth, const ScheduleContext& context = 0)
     {
         if constexpr (ToMatmulConfig(MM_CFG).intraBlockPartSum) {
             if (!MATMUL_MODULE(MatmulSubBlockInfo)->GetFakeMsg()) {
@@ -52,9 +52,9 @@ public:
     }
 
     template <bool enSequentialWrite = false, typename ScheduleContext = int>
-    __aicore__ inline void Copy(const LocalTensor<DstT> &co2Local, const LocalTensor<SrcT> &co1Local, int32_t curRow,
+    __aicore__ inline void Copy(const LocalTensor<DstT>& co2Local, const LocalTensor<SrcT>& co1Local, int32_t curRow,
                                 int32_t curCol, int32_t baseHeight, int32_t baseWidth, int32_t baseBlockHeight,
-                                int32_t baseBlockWidth, const ScheduleContext &context = 0)
+                                int32_t baseBlockWidth, const ScheduleContext& context = 0)
     {
         if constexpr (FIXPIPE_MODE == McgShfMode::DUAL_DST_SPLIT_M) {
             baseHeight = (baseHeight + 1) / 2 * 2; // 指令要求m必须是偶数，向上对齐到2的倍数
@@ -65,7 +65,7 @@ public:
 
 private:
     template <bool enSequentialWrite, class T, bool IS_INTRA_BLOCK = false>
-    __aicore__ inline void CopyOutImpl(const T &dst, const LocalTensor<SrcT> &co1Local, int32_t curRow, int32_t curCol,
+    __aicore__ inline void CopyOutImpl(const T& dst, const LocalTensor<SrcT>& co1Local, int32_t curRow, int32_t curCol,
                                        int32_t baseHeight, int32_t baseWidth, int32_t baseBlockHeight,
                                        int32_t baseBlockWidth)
     {
@@ -82,7 +82,7 @@ private:
     }
 
     template <bool enSequentialWrite, class T, bool IS_INTRA_BLOCK = false>
-    __aicore__ inline void CopyOutNZ2ND(const T &dst, const LocalTensor<SrcT> &co1Local, int32_t curRow, int32_t curCol,
+    __aicore__ inline void CopyOutNZ2ND(const T& dst, const LocalTensor<SrcT>& co1Local, int32_t curRow, int32_t curCol,
                                         int32_t baseHeight, int32_t baseWidth, int32_t baseBlockHeight,
                                         int32_t baseBlockWidth)
     {
@@ -128,7 +128,7 @@ private:
         return dstOffset;
     }
 
-    __aicore__ inline void SetFixpipeParams(FixpipeAdaptor &fixpipe)
+    __aicore__ inline void SetFixpipeParams(FixpipeAdaptor& fixpipe)
     {
         if constexpr (PhyPosIsUB(C_TYPE::pos) &&
                       AscendC::Impl::Detail::MatmulFeatureTrait<MM_CFG>::IsSupportL0CToUB()) {
@@ -142,7 +142,7 @@ private:
     }
 
     template <class T>
-    __aicore__ inline void CopyTensor(const T &dst, const LocalTensor<SrcT> &co1Local, FixpipeAdaptor &fixpipe,
+    __aicore__ inline void CopyTensor(const T& dst, const LocalTensor<SrcT>& co1Local, FixpipeAdaptor& fixpipe,
                                       const int32_t curN = 0, const int32_t baseUseN = 0)
     {
         if (MATMUL_MODULE(MatmulQuantProcessor)->IsQuantSenario()) {

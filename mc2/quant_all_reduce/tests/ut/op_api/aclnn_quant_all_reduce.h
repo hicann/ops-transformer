@@ -47,10 +47,10 @@ extern "C" {
  * @return aclnnStatus: 返回值，返回状态码
  *
  */
-ACLNN_API aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor *context, const aclTensor *x,
-                                                          const aclTensor *scales, int64_t hcclBufferSize,
-                                                          int64_t worldSize, const char *reduceOp, aclTensor *output,
-                                                          uint64_t *workspaceSize, aclOpExecutor **executor);
+ACLNN_API aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor* context, const aclTensor* x,
+                                                          const aclTensor* scales, int64_t hcclBufferSize,
+                                                          int64_t worldSize, const char* reduceOp, aclTensor* output,
+                                                          uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnQuantAllReduce的第二段接口，用于执行计算。
@@ -60,7 +60,7 @@ ACLNN_API aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor *conte
  * @param [in] stream: 指定执行任务的Stream。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnQuantAllReduce(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnQuantAllReduce(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                           const aclrtStream stream);
 
 #ifdef __cplusplus

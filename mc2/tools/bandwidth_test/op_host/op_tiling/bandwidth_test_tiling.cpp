@@ -77,7 +77,7 @@ const int64_t MIN_WORLD_SIZE = 1;
 constexpr uint64_t TILING_KEY_BASE_A5 = 2ULL; // A5架构base key
 
 // 打印TilingData调试信息
-static void PrintTilingDataInfo(const char *nodeName, BandwidthTestTilingData &tilingData)
+static void PrintTilingDataInfo(const char* nodeName, BandwidthTestTilingData& tilingData)
 {
     OP_LOGD(nodeName, "data_size is %d.", tilingData.dataSize);
     OP_LOGD(nodeName, "world_size is %d.", tilingData.worldSize);
@@ -89,7 +89,7 @@ static void PrintTilingDataInfo(const char *nodeName, BandwidthTestTilingData &t
 }
 
 // 校验属性指针非空
-static ge::graphStatus CheckAttrPointersNotNull(gert::TilingContext *context, const char *nodeName)
+static ge::graphStatus CheckAttrPointersNotNull(gert::TilingContext* context, const char* nodeName)
 {
     auto attrs = context->GetAttrs();
     auto groupPtr = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_GROUP_INDEX));
@@ -107,7 +107,7 @@ static ge::graphStatus CheckAttrPointersNotNull(gert::TilingContext *context, co
 }
 
 // 校验属性值范围合法性
-static ge::graphStatus CheckAttrValuesValid(gert::TilingContext *context, const char *nodeName)
+static ge::graphStatus CheckAttrValuesValid(gert::TilingContext* context, const char* nodeName)
 {
     auto attrs = context->GetAttrs();
     auto groupPtr = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_GROUP_INDEX));
@@ -138,8 +138,8 @@ static ge::graphStatus CheckAttrValuesValid(gert::TilingContext *context, const 
 }
 
 // 获取属性并填充TilingData
-static ge::graphStatus GetAttrAndSetTilingData(gert::TilingContext *context, const char *nodeName,
-                                               BandwidthTestTilingData &tilingData, std::string &group)
+static ge::graphStatus GetAttrAndSetTilingData(gert::TilingContext* context, const char* nodeName,
+                                               BandwidthTestTilingData& tilingData, std::string& group)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return ge::GRAPH_FAILED);
@@ -170,10 +170,10 @@ static ge::graphStatus GetAttrAndSetTilingData(gert::TilingContext *context, con
 
 // 校验输入tensor shape
 // x: [bs, data_size], dst_rank_id: [bs]
-static ge::graphStatus CheckInputTensorShape(gert::TilingContext *context, const char *nodeName,
-                                             BandwidthTestTilingData &tilingData)
+static ge::graphStatus CheckInputTensorShape(gert::TilingContext* context, const char* nodeName,
+                                             BandwidthTestTilingData& tilingData)
 {
-    const gert::StorageShape *xStorageShape = context->GetInputShape(INPUT_X_INDEX);
+    const gert::StorageShape* xStorageShape = context->GetInputShape(INPUT_X_INDEX);
     OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "x"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         xStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
@@ -193,7 +193,7 @@ static ge::graphStatus CheckInputTensorShape(gert::TilingContext *context, const
         return ge::GRAPH_FAILED);
 
     // 单行hidden 32B对齐后的字节数不能超过kernel侧DataCopyParams.blockLen(uint16_t)上限，避免拷贝长度截断
-    const gert::CompileTimeTensorDesc *xDesc = context->GetInputDesc(static_cast<size_t>(INPUT_X_INDEX));
+    const gert::CompileTimeTensorDesc* xDesc = context->GetInputDesc(static_cast<size_t>(INPUT_X_INDEX));
     OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "x"), return ge::GRAPH_FAILED);
     const int64_t xDtypeSize = static_cast<int64_t>(ge::GetSizeByDataType(xDesc->GetDataType()));
     const int64_t hAlignBytes = ((xDim1 * xDtypeSize + UB_ALIGN_BYTES - 1) / UB_ALIGN_BYTES) * UB_ALIGN_BYTES;
@@ -205,7 +205,7 @@ static ge::graphStatus CheckInputTensorShape(gert::TilingContext *context, const
 
     tilingData.dataSize = static_cast<int32_t>(xDim1);
 
-    const gert::StorageShape *dstRankIdStorageShape = context->GetInputShape(INPUT_DST_RANK_ID_INDEX);
+    const gert::StorageShape* dstRankIdStorageShape = context->GetInputShape(INPUT_DST_RANK_ID_INDEX);
     OP_TILING_CHECK(dstRankIdStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "dst_rank_id"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(dstRankIdStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
@@ -226,14 +226,14 @@ static ge::graphStatus CheckInputTensorShape(gert::TilingContext *context, const
 
 // 校验输出tensor shape
 // y: [maxBs * worldSize, dataSize], receive_cnt: [worldSize]
-static ge::graphStatus CheckOutputTensorShape(gert::TilingContext *context, const char *nodeName,
-                                              BandwidthTestTilingData &tilingData)
+static ge::graphStatus CheckOutputTensorShape(gert::TilingContext* context, const char* nodeName,
+                                              BandwidthTestTilingData& tilingData)
 {
     int64_t worldSize = static_cast<int64_t>(tilingData.worldSize);
     int64_t maxBs = static_cast<int64_t>(tilingData.maxBs);
     int64_t dataSize = static_cast<int64_t>(tilingData.dataSize);
 
-    const gert::StorageShape *yStorageShape = context->GetOutputShape(OUTPUT_Y_INDEX);
+    const gert::StorageShape* yStorageShape = context->GetOutputShape(OUTPUT_Y_INDEX);
     OP_TILING_CHECK(yStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "y"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         yStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
@@ -254,7 +254,7 @@ static ge::graphStatus CheckOutputTensorShape(gert::TilingContext *context, cons
                                               ("=" + std::to_string(dataSize)).c_str()),
                     return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *receiveCntStorageShape = context->GetOutputShape(OUTPUT_RECEIVE_CNT_INDEX);
+    const gert::StorageShape* receiveCntStorageShape = context->GetOutputShape(OUTPUT_RECEIVE_CNT_INDEX);
     OP_TILING_CHECK(receiveCntStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "receive_cnt"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(receiveCntStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
@@ -273,8 +273,8 @@ static ge::graphStatus CheckOutputTensorShape(gert::TilingContext *context, cons
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckTensorShape(gert::TilingContext *context, const char *nodeName,
-                                        BandwidthTestTilingData &tilingData)
+static ge::graphStatus CheckTensorShape(gert::TilingContext* context, const char* nodeName,
+                                        BandwidthTestTilingData& tilingData)
 {
     OP_TILING_CHECK(CheckInputTensorShape(context, nodeName, tilingData) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "Check input tensor shape failed."), return ge::GRAPH_FAILED);
@@ -294,10 +294,10 @@ static uint64_t CalTilingKey()
 }
 
 // 设置Workspace大小
-static ge::graphStatus SetWorkSpace(gert::TilingContext *context, BandwidthTestTilingData *tilingData,
-                                    const char *nodeName)
+static ge::graphStatus SetWorkSpace(gert::TilingContext* context, BandwidthTestTilingData* tilingData,
+                                    const char* nodeName)
 {
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
@@ -309,8 +309,8 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, BandwidthTestT
 
 // 检查HCCL窗口大小是否满足通信需求
 // 需要的空间: world_size * max_bs * data_size * 2 * 2 (双缓冲 + 预留)
-static ge::graphStatus CheckWinSize(const gert::TilingContext *context, BandwidthTestTilingData *tilingData,
-                                    const char *nodeName)
+static ge::graphStatus CheckWinSize(const gert::TilingContext* context, BandwidthTestTilingData* tilingData,
+                                    const char* nodeName)
 {
     uint64_t hcclBufferSize = 0;
     uint64_t maxWindowSize = 0;
@@ -339,10 +339,10 @@ static ge::graphStatus CheckWinSize(const gert::TilingContext *context, Bandwidt
 }
 
 // Tiling校验主函数
-static ge::graphStatus BandwidthTestTilingCheckAttr(gert::TilingContext *context)
+static ge::graphStatus BandwidthTestTilingCheckAttr(gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
-    BandwidthTestTilingData *tilingData = context->GetTilingData<BandwidthTestTilingData>();
+    const char* nodeName = context->GetNodeName();
+    BandwidthTestTilingData* tilingData = context->GetTilingData<BandwidthTestTilingData>();
     std::string group = "";
 
     OP_TILING_CHECK(GetAttrAndSetTilingData(context, nodeName, *tilingData, group) != ge::GRAPH_SUCCESS,
@@ -362,13 +362,13 @@ static ge::graphStatus BandwidthTestTilingCheckAttr(gert::TilingContext *context
 
 // Tiling主入口函数
 // 执行流程: 参数校验 -> 窗口检查 -> 设置通信配置 -> 填充TilingData
-static ge::graphStatus BandwidthTestTilingFuncImpl(gert::TilingContext *context)
+static ge::graphStatus BandwidthTestTilingFuncImpl(gert::TilingContext* context)
 {
     uint32_t batchMode = 1U;
     context->SetScheduleMode(batchMode);
 
-    const char *nodeName = context->GetNodeName();
-    BandwidthTestTilingData *tilingData = context->GetTilingData<BandwidthTestTilingData>();
+    const char* nodeName = context->GetNodeName();
+    BandwidthTestTilingData* tilingData = context->GetTilingData<BandwidthTestTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE(nodeName, "tilingData is nullptr."), return ge::GRAPH_FAILED);
     OP_LOGI(nodeName, "Enter BandwidthTest tiling check func.");
 
@@ -407,7 +407,7 @@ static ge::graphStatus BandwidthTestTilingFuncImpl(gert::TilingContext *context)
 
 struct BandwidthTestCompileInfo {};
 
-static ge::graphStatus TilingParseForBandwidthTest(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForBandwidthTest(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

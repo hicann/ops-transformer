@@ -48,7 +48,7 @@ mc2tiling::TilingArgs MakeFormulaicArgs(uint64_t m, uint64_t k, uint64_t n, uint
     return args;
 }
 
-CutResult RunFormulaicTiling(const mc2tiling::TilingArgs &args, uint32_t rankDim, NpuArch npuArch = Ops::Base::DAV_2201,
+CutResult RunFormulaicTiling(const mc2tiling::TilingArgs& args, uint32_t rankDim, NpuArch npuArch = Ops::Base::DAV_2201,
                              SocVersion_2201 soc = SocVersion_2201::SOC910_B)
 {
     AllGatherPlusMMV2 tileFormulate(args, rankDim, KernelType::ALL_GATHER, npuArch, soc);

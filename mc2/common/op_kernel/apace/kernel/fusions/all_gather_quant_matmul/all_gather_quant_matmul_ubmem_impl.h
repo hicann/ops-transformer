@@ -107,7 +107,7 @@ public:
     __aicore__ inline AllGatherQuantMatmulUbmemImpl() {}
     __aicore__ inline ~AllGatherQuantMatmulUbmemImpl() {}
 
-    __aicore__ inline void operator()(Params &params)
+    __aicore__ inline void operator()(Params& params)
     {
         if ASCEND_IS_AIV {
             AllGatherProcess(params);
@@ -117,10 +117,10 @@ public:
     }
 
 private:
-    __aicore__ inline void AllGatherProcess(const Params &params);
-    __aicore__ inline void MatmulProcess(Params &params);
+    __aicore__ inline void AllGatherProcess(const Params& params);
+    __aicore__ inline void MatmulProcess(Params& params);
 
-    __aicore__ inline void AllGatherInit(const Params &params);
+    __aicore__ inline void AllGatherInit(const Params& params);
     __aicore__ inline void CopyLocalData();
     __aicore__ inline void ExecuteAllGather();
     __aicore__ inline void WriteStatusToWin();
@@ -137,8 +137,8 @@ private:
     }
 
 private:
-    __gm__ Apace::HcclOpParam *hcclContext_{nullptr};
-    __gm__ QuantMatmulTilingData *tilingData_{nullptr};
+    __gm__ Apace::HcclOpParam* hcclContext_{nullptr};
+    __gm__ QuantMatmulTilingData* tilingData_{nullptr};
 
     uint32_t aivId_{0};
     uint32_t aicId_{0};
@@ -183,7 +183,7 @@ private:
 
 template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
 __aicore__ inline void AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue,
-                                                     BlockScheduler>::AllGatherProcess(const Params &params)
+                                                     BlockScheduler>::AllGatherProcess(const Params& params)
 {
     AllGatherInit(params);
     CopyLocalData();
@@ -195,10 +195,10 @@ __aicore__ inline void AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, Bl
 
 template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
 __aicore__ inline void AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue,
-                                                     BlockScheduler>::AllGatherInit(const Params &params)
+                                                     BlockScheduler>::AllGatherInit(const Params& params)
 {
-    hcclContext_ = (__gm__ Apace::HcclOpParam *)params.hcclContext;
-    tilingData_ = (__gm__ QuantMatmulTilingData *)params.tilingGM;
+    hcclContext_ = (__gm__ Apace::HcclOpParam*)params.hcclContext;
+    tilingData_ = (__gm__ QuantMatmulTilingData*)params.tilingGM;
 
     rankSize_ = Apace::GetRankDim(hcclContext_);
     curRankId_ = Apace::GetRankId(hcclContext_);
@@ -278,11 +278,11 @@ __aicore__ inline void AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, Bl
 
 template <class ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
 __aicore__ inline void
-AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::MatmulProcess(Params &params)
+AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::MatmulProcess(Params& params)
 {
-    __gm__ QuantMatmulTilingData *tilingData = (__gm__ QuantMatmulTilingData *)params.tilingGM;
+    __gm__ QuantMatmulTilingData* tilingData = (__gm__ QuantMatmulTilingData*)params.tilingGM;
 
-    auto *hcclCtx = (__gm__ Apace::HcclOpParam *)params.hcclContext;
+    auto* hcclCtx = (__gm__ Apace::HcclOpParam*)params.hcclContext;
     uint32_t curRankId = Apace::GetRankId(hcclCtx);
     uint32_t rankSize = Apace::GetRankDim(hcclCtx);
 
@@ -326,7 +326,7 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
 
             auto scaleSrcLayout = MakeLayoutScaleGM{}(1, curChunkSize);
             auto scaleSrcTensor = asc::te::make_tensor(
-                asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ ScalesType *)(inputXScaleAddr_ + chunkOffset)),
+                asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ ScalesType*)(inputXScaleAddr_ + chunkOffset)),
                 scaleSrcLayout);
 
             auto scaleUbLayout = MakeLayoutScaleUB{}(1, curChunkPaddedN);
@@ -341,7 +341,7 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
             auto scaleDstLayout = MakeLayoutScaleGM{}(1, curChunkSize);
             auto scaleDstTensor =
                 asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
-                                         (__gm__ ScalesType *)(localWinGm + winScaleBase + chunkOffset)),
+                                         (__gm__ ScalesType*)(localWinGm + winScaleBase + chunkOffset)),
                                      scaleDstLayout);
             asc::te::copy(copyUB2GM_, scaleDstTensor, scaleUbTensor);
             AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
@@ -386,11 +386,11 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
 
         auto xSrcLayout = MakeLayoutGM{}(1, chunkElems);
         auto xSrcTensor = asc::te::make_tensor(
-            asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(inputXAddr_ + globalOffset)), xSrcLayout);
+            asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t*)(inputXAddr_ + globalOffset)), xSrcLayout);
 
         auto xDstLayout = MakeLayoutGM{}(1, chunkElems);
         auto xDstTensor = asc::te::make_tensor(
-            asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(localWinGm + selfDataOffset + globalOffset)),
+            asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t*)(localWinGm + selfDataOffset + globalOffset)),
             xDstLayout);
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(evtId);
@@ -432,7 +432,7 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
 
                 auto scaleSrcLayout = MakeLayoutScaleGM{}(1, curChunkSize);
                 auto scaleSrcTensor = asc::te::make_tensor(
-                    asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ ScalesType *)(remoteScaleAddr + chunkOffset)),
+                    asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ ScalesType*)(remoteScaleAddr + chunkOffset)),
                     scaleSrcLayout);
 
                 auto scaleUbLayout = MakeLayoutScaleUB{}(1, curChunkPaddedN);
@@ -446,12 +446,12 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
 
                 auto localScaleLayout = MakeLayoutScaleGM{}(1, curChunkSize);
                 auto localScaleTensor = asc::te::make_tensor(
-                    asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ ScalesType *)(localScaleAddr + chunkOffset)),
+                    asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ ScalesType*)(localScaleAddr + chunkOffset)),
                     localScaleLayout);
                 auto allGatherScaleLayout = MakeLayoutScaleGM{}(1, curChunkSize);
                 auto allGatherScaleTensor =
                     asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
-                                             (__gm__ ScalesType *)(allGatherScaleAddr + chunkOffset)),
+                                             (__gm__ ScalesType*)(allGatherScaleAddr + chunkOffset)),
                                          allGatherScaleLayout);
 
                 asc::te::copy(copyUB2GM_, localScaleTensor, scaleUbTensor);
@@ -508,7 +508,7 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
     GM_ADDR dstAddr = WinStatusAddr(remoteRankId_) + curOffset * sizeof(float);
     auto dstLayout = MakeLayoutStatusGM{}(1, FLOAT_UB_ALIGN_NUM);
     auto dstTensor =
-        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ float *)(dstAddr)), dstLayout);
+        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ float*)(dstAddr)), dstLayout);
     asc::te::copy(copyUB2GM_, dstTensor, statusUbTensor);
 
     AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(EVT_ID);
@@ -523,8 +523,8 @@ AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSched
     GM_ADDR statusAddr = WinStatusAddr(curRankId_) + offset * sizeof(float);
 
     auto statusGmLayout = MakeLayoutStatusGM{}(1, FLOAT_UB_ALIGN_NUM);
-    auto statusGmTensor = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ float *)(statusAddr)), statusGmLayout);
+    auto statusGmTensor =
+        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ float*)(statusAddr)), statusGmLayout);
 
     auto statusUbLayout = MakeLayoutStatusUB{}(1, FLOAT_UB_ALIGN_NUM);
     auto statusUbTensor =
@@ -576,12 +576,12 @@ __aicore__ inline void AllGatherQuantMatmulUbmemImpl<ProblemShape, BlockMmad, Bl
         rowsPerSlot = 1;
     }
 
-    auto srcTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(remoteXAddr)),
+    auto srcTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t*)(remoteXAddr)),
                                           MakeLayoutGM{}(M_, K_));
-    auto localTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(localXAddr)),
+    auto localTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t*)(localXAddr)),
                                             MakeLayoutGM{}(M_, K_));
-    auto agTensor = asc::te::make_tensor(
-        asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t *)(allGatherXAddr)), MakeLayoutGM{}(M_, K_));
+    auto agTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ int8_t*)(allGatherXAddr)),
+                                         MakeLayoutGM{}(M_, K_));
 
     for (uint32_t rowDone = 0; rowDone < mCnt; rowDone += rowsPerSlot) {
         uint32_t curRows = (rowDone + rowsPerSlot > mCnt) ? (mCnt - rowDone) : rowsPerSlot;

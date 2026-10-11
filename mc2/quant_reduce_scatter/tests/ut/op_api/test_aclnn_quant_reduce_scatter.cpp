@@ -411,7 +411,7 @@ static QuantReduceScatterAclnnTestParam g_casesParams[] = {
      ACL_FLOAT8_E5M2,
      ACLNN_ERR_PARAM_INVALID}};
 
-static void TestOneParamCase(const QuantReduceScatterAclnnTestParam &param)
+static void TestOneParamCase(const QuantReduceScatterAclnnTestParam& param)
 {
     std::cout << "run case " << param.case_name << std::endl;
     vector<int64_t> xShape = param.xShape;
@@ -427,11 +427,11 @@ static void TestOneParamCase(const QuantReduceScatterAclnnTestParam &param)
     TensorDesc output = TensorDesc(outputShape, outputDtype, ACL_FORMAT_ND);
     int64_t hcclBufferSize = 2097152;
     int64_t worldSize = 2;
-    const char *reduceOp = "sum";
+    const char* reduceOp = "sum";
     auto ut = OP_API_UT(aclnnQuantReduceScatter, INPUT(context, x, scales, hcclBufferSize, worldSize, reduceOp),
                         OUTPUT(output));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     if (retStatus == ACLNN_SUCCESS) {
         EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);

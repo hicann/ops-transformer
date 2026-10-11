@@ -31,7 +31,7 @@ struct AddRmsNormTilingInputFromMM {
     ge::DataType x1Dtype;
 };
 struct AddRMSNormTilingDepend {
-    AddRMSNormTilingDepend(const char *name, fe::PlatFormInfos &infos, ARNCtxInfo info, AddRmsNormTilingInputFromMM mm,
+    AddRMSNormTilingDepend(const char* name, fe::PlatFormInfos& infos, ARNCtxInfo info, AddRmsNormTilingInputFromMM mm,
                            bool b, bool half)
         : nodeName(name),
           platFormInfos(infos),
@@ -39,8 +39,8 @@ struct AddRMSNormTilingDepend {
           addRmsNormTilingInputFromMm(mm),
           useMmOutputAsX1Input(b),
           useHalfNumBlocks(half) {};
-    const char *nodeName;
-    fe::PlatFormInfos &platFormInfos;
+    const char* nodeName;
+    fe::PlatFormInfos& platFormInfos;
     ARNCtxInfo arnCtxInfo;
     AddRmsNormTilingInputFromMM addRmsNormTilingInputFromMm{};
     bool useMmOutputAsX1Input{false};
@@ -54,8 +54,8 @@ struct TilingOut {
     uint32_t numBlocks;
 };
 struct AddRMSNormTilingOutput {
-    Mc2Tiling::AddRMSNormTilingData &addRmsNormTilingData;
-    TilingOut &tilingOut;
+    Mc2Tiling::AddRMSNormTilingData& addRmsNormTilingData;
+    TilingOut& tilingOut;
 };
 
 namespace CommonAddResNormTiling {
@@ -66,12 +66,12 @@ enum ModeKey : uint32_t {
     K_SINGLE_N,
     K_MULTI_N,
 };
-ge::graphStatus Tiling4AddRmsNorm(const AddRMSNormTilingDepend &addRmsNormTilingDepend,
-                                  AddRMSNormTilingOutput &addRmsNormTilingOutput);
-ge::graphStatus CheckAddRmsNormInput(const gert::TilingContext *context, const ARNCtxInfo &arnCtxInfo);
-ge::graphStatus SetAddRmsNormTilingData(const AddRMSNormTilingDepend &addRmsNormTilingDepend, const uint32_t numRow,
+ge::graphStatus Tiling4AddRmsNorm(const AddRMSNormTilingDepend& addRmsNormTilingDepend,
+                                  AddRMSNormTilingOutput& addRmsNormTilingOutput);
+ge::graphStatus CheckAddRmsNormInput(const gert::TilingContext* context, const ARNCtxInfo& arnCtxInfo);
+ge::graphStatus SetAddRmsNormTilingData(const AddRMSNormTilingDepend& addRmsNormTilingDepend, const uint32_t numRow,
                                         const int64_t numCol, const uint32_t blockFactor,
-                                        AddRMSNormTilingOutput &addRmsNormTilingOutput);
+                                        AddRMSNormTilingOutput& addRmsNormTilingOutput);
 } // namespace CommonAddResNormTiling
 } // namespace optiling
 #endif // COMMON_ADD_RMS_NORM_H_

@@ -18,9 +18,9 @@
 #include "mc2_common_log.h"
 
 namespace fallback {
-static const char *fallbackInfo = "BmmReduceScatterAlltoAllFallback";
+static const char* fallbackInfo = "BmmReduceScatterAlltoAllFallback";
 
-static ge::graphStatus BmmReduceScatterAlltoAllExecuteFunc(gert::OpExecuteContext *host_api_ctx)
+static ge::graphStatus BmmReduceScatterAlltoAllExecuteFunc(gert::OpExecuteContext* host_api_ctx)
 {
     OPS_LOG_D("Start to fallback for all to all allgather bmm.");
     OPS_ERR_IF(host_api_ctx == nullptr, OPS_LOG_E(fallbackInfo, "host_api_ctx is null"), return ge::GRAPH_FAILED);
@@ -39,12 +39,12 @@ static ge::graphStatus BmmReduceScatterAlltoAllExecuteFunc(gert::OpExecuteContex
     const auto attrs = host_api_ctx->GetAttrs();
     OPS_ERR_IF(attrs == nullptr, OPS_LOG_E(fallbackInfo, "attrs is null"), return ge::GRAPH_FAILED);
 
-    const char *groupEp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_EP));
-    const char *groupTp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_TP));
-    const int64_t *epSize = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_EP_WORLD_SIZE));
-    const int64_t *tpSize = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_TP_WORLD_SIZE));
-    const int64_t *yShard = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_Y_SHARD_TYPE));
-    const bool *isTransW = attrs->GetBool(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_IS_TRANS_W));
+    const char* groupEp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_EP));
+    const char* groupTp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_TP));
+    const int64_t* epSize = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_EP_WORLD_SIZE));
+    const int64_t* tpSize = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_TP_WORLD_SIZE));
+    const int64_t* yShard = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_Y_SHARD_TYPE));
+    const bool* isTransW = attrs->GetBool(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_IS_TRANS_W));
 
     auto weightAcl = ConvertMmType(weight, *isTransW); // 手动转换为 aclTensor，并根据转置信息处理 stride
     OPS_ERR_IF(weightAcl == nullptr, OPS_LOG_E(fallbackInfo, "weightAcl is null"), return ge::GRAPH_FAILED);

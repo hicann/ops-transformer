@@ -50,8 +50,8 @@ struct CheckWinSizeData {
     bool isMc2Context;
 };
 
-inline uint64_t CalcMinWinSize(const CheckWinSizeData &winSizeData, uint64_t &tokenNeedSizeDispatch,
-                               uint64_t &tokenNeedSizeCombine, uint64_t combineDataAlign = WIN_ADDR_ALIGN)
+inline uint64_t CalcMinWinSize(const CheckWinSizeData& winSizeData, uint64_t& tokenNeedSizeDispatch,
+                               uint64_t& tokenNeedSizeCombine, uint64_t combineDataAlign = WIN_ADDR_ALIGN)
 {
     const uint64_t h = winSizeData.h;
     const uint64_t k = winSizeData.k;
@@ -73,8 +73,8 @@ inline uint64_t CalcMinWinSize(const CheckWinSizeData &winSizeData, uint64_t &to
                    DOUBLE_DATA_BUFFER;
 }
 
-inline ge::graphStatus CheckLayeredWinSizeParams(const gert::TilingContext *context, const char *nodeName,
-                                                 const CheckWinSizeData &winSizeData)
+inline ge::graphStatus CheckLayeredWinSizeParams(const gert::TilingContext* context, const char* nodeName,
+                                                 const CheckWinSizeData& winSizeData)
 {
     if (winSizeData.isLayered) {
         const std::string socVersion = mc2tiling::GetSocVersion(context);
@@ -94,8 +94,8 @@ inline ge::graphStatus CheckLayeredWinSizeParams(const gert::TilingContext *cont
     return ge::GRAPH_SUCCESS;
 }
 
-inline ge::graphStatus CalcMinWinSizeA3(const gert::TilingContext *context, const char *nodeName,
-                                        CheckWinSizeData &winSizeData)
+inline ge::graphStatus CalcMinWinSizeA3(const gert::TilingContext* context, const char* nodeName,
+                                        CheckWinSizeData& winSizeData)
 {
     OP_TILING_CHECK(CheckLayeredWinSizeParams(context, nodeName, winSizeData) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "Invalid hierarchy window parameters."), return ge::GRAPH_FAILED);
@@ -106,8 +106,8 @@ inline ge::graphStatus CalcMinWinSizeA3(const gert::TilingContext *context, cons
     return ge::GRAPH_SUCCESS;
 }
 
-inline ge::graphStatus CheckActualWinSize(const gert::TilingContext *context, const char *nodeName,
-                                          const CheckWinSizeData &winSizeData, const uint64_t maxWindowSizeEp,
+inline ge::graphStatus CheckActualWinSize(const gert::TilingContext* context, const char* nodeName,
+                                          const CheckWinSizeData& winSizeData, const uint64_t maxWindowSizeEp,
                                           const uint64_t hcclBufferSizeEp)
 {
     uint64_t h = winSizeData.h;
@@ -172,8 +172,8 @@ inline ge::graphStatus CheckActualWinSize(const gert::TilingContext *context, co
     return ge::GRAPH_SUCCESS;
 }
 
-inline ge::graphStatus CheckWinSize(const gert::TilingContext *context, const char *nodeName,
-                                    CheckWinSizeData &winSizeData)
+inline ge::graphStatus CheckWinSize(const gert::TilingContext* context, const char* nodeName,
+                                    CheckWinSizeData& winSizeData)
 {
     auto attrs = context->GetAttrs();
     uint64_t hcclBufferSizeEp = 0;

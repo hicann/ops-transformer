@@ -34,7 +34,7 @@ protected:
 TEST_P(InferDataTypeInplaceMatmulAllReduceAddRmsNormTest, param)
 {
     auto param = GetParam();
-    std::vector<void *> inputDataTypes;
+    std::vector<void*> inputDataTypes;
     if (param.inputInstance.size() < 8) {
         return;
     }

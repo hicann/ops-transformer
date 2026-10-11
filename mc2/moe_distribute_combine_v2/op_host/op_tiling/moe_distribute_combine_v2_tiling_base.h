@@ -22,11 +22,11 @@
 namespace optiling {
 class MoeDistributeCombineV2TilingFuncBase {
 public:
-    ge::graphStatus MoeDistributeCombineA3TilingFuncImpl(gert::TilingContext *context, const CombineV2Config &config);
-    ge::graphStatus MoeDistributeCombineV2TilingFuncNew(gert::TilingContext *context, const CombineV2Config &config);
-    ge::graphStatus MoeDistributeCombineV2TilingFunc(gert::TilingContext *context);
-    virtual ge::graphStatus MoeDistributeCombineTilingFuncImpl(gert::TilingContext *context,
-                                                               const CombineV2Config &config) = 0;
+    ge::graphStatus MoeDistributeCombineA3TilingFuncImpl(gert::TilingContext* context, const CombineV2Config& config);
+    ge::graphStatus MoeDistributeCombineV2TilingFuncNew(gert::TilingContext* context, const CombineV2Config& config);
+    ge::graphStatus MoeDistributeCombineV2TilingFunc(gert::TilingContext* context);
+    virtual ge::graphStatus MoeDistributeCombineTilingFuncImpl(gert::TilingContext* context,
+                                                               const CombineV2Config& config) = 0;
     virtual uint64_t CalTilingKey(uint32_t commQuantMode, bool isLayered);
 };
 } // namespace optiling

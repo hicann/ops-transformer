@@ -72,10 +72,10 @@ extern "C" {
  * 不支持跨超节点，只支持超节点内。
  */
 ACLNN_API aclnnStatus aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *weight, const aclTensor *biasOptional, const char *groupEp,
-    const char *groupTp, int64_t epWorldSize, int64_t tpWorldSize, int64_t xShardType, int64_t actType,
-    aclTensor *y1Out, aclTensor *y2OutOptional, aclTensor *y3OutOptional, uint64_t *workspaceSize,
-    aclOpExecutor **executor);
+    const aclTensor* x, const aclTensor* weight, const aclTensor* biasOptional, const char* groupEp,
+    const char* groupTp, int64_t epWorldSize, int64_t tpWorldSize, int64_t xShardType, int64_t actType,
+    aclTensor* y1Out, aclTensor* y2OutOptional, aclTensor* y3OutOptional, uint64_t* workspaceSize,
+    aclOpExecutor** executor);
 
 /**
  * @brief aclnnAlltoAllAllGatherBatchMatMul的第二段接口，用于执行计算。
@@ -86,8 +86,8 @@ ACLNN_API aclnnStatus aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(void *workspace, uint64_t workspaceSize,
-                                                        aclOpExecutor *executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(void* workspace, uint64_t workspaceSize,
+                                                        aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

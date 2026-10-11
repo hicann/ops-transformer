@@ -18,7 +18,7 @@
 
 namespace fallback {
 
-const char *QuantAllReduceInfo = "QuantAllReduceFallback";
+const char* QuantAllReduceInfo = "QuantAllReduceFallback";
 
 // input
 constexpr uint32_t CONTEXT_IDX = 0;
@@ -31,7 +31,7 @@ constexpr uint32_t HCCL_BUFFER_SIZE_IDX = 0;
 constexpr uint32_t REDUCE_OP_IDX = 1;
 constexpr uint32_t WORLD_SIZE_IDX = 3;
 
-static ge::graphStatus QuantAllReduceExecuteFunc(gert::OpExecuteContext *host_api_ctx)
+static ge::graphStatus QuantAllReduceExecuteFunc(gert::OpExecuteContext* host_api_ctx)
 {
     OPS_LOG_D(QuantAllReduceInfo, "Start to fallback for quant_all_reduce.");
     OPS_ERR_IF(host_api_ctx == nullptr, OPS_LOG_E(QuantAllReduceInfo, "host_api_ctx is null"), return ge::GRAPH_FAILED);
@@ -47,12 +47,12 @@ static ge::graphStatus QuantAllReduceExecuteFunc(gert::OpExecuteContext *host_ap
     // 校验attrs
     const auto attrs = host_api_ctx->GetAttrs();
     OPS_ERR_IF(attrs == nullptr, OPS_LOG_E(QuantAllReduceInfo, "attrs is null"), return ge::GRAPH_FAILED);
-    const int64_t *hccl_buffer_size = attrs->GetInt(static_cast<size_t>(HCCL_BUFFER_SIZE_IDX));
+    const int64_t* hccl_buffer_size = attrs->GetInt(static_cast<size_t>(HCCL_BUFFER_SIZE_IDX));
     OPS_ERR_IF(hccl_buffer_size == nullptr, OPS_LOG_E(QuantAllReduceInfo, "hccl_buffer_size is null"),
                return ge::GRAPH_FAILED);
-    const char *reduce_op = attrs->GetStr(static_cast<size_t>(REDUCE_OP_IDX));
+    const char* reduce_op = attrs->GetStr(static_cast<size_t>(REDUCE_OP_IDX));
     OPS_ERR_IF(reduce_op == nullptr, OPS_LOG_E(QuantAllReduceInfo, "reduce_op is null"), return ge::GRAPH_FAILED);
-    const int64_t *world_size = attrs->GetInt(static_cast<size_t>(WORLD_SIZE_IDX));
+    const int64_t* world_size = attrs->GetInt(static_cast<size_t>(WORLD_SIZE_IDX));
     OPS_ERR_IF(world_size == nullptr, OPS_LOG_E(QuantAllReduceInfo, "world_size is null"), return ge::GRAPH_FAILED);
 
     // 校验output

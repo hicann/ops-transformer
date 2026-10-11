@@ -23,7 +23,7 @@ namespace Mc2batch_matmul_v3_advanced {
 using namespace mc2_matmul_v3_advanced;
 class Mc2BatchMatMulV3AswBasicTiling : public Mc2MatMulV3BaseTiling {
 public:
-    Mc2BatchMatMulV3AswBasicTiling(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg)
+    Mc2BatchMatMulV3AswBasicTiling(gert::TilingContext* context, Mc2MatMulTilingCfg& cfg)
         : Mc2MatMulV3BaseTiling(context, cfg) {};
 
     ~Mc2BatchMatMulV3AswBasicTiling() override {};

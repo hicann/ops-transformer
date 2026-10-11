@@ -55,7 +55,7 @@ TEST_F(L2InplaceMatmulAllReduceAddRmsNormTest, TestInplaceMmAllReduceAddRmsNormF
                         INPUT(x1Desc, x2Desc, bias, residualDesc, gammaDesc, 0.000001, "test_group", "sum", 8, 1),
                         OUTPUT(normOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -74,7 +74,7 @@ TEST_F(L2InplaceMatmulAllReduceAddRmsNormTest, TestInplaceMmAllReduceAddRmsNormW
                         INPUT(x1Desc, x2Desc, bias, residualDesc, gammaDesc, 0.000001, "test_group", "sum", 8, 0),
                         OUTPUT(normOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -94,7 +94,7 @@ TEST_F(L2InplaceMatmulAllReduceAddRmsNormTest, TestInplaceQuantMmAllReduceAddRms
         INPUT(x1Desc, x2Desc, biasDesc, dequantScaleDesc, residualDesc, gammaDesc, 0.000001, "test_group", "sum", 8, 1),
         OUTPUT(normOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -114,7 +114,7 @@ TEST_F(L2InplaceMatmulAllReduceAddRmsNormTest, TestInplaceQuantMmAllReduceAddRms
         INPUT(x1Desc, x2Desc, biasDesc, dequantScaleDesc, residualDesc, gammaDesc, 0.000001, "test_group", "sum", 8, 0),
         OUTPUT(normOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -135,7 +135,7 @@ TEST_F(L2InplaceMatmulAllReduceAddRmsNormTest, TestInplaceWeightQuantMmAllReduce
                               gammaDesc, 0.000001, "test_group", "sum", 8, 1, 0),
                         OUTPUT(normOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -156,7 +156,7 @@ TEST_F(L2InplaceMatmulAllReduceAddRmsNormTest, TestInplaceWeightQuantMmAllReduce
                               gammaDesc, 0.000001, "test_group", "sum", 8, 0, 0),
                         OUTPUT(normOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }

@@ -69,8 +69,8 @@ namespace SortLib {
  *            pipe.Reset();   // 调用后释放本接口占用的 UB，保证后续接口可用
  */
 template <typename ValT, typename IdxT, typename CountT, bool isDescending, typename HookT = NoOpHook>
-__aicore__ inline void SortInvoke(AscendC::TPipe *pipe, __gm__ ValT *x, __gm__ ValT *sortedValues,
-                                  __gm__ IdxT *sortedIndices, __gm__ char *workspace, const SortParams &p,
+__aicore__ inline void SortInvoke(AscendC::TPipe* pipe, __gm__ ValT* x, __gm__ ValT* sortedValues,
+                                  __gm__ IdxT* sortedIndices, __gm__ char* workspace, const SortParams& p,
                                   HookT hook = HookT())
 {
     if (p.totalElements == 0) {

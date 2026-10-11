@@ -21,14 +21,14 @@ using namespace AscendC;
 using namespace ge;
 namespace optiling {
 
-ge::graphStatus MoeDistributeDispatchTilingA5::MoeDistributeDispatchTilingFunc(gert::TilingContext *context)
+ge::graphStatus MoeDistributeDispatchTilingA5::MoeDistributeDispatchTilingFunc(gert::TilingContext* context)
 {
     ge::graphStatus ret = MoeDistributeDispatchA3A5TilingFuncImpl(context);
     return ret;
 }
 
-ge::graphStatus MoeDistributeDispatchTilingA5::CheckEpWorldSizeAttrs(const char *nodeName,
-                                                                     MoeDistributeDispatchTilingData &tilingData)
+ge::graphStatus MoeDistributeDispatchTilingA5::CheckEpWorldSizeAttrs(const char* nodeName,
+                                                                     MoeDistributeDispatchTilingData& tilingData)
 {
     uint32_t epWorldSize = tilingData.moeDistributeDispatchInfo.epWorldSize;
 

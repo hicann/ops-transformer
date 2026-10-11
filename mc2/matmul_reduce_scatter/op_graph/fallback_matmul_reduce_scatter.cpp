@@ -18,9 +18,9 @@
 #include "mc2_common_log.h"
 
 namespace fallback {
-const char *reduceScatterInfo = "MmReduceScatterFallback";
+const char* reduceScatterInfo = "MmReduceScatterFallback";
 
-static ge::graphStatus MatmulReduceScatterExecuteFunc(gert::OpExecuteContext *host_api_ctx)
+static ge::graphStatus MatmulReduceScatterExecuteFunc(gert::OpExecuteContext* host_api_ctx)
 {
     OPS_LOG_D(reduceScatterInfo, "Start to fallback for matmul reducescatter.");
     OPS_CHECK(host_api_ctx == nullptr, OPS_LOG_E(reduceScatterInfo, "host_api_ctx is null"), return ge::GRAPH_FAILED);
@@ -39,23 +39,23 @@ static ge::graphStatus MatmulReduceScatterExecuteFunc(gert::OpExecuteContext *ho
     const auto attrs = host_api_ctx->GetAttrs();
     OPS_CHECK(attrs == nullptr, OPS_LOG_E(reduceScatterInfo, "attrs is null"), return ge::GRAPH_FAILED);
 
-    const char *group = attrs->GetStr(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_GROUP));
+    const char* group = attrs->GetStr(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_GROUP));
     OPS_CHECK(group == nullptr, OPS_LOG_E(reduceScatterInfo, "group is null"), return ge::GRAPH_FAILED);
 
-    const char *op = attrs->GetStr(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_OP));
+    const char* op = attrs->GetStr(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_OP));
     OPS_CHECK(op == nullptr, OPS_LOG_E(reduceScatterInfo, "reduceOp is null"), return ge::GRAPH_FAILED);
 
-    const bool *trans_x1_ptr = attrs->GetBool(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_TRANS_X1));
+    const bool* trans_x1_ptr = attrs->GetBool(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_TRANS_X1));
     const bool trans_x1 = (trans_x1_ptr != nullptr ? *trans_x1_ptr : false);
     auto x1_acl = ConvertMmType(x1, trans_x1);
     OPS_CHECK(x1_acl == nullptr, OPS_LOG_E(reduceScatterInfo, "x1_acl is null"), return ge::GRAPH_FAILED);
 
-    const bool *trans_x2_ptr = attrs->GetBool(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_TRANS_X2));
+    const bool* trans_x2_ptr = attrs->GetBool(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_TRANS_X2));
     const bool trans_x2 = (trans_x2_ptr != nullptr ? *trans_x2_ptr : false);
     auto x2_acl = ConvertMmType(x2, trans_x2);
     OPS_CHECK(x2_acl == nullptr, OPS_LOG_E(reduceScatterInfo, "x2_acl is null"), return ge::GRAPH_FAILED);
 
-    const int64_t *comm_turn_ptr = attrs->GetInt(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_COMM_TURN));
+    const int64_t* comm_turn_ptr = attrs->GetInt(static_cast<size_t>(ops::MmReduceScatterAttrIdx::K_COMM_TURN));
     const int64_t comm_turn = (comm_turn_ptr != nullptr ? *comm_turn_ptr : 0);
     const int64_t stream_mode = 1; // STOP_ON_FAILURE
     const auto api_ret =

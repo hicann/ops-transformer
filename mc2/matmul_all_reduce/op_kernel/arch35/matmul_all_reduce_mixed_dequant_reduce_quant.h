@@ -46,7 +46,7 @@ public:
     GlobalTensor<T> quantOutputGM_;
     GlobalTensor<float> scaleInputGM_;
     GlobalTensor<float> scaleOutputGM_;
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::VECIN, 1> inTilesQ_;
     TQue<QuePosition::VECOUT, 1> outTilesQ_;
     TQue<QuePosition::VECIN, 1> inScalesQ_;
@@ -59,7 +59,7 @@ public:
     __aicore__ inline MatmulAllReduceMixedDequantReduceQuant() {}
 
     __aicore__ inline void Init(GM_ADDR inputAddr, GM_ADDR outputAddr, uint32_t tileMPerRank, uint32_t tileN,
-                                uint32_t oneLineScaleCnt, uint32_t coreNum, uint32_t maxProcRows, TPipe *tPipe)
+                                uint32_t oneLineScaleCnt, uint32_t coreNum, uint32_t maxProcRows, TPipe* tPipe)
     {
         if ASCEND_IS_AIC {
             return;
@@ -166,16 +166,16 @@ public:
     __aicore__ inline void InitInputGM(uint64_t rankOffset, uint64_t gmOffset, uint32_t tileN, uint64_t inputBlockSize,
                                        uint64_t scaleBlockSize)
     {
-        dequantInputGM_.SetGlobalBuffer((__gm__ T *)(this->inputAddr_ + gmOffset + rankOffset), inputBlockSize);
-        scaleInputGM_.SetGlobalBuffer((__gm__ float *)(this->inputAddr_ + gmOffset + rankOffset + tileN * sizeof(T)),
+        dequantInputGM_.SetGlobalBuffer((__gm__ T*)(this->inputAddr_ + gmOffset + rankOffset), inputBlockSize);
+        scaleInputGM_.SetGlobalBuffer((__gm__ float*)(this->inputAddr_ + gmOffset + rankOffset + tileN * sizeof(T)),
                                       scaleBlockSize);
     }
 
     __aicore__ inline void InitOutputGM(uint64_t gmOffset, uint32_t tileN, uint64_t outputBlockSize,
                                         uint64_t scaleBlockSize)
     {
-        quantOutputGM_.SetGlobalBuffer((__gm__ T *)(this->outputAddr_ + gmOffset), outputBlockSize);
-        scaleOutputGM_.SetGlobalBuffer((__gm__ float *)(this->outputAddr_ + gmOffset + tileN * sizeof(T)),
+        quantOutputGM_.SetGlobalBuffer((__gm__ T*)(this->outputAddr_ + gmOffset), outputBlockSize);
+        scaleOutputGM_.SetGlobalBuffer((__gm__ float*)(this->outputAddr_ + gmOffset + tileN * sizeof(T)),
                                        scaleBlockSize);
     }
 
@@ -199,11 +199,11 @@ public:
         DataCopyExtParams gToLSCopyParams = {static_cast<uint16_t>(curRows),
                                              static_cast<uint32_t>(curRowScaleCnt * sizeof(float)), gToLSCopyStride, 0,
                                              0};
-        DataCopyPadExtParams<T> padParamsFp8 = {false, 0, 0, *(reinterpret_cast<T *>(uint8_t(0)))};
+        DataCopyPadExtParams<T> padParamsFp8 = {false, 0, 0, *(reinterpret_cast<T*>(uint8_t(0)))};
         LocalTensor<T> curTiles = inTilesQ_.AllocTensor<T>();
         LocalTensor<float> curScales = inScalesQ_.AllocTensor<float>();
         if (curRowDataCnt != (curRowScaleCnt * TILELEN)) {
-            Duplicate(curTiles, *(reinterpret_cast<T *>(uint8_t(0))), padCalCnt);
+            Duplicate(curTiles, *(reinterpret_cast<T*>(uint8_t(0))), padCalCnt);
             SyncFunc<AscendC::HardEvent::V_MTE2>();
         }
         DataCopyPad<T, PaddingMode::Normal>(curTiles, dequantInputGM_[innerIdx * this->procRowTileCnt_ * TILELEN],

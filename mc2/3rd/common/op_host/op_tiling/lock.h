@@ -30,10 +30,10 @@ public:
           _waiting_writers(0)
     {}
     ~RWLock() = default;
-    RWLock(const RWLock &) = delete;
-    RWLock(RWLock &&) = delete;
-    RWLock &operator=(const RWLock &) = delete;
-    RWLock &operator=(RWLock &&) = delete;
+    RWLock(const RWLock&) = delete;
+    RWLock(RWLock&&) = delete;
+    RWLock& operator=(const RWLock&) = delete;
+    RWLock& operator=(RWLock&&) = delete;
 
     void rdlock();
 

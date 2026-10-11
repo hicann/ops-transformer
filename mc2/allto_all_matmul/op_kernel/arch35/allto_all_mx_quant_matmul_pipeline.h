@@ -24,13 +24,13 @@ namespace Mc2Kernel {
 template <typename ComputationContextType>
 struct AlltoAllMXQmmPipelineContext {
     // computation
-    ComputationContextType *computationContext;
+    ComputationContextType* computationContext;
     // transpose
-    MC2KernelTemplate::MC2TransposeContext *transposeContext;
+    MC2KernelTemplate::MC2TransposeContext* transposeContext;
     // scaleTranspose
-    MC2KernelTemplate::MC2TransposeContext *scaleTransposeContext;
+    MC2KernelTemplate::MC2TransposeContext* scaleTransposeContext;
     // communication
-    MC2KernelTemplate::MC2AlltoAllContext *communicationContext;
+    MC2KernelTemplate::MC2AlltoAllContext* communicationContext;
 };
 
 // 通信转置计算模板
@@ -38,8 +38,8 @@ template <typename CommunicationType, typename TransposeType, typename ScaleTran
           typename ContextType>
 class AlltoAllMXQuantMatmulPipeLine {
 public:
-    __aicore__ inline AlltoAllMXQuantMatmulPipeLine(CommunicationType *commStage, TransposeType *transStage,
-                                                    ScaleTransposeType *scaleTransStage, ComputationType *computeStage)
+    __aicore__ inline AlltoAllMXQuantMatmulPipeLine(CommunicationType* commStage, TransposeType* transStage,
+                                                    ScaleTransposeType* scaleTransStage, ComputationType* computeStage)
         : commStage_(commStage),
           transStage_(transStage),
           scaleTransStage_(scaleTransStage),
@@ -47,7 +47,7 @@ public:
 
     __aicore__ inline void Init();
 
-    __aicore__ inline void GetContext(ContextType *context);
+    __aicore__ inline void GetContext(ContextType* context);
 
     __aicore__ inline void Process(uint32_t taskCnt);
 
@@ -56,7 +56,7 @@ public:
     __aicore__ inline void End();
 
     // 注入 opStateDump，使 pipeline 循环内可记录 tile/tail 进度
-    __aicore__ inline void SetOpStateDump(Mc2Kernel::OpStateDump &rt)
+    __aicore__ inline void SetOpStateDump(Mc2Kernel::OpStateDump& rt)
     {
         opStateDump_ = rt;
     }
@@ -67,10 +67,10 @@ private:
     static constexpr uint8_t POS_SCALE_COMM_BEFORE = 1U;       // scale 通信前
     static constexpr uint8_t POS_COMP_CUBE_MATMUL_BEFORE = 2U; // C核 matmul 前
     static constexpr uint8_t POS_COMP_VEC_PERMUTE_BEFORE = 3U; // V核转置前
-    CommunicationType *commStage_;                             // 通信节点
-    TransposeType *transStage_;                                // 转置计算的计算节点
-    ScaleTransposeType *scaleTransStage_;                      // 缩放转置的计算节点
-    ComputationType *computeStage_;                            // 矩阵乘的计算节点
+    CommunicationType* commStage_;                             // 通信节点
+    TransposeType* transStage_;                                // 转置计算的计算节点
+    ScaleTransposeType* scaleTransStage_;                      // 缩放转置的计算节点
+    ComputationType* computeStage_;                            // 矩阵乘的计算节点
     // 状态打点，由 arch35/kernel_base 通过 SetOpStateDump 注入；未注入时 DoDump 为空操作
     Mc2Kernel::OpStateDump opStateDump_{};
 };
@@ -88,7 +88,7 @@ __aicore__ inline void AlltoAllMXQuantMatmulPipeLine<CommunicationType, Transpos
 template <typename CommunicationType, typename TransposeType, typename ScaleTransposeType, typename ComputationType,
           typename ContextType>
 __aicore__ inline void AlltoAllMXQuantMatmulPipeLine<CommunicationType, TransposeType, ScaleTransposeType,
-                                                     ComputationType, ContextType>::GetContext(ContextType *context)
+                                                     ComputationType, ContextType>::GetContext(ContextType* context)
 {
     context->communicationContext = commStage_->GetContextPtr();
     context->transposeContext = transStage_->GetContextPtr();

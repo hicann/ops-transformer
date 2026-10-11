@@ -43,7 +43,7 @@ struct TileVmad<Arch::AtlasA2, Gemm::GemmType<ElementA, layout::RowMajor>,
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementY> dstTensor, AscendC::LocalTensor<ElementX> srcTensor_v,
                     AscendC::LocalTensor<ElementA> srcTensor_m, AscendC::LocalTensor<ElementAccumulator> temp,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         uint32_t m_catlassual = layoutSrc.shape(0);
         uint32_t n_catlassual = layoutSrc.shape(1);
@@ -132,7 +132,7 @@ struct TileVmad<Arch::AtlasA2, Gemm::GemmType<float, layout::RowMajor>, Gemm::Ge
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementY> dstTensor, AscendC::LocalTensor<ElementX> srcTensor_v,
                     AscendC::LocalTensor<ElementA> srcTensor_m, AscendC::LocalTensor<ElementAccumulator> temp,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         uint32_t m_catlassual = layoutSrc.shape(0);
         uint32_t n_catlassual = layoutSrc.shape(1);
@@ -214,7 +214,7 @@ struct TileVmad<Arch::AtlasA2, Gemm::GemmType<ElementA, layout::ColumnMajor>,
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementY> dstTensor, AscendC::LocalTensor<ElementX> srcTensor_v,
                     AscendC::LocalTensor<ElementA> srcTensor_m, AscendC::LocalTensor<ElementAccumulator> temp,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         uint32_t m_catlassual = layoutSrc.shape(0);
         uint32_t n_catlassual = layoutSrc.shape(1);
@@ -283,7 +283,7 @@ struct TileVmad<Arch::AtlasA2, Gemm::GemmType<float, layout::ColumnMajor>, Gemm:
     CATLASS_DEVICE
     void operator()(AscendC::LocalTensor<ElementY> dstTensor, AscendC::LocalTensor<ElementX> srcTensor_v,
                     AscendC::LocalTensor<ElementA> srcTensor_m, AscendC::LocalTensor<ElementAccumulator> temp,
-                    LayoutDst const &layoutDst, LayoutSrc const &layoutSrc)
+                    LayoutDst const& layoutDst, LayoutSrc const& layoutSrc)
     {
         uint32_t m_catlassual = layoutSrc.shape(0);
         uint32_t n_catlassual = layoutSrc.shape(1);

@@ -80,16 +80,16 @@ public:
         Epilogue::Tile::CopyUb2Gm<ArchTag, Gemm::GemmType<ElementPerTokenScale, LayoutPerTokenScale>>;
 
     struct Params {
-        __gm__ ElementPerTokenScale *ptrPerTokenScale{nullptr};
+        __gm__ ElementPerTokenScale* ptrPerTokenScale{nullptr};
         LayoutPerTokenScale layoutPerTokenScale{};
-        __gm__ ElementD *ptrD{nullptr};
+        __gm__ ElementD* ptrD{nullptr};
         LayoutD layoutD{};
 
         CATLASS_DEVICE Params() {};
 
         CATLASS_DEVICE
-        Params(__gm__ ElementPerTokenScale *ptrPerTokenScale_, LayoutPerTokenScale const &layoutPerTokenScale_,
-               __gm__ ElementD *ptrD_, LayoutD const &layoutD_)
+        Params(__gm__ ElementPerTokenScale* ptrPerTokenScale_, LayoutPerTokenScale const& layoutPerTokenScale_,
+               __gm__ ElementD* ptrD_, LayoutD const& layoutD_)
             : ptrPerTokenScale(ptrPerTokenScale_),
               layoutPerTokenScale(layoutPerTokenScale_),
               ptrD(ptrD_),
@@ -98,7 +98,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, int32_t n, Params const &params = Params{})
+    BlockEpilogue(Arch::Resource<ArchTag> const& resource, int32_t n, Params const& params = Params{})
         : params(params)
     {
         (void)n;
@@ -154,20 +154,20 @@ public:
     CATLASS_DEVICE ~BlockEpilogue() {}
 
     CATLASS_DEVICE
-    void UpdateParams(Params const &params_)
+    void UpdateParams(Params const& params_)
     {
         params = params_;
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementC> const &gmC, MatrixCoord const &shapeC,
-                    AscendC::GlobalTensor<ElementPerTokenScale> const &gmPerTokenScale1,
-                    AscendC::GlobalTensor<ElementD> const &gmD,
-                    AscendC::GlobalTensor<ElementPerTokenScale> const &gmPerTokenScale2, uint32_t epilogueCoreNum = 40,
+    void operator()(AscendC::GlobalTensor<ElementC> const& gmC, MatrixCoord const& shapeC,
+                    AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale1,
+                    AscendC::GlobalTensor<ElementD> const& gmD,
+                    AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale2, uint32_t epilogueCoreNum = 40,
                     float activationClamp = 0.0f, uint32_t activationCode = 0,
                     float activationParams1 = SwigluOaiActivation::DEFAULT_ALPHA,
                     float activationParams2 = SituActivation::DEFAULT_BETA, uint32_t gmmOutPreRowStride = 1,
-                    Callback &&callback = Callback{})
+                    Callback&& callback = Callback{})
     {
         activationCode_ = activationCode;
         activationParams1_ = activationParams1;
@@ -282,7 +282,7 @@ public:
 
 private:
     CATLASS_DEVICE
-    void FlushScaleBatch(AscendC::GlobalTensor<ElementPerTokenScale> const &gmPerTokenScale, uint32_t gmOffset,
+    void FlushScaleBatch(AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale, uint32_t gmOffset,
                          uint32_t scaleCount, uint32_t scaleStage)
     {
         if (scaleCount == 0) {
@@ -332,10 +332,10 @@ private:
     }
 
     CATLASS_DEVICE
-    void LoadTile(AscendC::GlobalTensor<ElementC> const &gmTileC, uint32_t branchLength, uint32_t tileOffset,
+    void LoadTile(AscendC::GlobalTensor<ElementC> const& gmTileC, uint32_t branchLength, uint32_t tileOffset,
                   uint32_t tileLength, uint32_t gmRowStride, uint32_t stageId)
     {
-        auto &ubC = ubCList[stageId];
+        auto& ubC = ubCList[stageId];
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[stageId]);
         LayoutC tileLayout{1, tileLength};
         LayoutC gmTileLayout{1, tileLength, gmRowStride};
@@ -348,10 +348,10 @@ private:
     void ComputeLoadedTile(uint32_t stageId, uint32_t tileLength, ElementPerTokenScale perTokenScale,
                            float activationClamp)
     {
-        auto &ubC = ubCList[stageId];
-        auto &ubGate = ubGateFp32List[stageId];
-        auto &ubUp = ubUpFp32List[stageId];
-        auto &ubActivation = ubActivationList[stageId];
+        auto& ubC = ubCList[stageId];
+        auto& ubGate = ubGateFp32List[stageId];
+        auto& ubUp = ubUpFp32List[stageId];
+        auto& ubActivation = ubActivationList[stageId];
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[stageId]);
         Activation::PrepareBranches(ubGate, ubUp, ubC, TILE_LENGTH, tileLength);
@@ -377,8 +377,8 @@ private:
     CATLASS_DEVICE
     void AccumulateRowAbsMax(uint32_t stageId, uint32_t tileLength)
     {
-        auto &ubAbs = ubGateFp32List[stageId];
-        auto &ubTileMax = ubUpFp32List[stageId];
+        auto& ubAbs = ubGateFp32List[stageId];
+        auto& ubTileMax = ubUpFp32List[stageId];
         AscendC::Abs(ubAbs, ubActivationList[stageId], tileLength);
         AscendC::PipeBarrier<PIPE_V>();
         AscendC::ReduceMax<float>(ubTileMax, ubAbs, ubTileMax, tileLength, false);
@@ -396,10 +396,10 @@ private:
     }
 
     CATLASS_DEVICE
-    void QuantizeAndCopyTile(uint32_t stageId, AscendC::GlobalTensor<ElementD> const &gmTileD, uint32_t tileLength,
+    void QuantizeAndCopyTile(uint32_t stageId, AscendC::GlobalTensor<ElementD> const& gmTileD, uint32_t tileLength,
                              ElementPerTokenScale quantMultiplier)
     {
-        auto &ubQuantTmp = ubGateFp32List[stageId];
+        auto& ubQuantTmp = ubGateFp32List[stageId];
         auto ubQuantS32 = ubQuantTmp.template ReinterpretCast<int32_t>();
         auto ubQuantF16 = ubQuantTmp.template ReinterpretCast<half>();
         AscendC::Muls(ubQuantTmp, ubActivationList[stageId], quantMultiplier, tileLength);

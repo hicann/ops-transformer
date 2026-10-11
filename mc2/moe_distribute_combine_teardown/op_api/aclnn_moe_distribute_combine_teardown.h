@@ -56,12 +56,12 @@ extern "C" {
  * @return aclnnStatus: 返回值，返回状态码。
  */
 ACLNN_API aclnnStatus aclnnMoeDistributeCombineTeardownGetWorkspaceSize(
-    const aclTensor *expandX, const aclTensor *quantExpandX, const aclTensor *expertIds, const aclTensor *expandIdx,
-    const aclTensor *expertScales, const aclTensor *commCmdInfo, const aclTensor *xActiveMaskOptional,
-    const aclTensor *sharedExpertXOptional, const char *groupEp, int64_t epWorldSize, int64_t epRankId,
+    const aclTensor* expandX, const aclTensor* quantExpandX, const aclTensor* expertIds, const aclTensor* expandIdx,
+    const aclTensor* expertScales, const aclTensor* commCmdInfo, const aclTensor* xActiveMaskOptional,
+    const aclTensor* sharedExpertXOptional, const char* groupEp, int64_t epWorldSize, int64_t epRankId,
     int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum, int64_t sharedExpertRankNum,
-    int64_t globalBs, int64_t commQuantMode, int64_t commType, const char *commAlg, aclTensor *xOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t globalBs, int64_t commQuantMode, int64_t commType, const char* commAlg, aclTensor* xOut,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMoeDistributeCombineTeardown的第二段接口，用于执行计算。
@@ -72,8 +72,8 @@ ACLNN_API aclnnStatus aclnnMoeDistributeCombineTeardownGetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码。
  */
-ACLNN_API aclnnStatus aclnnMoeDistributeCombineTeardown(void *workspace, uint64_t workspaceSize,
-                                                        aclOpExecutor *executor, aclrtStream stream);
+ACLNN_API aclnnStatus aclnnMoeDistributeCombineTeardown(void* workspace, uint64_t workspaceSize,
+                                                        aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

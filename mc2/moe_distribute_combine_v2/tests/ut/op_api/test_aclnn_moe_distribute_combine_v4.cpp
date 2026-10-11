@@ -70,7 +70,7 @@ TEST_F(L2MoeDistributeCombineV4Test, TestMoeDistributeCombineV4FirstApi)
               SHARED_EXPERT_RANK_NUM, GLOBAL_BS, OUT_DTYPE, COMM_QUANT_MODE, GROUP_LIST_TYPE, "test", 0, 0, 0),
         OUTPUT(x));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }

@@ -69,7 +69,7 @@ ge::graphStatus Mc2WeightQuantBatchMatmulV2CustomNzSplitK::PostTiling()
     context_->SetBlockDim(CalcTschBlockDim(usedAivNum, compileInfoPtr_->aicNum, compileInfoPtr_->aivNum));
     errno_t ret =
         memcpy_s(context_->GetTilingData<Mc2WeightQuantBatchMatmulV2CustomNzSplitKTilingData>(),
-                 context_->GetRawTilingData()->GetCapacity(), reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                 context_->GetRawTilingData()->GetCapacity(), reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -200,7 +200,7 @@ uint64_t Mc2WeightQuantBatchMatmulV2CustomNzSplitK::GetTilingKey() const
 // 6、计算Workspace 大小
 ge::graphStatus Mc2WeightQuantBatchMatmulV2CustomNzSplitK::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "failed to get workspace size"), return ge::GRAPH_FAILED);
     uint64_t workspaceSize =
         CACHE_NUM * CUBE_BASE_N * SINGLE_K * compileInfoPtr_->aicNum * GetSizeByDataType(matmulInfoPtr_->aDtype) +

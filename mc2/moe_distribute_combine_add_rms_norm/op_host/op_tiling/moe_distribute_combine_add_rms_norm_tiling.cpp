@@ -25,7 +25,7 @@ using namespace Mc2Tiling;
 
 namespace optiling {
 ge::graphStatus MoeDistributeCombineAddRmsNormTilingFuncBase::MoeDistributeCombineAddRmsNormTilingFunc(
-    gert::TilingContext *context)
+    gert::TilingContext* context)
 {
     ge::graphStatus ret = MoeDistributeCombineV2TilingFunc(context);
     return ret;

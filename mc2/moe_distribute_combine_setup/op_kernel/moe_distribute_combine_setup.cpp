@@ -35,9 +35,9 @@ __global__ __aicore__ void moe_distribute_combine_setup(GM_ADDR context, GM_ADDR
 {
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
     REGISTER_TILING_DEFAULT(MoeDistributeCombineSetupTilingData);
-    auto tiling = (__gm__ MoeDistributeCombineSetupTilingData *)tilingGM;
-    __gm__ void *mc2InitTiling = (__gm__ void *)(&(tiling->mc2InitTiling));
-    __gm__ void *mc2CcTiling = (__gm__ void *)(&(tiling->mc2CcTiling));
+    auto tiling = (__gm__ MoeDistributeCombineSetupTilingData*)tilingGM;
+    __gm__ void* mc2InitTiling = (__gm__ void*)(&(tiling->mc2InitTiling));
+    __gm__ void* mc2CcTiling = (__gm__ void*)(&(tiling->mc2CcTiling));
     TPipe pipe;
 #if (ORIG_DTYPE_EXPAND_X == DT_BF16 || ORIG_DTYPE_EXPAND_X == DT_FLOAT16)
     if constexpr (!HasTp) { // tp=1

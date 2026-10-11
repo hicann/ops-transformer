@@ -111,7 +111,7 @@ ge::graphStatus MoeDistributeCombineSetupTilingA3::CheckTensorShapeSize(int64_t 
                                               (std::string("(0, ") + std::to_string(MAX_BS) + "]").c_str()),
                     return ge::GRAPH_FAILED);
 
-    uint32_t &moeExpertNum = tilingData_->moeDistributeCombineSetupInfo.moeExpertNum;
+    uint32_t& moeExpertNum = tilingData_->moeDistributeCombineSetupInfo.moeExpertNum;
     OP_TILING_CHECK(
         (k <= 0) || (k > MAX_K) || (k > static_cast<int64_t>(moeExpertNum)),
         OP_LOGE_FOR_INVALID_VALUE(
@@ -129,7 +129,7 @@ void MoeDistributeCombineSetupTilingA3::SetHcommCfg()
     std::string algConfigStr = "BatchWrite=level0:fullmesh";
     uint32_t reduceType = 0U;
 
-    uint32_t &aivNum = tilingData_->moeDistributeCombineSetupInfo.aivNum;
+    uint32_t& aivNum = tilingData_->moeDistributeCombineSetupInfo.aivNum;
     OP_LOGD(nodeName_, "QueueNum = %u, aivNum = %u", (LOCAL_STREAM_MAX_NUM / aivNum), aivNum);
     AscendC::Mc2CcTilingConfig mc2CcTilingConfig(groupEp_, opType, algConfigStr, reduceType);
     mc2CcTilingConfig.SetQueueNum(LOCAL_STREAM_MAX_NUM / aivNum);

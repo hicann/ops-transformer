@@ -40,7 +40,7 @@ namespace optiling {
  *   4. 若 maxTileM < 256（最小对齐长度），返回 HCCL_UNSUPPORTED
  *   5. 返回 maxTileM，表示需要调整
  */
-uint64_t CalcMaxTileMFromHcclLimit(const CutResult &cutRes, const CommSizeInfo &commSize, const std::string &opName)
+uint64_t CalcMaxTileMFromHcclLimit(const CutResult& cutRes, const CommSizeInfo& commSize, const std::string& opName)
 {
     uint64_t singleRowSize = commSize.kValue * commSize.dtypeSize * commSize.rankDim;
     if (singleRowSize == 0) {
@@ -149,7 +149,7 @@ uint64_t SelectOptimalCandidateTileM(uint64_t maxTileM)
  *   - 超大数据量：报错提示不支持
  */
 uint64_t DetermineFinalTileMWithLimit(uint64_t mValue, uint64_t candidateTileM, uint64_t maxTileM,
-                                      const std::string &opName)
+                                      const std::string& opName)
 {
     uint64_t totalTileCnt = (mValue + candidateTileM - 1) / candidateTileM;
     if (totalTileCnt <= HCCL_MAX_TOTAL_TILES) {
@@ -211,8 +211,8 @@ uint64_t DetermineFinalTileMWithLimit(uint64_t mValue, uint64_t candidateTileM, 
  *      - shortTileAtBack 保持原始值
  *   5. 打印调整后的切分结果
  */
-void ApplyTileSplit(CutResult &cutRes, uint64_t mValue, uint64_t tileM, const CommSizeInfo &commSize,
-                    const std::string &opName)
+void ApplyTileSplit(CutResult& cutRes, uint64_t mValue, uint64_t tileM, const CommSizeInfo& commSize,
+                    const std::string& opName)
 {
     uint64_t numLongTile = mValue / tileM;
     uint64_t tailM = mValue - numLongTile * tileM;
@@ -267,7 +267,7 @@ void ApplyTileSplit(CutResult &cutRes, uint64_t mValue, uint64_t tileM, const Co
  *   - 大数据量：扩展到最多HCCL_MAX_TOTAL_TILES次通信，仍优先使用优选候选值
  *   - 超大数据量：报错，无法同时满足256MB单次限制和HCCL_MAX_TOTAL_TILES次总限制
  */
-void AdjustCutResultForCCU(CutResult &cutRes, uint64_t mValue, const CommSizeInfo &commSize, const std::string &opName)
+void AdjustCutResultForCCU(CutResult& cutRes, uint64_t mValue, const CommSizeInfo& commSize, const std::string& opName)
 {
     uint64_t maxTileM = CalcMaxTileMFromHcclLimit(cutRes, commSize, opName);
     if (maxTileM == HCCL_NO_ADJUSTMENT || maxTileM == HCCL_UNSUPPORTED) {
@@ -300,7 +300,7 @@ void AdjustCutResultForCCU(CutResult &cutRes, uint64_t mValue, const CommSizeInf
  *   4. 重新切分并更新cutRes
  *
  */
-void AdjustCutResultForAICPU(CutResult &cutRes, uint64_t mValue, uint64_t baseM, const std::string &opName)
+void AdjustCutResultForAICPU(CutResult& cutRes, uint64_t mValue, uint64_t baseM, const std::string& opName)
 {
     uint64_t currentTileCnt = cutRes.numLongTile + cutRes.numShortTile;
     if (currentTileCnt <= AICPU_TARGET_TILE_CNT) {

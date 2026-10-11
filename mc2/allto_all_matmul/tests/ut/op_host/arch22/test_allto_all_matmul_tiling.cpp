@@ -2099,7 +2099,7 @@ struct AlltoAllMatmulCompileInfo {
 } compileInfoA3;
 
 // ut
-static void TestOneParamCase(const AlltoAllMatmulTestParam &param)
+static void TestOneParamCase(const AlltoAllMatmulTestParam& param)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     //
@@ -2157,14 +2157,14 @@ static void TestOneParamCase(const AlltoAllMatmulTestParam &param)
     Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
 }
 
-static void ThreadFunction(const AlltoAllMatmulTestParam *testCases, size_t caseNum, size_t threadIdx, size_t threadNum)
+static void ThreadFunction(const AlltoAllMatmulTestParam* testCases, size_t caseNum, size_t threadIdx, size_t threadNum)
 {
     for (size_t idx = threadIdx; idx < caseNum; idx += threadNum) {
         TestOneParamCase(testCases[idx]);
     }
 }
 
-static void TestExecMultiThread(const AlltoAllMatmulTestParam *testCases, size_t testCaseNum, size_t threadNum)
+static void TestExecMultiThread(const AlltoAllMatmulTestParam* testCases, size_t testCaseNum, size_t threadNum)
 {
     std::thread threads[threadNum];
     for (size_t idx = 0; idx < threadNum; ++idx) {
@@ -2187,9 +2187,9 @@ TEST_F(AlltoAllMatmulA3TilingTest, GeneralCasesMultiThread)
 
 INSTANTIATE_TEST_CASE_P(AlltoAllMatmulTilingUT, AlltoAllMatmulA3TilingTest, testing::ValuesIn(testCases));
 
-static std::string GetCsvPath(const char *file)
+static std::string GetCsvPath(const char* file)
 {
-    const char *envPath = std::getenv("CSV_CASE_PATH");
+    const char* envPath = std::getenv("CSV_CASE_PATH");
     if (envPath != nullptr && strlen(envPath) > 0) {
         return std::string(envPath);
     }

@@ -40,7 +40,7 @@ struct AlltoAllMatmulV2ApiUtParam {
     op::SocVersion soc;
     aclnnStatus expectResult;
 
-    explicit AlltoAllMatmulV2ApiUtParam(const csv_map &csvMap)
+    explicit AlltoAllMatmulV2ApiUtParam(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->context = GetTensorACL(csvMap, "context_shape", "context_dtype", "context_format");
@@ -74,7 +74,7 @@ struct AlltoAllMatmulV2ApiUtParam {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AlltoAllMatmulV2ApiUtParam &param)
+inline std::ostream& operator<<(std::ostream& os, const AlltoAllMatmulV2ApiUtParam& param)
 {
     return os << param.case_name;
 }

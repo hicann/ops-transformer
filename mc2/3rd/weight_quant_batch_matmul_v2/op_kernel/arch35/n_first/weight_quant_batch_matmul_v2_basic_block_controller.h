@@ -21,42 +21,41 @@
 namespace Mc2WeightQuantBatchMatmulV2::Arch35 {
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmCfg, const VecAntiQuantConfig &vecCfg>
+          const WqmmConfig& wqmmCfg, const VecAntiQuantConfig& vecCfg>
 class WeightQuantBatchMatmulV2BasicBlockController {
 public:
     __aicore__ inline WeightQuantBatchMatmulV2BasicBlockController(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                                const Mc2WeightQuantBatchMatmulV2ASTilingData *tilingData, TPipe *tPipe);
+                                const Mc2WeightQuantBatchMatmulV2ASTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     uint64_t curBlockIdx_;
     uint64_t mDimIdx_;
     uint64_t nDimIdx_;
-    const Mc2WeightQuantBatchMatmulV2ASTilingData *tiling_;
+    const Mc2WeightQuantBatchMatmulV2ASTilingData* tiling_;
     WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmCfg, vecCfg> wqmmBasicBlock_;
     BasicBlockOffsetParam basicBlockOffsetParam_;
 };
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmCfg, const VecAntiQuantConfig &vecCfg>
+          const WqmmConfig& wqmmCfg, const VecAntiQuantConfig& vecCfg>
 __aicore__ inline void
 WeightQuantBatchMatmulV2BasicBlockController<xType, wType, antiQuantScaleType, biasType, yType, wqmmCfg, vecCfg>::Init(
     GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR quantScale, GM_ADDR quantOffset,
-    GM_ADDR bias, GM_ADDR y, GM_ADDR workspace, const Mc2WeightQuantBatchMatmulV2ASTilingData *tilingData, TPipe *tPipe)
+    GM_ADDR bias, GM_ADDR y, GM_ADDR workspace, const Mc2WeightQuantBatchMatmulV2ASTilingData* tilingData, TPipe* tPipe)
 {
     tiling_ = tilingData;
     curBlockIdx_ = GetBlockIdx();
     if ASCEND_IS_AIV {
         curBlockIdx_ = curBlockIdx_ / AscendC::GetTaskRation();
     }
-    wqmmBasicBlock_.UpdateGlobalAddr(reinterpret_cast<__gm__ xType *>(x), reinterpret_cast<__gm__ wType *>(weight),
-                                     reinterpret_cast<__gm__ antiQuantScaleType *>(antiquantScale),
-                                     reinterpret_cast<__gm__ xType *>(antiquantOffset),
-                                     reinterpret_cast<__gm__ uint64_t *>(quantScale),
-                                     reinterpret_cast<__gm__ biasType *>(bias), reinterpret_cast<__gm__ yType *>(y),
-                                     tilingData->hasBias, tilingData->weightL2Cacheable);
+    wqmmBasicBlock_.UpdateGlobalAddr(
+        reinterpret_cast<__gm__ xType*>(x), reinterpret_cast<__gm__ wType*>(weight),
+        reinterpret_cast<__gm__ antiQuantScaleType*>(antiquantScale), reinterpret_cast<__gm__ xType*>(antiquantOffset),
+        reinterpret_cast<__gm__ uint64_t*>(quantScale), reinterpret_cast<__gm__ biasType*>(bias),
+        reinterpret_cast<__gm__ yType*>(y), tilingData->hasBias, tilingData->weightL2Cacheable);
     wqmmBasicBlock_.Init(tilingData->aPreloadSize, &(tilingData->matmulTiling), tPipe);
     basicBlockOffsetParam_.kaL1Size = tiling_->matmulTiling.baseK * tiling_->matmulTiling.stepKa;
     basicBlockOffsetParam_.kbL1Size = tiling_->matmulTiling.baseK * tiling_->matmulTiling.stepKb;
@@ -70,7 +69,7 @@ WeightQuantBatchMatmulV2BasicBlockController<xType, wType, antiQuantScaleType, b
 }
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmCfg, const VecAntiQuantConfig &vecCfg>
+          const WqmmConfig& wqmmCfg, const VecAntiQuantConfig& vecCfg>
 __aicore__ inline void WeightQuantBatchMatmulV2BasicBlockController<xType, wType, antiQuantScaleType, biasType, yType,
                                                                     wqmmCfg, vecCfg>::Process()
 {

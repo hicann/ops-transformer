@@ -37,13 +37,13 @@ struct TokenUnpermuteScratch {
 
 // 加载并转换一批 top-k 权重。
 template <typename TopkWeightsType>
-__aicore__ inline void LoadTokenUnpermuteWeights(const MoeStageCommonConfig &common, const Params &params,
-                                                 TokenUnpermuteScratch &scratch, int32_t jobOffset,
+__aicore__ inline void LoadTokenUnpermuteWeights(const MoeStageCommonConfig& common, const Params& params,
+                                                 TokenUnpermuteScratch& scratch, int32_t jobOffset,
                                                  int32_t batchTokenOffset, int32_t batchTokenCount)
 {
     if constexpr (Std::IsSame<TopkWeightsType, float>::value) {
         GlobalTensor<float> topKWeightsGm;
-        topKWeightsGm.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(params.probsGmAddr));
+        topKWeightsGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(params.probsGmAddr));
         DataCopyPad(scratch.topKWeightsTensor,
                     topKWeightsGm[static_cast<uint64_t>(jobOffset + batchTokenOffset) * common.topK],
                     {1U, static_cast<uint32_t>(batchTokenCount * common.topK * sizeof(float)), 0U, 0U, 0U},
@@ -53,7 +53,7 @@ __aicore__ inline void LoadTokenUnpermuteWeights(const MoeStageCommonConfig &com
     }
     if constexpr (Std::IsSame<TopkWeightsType, bfloat16_t>::value) {
         GlobalTensor<bfloat16_t> topKWeightsGm;
-        topKWeightsGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(params.probsGmAddr));
+        topKWeightsGm.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(params.probsGmAddr));
         DataCopyPad(scratch.topKWeightsBf16Tensor,
                     topKWeightsGm[static_cast<uint64_t>(jobOffset + batchTokenOffset) * common.topK],
                     {1U, static_cast<uint32_t>(batchTokenCount * common.topK * sizeof(bfloat16_t)), 0U, 0U, 0U},
@@ -68,10 +68,10 @@ __aicore__ inline void LoadTokenUnpermuteWeights(const MoeStageCommonConfig &com
 
 // 将一个 MoE 专家的输入搬入 UB，并按 Combine 模式完成 Cast 或 MXFP8 反量化。
 template <uint8_t CombineMode>
-__aicore__ inline void LoadMoeExpertInput(const TokenUnpermuteConfig &context, const MoeStageCommonConfig &common,
-                                          TokenUnpermuteScratch &scratch, const GlobalTensor<bfloat16_t> &expandedX,
+__aicore__ inline void LoadMoeExpertInput(const TokenUnpermuteConfig& context, const MoeStageCommonConfig& common,
+                                          TokenUnpermuteScratch& scratch, const GlobalTensor<bfloat16_t>& expandedX,
                                           uint64_t expertInputIndex, TEventID event,
-                                          LocalTensor<bfloat16_t> &dataInBf16, LocalTensor<float> &dataInFp32)
+                                          LocalTensor<bfloat16_t>& dataInBf16, LocalTensor<float>& dataInFp32)
 {
     WaitFlag<HardEvent::V_MTE2>(event);
     if constexpr (CombineMode == COMBINE_NO_QUANT) {
@@ -93,11 +93,11 @@ __aicore__ inline void LoadMoeExpertInput(const TokenUnpermuteConfig &context, c
 
 // 读回本 token 的 topK 目标卡号（专家→卡 = expertId / moeExpertPerRank）。
 // 结果放函数栈小数组（topK≤32 有 host 校验；unpermute UB 已满载，UB 化需动整段布局，暂保留栈存储）。
-__aicore__ inline void LoadTokenExpertRanks(const MoeStageCommonConfig &common, const Params &params, int32_t tokenIdx,
+__aicore__ inline void LoadTokenExpertRanks(const MoeStageCommonConfig& common, const Params& params, int32_t tokenIdx,
                                             int32_t (&expertRanks)[32])
 {
-    __gm__ int32_t *topkIdsBase =
-        reinterpret_cast<__gm__ int32_t *>(params.expertIdxGmAddr) + static_cast<uint64_t>(tokenIdx) * common.topK;
+    __gm__ int32_t* topkIdsBase =
+        reinterpret_cast<__gm__ int32_t*>(params.expertIdxGmAddr) + static_cast<uint64_t>(tokenIdx) * common.topK;
     for (int32_t k = 0; k < static_cast<int32_t>(common.topK); ++k) {
         expertRanks[k] = ReadGmByPassDCache(topkIdsBase + k) / static_cast<int32_t>(common.moeExpertPerRank);
     }
@@ -107,7 +107,7 @@ __aicore__ inline void LoadTokenExpertRanks(const MoeStageCommonConfig &common, 
 // 一致）。返回 false = 该槽已并入同卡首槽、不会到达；sameRankCount 顺手数同卡命中数，tkw=0 下
 // 决定该槽是否还需本端乘权（==1 是 PLAIN 行、发送端未乘；>=2 是合并行、发送端已按成员权重乘加）。
 __aicore__ inline bool JudgeDedupCanonicalSlot(const int32_t (&expertRanks)[32], int32_t topK, int32_t expertIdx,
-                                               int32_t &sameRankCount)
+                                               int32_t& sameRankCount)
 {
     sameRankCount = 1;
     for (int32_t otherIdx = 0; otherIdx < topK; ++otherIdx) {
@@ -123,8 +123,8 @@ __aicore__ inline bool JudgeDedupCanonicalSlot(const int32_t (&expertRanks)[32],
 
 // 把一个专家槽的输入累加进 dataResFp32Tensor（首槽直拷/乘权，后续槽乘权后加）。
 template <bool TopkWeightsPrefetch>
-__aicore__ inline void AccumulateExpertSlotInput(const MoeStageCommonConfig &common, TokenUnpermuteScratch &scratch,
-                                                 const LocalTensor<float> &dataInFp32, int32_t localIdx,
+__aicore__ inline void AccumulateExpertSlotInput(const MoeStageCommonConfig& common, TokenUnpermuteScratch& scratch,
+                                                 const LocalTensor<float>& dataInFp32, int32_t localIdx,
                                                  int32_t expertIdx, bool applyScale, bool accumStarted)
 {
     if (!accumStarted) {
@@ -155,11 +155,11 @@ __aicore__ inline void AccumulateExpertSlotInput(const MoeStageCommonConfig &com
 // combine 去重模式：生产卡已按卡合并（同卡多专家的贡献落在该卡首个 topk 槽、其余槽不再到达），
 // 归属卡只累加 canonical 槽。
 template <uint8_t CombineMode, bool TopkWeightsPrefetch>
-__aicore__ inline void AccumulateMoeExpertsForToken(const TokenUnpermuteConfig &context,
-                                                    const MoeStageCommonConfig &common, const Params &params,
-                                                    TokenUnpermuteScratch &scratch, int32_t tokenIdx, int32_t localIdx,
-                                                    const GlobalTensor<bfloat16_t> &expandedX,
-                                                    const MegaMoeUnpermuteBufferConfig &bufferConfig)
+__aicore__ inline void AccumulateMoeExpertsForToken(const TokenUnpermuteConfig& context,
+                                                    const MoeStageCommonConfig& common, const Params& params,
+                                                    TokenUnpermuteScratch& scratch, int32_t tokenIdx, int32_t localIdx,
+                                                    const GlobalTensor<bfloat16_t>& expandedX,
+                                                    const MegaMoeUnpermuteBufferConfig& bufferConfig)
 {
     const bool dedupCombineActive = IsCombineDedupOn(params.tilingData->dedupMode);
     int32_t expertRanks[32];
@@ -196,23 +196,23 @@ __aicore__ inline void AccumulateMoeExpertsForToken(const TokenUnpermuteConfig &
 
 // 等待该共享专家的 GMM2 结果就绪后累加进当前 token（等待与累加是一体动作，调用方无需分两步）。
 template <uint32_t Gmm1TileM>
-__aicore__ inline void AccumulateSharedExpertForToken(const MoeStageCommonConfig &common, const Params &params,
-                                                      TokenUnpermuteScratch &scratch, int32_t tokenIdx,
+__aicore__ inline void AccumulateSharedExpertForToken(const MoeStageCommonConfig& common, const Params& params,
+                                                      TokenUnpermuteScratch& scratch, int32_t tokenIdx,
                                                       int32_t localIdx, uint32_t sharedExpertIdx,
-                                                      const MegaMoeUnpermuteBufferConfig &bufferConfig)
+                                                      const MegaMoeUnpermuteBufferConfig& bufferConfig)
 {
     uint32_t tokenGroupIndex = static_cast<uint32_t>(tokenIdx) / Gmm1TileM;
     uint32_t tokenGroupCount = Ops::Base::CeilDiv(common.tokenNum, Gmm1TileM);
     uint64_t sharedExpertStride = static_cast<uint64_t>(tokenGroupCount) * INT_CACHELINE;
-    __gm__ int32_t *counterAddr = GetCombineSyncCounterAddress(
-        reinterpret_cast<__gm__ int32_t *>(params.workspaceInfo.sharedExpertGmm2TileCounterPtr) +
+    __gm__ int32_t* counterAddr = GetCombineSyncCounterAddress(
+        reinterpret_cast<__gm__ int32_t*>(params.workspaceInfo.sharedExpertGmm2TileCounterPtr) +
             static_cast<uint64_t>(sharedExpertIdx) * sharedExpertStride,
         tokenGroupIndex);
     uint32_t gmm2NTilesPerGroup = Ops::Base::CeilDiv(common.tokenHiddenDim, L1_TILE_N);
     WaitUntilGmFlagEquals(counterAddr, static_cast<int32_t>(gmm2NTilesPerGroup));
 
     GlobalTensor<bfloat16_t> sharedResult;
-    sharedResult.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(params.workspaceInfo.sharedExpertResultPtr));
+    sharedResult.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(params.workspaceInfo.sharedExpertResultPtr));
     int32_t accumulationItemIdx = localIdx * static_cast<int32_t>(common.topK + common.sharedExpertNum) +
                                   static_cast<int32_t>(common.topK + sharedExpertIdx);
     int32_t inputBufferIdx = accumulationItemIdx % bufferConfig.inputBufferCount;
@@ -238,9 +238,9 @@ __aicore__ inline void AccumulateSharedExpertForToken(const MoeStageCommonConfig
 
 template <uint8_t CombineMode, typename TopkWeightsType, bool TopkWeightsPrefetch, uint32_t Gmm1TileM>
 __aicore__ inline void ProcessTokenUnpermuteBatch(
-    const TokenUnpermuteConfig &context, const MoeStageCommonConfig &common, const Params &params,
-    TokenUnpermuteScratch &scratch, const MegaMoeUnpermuteBufferConfig &bufferConfig,
-    const GlobalTensor<bfloat16_t> &expandedX, GlobalTensor<bfloat16_t> &output, int32_t jobOffset,
+    const TokenUnpermuteConfig& context, const MoeStageCommonConfig& common, const Params& params,
+    TokenUnpermuteScratch& scratch, const MegaMoeUnpermuteBufferConfig& bufferConfig,
+    const GlobalTensor<bfloat16_t>& expandedX, GlobalTensor<bfloat16_t>& output, int32_t jobOffset,
     int32_t batchTokenOffset, int32_t batchTokenCount, TEventID outputBufferEvent)
 {
     if constexpr (!TopkWeightsPrefetch) {
@@ -281,9 +281,9 @@ __aicore__ inline void ProcessTokenUnpermuteBatch(
  *   [fp32Scale  ] 仅量化 combine 时存在，Align32(ceil(H/32)·4B·扩展系数)
  */
 template <typename TopkWeightsType, int32_t CombineQuantMode>
-__aicore__ inline MegaMoeUnpermuteBufferConfig CreateTokenUnpermuteBuffers(const TokenUnpermuteConfig &context,
+__aicore__ inline MegaMoeUnpermuteBufferConfig CreateTokenUnpermuteBuffers(const TokenUnpermuteConfig& context,
                                                                            uint32_t tokenHiddenDim,
-                                                                           TokenUnpermuteScratch &scratch)
+                                                                           TokenUnpermuteScratch& scratch)
 {
     MegaMoeUnpermuteBufferConfig bufferConfig = context.job.jobIndex < context.fullTokenChunkJobCount ?
                                                     context.fullTokenChunkConfig :
@@ -332,9 +332,9 @@ __aicore__ inline MegaMoeUnpermuteBufferConfig CreateTokenUnpermuteBuffers(const
 
 // 执行当前 token 分区的完整 Unpermute 流水。
 template <uint8_t CombineMode, typename TopkWeightsType, bool TopkWeightsPrefetch, uint32_t Gmm1TileM>
-__aicore__ inline void UnpermuteTokens(const TokenUnpermuteConfig &context, const MoeStageCommonConfig &common,
-                                       const Params &params, TokenUnpermuteScratch &scratch,
-                                       const MegaMoeUnpermuteBufferConfig &bufferConfig)
+__aicore__ inline void UnpermuteTokens(const TokenUnpermuteConfig& context, const MoeStageCommonConfig& common,
+                                       const Params& params, TokenUnpermuteScratch& scratch,
+                                       const MegaMoeUnpermuteBufferConfig& bufferConfig)
 {
     if constexpr (g_coreType == AIC) {
         return;
@@ -346,9 +346,9 @@ __aicore__ inline void UnpermuteTokens(const TokenUnpermuteConfig &context, cons
     int32_t jobLen = static_cast<int32_t>(tokenRange.count);
     int32_t jobOffset = static_cast<int32_t>(tokenRange.start);
     GlobalTensor<bfloat16_t> expandedX;
-    expandedX.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(params.peermemInfo.combineSendPtr));
+    expandedX.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(params.peermemInfo.combineSendPtr));
     GlobalTensor<bfloat16_t> output;
-    output.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t *>(params.y2GmAddr));
+    output.SetGlobalBuffer(reinterpret_cast<__gm__ bfloat16_t*>(params.y2GmAddr));
 
     constexpr TEventID outputBufferEvent = EVENT_ID0;
     SetFlag<HardEvent::MTE3_V>(outputBufferEvent);

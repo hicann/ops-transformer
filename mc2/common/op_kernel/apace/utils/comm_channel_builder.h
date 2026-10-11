@@ -97,12 +97,12 @@ public:
      * \param [out] remoteAddrs  context 中远端地址数组字段
      * \return true 成功, false 失败
      */
-    bool AllocRegAndBuildChannels(ChannelMode mode, const char *memTag, uint64_t *channels, uint64_t *remoteAddrs)
+    bool AllocRegAndBuildChannels(ChannelMode mode, const char* memTag, uint64_t* channels, uint64_t* remoteAddrs)
     {
         ::CommProtocol protocol =
             (mode == ChannelMode::URMA) ? ::CommProtocol::COMM_PROTOCOL_UBC_CTP : ::CommProtocol::COMM_PROTOCOL_UB_MEM;
 
-        void *buf = nullptr;
+        void* buf = nullptr;
         uint64_t hcclBufSize = 0;
         if (HcclGetHcclBuffer(comm_, &buf, &hcclBufSize) != ::HCCL_SUCCESS || buf == nullptr) {
             return false;
@@ -128,14 +128,14 @@ public:
      *       rankId/rankSize 赋值及 channel 建立仅在新建路径中执行。
      *       调用方应在本函数返回后对 rank 间做一次 barrier，确保所有 channel 握手完成。
      */
-    void *CreateDeviceContext(void *hostCtx, uint64_t ctxSize, const char *ctxTag,
-                              typename CommCtxTrait<DataChannelMode>::type *dataCtx,
-                              typename CommCtxTrait<BarrierChannelMode>::type *barrierCtx = nullptr)
+    void* CreateDeviceContext(void* hostCtx, uint64_t ctxSize, const char* ctxTag,
+                              typename CommCtxTrait<DataChannelMode>::type* dataCtx,
+                              typename CommCtxTrait<BarrierChannelMode>::type* barrierCtx = nullptr)
     {
         constexpr uint64_t BARRIER_BUF_SIZE = 2UL * 1024 * 1024;
         uint64_t totalSize = (barrierCtx != nullptr) ? ctxSize + BARRIER_BUF_SIZE : ctxSize;
 
-        void *devCtx = nullptr;
+        void* devCtx = nullptr;
         CommEngine engine = static_cast<CommEngine>(BUILDER_COMM_ENGINE_AIV);
         uint64_t existingSize = 0;
         if (HcclEngineCtxGet(comm_, ctxTag, engine, &devCtx, &existingSize) == HCCL_SUCCESS) {
@@ -156,7 +156,7 @@ public:
         dataCtx->rankId = rankId_;
         dataCtx->rankSize = rankNum_;
         std::string dataBufTag = std::string(ctxTag) + "dataBuf";
-        uint64_t *channelHandles = nullptr;
+        uint64_t* channelHandles = nullptr;
         if constexpr (DataChannelMode == ChannelMode::URMA) {
             channelHandles = dataCtx->channelHandles;
         }
@@ -167,7 +167,7 @@ public:
         if (barrierCtx != nullptr) {
             barrierCtx->rankId = rankId_;
             barrierCtx->rankSize = rankNum_;
-            void *barrierBuf = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(devCtx) + ctxSize);
+            void* barrierBuf = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(devCtx) + ctxSize);
             CommMem regMem = {};
             regMem.type = COMM_MEM_TYPE_DEVICE;
             regMem.addr = barrierBuf;
@@ -195,11 +195,11 @@ public:
 private:
     // 跨超节点/跨 server 场景下，HCCL 拓扑存在多个 net layer（层内 rank 可达、层间不可达）。
     // 对每个 peer 找到存在目标协议 link 的 layer，构建 rank->layer 映射；单层拓扑留空映射（用 netLayers[0]）。
-    void BuildLayerMap(::CommProtocol protocol, const uint32_t *layers, uint32_t layerNum,
-                       std::map<uint32_t, uint32_t> &layerMap)
+    void BuildLayerMap(::CommProtocol protocol, const uint32_t* layers, uint32_t layerNum,
+                       std::map<uint32_t, uint32_t>& layerMap)
     {
         for (uint32_t li = 0U; li < layerNum; ++li) {
-            uint32_t *rankList = nullptr;
+            uint32_t* rankList = nullptr;
             uint32_t rankCnt = 0;
             if (HcclRankGraphGetRanksByLayer(comm_, layers[li], &rankList, &rankCnt) != ::HCCL_SUCCESS) {
                 continue;
@@ -209,7 +209,7 @@ private:
                 if (peer == rankId_ || layerMap.count(peer) != 0U) {
                     continue;
                 }
-                CommLink *links = nullptr;
+                CommLink* links = nullptr;
                 uint32_t linkNum = 0;
                 if (HcclRankGraphGetLinks(comm_, layers[li], rankId_, peer, &links, &linkNum) != ::HCCL_SUCCESS ||
                     linkNum == 0 || links == nullptr) {
@@ -226,9 +226,9 @@ private:
     }
 
     bool BuildChannels(ChannelMode mode, bool useHcclBuf, ::CommProtocol protocol, HcclMemHandle memHandle,
-                       const char *memTag, uint64_t *channels, uint64_t *remoteAddrs)
+                       const char* memTag, uint64_t* channels, uint64_t* remoteAddrs)
     {
-        uint32_t *netLayers = nullptr;
+        uint32_t* netLayers = nullptr;
         uint32_t netLayerNum = 0;
         if (HcclRankGraphGetLayers(comm_, &netLayers, &netLayerNum) != ::HCCL_SUCCESS || netLayerNum == 0) {
             return false;
@@ -264,7 +264,7 @@ private:
     }
 
     bool AcquireChannelAndRemoteMem(uint32_t layerId, ::CommProtocol protocol, HcclMemHandle memHandle,
-                                    const char *memTag, uint32_t peer, ChannelHandle &channel, uint64_t &remoteAddr)
+                                    const char* memTag, uint32_t peer, ChannelHandle& channel, uint64_t& remoteAddr)
     {
         channel = 0;
         remoteAddr = 0;
@@ -272,9 +272,9 @@ private:
         ASC_CHECK(AcquireChannel(layerId, protocol, peer, channel, memHandle));
 
         uint32_t memNum = 0;
-        CommMem *remoteMems = nullptr;
+        CommMem* remoteMems = nullptr;
         // HCCL C 接口按 char*** 返回远端注册内存的 tag 列表，边界处立即转为 std::string 管理
-        char **memTagsRaw = nullptr;
+        char** memTagsRaw = nullptr;
         if (HcclChannelGetRemoteMems(comm_, channel, &memNum, &remoteMems, &memTagsRaw) != ::HCCL_SUCCESS ||
             memNum == 0 || remoteMems == nullptr) {
             return false;
@@ -296,14 +296,14 @@ private:
     }
 
     bool AcquireChannelAndRemoteMemHcclBuf(uint32_t layerId, ::CommProtocol protocol, uint32_t peer,
-                                           ChannelHandle &channel, uint64_t &remoteAddr)
+                                           ChannelHandle& channel, uint64_t& remoteAddr)
     {
         channel = 0;
         remoteAddr = 0;
 
         ASC_CHECK(AcquireChannel(layerId, protocol, peer, channel));
 
-        void *remoteBuf = nullptr;
+        void* remoteBuf = nullptr;
         uint64_t remoteBufSize = 0;
         if (HcclChannelGetHcclBuffer(comm_, channel, &remoteBuf, &remoteBufSize) != ::HCCL_SUCCESS ||
             remoteBuf == nullptr) {
@@ -314,12 +314,12 @@ private:
         return true;
     }
 
-    bool AcquireChannel(uint32_t layerId, ::CommProtocol protocol, uint32_t peer, ChannelHandle &channel,
+    bool AcquireChannel(uint32_t layerId, ::CommProtocol protocol, uint32_t peer, ChannelHandle& channel,
                         HcclMemHandle memHandle = nullptr)
     {
         channel = 0;
 
-        CommLink *links = nullptr;
+        CommLink* links = nullptr;
         uint32_t linkNum = 0;
         if (HcclRankGraphGetLinks(comm_, layerId, rankId_, peer, &links, &linkNum) != ::HCCL_SUCCESS || linkNum == 0 ||
             links == nullptr) {

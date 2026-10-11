@@ -33,17 +33,17 @@ struct SituGluParams {
 };
 
 template <typename InputType>
-__simd_callee__ inline void LoadSituGluInputAsFp32(AscendC::Reg::RegTensor<float> &dstReg,
-                                                   AscendC::Reg::RegTensor<InputType> &inputReg,
-                                                   __ubuf__ InputType *src, AscendC::Reg::MaskReg computeMask)
+__simd_callee__ inline void LoadSituGluInputAsFp32(AscendC::Reg::RegTensor<float>& dstReg,
+                                                   AscendC::Reg::RegTensor<InputType>& inputReg,
+                                                   __ubuf__ InputType* src, AscendC::Reg::MaskReg computeMask)
 {
     AscendC::Reg::LoadAlign<InputType, AscendC::Reg::LoadDist::DIST_UNPACK_B16>(inputReg, src);
     AscendC::Reg::Cast<float, InputType, CAST_INPUT_TO_FP32>(dstReg, inputReg, computeMask);
 }
 
-__simd_callee__ inline void StoreSituGluFp32AsBf16(__ubuf__ bfloat16_t *dst,
-                                                   AscendC::Reg::RegTensor<bfloat16_t> &outputReg,
-                                                   AscendC::Reg::RegTensor<float> &srcReg,
+__simd_callee__ inline void StoreSituGluFp32AsBf16(__ubuf__ bfloat16_t* dst,
+                                                   AscendC::Reg::RegTensor<bfloat16_t>& outputReg,
+                                                   AscendC::Reg::RegTensor<float>& srcReg,
                                                    AscendC::Reg::MaskReg computeMask, AscendC::Reg::MaskReg storeMask)
 {
     AscendC::Reg::Cast<bfloat16_t, float, CAST_FP32_TO_BF16>(outputReg, srcReg, computeMask);
@@ -51,11 +51,11 @@ __simd_callee__ inline void StoreSituGluFp32AsBf16(__ubuf__ bfloat16_t *dst,
 }
 
 __simd_callee__ inline void ComputeSituGluTanhPiecewiseApprox(
-    AscendC::Reg::RegTensor<float> &resultReg, AscendC::Reg::RegTensor<float> &zReg,
-    AscendC::Reg::RegTensor<float> &oneReg, AscendC::Reg::RegTensor<float> &absReg,
-    AscendC::Reg::RegTensor<float> &squareReg, AscendC::Reg::RegTensor<float> &polynomialReg,
-    AscendC::Reg::RegTensor<float> &temporaryReg, AscendC::Reg::RegTensor<float> &expReg,
-    AscendC::Reg::RegTensor<float> &c1Reg, AscendC::Reg::RegTensor<float> &c2Reg, AscendC::Reg::MaskReg &compareMask,
+    AscendC::Reg::RegTensor<float>& resultReg, AscendC::Reg::RegTensor<float>& zReg,
+    AscendC::Reg::RegTensor<float>& oneReg, AscendC::Reg::RegTensor<float>& absReg,
+    AscendC::Reg::RegTensor<float>& squareReg, AscendC::Reg::RegTensor<float>& polynomialReg,
+    AscendC::Reg::RegTensor<float>& temporaryReg, AscendC::Reg::RegTensor<float>& expReg,
+    AscendC::Reg::RegTensor<float>& c1Reg, AscendC::Reg::RegTensor<float>& c2Reg, AscendC::Reg::MaskReg& compareMask,
     AscendC::Reg::MaskReg computeMask)
 {
     AscendC::Reg::Mul(squareReg, zReg, zReg, computeMask);
@@ -80,14 +80,14 @@ __simd_callee__ inline void ComputeSituGluTanhPiecewiseApprox(
 
 template <bool IsLinear>
 __simd_callee__ inline void ComputeSituGluRegFlow(
-    AscendC::Reg::RegTensor<float> &outputFp32Reg, AscendC::Reg::RegTensor<float> &gateFp32Reg,
-    AscendC::Reg::RegTensor<float> &upFp32Reg, AscendC::Reg::RegTensor<float> &negReg,
-    AscendC::Reg::RegTensor<float> &expReg, AscendC::Reg::RegTensor<float> &denominatorReg,
-    AscendC::Reg::RegTensor<float> &sigmoidReg, AscendC::Reg::RegTensor<float> &zReg,
-    AscendC::Reg::RegTensor<float> &betaReg, AscendC::Reg::RegTensor<float> &oneReg,
-    AscendC::Reg::RegTensor<float> &absReg, AscendC::Reg::RegTensor<float> &squareReg,
-    AscendC::Reg::RegTensor<float> &polynomialReg, AscendC::Reg::RegTensor<float> &tanhTemporaryReg,
-    AscendC::Reg::RegTensor<float> &c1Reg, AscendC::Reg::RegTensor<float> &c2Reg, AscendC::Reg::MaskReg &compareMask,
+    AscendC::Reg::RegTensor<float>& outputFp32Reg, AscendC::Reg::RegTensor<float>& gateFp32Reg,
+    AscendC::Reg::RegTensor<float>& upFp32Reg, AscendC::Reg::RegTensor<float>& negReg,
+    AscendC::Reg::RegTensor<float>& expReg, AscendC::Reg::RegTensor<float>& denominatorReg,
+    AscendC::Reg::RegTensor<float>& sigmoidReg, AscendC::Reg::RegTensor<float>& zReg,
+    AscendC::Reg::RegTensor<float>& betaReg, AscendC::Reg::RegTensor<float>& oneReg,
+    AscendC::Reg::RegTensor<float>& absReg, AscendC::Reg::RegTensor<float>& squareReg,
+    AscendC::Reg::RegTensor<float>& polynomialReg, AscendC::Reg::RegTensor<float>& tanhTemporaryReg,
+    AscendC::Reg::RegTensor<float>& c1Reg, AscendC::Reg::RegTensor<float>& c2Reg, AscendC::Reg::MaskReg& compareMask,
     AscendC::Reg::MaskReg computeMask, float clampLimit, float beta, float invBeta, float alpha, float invAlpha)
 {
     AscendC::Reg::Mins(gateFp32Reg, gateFp32Reg, clampLimit, computeMask);
@@ -119,14 +119,14 @@ __simd_callee__ inline void ComputeSituGluRegFlow(
 template <typename InputType, bool TopkWeightsPrefetch, bool IsLinear>
 __simd_vf__ inline void RunSiTUGLU(GatedActivationTileContext<InputType> context, SituGluParams params)
 {
-    __ubuf__ InputType *gate = context.gate;
-    __ubuf__ InputType *up = context.up;
-    __ubuf__ bfloat16_t *output = context.output;
-    __ubuf__ float *topkWeights = context.topkWeights;
-    __ubuf__ InputType *gateTail = context.gateTail;
-    __ubuf__ InputType *upTail = context.upTail;
-    __ubuf__ bfloat16_t *outputTail = context.outputTail;
-    __ubuf__ bfloat16_t *additionalPaddingOutput = context.additionalPaddingOutput;
+    __ubuf__ InputType* gate = context.gate;
+    __ubuf__ InputType* up = context.up;
+    __ubuf__ bfloat16_t* output = context.output;
+    __ubuf__ float* topkWeights = context.topkWeights;
+    __ubuf__ InputType* gateTail = context.gateTail;
+    __ubuf__ InputType* upTail = context.upTail;
+    __ubuf__ bfloat16_t* outputTail = context.outputTail;
+    __ubuf__ bfloat16_t* additionalPaddingOutput = context.additionalPaddingOutput;
 
     const uint32_t inputRowStrideElements = context.inputRowStrideElements;
     const uint32_t outputRowStrideElements = context.outputRowStrideElements;

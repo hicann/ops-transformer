@@ -22,7 +22,7 @@ namespace optiling {
 namespace mc2_matmul_v3_advanced {
 class Mc2MatMulV3AswBasicApiTiling : public Mc2MatMulV3AswTiling {
 public:
-    Mc2MatMulV3AswBasicApiTiling(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg)
+    Mc2MatMulV3AswBasicApiTiling(gert::TilingContext* context, Mc2MatMulTilingCfg& cfg)
         : Mc2MatMulV3AswTiling(context, cfg) {};
 
     ~Mc2MatMulV3AswBasicApiTiling() override {};

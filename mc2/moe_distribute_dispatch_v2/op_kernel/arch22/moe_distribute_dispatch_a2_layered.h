@@ -73,12 +73,12 @@ public:
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIds, GM_ADDR scales, GM_ADDR expertScales,
                                 GM_ADDR performanceInfo, GM_ADDR expandXOut, GM_ADDR dynamicScalesOut,
                                 GM_ADDR expandIdxOut, GM_ADDR expertTokenNumsOut, GM_ADDR epRecvCountsOut,
-                                GM_ADDR expandScales, GM_ADDR workspaceGM, TPipe *pipe, GM_ADDR tilingGM,
+                                GM_ADDR expandScales, GM_ADDR workspaceGM, TPipe* pipe, GM_ADDR tilingGM,
                                 GM_ADDR contextGM0);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InitCommTiling(TPipe *pipe, GM_ADDR tilingGM, GM_ADDR contextGM0);
+    __aicore__ inline void InitCommTiling(TPipe* pipe, GM_ADDR tilingGM, GM_ADDR contextGM0);
     __aicore__ inline void InitTokenStruct();
     __aicore__ inline void InitGlobalTensor(GM_ADDR x, GM_ADDR expertIds, GM_ADDR expertScales, GM_ADDR expandXOut,
                                             GM_ADDR dynamicScalesOut, GM_ADDR expertTokenNumsOut,
@@ -101,14 +101,14 @@ private:
     __aicore__ inline uint32_t GetArrivedTokenInfo(uint32_t serverIdx, uint32_t tokenIdx, bool justExpInfo,
                                                    LocalTensor<uint8_t> localUB_U8);
     __aicore__ inline void AIVRDMAPostSend(GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr, uint64_t destRankId,
-                                           uint64_t messageLen, __gm__ HcclAiRMAInfo *QpInfo);
+                                           uint64_t messageLen, __gm__ HcclAiRMAInfo* QpInfo);
     __aicore__ inline uint32_t GetSelfServerTokenInfo(uint32_t tokenIdx, bool justExpInfo,
                                                       LocalTensor<uint8_t> localUB_U8);
     __aicore__ inline void PreloadForInner();
     __aicore__ inline void PreloadForOuter();
     __aicore__ inline void CopyPerformanceInfo();
 
-    TPipe *tpipe_{nullptr};
+    TPipe* tpipe_{nullptr};
     GlobalTensor<int32_t> expertIdsGMTensor_;
     GlobalTensor<ExpandXOutType> expandXOutGMTensor_;
     GlobalTensor<float> dynamicScalesOutGMTensor_;
@@ -131,7 +131,7 @@ private:
     TBuf<TPosition::VECOUT> rdmaInBuf2_;
     TBuf<TPosition::LCM> aDumpBuf_;
 
-    __gm__ HcclAiRMAInfo *qp_info_;
+    __gm__ HcclAiRMAInfo* qp_info_;
     GM_ADDR expandXGM_;
     GM_ADDR expandIdxGM_;
     GM_ADDR weightsGM_;
@@ -204,7 +204,7 @@ private:
 };
 
 template <TemplateMC2TypeA2layeredClass>
-__aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFunc>::InitCommTiling(TPipe *pipe,
+__aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFunc>::InitCommTiling(TPipe* pipe,
                                                                                                     GM_ADDR tilingGM,
                                                                                                     GM_ADDR contextGM0)
 {
@@ -216,7 +216,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
 
     rankId_ = tilingData.moeDistributeDispatchInfo.epRankId;
     serverId_ = rankId_ / SERVER_RANK_SIZE;
-    qp_info_ = (__gm__ HcclAiRMAInfo *)(((__gm__ HcclA2CombineOpParam *)contextGM0)->aiRMAInfo);
+    qp_info_ = (__gm__ HcclAiRMAInfo*)(((__gm__ HcclA2CombineOpParam*)contextGM0)->aiRMAInfo);
 
     axisBS_ = tilingData.moeDistributeDispatchInfo.bs;
     globalBs_ = tilingData.moeDistributeDispatchInfo.globalBs;
@@ -272,11 +272,11 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     GM_ADDR expertTokenNumsOut, GM_ADDR epRecvCountsOut, GM_ADDR expandScales, GM_ADDR workspaceGM)
 {
     // Input/Output global tensor init
-    expertIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t *)expertIds);
-    expandXOutGMTensor_.SetGlobalBuffer((__gm__ ExpandXOutType *)(expandXOut),
+    expertIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t*)expertIds);
+    expandXOutGMTensor_.SetGlobalBuffer((__gm__ ExpandXOutType*)(expandXOut),
                                         worldSize_ * axisBS_ * localMoeExpertNum_ * axisH_);
-    dynamicScalesOutGMTensor_.SetGlobalBuffer((__gm__ float *)(dynamicScalesOut));
-    weightsOutGt.SetGlobalBuffer((__gm__ float *)(expandScales));
+    dynamicScalesOutGMTensor_.SetGlobalBuffer((__gm__ float*)(dynamicScalesOut));
+    weightsOutGt.SetGlobalBuffer((__gm__ float*)(expandScales));
     expertTokenNumsOutGM_ = expertTokenNumsOut; // 无GlobalTensor
     epRecvCountsGM_ = epRecvCountsOut;          // 无GlobalTensor
     expandXGM_ = x;
@@ -284,12 +284,12 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     weightsGM_ = expertScales;
 
     // RDMA send/recv global tensor init
-    sendTokensU8Tensor_.SetGlobalBuffer((__gm__ uint8_t *)(addrInfo_.GetLocalSendBuffDataAddr()));
-    sendStatusTensor_.SetGlobalBuffer((__gm__ uint64_t *)(addrInfo_.GetLocalSendBuffFlagAddr()));
+    sendTokensU8Tensor_.SetGlobalBuffer((__gm__ uint8_t*)(addrInfo_.GetLocalSendBuffDataAddr()));
+    sendStatusTensor_.SetGlobalBuffer((__gm__ uint64_t*)(addrInfo_.GetLocalSendBuffFlagAddr()));
 
     // Global work space init
     tokenAddrFlagStructGM_ = workspaceGM;
-    tokenAddrFlagStructGlobalU64Tensor_.SetGlobalBuffer((__gm__ uint64_t *)(tokenAddrFlagStructGM_),
+    tokenAddrFlagStructGlobalU64Tensor_.SetGlobalBuffer((__gm__ uint64_t*)(tokenAddrFlagStructGM_),
                                                         axisBS_ * FLAG_SIZE);
 
     // Combine info offset init
@@ -324,7 +324,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     needPerformanceInfo_ = performanceInfo != nullptr;
     if (unlikely(needPerformanceInfo_)) {
         performanceInfoSize_ = worldSize_;
-        performanceInfoI32GMTensor_.SetGlobalBuffer((__gm__ int32_t *)performanceInfo);
+        performanceInfoI32GMTensor_.SetGlobalBuffer((__gm__ int32_t*)performanceInfo);
         tpipe_->InitBuffer(performanceInfoBuf_, performanceInfoSize_ * sizeof(int64_t));
         performanceInfoI32Tensor_ = performanceInfoBuf_.Get<int32_t>();
         Duplicate<int32_t>(performanceInfoI32Tensor_, 0, performanceInfoSize_ * sizeof(int64_t) / sizeof(int32_t));
@@ -361,7 +361,7 @@ template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFunc>::Init(
     GM_ADDR x, GM_ADDR expertIds, GM_ADDR scales, GM_ADDR expertScales, GM_ADDR performanceInfo, GM_ADDR expandXOut,
     GM_ADDR dynamicScalesOut, GM_ADDR expandIdxOut, GM_ADDR expertTokenNumsOut, GM_ADDR epRecvCountsOut,
-    GM_ADDR expandScales, GM_ADDR workspaceGM, TPipe *pipe, GM_ADDR tilingGM, GM_ADDR contextGM0)
+    GM_ADDR expandScales, GM_ADDR workspaceGM, TPipe* pipe, GM_ADDR tilingGM, GM_ADDR contextGM0)
 {
     InitCommTiling(pipe, tilingGM, contextGM0);
     InitTokenStruct();
@@ -373,20 +373,20 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFunc>::AIVRDMAPostSend(
-    GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr, uint64_t destRankId, uint64_t messageLen, __gm__ HcclAiRMAInfo *QpInfo)
+    GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr, uint64_t destRankId, uint64_t messageLen, __gm__ HcclAiRMAInfo* QpInfo)
 {
-    auto qpNum = ((__gm__ HcclAiRMAInfo *)QpInfo)->qpNum;
+    auto qpNum = ((__gm__ HcclAiRMAInfo*)QpInfo)->qpNum;
     auto qp_ctx_entry =
-        (__gm__ HcclAiRMAWQ *)(((__gm__ HcclAiRMAInfo *)QpInfo)->sqPtr +
-                               destRankId * qpNum * (uint64_t)(((__gm__ HcclAiRMAInfo *)QpInfo)->sizeOfAiRMAWQ));
-    auto mem_info_table = ((__gm__ HcclAiRMAInfo *)QpInfo)->memPtr;
-    auto sizeof_memdetail = ((__gm__ HcclAiRMAInfo *)QpInfo)->sizeOfAiRMAMem;
-    auto cur_rank_id = (((__gm__ HcclAiRMAInfo *)QpInfo)->curRankId);
+        (__gm__ HcclAiRMAWQ*)(((__gm__ HcclAiRMAInfo*)QpInfo)->sqPtr +
+                              destRankId * qpNum * (uint64_t)(((__gm__ HcclAiRMAInfo*)QpInfo)->sizeOfAiRMAWQ));
+    auto mem_info_table = ((__gm__ HcclAiRMAInfo*)QpInfo)->memPtr;
+    auto sizeof_memdetail = ((__gm__ HcclAiRMAInfo*)QpInfo)->sizeOfAiRMAMem;
+    auto cur_rank_id = (((__gm__ HcclAiRMAInfo*)QpInfo)->curRankId);
     auto sqBaseAddr = qp_ctx_entry->bufAddr;
     auto wqeSize = qp_ctx_entry->wqeSize;
     auto curHardwareHead = qp_ctx_entry->headAddr;
-    cacheWriteThrough((__gm__ uint8_t *)curHardwareHead, 8);
-    uint64_t curHead = *(__gm__ uint32_t *)(curHardwareHead);
+    cacheWriteThrough((__gm__ uint8_t*)curHardwareHead, 8);
+    uint64_t curHead = *(__gm__ uint32_t*)(curHardwareHead);
     auto curHardwareTailAddr = qp_ctx_entry->tailAddr;
     uint64_t shift = 15U;
     auto QP_DEPTH = qp_ctx_entry->depth;
@@ -396,14 +396,14 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     // Make sure we don't overflow the SQ in an infinite loop - no need to mitigate endless loop as the host
     // will timeout and kill the kernel, same as all2all kernel if it fails to complete (e.g. in case of link loss)
     while (1) {
-        cacheWriteThrough((__gm__ uint8_t *)curHardwareTailAddr, 8);
-        if ((curHead - *(__gm__ uint32_t *)(curHardwareTailAddr)) < QP_DEPTH - 1) {
+        cacheWriteThrough((__gm__ uint8_t*)curHardwareTailAddr, 8);
+        if ((curHead - *(__gm__ uint32_t*)(curHardwareTailAddr)) < QP_DEPTH - 1) {
             break;
         }
         int64_t systemCycleAfter = AscendC::GetSystemCycle(); // add this line to solve slow poll CQ issue
     }
 
-    __gm__ uint8_t *wqeAddr = (__gm__ uint8_t *)(sqBaseAddr + wqeSize * (curHead % QP_DEPTH));
+    __gm__ uint8_t* wqeAddr = (__gm__ uint8_t*)(sqBaseAddr + wqeSize * (curHead % QP_DEPTH));
 
     // Write the WQE to GM
     uint64_t ownBit = (curHead >> shift) & 1U;
@@ -411,28 +411,27 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     byte_4 |= ((~ownBit) << 7U) & (1U << 7U); // [7] owner_bit
     byte_4 |= 1U << 8U;                       // [8:8] IBV_SEND_SIGNALED
 
-    *(__gm__ uint32_t *)(wqeAddr) = byte_4;         // Control set by local parameter see above lines
-    *(__gm__ uint32_t *)(wqeAddr + 4) = messageLen; // message size
-    *(__gm__ uint32_t *)(wqeAddr + 8) = 0;          // immtdata is always 0 till we provide poll CQ flow in AIV
-    *(__gm__ uint32_t *)(wqeAddr + 12) = 1U << 24U; // [120:127] num_sge = 1
-    *(__gm__ uint32_t *)(wqeAddr + 16) = 0;         // [128:151] start_sge_idx = 0;
-    __gm__ HcclAiRMAMemInfo *memDetail = (__gm__ HcclAiRMAMemInfo *)(mem_info_table + sizeof_memdetail * destRankId);
-    *(__gm__ uint32_t *)(wqeAddr + 20) =
-        ((__gm__ MemDetails *)(memDetail->memDetailPtr +
-                               memDetail->sizeOfMemDetails * static_cast<uint32_t>(HcclAiRMAMemType::REMOTE_INPUT)))
+    *(__gm__ uint32_t*)(wqeAddr) = byte_4;         // Control set by local parameter see above lines
+    *(__gm__ uint32_t*)(wqeAddr + 4) = messageLen; // message size
+    *(__gm__ uint32_t*)(wqeAddr + 8) = 0;          // immtdata is always 0 till we provide poll CQ flow in AIV
+    *(__gm__ uint32_t*)(wqeAddr + 12) = 1U << 24U; // [120:127] num_sge = 1
+    *(__gm__ uint32_t*)(wqeAddr + 16) = 0;         // [128:151] start_sge_idx = 0;
+    __gm__ HcclAiRMAMemInfo* memDetail = (__gm__ HcclAiRMAMemInfo*)(mem_info_table + sizeof_memdetail * destRankId);
+    *(__gm__ uint32_t*)(wqeAddr + 20) =
+        ((__gm__ MemDetails*)(memDetail->memDetailPtr +
+                              memDetail->sizeOfMemDetails * static_cast<uint32_t>(HcclAiRMAMemType::REMOTE_INPUT)))
             ->key;
-    *(__gm__ uint64_t *)(wqeAddr + 24) = (uint64_t)destDmaAddr; // destination VA
+    *(__gm__ uint64_t*)(wqeAddr + 24) = (uint64_t)destDmaAddr; // destination VA
 
     // Setup SGE and write to GM
-    __gm__ uint8_t *sgeAddr = wqeAddr + sizeof(struct hns_roce_rc_sq_wqe);
-    *(__gm__ uint32_t *)(sgeAddr) = messageLen;
-    memDetail = (__gm__ HcclAiRMAMemInfo *)(mem_info_table + sizeof_memdetail * destRankId);
-    *(__gm__ uint32_t *)(sgeAddr + sizeof(uint32_t)) =
-        ((__gm__ MemDetails *)(memDetail->memDetailPtr +
-                               memDetail->sizeOfMemDetails * static_cast<uint32_t>(HcclAiRMAMemType::LOCAL_OUTPUT)))
-            ->key; // L_Key
-    *(__gm__ uint64_t *)(sgeAddr + 2 * sizeof(uint32_t)) =
-        (uint64_t)srcDmaAddr; // src VA addr memory registered by RNIC
+    __gm__ uint8_t* sgeAddr = wqeAddr + sizeof(struct hns_roce_rc_sq_wqe);
+    *(__gm__ uint32_t*)(sgeAddr) = messageLen;
+    memDetail = (__gm__ HcclAiRMAMemInfo*)(mem_info_table + sizeof_memdetail * destRankId);
+    *(__gm__ uint32_t*)(sgeAddr + sizeof(uint32_t)) =
+        ((__gm__ MemDetails*)(memDetail->memDetailPtr +
+                              memDetail->sizeOfMemDetails * static_cast<uint32_t>(HcclAiRMAMemType::LOCAL_OUTPUT)))
+            ->key;                                                              // L_Key
+    *(__gm__ uint64_t*)(sgeAddr + 2 * sizeof(uint32_t)) = (uint64_t)srcDmaAddr; // src VA addr memory registered by RNIC
 
     // wqe & sge cache flush
     cacheWriteThrough(wqeAddr, sizeof(struct hns_roce_rc_sq_wqe) + sizeof(struct hns_roce_lite_wqe_data_seg));
@@ -445,7 +444,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     doorBellInfo |= (curHead % 65536UL) << 32UL;          // [32:47] DB_PI = sq.head
     doorBellInfo |= (uint64_t)(qp_ctx_entry->sl) << 48UL; // [48:50] DB_SL = qp.sl
 
-    __gm__ uint64_t *doorBellAddr = (__gm__ uint64_t *)(qp_ctx_entry->dbAddr);
+    __gm__ uint64_t* doorBellAddr = (__gm__ uint64_t*)(qp_ctx_entry->dbAddr);
     PipeBarrier<PIPE_ALL>();
 
     ubLocal.SetValue(0, doorBellInfo);
@@ -458,7 +457,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
 
     ubLocalHead.SetValue(0, (uint32_t)curHead);
     AscendC::GlobalTensor<uint32_t> HeadGlobalTensor;
-    HeadGlobalTensor.SetGlobalBuffer((__gm__ uint32_t *)curHardwareHead);
+    HeadGlobalTensor.SetGlobalBuffer((__gm__ uint32_t*)curHardwareHead);
     AscendC::DataCopyExtParams copyParamsHead{1, 1 * sizeof(uint32_t), 0, 0, 0};
     PipeBarrier<PIPE_ALL>();
     AscendC::DataCopyPad(HeadGlobalTensor, ubLocalHead, copyParamsHead);
@@ -510,7 +509,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     innerAxisBSLt(0) = static_cast<int16_t>(axisBS_);
     SyncFunc<AscendC::HardEvent::S_MTE3>(); // 保证axisBS_信息写入
     uint32_t dstServerId = curServerId;
-    sendInnerTableTensor_.SetGlobalBuffer((__gm__ uint8_t *)(addrInfo_.GetLocalSendBuffInnerDataAddr(dstServerId)));
+    sendInnerTableTensor_.SetGlobalBuffer((__gm__ uint8_t*)(addrInfo_.GetLocalSendBuffInnerDataAddr(dstServerId)));
     DataCopyPad(sendInnerTableTensor_, innerAxisBSU8Lt, bsParams);
 
     // 计算TBUF能存放最大多少BS的Inner表信息
@@ -604,29 +603,28 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
         LocalTensor<uint64_t> statusTensor = statusBuf_.Get<uint64_t>();
         uint64_t endFlagValue = 0;
         GlobalTensor<uint64_t> readInnerStatusTensor;
-        readInnerStatusTensor.SetGlobalBuffer(
-            (__gm__ uint64_t *)(addrInfo_.GetLocalRecvBuffInnerFlagAddr(srcServerId)));
+        readInnerStatusTensor.SetGlobalBuffer((__gm__ uint64_t*)(addrInfo_.GetLocalRecvBuffInnerFlagAddr(srcServerId)));
 
         while (endFlagValue != END_OF_WRITE_FLAG_VALUE) {
             DataCopy(statusTensor, readInnerStatusTensor, FLAG_SIZE / sizeof(uint64_t));
             SyncFunc<AscendC::HardEvent::MTE2_S>(); // 等待状态符搬完
             endFlagValue = statusTensor.GetValue(0);
         }
-        readInnerTensor.SetGlobalBuffer((__gm__ uint8_t *)(addrInfo_.GetLocalRecvBuffInnerDataAddr(srcServerId)));
+        readInnerTensor.SetGlobalBuffer((__gm__ uint8_t*)(addrInfo_.GetLocalRecvBuffInnerDataAddr(srcServerId)));
         DataCopy(innerAxisBSU8Lt, readInnerTensor, UB_32B_ALIGN);
         SyncFunc<AscendC::HardEvent::MTE2_MTE3>(); // 等待innerAxisBSU8Lt搬运完成
     } else {
-        readInnerTensor.SetGlobalBuffer((__gm__ uint8_t *)(addrInfo_.GetLocalSendBuffInnerDataAddr(serverId_)));
+        readInnerTensor.SetGlobalBuffer((__gm__ uint8_t*)(addrInfo_.GetLocalSendBuffInnerDataAddr(serverId_)));
     }
     aDump_.UpdateHierarchyInnerSendOrRecv(dstServerId, Mc2A2Kernel::IS_RECV);
 
     // 先存储BS信息到Out
     GlobalTensor<int16_t> combineInnerCnt;
     combineInnerCnt.SetGlobalBuffer(
-        (__gm__ int16_t *)(epRecvCountsGM_ + combineInnerCntOffset + globalBs_ * curServerId * sizeof(int16_t)));
+        (__gm__ int16_t*)(epRecvCountsGM_ + combineInnerCntOffset + globalBs_ * curServerId * sizeof(int16_t)));
     GlobalTensor<int32_t> combineInnerOffset;
-    combineInnerOffset.SetGlobalBuffer((__gm__ int32_t *)(epRecvCountsGM_ + combineInnerCntIndexOffset +
-                                                          globalBs_ * axisK_ * curServerId * sizeof(int32_t)));
+    combineInnerOffset.SetGlobalBuffer((__gm__ int32_t*)(epRecvCountsGM_ + combineInnerCntIndexOffset +
+                                                         globalBs_ * axisK_ * curServerId * sizeof(int32_t)));
     DataCopyPad(combineInnerCnt, innerAxisBSLt, bsParams);
 
     SyncFunc<AscendC::HardEvent::MTE2_S>();
@@ -703,9 +701,9 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     LocalTensor<int32_t> outerOffsetLt = tBuf.GetWithOffset<int32_t>(outerOffsetNumInUB_, baseBuffOffset);
 
     GlobalTensor<int32_t> combineOuterCnt;
-    combineOuterCnt.SetGlobalBuffer((__gm__ int32_t *)(epRecvCountsGM_ + combineOuterCntOffset));
+    combineOuterCnt.SetGlobalBuffer((__gm__ int32_t*)(epRecvCountsGM_ + combineOuterCntOffset));
     GlobalTensor<int32_t> combineOuterOffset;
-    combineOuterOffset.SetGlobalBuffer((__gm__ int32_t *)(epRecvCountsGM_ + combineOuterCntIndexOffset));
+    combineOuterOffset.SetGlobalBuffer((__gm__ int32_t*)(epRecvCountsGM_ + combineOuterCntIndexOffset));
 
     uint32_t BASE_VALUE = axisBS_; // 用于隔开不同的专家
     uint32_t leftBS = axisBS_;
@@ -790,9 +788,9 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     GlobalTensor<uint8_t> expertIdsGMTensorU8_;
     GlobalTensor<uint8_t> weightGt;
     GlobalTensor<uint8_t> xGMtU8;
-    xGMtU8.SetGlobalBuffer((__gm__ uint8_t *)expandXGM_);
-    weightGt.SetGlobalBuffer((__gm__ uint8_t *)weightsGM_);
-    expertIdsGMTensorU8_.SetGlobalBuffer((__gm__ uint8_t *)expandIdxGM_);
+    xGMtU8.SetGlobalBuffer((__gm__ uint8_t*)expandXGM_);
+    weightGt.SetGlobalBuffer((__gm__ uint8_t*)weightsGM_);
+    expertIdsGMTensorU8_.SetGlobalBuffer((__gm__ uint8_t*)expandIdxGM_);
 
     if constexpr (DynamicQuant) {
         uint32_t tokenCastLtOffset = RoundUp(TBUF_TEMP_OFFSET + quantTokenUBSize * maxTokenNumInUB, UB_32B_ALIGN);
@@ -964,7 +962,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     }
     uint32_t dstRankId = aivId_ + rankId_ / SERVER_RANK_SIZE * SERVER_RANK_SIZE;
     GlobalTensor<uint64_t> globalSet;
-    globalSet.SetGlobalBuffer((__gm__ uint64_t *)(addrInfo_.GetRemoteIpcSyncFlagAddr(dstRankId)));
+    globalSet.SetGlobalBuffer((__gm__ uint64_t*)(addrInfo_.GetRemoteIpcSyncFlagAddr(dstRankId)));
     LocalTensor<uint64_t> localSet = tBuf.GetWithOffset<uint64_t>(B64_PER_BLOCK, 0);
     uint64_t setVal = magicVal_;
     localSet.SetValue(0, setVal);
@@ -984,7 +982,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     bool isSync = true;
     uint32_t srcRankId = aivId_ + rankId_ / SERVER_RANK_SIZE * SERVER_RANK_SIZE;
     GlobalTensor<uint64_t> flagIpcGt;
-    flagIpcGt.SetGlobalBuffer((__gm__ uint64_t *)(addrInfo_.GetLocalIpcSyncFlagAddr(srcRankId)));
+    flagIpcGt.SetGlobalBuffer((__gm__ uint64_t*)(addrInfo_.GetLocalIpcSyncFlagAddr(srcRankId)));
     PipeBarrier<PIPE_ALL>();
     int64_t startTime = GetCurrentTimestampUs();
     do {
@@ -1010,11 +1008,11 @@ __aicore__ inline uint32_t MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layer
     GlobalTensor<uint8_t> TokensGtU8;
     GlobalTensor<uint64_t> readStatusTensor;
     uint32_t srcRankId = serverIdx * SERVER_RANK_SIZE + rankId_ % SERVER_RANK_SIZE;
-    TokenFlagGtU64.SetGlobalBuffer((__gm__ uint64_t *)(addrInfo_.GetLocalRecvBuffDataAddr(srcRankId)));
-    TokensGtU8.SetGlobalBuffer((__gm__ uint8_t *)(addrInfo_.GetLocalRecvBuffDataAddr(srcRankId)));
+    TokenFlagGtU64.SetGlobalBuffer((__gm__ uint64_t*)(addrInfo_.GetLocalRecvBuffDataAddr(srcRankId)));
+    TokensGtU8.SetGlobalBuffer((__gm__ uint8_t*)(addrInfo_.GetLocalRecvBuffDataAddr(srcRankId)));
 
     LocalTensor<uint64_t> statusTensor = statusBuf_.Get<uint64_t>();
-    readStatusTensor.SetGlobalBuffer((__gm__ uint64_t *)(addrInfo_.GetLocalRecvBuffFlagAddr(srcRankId)));
+    readStatusTensor.SetGlobalBuffer((__gm__ uint64_t*)(addrInfo_.GetLocalRecvBuffFlagAddr(srcRankId)));
     uint64_t TokenOffset = tokenIdx * tokenStructLen_;
     uint64_t nextTokenOffset = (tokenIdx + 1) * tokenStructLen_;
     uint32_t copyNum = FLAG_SIZE / sizeof(uint64_t);
@@ -1078,7 +1076,7 @@ __aicore__ inline uint32_t MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layer
         return SKIP_STATUS;
     } else {
         GlobalTensor<uint8_t> TokensGtU8;
-        TokensGtU8.SetGlobalBuffer((__gm__ uint8_t *)(addrInfo_.GetLocalSendBuffDataAddr()));
+        TokensGtU8.SetGlobalBuffer((__gm__ uint8_t*)(addrInfo_.GetLocalSendBuffDataAddr()));
         if (justExpInfo) {
             DataCopy(localUB_U8, TokensGtU8[tokenIdx * tokenStructLen_ + expOffsetInStruct_], expLenInStruct_);
         } else {
@@ -1161,8 +1159,8 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
 
             // 本卡需要发送
             uint32_t targetRankId = GetExpRank(targetExpId);
-            targetTokenIpcGt.SetGlobalBuffer((__gm__ uint8_t *)(addrInfo_.GetIpcDataAddr(
-                targetRankId, targetExpId % localMoeExpertNum_, fromRankId)));
+            targetTokenIpcGt.SetGlobalBuffer((
+                __gm__ uint8_t*)(addrInfo_.GetIpcDataAddr(targetRankId, targetExpId % localMoeExpertNum_, fromRankId)));
             DataCopy(targetTokenIpcGt[tokenStructLen_ * targetTokenIdx], localUB_U8, tokenStructLen_);
         }
         SyncFunc<AscendC::HardEvent::MTE3_MTE2>(); // localUB搬下次Token时，确保当前Token已搬移至Ipc Buffer
@@ -1188,7 +1186,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
         }
         uint32_t localExpOffset = (targetExpId % (localMoeExpertNum_ * SERVER_RANK_SIZE)) * EXP_TOKEN_COUNT_FLAG_CNT;
         targetCntIpcGt.SetGlobalBuffer(
-            (__gm__ int32_t *)(addrInfo_.GetRemoteIpcTokenCntAddr(targetRankId, targetExpId, fromRankId)));
+            (__gm__ int32_t*)(addrInfo_.GetRemoteIpcTokenCntAddr(targetRankId, targetExpId, fromRankId)));
         DataCopy(targetCntIpcGt, tokenNumPerExp[localExpOffset], EXP_TOKEN_COUNT_FLAG_CNT);
     }
     aDump_.UpdateHierarchyInterNodeSendOrRecv(fromServerId, tokenIdx, Mc2A2Kernel::IS_RECV);
@@ -1218,7 +1216,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     uint32_t srCntCurCore = (localAivId < srCntRemain) ? (srCntPerCore + 1) : srCntPerCore;
 
     GlobalTensor<int32_t> tokenCntIpcGt;
-    tokenCntIpcGt.SetGlobalBuffer((__gm__ int32_t *)(addrInfo_.GetLocalIpcTokenCntAddr()));
+    tokenCntIpcGt.SetGlobalBuffer((__gm__ int32_t*)(addrInfo_.GetLocalIpcTokenCntAddr()));
 
     // tBuf 内存分配
     // 4k ~ 6k 保存按expert统计的token个数信息
@@ -1274,7 +1272,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
         }
         uint32_t localMoeExpertId = srIdx / worldSize_;
         uint32_t srcRankId = srIdx % worldSize_;
-        srcIpcGt.SetGlobalBuffer((__gm__ uint8_t *)(addrInfo_.GetIpcDataAddr(rankId_, localMoeExpertId, srcRankId)));
+        srcIpcGt.SetGlobalBuffer((__gm__ uint8_t*)(addrInfo_.GetIpcDataAddr(rankId_, localMoeExpertId, srcRankId)));
         uint32_t tokenCntInUB = tokenUbSize_ / tokenStructLen_;
         // 单次能搬移的token数据量
         uint32_t batchCnt = (curSrTokenCnt + tokenCntInUB - 1) / tokenCntInUB;
@@ -1334,7 +1332,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     if (aivId_ == 0) {
         // 搬运token统计信息到output
         GlobalTensor<int32_t> tokenNumsGlobal;
-        tokenNumsGlobal.SetGlobalBuffer((__gm__ int32_t *)(epRecvCountsGM_));
+        tokenNumsGlobal.SetGlobalBuffer((__gm__ int32_t*)(epRecvCountsGM_));
         DataCopyExtParams countsParams{
             1, static_cast<uint32_t>(localMoeExpertNum_ * serverNum * SERVER_RANK_SIZE * sizeof(int32_t)), 0, 0, 0};
         SyncFunc<AscendC::HardEvent::S_MTE3>();
@@ -1342,7 +1340,7 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
 
         // 搬运按expert的token信息到output
         GlobalTensor<int64_t> expertTokenNumsGlobal;
-        expertTokenNumsGlobal.SetGlobalBuffer((__gm__ int64_t *)(expertTokenNumsOutGM_));
+        expertTokenNumsGlobal.SetGlobalBuffer((__gm__ int64_t*)(expertTokenNumsOutGM_));
         DataCopyExtParams writeCountsParams{1, static_cast<uint32_t>(localMoeExpertNum_ * sizeof(int64_t)), 0, 0, 0};
         SyncFunc<AscendC::HardEvent::S_MTE3>();
         DataCopyPad(expertTokenNumsGlobal, tokenCntByExpUB, writeCountsParams);
@@ -1365,16 +1363,16 @@ __aicore__ inline void MoeDistributeDispatchA2Layered<TemplateMC2TypeA2layeredFu
     PipeBarrier<PIPE_ALL>();
     if (aivId_ == serverNum - 1) {
         GlobalTensor<int32_t> readStatusTensorU32;
-        readStatusTensorU32.SetGlobalBuffer((__gm__ int32_t *)(addrInfo_.GetLocalRecvBuffFlagAddr(0U)));
+        readStatusTensorU32.SetGlobalBuffer((__gm__ int32_t*)(addrInfo_.GetLocalRecvBuffFlagAddr(0U)));
         DataCopy(readStatusTensorU32, cleanTempLt_, writeEndFlagCleanSize / sizeof(uint32_t));
         GlobalTensor<int32_t> readInnerStatusTensorU32;
-        readInnerStatusTensorU32.SetGlobalBuffer((__gm__ int32_t *)(addrInfo_.GetLocalRecvBuffInnerFlagAddr(0U)));
+        readInnerStatusTensorU32.SetGlobalBuffer((__gm__ int32_t*)(addrInfo_.GetLocalRecvBuffInnerFlagAddr(0U)));
         DataCopy(readInnerStatusTensorU32, cleanTempLt_, writeEndFlagCleanSize / sizeof(uint32_t));
     }
 
     GlobalTensor<int32_t> tokenEndFlagCleanTensor;
     uint32_t srcRankId = srcServerId * SERVER_RANK_SIZE + rankId_ % SERVER_RANK_SIZE;
-    tokenEndFlagCleanTensor.SetGlobalBuffer((__gm__ int32_t *)(addrInfo_.GetLocalRecvBuffDataAddr(srcRankId)));
+    tokenEndFlagCleanTensor.SetGlobalBuffer((__gm__ int32_t*)(addrInfo_.GetLocalRecvBuffDataAddr(srcRankId)));
     DataCopyExtParams cleanTokenEndFlagParams{uint16_t(maxBs_), uint32_t(flagLenInStruct_), 0,
                                               uint32_t(tokenStructLen_ - flagLenInStruct_), 0};
     SyncFunc<AscendC::HardEvent::S_MTE3>();

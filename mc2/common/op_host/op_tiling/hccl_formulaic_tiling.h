@@ -50,7 +50,7 @@ public:
     double backTileRatio = BACKTILE_ALIGN_RATIO; // 计算长块个数使用的参数
 
     // Constructor
-    explicit FormPartition(const mc2tiling::TilingArgs &args)
+    explicit FormPartition(const mc2tiling::TilingArgs& args)
     {
         totalLen = args.mValue;
         tileArgs.mAlignLen = mc2tiling::BASE_BLOCK_M; // 切分长度照顾mm性能，对齐baseM
@@ -122,7 +122,7 @@ public:
     NpuArch npuArch_ = Ops::Base::DAV_2201; // 目标平台arch:由调用点经框架GetCurNpuArch取后传入
 
     // Constructor
-    explicit OneCalcOneCommBase(const mc2tiling::TilingArgs &args, uint32_t inputRankDim, KernelType inputKernelType,
+    explicit OneCalcOneCommBase(const mc2tiling::TilingArgs& args, uint32_t inputRankDim, KernelType inputKernelType,
                                 NpuArch npuArch = Ops::Base::DAV_2201,
                                 SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B)
         : matmulPerf_(args, npuArch, socVersion_2201),

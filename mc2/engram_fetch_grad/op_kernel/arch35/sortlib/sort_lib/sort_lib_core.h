@@ -68,7 +68,7 @@ private:
     AscendC::TQue<AscendC::QuePosition::VECOUT, 1> blockHistFlagUbQue_;
 
     // === runtime state ===
-    AscendC::TPipe *pipe_;
+    AscendC::TPipe* pipe_;
     uint32_t blockIdx_ = 0;
     uint32_t realCoreNum_ = 0;
     SortLib::SortParams params_;
@@ -85,11 +85,11 @@ private:
     __aicore__ inline void ClearWorkSpace();
     __aicore__ inline void SetupDoubleBuffer();
     __aicore__ inline AscendC::LocalTensor<KeyT> PreProcess(AscendC::LocalTensor<ValT> inputX, uint32_t numTileData);
-    __aicore__ inline void PreGlobalExclusiveSum(AscendC::LocalTensor<KeyT> &inputXCopy,
-                                                 AscendC::LocalTensor<CountT> &blockExclusiveUb,
-                                                 AscendC::LocalTensor<uint16_t> &histUb,
-                                                 AscendC::LocalTensor<uint16_t> &histCumsumUb,
-                                                 AscendC::LocalTensor<uint8_t> &inputB8Ub, uint32_t currTileSize,
+    __aicore__ inline void PreGlobalExclusiveSum(AscendC::LocalTensor<KeyT>& inputXCopy,
+                                                 AscendC::LocalTensor<CountT>& blockExclusiveUb,
+                                                 AscendC::LocalTensor<uint16_t>& histUb,
+                                                 AscendC::LocalTensor<uint16_t>& histCumsumUb,
+                                                 AscendC::LocalTensor<uint8_t>& inputB8Ub, uint32_t currTileSize,
                                                  uint32_t round);
     __aicore__ inline void GetGlobalExclusiveSum(uint32_t round, AscendC::GlobalTensor<ValT> inputX);
     __aicore__ inline void ScatterBlockHist2Global(AscendC::LocalTensor<uint16_t> blockHist,
@@ -99,7 +99,7 @@ private:
     __aicore__ inline void LookbackGlobal(AscendC::LocalTensor<CountT> nowTileHistBuffer,
                                           AscendC::GlobalTensor<CountT> allTileHistBuffer,
                                           AscendC::LocalTensor<uint32_t> ubFlagTensor, uint32_t tileId, uint32_t round);
-    __aicore__ inline void SetPrefixReadyMask(AscendC::LocalTensor<CountT> &blockHistWithFlag,
+    __aicore__ inline void SetPrefixReadyMask(AscendC::LocalTensor<CountT>& blockHistWithFlag,
                                               AscendC::GlobalTensor<CountT> blockHistToGm, uint32_t tileId,
                                               uint32_t round);
     __aicore__ inline void LoadTilePreComputeData(AscendC::LocalTensor<uint8_t> inputX8Ub,
@@ -107,7 +107,7 @@ private:
                                                   AscendC::LocalTensor<uint16_t> blockHistUb, uint32_t tileId,
                                                   uint32_t curSize);
     __aicore__ inline void CopyIndexDataIn(AscendC::GlobalTensor<uint32_t> inputIndex,
-                                           AscendC::LocalTensor<uint32_t> &xLocal, uint64_t tileOffset,
+                                           AscendC::LocalTensor<uint32_t>& xLocal, uint64_t tileOffset,
                                            uint32_t currTileSize);
     __aicore__ inline void ComputeOnePass(uint32_t round, AscendC::GlobalTensor<ValT> inputXGm);
     template <typename HookT>
@@ -134,7 +134,7 @@ private:
 public:
     __aicore__ inline SortRadixMoreCore(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR value, GM_ADDR sortIndex, GM_ADDR workspace,
-                                const SortLib::SortParams &params, AscendC::TPipe *pipe);
+                                const SortLib::SortParams& params, AscendC::TPipe* pipe);
     template <typename HookT>
     __aicore__ inline void Process(HookT hook);
 };
@@ -174,9 +174,9 @@ __aicore__ inline auto SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::PreProc
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
 __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::PreGlobalExclusiveSum(
 
-    AscendC::LocalTensor<KeyT> &inputXCopy, AscendC::LocalTensor<CountT> &blockExclusiveUb,
-    AscendC::LocalTensor<uint16_t> &histUb, AscendC::LocalTensor<uint16_t> &histCumsumUb,
-    AscendC::LocalTensor<uint8_t> &inputB8Ub, uint32_t currTileSize, uint32_t round)
+    AscendC::LocalTensor<KeyT>& inputXCopy, AscendC::LocalTensor<CountT>& blockExclusiveUb,
+    AscendC::LocalTensor<uint16_t>& histUb, AscendC::LocalTensor<uint16_t>& histCumsumUb,
+    AscendC::LocalTensor<uint8_t>& inputB8Ub, uint32_t currTileSize, uint32_t round)
 {
     // Extract the current radix byte, build the tile histogram, and update this core's per-bin exclusive totals.
     if constexpr (sizeof(ValT) == sizeof(int32_t)) {
@@ -266,8 +266,8 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::GetGlob
     } else {
         // int64 counters can exceed the int32 atomic path, so use the SIMT int64 atomic-add helper.
         asc_vf_call<SimtGlobalOffset<CountT>>(dim3(RADIX_SORT_NUM), exclusiveBinOffset,
-                                              (__gm__ CountT *)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
-                                              (__ubuf__ CountT *)(blockExclusiveUb.GetPhyAddr()));
+                                              (__gm__ CountT*)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
+                                              (__ubuf__ CountT*)(blockExclusiveUb.GetPhyAddr()));
     }
     blockUbFlagQue_.FreeTensor(blockExclusiveUb);
 }
@@ -279,9 +279,9 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Scatter
     AscendC::GlobalTensor<CountT> allblockHistToGm, uint32_t tileId, uint32_t round)
 {
     int64_t roundOffset = static_cast<int64_t>(round) * RADIX_SORT_NUM * tileCount_;
-    __ubuf__ uint16_t *blockHistPtr = (__ubuf__ uint16_t *)blockHist.GetPhyAddr();
-    __ubuf__ CountT *blockHistWithFlagPtr = (__ubuf__ CountT *)blockHistWithFlag.GetPhyAddr();
-    asc_vf_call<EncodeHistVF<CountT>>((__ubuf__ uint16_t *)blockHistPtr, (__ubuf__ CountT *)blockHistWithFlagPtr);
+    __ubuf__ uint16_t* blockHistPtr = (__ubuf__ uint16_t*)blockHist.GetPhyAddr();
+    __ubuf__ CountT* blockHistWithFlagPtr = (__ubuf__ CountT*)blockHistWithFlag.GetPhyAddr();
+    asc_vf_call<EncodeHistVF<CountT>>((__ubuf__ uint16_t*)blockHistPtr, (__ubuf__ CountT*)blockHistWithFlagPtr);
     SyncEvent<AscendC::HardEvent::V_MTE3>();
     if (tileId < (tileCount_ - 1)) {
         CopyUbToGm(allblockHistToGm, blockHistWithFlag, (uint64_t)roundOffset + RADIX_SORT_NUM * tileId,
@@ -297,7 +297,7 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Lookbac
     AscendC::LocalTensor<uint32_t> ubFlagTensor, uint32_t tileId, uint32_t round)
 {
     int64_t roundOffset = static_cast<int64_t>(round) * RADIX_SORT_NUM * tileCount_;
-    __ubuf__ CountT *nowTileHistBufferPtr = (__ubuf__ CountT *)nowTileHistBuffer.GetPhyAddr();
+    __ubuf__ CountT* nowTileHistBufferPtr = (__ubuf__ CountT*)nowTileHistBuffer.GetPhyAddr();
 
     uint16_t repeatTime;
     if constexpr (AscendC::IsSameType<CountT, uint32_t>::value) {
@@ -311,18 +311,18 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Lookbac
     for (int i = tileId - 1; i >= 0; --i) {
         int mode = -1;
         uint32_t histTileOffset = RADIX_SORT_NUM * i;
-        __ubuf__ uint32_t *ubFlagTensorPtr = (__ubuf__ uint32_t *)ubFlagTensor.GetPhyAddr();
-        __ubuf__ CountT *tilePrevHistValuePtrCopy = nullptr;
+        __ubuf__ uint32_t* ubFlagTensorPtr = (__ubuf__ uint32_t*)ubFlagTensor.GetPhyAddr();
+        __ubuf__ CountT* tilePrevHistValuePtrCopy = nullptr;
         while (true) {
             // Poll until the previous tile publishes a full 256-bin aggregate-ready or prefix-ready state.
             AscendC::LocalTensor<CountT> xLocal = inQueueGlobalHist_.template AllocTensor<CountT>();
             CopyGmToUb(allTileHistBuffer, xLocal, (uint64_t)roundOffset + histTileOffset, RADIX_SORT_NUM);
             inQueueGlobalHist_.EnQue(xLocal);
             AscendC::LocalTensor<CountT> tilePrevHistValue = inQueueGlobalHist_.template DeQue<CountT>();
-            __ubuf__ CountT *tilePrevHistValuePtr = (__ubuf__ CountT *)tilePrevHistValue.GetPhyAddr();
+            __ubuf__ CountT* tilePrevHistValuePtr = (__ubuf__ CountT*)tilePrevHistValue.GetPhyAddr();
             tilePrevHistValuePtrCopy = tilePrevHistValuePtr;
-            asc_vf_call<LookbackCheckStateVF<CountT>>((__ubuf__ CountT *)tilePrevHistValuePtr,
-                                                      (__ubuf__ uint32_t *)ubFlagTensorPtr, repeatTime);
+            asc_vf_call<LookbackCheckStateVF<CountT>>((__ubuf__ CountT*)tilePrevHistValuePtr,
+                                                      (__ubuf__ uint32_t*)ubFlagTensorPtr, repeatTime);
             SyncEvent<AscendC::HardEvent::V_S>();
             uint32_t notInitCountScalar = ubFlagTensorPtr[NOT_INIT_COUNT_INDEX];
             uint32_t aggReadyCountScalar = ubFlagTensorPtr[AGG_READY_COUNT_INDEX];
@@ -339,11 +339,11 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Lookbac
             }
             inQueueGlobalHist_.FreeTensor(tilePrevHistValue);
         }
-        __ubuf__ CountT *nowTileHistBufferPtrCopy = nowTileHistBufferPtr;
+        __ubuf__ CountT* nowTileHistBufferPtrCopy = nowTileHistBufferPtr;
         SyncEvent<AscendC::HardEvent::S_V>();
-        asc_vf_call<LookbackAccumVF<CountT>>((__ubuf__ CountT *)nowTileHistBufferPtr,
-                                             (__ubuf__ CountT *)nowTileHistBufferPtrCopy,
-                                             (__ubuf__ CountT *)tilePrevHistValuePtrCopy, repeatTime);
+        asc_vf_call<LookbackAccumVF<CountT>>((__ubuf__ CountT*)nowTileHistBufferPtr,
+                                             (__ubuf__ CountT*)nowTileHistBufferPtrCopy,
+                                             (__ubuf__ CountT*)tilePrevHistValuePtrCopy, repeatTime);
         event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(AscendC::HardEvent::V_S));
         AscendC::SetFlag<AscendC::HardEvent::V_S>(eventId);
         AscendC::WaitFlag<AscendC::HardEvent::V_S>(eventId);
@@ -356,12 +356,12 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Lookbac
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
 __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::SetPrefixReadyMask(
 
-    AscendC::LocalTensor<CountT> &blockHistWithFlag, AscendC::GlobalTensor<CountT> blockHistToGm, uint32_t tileId,
+    AscendC::LocalTensor<CountT>& blockHistWithFlag, AscendC::GlobalTensor<CountT> blockHistToGm, uint32_t tileId,
     uint32_t round)
 {
     int64_t roundOffset = static_cast<int64_t>(round) * RADIX_SORT_NUM * tileCount_;
-    __ubuf__ CountT *histCumsumPtr = (__ubuf__ CountT *)blockHistWithFlag.GetPhyAddr();
-    __ubuf__ CountT *histCumsumPtrCopy = histCumsumPtr;
+    __ubuf__ CountT* histCumsumPtr = (__ubuf__ CountT*)blockHistWithFlag.GetPhyAddr();
+    __ubuf__ CountT* histCumsumPtrCopy = histCumsumPtr;
 
     uint16_t repeatTime;
     if constexpr (AscendC::IsSameType<CountT, uint32_t>::value) {
@@ -369,7 +369,7 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::SetPref
     } else {
         repeatTime = RADIX_SORT_NUM / VF_LEN_B64;
     }
-    asc_vf_call<SetPrefixReadyVF<CountT>>((__ubuf__ CountT *)histCumsumPtr, (__ubuf__ CountT *)histCumsumPtrCopy,
+    asc_vf_call<SetPrefixReadyVF<CountT>>((__ubuf__ CountT*)histCumsumPtr, (__ubuf__ CountT*)histCumsumPtrCopy,
                                           repeatTime);
     SyncEvent<AscendC::HardEvent::V_MTE3>();
     CopyUbToGm(blockHistToGm, blockHistWithFlag, (uint64_t)roundOffset + RADIX_SORT_NUM * tileId, RADIX_SORT_NUM);
@@ -389,7 +389,7 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::LoadTil
 
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
 __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::CopyIndexDataIn(
-    AscendC::GlobalTensor<uint32_t> inputIndex, AscendC::LocalTensor<uint32_t> &xLocal, uint64_t tileOffset,
+    AscendC::GlobalTensor<uint32_t> inputIndex, AscendC::LocalTensor<uint32_t>& xLocal, uint64_t tileOffset,
     uint32_t currTileSize)
 {
     CopyGmToUb(inputIndex, xLocal, tileOffset, currTileSize * sizeof(CountT) / sizeof(uint32_t));
@@ -526,8 +526,8 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Process
 template <typename ValT, typename IdxT, typename CountT, bool isDescend>
 __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Init(GM_ADDR x, GM_ADDR value,
                                                                               GM_ADDR sortIndex, GM_ADDR workspace,
-                                                                              const SortLib::SortParams &params,
-                                                                              AscendC::TPipe *pipe)
+                                                                              const SortLib::SortParams& params,
+                                                                              AscendC::TPipe* pipe)
 {
     blockIdx_ = AscendC::GetBlockIdx();
     pipe_ = pipe;
@@ -535,9 +535,9 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Init(GM
     ParserTilingData();
     realCoreNum_ = AscendC::GetBlockNum();
 
-    inputXGm_.SetGlobalBuffer((__gm__ ValT *)x);
-    outValueGm_.SetGlobalBuffer((__gm__ ValT *)value);
-    outIdxGm_.SetGlobalBuffer((__gm__ uint32_t *)sortIndex);
+    inputXGm_.SetGlobalBuffer((__gm__ ValT*)x);
+    outValueGm_.SetGlobalBuffer((__gm__ ValT*)value);
+    outIdxGm_.SetGlobalBuffer((__gm__ uint32_t*)sortIndex);
 
     // ⚠️ Workspace 布局契约：本六段 [0]~[5] 的 offset 计算，
     //    必须与 op_host/arch35/sort_lib_tiling.h 中 SortTilingCompute 的六段总大小计算逐段一致。
@@ -548,37 +548,37 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Init(GM
     constexpr uint32_t radixRounds = sizeof(ValT); // radix sort passes
     uint64_t exclBinBytes = static_cast<uint64_t>(RADIX_SORT_NUM) * radixRounds * sizeof(CountT);
     exclBinBytes = RoundUpAlign(exclBinBytes, UB_ALIGN_BYTES);
-    exclusiveBinsGmWkAsU32_.SetGlobalBuffer((__gm__ uint32_t *)workspace);
+    exclusiveBinsGmWkAsU32_.SetGlobalBuffer((__gm__ uint32_t*)workspace);
     uint64_t wkOffset = exclBinBytes;
 
     // [1] globalHistGmWk_ — radixRounds 轮 × 256 bin × tileCount × sizeof(CountT) 字节
     uint64_t globalHistBytes = static_cast<uint64_t>(tileCount_) * RADIX_SORT_NUM * radixRounds * sizeof(CountT);
     globalHistBytes = RoundUpAlign(globalHistBytes, UB_ALIGN_BYTES);
-    globalHistGmWk_.SetGlobalBuffer((__gm__ CountT *)(workspace + wkOffset));
+    globalHistGmWk_.SetGlobalBuffer((__gm__ CountT*)(workspace + wkOffset));
     wkOffset += globalHistBytes;
 
     // [2] outIdxDbWK_ — totalElements × sizeof(CountT) 字节
     uint64_t idxDbBytes = static_cast<uint64_t>(totalDataNum_) * sizeof(CountT);
     idxDbBytes = RoundUpAlign(idxDbBytes, UB_ALIGN_BYTES);
-    outIdxDbWK_.SetGlobalBuffer((__gm__ uint32_t *)(workspace + wkOffset));
+    outIdxDbWK_.SetGlobalBuffer((__gm__ uint32_t*)(workspace + wkOffset));
     wkOffset += idxDbBytes;
 
     // [3] histTileGmWk_ + histCumsumTileGmWk_ — 各 tileCount × 256 × sizeof(uint16_t)
     uint64_t tileHistBytes = static_cast<uint64_t>(tileCount_) * RADIX_SORT_NUM * sizeof(uint16_t);
     tileHistBytes = RoundUpAlign(tileHistBytes, UB_ALIGN_BYTES);
-    histTileGmWk_.SetGlobalBuffer((__gm__ uint16_t *)(workspace + wkOffset));
+    histTileGmWk_.SetGlobalBuffer((__gm__ uint16_t*)(workspace + wkOffset));
     wkOffset += tileHistBytes;
-    histCumsumTileGmWk_.SetGlobalBuffer((__gm__ uint16_t *)(workspace + wkOffset));
+    histCumsumTileGmWk_.SetGlobalBuffer((__gm__ uint16_t*)(workspace + wkOffset));
     wkOffset += tileHistBytes;
 
     // [4] xB8GmWk_ — tileCount × numTileData 字节, 对齐 UB_ALIGN_BYTES
     uint64_t xB8Bytes = static_cast<uint64_t>(tileCount_) * numTileData_;
     xB8Bytes = RoundUpAlign(xB8Bytes, UB_ALIGN_BYTES);
-    xB8GmWk_.SetGlobalBuffer((__gm__ uint8_t *)(workspace + wkOffset));
+    xB8GmWk_.SetGlobalBuffer((__gm__ uint8_t*)(workspace + wkOffset));
     wkOffset += xB8Bytes;
 
     // [5] outValueDbWK_ — ValT 结尾段
-    outValueDbWK_.SetGlobalBuffer((__gm__ ValT *)(workspace + wkOffset));
+    outValueDbWK_.SetGlobalBuffer((__gm__ ValT*)(workspace + wkOffset));
 
     pipe_->InitBuffer(inQueueX_, 1, numTileData_ * sizeof(ValT));
     pipe_->InitBuffer(inQueueIndex_, 1, numTileData_ * sizeof(CountT));
@@ -619,36 +619,34 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Scatter
     if (round == 0) {
         asc_vf_call<CopyOutGm<ValT, CountT, uint32_t, false>>(
             dim3(THREAD_DIM_NUM), tileDataStart, cureTileSize, 0, exclRoundOffset,
-            (__ubuf__ uint16_t *)(blockExclusiveSum.GetPhyAddr()),
-            (__gm__ CountT *)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockDataInGlobalPos.GetPhyAddr()),
-            (__ubuf__ uint32_t *)(sortedIndexLocal.GetPhyAddr()), (__ubuf__ uint32_t *)(xInputIndexLocal.GetPhyAddr()),
-            (__ubuf__ uint8_t *)(sortedValueLocal.GetPhyAddr()), (__ubuf__ ValT *)(xInputValueLocal.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockHistFlag.GetPhyAddr()), (__ubuf__ uint16_t *)(blockHist.GetPhyAddr()),
-            (__gm__ uint32_t *)(idxDbGm_.Alternate().GetPhyAddr()),
-            (__gm__ ValT *)(inputXDbGm_.Alternate().GetPhyAddr()));
+            (__ubuf__ uint16_t*)(blockExclusiveSum.GetPhyAddr()),
+            (__gm__ CountT*)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
+            (__ubuf__ CountT*)(blockDataInGlobalPos.GetPhyAddr()), (__ubuf__ uint32_t*)(sortedIndexLocal.GetPhyAddr()),
+            (__ubuf__ uint32_t*)(xInputIndexLocal.GetPhyAddr()), (__ubuf__ uint8_t*)(sortedValueLocal.GetPhyAddr()),
+            (__ubuf__ ValT*)(xInputValueLocal.GetPhyAddr()), (__ubuf__ CountT*)(blockHistFlag.GetPhyAddr()),
+            (__ubuf__ uint16_t*)(blockHist.GetPhyAddr()), (__gm__ uint32_t*)(idxDbGm_.Alternate().GetPhyAddr()),
+            (__gm__ ValT*)(inputXDbGm_.Alternate().GetPhyAddr()));
     } else if (round < static_cast<uint32_t>(sizeof(ValT) - 1)) {
         asc_vf_call<CopyOutGm<ValT, CountT, uint32_t, true>>(
             dim3(THREAD_DIM_NUM), tileDataStart, cureTileSize, 0, exclRoundOffset,
-            (__ubuf__ uint16_t *)(blockExclusiveSum.GetPhyAddr()),
-            (__gm__ CountT *)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockDataInGlobalPos.GetPhyAddr()),
-            (__ubuf__ uint32_t *)(sortedIndexLocal.GetPhyAddr()), (__ubuf__ uint32_t *)(xInputIndexLocal.GetPhyAddr()),
-            (__ubuf__ uint8_t *)(sortedValueLocal.GetPhyAddr()), (__ubuf__ ValT *)(xInputValueLocal.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockHistFlag.GetPhyAddr()), (__ubuf__ uint16_t *)(blockHist.GetPhyAddr()),
-            (__gm__ uint32_t *)(idxDbGm_.Alternate().GetPhyAddr()),
-            (__gm__ ValT *)(inputXDbGm_.Alternate().GetPhyAddr()));
+            (__ubuf__ uint16_t*)(blockExclusiveSum.GetPhyAddr()),
+            (__gm__ CountT*)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
+            (__ubuf__ CountT*)(blockDataInGlobalPos.GetPhyAddr()), (__ubuf__ uint32_t*)(sortedIndexLocal.GetPhyAddr()),
+            (__ubuf__ uint32_t*)(xInputIndexLocal.GetPhyAddr()), (__ubuf__ uint8_t*)(sortedValueLocal.GetPhyAddr()),
+            (__ubuf__ ValT*)(xInputValueLocal.GetPhyAddr()), (__ubuf__ CountT*)(blockHistFlag.GetPhyAddr()),
+            (__ubuf__ uint16_t*)(blockHist.GetPhyAddr()), (__gm__ uint32_t*)(idxDbGm_.Alternate().GetPhyAddr()),
+            (__gm__ ValT*)(inputXDbGm_.Alternate().GetPhyAddr()));
     } else {
         AscendC::GlobalTensor<IdxT> outIdxT2 = (idxDbGm_.Alternate()).template ReinterpretCast<IdxT>();
         asc_vf_call<CopyOutGm<ValT, CountT, IdxT, true>>(
             dim3(THREAD_DIM_NUM), tileDataStart, cureTileSize, 0, exclRoundOffset,
-            (__ubuf__ uint16_t *)(blockExclusiveSum.GetPhyAddr()),
-            (__gm__ CountT *)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockDataInGlobalPos.GetPhyAddr()),
-            (__ubuf__ uint32_t *)(sortedIndexLocal.GetPhyAddr()), (__ubuf__ uint32_t *)(xInputIndexLocal.GetPhyAddr()),
-            (__ubuf__ uint8_t *)(sortedValueLocal.GetPhyAddr()), (__ubuf__ ValT *)(xInputValueLocal.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockHistFlag.GetPhyAddr()), (__ubuf__ uint16_t *)(blockHist.GetPhyAddr()),
-            (__gm__ IdxT *)(outIdxT2.GetPhyAddr()), (__gm__ ValT *)(inputXDbGm_.Alternate().GetPhyAddr()));
+            (__ubuf__ uint16_t*)(blockExclusiveSum.GetPhyAddr()),
+            (__gm__ CountT*)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
+            (__ubuf__ CountT*)(blockDataInGlobalPos.GetPhyAddr()), (__ubuf__ uint32_t*)(sortedIndexLocal.GetPhyAddr()),
+            (__ubuf__ uint32_t*)(xInputIndexLocal.GetPhyAddr()), (__ubuf__ uint8_t*)(sortedValueLocal.GetPhyAddr()),
+            (__ubuf__ ValT*)(xInputValueLocal.GetPhyAddr()), (__ubuf__ CountT*)(blockHistFlag.GetPhyAddr()),
+            (__ubuf__ uint16_t*)(blockHist.GetPhyAddr()), (__gm__ IdxT*)(outIdxT2.GetPhyAddr()),
+            (__gm__ ValT*)(inputXDbGm_.Alternate().GetPhyAddr()));
     }
 }
 
@@ -665,23 +663,23 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Scatter
     if (round == 0) {
         asc_vf_call<CopyOutGm<ValT, CountT, IdxT, false>>(
             dim3(THREAD_DIM_NUM), tileDataStart, cureTileSize, 0, exclRoundOffset,
-            (__ubuf__ uint16_t *)(blockExclusiveSum.GetPhyAddr()),
-            (__gm__ CountT *)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockDataInGlobalPos.GetPhyAddr()),
-            (__ubuf__ uint32_t *)(sortedIndexLocal.GetPhyAddr()), (__ubuf__ CountT *)(xInputIndexLocal.GetPhyAddr()),
-            (__ubuf__ uint8_t *)(sortedValueLocal.GetPhyAddr()), (__ubuf__ ValT *)(xInputValueLocal.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockHistFlag.GetPhyAddr()), (__ubuf__ uint16_t *)(blockHist.GetPhyAddr()),
-            (__gm__ IdxT *)(idxDbGm_.Alternate().GetPhyAddr()), (__gm__ ValT *)(inputXDbGm_.Alternate().GetPhyAddr()));
+            (__ubuf__ uint16_t*)(blockExclusiveSum.GetPhyAddr()),
+            (__gm__ CountT*)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
+            (__ubuf__ CountT*)(blockDataInGlobalPos.GetPhyAddr()), (__ubuf__ uint32_t*)(sortedIndexLocal.GetPhyAddr()),
+            (__ubuf__ CountT*)(xInputIndexLocal.GetPhyAddr()), (__ubuf__ uint8_t*)(sortedValueLocal.GetPhyAddr()),
+            (__ubuf__ ValT*)(xInputValueLocal.GetPhyAddr()), (__ubuf__ CountT*)(blockHistFlag.GetPhyAddr()),
+            (__ubuf__ uint16_t*)(blockHist.GetPhyAddr()), (__gm__ IdxT*)(idxDbGm_.Alternate().GetPhyAddr()),
+            (__gm__ ValT*)(inputXDbGm_.Alternate().GetPhyAddr()));
     } else {
         asc_vf_call<CopyOutGm<ValT, CountT, IdxT, true>>(
             dim3(THREAD_DIM_NUM), tileDataStart, cureTileSize, 0, exclRoundOffset,
-            (__ubuf__ uint16_t *)(blockExclusiveSum.GetPhyAddr()),
-            (__gm__ CountT *)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockDataInGlobalPos.GetPhyAddr()),
-            (__ubuf__ uint32_t *)(sortedIndexLocal.GetPhyAddr()), (__ubuf__ CountT *)(xInputIndexLocal.GetPhyAddr()),
-            (__ubuf__ uint8_t *)(sortedValueLocal.GetPhyAddr()), (__ubuf__ ValT *)(xInputValueLocal.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockHistFlag.GetPhyAddr()), (__ubuf__ uint16_t *)(blockHist.GetPhyAddr()),
-            (__gm__ IdxT *)(idxDbGm_.Alternate().GetPhyAddr()), (__gm__ ValT *)(inputXDbGm_.Alternate().GetPhyAddr()));
+            (__ubuf__ uint16_t*)(blockExclusiveSum.GetPhyAddr()),
+            (__gm__ CountT*)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
+            (__ubuf__ CountT*)(blockDataInGlobalPos.GetPhyAddr()), (__ubuf__ uint32_t*)(sortedIndexLocal.GetPhyAddr()),
+            (__ubuf__ CountT*)(xInputIndexLocal.GetPhyAddr()), (__ubuf__ uint8_t*)(sortedValueLocal.GetPhyAddr()),
+            (__ubuf__ ValT*)(xInputValueLocal.GetPhyAddr()), (__ubuf__ CountT*)(blockHistFlag.GetPhyAddr()),
+            (__ubuf__ uint16_t*)(blockHist.GetPhyAddr()), (__gm__ IdxT*)(idxDbGm_.Alternate().GetPhyAddr()),
+            (__gm__ ValT*)(inputXDbGm_.Alternate().GetPhyAddr()));
     }
 }
 
@@ -700,13 +698,13 @@ __aicore__ inline void SortRadixMoreCore<ValT, IdxT, CountT, isDescend>::Scatter
         AscendC::GlobalTensor<IdxT> outIdxT2 = (idxDbGm_.Alternate()).template ReinterpretCast<IdxT>();
         asc_vf_call<CopyOutGm<ValT, CountT, IdxT, false>>(
             dim3(THREAD_DIM_NUM), tileDataStart, cureTileSize, 0, exclRoundOffset,
-            (__ubuf__ uint16_t *)(blockExclusiveSum.GetPhyAddr()),
-            (__gm__ CountT *)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockDataInGlobalPos.GetPhyAddr()),
-            (__ubuf__ uint32_t *)(sortedIndexLocal.GetPhyAddr()), (__ubuf__ CountT *)(xInputIndexLocal.GetPhyAddr()),
-            (__ubuf__ uint8_t *)(sortedValueLocal.GetPhyAddr()), (__ubuf__ ValT *)(xInputValueLocal.GetPhyAddr()),
-            (__ubuf__ CountT *)(blockHistFlag.GetPhyAddr()), (__ubuf__ uint16_t *)(blockHist.GetPhyAddr()),
-            (__gm__ IdxT *)(outIdxT2.GetPhyAddr()), (__gm__ ValT *)(inputXDbGm_.Alternate().GetPhyAddr()));
+            (__ubuf__ uint16_t*)(blockExclusiveSum.GetPhyAddr()),
+            (__gm__ CountT*)(exclusiveBinsGmWkAsCount_.GetPhyAddr()),
+            (__ubuf__ CountT*)(blockDataInGlobalPos.GetPhyAddr()), (__ubuf__ uint32_t*)(sortedIndexLocal.GetPhyAddr()),
+            (__ubuf__ CountT*)(xInputIndexLocal.GetPhyAddr()), (__ubuf__ uint8_t*)(sortedValueLocal.GetPhyAddr()),
+            (__ubuf__ ValT*)(xInputValueLocal.GetPhyAddr()), (__ubuf__ CountT*)(blockHistFlag.GetPhyAddr()),
+            (__ubuf__ uint16_t*)(blockHist.GetPhyAddr()), (__gm__ IdxT*)(outIdxT2.GetPhyAddr()),
+            (__gm__ ValT*)(inputXDbGm_.Alternate().GetPhyAddr()));
     } else if constexpr (AscendC::IsSameType<CountT, uint32_t>::value && sizeof(IdxT) == sizeof(int64_t)) {
         ScatterPairUpcast(xInputValueLocal, sortedIndexLocal, xInputIndexLocal, sortedValueLocal, blockExclusiveSum,
                           blockDataInGlobalPos, blockHistFlag, blockHist, round, tileDataStart, cureTileSize);

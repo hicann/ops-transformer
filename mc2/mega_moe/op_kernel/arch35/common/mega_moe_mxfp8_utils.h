@@ -27,22 +27,21 @@ namespace Mxfp8 {
 
 // 将一行 BF16 token 量化为带 padding 的 MXFP8 data + scale 记录。
 template <uint8_t QuantMode, typename ExpandXType>
-__aicore__ inline void QuantMxFp8(LocalTensor<ExpandXType> &outLocal, LocalTensor<ExpandXType> &inLocal,
-                                  LocalTensor<float> &floatTemp, int32_t processLen)
+__aicore__ inline void QuantMxFp8(LocalTensor<ExpandXType>& outLocal, LocalTensor<ExpandXType>& inLocal,
+                                  LocalTensor<float>& floatTemp, int32_t processLen)
 {
     uint32_t mxScaleNum = Ops::Base::CeilAlign(
         Ops::Base::CeilDiv(static_cast<uint32_t>(processLen), static_cast<uint32_t>(ALIGN_32)), 2U);
     using Fp8Type = typename std::conditional<QuantMode == MXFP8_E4M3_COMM_QUANT, fp8_e4m3fn_t, fp8_e5m2_t>::type;
     LocalTensor<Fp8Type> castFp8LocalTensor = outLocal.template ReinterpretCast<Fp8Type>();
-    __ubuf__ ExpandXType *srcAddr = (__ubuf__ ExpandXType *)inLocal.GetPhyAddr();
-    __ubuf__ uint16_t *maxExpAddr = (__ubuf__ uint16_t *)floatTemp.GetPhyAddr();
-    __ubuf__ uint16_t *halfScaleLocalAddr =
-        (__ubuf__ uint16_t *)floatTemp[Ops::Base::CeilAlign(mxScaleNum, static_cast<uint32_t>(ALIGN_32))].GetPhyAddr();
-    __ubuf__ int8_t *outLocalAddr = (__ubuf__ int8_t *)castFp8LocalTensor.GetPhyAddr();
+    __ubuf__ ExpandXType* srcAddr = (__ubuf__ ExpandXType*)inLocal.GetPhyAddr();
+    __ubuf__ uint16_t* maxExpAddr = (__ubuf__ uint16_t*)floatTemp.GetPhyAddr();
+    __ubuf__ uint16_t* halfScaleLocalAddr =
+        (__ubuf__ uint16_t*)floatTemp[Ops::Base::CeilAlign(mxScaleNum, static_cast<uint32_t>(ALIGN_32))].GetPhyAddr();
+    __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)castFp8LocalTensor.GetPhyAddr();
     uint32_t tokenStorageElementCount =
         Ops::Base::CeilAlign(static_cast<uint32_t>(processLen), static_cast<uint32_t>(ALIGN_256));
-    __ubuf__ uint16_t *mxScaleLocalAddr =
-        (__ubuf__ uint16_t *)castFp8LocalTensor[tokenStorageElementCount].GetPhyAddr();
+    __ubuf__ uint16_t* mxScaleLocalAddr = (__ubuf__ uint16_t*)castFp8LocalTensor[tokenStorageElementCount].GetPhyAddr();
     Quant::ComputeMaxExp(srcAddr, maxExpAddr, static_cast<uint32_t>(processLen));
     Quant::ComputeScale<Fp8Type>(maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr, mxScaleNum);
     Quant::ComputeFp8Data<ExpandXType, Fp8Type, AscendC::RoundMode::CAST_TRUNC, AscendC::RoundMode::CAST_RINT>(
@@ -50,7 +49,7 @@ __aicore__ inline void QuantMxFp8(LocalTensor<ExpandXType> &outLocal, LocalTenso
 }
 
 // 将一条 MXFP8 token 记录反量化为 FP32，供 Unpermute 累加。
-__simd_callee__ inline void ConvertMxScaleToBf16(__ubuf__ fp8_e8m0_t *srcPtr0, __ubuf__ bfloat16_t *dyScaleBf16Ptr,
+__simd_callee__ inline void ConvertMxScaleToBf16(__ubuf__ fp8_e8m0_t* srcPtr0, __ubuf__ bfloat16_t* dyScaleBf16Ptr,
                                                  uint32_t scaleLen, uint32_t bf16RepeatSize, uint16_t repeatTimes)
 {
     AscendC::Reg::RegTensor<fp8_e8m0_t> vSrcReg;
@@ -69,7 +68,7 @@ __simd_callee__ inline void ConvertMxScaleToBf16(__ubuf__ fp8_e8m0_t *srcPtr0, _
     Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
 }
 
-__simd_callee__ inline void ConvertMxScaleToFp32(__ubuf__ bfloat16_t *dyScaleBf16Ptr, __ubuf__ float *dyScaleFp32Ptr,
+__simd_callee__ inline void ConvertMxScaleToFp32(__ubuf__ bfloat16_t* dyScaleBf16Ptr, __ubuf__ float* dyScaleFp32Ptr,
                                                  uint32_t quantCount, uint32_t fp32RepeatSize, uint16_t repeatTimes)
 {
     AscendC::Reg::RegTensor<bfloat16_t> dyScaleBf16Reg;
@@ -89,8 +88,8 @@ __simd_callee__ inline void ConvertMxScaleToFp32(__ubuf__ bfloat16_t *dyScaleBf1
 }
 
 template <typename T>
-__simd_callee__ inline void DequantizeMxFp8Token(__ubuf__ T *tokenPtr0, __ubuf__ float *dyScaleFp32Ptr,
-                                                 __ubuf__ float *sumDstPtr, uint32_t tokenLen, uint32_t fp32RepeatSize,
+__simd_callee__ inline void DequantizeMxFp8Token(__ubuf__ T* tokenPtr0, __ubuf__ float* dyScaleFp32Ptr,
+                                                 __ubuf__ float* sumDstPtr, uint32_t tokenLen, uint32_t fp32RepeatSize,
                                                  uint16_t repeatTimes)
 {
     AscendC::Reg::RegTensor<T> tokenSrcReg;
@@ -113,13 +112,13 @@ __simd_callee__ inline void DequantizeMxFp8Token(__ubuf__ T *tokenPtr0, __ubuf__
 }
 
 template <typename T, typename XType>
-__simd_vf__ inline void DeQuantMxFp8Vf(__ubuf__ XType *inAddr, __ubuf__ float *sumDstPtr,
-                                       __ubuf__ bfloat16_t *dyScaleBf16Ptr, __ubuf__ float *dyScaleFp32Ptr,
+__simd_vf__ inline void DeQuantMxFp8Vf(__ubuf__ XType* inAddr, __ubuf__ float* sumDstPtr,
+                                       __ubuf__ bfloat16_t* dyScaleBf16Ptr, __ubuf__ float* dyScaleFp32Ptr,
                                        uint32_t scaleLen, uint32_t tokenLen)
 {
-    __ubuf__ T *tokenPtr0 = (__ubuf__ T *)inAddr;
+    __ubuf__ T* tokenPtr0 = (__ubuf__ T*)inAddr;
     uint32_t tokenStorageElementCount = ((tokenLen + ALIGN_256 - 1U) / ALIGN_256 * ALIGN_256) / 2U;
-    __ubuf__ fp8_e8m0_t *srcPtr0 = (__ubuf__ fp8_e8m0_t *)(inAddr + tokenStorageElementCount);
+    __ubuf__ fp8_e8m0_t* srcPtr0 = (__ubuf__ fp8_e8m0_t*)(inAddr + tokenStorageElementCount);
     constexpr uint32_t bf16RepeatSize = AscendC::VECTOR_REG_WIDTH / sizeof(bfloat16_t);
     constexpr uint32_t fp32RepeatSize = AscendC::VECTOR_REG_WIDTH / sizeof(float);
     uint16_t bf16RepeatTimes = (scaleLen + bf16RepeatSize - 1U) / bf16RepeatSize;
@@ -132,14 +131,14 @@ __simd_vf__ inline void DeQuantMxFp8Vf(__ubuf__ XType *inAddr, __ubuf__ float *s
 }
 
 template <typename T, typename XType>
-__aicore__ inline void DeQuantMxFp8(LocalTensor<XType> &inLocal, LocalTensor<float> &sumTensor,
-                                    LocalTensor<bfloat16_t> &scaleBf16Tensor, LocalTensor<float> &scaleFP32Tensor,
+__aicore__ inline void DeQuantMxFp8(LocalTensor<XType>& inLocal, LocalTensor<float>& sumTensor,
+                                    LocalTensor<bfloat16_t>& scaleBf16Tensor, LocalTensor<float>& scaleFP32Tensor,
                                     uint32_t scaleLen, uint32_t tokenLen)
 {
-    __ubuf__ XType *inAddr = (__ubuf__ XType *)inLocal.GetPhyAddr();
-    __ubuf__ bfloat16_t *dyScaleBf16Ptr = (__ubuf__ bfloat16_t *)scaleBf16Tensor.GetPhyAddr();
-    __ubuf__ float *dyScaleFp32Ptr = (__ubuf__ float *)scaleFP32Tensor.GetPhyAddr();
-    __ubuf__ float *sumDstPtr = (__ubuf__ float *)sumTensor.GetPhyAddr();
+    __ubuf__ XType* inAddr = (__ubuf__ XType*)inLocal.GetPhyAddr();
+    __ubuf__ bfloat16_t* dyScaleBf16Ptr = (__ubuf__ bfloat16_t*)scaleBf16Tensor.GetPhyAddr();
+    __ubuf__ float* dyScaleFp32Ptr = (__ubuf__ float*)scaleFP32Tensor.GetPhyAddr();
+    __ubuf__ float* sumDstPtr = (__ubuf__ float*)sumTensor.GetPhyAddr();
     asc_vf_call<DeQuantMxFp8Vf<T, XType>>(inAddr, sumDstPtr, dyScaleBf16Ptr, dyScaleFp32Ptr, scaleLen, tokenLen);
 }
 

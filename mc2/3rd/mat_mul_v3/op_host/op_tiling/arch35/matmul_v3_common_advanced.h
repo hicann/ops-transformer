@@ -71,7 +71,7 @@ struct Mc2MatMulV3BatchInfo {
 };
 
 struct Mc2MatMulV3Args {
-    const char *opName = nullptr;
+    const char* opName = nullptr;
     bool isATrans = false;
     bool isBTrans = false;
     bool isHf32 = false;
@@ -90,7 +90,7 @@ struct Mc2MatMulV3Args {
     uint64_t nValue = 0UL;
     uint64_t aDtypeSize = 1UL;
     uint64_t bDtypeSize = 1UL;
-    Mc2MatMulV3BatchInfo *batchInfo = nullptr;
+    Mc2MatMulV3BatchInfo* batchInfo = nullptr;
 };
 
 struct Mc2MatMulV3TailInfo {

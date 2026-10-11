@@ -72,10 +72,10 @@ struct SubShapePara {
 };
 
 // Do infershape for OP which is single-input single-output and in-shape equal out-shape.
-ge::graphStatus InferShape4Elewise(gert::InferShapeContext *context);
+ge::graphStatus InferShape4Elewise(gert::InferShapeContext* context);
 
 // Do InferDataType for OP which is single-output and dtype is bool.
-ge::graphStatus InferDataType4SingleOutBool(gert::InferDataTypeContext *context);
+ge::graphStatus InferDataType4SingleOutBool(gert::InferDataTypeContext* context);
 
 /*
  * @brief: get output shape
@@ -84,7 +84,7 @@ ge::graphStatus InferDataType4SingleOutBool(gert::InferDataTypeContext *context)
  * @param [in] output_idx: constvalue output index
  * @return vector<int64_t>: success or failed
  */
-ge::graphStatus CopyShapeInput2OutputWithIdx(gert::InferShapeContext *context, int64_t input_idx, int64_t output_idx);
+ge::graphStatus CopyShapeInput2OutputWithIdx(gert::InferShapeContext* context, int64_t input_idx, int64_t output_idx);
 
 /*
  * @brief: get output shape
@@ -93,19 +93,19 @@ ge::graphStatus CopyShapeInput2OutputWithIdx(gert::InferShapeContext *context, i
  * @param [in] output_idxs: constvalue output indexes,vector<int64_t>
  * @return graphStatus: success or failed
  */
-ge::graphStatus InferShape4InIdxAndOutVector(gert::InferShapeContext *context, int64_t input_idx,
-                                             const std::vector<int64_t> &output_idxs);
+ge::graphStatus InferShape4InIdxAndOutVector(gert::InferShapeContext* context, int64_t input_idx,
+                                             const std::vector<int64_t>& output_idxs);
 
-std::string ShapeCannotBroadcastMsg(const gert::Shape &shape1, const gert::Shape &shape2);
+std::string ShapeCannotBroadcastMsg(const gert::Shape& shape1, const gert::Shape& shape2);
 /*
  * @brief: broadcast new shape to output shape
  * @param [in] shape: const gert::Shape*, new shape to broadcast
  * @param [in/out] shape_output: gert::Shape*, output shape
  * @return succeed or not
  */
-bool BroadcastShape(const gert::Shape *in1_shape, const gert::Shape *in2_shape, gert::Shape *out_shape);
-bool BroadcastShape(const std::vector<const gert::Shape *> &in_shapes, gert::Shape *out_shape);
-bool BroadcastShape(const gert::Shape **in_shapes, size_t size, gert::Shape *out_shape);
+bool BroadcastShape(const gert::Shape* in1_shape, const gert::Shape* in2_shape, gert::Shape* out_shape);
+bool BroadcastShape(const std::vector<const gert::Shape*>& in_shapes, gert::Shape* out_shape);
+bool BroadcastShape(const gert::Shape** in_shapes, size_t size, gert::Shape* out_shape);
 
 /*
  * @brief: set all the output shape to [-1, -1, ....] with input rank
@@ -113,7 +113,7 @@ bool BroadcastShape(const gert::Shape **in_shapes, size_t size, gert::Shape *out
  * @param [out] output_shape: the output shape ptr
  * @return ge::graphStatus
  */
-inline ge::graphStatus SetAllUnknownDim(const int64_t rank, gert::Shape *output_shape)
+inline ge::graphStatus SetAllUnknownDim(const int64_t rank, gert::Shape* output_shape)
 {
     OP_CHECK_IF(output_shape == nullptr, OP_LOGD("SetAllUnknownDim", "the output_shape is nullptr, return unsuccess"),
                 return ge::GRAPH_FAILED);
@@ -132,7 +132,7 @@ inline ge::graphStatus SetAllUnknownDim(const int64_t rank, gert::Shape *output_
  * @param [out] output_shape: the output shape ptr
  * @return ge::graphStatus
  */
-inline ge::graphStatus SetUnknownRank(gert::Shape *output_shape)
+inline ge::graphStatus SetUnknownRank(gert::Shape* output_shape)
 {
     OP_CHECK_IF(output_shape == nullptr, OP_LOGD("SetUnknownRank", "the output_shape is nullptr, return unsuccess"),
                 return ge::GRAPH_FAILED);
@@ -148,7 +148,7 @@ inline ge::graphStatus SetUnknownRank(gert::Shape *output_shape)
  * @param [out] output_shape: the output shape ptr
  * @return ge::graphStatus
  */
-inline bool IsUnknownRank(const gert::Shape *check_shape)
+inline bool IsUnknownRank(const gert::Shape* check_shape)
 {
     return check_shape->GetDimNum() == 1 && check_shape->GetDim(0) == UNKNOWN_RANK_DIM_VALUE_;
 }
@@ -160,7 +160,7 @@ inline bool IsUnknownRank(const gert::Shape *check_shape)
  * @param out Output Shape
  * @return status whether Shape's condition Satisfied
  */
-ge::graphStatus WithRankAtLeast(const gert::Shape *tensor, int64_t rank, gert::Shape *out_shape,
+ge::graphStatus WithRankAtLeast(const gert::Shape* tensor, int64_t rank, gert::Shape* out_shape,
                                 const std::string opName);
 
 /**
@@ -170,7 +170,7 @@ ge::graphStatus WithRankAtLeast(const gert::Shape *tensor, int64_t rank, gert::S
  * @param out Output Shape
  * @return status whether Shape's condition Satisfied
  */
-ge::graphStatus WithRank(const gert::Shape *tensor, int64_t rank, gert::Shape *out_shape, const std::string opName);
+ge::graphStatus WithRank(const gert::Shape* tensor, int64_t rank, gert::Shape* out_shape, const std::string opName);
 
 /**
  * Add two dims
@@ -179,7 +179,7 @@ ge::graphStatus WithRank(const gert::Shape *tensor, int64_t rank, gert::Shape *o
  * @param out sum dim val
  * @return status whether this operation success
  */
-ge::graphStatus Add(int64_t dim1, int64_t dim2, int64_t &out);
+ge::graphStatus Add(int64_t dim1, int64_t dim2, int64_t& out);
 
 /**
  * Get SubShape according to start end index and step size stride
@@ -190,14 +190,14 @@ ge::graphStatus Add(int64_t dim1, int64_t dim2, int64_t &out);
  * @param out sub shape output
  * @return status whether this operation success
  */
-ge::graphStatus SubShape(const gert::Shape *s, SubShapePara &para, gert::Shape *out, const std::string opName);
+ge::graphStatus SubShape(const gert::Shape* s, SubShapePara& para, gert::Shape* out, const std::string opName);
 
 /*
  * @brief: check whether the output shape is unknown rank shape
  * @param [out] output_shape: the output shape ptr
  * @return bool
  */
-inline bool IsUnknownShape(const gert::Shape *check_shape)
+inline bool IsUnknownShape(const gert::Shape* check_shape)
 {
     for (size_t i = 0; i < check_shape->GetDimNum(); i++) {
         if (check_shape->GetDim(i) == UNKNOWN_DIM_VALUE_) {
@@ -213,10 +213,10 @@ inline bool IsUnknownShape(const gert::Shape *check_shape)
  * @param indices: index of scalar
  * @return ge::graphStatus: whether this operation success
  */
-ge::graphStatus CheckInputsIsScalar(const gert::InferShapeContext *context, const std::vector<size_t> &indices);
+ge::graphStatus CheckInputsIsScalar(const gert::InferShapeContext* context, const std::vector<size_t>& indices);
 
 // do inferDataType for output is same input.
-ge::graphStatus InferDtype4SameInput(gert::InferDataTypeContext *context);
+ge::graphStatus InferDtype4SameInput(gert::InferDataTypeContext* context);
 
 /*
  * @brief: Merge two dims of Shape
@@ -225,7 +225,7 @@ ge::graphStatus InferDtype4SameInput(gert::InferDataTypeContext *context);
  * @param out merged dim val
  * @return ge::graphStatus: whether this operation success
  */
-ge::graphStatus Merge(const int64_t dim1, const int64_t dim2, int64_t &out);
+ge::graphStatus Merge(const int64_t dim1, const int64_t dim2, int64_t& out);
 
 /**
  * @brief: Merge two shapes
@@ -235,7 +235,7 @@ ge::graphStatus Merge(const int64_t dim1, const int64_t dim2, int64_t &out);
  * @param opName
  * @return ge::graphStatus: whether this operation success
  */
-ge::graphStatus Merge(const gert::Shape *s0, const gert::Shape *s1, gert::Shape *out, const std::string opName);
+ge::graphStatus Merge(const gert::Shape* s0, const gert::Shape* s1, gert::Shape* out, const std::string opName);
 
 /**
  * Get SubShape according to start end index and step size stride
@@ -245,14 +245,14 @@ ge::graphStatus Merge(const gert::Shape *s0, const gert::Shape *s1, gert::Shape 
  * @param out sub shape output
  * @return status whether this operation success
  */
-ge::graphStatus SubShape(const gert::Shape *s, StridedInterval &interval, const std::string op_name, gert::Shape *out);
+ge::graphStatus SubShape(const gert::Shape* s, StridedInterval& interval, const std::string op_name, gert::Shape* out);
 
 /*
  * @brief: check whether the shape is unknown rank shape or unknown rank
  * @param [in] check_shape: the shape ptr
  * @return bool
  */
-bool ShapeFullDefined(const gert::Shape *check_shape);
+bool ShapeFullDefined(const gert::Shape* check_shape);
 
 /*
  * @brief: concat two shape used as the output shape
@@ -260,7 +260,7 @@ bool ShapeFullDefined(const gert::Shape *check_shape);
  * @param [in] s2: the input2 shape ptr
  * @return ge::graphStatus: whether this operation success
  */
-ge::graphStatus Concatenate(const gert::Shape *s1, const gert::Shape *s2, gert::Shape *out);
+ge::graphStatus Concatenate(const gert::Shape* s1, const gert::Shape* s2, gert::Shape* out);
 } // namespace ops
 
 #endif // OPS_BUILT_IN_OP_PROTO_RUNTIME_RUNTIME_UTIL_H_

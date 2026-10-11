@@ -24,7 +24,7 @@ using namespace ops;
  * @param value: 给定值
  * @return
  */
-static bool IsContains(const std::vector<uint32_t> &list, uint32_t value)
+static bool IsContains(const std::vector<uint32_t>& list, uint32_t value)
 {
     return std::find(list.begin(), list.end(), value) != list.end();
 }
@@ -34,20 +34,20 @@ static bool IsContains(const std::vector<uint32_t> &list, uint32_t value)
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @return
  */
-static ge::graphStatus CheckAttrsInfo(const gert::TilingContext *context)
+static ge::graphStatus CheckAttrsInfo(const gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const char* nodeName = context->GetNodeName();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return ge::GRAPH_FAILED);
 
     // 校验reduce_op的类型是否为sum
-    const char *reduceOpPtr = attrs->GetAttrPointer<char>(REDUCE_OP_INDEX);
+    const char* reduceOpPtr = attrs->GetAttrPointer<char>(REDUCE_OP_INDEX);
     OP_TILING_CHECK(reduceOpPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "reduce_op"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(std::strcmp(reduceOpPtr, REDUCE_OP_TYPE.c_str()) != 0,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "reduce_op", reduceOpPtr, REDUCE_OP_TYPE.c_str()),
                     return ge::GRAPH_FAILED);
     // 校验output_dtype
-    const int64_t *outputTypePtr = attrs->GetAttrPointer<int64_t>(OUTPUT_DTYPE_INDEX);
+    const int64_t* outputTypePtr = attrs->GetAttrPointer<int64_t>(OUTPUT_DTYPE_INDEX);
     OP_TILING_CHECK(outputTypePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "outputType"),
                     return ge::GRAPH_FAILED);
     ge::DataType outputType = static_cast<ge::DataType>(*outputTypePtr);
@@ -64,11 +64,11 @@ static ge::graphStatus CheckAttrsInfo(const gert::TilingContext *context)
  * @param runInfo: 封装的doTiling所需要的参数
  * @return
  */
-static ge::graphStatus SetHcclBufferSize(const gert::TilingContext *context, TilingRunInfo &runInfo)
+static ge::graphStatus SetHcclBufferSize(const gert::TilingContext* context, TilingRunInfo& runInfo)
 {
-    const char *nodeName = context->GetNodeName();
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
-    const int64_t *hcclBufferSizePtr = attrs->GetAttrPointer<int64_t>(HCCL_BUFFER_SIZE_INDEX);
+    const char* nodeName = context->GetNodeName();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
+    const int64_t* hcclBufferSizePtr = attrs->GetAttrPointer<int64_t>(HCCL_BUFFER_SIZE_INDEX);
     OP_TILING_CHECK(hcclBufferSizePtr == nullptr,
                     OP_LOGE(nodeName, "Get hcclBufferSize failed, the hcclBufferSize is nullptr."),
                     return ge::GRAPH_FAILED);
@@ -82,12 +82,12 @@ static ge::graphStatus SetHcclBufferSize(const gert::TilingContext *context, Til
  * @param runInfo: 封装的doTiling所需要的参数
  * @return
  */
-static ge::graphStatus SetRankSize(const gert::TilingContext *context, TilingRunInfo &runInfo)
+static ge::graphStatus SetRankSize(const gert::TilingContext* context, TilingRunInfo& runInfo)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // attrs在函数CheckAttrsInfo中已做校验
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
-    const int64_t *rankSizePtr = attrs->GetAttrPointer<int64_t>(WORLD_SIZE_INDEX);
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
+    const int64_t* rankSizePtr = attrs->GetAttrPointer<int64_t>(WORLD_SIZE_INDEX);
     OP_TILING_CHECK(rankSizePtr == nullptr || *rankSizePtr == RANK_SIZE_DEFAULT,
                     OP_LOGE(nodeName, "Get rankSize failed, the rankSize is nullptr or invalid value."),
                     return ge::GRAPH_FAILED);
@@ -105,16 +105,16 @@ static ge::graphStatus SetRankSize(const gert::TilingContext *context, TilingRun
  * @param runInfo: 封装的doTiling所需要的参数
  * @return
  */
-static bool SetQuantMode(const gert::TilingContext *context, TilingRunInfo &runInfo, const OpType opType)
+static bool SetQuantMode(const gert::TilingContext* context, TilingRunInfo& runInfo, const OpType opType)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // context->GetInputDesc在函数CheckTensorDataType中已经校验
     ge::DataType xDtype = context->GetInputDesc(X_INDEX)->GetDataType();
     ge::DataType scalesDtype = context->GetInputDesc(SCALES_INDEX)->GetDataType();
     // 0: 无量化模式; 1: TG量化; 2: MX量化; 3: PT(per-tensor)量化
     uint32_t quantMode = 0;
     // PT: scales shape 为 1D (size 1)，dtype float32（GetInputShape在函数CheckTensorDataType中已校验）
-    const gert::StorageShape *scalesStorage = context->GetInputShape(SCALES_INDEX);
+    const gert::StorageShape* scalesStorage = context->GetInputShape(SCALES_INDEX);
     if (scalesStorage->GetStorageShape().GetDimNum() == 1 && scalesStorage->GetStorageShape().GetDim(0) == 1 &&
         scalesDtype == ge::DT_FLOAT) {
         quantMode = PT_QUANT_MOD;
@@ -144,9 +144,9 @@ static bool SetQuantMode(const gert::TilingContext *context, TilingRunInfo &runI
  * @param runInfo: 封装的doTiling所需要的参数
  * @return
  */
-static bool CheckTensorDataType(const gert::TilingContext *context, TilingRunInfo &runInfo, const OpType opType)
+static bool CheckTensorDataType(const gert::TilingContext* context, TilingRunInfo& runInfo, const OpType opType)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // 校验x的dtype
     auto xDesc = context->GetInputDesc(X_INDEX);
     OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "x"), return false);
@@ -164,7 +164,7 @@ static bool CheckTensorDataType(const gert::TilingContext *context, TilingRunInf
         OP_LOGE_FOR_INVALID_DTYPE(nodeName, "scales", Ops::Base::ToString(scalesDtype).c_str(), "float/float8_e8m0"),
         return false);
     // 校验scales的shape（SetQuantMode需要根据shape判断量化模式，必须在此前置判空）
-    const gert::StorageShape *scalesStorage = context->GetInputShape(SCALES_INDEX);
+    const gert::StorageShape* scalesStorage = context->GetInputShape(SCALES_INDEX);
     OP_TILING_CHECK(scalesStorage == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "scales"), return false);
     // 校验output的dtype
     auto outputDesc = context->GetOutputDesc(OUTPUT_INDEX);
@@ -185,10 +185,10 @@ static bool CheckTensorDataType(const gert::TilingContext *context, TilingRunInf
  * @param opType: 当前op类型
  * @return
  */
-static bool CheckXDimValid(const gert::TilingContext *context, const OpType opType)
+static bool CheckXDimValid(const gert::TilingContext* context, const OpType opType)
 {
     (void)opType; // Reserved for future extension
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // context->GetInputShape在函数CheckInputTensorDim中已经校验
     size_t xDimNum = context->GetInputShape(X_INDEX)->GetStorageShape().GetDimNum();
     // quant_all_reduce和quant_reduce_scatter算子的x可能是2维或者3维，即x.shape(bs, h)或x.shape(b, s, h)
@@ -207,12 +207,12 @@ static bool CheckXDimValid(const gert::TilingContext *context, const OpType opTy
  * @param opType: 当前op类型
  * @return
  */
-static bool CheckXShapeValid(const gert::TilingContext *context, TilingRunInfo &runInfo, const OpType opType)
+static bool CheckXShapeValid(const gert::TilingContext* context, TilingRunInfo& runInfo, const OpType opType)
 {
     (void)opType; // Reserved for future extension
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // context->GetInputShape在函数CheckInputTensorDim中已经校验
-    const gert::StorageShape *xShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* xShape = context->GetInputShape(X_INDEX);
     // 获取x各维度值
     size_t xDimNum = xShape->GetStorageShape().GetDimNum();
     uint64_t xValueOne = xShape->GetStorageShape().GetDim(DIM_ZERO);
@@ -237,7 +237,7 @@ static bool CheckXShapeValid(const gert::TilingContext *context, TilingRunInfo &
         return false);
 
     // 校验BS是否被worldSize整除
-    const char *dimDesc = (xDimNum == THREE_DIMS) ? "B*S" : "BS"; // 报错信息二维时为BS, 三维时为B*S
+    const char* dimDesc = (xDimNum == THREE_DIMS) ? "B*S" : "BS"; // 报错信息二维时为BS, 三维时为B*S
     OP_TILING_CHECK(xValueBS % runInfo.rankSize != 0,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "x",
                                                           ("shape=" + Ops::Base::ToString(xShape->GetStorageShape()) +
@@ -262,9 +262,9 @@ static bool CheckXShapeValid(const gert::TilingContext *context, TilingRunInfo &
  * @param runInfo: 封装的doTiling所需要的参数
  * @return 计算出的正确scales维度向量
  */
-static std::vector<uint64_t> CalculateExpectedScalesShape(const gert::TilingContext *context, TilingRunInfo &runInfo)
+static std::vector<uint64_t> CalculateExpectedScalesShape(const gert::TilingContext* context, TilingRunInfo& runInfo)
 {
-    const gert::StorageShape *xShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* xShape = context->GetInputShape(X_INDEX);
 
     // 获取x的维度和值
     size_t xDimNum = xShape->GetStorageShape().GetDimNum();
@@ -316,7 +316,7 @@ static std::vector<uint64_t> CalculateExpectedScalesShape(const gert::TilingCont
 }
 
 // 辅助函数：格式化shape为字符串
-static std::string FormatShape(const std::vector<uint64_t> &dims)
+static std::string FormatShape(const std::vector<uint64_t>& dims)
 {
     std::stringstream ss;
     ss << "[";
@@ -337,14 +337,14 @@ static std::string FormatShape(const std::vector<uint64_t> &dims)
  * @param runInfo: 封装的doTiling所需要的参数（包含quantMode信息）
  * @return true: 校验通过, false: 校验失败
  */
-static bool CheckScalesValid(const gert::TilingContext *context, const std::vector<uint64_t> &expectedScalesDims,
-                             const TilingRunInfo &runInfo)
+static bool CheckScalesValid(const gert::TilingContext* context, const std::vector<uint64_t>& expectedScalesDims,
+                             const TilingRunInfo& runInfo)
 {
-    const char *nodeName = context->GetNodeName();
-    const gert::StorageShape *scalesShape = context->GetInputShape(SCALES_INDEX);
+    const char* nodeName = context->GetNodeName();
+    const gert::StorageShape* scalesShape = context->GetInputShape(SCALES_INDEX);
 
     // 将quantMode转换为可读字符串
-    const char *quantModeStr = "";
+    const char* quantModeStr = "";
     if (runInfo.quantMode == TG_QUANT_MOD) {
         quantModeStr = "TG";
     } else if (runInfo.quantMode == MX_QUANT_MOD) {
@@ -383,11 +383,11 @@ static bool CheckScalesValid(const gert::TilingContext *context, const std::vect
  * @param opType:当前op类型
  * @return
  */
-static bool CheckInputTensorDim(const gert::TilingContext *context, TilingRunInfo &runInfo, const OpType opType)
+static bool CheckInputTensorDim(const gert::TilingContext* context, TilingRunInfo& runInfo, const OpType opType)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // 1.校验x相关
-    const gert::StorageShape *xShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* xShape = context->GetInputShape(X_INDEX);
     // 校验x不为空
     OP_TILING_CHECK(xShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xShape"), return false);
     // 校验x维度数量合法性
@@ -402,7 +402,7 @@ static bool CheckInputTensorDim(const gert::TilingContext *context, TilingRunInf
     }
 
     // 2.校验scales
-    const gert::StorageShape *scalesShape = context->GetInputShape(SCALES_INDEX);
+    const gert::StorageShape* scalesShape = context->GetInputShape(SCALES_INDEX);
     // 根据x计算正确的scales, 当scale形状不匹配时，会打印预期的形状和实际的形状
     std::vector<uint64_t> expectedScalesDims = CalculateExpectedScalesShape(context, runInfo);
     // 校验scales不为空
@@ -418,8 +418,8 @@ static bool CheckInputTensorDim(const gert::TilingContext *context, TilingRunInf
 /**
  * @brief 检查输出维度大小的合法性
  */
-static bool CheckOutputDimSize(const gert::TilingContext *context, size_t outputDim, size_t xDimNum, OpType opType,
-                               const char *nodeName)
+static bool CheckOutputDimSize(const gert::TilingContext* context, size_t outputDim, size_t xDimNum, OpType opType,
+                               const char* nodeName)
 {
     (void)context; // Reserved for future extension
     bool invalidOutputDim = false;
@@ -444,9 +444,9 @@ static bool CheckOutputDimSize(const gert::TilingContext *context, size_t output
 /**
  * @brief 检查quant_all_reduce的输出形状
  */
-static bool CheckAllReduceOutputShape(const gert::TilingContext *context, const gert::StorageShape *outputShape,
-                                      size_t outputDim, size_t xDimNum, const TilingRunInfo &runInfo,
-                                      const char *nodeName)
+static bool CheckAllReduceOutputShape(const gert::TilingContext* context, const gert::StorageShape* outputShape,
+                                      size_t outputDim, size_t xDimNum, const TilingRunInfo& runInfo,
+                                      const char* nodeName)
 {
     (void)xDimNum; // Reserved for future extension
     uint64_t outputValueOne = outputShape->GetStorageShape().GetDim(DIM_ZERO);
@@ -491,9 +491,9 @@ static bool CheckAllReduceOutputShape(const gert::TilingContext *context, const 
 /**
  * @brief 检查quant_reduce_scatter的输出形状, 当输入x为3D时
  */
-static bool CheckReduceScatter3DShape(const gert::TilingContext *context, uint64_t outputValueOne,
+static bool CheckReduceScatter3DShape(const gert::TilingContext* context, uint64_t outputValueOne,
                                       uint64_t outputValueTwo, uint64_t xValueOne, uint64_t xValueTwo,
-                                      const TilingRunInfo &runInfo, const char *nodeName)
+                                      const TilingRunInfo& runInfo, const char* nodeName)
 {
     // 若X为3维，则要对b,s进行合轴，再与output判断是否合法
     uint64_t xValueBS = xValueOne * xValueTwo;
@@ -515,7 +515,7 @@ static bool CheckReduceScatter3DShape(const gert::TilingContext *context, uint64
  * @brief 检查quant_reduce_scatter的的输出形状, 当输入x为2D时
  */
 static bool CheckReduceScatter2DShape(uint64_t outputValueOne, uint64_t outputValueTwo, uint64_t xValueOne,
-                                      const uint64_t xValueTwo, const TilingRunInfo &runInfo, const char *nodeName)
+                                      const uint64_t xValueTwo, const TilingRunInfo& runInfo, const char* nodeName)
 {
     // 若X为2维, 逐个校验即可
     bool invalidShape = xValueOne / runInfo.rankSize != outputValueOne; // 校验bs轴
@@ -534,9 +534,9 @@ static bool CheckReduceScatter2DShape(uint64_t outputValueOne, uint64_t outputVa
 /**
  * @brief 检查quant_reduce_scatter的输出形状
  */
-static bool CheckReduceScatterOutputShape(const gert::TilingContext *context, const gert::StorageShape *outputShape,
-                                          size_t outputDim, size_t xDimNum, const TilingRunInfo &runInfo,
-                                          const char *nodeName)
+static bool CheckReduceScatterOutputShape(const gert::TilingContext* context, const gert::StorageShape* outputShape,
+                                          size_t outputDim, size_t xDimNum, const TilingRunInfo& runInfo,
+                                          const char* nodeName)
 {
     (void)outputDim; // Reserved for future extension
     uint64_t outputValueOne = outputShape->GetStorageShape().GetDim(DIM_ZERO);
@@ -559,11 +559,11 @@ static bool CheckReduceScatterOutputShape(const gert::TilingContext *context, co
  * @param runInfo: 封装的doTiling所需要的参数
  * @return
  */
-static bool CheckOutputDim(const gert::TilingContext *context, const TilingRunInfo &runInfo, const OpType opType)
+static bool CheckOutputDim(const gert::TilingContext* context, const TilingRunInfo& runInfo, const OpType opType)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // context->GetOutputShape在函数CheckOutputTensorDim中已经校验
-    const gert::StorageShape *outputShape = context->GetOutputShape(OUTPUT_INDEX);
+    const gert::StorageShape* outputShape = context->GetOutputShape(OUTPUT_INDEX);
     size_t outputDim = outputShape->GetStorageShape().GetDimNum();
     // context->GetInputShape在函数CheckInputTensorDim中已经校验
     size_t xDimNum = context->GetInputShape(X_INDEX)->GetStorageShape().GetDimNum();
@@ -587,11 +587,11 @@ static bool CheckOutputDim(const gert::TilingContext *context, const TilingRunIn
  * @param opType: 当前op类型
  * @return
  */
-static bool CheckOutputTensorDim(const gert::TilingContext *context, const TilingRunInfo &runInfo, const OpType opType)
+static bool CheckOutputTensorDim(const gert::TilingContext* context, const TilingRunInfo& runInfo, const OpType opType)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // 红线校验
-    const gert::StorageShape *outputShape = context->GetOutputShape(OUTPUT_INDEX);
+    const gert::StorageShape* outputShape = context->GetOutputShape(OUTPUT_INDEX);
     OP_TILING_CHECK(outputShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "output"), return false);
     return CheckOutputDim(context, runInfo, opType);
 }
@@ -601,9 +601,9 @@ static bool CheckOutputTensorDim(const gert::TilingContext *context, const Tilin
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @return
  */
-static bool CheckTensorFormat(const gert::TilingContext *context)
+static bool CheckTensorFormat(const gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // 3维及以上NPU输入经torchair入图时，Data节点npu_format默认为NCHW并被FE传播至下游，proto/tiling仅放行ND会导致报错
     // MC2通信数据为连续排布，非分形格式与ND存储等价，放行NCHW/NHWC等非分形格式
     // (proto生成器对NCL等格式不支持，故集合与proto FormatList保持一致)
@@ -634,12 +634,12 @@ static bool CheckTensorFormat(const gert::TilingContext *context)
  * @param runInfo: 封装的doTiling所需要的参数
  * @return
  */
-static bool CheckWindowSize(const gert::TilingContext *context, const TilingRunInfo &runInfo)
+static bool CheckWindowSize(const gert::TilingContext* context, const TilingRunInfo& runInfo)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
 
     // 计算xDataSize
-    const gert::StorageShape *xShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* xShape = context->GetInputShape(X_INDEX);
     size_t xDimNum = xShape->GetStorageShape().GetDimNum();
     uint64_t xValue = xDimNum > 0 ? 1UL : 0UL;
     for (size_t i = 0; i < xDimNum; ++i) {
@@ -650,7 +650,7 @@ static bool CheckWindowSize(const gert::TilingContext *context, const TilingRunI
 
     // 计算scalesDataSize
     uint64_t scalesSize = 0UL;
-    const gert::StorageShape *scalesShape = context->GetInputShape(SCALES_INDEX);
+    const gert::StorageShape* scalesShape = context->GetInputShape(SCALES_INDEX);
     size_t scalesDimNum = scalesShape->GetStorageShape().GetDimNum();
     uint64_t scalesValue = scalesDimNum > 0 ? 1UL : 0UL;
     for (size_t i = 0; i < scalesDimNum; ++i) {
@@ -684,10 +684,10 @@ static bool CheckWindowSize(const gert::TilingContext *context, const TilingRunI
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @return
  */
-static ge::graphStatus SetWorkSpace(gert::TilingContext *context)
+static ge::graphStatus SetWorkSpace(gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    const char* nodeName = context->GetNodeName();
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "workSpaces"), return ge::GRAPH_FAILED);
     workSpaces[0] = SYSTEM_NEED_WORKSPACE;
     return ge::GRAPH_SUCCESS;
@@ -698,11 +698,11 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context)
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @return
  */
-ge::graphStatus QuantReduceScatterUtilTiling::CheckNpuArch(const gert::TilingContext *context)
+ge::graphStatus QuantReduceScatterUtilTiling::CheckNpuArch(const gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // 校验NpuArch
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     OP_TILING_CHECK(platformInfoPtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "platformInfoPtr"),
                     return ge::GRAPH_FAILED);
     platform_ascendc::PlatformAscendC ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
@@ -721,10 +721,10 @@ ge::graphStatus QuantReduceScatterUtilTiling::CheckNpuArch(const gert::TilingCon
  * @param opType: 当前op类型
  * @return
  */
-ge::graphStatus QuantReduceScatterUtilTiling::CheckTilingFunc(gert::TilingContext *context, TilingRunInfo &runInfo,
+ge::graphStatus QuantReduceScatterUtilTiling::CheckTilingFunc(gert::TilingContext* context, TilingRunInfo& runInfo,
                                                               const OpType opType)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     if (CheckAttrsInfo(context) != ge::GRAPH_SUCCESS) {
         OP_LOGE(nodeName, "CheckAttrsInfo failed");
         return ge::GRAPH_FAILED;

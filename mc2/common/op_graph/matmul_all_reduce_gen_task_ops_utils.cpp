@@ -40,8 +40,8 @@ static bool IsPlatform310P()
            version_with_common_def.end();
 }
 
-ge::Status MatmulAllReduceGenTaskOpsUtils::MatmulAllReduceGenTaskCallback(const gert::ExeResGenerationContext *context,
-                                                                          std::vector<std::vector<uint8_t>> &tasks)
+ge::Status MatmulAllReduceGenTaskOpsUtils::MatmulAllReduceGenTaskCallback(const gert::ExeResGenerationContext* context,
+                                                                          std::vector<std::vector<uint8_t>>& tasks)
 {
     if (IsPlatform310P()) {
         int64_t aicore_idx = AICORE_IDX;

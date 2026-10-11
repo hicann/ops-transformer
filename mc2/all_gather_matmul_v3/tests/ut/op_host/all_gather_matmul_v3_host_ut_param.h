@@ -29,7 +29,7 @@ struct AllGatherMatmulV3HostUtParamBase {
     std::string commMode;
     uint64_t rankNum;
 
-    explicit AllGatherMatmulV3HostUtParamBase(const csv_map &csvMap)
+    explicit AllGatherMatmulV3HostUtParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->expectResult = Str2StatusGE(ReadMap(csvMap, "expectResult"));
@@ -45,7 +45,7 @@ struct AllGatherMatmulV3HostUtParamBase {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AllGatherMatmulV3HostUtParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const AllGatherMatmulV3HostUtParamBase& param)
 {
     return os << param.case_name;
 }
@@ -62,7 +62,7 @@ struct AllGatherMatmulV3TilingUtParam : public AllGatherMatmulV3HostUtParamBase 
     std::string soc;
     uint64_t expectTilingKey;
 
-    explicit AllGatherMatmulV3TilingUtParam(const csv_map &csvMap)
+    explicit AllGatherMatmulV3TilingUtParam(const csv_map& csvMap)
         : AllGatherMatmulV3HostUtParamBase(csvMap)
     {
         GetTensorGE(csvMap, "context_shape", "context_dtype", "context_format", this->context);

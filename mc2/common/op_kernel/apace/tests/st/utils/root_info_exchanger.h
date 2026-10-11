@@ -30,7 +30,7 @@
 
 class RootInfoExchanger {
 public:
-    RootInfoExchanger(uint32_t rank, uint32_t rankNum, const std::string &endpoint)
+    RootInfoExchanger(uint32_t rank, uint32_t rankNum, const std::string& endpoint)
         : rank_(rank),
           rankNum_(rankNum)
     {
@@ -45,7 +45,7 @@ public:
         CloseSocks();
     }
 
-    bool Exchange(HcclRootInfo &rootInfo)
+    bool Exchange(HcclRootInfo& rootInfo)
     {
         if (!valid_) {
             return false;
@@ -75,7 +75,7 @@ public:
     }
 
 private:
-    static bool ParseEndpoint(const std::string &endpoint, std::string &ip, uint16_t &port)
+    static bool ParseEndpoint(const std::string& endpoint, std::string& ip, uint16_t& port)
     {
         const std::string prefix = "tcp://";
         if (endpoint.find(prefix) != 0) {
@@ -91,11 +91,11 @@ private:
         return !ip.empty() && port > 0;
     }
 
-    static int32_t SendAll(int32_t sock, const void *buf, size_t len)
+    static int32_t SendAll(int32_t sock, const void* buf, size_t len)
     {
         size_t sent = 0;
         while (sent < len) {
-            ssize_t n = send(sock, static_cast<const char *>(buf) + sent, len - sent, 0);
+            ssize_t n = send(sock, static_cast<const char*>(buf) + sent, len - sent, 0);
             if (n <= 0) {
                 return -1;
             }
@@ -104,11 +104,11 @@ private:
         return 0;
     }
 
-    static int32_t RecvAll(int32_t sock, void *buf, size_t len)
+    static int32_t RecvAll(int32_t sock, void* buf, size_t len)
     {
         size_t received = 0;
         while (received < len) {
-            ssize_t n = recv(sock, static_cast<char *>(buf) + received, len - received, 0);
+            ssize_t n = recv(sock, static_cast<char*>(buf) + received, len - received, 0);
             if (n <= 0) {
                 return -1;
             }
@@ -117,7 +117,7 @@ private:
         return 0;
     }
 
-    int32_t ExchangeRootInfo(HcclRootInfo &rootInfo)
+    int32_t ExchangeRootInfo(HcclRootInfo& rootInfo)
     {
         if (rank_ == 0) {
             auto ret = HcclGetRootInfo(&rootInfo);
@@ -177,7 +177,7 @@ private:
             addr.sin_family = AF_INET;
             addr.sin_port = htons(port_);
             inet_pton(AF_INET, ip_.c_str(), &addr.sin_addr);
-            if (bind(listenSock, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) < 0 ||
+            if (bind(listenSock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0 ||
                 listen(listenSock, static_cast<int>(rankNum_)) < 0) {
                 close(listenSock);
                 return -1;
@@ -202,7 +202,7 @@ private:
             addr.sin_port = htons(port_);
             inet_pton(AF_INET, ip_.c_str(), &addr.sin_addr);
             for (int32_t retry = 0; retry < 100; retry++) {
-                if (connect(sock, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) == 0) {
+                if (connect(sock, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0) {
                     socks_[0] = sock;
                     return 0;
                 }

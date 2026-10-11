@@ -35,13 +35,13 @@ public:
     // mc2 ctx 路径无需 winsize 校验，Check 仅作为接口对齐的 no-op。
     // Mc2MoeContext 不携带 epWorldSize，由调用方从 tilingData 传入并暂存。
     __aicore__ inline void InitAndCheck(GM_ADDR ctxPtr, uint32_t epWorldSize, uint64_t /* totalWinSize */,
-                                        TPipe * /* pipe */, GM_ADDR /* exceptionAddr */)
+                                        TPipe* /* pipe */, GM_ADDR /* exceptionAddr */)
     {
-        mc2Context_ = (__gm__ Mc2Aclnn::Mc2MoeContext *)ctxPtr;
+        mc2Context_ = (__gm__ Mc2Aclnn::Mc2MoeContext*)ctxPtr;
         epWorldSize_ = epWorldSize;
     }
 
-    __aicore__ inline void Check(uint64_t /* totalWinSize */, TPipe * /* pipe */, GM_ADDR /* exceptionAddr */) {}
+    __aicore__ inline void Check(uint64_t /* totalWinSize */, TPipe* /* pipe */, GM_ADDR /* exceptionAddr */) {}
 
     __aicore__ inline GM_ADDR GetStatusDataSpaceGm()
     {
@@ -71,7 +71,7 @@ public:
     }
 
 private:
-    __gm__ Mc2Aclnn::Mc2MoeContext *mc2Context_{nullptr};
+    __gm__ Mc2Aclnn::Mc2MoeContext* mc2Context_{nullptr};
     uint32_t epWorldSize_{0};
 };
 

@@ -25,7 +25,7 @@ class AllGatherMMFitBalanceTiling : public Mc2FitBasedBalanceTiling {
 public:
     double frontMMTime_ = 0;
 
-    explicit AllGatherMMFitBalanceTiling(const mc2tiling::TilingArgs &args, KernelType kernelType,
+    explicit AllGatherMMFitBalanceTiling(const mc2tiling::TilingArgs& args, KernelType kernelType,
                                          TopoType topoType = TopoType::STANDARD_CARD)
         : Mc2FitBasedBalanceTiling(args, kernelType, topoType)
     {

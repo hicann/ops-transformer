@@ -56,9 +56,9 @@ public:
         uint64_t start, step, count;
     };
 
-    __aicore__ inline MC2VecAddBias(TPipe *tPipe)
+    __aicore__ inline MC2VecAddBias(TPipe* tPipe)
         : tPipe_(tPipe){};
-    __aicore__ inline MC2AddBiasContext *GetContextPtr();
+    __aicore__ inline MC2AddBiasContext* GetContextPtr();
     __aicore__ inline void Init() {};
     __aicore__ inline void Process(uint32_t taskIndex);
 
@@ -85,7 +85,7 @@ protected:
     MC2AddBiasContext context_;
     GlobalTensor<MatmulDataType> matmulGm_;
     GlobalTensor<BiasDataType> biasGm_;
-    TPipe *tPipe_;
+    TPipe* tPipe_;
     TBuf<TPosition::VECCALC> matmulTileBuf_[BUFFER_NUM];
     TBuf<TPosition::VECCALC> biasTileBuf_[BUFFER_NUM];
     TBuf<TPosition::VECCALC> matmulFp32Buf_; // FP32 计算缓冲 (单缓冲, V pipe in-order 保证不冲突)
@@ -234,7 +234,7 @@ protected:
         AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(copyInEvent_);
     }
 
-    __aicore__ inline void Compute(const LocalTensor<float> &bias, uint32_t curTileM, uint32_t curTileN,
+    __aicore__ inline void Compute(const LocalTensor<float>& bias, uint32_t curTileM, uint32_t curTileN,
                                    uint32_t ubRowStride, uint32_t bufIdx)
     {
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(copyInEvent_);
@@ -247,7 +247,7 @@ protected:
     }
 
     // FP32 路径: Cast↑(matmul→float) → Set castDone → Add<float> → Wait copyOutDone → Cast↓(float→matmulOut_)
-    __aicore__ inline void ComputeFp32(const LocalTensor<float> &bias, uint32_t curTileM, uint32_t curTileN,
+    __aicore__ inline void ComputeFp32(const LocalTensor<float>& bias, uint32_t curTileM, uint32_t curTileN,
                                        uint32_t ubRowStride, uint32_t bufIdx)
     {
         uint32_t ubRowStrideFp32 = Ceil(curTileN, FP32_ELEMS_PER_BLOCK) * FP32_ELEMS_PER_BLOCK;
@@ -295,7 +295,7 @@ protected:
         }
     }
 
-    __aicore__ inline void ComputeDirect(const LocalTensor<float> &bias, uint32_t curTileM, uint32_t curTileN,
+    __aicore__ inline void ComputeDirect(const LocalTensor<float>& bias, uint32_t curTileM, uint32_t curTileN,
                                          uint32_t ubRowStride, uint32_t bufIdx)
     {
         LocalTensor<float> matmulFp32 = matmulTile_[bufIdx].template ReinterpretCast<float>();
@@ -331,7 +331,7 @@ protected:
     }
 
     __aicore__ inline void ProcessMTile(uint64_t offset, uint32_t curTileM, uint32_t curTileN, uint32_t ubRowStride,
-                                        const LocalTensor<float> &bias, uint32_t bufIdx)
+                                        const LocalTensor<float>& bias, uint32_t bufIdx)
     {
         CopyIn(offset, curTileM, curTileN, bufIdx);
         Compute(bias, curTileM, curTileN, ubRowStride, bufIdx);
@@ -417,7 +417,7 @@ protected:
 };
 
 template <typename MatmulDataType, typename BiasDataType, uint32_t SplitModeVal>
-__aicore__ inline MC2AddBiasContext *MC2VecAddBias<MatmulDataType, BiasDataType, SplitModeVal>::GetContextPtr()
+__aicore__ inline MC2AddBiasContext* MC2VecAddBias<MatmulDataType, BiasDataType, SplitModeVal>::GetContextPtr()
 {
     return &context_;
 }
@@ -437,8 +437,8 @@ __aicore__ inline void MC2VecAddBias<MatmulDataType, BiasDataType, SplitModeVal>
 {
     tPipe_->Reset();
     CalcSplit();
-    matmulGm_.SetGlobalBuffer((__gm__ MatmulDataType *)matmulAddr);
-    biasGm_.SetGlobalBuffer((__gm__ BiasDataType *)biasAddr);
+    matmulGm_.SetGlobalBuffer((__gm__ MatmulDataType*)matmulAddr);
+    biasGm_.SetGlobalBuffer((__gm__ BiasDataType*)biasAddr);
 
     for (uint32_t i = 0; i < BUFFER_NUM; i++) {
         tPipe_->InitBuffer(matmulTileBuf_[i],

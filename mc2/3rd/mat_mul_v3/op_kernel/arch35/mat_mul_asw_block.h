@@ -75,7 +75,7 @@ class Mc2MatmulAswBlock {
 public:
     __aicore__ inline Mc2MatmulAswBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-    __aicore__ inline void Init(const void *tilingData);
+    __aicore__ inline void Init(const void* tilingData);
     template <class A_TYPE, class B_TYPE>
     __aicore__ inline void LoadBalanceInit();
     __aicore__ inline uint64_t GetNewBlockIdx(uint64_t roundIdx);
@@ -94,7 +94,7 @@ public:
 public:
     AswBlockOffset offset_;
     AswBlockArgs params_;
-    const Mc2MatMulV3TilingData *matmulTilingData_;
+    const Mc2MatMulV3TilingData* matmulTilingData_;
 };
 
 template <class A_TYPE, class B_TYPE>
@@ -109,9 +109,9 @@ __aicore__ inline void Mc2MatmulAswBlock::LoadBalanceInit()
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-__aicore__ inline void Mc2MatmulAswBlock::Init(const void *tilingData)
+__aicore__ inline void Mc2MatmulAswBlock::Init(const void* tilingData)
 {
-    matmulTilingData_ = static_cast<const Mc2MatMulV3TilingData *>(tilingData);
+    matmulTilingData_ = static_cast<const Mc2MatMulV3TilingData*>(tilingData);
     params_.index = 0UL;
     params_.singleCoreM = 0UL;
     params_.singleCoreN = 0UL;

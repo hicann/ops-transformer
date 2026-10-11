@@ -41,7 +41,7 @@ namespace optiling {
 
 REGISTER_OPS_TILING_TEMPLATE(Mc2MatMulV3, Mc2MatmulV3BaseTiling, 0);
 
-static ge::graphStatus Mc2MatmulV3TilingFunc(gert::TilingContext *context)
+static ge::graphStatus Mc2MatmulV3TilingFunc(gert::TilingContext* context)
 {
     OP_TILING_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT("Mc2MatMulV3", "context"), return ge::GRAPH_FAILED);
     if (Mc2IsAdvancedSocVersion(context)) {
@@ -50,13 +50,13 @@ static ge::graphStatus Mc2MatmulV3TilingFunc(gert::TilingContext *context)
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus Mc2TilingPrepareForMatmulV3(gert::TilingParseContext *context)
+static ge::graphStatus Mc2TilingPrepareForMatmulV3(gert::TilingParseContext* context)
 {
     if (Mc2IsAdvancedSocVersion(context)) {
         return mc2_matmul_v3_advanced::InitCompileInfo(context);
     }
     OP_TILING_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT("Mc2MatMulV3", "context"), return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "platformInfo"),
                     return ge::GRAPH_FAILED);
 

@@ -22,11 +22,11 @@
 using namespace ge;
 using namespace Mc2Moe;
 namespace {
-const char *K_INNER_DEBUG = "MC2: AlltoAllAllGatherBmm Infershape Debug";
+const char* K_INNER_DEBUG = "MC2: AlltoAllAllGatherBmm Infershape Debug";
 
 // for y2
-void DynamicEmptyCheck(const gert::Shape *xShape, const gert::Shape *weightShape, const size_t wDimH,
-                       OutShapeInfo &outShapeInfo)
+void DynamicEmptyCheck(const gert::Shape* xShape, const gert::Shape* weightShape, const size_t wDimH,
+                       OutShapeInfo& outShapeInfo)
 {
     // dynamic
     if (xShape->GetDim(DIM_E) == -1) {
@@ -51,7 +51,7 @@ void DynamicEmptyCheck(const gert::Shape *xShape, const gert::Shape *weightShape
 }
 
 // 判断是否输出可选输出, 不输出时设置 shape 为 [0, 0, 0]
-void OutputFlagCheck(const char *nodeName, const bool flag, const char *outName, OutShapeInfo &outShapeInfo)
+void OutputFlagCheck(const char* nodeName, const bool flag, const char* outName, OutShapeInfo& outShapeInfo)
 {
     if (!flag) {
         outShapeInfo.e = 0;
@@ -62,7 +62,7 @@ void OutputFlagCheck(const char *nodeName, const bool flag, const char *outName,
     return;
 }
 
-bool ActTypeCheck(const char *nodeName, const int64_t actType, const bool y3Flag)
+bool ActTypeCheck(const char* nodeName, const int64_t actType, const bool y3Flag)
 {
     if (std::find(ops::ACT_TYPE_SUPPORT_VEC.begin(), ops::ACT_TYPE_SUPPORT_VEC.end(), actType) ==
         ops::ACT_TYPE_SUPPORT_VEC.end()) {
@@ -80,7 +80,7 @@ bool ActTypeCheck(const char *nodeName, const int64_t actType, const bool y3Flag
     return true;
 }
 
-bool CommonCheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
+bool CommonCheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
                             const size_t wDimH)
 {
     // 检查每个维度: x dim C >= 1，dim E H M 会在后面限制, 这里不再做校验
@@ -122,8 +122,8 @@ bool CommonCheckTensorShape(const char *nodeName, const gert::Shape *xShape, con
 }
 
 // 盘古 2.6T (shard 0) && GPT 2.2T (shard 1)
-static bool CheckTensorShapeDimWithoutxShard(const char *nodeName, const gert::Shape *xShape,
-                                             const gert::Shape *weightShape, const int64_t epSize, const size_t wDimM)
+static bool CheckTensorShapeDimWithoutxShard(const char* nodeName, const gert::Shape* xShape,
+                                             const gert::Shape* weightShape, const int64_t epSize, const size_t wDimM)
 {
     // x[DIM_E] = E, value E should = [2, 2048]
     if (((xShape->GetDim(DIM_E) < VALUE_E_MIN) || (xShape->GetDim(DIM_E) > VALUE_E_MAX)) &&
@@ -154,8 +154,8 @@ static bool CheckTensorShapeDimWithoutxShard(const char *nodeName, const gert::S
     return true;
 }
 
-static bool CheckTensorShapeDimWithZeroxShard(const char *nodeName, const gert::Shape *xShape,
-                                              const gert::Shape *weightShape, const int64_t tpSize, const size_t wDimH)
+static bool CheckTensorShapeDimWithZeroxShard(const char* nodeName, const gert::Shape* xShape,
+                                              const gert::Shape* weightShape, const int64_t tpSize, const size_t wDimH)
 {
     // x[X_DIM_H] = H / tp, value H should = [1, 65535]
     if (((xShape->GetDim(X_DIM_H) * tpSize < VALUE_H_MIN) || (xShape->GetDim(X_DIM_H) * tpSize > VALUE_H_MAX)) &&
@@ -176,8 +176,8 @@ static bool CheckTensorShapeDimWithZeroxShard(const char *nodeName, const gert::
     return true;
 }
 
-static bool CheckTensorShapeDimWithOnexShard(const char *nodeName, const gert::Shape *xShape,
-                                             const gert::Shape *weightShape, const size_t wDimH)
+static bool CheckTensorShapeDimWithOnexShard(const char* nodeName, const gert::Shape* xShape,
+                                             const gert::Shape* weightShape, const size_t wDimH)
 {
     // x[X_DIM_H] = H, value H should = [1, 65535]
     if (((xShape->GetDim(X_DIM_H) < VALUE_H_MIN) || (xShape->GetDim(X_DIM_H) > VALUE_H_MAX)) &&
@@ -198,7 +198,7 @@ static bool CheckTensorShapeDimWithOnexShard(const char *nodeName, const gert::S
     return true;
 }
 
-bool XShardCheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
+bool XShardCheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
                             const int64_t epSize, const int64_t tpSize, const int64_t xShard, const size_t wDimH,
                             const size_t wDimM)
 {
@@ -214,7 +214,7 @@ bool XShardCheckTensorShape(const char *nodeName, const gert::Shape *xShape, con
     return true;
 }
 
-bool CheckBiasShape(const char *nodeName, const gert::Shape *weightShape, const gert::Shape *biasShape,
+bool CheckBiasShape(const char* nodeName, const gert::Shape* weightShape, const gert::Shape* biasShape,
                     const size_t wDimM)
 {
     // 检查 dimNum
@@ -252,8 +252,8 @@ bool CheckBiasShape(const char *nodeName, const gert::Shape *weightShape, const 
     return true;
 }
 
-bool CheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
-                      const gert::Shape *biasShape, const int64_t epSize, const int64_t tpSize, const size_t wDimH,
+bool CheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
+                      const gert::Shape* biasShape, const int64_t epSize, const int64_t tpSize, const size_t wDimH,
                       const size_t wDimM, const int64_t xShard)
 {
     OPS_LOG_D(nodeName, "Begin to print x shape");
@@ -294,10 +294,10 @@ bool CheckTensorShape(const char *nodeName, const gert::Shape *xShape, const ger
     return true;
 }
 
-bool CheckAttrs(const gert::InferShapeContext *context, int64_t &epSize, int64_t &tpSize, bool &isTransW,
-                int64_t &xShard, bool &y2Flag, bool &y3Flag)
+bool CheckAttrs(const gert::InferShapeContext* context, int64_t& epSize, int64_t& tpSize, bool& isTransW,
+                int64_t& xShard, bool& y2Flag, bool& y3Flag)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
 
     auto attrs = context->GetAttrs();
     if (nodeName != nullptr) {
@@ -305,15 +305,15 @@ bool CheckAttrs(const gert::InferShapeContext *context, int64_t &epSize, int64_t
     }
 
     // get 只有在 index 超出 attr num 的时候才会返回 nullptr
-    const char *groupEp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_EP));
-    const char *groupTp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_TP));
-    const int64_t *tpWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_TP_WORLD_SIZE));
-    const int64_t *epWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_EP_WORLD_SIZE));
-    const bool *isTransWPtr = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_IS_TRANS_W));
-    const int64_t *xShardType = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_X_SHARD_TYPE));
-    const int64_t *actTypePtr = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_ACT_TYPE));
-    const bool *outputY2Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y2_FLAG));
-    const bool *outputY3Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y3_FLAG));
+    const char* groupEp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_EP));
+    const char* groupTp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_TP));
+    const int64_t* tpWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_TP_WORLD_SIZE));
+    const int64_t* epWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_EP_WORLD_SIZE));
+    const bool* isTransWPtr = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_IS_TRANS_W));
+    const int64_t* xShardType = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_X_SHARD_TYPE));
+    const int64_t* actTypePtr = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_ACT_TYPE));
+    const bool* outputY2Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y2_FLAG));
+    const bool* outputY3Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y3_FLAG));
 
     if ((tpWorldSize == nullptr) || (epWorldSize == nullptr) || (isTransWPtr == nullptr) || (xShardType == nullptr) ||
         (actTypePtr == nullptr) || (outputY2Flag == nullptr) || (outputY3Flag == nullptr)) {
@@ -356,8 +356,8 @@ bool CheckAttrs(const gert::InferShapeContext *context, int64_t &epSize, int64_t
     return true;
 }
 
-void GetY1Y3ShapeInfo(const gert::Shape *xShape, const gert::Shape *weightShape, const int64_t epSize,
-                      const int64_t tpSize, const int64_t xShard, const size_t wDimM, OutShapeInfo &outShapeInfo)
+void GetY1Y3ShapeInfo(const gert::Shape* xShape, const gert::Shape* weightShape, const int64_t epSize,
+                      const int64_t tpSize, const int64_t xShard, const size_t wDimM, OutShapeInfo& outShapeInfo)
 {
     if (xShard == 0) {
         outShapeInfo.e = weightShape->GetDim(DIM_E);
@@ -371,8 +371,8 @@ void GetY1Y3ShapeInfo(const gert::Shape *xShape, const gert::Shape *weightShape,
     return;
 }
 
-void GetY2ShapeInfo(const gert::Shape *xShape, const gert::Shape *weightShape, const int64_t epSize,
-                    const int64_t tpSize, const int64_t xShard, const size_t wDimH, OutShapeInfo &outShapeInfo)
+void GetY2ShapeInfo(const gert::Shape* xShape, const gert::Shape* weightShape, const int64_t epSize,
+                    const int64_t tpSize, const int64_t xShard, const size_t wDimH, OutShapeInfo& outShapeInfo)
 {
     if (xShard == 0) {
         outShapeInfo.e = weightShape->GetDim(DIM_E);
@@ -389,9 +389,9 @@ void GetY2ShapeInfo(const gert::Shape *xShape, const gert::Shape *weightShape, c
 } // namespace
 
 namespace ops {
-static void SetTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
+static void SetTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
                            const int64_t epSize, const int64_t tpSize, const size_t wDimH, const size_t wDimM,
-                           const int64_t xShard, gert::Shape *y1Shape, gert::Shape *y2Shape, gert::Shape *y3Shape,
+                           const int64_t xShard, gert::Shape* y1Shape, gert::Shape* y2Shape, gert::Shape* y3Shape,
                            bool y2Flag, bool y3Flag)
 {
     // y1、y3
@@ -412,25 +412,25 @@ static void SetTensorShape(const char *nodeName, const gert::Shape *xShape, cons
     Mc2Moe::SetShape(y2Shape, outShapeInfo);
 }
 
-static ge::graphStatus InferShapeAlltoAllAllGatherBmm(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeAlltoAllAllGatherBmm(gert::InferShapeContext* context)
 {
     OPS_ERR_IF(context == nullptr, OPS_LOG_E(K_INNER_DEBUG, "Context is null."), return ge::GRAPH_FAILED);
 
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OPS_LOG_I(nodeName, "Enter AlltoAllAllGatherBmm infer shape impl.");
 
     // 检查 shape 是否为空
-    const gert::Shape *xShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_X));
+    const gert::Shape* xShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_X));
     OPS_ERR_IF(xShape == nullptr, OPS_LOG_E(K_INNER_DEBUG, "xShape is null."), return ge::GRAPH_FAILED);
-    const gert::Shape *weightShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_WEIGHT));
+    const gert::Shape* weightShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_WEIGHT));
     OPS_ERR_IF(weightShape == nullptr, OPS_LOG_E(K_INNER_DEBUG, "weightShape is null."), return ge::GRAPH_FAILED);
-    gert::Shape *y1Shape = context->GetOutputShape(static_cast<size_t>(ops::AlltoAllAllGatherBmmOutIdx::K_Y1));
+    gert::Shape* y1Shape = context->GetOutputShape(static_cast<size_t>(ops::AlltoAllAllGatherBmmOutIdx::K_Y1));
     OPS_ERR_IF(y1Shape == nullptr, OPS_LOG_E(K_INNER_DEBUG, "y1Shape is null."), return ge::GRAPH_FAILED);
-    gert::Shape *y2Shape = context->GetOutputShape(static_cast<size_t>(ops::AlltoAllAllGatherBmmOutIdx::K_Y2));
+    gert::Shape* y2Shape = context->GetOutputShape(static_cast<size_t>(ops::AlltoAllAllGatherBmmOutIdx::K_Y2));
     OPS_ERR_IF(y2Shape == nullptr, OPS_LOG_E(K_INNER_DEBUG, "y2Shape is null."), return ge::GRAPH_FAILED);
-    gert::Shape *y3Shape = context->GetOutputShape(static_cast<size_t>(ops::AlltoAllAllGatherBmmOutIdx::K_Y3));
+    gert::Shape* y3Shape = context->GetOutputShape(static_cast<size_t>(ops::AlltoAllAllGatherBmmOutIdx::K_Y3));
     OPS_ERR_IF(y3Shape == nullptr, OPS_LOG_E(K_INNER_DEBUG, "y3Shape is null."), return ge::GRAPH_FAILED);
-    const gert::Shape *biasShape = context->GetOptionalInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_BIAS));
+    const gert::Shape* biasShape = context->GetOptionalInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_BIAS));
 
     // 检查属性
     int64_t epSize = -1;
@@ -467,11 +467,11 @@ static ge::graphStatus InferShapeAlltoAllAllGatherBmm(gert::InferShapeContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeAlltoAllAllGatherBmm(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeAlltoAllAllGatherBmm(gert::InferDataTypeContext* context)
 {
     OPS_ERR_IF(context == nullptr, OPS_LOG_E(K_INNER_DEBUG, "Context is null."), return ge::GRAPH_FAILED);
 
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OPS_LOG_I(nodeName, "Enter AlltoAllAllGatherBmm infer data type impl.");
 
     const ge::DataType xType = context->GetInputDataType(static_cast<size_t>(ops::MC2MoeInputIdx::K_X));

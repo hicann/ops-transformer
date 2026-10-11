@@ -25,7 +25,7 @@ class WeightQuantMatmulAllReduceAddRmsNormTiling : public TilingBaseClass {
     friend class WeightQuantMMNTilingTransferHelper;
 
 public:
-    explicit WeightQuantMatmulAllReduceAddRmsNormTiling(gert::TilingContext *context);
+    explicit WeightQuantMatmulAllReduceAddRmsNormTiling(gert::TilingContext* context);
     ~WeightQuantMatmulAllReduceAddRmsNormTiling() override = default;
 
 protected:
@@ -37,7 +37,7 @@ protected:
     uint64_t GetTilingKey() const override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
-    ge::graphStatus CheckMRNInput(const MRNCtxInfo &mrnCtxInfo);
+    ge::graphStatus CheckMRNInput(const MRNCtxInfo& mrnCtxInfo);
 
 private:
     bool HasTail() const;
@@ -52,12 +52,12 @@ private:
 class WeightQuantMMNTilingTransferHelper : public WeightQuantMatmulAllReduceTiling {
 public:
     WeightQuantMMNTilingTransferHelper(
-        WeightQuantMatmulAllReduceAddRmsNormTiling &weightQuantMatmulAllReduceAddRmsNormTiling,
-        Mc2Tiling::WeightQuantMatmulAllReduceTilingData &data);
+        WeightQuantMatmulAllReduceAddRmsNormTiling& weightQuantMatmulAllReduceAddRmsNormTiling,
+        Mc2Tiling::WeightQuantMatmulAllReduceTilingData& data);
     ge::graphStatus GetShapeAttrsInfo() override;
 
 private:
-    WeightQuantMatmulAllReduceAddRmsNormTiling &tilingProcesser_;
+    WeightQuantMatmulAllReduceAddRmsNormTiling& tilingProcesser_;
 };
 } // namespace optiling
 

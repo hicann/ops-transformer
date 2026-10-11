@@ -22,9 +22,9 @@
 using namespace ge;
 using namespace Mc2Moe;
 namespace {
-const char *K_INNER_DEBUG = "MC2: BmmReduceScatterAlltoAll Infershape Debug";
+const char* K_INNER_DEBUG = "MC2: BmmReduceScatterAlltoAll Infershape Debug";
 
-bool CommonCheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
+bool CommonCheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
                             const size_t wDimM)
 {
     // 检查 < 0 的范围: x dim C >= 1, dim E H M 会在后面拦截
@@ -53,7 +53,7 @@ bool CommonCheckTensorShape(const char *nodeName, const gert::Shape *xShape, con
 }
 
 // 盘古 2.6T && GPT 2.2T
-bool YShardCheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
+bool YShardCheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
                             const int64_t epSize, const int64_t tpSize, const int64_t yShard, const size_t wDimH,
                             const size_t wDimM)
 {
@@ -116,7 +116,7 @@ bool YShardCheckTensorShape(const char *nodeName, const gert::Shape *xShape, con
     return true;
 }
 
-bool CheckBiasShape(const char *nodeName, const gert::Shape *weightShape, const gert::Shape *biasShape,
+bool CheckBiasShape(const char* nodeName, const gert::Shape* weightShape, const gert::Shape* biasShape,
                     const int64_t tpSize, const int64_t yShard, const size_t wDimH)
 {
     // 检查 dimNum
@@ -167,8 +167,8 @@ bool CheckBiasShape(const char *nodeName, const gert::Shape *weightShape, const 
     return true;
 }
 
-bool CheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
-                      const gert::Shape *biasShape, const int64_t epSize, const int64_t tpSize, const size_t wDimM,
+bool CheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
+                      const gert::Shape* biasShape, const int64_t epSize, const int64_t tpSize, const size_t wDimM,
                       const size_t wDimH, const int64_t yShard)
 {
     OPS_LOG_D(nodeName, "Begin to print x shape");
@@ -209,22 +209,22 @@ bool CheckTensorShape(const char *nodeName, const gert::Shape *xShape, const ger
     return true;
 }
 
-bool CheckAttrs(const gert::InferShapeContext *context, int64_t &epSize, int64_t &tpSize, bool &isTransW,
-                int64_t &yShard)
+bool CheckAttrs(const gert::InferShapeContext* context, int64_t& epSize, int64_t& tpSize, bool& isTransW,
+                int64_t& yShard)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
 
     auto attrs = context->GetAttrs();
     if (nodeName != nullptr) {
         OPS_ERR_IF(attrs == nullptr, OPS_LOG_E(nodeName, "attrs is null."), return false);
     }
 
-    const char *groupEp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_EP));
-    const char *groupTp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_TP));
-    const int64_t *epPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_EP_WORLD_SIZE));
-    const int64_t *tpPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_TP_WORLD_SIZE));
-    const bool *isTransWPtr = attrs->GetBool(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_IS_TRANS_W));
-    const int64_t *yPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_Y_SHARD_TYPE));
+    const char* groupEp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_EP));
+    const char* groupTp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_TP));
+    const int64_t* epPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_EP_WORLD_SIZE));
+    const int64_t* tpPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_TP_WORLD_SIZE));
+    const bool* isTransWPtr = attrs->GetBool(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_IS_TRANS_W));
+    const int64_t* yPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_Y_SHARD_TYPE));
 
     if ((epPtr == nullptr) || (tpPtr == nullptr) || (isTransWPtr == nullptr) || (yPtr == nullptr)) {
         OPS_LOG_E(nodeName, "attrs index in context is in valid or out of range, attrs got nullptr.");
@@ -256,8 +256,8 @@ bool CheckAttrs(const gert::InferShapeContext *context, int64_t &epSize, int64_t
     return true;
 }
 
-void GetShapeInfo(const gert::Shape *xShape, const gert::Shape *weightShape, const int64_t epSize, const int64_t tpSize,
-                  const int64_t yShard, const size_t wDimH, OutShapeInfo &outShapeInfo)
+void GetShapeInfo(const gert::Shape* xShape, const gert::Shape* weightShape, const int64_t epSize, const int64_t tpSize,
+                  const int64_t yShard, const size_t wDimH, OutShapeInfo& outShapeInfo)
 {
     if (yShard == 0) {
         outShapeInfo.e = xShape->GetDim(DIM_E) * epSize;
@@ -274,21 +274,21 @@ void GetShapeInfo(const gert::Shape *xShape, const gert::Shape *weightShape, con
 } // namespace
 
 namespace ops {
-static ge::graphStatus InferShapeBmmReduceScatterAlltoAll(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeBmmReduceScatterAlltoAll(gert::InferShapeContext* context)
 {
     OPS_ERR_IF(context == nullptr, OPS_LOG_E(K_INNER_DEBUG, "Context is null."), return ge::GRAPH_FAILED);
 
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OPS_LOG_I(nodeName, "Enter BmmReduceScatterAlltoAll infer shape impl.");
 
     // 检查 shape 是否为空
-    const gert::Shape *xShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_X));
+    const gert::Shape* xShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_X));
     OPS_ERR_IF(xShape == nullptr, OPS_LOG_E(nodeName, "xShape is null."), return ge::GRAPH_FAILED);
-    const gert::Shape *weightShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_WEIGHT));
+    const gert::Shape* weightShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_WEIGHT));
     OPS_ERR_IF(weightShape == nullptr, OPS_LOG_E(nodeName, "weightShape is null."), return ge::GRAPH_FAILED);
-    gert::Shape *yShape = context->GetOutputShape(static_cast<size_t>(ops::BmmReduceScatterAlltoAllOutIdx::K_Y));
+    gert::Shape* yShape = context->GetOutputShape(static_cast<size_t>(ops::BmmReduceScatterAlltoAllOutIdx::K_Y));
     OPS_ERR_IF(yShape == nullptr, OPS_LOG_E(nodeName, "yShape is null."), return ge::GRAPH_FAILED);
-    const gert::Shape *biasShape = context->GetOptionalInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_BIAS));
+    const gert::Shape* biasShape = context->GetOptionalInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_BIAS));
 
     // 检查属性
     int64_t epSize = -1;
@@ -327,11 +327,11 @@ static ge::graphStatus InferShapeBmmReduceScatterAlltoAll(gert::InferShapeContex
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeBmmReduceScatterAlltoAll(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeBmmReduceScatterAlltoAll(gert::InferDataTypeContext* context)
 {
     OPS_ERR_IF(context == nullptr, OPS_LOG_E(K_INNER_DEBUG, "Context is null."), return ge::GRAPH_FAILED);
 
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OPS_LOG_I(nodeName, "Enter BmmReduceScatterAlltoAll infer data type impl.");
 
     // tensor 类型检查

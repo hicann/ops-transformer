@@ -18,14 +18,14 @@
 #include "aclnn/aclnn_base.h"
 #include "aclnn_util.h"
 
-ACLNN_API aclnnStatus aclnnMatmulAlltoAllBaseGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2,
-                                                              const aclTensor *biasOptional,
-                                                              const aclIntArray *alltoAllAxesOptional,
-                                                              const char *group, const char *commMode, bool transposeX1,
-                                                              bool transposeX2, const aclTensor *output,
-                                                              uint64_t *workspaceSize, aclOpExecutor **executor);
+ACLNN_API aclnnStatus aclnnMatmulAlltoAllBaseGetWorkspaceSize(const aclTensor* x1, const aclTensor* x2,
+                                                              const aclTensor* biasOptional,
+                                                              const aclIntArray* alltoAllAxesOptional,
+                                                              const char* group, const char* commMode, bool transposeX1,
+                                                              bool transposeX2, const aclTensor* output,
+                                                              uint64_t* workspaceSize, aclOpExecutor** executor);
 
-ACLNN_API aclnnStatus aclnnMatmulAlltoAllBase(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMatmulAlltoAllBase(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                               aclrtStream stream);
 
 #endif // OP_API_INC_MATMUL_ALL_TO_ALL_BASE_

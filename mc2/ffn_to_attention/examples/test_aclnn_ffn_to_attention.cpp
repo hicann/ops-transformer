@@ -45,7 +45,7 @@ constexpr uint32_t WORLD_SIZE = 16;
 constexpr uint32_t ATTN_NUM = 8;
 constexpr uint32_t DEV_NUM = WORLD_SIZE;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -55,8 +55,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -76,8 +76,8 @@ class FFNToAttentionExample {
 public:
     void InitHostData();
     int CreateInputTensors();
-    int PrepareWorkspace(const char *hcomName);
-    int Execute(const Args &args);
+    int PrepareWorkspace(const char* hcomName);
+    int Execute(const Args& args);
     void Release();
 
 private:
@@ -93,23 +93,23 @@ private:
     int64_t Token_info_shape[3] = {micro_batch_num, Y, expert_num_per_token};
     int64_t Token_data_shape[4] = {micro_batch_num, Y, expert_num_per_token, H};
 
-    void *xDeviceAddr = nullptr;
-    void *sessionIdsDeviceAddr = nullptr;
-    void *microBatchIdsDeviceAddr = nullptr;
-    void *tokenIdsDeviceAddr = nullptr;
-    void *expertOffsetsDeviceAddr = nullptr;
-    void *actualTokenNumDeviceAddr = nullptr;
-    void *attnRankTableDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* sessionIdsDeviceAddr = nullptr;
+    void* microBatchIdsDeviceAddr = nullptr;
+    void* tokenIdsDeviceAddr = nullptr;
+    void* expertOffsetsDeviceAddr = nullptr;
+    void* actualTokenNumDeviceAddr = nullptr;
+    void* attnRankTableDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *sessionIds = nullptr;
-    aclTensor *microBatchIds = nullptr;
-    aclTensor *tokenIds = nullptr;
-    aclTensor *expertOffsets = nullptr;
-    aclTensor *actualTokenNum = nullptr;
-    aclTensor *attnRankTable = nullptr;
-    aclIntArray *tokenInfoTableShape = aclCreateIntArray(Token_info_shape, 3);
-    aclIntArray *tokenDataShape = aclCreateIntArray(Token_data_shape, 4);
+    aclTensor* x = nullptr;
+    aclTensor* sessionIds = nullptr;
+    aclTensor* microBatchIds = nullptr;
+    aclTensor* tokenIds = nullptr;
+    aclTensor* expertOffsets = nullptr;
+    aclTensor* actualTokenNum = nullptr;
+    aclTensor* attnRankTable = nullptr;
+    aclIntArray* tokenInfoTableShape = aclCreateIntArray(Token_info_shape, 3);
+    aclIntArray* tokenDataShape = aclCreateIntArray(Token_data_shape, 4);
 
     // 定义当前场景下各变量维度
     std::vector<int64_t> xShape{Y, H};
@@ -137,8 +137,8 @@ private:
     std::vector<int32_t> attnRankTableHostData = std::vector<int32_t>(attnRankTableShapeSize);
 
     uint64_t FFN2AttentionWorkspaceSize = 0;
-    aclOpExecutor *FFN2AttentionExecutor = nullptr;
-    void *FFN2AttentionWorkspaceAddr = nullptr;
+    aclOpExecutor* FFN2AttentionExecutor = nullptr;
+    void* FFN2AttentionWorkspaceAddr = nullptr;
 };
 
 void FFNToAttentionExample::InitHostData()
@@ -177,7 +177,7 @@ int FFNToAttentionExample::CreateInputTensors()
     return 0;
 }
 
-int FFNToAttentionExample::PrepareWorkspace(const char *hcomName)
+int FFNToAttentionExample::PrepareWorkspace(const char* hcomName)
 {
     /**************************************** 调用FFN2Attention ********************************************/
     // 调用第一阶段接口
@@ -194,7 +194,7 @@ int FFNToAttentionExample::PrepareWorkspace(const char *hcomName)
     return 0;
 }
 
-int FFNToAttentionExample::Execute(const Args &args)
+int FFNToAttentionExample::Execute(const Args& args)
 {
     int ret = 0;
     // 调用第二阶段接口
@@ -281,7 +281,7 @@ void FFNToAttentionExample::Release()
     FreeDeviceMemory();
 }
 
-int LaunchOneProcessFFN2Attention(Args &args)
+int LaunchOneProcessFFN2Attention(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed, ret %d\n", ret); return ret);
@@ -311,7 +311,7 @@ int LaunchOneProcessFFN2Attention(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclInit failed, ret = %d\n", ret); return ret);

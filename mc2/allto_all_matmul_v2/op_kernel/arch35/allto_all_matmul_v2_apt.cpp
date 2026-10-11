@@ -27,7 +27,7 @@ __global__ __aicore__ void allto_all_matmul_v2(GM_ADDR context, GM_ADDR x1, GM_A
     REGISTER_TILING_DEFAULT(allToAllMatmulTilingData);
     GET_TILING_DATA_WITH_STRUCT(allToAllMatmulTilingData, tilingData, tilingGM);
 
-    __gm__ CommContext *hcommCtx = reinterpret_cast<__gm__ CommContext *>(context);
+    __gm__ CommContext* hcommCtx = reinterpret_cast<__gm__ CommContext*>(context);
 
 #if (ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN && ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN)
     using Impl = AllToAllMxQuantMatmulUrmaImpl<fp8_e4m3fn_t, fp8_e4m3fn_t, DTYPE_Y, false, true>;

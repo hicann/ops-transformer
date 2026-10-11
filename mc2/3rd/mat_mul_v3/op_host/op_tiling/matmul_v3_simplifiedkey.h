@@ -20,7 +20,7 @@
 #include "mc2_log.h"
 
 namespace optiling {
-inline ge::graphStatus Mc2GenSimplifiedKey(gert::TilingContext *context, ge::char_t *simplifiedKey)
+inline ge::graphStatus Mc2GenSimplifiedKey(gert::TilingContext* context, ge::char_t* simplifiedKey)
 {
     static const size_t DEST_MAX = 100;
     static const size_t MAX_LEN_SIMPLIFIED_KEY = 256;

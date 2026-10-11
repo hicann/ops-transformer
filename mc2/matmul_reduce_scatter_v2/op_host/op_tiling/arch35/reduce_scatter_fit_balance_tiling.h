@@ -23,7 +23,7 @@ constexpr double RS_FP4_COMPUTE_PER_CYCLE_RATIO = 1; // 调整mxfp4的computesPe
 class MMReduceScatterFitBalanceTiling : public Mc2FitBasedBalanceTiling {
 public:
     explicit MMReduceScatterFitBalanceTiling(
-        const mc2tiling::TilingArgs &args, KernelType kernelType, TopoType topoType = TopoType::STANDARD_CARD,
+        const mc2tiling::TilingArgs& args, KernelType kernelType, TopoType topoType = TopoType::STANDARD_CARD,
         bool isAicpuComm = false) // 是否AICPU通信模式，AICPU时触发M轴切分封顶至AICPU_M_TILE_CAP
         : Mc2FitBasedBalanceTiling(args, kernelType, topoType),
           isAicpuComm_(isAicpuComm)

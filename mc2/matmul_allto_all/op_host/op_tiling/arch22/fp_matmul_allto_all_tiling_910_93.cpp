@@ -39,9 +39,9 @@ namespace MC2Tiling {
  */
 bool FpMatmulAllToAllTilingBaseA3::IsCapable()
 {
-    fe::PlatFormInfos *platformInfoPtr = context_->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context_->GetPlatformInfo();
     OP_TILING_CHECK(platformInfoPtr == nullptr, OP_LOGE(opName_, "fail to get platform info"), return ge::GRAPH_FAILED);
-    fe::PlatFormInfos &platformInfo = *platformInfoPtr;
+    fe::PlatFormInfos& platformInfo = *platformInfoPtr;
     (void)platformInfo.GetPlatformResWithLock("version", "Short_SoC_version", socVersionStr_);
     OP_LOGD(opName_, "Current SocVersion_2201 is : %s", socVersionStr_.c_str());
     QuantMode mode = MatmulAlltoAllTilingUtil::GetQuantMode(context_, opName_);
@@ -60,8 +60,8 @@ bool FpMatmulAllToAllTilingBaseA3::IsCapable()
  * @param opName  算子名称
  * @return ge::graphStatus
  */
-ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckA3NonQuantTensorDataType(const gert::TilingContext *context,
-                                                                            const char *opName)
+ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckA3NonQuantTensorDataType(const gert::TilingContext* context,
+                                                                            const char* opName)
 {
     // 获取并校验输入张量描述符
     auto x1TensorDesc = context->GetInputDesc(INPUT_X1_INDEX);
@@ -130,11 +130,11 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckOpInputInfo()
 
 ge::graphStatus FpMatmulAllToAllTilingBaseA3::CheckBsRankSizeRange()
 {
-    const gert::StorageShape *x1Shape = context_->GetInputShape(INPUT_X1_INDEX);
+    const gert::StorageShape* x1Shape = context_->GetInputShape(INPUT_X1_INDEX);
     uint64_t x1Dim0 = x1Shape->GetStorageShape().GetDim(0);
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
-    const int64_t *worldSize = attrs->GetAttrPointer<int64_t>(ATTR_WORLD_SIZE_INDEX);
-    const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
+    const int64_t* worldSize = attrs->GetAttrPointer<int64_t>(ATTR_WORLD_SIZE_INDEX);
+    const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     int64_t rankSize = 0;
     if (worldSize == nullptr || *worldSize == RANK_DEFAULT_NUM) {
         OP_TILING_CHECK(!mc2tiling::GetRankSize(opName_, group, rankSize), OP_LOGE(opName_, "GetRankSize failed."),
@@ -250,8 +250,8 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::SetHcclTiling()
  * @param opName
  * @param tilingInfo
  */
-void FpMatmulAllToAllTilingBaseA3::PrintMatmulAlltoAllTilingInfo(const std::string &opName,
-                                                                 MatmulAlltoAllTilingInfoA3 &tilingInfo)
+void FpMatmulAllToAllTilingBaseA3::PrintMatmulAlltoAllTilingInfo(const std::string& opName,
+                                                                 MatmulAlltoAllTilingInfoA3& tilingInfo)
 {
     OP_LOGD(opName, "tilingInfo.rankDim: %u", tilingInfo.rankDim);
     OP_LOGD(opName, "tilingInfo.tileM: %u", tilingInfo.tileM);
@@ -274,7 +274,7 @@ void FpMatmulAllToAllTilingBaseA3::PrintMatmulAlltoAllTilingInfo(const std::stri
  *
  * @param matmulAlltoAllTilingDataA3 tilingData参数
  */
-void FpMatmulAllToAllTilingBaseA3::PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingDataA3 &matmulAlltoAllTilingDataA3)
+void FpMatmulAllToAllTilingBaseA3::PrintMatmulAlltoAllTilingData(MatmulAlltoAllTilingDataA3& matmulAlltoAllTilingDataA3)
 {
     PrintMatmulAlltoAllTilingInfo(opName_, matmulAlltoAllTilingDataA3.matmulAlltoAllTilingInfo);
     PrintMc2MatmulV3TilingData(opName_, matmulAlltoAllTilingDataA3.mc2MmV3TileTilingData);
@@ -334,7 +334,7 @@ void FpMatmulAllToAllTilingBaseA3::SetUserWorkSpace()
  */
 ge::graphStatus FpMatmulAllToAllTilingBaseA3::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "Get workspace failed"), return ge::GRAPH_FAILED);
     SetUserWorkSpace();
     uint64_t workspaceSize_ =
@@ -353,7 +353,7 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::GetWorkspaceSize()
 ge::graphStatus FpMatmulAllToAllTilingBaseA3::PostTiling()
 {
     SetTilingInfo(localTilingData_.matmulAlltoAllTilingInfo);
-    MatmulAlltoAllTilingDataA3 *outTilingData = context_->GetTilingData<MatmulAlltoAllTilingDataA3>();
+    MatmulAlltoAllTilingDataA3* outTilingData = context_->GetTilingData<MatmulAlltoAllTilingDataA3>();
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
     OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get tiling data from context"),
                     return ge::GRAPH_FAILED);
@@ -382,7 +382,7 @@ ge::graphStatus FpMatmulAllToAllTilingBaseA3::PostTiling()
  *
  * @param tilingInfo 目标结构体
  */
-void FpMatmulAllToAllTilingBaseA3::SetTilingInfo(MatmulAlltoAllTilingInfoA3 &tilingInfo) const
+void FpMatmulAllToAllTilingBaseA3::SetTilingInfo(MatmulAlltoAllTilingInfoA3& tilingInfo) const
 {
     // 基本字段拷贝
     tilingInfo.tileM = inferredInfo.tileM;
@@ -406,13 +406,13 @@ void FpMatmulAllToAllTilingBaseA3::SetTilingInfo(MatmulAlltoAllTilingInfoA3 &til
  *
  * @param context
  */
-FpMatmulAllToAllTilingBaseA3::FpMatmulAllToAllTilingBaseA3(gert::TilingContext *context)
+FpMatmulAllToAllTilingBaseA3::FpMatmulAllToAllTilingBaseA3(gert::TilingContext* context)
     : MatmulAllToAllTilingBase(context)
 {}
 
 ge::graphStatus FpMatmulAllToAllHelper::GetShapeAttrsInfo()
 {
-    auto &&tilingArgs = tilingProcesser_.contextInfo.args_;
+    auto&& tilingArgs = tilingProcesser_.contextInfo.args_;
     args_.opName = tilingProcesser_.opName_;
     args_.isATrans = tilingArgs.isATrans;
     args_.isBTrans = tilingArgs.isBTrans;
@@ -432,8 +432,8 @@ ge::graphStatus FpMatmulAllToAllHelper::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-FpMatmulAllToAllHelper::FpMatmulAllToAllHelper(FpMatmulAllToAllTilingBaseA3 &matmulAlltoAllTilingA3,
-                                               Mc2MatmulV3TilingData &data)
+FpMatmulAllToAllHelper::FpMatmulAllToAllHelper(FpMatmulAllToAllTilingBaseA3& matmulAlltoAllTilingA3,
+                                               Mc2MatmulV3TilingData& data)
     : Mc2MatmulV3BaseTiling(matmulAlltoAllTilingA3.context_, &data),
       tilingProcesser_(matmulAlltoAllTilingA3)
 {}

@@ -54,11 +54,11 @@ constexpr char COMM_MODE_CCU[] = "ccu";
 
 struct NnopbaseDfxId {
     uint32_t id;
-    const char *funcName;
+    const char* funcName;
     bool hasReg;
 };
 
-inline bool IsTransposeLastTwoDims(const aclTensor *tensor)
+inline bool IsTransposeLastTwoDims(const aclTensor* tensor)
 {
     // 当输入tensor的shape小于2或者大于6的时候，返回错误
     if (tensor->GetViewShape().GetDimNum() < 2 || tensor->GetViewShape().GetDimNum() > 6) {
@@ -84,51 +84,51 @@ inline bool IsTransposeLastTwoDims(const aclTensor *tensor)
     return false;
 }
 
-aclnnStatus MatmulAllReduceCheckParams(const aclTensor *x1, const aclTensor *x2, const aclTensor *x3,
-                                       const aclTensor *bias, const char *reduceOp, int64_t streamMode,
-                                       const aclTensor *output);
-aclnnStatus QuantMatmulAllReduceCheckParams(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                            const aclTensor *dequantScale, const aclTensor *pertokenScale,
-                                            const aclTensor *x3, const char *reduceOp, int64_t streamMode,
-                                            const aclTensor *output);
-bool MatmulAllReduceCheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTensor *output);
-bool MatmulAllReduceCheckAttr(const char *reduceOp, int64_t streamMode);
-bool MatmulAllReduceCheckFormat(const aclTensor *x2);
+aclnnStatus MatmulAllReduceCheckParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* x3,
+                                       const aclTensor* bias, const char* reduceOp, int64_t streamMode,
+                                       const aclTensor* output);
+aclnnStatus QuantMatmulAllReduceCheckParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                            const aclTensor* dequantScale, const aclTensor* pertokenScale,
+                                            const aclTensor* x3, const char* reduceOp, int64_t streamMode,
+                                            const aclTensor* output);
+bool MatmulAllReduceCheckNotNull(const aclTensor* x1, const aclTensor* x2, const aclTensor* output);
+bool MatmulAllReduceCheckAttr(const char* reduceOp, int64_t streamMode);
+bool MatmulAllReduceCheckFormat(const aclTensor* x2);
 
-bool MatmulAllReduceCheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *x3,
-                                    const aclTensor *bias, const aclTensor *output, bool is310P);
-bool QuantMatmulAllReduceCheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                         const aclTensor *dequantScale, const aclTensor *pertokenScale,
-                                         const aclTensor *x3, const aclTensor *output);
-bool MatmulAllReduceCheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *x3, const aclTensor *bias,
-                               const aclTensor *output);
-bool QuantMatmulAllReduceCheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                    const aclTensor *dequantScale, const aclTensor *pertokenScale, const aclTensor *x3,
-                                    const aclTensor *output);
-bool QuantMatmulAllReduceCheckDequantScale(const aclTensor *dequantScale, const op::Shape &outShape, size_t x1Len);
-bool MatmulAllReduceIsWeightNZFormat(const aclTensor *x2);
-bool QuantMatmulAllReduceIsWeightNZFormat(const aclTensor *x2);
+bool MatmulAllReduceCheckDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclTensor* x3,
+                                    const aclTensor* bias, const aclTensor* output, bool is310P);
+bool QuantMatmulAllReduceCheckDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                         const aclTensor* dequantScale, const aclTensor* pertokenScale,
+                                         const aclTensor* x3, const aclTensor* output);
+bool MatmulAllReduceCheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor* x3, const aclTensor* bias,
+                               const aclTensor* output);
+bool QuantMatmulAllReduceCheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                    const aclTensor* dequantScale, const aclTensor* pertokenScale, const aclTensor* x3,
+                                    const aclTensor* output);
+bool QuantMatmulAllReduceCheckDequantScale(const aclTensor* dequantScale, const op::Shape& outShape, size_t x1Len);
+bool MatmulAllReduceIsWeightNZFormat(const aclTensor* x2);
+bool QuantMatmulAllReduceIsWeightNZFormat(const aclTensor* x2);
 
-bool MatmulAllReduceCheckValidContiguous(const aclTensor *tensor, const char *tensorName);
-bool MatmulAllReduceCheckValidEmptyTensor(const aclTensor *x1, const aclTensor *x2);
+bool MatmulAllReduceCheckValidContiguous(const aclTensor* tensor, const char* tensorName);
+bool MatmulAllReduceCheckValidEmptyTensor(const aclTensor* x1, const aclTensor* x2);
 
 // 全量化
-bool QuantMatmulAllReduceIsAclnnPreTransposed(const aclTensor *x2);
-void QuantMatmulAllReduceProcessTransposedX2(const aclTensor *x2, uint64_t &x2Dim0, uint64_t &x2Dim1,
-                                             ge::AscendString &x2ShapeStr);
-bool QuantMatmulAllReduceCheckPertokenScaleShape(const aclTensor *pertokenScale, const aclTensor *x1,
+bool QuantMatmulAllReduceIsAclnnPreTransposed(const aclTensor* x2);
+void QuantMatmulAllReduceProcessTransposedX2(const aclTensor* x2, uint64_t& x2Dim0, uint64_t& x2Dim1,
+                                             ge::AscendString& x2ShapeStr);
+bool QuantMatmulAllReduceCheckPertokenScaleShape(const aclTensor* pertokenScale, const aclTensor* x1,
                                                  const size_t x1Len);
 
-aclTensor *QuantMatmulAllReduceCopyTensor(const aclTensor *x2);
-const aclTensor *QuantMatmulAllReduceTransTensor(const aclTensor *x2);
+aclTensor* QuantMatmulAllReduceCopyTensor(const aclTensor* x2);
+const aclTensor* QuantMatmulAllReduceTransTensor(const aclTensor* x2);
 
-aclnnStatus InnerQuantMatmulAllReduceGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2,
-                                                      const aclTensor *biasOptional, const aclTensor *x3Optional,
-                                                      const aclTensor *dequant, const aclTensor *pertokenScaleOptional,
-                                                      const char *group, const char *reduceOp, int64_t commTurn,
-                                                      const aclTensor *output, uint64_t *workspaceSize,
-                                                      aclOpExecutor **executor);
-bool IsCommModeValid(const char *commModePtr);
+aclnnStatus InnerQuantMatmulAllReduceGetWorkspaceSize(const aclTensor* x1, const aclTensor* x2,
+                                                      const aclTensor* biasOptional, const aclTensor* x3Optional,
+                                                      const aclTensor* dequant, const aclTensor* pertokenScaleOptional,
+                                                      const char* group, const char* reduceOp, int64_t commTurn,
+                                                      const aclTensor* output, uint64_t* workspaceSize,
+                                                      aclOpExecutor** executor);
+bool IsCommModeValid(const char* commModePtr);
 #ifdef __cplusplus
 }
 #endif

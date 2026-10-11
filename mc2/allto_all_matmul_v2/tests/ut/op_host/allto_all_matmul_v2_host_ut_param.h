@@ -42,7 +42,7 @@ struct AlltoAllMatmulV2TilingUtParam {
     ge::graphStatus expectResult;
     uint64_t expectTilingKey;
 
-    explicit AlltoAllMatmulV2TilingUtParam(const csv_map &csvMap)
+    explicit AlltoAllMatmulV2TilingUtParam(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         GetTensorGE(csvMap, "context_shape", "context_dtype", "context_format", this->context);
@@ -77,7 +77,7 @@ struct AlltoAllMatmulV2TilingUtParam {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AlltoAllMatmulV2TilingUtParam &param)
+inline std::ostream& operator<<(std::ostream& os, const AlltoAllMatmulV2TilingUtParam& param)
 {
     return os << param.case_name;
 }

@@ -139,53 +139,53 @@ public:
     };
 
 public:
-    __aicore__ inline void Init(const Params &params);
-    __aicore__ inline void Run(const Params &params, Mc2Kernel::OpStateDump &opStateDump);
-    __aicore__ inline void operator()(const Params &params, Mc2Kernel::OpStateDump &opStateDump)
+    __aicore__ inline void Init(const Params& params);
+    __aicore__ inline void Run(const Params& params, Mc2Kernel::OpStateDump& opStateDump);
+    __aicore__ inline void operator()(const Params& params, Mc2Kernel::OpStateDump& opStateDump)
     {
         Run(params, opStateDump);
     }
 
-    __aicore__ inline BufferSyncManager &GetBufferSyncMgr()
+    __aicore__ inline BufferSyncManager& GetBufferSyncMgr()
     {
         return bufferSyncMgr_;
     }
 
-    __aicore__ inline void SetChannels(Apace::Basic::BufferChannel *dataChannel,
-                                       Apace::Basic::BufferChannel *scaleChannel)
+    __aicore__ inline void SetChannels(Apace::Basic::BufferChannel* dataChannel,
+                                       Apace::Basic::BufferChannel* scaleChannel)
     {
         dataChannel_ = dataChannel;
         scaleChannel_ = scaleChannel;
     }
 
 private:
-    __aicore__ inline void ResetGmAddr(const Params &params);
-    __aicore__ inline void ProcessSingleBatch(const Params &params, BlockScheduler &bs, uint64_t restBatch,
-                                              bool isTailRound, Mc2Kernel::OpStateDump &opStateDump);
+    __aicore__ inline void ResetGmAddr(const Params& params);
+    __aicore__ inline void ProcessSingleBatch(const Params& params, BlockScheduler& bs, uint64_t restBatch,
+                                              bool isTailRound, Mc2Kernel::OpStateDump& opStateDump);
     __aicore__ inline int32_t CalcDependTileIdx(int64_t mPos, uint32_t headTileSize, uint32_t totalTiles) const;
 
     template <typename TensorB, typename TensorScaleB, typename TensorC>
-    __aicore__ inline void SetL2Cache(const ProblemShape &problemShape, uint64_t curBaseM, uint64_t baseN,
-                                      uint64_t scaleKL1, TensorB &gmB, TensorScaleB &gmScaleB, TensorC &gmC);
+    __aicore__ inline void SetL2Cache(const ProblemShape& problemShape, uint64_t curBaseM, uint64_t baseN,
+                                      uint64_t scaleKL1, TensorB& gmB, TensorScaleB& gmScaleB, TensorC& gmC);
 
     template <typename TensorScaleB>
-    __aicore__ inline void SetScaleL2Cache(const ProblemShape &problemShape, uint64_t baseN, uint64_t scaleKL1,
-                                           TensorScaleB &gmScaleB);
+    __aicore__ inline void SetScaleL2Cache(const ProblemShape& problemShape, uint64_t baseN, uint64_t scaleKL1,
+                                           TensorScaleB& gmScaleB);
 
 private:
     BlockMmad mmadOp_;
     BufferSyncManager bufferSyncMgr_;
-    Apace::Basic::BufferChannel *dataChannel_{nullptr};
-    Apace::Basic::BufferChannel *scaleChannel_{nullptr};
+    Apace::Basic::BufferChannel* dataChannel_{nullptr};
+    Apace::Basic::BufferChannel* scaleChannel_{nullptr};
 
-    __gm__ AType *aGmAddr_;      // 远程数据基址（通信缓冲区）
-    __gm__ AType *localAGmAddr_; // 本地数据基址
-    __gm__ BType *bGmAddr_;
-    __gm__ CType *cGmAddr_; // 输出基址（已根据流水步偏移）
-    __gm__ BiasType *biasGmAddr_ = nullptr;
-    __gm__ ::fp8_e8m0_t *scaleAGmAddr_; // 远程 Scale 基址
-    __gm__ ::fp8_e8m0_t *localScaleAGmAddr_;
-    __gm__ ::fp8_e8m0_t *scaleBGmAddr_;
+    __gm__ AType* aGmAddr_;      // 远程数据基址（通信缓冲区）
+    __gm__ AType* localAGmAddr_; // 本地数据基址
+    __gm__ BType* bGmAddr_;
+    __gm__ CType* cGmAddr_; // 输出基址（已根据流水步偏移）
+    __gm__ BiasType* biasGmAddr_ = nullptr;
+    __gm__ ::fp8_e8m0_t* scaleAGmAddr_; // 远程 Scale 基址
+    __gm__ ::fp8_e8m0_t* localScaleAGmAddr_;
+    __gm__ ::fp8_e8m0_t* scaleBGmAddr_;
 
     bool isAtomicAdd_{false}; // REMOTE 模式下需要原子累加到 C
     bool isBias_{false};
@@ -193,8 +193,8 @@ private:
 };
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run(const Params &params,
-                                                                                 Mc2Kernel::OpStateDump &opStateDump)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run(const Params& params,
+                                                                                 Mc2Kernel::OpStateDump& opStateDump)
 {
     Init(params);
 
@@ -217,7 +217,7 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Run
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
 template <typename TensorScaleB>
 __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetScaleL2Cache(
-    const ProblemShape &problemShape, uint64_t baseN, uint64_t scaleKL1, TensorScaleB &gmScaleB)
+    const ProblemShape& problemShape, uint64_t baseN, uint64_t scaleKL1, TensorScaleB& gmScaleB)
 {
     if (asc::te::get<MNK_B>(problemShape) != 1) {
         return;
@@ -244,8 +244,8 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Set
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
 template <typename TensorB, typename TensorScaleB, typename TensorC>
 __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::SetL2Cache(
-    const ProblemShape &problemShape, uint64_t curBaseM, uint64_t baseN, uint64_t scaleKL1, TensorB &gmB,
-    TensorScaleB &gmScaleB, TensorC &gmC)
+    const ProblemShape& problemShape, uint64_t curBaseM, uint64_t baseN, uint64_t scaleKL1, TensorB& gmB,
+    TensorScaleB& gmScaleB, TensorC& gmC)
 {
     if (isAtomicAdd_) {
         gmC.set_l2_cache_hint(asc::te::cache_mode::disable);
@@ -273,7 +273,7 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Set
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Init(const Params &params)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Init(const Params& params)
 {
     if ASCEND_IS_AIV {
         return;
@@ -290,19 +290,19 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Ini
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ResetGmAddr(const Params &params)
+__aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ResetGmAddr(const Params& params)
 {
     if ASCEND_IS_AIV {
         return;
     }
-    aGmAddr_ = reinterpret_cast<__gm__ AType *>(params.mmadParams.aGmAddr);
-    bGmAddr_ = reinterpret_cast<__gm__ BType *>(params.mmadParams.bGmAddr);
-    cGmAddr_ = reinterpret_cast<__gm__ CType *>(params.mmadParams.cGmAddr);
-    localAGmAddr_ = reinterpret_cast<__gm__ AType *>(params.localParams.localAGmAddr);
-    localScaleAGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t *>(params.localParams.localScaleAGmAddr);
-    scaleAGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t *>(params.mmadParams.scaleAGmAddr);
-    scaleBGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t *>(params.mmadParams.scaleBGmAddr);
-    biasGmAddr_ = reinterpret_cast<__gm__ BiasType *>(params.mmadParams.biasGmAddr);
+    aGmAddr_ = reinterpret_cast<__gm__ AType*>(params.mmadParams.aGmAddr);
+    bGmAddr_ = reinterpret_cast<__gm__ BType*>(params.mmadParams.bGmAddr);
+    cGmAddr_ = reinterpret_cast<__gm__ CType*>(params.mmadParams.cGmAddr);
+    localAGmAddr_ = reinterpret_cast<__gm__ AType*>(params.localParams.localAGmAddr);
+    localScaleAGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t*>(params.localParams.localScaleAGmAddr);
+    scaleAGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t*>(params.mmadParams.scaleAGmAddr);
+    scaleBGmAddr_ = reinterpret_cast<__gm__ ::fp8_e8m0_t*>(params.mmadParams.scaleBGmAddr);
+    biasGmAddr_ = reinterpret_cast<__gm__ BiasType*>(params.mmadParams.biasGmAddr);
 }
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
@@ -318,7 +318,7 @@ __aicore__ inline int32_t AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::
 
 QBMM_MX_KERNEL_CLASS_TEM_PARAMS
 __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ProcessSingleBatch(
-    const Params &params, BlockScheduler &bs, uint64_t restBatch, bool isTailRound, Mc2Kernel::OpStateDump &opStateDump)
+    const Params& params, BlockScheduler& bs, uint64_t restBatch, bool isTailRound, Mc2Kernel::OpStateDump& opStateDump)
 {
     auto rankId = params.localParams.rankId;
     auto rankSize = params.localParams.rankSize;
@@ -358,8 +358,8 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
     auto gmC = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(cGmAddr_), layoutC);
 
     // 尾块更新逻辑
-    auto &mTailTile = params.schParams.mTailTile;
-    auto &nTailTile = params.schParams.nTailTile;
+    auto& mTailTile = params.schParams.mTailTile;
+    auto& nTailTile = params.schParams.nTailTile;
     if (needUpdateTail_ ||
         (isTailRound && ((bs.GetEndBlockIdx() + 1) + (restBatch * bs.GetTotalCnt())) * mTailTile * nTailTile <=
                             AscendC::GetBlockNum())) {
@@ -451,11 +451,11 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
             // Phase 3: 遍历其它 rank，在 L0C 上累加（最后一个 rank 触发 fixpipe）
             auto gmA = asc::te::make_tensor(
                 asc::te::make_mem_ptr<asc::te::location::gm>(
-                    reinterpret_cast<__gm__ AType *>(reinterpret_cast<__gm__ char *>(aGmAddr_) + dataSlotOffset)),
+                    reinterpret_cast<__gm__ AType*>(reinterpret_cast<__gm__ char*>(aGmAddr_) + dataSlotOffset)),
                 layoutA);
             auto gmScaleA = asc::te::make_tensor(
-                asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ::fp8_e8m0_t *>(
-                    reinterpret_cast<__gm__ char *>(scaleAGmAddr_) + scaleSlotOffset)),
+                asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ::fp8_e8m0_t*>(
+                    reinterpret_cast<__gm__ char*>(scaleAGmAddr_) + scaleSlotOffset)),
                 layoutScaleA);
             uint32_t remoteRankCnt = 1;
             uint64_t rankMStep = enableBufferReuse ? params.localParams.headTileSize : oriM;
@@ -512,11 +512,11 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
             }
             auto gmA = asc::te::make_tensor(
                 asc::te::make_mem_ptr<asc::te::location::gm>(
-                    reinterpret_cast<__gm__ AType *>(reinterpret_cast<__gm__ char *>(aGmAddr_) + dataSlotOffset)),
+                    reinterpret_cast<__gm__ AType*>(reinterpret_cast<__gm__ char*>(aGmAddr_) + dataSlotOffset)),
                 layoutA);
             auto gmScaleA = asc::te::make_tensor(
-                asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ::fp8_e8m0_t *>(
-                    reinterpret_cast<__gm__ char *>(scaleAGmAddr_) + scaleSlotOffset)),
+                asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ::fp8_e8m0_t*>(
+                    reinterpret_cast<__gm__ char*>(scaleAGmAddr_) + scaleSlotOffset)),
                 layoutScaleA);
             uint64_t rankMStep = enableBufferReuse ? params.localParams.headTileSize : oriM;
             uint64_t mPosInLayout = enableBufferReuse ?

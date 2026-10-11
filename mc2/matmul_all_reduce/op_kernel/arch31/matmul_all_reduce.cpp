@@ -49,11 +49,11 @@
         if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) { \
             GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingDataLocal, tilingGM); \
             templateClass<DTYPE_X1, DTYPE_X2, FORMAT_X1, FORMAT_X2, DTYPE_Y, DTYPE_Y, int8_t, __VA_ARGS__> matmulOp; \
-            const Mc2Tiling::QuantMatmulAllReduceTilingData *quantMmrTilingPtr = &tilingDataLocal; \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingPtr = &(quantMmrTilingPtr->tilematmulTiling); \
-            const AscendC::tiling::TCubeTiling *mmTilingTilePtr = &(qBmmV3TilingPtr->matmulTiling); \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingTailPtr = &(quantMmrTilingPtr->tailmatmulTiling); \
-            const AscendC::tiling::TCubeTiling *mmTilingTailPtr = &(qBmmV3TilingTailPtr->matmulTiling); \
+            const Mc2Tiling::QuantMatmulAllReduceTilingData* quantMmrTilingPtr = &tilingDataLocal; \
+            const Mc2QuantBatchMatmulV3TilingData* qBmmV3TilingPtr = &(quantMmrTilingPtr->tilematmulTiling); \
+            const AscendC::tiling::TCubeTiling* mmTilingTilePtr = &(qBmmV3TilingPtr->matmulTiling); \
+            const Mc2QuantBatchMatmulV3TilingData* qBmmV3TilingTailPtr = &(quantMmrTilingPtr->tailmatmulTiling); \
+            const AscendC::tiling::TCubeTiling* mmTilingTailPtr = &(qBmmV3TilingTailPtr->matmulTiling); \
             REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), opTile.mm, mmTilingTilePtr, opTail.mm, mmTilingTailPtr); \
             matmulOp.Init(aGM, bGM, biasGM, addGM, dequantGM, commQuantScale1GM, commQuantScale2GM, cGM, userWS, \
                           &tilingDataLocal, &tPipe); \
@@ -81,11 +81,11 @@
         if (msg.debugMode != static_cast<uint8_t>(DebugMode::MC2_DEBUG_ONLY_AICPU)) { \
             GET_TILING_DATA_WITH_STRUCT(Mc2Tiling::QuantMatmulAllReduceTilingData, tilingDataLocal, tilingGM); \
             templateClass<DTYPE_X1, DTYPE_X2, FORMAT_X1, FORMAT_X2, scaleType, DTYPE_Y, int8_t, __VA_ARGS__> matmulOp; \
-            const Mc2Tiling::QuantMatmulAllReduceTilingData *quantMmrTilingPtr = &tilingDataLocal; \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingPtr = &(quantMmrTilingPtr->tilematmulTiling); \
-            const AscendC::tiling::TCubeTiling *mmTilingTilePtr = &(qBmmV3TilingPtr->matmulTiling); \
-            const Mc2QuantBatchMatmulV3TilingData *qBmmV3TilingTailPtr = &(quantMmrTilingPtr->tailmatmulTiling); \
-            const AscendC::tiling::TCubeTiling *mmTilingTailPtr = &(qBmmV3TilingTailPtr->matmulTiling); \
+            const Mc2Tiling::QuantMatmulAllReduceTilingData* quantMmrTilingPtr = &tilingDataLocal; \
+            const Mc2QuantBatchMatmulV3TilingData* qBmmV3TilingPtr = &(quantMmrTilingPtr->tilematmulTiling); \
+            const AscendC::tiling::TCubeTiling* mmTilingTilePtr = &(qBmmV3TilingPtr->matmulTiling); \
+            const Mc2QuantBatchMatmulV3TilingData* qBmmV3TilingTailPtr = &(quantMmrTilingPtr->tailmatmulTiling); \
+            const AscendC::tiling::TCubeTiling* mmTilingTailPtr = &(qBmmV3TilingTailPtr->matmulTiling); \
             REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), opTile.mm, mmTilingTilePtr, opTail.mm, mmTilingTailPtr); \
             matmulOp.Init(aGM, bGM, biasGM, addGM, dequantGM, pertokenGM, commQuantScale1GM, commQuantScale2GM, cGM, \
                           userWS, &tilingDataLocal, &tPipe); \

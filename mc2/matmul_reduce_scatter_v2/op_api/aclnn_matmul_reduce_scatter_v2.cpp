@@ -55,7 +55,7 @@ static constexpr char ACLNN_CCU_PEER_ONLY_MODE[] = "ccu_peer_only";
 static constexpr char GRAPH_CCU_MODE[] = "ccu_graph";
 typedef struct {
     uint32_t id;
-    const char *funcName;
+    const char* funcName;
     bool hasReg;
 } NnopbaseDfxId;
 
@@ -74,12 +74,12 @@ enum class CommType : uint64_t {
 };
 
 extern "C" uint64_t NnopbaseMsprofSysTime();
-extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
-extern "C" void *NnopbaseGetUserHandle(void *executor);
-extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void NnopbaseSetUserHandle(void* executor, void* handle);
+extern "C" void* NnopbaseGetUserHandle(void* executor);
+extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId& dfxId);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
-static void SetNnopbaseHcclServerTypeByArch(aclOpExecutor *executor, CommType commModeEnum)
+static void SetNnopbaseHcclServerTypeByArch(aclOpExecutor* executor, CommType commModeEnum)
 {
     if ((executor == nullptr) || (NnopbaseSetHcclServerType == nullptr)) {
         return;
@@ -106,7 +106,7 @@ static void SetNnopbaseHcclServerTypeByArch(aclOpExecutor *executor, CommType co
 }
 
 // 检查入参是否为nullptr
-static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTensor *output)
+static bool CheckNotNull(const aclTensor* x1, const aclTensor* x2, const aclTensor* output)
 {
     OP_CHECK_NULL(output, return false);
     OP_CHECK_NULL(x2, return false);
@@ -134,7 +134,7 @@ static const std::initializer_list<op::DataType> INPUT_SUPPORT_TYPE_LOW_ACCURACY
     op::DataType::DT_FLOAT8_E5M2, op::DataType::DT_FLOAT8_E4M3FN, op::DataType::DT_HIFLOAT8,
     op::DataType::DT_FLOAT4_E2M1};
 
-static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *output)
+static bool CheckDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* output)
 {
     // 检查x1、x2、bias、output的数据类型是否在算子的支持列表内
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, DTYPE_SUPPORT_LIST, return false);
@@ -153,8 +153,8 @@ static const std::initializer_list<op::DataType> AIV_MODE_BIAS_SUPPORT_LIST = {
     op::DataType::DT_FLOAT16, op::DataType::DT_BF16, op::DataType::DT_FLOAT};
 static const std::initializer_list<op::DataType> AIV_MODE_OUTPUT_SUPPORT_TYPE = {op::DataType::DT_FLOAT16,
                                                                                  op::DataType::DT_BF16};
-static bool CheckAivModeDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                   const aclTensor *output)
+static bool CheckAivModeDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                   const aclTensor* output)
 {
     // 检查x1、x2、output的数据类型是否在算子的支持列表内
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, AIV_MODE_INPUT_SUPPORT_LIST, return false);
@@ -176,8 +176,8 @@ static bool CheckAttr(int64_t streamMode)
     }
     return true;
 }
-static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, int64_t streamMode,
-                               const aclTensor *output)
+static aclnnStatus CheckParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, int64_t streamMode,
+                               const aclTensor* output)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(CheckNotNull(x1, x2, output), ACLNN_ERR_PARAM_NULLPTR);
@@ -191,8 +191,8 @@ static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const a
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckAivModeParams(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                      int64_t streamMode, const aclTensor *output)
+static aclnnStatus CheckAivModeParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                      int64_t streamMode, const aclTensor* output)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(CheckNotNull(x1, x2, output), ACLNN_ERR_PARAM_NULLPTR);
@@ -205,7 +205,7 @@ static aclnnStatus CheckAivModeParams(const aclTensor *x1, const aclTensor *x2, 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckAndSetCommMode(const char *commMode, CommType &commModeEnum)
+static aclnnStatus CheckAndSetCommMode(const char* commMode, CommType& commModeEnum)
 {
     if (commMode == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "[aclnnMatmulReduceScatterV2GetWorkspaceSize] commMode must not be nullptr.");
@@ -223,7 +223,7 @@ static aclnnStatus CheckAndSetCommMode(const char *commMode, CommType &commModeE
     return ACLNN_SUCCESS;
 }
 
-static bool CheckShape(const aclTensor *x1, const aclTensor *x2, bool isTransA)
+static bool CheckShape(const aclTensor* x1, const aclTensor* x2, bool isTransA)
 {
     if (x1->GetViewShape().GetDimNum() != TWO_DIMS) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("aclnnMatmulReduceScatterV2GetWorkspaceSize", "x1",
@@ -259,7 +259,7 @@ static bool CheckShape(const aclTensor *x1, const aclTensor *x2, bool isTransA)
     return true;
 }
 
-static bool CheckEmptyTensor(const aclTensor *tensor, const char *tensorName)
+static bool CheckEmptyTensor(const aclTensor* tensor, const char* tensorName)
 {
     if (IsNullptr(tensor, tensorName)) {
         return false;
@@ -271,7 +271,7 @@ static bool CheckEmptyTensor(const aclTensor *tensor, const char *tensorName)
     return true;
 }
 
-static bool CheckEmptyOptionalTensor(const aclTensor *tensor, const char *tensorName)
+static bool CheckEmptyOptionalTensor(const aclTensor* tensor, const char* tensorName)
 {
     if (tensor == nullptr) {
         OP_LOGD("Expecting valid tensor, name %s", tensorName);
@@ -284,8 +284,8 @@ static bool CheckEmptyOptionalTensor(const aclTensor *tensor, const char *tensor
     return true;
 }
 
-static enum CaseOption CheckHighAccuracyCase(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                             const aclTensor *y)
+static enum CaseOption CheckHighAccuracyCase(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                             const aclTensor* y)
 {
     // 高精度场景须数据类型相同
     OP_CHECK_DTYPE_NOT_SAME(x1, x2, return CaseOption::INVALID);
@@ -296,8 +296,8 @@ static enum CaseOption CheckHighAccuracyCase(const aclTensor *x1, const aclTenso
     return CaseOption::HIGH_ACCURACY;
 }
 
-static enum CaseOption CheckLowAccuracyCase(const aclTensor *x1, const aclTensor *x2, const aclTensor *x1Scale,
-                                            const aclTensor *x2Scale)
+static enum CaseOption CheckLowAccuracyCase(const aclTensor* x1, const aclTensor* x2, const aclTensor* x1Scale,
+                                            const aclTensor* x2Scale)
 {
     // 先x1 x2指针判空
     if (!CheckEmptyTensor(x1, "x1") || !CheckEmptyTensor(x2, "x2")) {
@@ -323,8 +323,8 @@ static enum CaseOption CheckLowAccuracyCase(const aclTensor *x1, const aclTensor
     }
 }
 
-static enum CaseOption CheckCase(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *y,
-                                 const aclTensor *amax, const aclTensor *x1Scale, const aclTensor *x2Scale)
+static enum CaseOption CheckCase(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* y,
+                                 const aclTensor* amax, const aclTensor* x1Scale, const aclTensor* x2Scale)
 {
     if (amax != nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMatmulReduceScatterV2GetWorkspaceSize", "amaxOutOptional",
@@ -348,7 +348,7 @@ static enum CaseOption CheckCase(const aclTensor *x1, const aclTensor *x2, const
     }
 }
 
-static const aclTensor *TransX2Tensor(const aclTensor *x2)
+static const aclTensor* TransX2Tensor(const aclTensor* x2)
 {
     uint64_t storageShapeDimNum = x2->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDim(storageShapeDimNum);
@@ -382,13 +382,13 @@ static const aclTensor *TransX2Tensor(const aclTensor *x2)
                            storageShapeDimNum, x2->GetTensor()->GetAddr());
 }
 
-aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeA5(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                                    const aclTensor *x1Scale, const aclTensor *x2Scale,
-                                                    const aclTensor *quantScale, int64_t blockSize, const char *group,
-                                                    const char *reduceOp, int64_t commTurn, int64_t streamMode,
-                                                    int64_t groupSize, const char *commMode, aclTensor *output,
-                                                    aclTensor *amaxOutOptional, uint64_t *workspaceSize,
-                                                    aclOpExecutor **executor)
+aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeA5(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                                    const aclTensor* x1Scale, const aclTensor* x2Scale,
+                                                    const aclTensor* quantScale, int64_t blockSize, const char* group,
+                                                    const char* reduceOp, int64_t commTurn, int64_t streamMode,
+                                                    int64_t groupSize, const char* commMode, aclTensor* output,
+                                                    aclTensor* amaxOutOptional, uint64_t* workspaceSize,
+                                                    aclOpExecutor** executor)
 {
     OP_LOGD("aclnnmatmulReduceScatterV2GetWorkSpaceSizeA5 start, comm_mode is %s.", commMode);
     uint64_t timeStamp = NnopbaseMsprofSysTime();
@@ -455,19 +455,19 @@ aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeA5(const aclTensor *x1, const a
         OP_LOGD("X2 dim0 is %ld, dim1 is %ld.", x2->GetViewShape().GetDim(0), x2->GetViewShape().GetDim(1));
     }
     // Keep peer-only as an ACLNN-only optimization. Graph execution uses its own comm-mode marker.
-    const char *innerCommMode = commMode;
+    const char* innerCommMode = commMode;
     if (std::strcmp(commMode, "ccu") == 0) {
         innerCommMode = ACLNN_CCU_PEER_ONLY_MODE;
     } else if (std::strcmp(commMode, GRAPH_CCU_MODE) == 0) {
         innerCommMode = "ccu";
     }
     ret = aclnnInnerMatmulReduceScatterV2GetWorkspaceSize(
-        x1, transX2, bias, x1Scale, transX2Scale, quantScale, const_cast<char *>(group), const_cast<char *>(reduceOp),
+        x1, transX2, bias, x1Scale, transX2Scale, quantScale, const_cast<char*>(group), const_cast<char*>(reduceOp),
         transposeX1, transposeX2, commTurn, rankSize, blockSize, groupSize, isAmaxOut, yDtype,
-        const_cast<char *>(innerCommMode), output, amaxOutOptional, workspaceSize, executor);
+        const_cast<char*>(innerCommMode), output, amaxOutOptional, workspaceSize, executor);
     if ((ret == ACLNN_SUCCESS) && (executor != nullptr) && (*executor != nullptr)) {
         SetNnopbaseHcclServerTypeByArch(*executor, commModeEnum);
-        void *args = reinterpret_cast<void *>(static_cast<uintptr_t>(commModeEnum));
+        void* args = reinterpret_cast<void*>(static_cast<uintptr_t>(commModeEnum));
         NnopbaseSetUserHandle(*executor, args);
     }
     OP_LOGD("MatmulReduceScatterV2, end ret %d.", ret);
@@ -476,7 +476,7 @@ aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeA5(const aclTensor *x1, const a
     return ret;
 }
 
-static bool MatmulReduceScatterV2IsWeightNZFormat(const aclTensor *x2)
+static bool MatmulReduceScatterV2IsWeightNZFormat(const aclTensor* x2)
 {
     aclFormat format = aclFormat::ACL_FORMAT_UNDEFINED;
     aclGetFormat(x2, &format);
@@ -496,10 +496,10 @@ static bool MatmulReduceScatterV2IsWeightNZFormat(const aclTensor *x2)
 }
 
 aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeAivMode(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *x1Scale, const aclTensor *x2Scale,
-    const aclTensor *quantScale, int64_t blockSize, const char *group, const char *reduceOp, int64_t commTurn,
-    int64_t streamMode, int64_t groupSize, const char *commMode, aclTensor *output, aclTensor *amaxOutOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* x1Scale, const aclTensor* x2Scale,
+    const aclTensor* quantScale, int64_t blockSize, const char* group, const char* reduceOp, int64_t commTurn,
+    int64_t streamMode, int64_t groupSize, const char* commMode, aclTensor* output, aclTensor* amaxOutOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("aclnnMatmulReduceScatterV2GetWorkspaceSizeAivMode start");
     auto ret_param = CheckAivModeParams(x1, x2, bias, streamMode, output);
@@ -521,9 +521,9 @@ aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeAivMode(
         }
     }
     aclnnStatus ret = aclnnInnerMatmulReduceScatterV2GetWorkspaceSize(
-        x1, x2, bias, x1Scale, x2Scale, quantScale, const_cast<char *>(group), const_cast<char *>(reduceOp),
-        transposeX1, transposeX2, commTurn, rankSize, blockSize, groupSize, isAmaxOut, yDtype,
-        const_cast<char *>(commMode), output, amaxOutOptional, workspaceSize, executor);
+        x1, x2, bias, x1Scale, x2Scale, quantScale, const_cast<char*>(group), const_cast<char*>(reduceOp), transposeX1,
+        transposeX2, commTurn, rankSize, blockSize, groupSize, isAmaxOut, yDtype, const_cast<char*>(commMode), output,
+        amaxOutOptional, workspaceSize, executor);
     if ((ret == ACLNN_SUCCESS) && (executor != nullptr) && (*executor != nullptr)) {
         CommType commModeEnum = CommType::AIV;
         SetNnopbaseHcclServerTypeByArch(*executor, commModeEnum);
@@ -532,13 +532,13 @@ aclnnStatus matmulReduceScatterV2GetWorkSpaceSizeAivMode(
     return ret;
 }
 
-aclnnStatus aclnnMatmulReduceScatterV2GetWorkspaceSize(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                                       const aclTensor *x1Scale, const aclTensor *x2Scale,
-                                                       const aclTensor *quantScale, int64_t blockSize,
-                                                       const char *group, const char *reduceOp, int64_t commTurn,
-                                                       int64_t streamMode, int64_t groupSize, const char *commMode,
-                                                       aclTensor *output, aclTensor *amaxOutOptional,
-                                                       uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMatmulReduceScatterV2GetWorkspaceSize(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                                       const aclTensor* x1Scale, const aclTensor* x2Scale,
+                                                       const aclTensor* quantScale, int64_t blockSize,
+                                                       const char* group, const char* reduceOp, int64_t commTurn,
+                                                       int64_t streamMode, int64_t groupSize, const char* commMode,
+                                                       aclTensor* output, aclTensor* amaxOutOptional,
+                                                       uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     aclnnStatus ret = ACLNN_ERR_INNER;
     if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
@@ -559,7 +559,7 @@ aclnnStatus aclnnMatmulReduceScatterV2GetWorkspaceSize(const aclTensor *x1, cons
     return ret;
 }
 
-aclnnStatus aclnnMatmulReduceScatterV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMatmulReduceScatterV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                        aclrtStream stream)
 {
     if ((workspace == nullptr) || (workspaceSize == 0UL)) {
@@ -569,7 +569,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(void *workspace, uint64_t workspaceSize, 
 
     CommType commModeEnum = CommType::INVALID;
     if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
-        void *arg = NnopbaseGetUserHandle(executor);
+        void* arg = NnopbaseGetUserHandle(executor);
         uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
         commModeEnum = static_cast<CommType>(handleVal);
     } else if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2201) {

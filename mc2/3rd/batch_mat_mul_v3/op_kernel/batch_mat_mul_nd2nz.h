@@ -27,21 +27,21 @@ template <class T>
 class Mc2KernelND2NZBMM {
 public:
     __aicore__ inline Mc2KernelND2NZBMM(){};
-    __aicore__ inline void CopyIn(uint64_t progress, LocalTensor<T> &dstLocal);
+    __aicore__ inline void CopyIn(uint64_t progress, LocalTensor<T>& dstLocal);
     __aicore__ inline bool SetBufBMM();
     __aicore__ inline void Init(GM_ADDR dst, GM_ADDR src, uint32_t height, uint32_t width, uint32_t batch,
-                                TBuf<TPosition::VECCALC> &ubBuffer, uint32_t usedCoreNum);
+                                TBuf<TPosition::VECCALC>& ubBuffer, uint32_t usedCoreNum);
 
     __aicore__ inline bool ProcessBMM();
 
 private:
     __aicore__ inline void CopyOutDirect(uint64_t gmOutOffset, uint32_t startPad, uint16_t total, uint64_t progress);
-    __aicore__ inline void CopyOutPageInit(uint64_t &gmOutOffset, uint32_t startPad, uint32_t &bufOffset);
-    __aicore__ inline void CopyOutMakePage(uint32_t nLoop, uint32_t &bufOffset);
-    __aicore__ inline void CopyOutPageMainImp(uint64_t &gmOutOffset, uint32_t nLoop, uint32_t &bufOffset);
-    __aicore__ inline void CopyOutPageMain(uint64_t &gmOutOffset, uint32_t mPage, uint32_t startPad, uint32_t total,
-                                           uint32_t &bufOffset, uint64_t progress);
-    __aicore__ inline void CopyOutPageEnd(uint64_t gmOutOffset, uint32_t res, uint32_t &bufOffset);
+    __aicore__ inline void CopyOutPageInit(uint64_t& gmOutOffset, uint32_t startPad, uint32_t& bufOffset);
+    __aicore__ inline void CopyOutMakePage(uint32_t nLoop, uint32_t& bufOffset);
+    __aicore__ inline void CopyOutPageMainImp(uint64_t& gmOutOffset, uint32_t nLoop, uint32_t& bufOffset);
+    __aicore__ inline void CopyOutPageMain(uint64_t& gmOutOffset, uint32_t mPage, uint32_t startPad, uint32_t total,
+                                           uint32_t& bufOffset, uint64_t progress);
+    __aicore__ inline void CopyOutPageEnd(uint64_t gmOutOffset, uint32_t res, uint32_t& bufOffset);
     __aicore__ inline void CopyOutPage(uint64_t gmOutOffset, uint32_t mPage, uint32_t total, uint32_t startPad,
                                        uint64_t progress);
     __aicore__ inline void CopyOutBatchReform(uint64_t gmOutOffset, uint32_t mPage, uint32_t total, uint32_t startPad,
@@ -49,7 +49,7 @@ private:
     __aicore__ inline void ComputeBMM(uint64_t progress);
 
 private:
-    TBuf<TPosition::VECCALC> *ubPtr_;
+    TBuf<TPosition::VECCALC>* ubPtr_;
     GlobalTensor<T> srcGM;
     GlobalTensor<T> dstGM;
     LocalTensor<T> inBuf_;
@@ -79,7 +79,7 @@ private:
 };
 
 template <class T>
-__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyIn(uint64_t progress, LocalTensor<T> &dstLocal)
+__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyIn(uint64_t progress, LocalTensor<T>& dstLocal)
 {
     uint64_t curCopyInSize = progress == nFullProgress_ ? heightTotalTail_ * width_ : copyInSize_;
     uint64_t gmInOffset = copyInSize_ * progress;
@@ -139,7 +139,7 @@ __aicore__ inline bool Mc2KernelND2NZBMM<T>::SetBufBMM()
 
 template <class T>
 __aicore__ inline void Mc2KernelND2NZBMM<T>::Init(GM_ADDR dst, GM_ADDR src, uint32_t height, uint32_t width,
-                                                  uint32_t batch, TBuf<TPosition::VECCALC> &ubBuffer,
+                                                  uint32_t batch, TBuf<TPosition::VECCALC>& ubBuffer,
                                                   uint32_t usedCoreNum)
 {
     height_ = height;
@@ -152,8 +152,8 @@ __aicore__ inline void Mc2KernelND2NZBMM<T>::Init(GM_ADDR dst, GM_ADDR src, uint
 
     c0_ = BLOCK_SIZE_BYTE / sizeof(T);
 
-    srcGM.SetGlobalBuffer((__gm__ T *)src);
-    dstGM.SetGlobalBuffer((__gm__ T *)dst);
+    srcGM.SetGlobalBuffer((__gm__ T*)src);
+    dstGM.SetGlobalBuffer((__gm__ T*)dst);
     ubPtr_ = &ubBuffer;
 
     noPadD_ = (width_ == c0_);
@@ -249,8 +249,8 @@ __aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutDirect(uint64_t gmOutOffset,
 }
 
 template <class T>
-__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageInit(uint64_t &gmOutOffset, uint32_t startPad,
-                                                             uint32_t &bufOffset)
+__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageInit(uint64_t& gmOutOffset, uint32_t startPad,
+                                                             uint32_t& bufOffset)
 {
     uint32_t start = startPad - hPad_;
     uint32_t startSize = start * c0_;
@@ -275,7 +275,7 @@ __aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageInit(uint64_t &gmOutOffs
 }
 
 template <class T>
-__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutMakePage(uint32_t nLoop, uint32_t &bufOffset)
+__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutMakePage(uint32_t nLoop, uint32_t& bufOffset)
 {
     for (int j = 0; j < nLoop; j++) {
         for (int k = 0; k < widthBlockTotal_; k++) {
@@ -288,8 +288,8 @@ __aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutMakePage(uint32_t nLoop, uin
 }
 
 template <class T>
-__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageMainImp(uint64_t &gmOutOffset, uint32_t nLoop,
-                                                                uint32_t &bufOffset)
+__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageMainImp(uint64_t& gmOutOffset, uint32_t nLoop,
+                                                                uint32_t& bufOffset)
 {
     CopyOutMakePage(nLoop, bufOffset);
     SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
@@ -303,8 +303,8 @@ __aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageMainImp(uint64_t &gmOutO
 }
 
 template <class T>
-__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageMain(uint64_t &gmOutOffset, uint32_t mPage, uint32_t startPad,
-                                                             uint32_t total, uint32_t &bufOffset, uint64_t progress)
+__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageMain(uint64_t& gmOutOffset, uint32_t mPage, uint32_t startPad,
+                                                             uint32_t total, uint32_t& bufOffset, uint64_t progress)
 {
     uint32_t mPage2 = mPage / widthBlockTotal_;
     uint32_t nLoopIn = mPage2 / hAligned_;
@@ -321,7 +321,7 @@ __aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageMain(uint64_t &gmOutOffs
 }
 
 template <class T>
-__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageEnd(uint64_t gmOutOffset, uint32_t res, uint32_t &bufOffset)
+__aicore__ inline void Mc2KernelND2NZBMM<T>::CopyOutPageEnd(uint64_t gmOutOffset, uint32_t res, uint32_t& bufOffset)
 {
     for (int k = 0; k < widthBlockTotal_; k++) {
         Copy(midBuf_[c0_ * res * k], outBuf_[bufOffset + hBuffer_ * c0_ * k], res * c0_);
@@ -398,8 +398,8 @@ __aicore__ inline void Mc2KernelND2NZBMM<T>::ComputeBMM(uint64_t progress)
 
 #if defined(__DAV_C220_VEC__)
 template <class T>
-__aicore__ inline bool Mc2Nd2nzVnchwBMM(GlobalTensor<T> &dst, GlobalTensor<T> &src, uint32_t height, uint32_t width,
-                                        uint32_t batch, TBuf<TPosition::VECCALC> &ubBuffer, uint32_t usedCoreNum)
+__aicore__ inline bool Mc2Nd2nzVnchwBMM(GlobalTensor<T>& dst, GlobalTensor<T>& src, uint32_t height, uint32_t width,
+                                        uint32_t batch, TBuf<TPosition::VECCALC>& ubBuffer, uint32_t usedCoreNum)
 {
     Mc2KernelND2NZBMM<T> op;
     op.Init((GM_ADDR)dst[0].GetPhyAddr(), (GM_ADDR)src[0].GetPhyAddr(), height, width, batch, ubBuffer, usedCoreNum);
@@ -407,14 +407,14 @@ __aicore__ inline bool Mc2Nd2nzVnchwBMM(GlobalTensor<T> &dst, GlobalTensor<T> &s
 }
 
 template <>
-__aicore__ inline bool Mc2Nd2nzVnchwBMM(GlobalTensor<bfloat16_t> &dst, GlobalTensor<bfloat16_t> &src, uint32_t height,
-                                        uint32_t width, uint32_t batch, TBuf<TPosition::VECCALC> &ubBuffer,
+__aicore__ inline bool Mc2Nd2nzVnchwBMM(GlobalTensor<bfloat16_t>& dst, GlobalTensor<bfloat16_t>& src, uint32_t height,
+                                        uint32_t width, uint32_t batch, TBuf<TPosition::VECCALC>& ubBuffer,
                                         uint32_t usedCoreNum)
 {
     GlobalTensor<half> dstGlobalTrans;
     GlobalTensor<half> srcGlobalTrans;
-    dstGlobalTrans.SetGlobalBuffer((__gm__ half *)dst.GetPhyAddr(0));
-    srcGlobalTrans.SetGlobalBuffer((__gm__ half *)src.GetPhyAddr(0));
+    dstGlobalTrans.SetGlobalBuffer((__gm__ half*)dst.GetPhyAddr(0));
+    srcGlobalTrans.SetGlobalBuffer((__gm__ half*)src.GetPhyAddr(0));
     return Mc2Nd2nzVnchwBMM(dstGlobalTrans, srcGlobalTrans, height, width, batch, ubBuffer, usedCoreNum);
 }
 #endif

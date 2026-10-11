@@ -26,7 +26,7 @@ using namespace std;
 #endif
 
 template <class T>
-__aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T> &dstGlobal, const GlobalTensor<T> &srcGlobal, uint32_t baseH,
+__aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T>& dstGlobal, const GlobalTensor<T>& srcGlobal, uint32_t baseH,
                                     uint32_t baseW, uint32_t orgHeight, uint32_t orgWidth, LocalTensor<T> ubLocal1,
                                     LocalTensor<T> ubLocal2, uint8_t padH, uint8_t padW)
 {
@@ -110,16 +110,16 @@ __aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T> &dstGlobal, const Glob
 
 #if defined(__CCE_AICORE__) && (__CCE_AICORE__ > 200)
 template <>
-__aicore__ inline void CopyPadNd2Nz<bfloat16_t>(const GlobalTensor<bfloat16_t> &dstGlobal,
-                                                const GlobalTensor<bfloat16_t> &srcGlobal, uint32_t baseH,
+__aicore__ inline void CopyPadNd2Nz<bfloat16_t>(const GlobalTensor<bfloat16_t>& dstGlobal,
+                                                const GlobalTensor<bfloat16_t>& srcGlobal, uint32_t baseH,
                                                 uint32_t baseW, uint32_t orgHeight, uint32_t orgWidth,
                                                 LocalTensor<bfloat16_t> ubLocal1, LocalTensor<bfloat16_t> ubLocal2,
                                                 uint8_t padH, uint8_t padW)
 {
     GlobalTensor<half> dstGlobalTrans;
     GlobalTensor<half> srcGlobalTrans;
-    dstGlobalTrans.SetGlobalBuffer((__gm__ half *)dstGlobal.GetPhyAddr(0));
-    srcGlobalTrans.SetGlobalBuffer((__gm__ half *)srcGlobal.GetPhyAddr(0));
+    dstGlobalTrans.SetGlobalBuffer((__gm__ half*)dstGlobal.GetPhyAddr(0));
+    srcGlobalTrans.SetGlobalBuffer((__gm__ half*)srcGlobal.GetPhyAddr(0));
     CopyPadNd2Nz<half>(dstGlobalTrans, srcGlobalTrans, baseH, baseW, orgHeight, orgWidth,
                        ubLocal1.ReinterpretCast<half>(), ubLocal2.ReinterpretCast<half>(), padH, padW);
 }
@@ -127,8 +127,8 @@ __aicore__ inline void CopyPadNd2Nz<bfloat16_t>(const GlobalTensor<bfloat16_t> &
 
 #if defined(__DAV_C220_VEC__)
 template <class T, Nd2NzMode mode = Nd2NzMode::MULTI_CORE>
-__aicore__ inline bool Nd2nzVnchwMM(GlobalTensor<T> &dst, GlobalTensor<T> &src, uint32_t height, uint32_t width,
-                                    uint32_t batch, TBuf<TPosition::VECCALC> &ubBuffer, uint32_t usedCoreNum)
+__aicore__ inline bool Nd2nzVnchwMM(GlobalTensor<T>& dst, GlobalTensor<T>& src, uint32_t height, uint32_t width,
+                                    uint32_t batch, TBuf<TPosition::VECCALC>& ubBuffer, uint32_t usedCoreNum)
 {
     Mc2KernelND2NZMM<T> op;
     op.Init((GM_ADDR)dst[0].GetPhyAddr(), (GM_ADDR)src[0].GetPhyAddr(), height, width, batch, ubBuffer, usedCoreNum);
@@ -136,22 +136,22 @@ __aicore__ inline bool Nd2nzVnchwMM(GlobalTensor<T> &dst, GlobalTensor<T> &src, 
 }
 
 template <Nd2NzMode mode = Nd2NzMode::MULTI_CORE>
-__aicore__ inline bool Nd2nzVnchwMM(GlobalTensor<bfloat16_t> &dst, GlobalTensor<bfloat16_t> &src, uint32_t height,
-                                    uint32_t width, uint32_t batch, TBuf<TPosition::VECCALC> &ubBuffer,
+__aicore__ inline bool Nd2nzVnchwMM(GlobalTensor<bfloat16_t>& dst, GlobalTensor<bfloat16_t>& src, uint32_t height,
+                                    uint32_t width, uint32_t batch, TBuf<TPosition::VECCALC>& ubBuffer,
                                     uint32_t usedCoreNum)
 {
     GlobalTensor<half> dstGlobalTrans;
     GlobalTensor<half> srcGlobalTrans;
-    dstGlobalTrans.SetGlobalBuffer((__gm__ half *)dst.GetPhyAddr(0));
-    srcGlobalTrans.SetGlobalBuffer((__gm__ half *)src.GetPhyAddr(0));
+    dstGlobalTrans.SetGlobalBuffer((__gm__ half*)dst.GetPhyAddr(0));
+    srcGlobalTrans.SetGlobalBuffer((__gm__ half*)src.GetPhyAddr(0));
     return Nd2nzVnchwMM<half, mode>(dstGlobalTrans, srcGlobalTrans, height, width, batch, ubBuffer, usedCoreNum);
 }
 #endif
 
 template <class T>
 __aicore__ inline void MatrixtoNZ(uint64_t oriN, uint64_t oriD, uint64_t nValue, uint64_t dValue, uint32_t baseN,
-                                  uint32_t baseD, uint32_t usedCoreNum, GlobalTensor<T> &tempSrcGlobal,
-                                  GlobalTensor<T> &tempDstGlobal, TBuf<TPosition::VECCALC> &tmpBuf)
+                                  uint32_t baseD, uint32_t usedCoreNum, GlobalTensor<T>& tempSrcGlobal,
+                                  GlobalTensor<T>& tempDstGlobal, TBuf<TPosition::VECCALC>& tmpBuf)
 {
     if ASCEND_IS_AIV {
         uint32_t vBlockIndex = GetBlockIdx();
@@ -227,8 +227,8 @@ __aicore__ inline void MatrixtoNZ(uint64_t oriN, uint64_t oriD, uint64_t nValue,
 }
 
 template <class T>
-__aicore__ inline void MatrixAtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCubeTiling &cfg, bool isTransposeA,
-                                     TBuf<TPosition::VECCALC> &tmpBuf, uint32_t baseAN, uint32_t baseAD,
+__aicore__ inline void MatrixAtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCubeTiling& cfg, bool isTransposeA,
+                                     TBuf<TPosition::VECCALC>& tmpBuf, uint32_t baseAN, uint32_t baseAD,
                                      uint32_t batch = 1)
 {
     uint64_t c0Size = 16;
@@ -246,8 +246,8 @@ __aicore__ inline void MatrixAtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCube
     uint64_t dValue = isTransposeA ? alignedMSize : alignedKSize;
     GlobalTensor<T> tempSrcGlobal;
     GlobalTensor<T> tempDstGlobal;
-    tempDstGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace), alignedMSize * alignedKSize);
-    tempSrcGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(src), oriD * oriN);
+    tempDstGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace), alignedMSize * alignedKSize);
+    tempSrcGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(src), oriD * oriN);
 #if defined(__DAV_C220_VEC__)
     if (batch > 1) {
         Mc2Nd2nzVnchwBMM(tempDstGlobal, tempSrcGlobal, oriN, oriD, batch, tmpBuf, usedCoreNum);
@@ -267,8 +267,8 @@ __aicore__ inline void MatrixAtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCube
 }
 
 template <class T>
-__aicore__ inline void MatrixBtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCubeTiling &cfg, bool isTransposeB,
-                                     TBuf<TPosition::VECCALC> &tmpBuf, uint32_t baseBN, uint32_t baseBD,
+__aicore__ inline void MatrixBtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCubeTiling& cfg, bool isTransposeB,
+                                     TBuf<TPosition::VECCALC>& tmpBuf, uint32_t baseBN, uint32_t baseBD,
                                      uint32_t batch = 1)
 {
     uint64_t c0Size = 16;
@@ -284,8 +284,8 @@ __aicore__ inline void MatrixBtoNZV2(GM_ADDR workspace, GM_ADDR src, const TCube
     uint64_t dValue = isTransposeB ? alignedKSize : alignedNSize;
     GlobalTensor<T> tempSrcGlobal1;
     GlobalTensor<T> tempDstGlobal1;
-    tempDstGlobal1.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(workspace), alignedNSize * alignedKSize);
-    tempSrcGlobal1.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(src), oriD * oriN);
+    tempDstGlobal1.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(workspace), alignedNSize * alignedKSize);
+    tempSrcGlobal1.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(src), oriD * oriN);
 #if defined(__DAV_C220_VEC__)
     if (batch > 1) {
         Mc2Nd2nzVnchwBMM(tempDstGlobal1, tempSrcGlobal1, oriN, oriD, batch, tmpBuf, usedCoreNum);

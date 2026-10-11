@@ -27,20 +27,20 @@
 using namespace op;
 
 namespace MoeDistributeCombineSetupUT {
-static aclTensor *CreateAclTensor(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensor(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
 {
-    void *storage_data = nullptr;
+    void* storage_data = nullptr;
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
         strides[i] = shape[i + 1] * strides[i + 1];
     }
-    aclTensor *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
+    aclTensor* tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
                                         shape.size(), storage_data);
     assert(tensor != nullptr);
     return tensor;
 }
 
-static aclTensor *CreateAclTensorOrNull(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensorOrNull(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
 {
     if (shape.empty()) {
         return nullptr;
@@ -73,7 +73,7 @@ struct MoeDistributeCombineSetupAclnnTestParam {
     std::vector<int64_t> commCmdInfoOutShape;
 
     // 通信域标识
-    char *groupEp;
+    char* groupEp;
     int64_t epWorldSize;
     int64_t epRankId;
     int64_t moeExpertNum;
@@ -83,7 +83,7 @@ struct MoeDistributeCombineSetupAclnnTestParam {
     int64_t globalBs;
     int64_t commQuantMode;
     int64_t commType;
-    char *commAlg;
+    char* commAlg;
 
     // dtype
     aclDataType expandXDtype;
@@ -530,7 +530,7 @@ static MoeDistributeCombineSetupAclnnTestParam g_casesParams[] = {
      ACLNN_ERR_PARAM_INVALID},
 };
 
-static void TestOneParamCase(const MoeDistributeCombineSetupAclnnTestParam &param)
+static void TestOneParamCase(const MoeDistributeCombineSetupAclnnTestParam& param)
 {
     std::cout << "run case " << param.caseName << std::endl;
     if (param.groupEp == nullptr) {
@@ -542,7 +542,7 @@ static void TestOneParamCase(const MoeDistributeCombineSetupAclnnTestParam &para
     std::vector<int64_t> assistInfoForCombineShape = param.assistInfoForCombineShape;
     std::vector<int64_t> quantExpandXOutShape = param.quantExpandXOutShape;
     std::vector<int64_t> commCmdInfoOutShape = param.commCmdInfoOutShape;
-    char *groupEp = param.groupEp;
+    char* groupEp = param.groupEp;
     int64_t epWorldSize = param.epWorldSize;
     int64_t epRankId = param.epRankId;
     int64_t moeExpertNum = param.moeExpertNum;
@@ -552,7 +552,7 @@ static void TestOneParamCase(const MoeDistributeCombineSetupAclnnTestParam &para
     int64_t globalBs = param.globalBs;
     int64_t commQuantMode = param.commQuantMode;
     int64_t commType = param.commType;
-    char *commAlg = param.commAlg;
+    char* commAlg = param.commAlg;
     aclDataType expandXDtype = param.expandXDtype;
     aclDataType expertIdsDtype = param.expertIdsDtype;
     aclDataType assistInfoForCombineDtype = param.assistInfoForCombineDtype;
@@ -566,13 +566,13 @@ static void TestOneParamCase(const MoeDistributeCombineSetupAclnnTestParam &para
     aclnnStatus retStatus = param.aclnnStatusUt;
 
     // 封装
-    aclTensor *expandX = CreateAclTensorOrNull(expandXShape, expandXDtype, expandXFormat);
-    aclTensor *expertIds = CreateAclTensorOrNull(expertIdsShape, expertIdsDtype, expertIdsFormat);
-    aclTensor *assistInfoForCombine =
+    aclTensor* expandX = CreateAclTensorOrNull(expandXShape, expandXDtype, expandXFormat);
+    aclTensor* expertIds = CreateAclTensorOrNull(expertIdsShape, expertIdsDtype, expertIdsFormat);
+    aclTensor* assistInfoForCombine =
         CreateAclTensorOrNull(assistInfoForCombineShape, assistInfoForCombineDtype, assistInfoForCombineFormat);
-    aclTensor *quantExpandXOut =
+    aclTensor* quantExpandXOut =
         CreateAclTensorOrNull(quantExpandXOutShape, quantExpandXOutDtype, quantExpandXOutFormat);
-    aclTensor *commCmdInfoOut = CreateAclTensorOrNull(commCmdInfoOutShape, commCmdInfoOutDtype, commCmdInfoOutFormat);
+    aclTensor* commCmdInfoOut = CreateAclTensorOrNull(commCmdInfoOutShape, commCmdInfoOutDtype, commCmdInfoOutFormat);
 
     auto ut = OP_API_UT(
         aclnnMoeDistributeCombineSetup,
@@ -580,7 +580,7 @@ static void TestOneParamCase(const MoeDistributeCombineSetupAclnnTestParam &para
               sharedExpertNum, sharedExpertRankNum, globalBs, commQuantMode, commType, commAlg),
         OUTPUT(quantExpandXOut, commCmdInfoOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     if (retStatus == ACLNN_SUCCESS) {
         EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -602,11 +602,11 @@ TEST_F(TestAclnnMoeDistributeCombineSetup, CasesParamsTest)
 TEST_F(TestAclnnMoeDistributeCombineSetup, TestTeardownCalcOutputSizeNormal)
 {
     std::vector<int64_t> expandXShape = {192, 4096};
-    aclTensor *expandX = CreateAclTensor(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* expandX = CreateAclTensor(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
     std::vector<int64_t> expertIdsShape = {16, 6};
-    aclTensor *expertIds = CreateAclTensor(expertIdsShape, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* expertIds = CreateAclTensor(expertIdsShape, ACL_INT32, ACL_FORMAT_ND);
     std::vector<int64_t> assistInfoShape = {24576};
-    aclTensor *assistInfo = CreateAclTensor(assistInfoShape, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* assistInfo = CreateAclTensor(assistInfoShape, ACL_INT32, ACL_FORMAT_ND);
     std::string groupEp = "test_group";
     uint64_t tokenMsgSize = 0;
     uint64_t commCmdInfoOutSize = 0;
@@ -630,7 +630,7 @@ TEST_F(TestAclnnMoeDistributeCombineSetup, TestTeardownCalcOutputSizeNullptrExpa
 TEST_F(TestAclnnMoeDistributeCombineSetup, TestTeardownCalcOutputSizeInvalidDimNum)
 {
     std::vector<int64_t> expandXShape = {192};
-    aclTensor *expandX = CreateAclTensor(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* expandX = CreateAclTensor(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
     uint64_t tokenMsgSize = 0;
     uint64_t commCmdInfoOutSize = 0;
     aclnnStatus ret = aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
@@ -641,7 +641,7 @@ TEST_F(TestAclnnMoeDistributeCombineSetup, TestTeardownCalcOutputSizeInvalidDimN
 TEST_F(TestAclnnMoeDistributeCombineSetup, TestTeardownCalcOutputSizeInvalidDimValue)
 {
     std::vector<int64_t> expandXShape = {0, 4096};
-    aclTensor *expandX = CreateAclTensor(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* expandX = CreateAclTensor(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
     uint64_t tokenMsgSize = 0;
     uint64_t commCmdInfoOutSize = 0;
     aclnnStatus ret = aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
@@ -653,18 +653,18 @@ TEST_F(TestAclnnMoeDistributeCombineSetup, TestUnsupportedNpuArch)
 {
     op::SetPlatformNpuArch(Ops::Base::DAV_1001);
     std::vector<int64_t> expandXShape = {192, 4096};
-    aclTensor *expandX = CreateAclTensor(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* expandX = CreateAclTensor(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
     std::vector<int64_t> expertIdsShape = {16, 6};
-    aclTensor *expertIds = CreateAclTensor(expertIdsShape, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* expertIds = CreateAclTensor(expertIdsShape, ACL_INT32, ACL_FORMAT_ND);
     std::vector<int64_t> assistInfoShape = {24576};
-    aclTensor *assistInfo = CreateAclTensor(assistInfoShape, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* assistInfo = CreateAclTensor(assistInfoShape, ACL_INT32, ACL_FORMAT_ND);
     std::vector<int64_t> quantExpandXShape = {192, 6144};
-    aclTensor *quantExpandX = CreateAclTensor(quantExpandXShape, ACL_INT8, ACL_FORMAT_ND);
+    aclTensor* quantExpandX = CreateAclTensor(quantExpandXShape, ACL_INT8, ACL_FORMAT_ND);
     std::vector<int64_t> commCmdInfoShape = {3104};
-    aclTensor *commCmdInfo = CreateAclTensor(commCmdInfoShape, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* commCmdInfo = CreateAclTensor(commCmdInfoShape, ACL_INT32, ACL_FORMAT_ND);
     std::string groupEp = "test_group";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus ret = aclnnMoeDistributeCombineSetupGetWorkspaceSize(expandX, expertIds, assistInfo, groupEp.c_str(), 8,
                                                                      0, 32, 0, 0, 0, 0, 0, 2, "", quantExpandX,
                                                                      commCmdInfo, &workspaceSize, &executor);
@@ -680,14 +680,14 @@ TEST_F(TestAclnnMoeDistributeCombineSetup, ExecuteCall)
 
 TEST_F(TestAclnnMoeDistributeCombineSetup, TestEmptyDimTensor)
 {
-    aclTensor *expandX = CreateAclTensor({}, ACL_FLOAT16, ACL_FORMAT_ND);
-    aclTensor *expertIds = CreateAclTensor({16, 6}, ACL_INT32, ACL_FORMAT_ND);
-    aclTensor *assistInfo = CreateAclTensor({24576}, ACL_INT32, ACL_FORMAT_ND);
-    aclTensor *quantExpandXOut = CreateAclTensor({192, 6144}, ACL_INT8, ACL_FORMAT_ND);
-    aclTensor *commCmdInfoOut = CreateAclTensor({3104}, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* expandX = CreateAclTensor({}, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* expertIds = CreateAclTensor({16, 6}, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* assistInfo = CreateAclTensor({24576}, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* quantExpandXOut = CreateAclTensor({192, 6144}, ACL_INT8, ACL_FORMAT_ND);
+    aclTensor* commCmdInfoOut = CreateAclTensor({3104}, ACL_INT32, ACL_FORMAT_ND);
     std::string groupEp = "test_group";
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus ret = aclnnMoeDistributeCombineSetupGetWorkspaceSize(expandX, expertIds, assistInfo, groupEp.c_str(), 8,
                                                                      0, 32, 0, 0, 0, 0, 0, 2, "", quantExpandXOut,
                                                                      commCmdInfoOut, &workspaceSize, &executor);

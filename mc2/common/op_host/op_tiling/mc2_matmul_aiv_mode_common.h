@@ -22,14 +22,14 @@ struct AivPlatformInfo {
     uint64_t ubSize;
 };
 
-AivPlatformInfo GetAivPlatformInfo(const gert::TilingContext *context);
+AivPlatformInfo GetAivPlatformInfo(const gert::TilingContext* context);
 
 struct AivScaleDtypeResult {
     bool valid;
     bool isInt64;
 };
 
-AivScaleDtypeResult CheckAivMatmulScaleDtype(const gert::Tensor *scale, ge::DataType outputType);
+AivScaleDtypeResult CheckAivMatmulScaleDtype(const gert::Tensor* scale, ge::DataType outputType);
 
 } // namespace mc2tiling
 

@@ -40,7 +40,7 @@ constexpr int DEV_NUM = 2;
 template <typename Func>
 class Guard {
 public:
-    explicit Guard(Func &func)
+    explicit Guard(Func& func)
         : func_(func)
     {}
     ~Guard()
@@ -49,7 +49,7 @@ public:
     }
 
 private:
-    Func &func_;
+    Func& func_;
 };
 
 int64_t AlignN(int64_t x, int64_t n)
@@ -57,7 +57,7 @@ int64_t AlignN(int64_t x, int64_t n)
     return (x + n - 1) / n * n;
 }
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -76,8 +76,8 @@ struct Args {
 };
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -94,21 +94,21 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void DestroyTensor(aclTensor *tensor)
+void DestroyTensor(aclTensor* tensor)
 {
     if (tensor != nullptr) {
         aclDestroyTensor(tensor);
     }
 }
 
-void FreeDeviceAddr(void *deviceAddr)
+void FreeDeviceAddr(void* deviceAddr)
 {
     if (deviceAddr != nullptr) {
         aclrtFree(deviceAddr);
     }
 }
 
-int LaunchOneProcess(Args &args)
+int LaunchOneProcess(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret: %d\n", ret); return ret);
@@ -191,23 +191,23 @@ int LaunchOneProcess(Args &args)
     std::vector<float> xOutHostData(xOutShapeSize, 0);
 
     // 声明 device 地址和 tensor
-    void *expandXDeviceAddr = nullptr;
-    void *expertIdsDeviceAddr = nullptr;
-    void *expertScalesDeviceAddr = nullptr;
-    void *expandIdxDeviceAddr = nullptr;
-    void *assistInfoForCombineOutDeviceAddr = nullptr;
-    void *quantExpandXOutDeviceAddr = nullptr;
-    void *commCmdInfoOutforCombineDeviceAddr = nullptr;
-    void *xOutDeviceAddr = nullptr;
+    void* expandXDeviceAddr = nullptr;
+    void* expertIdsDeviceAddr = nullptr;
+    void* expertScalesDeviceAddr = nullptr;
+    void* expandIdxDeviceAddr = nullptr;
+    void* assistInfoForCombineOutDeviceAddr = nullptr;
+    void* quantExpandXOutDeviceAddr = nullptr;
+    void* commCmdInfoOutforCombineDeviceAddr = nullptr;
+    void* xOutDeviceAddr = nullptr;
 
-    aclTensor *expandX = nullptr;
-    aclTensor *expertIds = nullptr;
-    aclTensor *expertScales = nullptr;
-    aclTensor *expandIdx = nullptr;
-    aclTensor *assistInfoForCombineOut = nullptr;
-    aclTensor *quantExpandXOut = nullptr;
-    aclTensor *commCmdInfoOutforCombine = nullptr;
-    aclTensor *xOut = nullptr;
+    aclTensor* expandX = nullptr;
+    aclTensor* expertIds = nullptr;
+    aclTensor* expertScales = nullptr;
+    aclTensor* expandIdx = nullptr;
+    aclTensor* assistInfoForCombineOut = nullptr;
+    aclTensor* quantExpandXOut = nullptr;
+    aclTensor* commCmdInfoOutforCombine = nullptr;
+    aclTensor* xOut = nullptr;
 
     // 创建 tensor
     ret = CreateAclTensor(expandXHostData, expandXShape, &expandXDeviceAddr, aclDataType::ACL_FLOAT16, &expandX);
@@ -233,8 +233,8 @@ int LaunchOneProcess(Args &args)
 
     // 声明算子执行必需变量
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     /******************************调用combine_setup********************************************/
     ret = aclnnMoeDistributeCombineSetupGetWorkspaceSize(
@@ -309,7 +309,7 @@ int LaunchOneProcess(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclInit failed. ret = %d \n", ret); return ret);

@@ -60,7 +60,7 @@ constexpr uint64_t X2_MXFP8_QUANT_NUM = 6;
 constexpr uint64_t X1_PERTOKEN_QUANT_NUM = 3;
 constexpr uint64_t X2_PERCHANNEL_QUANT_NUM = 2;
 
-static const char *INNER_DEBUG = "MC2: MatmulAlltoAll InferShape Debug";
+static const char* INNER_DEBUG = "MC2: MatmulAlltoAll InferShape Debug";
 
 struct MatmulAlltoAllShapeInfo {
     int64_t outputDim;
@@ -73,9 +73,9 @@ struct MatmulAlltoAllShapeInfo {
 
 } // namespace
 
-static ge::graphStatus CheckAllToAllAxesShapeForMatmulAlltoAll(const gert::InferShapeContext *context)
+static ge::graphStatus CheckAllToAllAxesShapeForMatmulAlltoAll(const gert::InferShapeContext* context)
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const auto alltoAllAxesPtr = attrs->GetAttrPointer<gert::ContinuousVector>(INDEX_ATTR_ALLTO_ALL_AXES);
     if (alltoAllAxesPtr != nullptr) {
@@ -83,7 +83,7 @@ static ge::graphStatus CheckAllToAllAxesShapeForMatmulAlltoAll(const gert::Infer
                   OP_LOGE_FOR_INVALID_VALUE(INNER_DEBUG, "alltoAllAxes",
                                             std::to_string(alltoAllAxesPtr->GetSize()).c_str(), "2"),
                   return ge::GRAPH_FAILED);
-        const auto alltoAllAxes = static_cast<const int64_t *>(alltoAllAxesPtr->GetData());
+        const auto alltoAllAxes = static_cast<const int64_t*>(alltoAllAxesPtr->GetData());
         OPS_CHECK_NULL_WITH_CONTEXT(context, alltoAllAxes);
         const std::string axesVal =
             "[" + std::to_string(alltoAllAxes[0]) + ", " + std::to_string(alltoAllAxes[1]) + "]";
@@ -95,8 +95,8 @@ static ge::graphStatus CheckAllToAllAxesShapeForMatmulAlltoAll(const gert::Infer
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckAxisKShapeForMatmulAlltoAll(const gert::InferShapeContext *context,
-                                                        MatmulAlltoAllShapeInfo &shape)
+static ge::graphStatus CheckAxisKShapeForMatmulAlltoAll(const gert::InferShapeContext* context,
+                                                        MatmulAlltoAllShapeInfo& shape)
 {
     OPS_CHECK(
         shape.k1 > AXIS_K_UPPER_LIMIT || shape.k2 > AXIS_K_UPPER_LIMIT,
@@ -113,19 +113,19 @@ static ge::graphStatus CheckAxisKShapeForMatmulAlltoAll(const gert::InferShapeCo
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus GetMatmulAxisInfoForMatmulAlltoAll(const gert::InferShapeContext *context,
-                                                          MatmulAlltoAllShapeInfo &shape)
+static ge::graphStatus GetMatmulAxisInfoForMatmulAlltoAll(const gert::InferShapeContext* context,
+                                                          MatmulAlltoAllShapeInfo& shape)
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const char *groupStr = attrs->GetAttrPointer<char>(INDEX_ATTR_GROUP);
+    const char* groupStr = attrs->GetAttrPointer<char>(INDEX_ATTR_GROUP);
     OPS_CHECK(groupStr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "group"),
               return ge::GRAPH_FAILED);
 
-    const bool *isTransX1 = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_X1);
+    const bool* isTransX1 = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_X1);
     OPS_CHECK(isTransX1 == nullptr || *isTransX1,
               OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "trans_x1", "true", "false"), return ge::GRAPH_FAILED);
-    const bool *isTransX2 = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_X2);
+    const bool* isTransX2 = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_X2);
     const bool transX2 = ((isTransX2 != nullptr) && (*isTransX2));
 
     const auto x1Shape = context->GetInputShape(INDEX_IN_X1);
@@ -153,12 +153,12 @@ static ge::graphStatus GetMatmulAxisInfoForMatmulAlltoAll(const gert::InferShape
  * @param context
  * @param shape
  */
-static ge::graphStatus CheckRankDimForMatmulAlltoAll(const gert::InferShapeContext *context,
-                                                     MatmulAlltoAllShapeInfo &shape)
+static ge::graphStatus CheckRankDimForMatmulAlltoAll(const gert::InferShapeContext* context,
+                                                     MatmulAlltoAllShapeInfo& shape)
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *rankDim = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_WORLD_SIZE);
+    const int64_t* rankDim = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_WORLD_SIZE);
     OPS_CHECK(rankDim == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "rank"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(std::find(SUPPORT_RANK_NUM.begin(), SUPPORT_RANK_NUM.end(), *rankDim) == SUPPORT_RANK_NUM.end(),
                     OP_LOGE_FOR_INVALID_VALUE(INNER_DEBUG, "rank", std::to_string(*rankDim).c_str(),
@@ -173,14 +173,14 @@ static ge::graphStatus CheckRankDimForMatmulAlltoAll(const gert::InferShapeConte
  *
  * @param context
  */
-static ge::graphStatus InferShapeMatmulAlltoAll(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMatmulAlltoAll(gert::InferShapeContext* context)
 {
     OPS_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT(INNER_DEBUG, "context"), return ge::GRAPH_FAILED);
     const auto x2Shape = context->GetInputShape(INDEX_IN_X2);
     OPS_CHECK_NULL_WITH_CONTEXT(context, x2Shape);
     const auto x1Shape = context->GetInputShape(INDEX_IN_X1);
     OPS_CHECK_NULL_WITH_CONTEXT(context, x1Shape);
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
 
     MatmulAlltoAllShapeInfo shape;
@@ -215,15 +215,15 @@ static ge::graphStatus InferShapeMatmulAlltoAll(gert::InferShapeContext *context
  *
  * @param context
  */
-static ge::graphStatus InferDataTypeMatmulAlltoAll(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMatmulAlltoAll(gert::InferDataTypeContext* context)
 {
     OPS_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT(INNER_DEBUG, "context"), return ge::GRAPH_FAILED);
     OP_LOGD(INNER_DEBUG, "Start to infer datatype of matmul allto all.");
 
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const int64_t *x1QuantMode = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_X1_QUANT_MODE);
-    const int64_t *x2QuantMode = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_X2_QUANT_MODE);
+    const int64_t* x1QuantMode = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_X1_QUANT_MODE);
+    const int64_t* x2QuantMode = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_X2_QUANT_MODE);
     OPS_CHECK_NULL_WITH_CONTEXT(context, x1QuantMode);
     OPS_CHECK_NULL_WITH_CONTEXT(context, x2QuantMode);
     OPS_CHECK(!(*x1QuantMode == 0 && *x2QuantMode == 0) &&
@@ -235,7 +235,7 @@ static ge::graphStatus InferDataTypeMatmulAlltoAll(gert::InferDataTypeContext *c
               return ge::GRAPH_FAILED);
 
     auto yType = ge::DataType::DT_UNDEFINED;
-    const int64_t *yDtypePtr = attrs->GetInt(INDEX_ATTR_Y_DTYPE);
+    const int64_t* yDtypePtr = attrs->GetInt(INDEX_ATTR_Y_DTYPE);
     if ((yDtypePtr != nullptr && *yDtypePtr != static_cast<uint64_t>(ge::DataType::DT_UNDEFINED))) {
         OP_LOGI(INNER_DEBUG, "The yDtype value is: %ld", *yDtypePtr);
         yType = static_cast<ge::DataType>(*yDtypePtr);

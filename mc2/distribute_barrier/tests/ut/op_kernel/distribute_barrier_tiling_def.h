@@ -15,7 +15,7 @@
 #include "../../../../../tests/ut/framework_normal/common/hccl_stub.h"
 #include "../../../op_kernel/distribute_barrier_tiling.h"
 
-inline void InitDistributeBarrierTilingData(uint8_t *tiling, DistributeBarrierTilingData *constData)
+inline void InitDistributeBarrierTilingData(uint8_t* tiling, DistributeBarrierTilingData* constData)
 {
     memcpy(constData, tiling, sizeof(DistributeBarrierTilingData));
 }

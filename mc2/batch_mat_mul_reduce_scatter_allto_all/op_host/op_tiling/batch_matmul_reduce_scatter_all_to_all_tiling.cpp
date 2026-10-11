@@ -65,13 +65,13 @@ constexpr int64_t LITE_THRESHOLD = 640;
 namespace optiling {
 
 struct BmmTilingConfig {
-    gert::TilingContext *context;
-    BatchMatMulReduceScatterAlltoAllTilingData &tilingData;
-    ReduceScatterAlltoAllBatchInfo &bmmV3BatchInfo;
-    ReduceScatterAlltoAllMatmulInfo &mmV3ArgsInfo;
+    gert::TilingContext* context;
+    BatchMatMulReduceScatterAlltoAllTilingData& tilingData;
+    ReduceScatterAlltoAllBatchInfo& bmmV3BatchInfo;
+    ReduceScatterAlltoAllMatmulInfo& mmV3ArgsInfo;
 };
 
-static void PrintCommonTilingVariables(BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
+static void PrintCommonTilingVariables(BatchMatMulReduceScatterAlltoAllTilingData* tilingData)
 {
     OP_LOGD("BatchMatMulReduceScatterAlltoAll", "Common tiling - epGroupSize is %u.",
             tilingData->commonTiling.epGroupSize);
@@ -101,7 +101,7 @@ static void PrintCommonTilingVariables(BatchMatMulReduceScatterAlltoAllTilingDat
             tilingData->commonTiling.yShardFlag);
 }
 
-static void PrintSliceTileInfo(BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
+static void PrintSliceTileInfo(BatchMatMulReduceScatterAlltoAllTilingData* tilingData)
 {
     OP_LOGD("BatchMatMulReduceScatterAlltoAll", "Local E - Tile length is %lu.",
             tilingData->commonTiling.localTileE.tileLen);
@@ -157,7 +157,7 @@ static uint32_t GetDataSize(ge::DataType geDtype)
     }
 }
 
-static void InitTileInfo(BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
+static void InitTileInfo(BatchMatMulReduceScatterAlltoAllTilingData* tilingData)
 {
     if (tilingData->commonTiling.yShardFlag == 1U) {
         tilingData->commonTiling.localTileC.tileLen = tilingData->commonTiling.C / tilingData->commonTiling.tpGroupSize;
@@ -190,7 +190,7 @@ static void InitTileInfo(BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
 }
 
 static ge::graphStatus CalculateMaxSplitUB(int64_t ubSize, bool bias_flag, bool xCastFlag, bool biasCastFlag,
-                                           BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
+                                           BatchMatMulReduceScatterAlltoAllTilingData* tilingData)
 {
     uint64_t ubCapacity = 1U;
     uint64_t addLeft = 2U;
@@ -222,7 +222,7 @@ static ge::graphStatus CalculateMaxSplitUB(int64_t ubSize, bool bias_flag, bool 
     return ge::GRAPH_SUCCESS;
 }
 
-static uint64_t UpdateTilingKey(BatchMatMulReduceScatterAlltoAllTilingData *tilingData, bool isLite)
+static uint64_t UpdateTilingKey(BatchMatMulReduceScatterAlltoAllTilingData* tilingData, bool isLite)
 {
     uint8_t yShardFlag = tilingData->commonTiling.yShardFlag;
     bool isWeightTrans = tilingData->commonTiling.isWeightTrans;
@@ -242,8 +242,8 @@ static uint64_t UpdateTilingKey(BatchMatMulReduceScatterAlltoAllTilingData *tili
     return tilingKey;
 }
 
-static void CompleteBmmStructs(ReduceScatterAlltoAllBatchInfo &BMMV3BatchInfo,
-                               ReduceScatterAlltoAllMatmulInfo &MMV3ArgsInfo, uint32_t m, uint32_t n, uint32_t k,
+static void CompleteBmmStructs(ReduceScatterAlltoAllBatchInfo& BMMV3BatchInfo,
+                               ReduceScatterAlltoAllMatmulInfo& MMV3ArgsInfo, uint32_t m, uint32_t n, uint32_t k,
                                uint32_t b)
 {
     MMV3ArgsInfo.mValue = m;
@@ -258,8 +258,8 @@ static void CompleteBmmStructs(ReduceScatterAlltoAllBatchInfo &BMMV3BatchInfo,
     return;
 }
 
-static void GetBatchMatMulReduceScatterAlltoAllFormulateTileCnt(mc2tiling::TilingArgs &formulaicArgs,
-                                                                BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
+static void GetBatchMatMulReduceScatterAlltoAllFormulateTileCnt(mc2tiling::TilingArgs& formulaicArgs,
+                                                                BatchMatMulReduceScatterAlltoAllTilingData* tilingData)
 {
     ReduceScatterAll2AllBMMShardH formulaicTiling(formulaicArgs, tilingData->commonTiling.epGroupSize,
                                                   tilingData->commonTiling.tpGroupSize,
@@ -305,7 +305,7 @@ static void GetBatchMatMulReduceScatterAlltoAllFormulateTileCnt(mc2tiling::Tilin
 }
 
 static void GetBatchMatMulReduceScatterAlltoAllFormulateTileCntShard(
-    mc2tiling::TilingArgs &formulaicArgs, BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
+    mc2tiling::TilingArgs& formulaicArgs, BatchMatMulReduceScatterAlltoAllTilingData* tilingData)
 {
     ReduceScatterAll2AllBMM formulaicTiling(formulaicArgs, tilingData->commonTiling.epGroupSize,
                                             tilingData->commonTiling.tpGroupSize, tilingData->commonTiling.EOverEp);
@@ -331,12 +331,12 @@ static void GetBatchMatMulReduceScatterAlltoAllFormulateTileCntShard(
     return;
 }
 
-static ge::graphStatus DoBmmTiling(BmmTilingConfig &config, uint32_t tileLen, uint32_t batch, bool isLocal, bool isTail)
+static ge::graphStatus DoBmmTiling(BmmTilingConfig& config, uint32_t tileLen, uint32_t batch, bool isLocal, bool isTail)
 {
     CompleteBmmStructs(config.bmmV3BatchInfo, config.mmV3ArgsInfo, tileLen, config.tilingData.commonTiling.H,
                        config.tilingData.commonTiling.MOverTp, batch);
 
-    auto bmmTilingLambda = [isLocal, isTail, &config]() -> decltype(config.tilingData.domesticTiling.bmmTilingData) & {
+    auto bmmTilingLambda = [isLocal, isTail, &config]() -> decltype(config.tilingData.domesticTiling.bmmTilingData)& {
         if (isLocal && isTail) {
             return config.tilingData.localTailTiling.bmmTilingData;
         }
@@ -348,7 +348,7 @@ static ge::graphStatus DoBmmTiling(BmmTilingConfig &config, uint32_t tileLen, ui
         }
         return config.tilingData.domesticTiling.bmmTilingData;
     };
-    auto &bmmTilingData = bmmTilingLambda();
+    auto& bmmTilingData = bmmTilingLambda();
 
     BatchMatMulReduceScatterAlltoAllTiling bmmTiling(config.context, bmmTilingData, config.bmmV3BatchInfo,
                                                      config.mmV3ArgsInfo);
@@ -360,8 +360,8 @@ static ge::graphStatus DoBmmTiling(BmmTilingConfig &config, uint32_t tileLen, ui
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetMatmulTilingBatchMatMulReduceScatterAlltoAll(BmmTilingConfig &config,
-                                                                       mc2tiling::TilingArgs &formulaicArgs,
+static ge::graphStatus SetMatmulTilingBatchMatMulReduceScatterAlltoAll(BmmTilingConfig& config,
+                                                                       mc2tiling::TilingArgs& formulaicArgs,
                                                                        bool isLite)
 {
     // 1. 调用公式化tiling接口，获取local和非local块的切分信息并更新commonTiling
@@ -406,7 +406,7 @@ static ge::graphStatus SetMatmulTilingBatchMatMulReduceScatterAlltoAll(BmmTiling
     return ge::GRAPH_SUCCESS;
 }
 
-static bool CommonCheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
+static bool CommonCheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
                                    const size_t wDimM)
 {
     // 检查 < 0 的范围: x dim C >= 1, dim E H M 会在后面拦截
@@ -435,7 +435,7 @@ static bool CommonCheckTensorShape(const char *nodeName, const gert::Shape *xSha
 }
 
 // GPT 2.2T
-static bool YShardCheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
+static bool YShardCheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
                                    const int64_t yShard, const int64_t epSize, const int64_t tpSize, const size_t wDimH,
                                    const size_t wDimM)
 {
@@ -490,7 +490,7 @@ static bool YShardCheckTensorShape(const char *nodeName, const gert::Shape *xSha
     return true;
 }
 
-static bool CheckBiasShape(const char *nodeName, const gert::Shape *weightShape, const gert::Shape *biasShape,
+static bool CheckBiasShape(const char* nodeName, const gert::Shape* weightShape, const gert::Shape* biasShape,
                            const int64_t yShard, const int64_t tpSize, const size_t wDimH)
 {
     // 检查 dimNum
@@ -534,8 +534,8 @@ static bool CheckBiasShape(const char *nodeName, const gert::Shape *weightShape,
     return true;
 }
 
-static bool CheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
-                             const gert::Shape *biasShape, const int64_t epSize, const int64_t tpSize,
+static bool CheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
+                             const gert::Shape* biasShape, const int64_t epSize, const int64_t tpSize,
                              const size_t wDimM, const size_t wDimH, const int64_t yShard)
 {
     if ((xShape == nullptr) || (weightShape == nullptr)) {
@@ -573,17 +573,17 @@ static bool CheckTensorShape(const char *nodeName, const gert::Shape *xShape, co
     return true;
 }
 
-static bool CheckAttrs(const gert::TilingContext *context, int64_t &epSize, int64_t &tpSize, int64_t &yShard)
+static bool CheckAttrs(const gert::TilingContext* context, int64_t& epSize, int64_t& tpSize, int64_t& yShard)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     auto attrs = context->GetAttrs();
     OPS_ERR_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return false);
 
-    const char *groupEp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_EP));
-    const char *groupTp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_TP));
-    const int64_t *epPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_EP_WORLD_SIZE));
-    const int64_t *tpPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_TP_WORLD_SIZE));
-    const int64_t *yPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_Y_SHARD_TYPE));
+    const char* groupEp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_EP));
+    const char* groupTp = attrs->GetStr(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_GROUP_TP));
+    const int64_t* epPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_EP_WORLD_SIZE));
+    const int64_t* tpPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_TP_WORLD_SIZE));
+    const int64_t* yPtr = attrs->GetInt(static_cast<size_t>(ops::BmmReduceScatterAlltoAllAttrIdx::K_Y_SHARD_TYPE));
 
     if ((epPtr == nullptr) || (tpPtr == nullptr) || (yPtr == nullptr)) {
         OP_LOGE_WITH_INVALID_INPUT(nodeName, "attr pointer");
@@ -615,19 +615,19 @@ static bool CheckAttrs(const gert::TilingContext *context, int64_t &epSize, int6
     return true;
 }
 
-static ge::graphStatus TilingCheckBatchMatMulReduceScatterAlltoAll(gert::TilingContext *context)
+static ge::graphStatus TilingCheckBatchMatMulReduceScatterAlltoAll(gert::TilingContext* context)
 {
     // 检查 shape 是否为空
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGI(nodeName, "Enter BmmReduceScatterAlltoAll tiling check impl.");
-    const gert::StorageShape *xStorageShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_X));
+    const gert::StorageShape* xStorageShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_X));
 
     OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "x"), return ge::GRAPH_FAILED);
-    const gert::StorageShape *weightStorageShape =
+    const gert::StorageShape* weightStorageShape =
         context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_WEIGHT));
     OP_TILING_CHECK(weightStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "weight"),
                     return ge::GRAPH_FAILED);
-    const gert::StorageShape *yStorageShape =
+    const gert::StorageShape* yStorageShape =
         context->GetOutputShape(static_cast<size_t>(ops::BmmReduceScatterAlltoAllOutIdx::K_Y));
     OP_TILING_CHECK(yStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "y"), return ge::GRAPH_FAILED);
 
@@ -653,12 +653,12 @@ static ge::graphStatus TilingCheckBatchMatMulReduceScatterAlltoAll(gert::TilingC
         wDimH = wDimHTrans;
     }
 
-    const gert::StorageShape *biasStorageShape =
+    const gert::StorageShape* biasStorageShape =
         context->GetOptionalInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_BIAS));
 
-    const gert::Shape *xShape = &xStorageShape->GetStorageShape();
-    const gert::Shape *weightShape = &weightStorageShape->GetStorageShape();
-    const gert::Shape *biasShape = (biasStorageShape == nullptr) ? nullptr : &biasStorageShape->GetStorageShape();
+    const gert::Shape* xShape = &xStorageShape->GetStorageShape();
+    const gert::Shape* weightShape = &weightStorageShape->GetStorageShape();
+    const gert::Shape* biasShape = (biasStorageShape == nullptr) ? nullptr : &biasStorageShape->GetStorageShape();
 
     // tensor shape 检查
     if (!CheckTensorShape(nodeName, xShape, weightShape, biasShape, epSize, tpSize, wDimM, wDimH, yShard)) {
@@ -668,10 +668,10 @@ static ge::graphStatus TilingCheckBatchMatMulReduceScatterAlltoAll(gert::TilingC
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MC2SetWorkspace(gert::TilingContext *context,
-                                       BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
+static ge::graphStatus MC2SetWorkspace(gert::TilingContext* context,
+                                       BatchMatMulReduceScatterAlltoAllTilingData* tilingData)
 {
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(context->GetNodeName(), "get workspace failed"),
                     return ge::GRAPH_FAILED);
 
@@ -702,10 +702,10 @@ static ge::graphStatus MC2SetWorkspace(gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MC2SetWorkspaceShard(gert::TilingContext *context,
-                                            BatchMatMulReduceScatterAlltoAllTilingData *tilingData, bool isLite)
+static ge::graphStatus MC2SetWorkspaceShard(gert::TilingContext* context,
+                                            BatchMatMulReduceScatterAlltoAllTilingData* tilingData, bool isLite)
 {
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(context->GetNodeName(), "get workspace failed"),
                     return ge::GRAPH_FAILED);
 
@@ -748,8 +748,8 @@ struct TensorInfo {
     ge::DataType inputDatatype = ge::DT_FLOAT;
     ge::DataType biasDatatype = ge::DT_FLOAT;
     bool isLite = false;
-    const char *epGroup = nullptr;
-    const char *tpGroup = nullptr;
+    const char* epGroup = nullptr;
+    const char* tpGroup = nullptr;
     uint64_t aicCoreNum = 0; // AIC 核心数
     uint64_t aivCoreNum = 0; // AIV 核心数
     uint64_t ubSize = 0;     // UB 大小
@@ -760,7 +760,7 @@ struct TensorInfo {
     ReduceScatterAlltoAllBatchInfo bmmv3BatchInfo;
 };
 // 子函数2: 获取平台信息
-static void GetPlatformInfo(const gert::TilingContext *context, TensorInfo &tensorInfo)
+static void GetPlatformInfo(const gert::TilingContext* context, TensorInfo& tensorInfo)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     tensorInfo.aicCoreNum = ascendcPlatform.GetCoreNumAic();
@@ -771,14 +771,14 @@ static void GetPlatformInfo(const gert::TilingContext *context, TensorInfo &tens
 }
 
 // 子函数3: 获取关键参数并计算，填充tilingdata
-static ge::graphStatus CalculateTensorInfo(const gert::TilingContext *context, TensorInfo &tensorInfo,
-                                           BatchMatMulReduceScatterAlltoAllTilingData *tilingData,
-                                           const gert::StorageShape *biasInputShape)
+static ge::graphStatus CalculateTensorInfo(const gert::TilingContext* context, TensorInfo& tensorInfo,
+                                           BatchMatMulReduceScatterAlltoAllTilingData* tilingData,
+                                           const gert::StorageShape* biasInputShape)
 {
     constexpr int MATMUL_INPUT_M_AXIS = 2;
-    const gert::StorageShape *xInputShape = context->GetInputShape(X_INDEX);
-    const gert::StorageShape *weightInputShape = context->GetInputShape(WEIGHT_INDEX);
-    const gert::StorageShape *yShape = context->GetOutputShape(OUTPUT_Y_INDEX);
+    const gert::StorageShape* xInputShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* weightInputShape = context->GetInputShape(WEIGHT_INDEX);
+    const gert::StorageShape* yShape = context->GetOutputShape(OUTPUT_Y_INDEX);
     auto attrs = context->GetAttrs();
     int64_t ep = *(attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX));
     int64_t tp = *(attrs->GetAttrPointer<int64_t>(ATTR_TP_WORLD_SIZE_INDEX));
@@ -786,8 +786,8 @@ static ge::graphStatus CalculateTensorInfo(const gert::TilingContext *context, T
     tensorInfo.isWeightTrans = *(attrs->GetAttrPointer<bool>(ATTR_IS_WEIGHT_TRANS_INDEX));
     tensorInfo.epGroup = attrs->GetAttrPointer<char>(ATTR_EP_GROUP_INDEX);
     tensorInfo.tpGroup = attrs->GetAttrPointer<char>(ATTR_TP_GROUP_INDEX);
-    const char *epGroupStr = tensorInfo.epGroup ? tensorInfo.epGroup : "null";
-    const char *tpGroupStr = tensorInfo.tpGroup ? tensorInfo.tpGroup : "null";
+    const char* epGroupStr = tensorInfo.epGroup ? tensorInfo.epGroup : "null";
+    const char* tpGroupStr = tensorInfo.tpGroup ? tensorInfo.tpGroup : "null";
     OP_LOGD("BatchMatMulReduceScatterAlltoAll",
             "EP group is %s, ep is %ld, TP group is %s, tp is %ld, weight_trans_flag is %d, y_shard_flag is %ld",
             epGroupStr, ep, tpGroupStr, tp, tensorInfo.isWeightTrans, *yShard);
@@ -824,7 +824,7 @@ static ge::graphStatus CalculateTensorInfo(const gert::TilingContext *context, T
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetHcclTiling(const gert::TilingContext *context, BatchMatMulReduceScatterAlltoAllTilingData *tilingData)
+static void SetHcclTiling(const gert::TilingContext* context, BatchMatMulReduceScatterAlltoAllTilingData* tilingData)
 {
     std::string reduceScatterConfig = "ReduceScatter=level0:doublering";
     std::string alltoAllConfig = "AlltoAll=level0:fullmesh;level1:pairwise";
@@ -862,11 +862,11 @@ static void SetHcclTiling(const gert::TilingContext *context, BatchMatMulReduceS
 }
 
 // 子函数5: 设置公式参数
-static void SetFormulaicArgs(mc2tiling::TilingArgs &formulaicArgs,
-                             BatchMatMulReduceScatterAlltoAllTilingData *tilingData, TensorInfo &tensorInfo)
+static void SetFormulaicArgs(mc2tiling::TilingArgs& formulaicArgs,
+                             BatchMatMulReduceScatterAlltoAllTilingData* tilingData, TensorInfo& tensorInfo)
 {
-    auto &MMV3ArgsInfo = tensorInfo.mmv3ArgsInfo;
-    auto &BMMV3BatchInfo = tensorInfo.bmmv3BatchInfo;
+    auto& MMV3ArgsInfo = tensorInfo.mmv3ArgsInfo;
+    auto& BMMV3BatchInfo = tensorInfo.bmmv3BatchInfo;
     MMV3ArgsInfo.opName = "BatchMatMulReduceScatterAlltoAll";
     MMV3ArgsInfo.isWeightTrans = tensorInfo.isWeightTrans;
     MMV3ArgsInfo.isBias = false; // 出于性能考虑，当前bias计算在外部进行，算子内不会有bias场景
@@ -888,9 +888,9 @@ static void SetFormulaicArgs(mc2tiling::TilingArgs &formulaicArgs,
 }
 
 // 子函数6: 核心tiling逻辑
-static ge::graphStatus ComputeCoreTiling(gert::TilingContext *context,
-                                         BatchMatMulReduceScatterAlltoAllTilingData *tilingData,
-                                         mc2tiling::TilingArgs &formulaicArgs, TensorInfo &tensorInfo)
+static ge::graphStatus ComputeCoreTiling(gert::TilingContext* context,
+                                         BatchMatMulReduceScatterAlltoAllTilingData* tilingData,
+                                         mc2tiling::TilingArgs& formulaicArgs, TensorInfo& tensorInfo)
 {
     bool xCastFlag = tensorInfo.inputDatatype == ge::DT_BF16;
     bool biasCastFlag = tensorInfo.biasDatatype == ge::DT_BF16;
@@ -907,12 +907,12 @@ static ge::graphStatus ComputeCoreTiling(gert::TilingContext *context,
 }
 
 // 主函数
-static ge::graphStatus BatchMatMulReduceScatterAlltoAllTilingFunc(gert::TilingContext *context)
+static ge::graphStatus BatchMatMulReduceScatterAlltoAllTilingFunc(gert::TilingContext* context)
 {
     OP_TILING_CHECK(TilingCheckBatchMatMulReduceScatterAlltoAll(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context->GetNodeName(), "Tiling check shape Failed!"), return ge::GRAPH_FAILED);
 
-    BatchMatMulReduceScatterAlltoAllTilingData *tilingData =
+    BatchMatMulReduceScatterAlltoAllTilingData* tilingData =
         context->GetTilingData<BatchMatMulReduceScatterAlltoAllTilingData>();
     mc2tiling::TilingArgs formulaicArgs;
     ReduceScatterAlltoAllBatchInfo BMMV3BatchInfo;
@@ -923,8 +923,8 @@ static ge::graphStatus BatchMatMulReduceScatterAlltoAllTilingFunc(gert::TilingCo
     context->SetBlockDim(tensorInfo.numBlocks);
     // 子函数3 获取参数，计算，填充tilingData
     // 存放inputDatatype，biasDatatype
-    auto *biasTensor = context->GetOptionalInputTensor(BIAS_INDEX);
-    const gert::StorageShape *biasInputShape = biasTensor ? context->GetOptionalInputShape(BIAS_INDEX) : nullptr;
+    auto* biasTensor = context->GetOptionalInputTensor(BIAS_INDEX);
+    const gert::StorageShape* biasInputShape = biasTensor ? context->GetOptionalInputShape(BIAS_INDEX) : nullptr;
     tensorInfo.inputDatatype = context->GetInputDesc(X_INDEX)->GetDataType();
     tensorInfo.biasDatatype = (biasInputShape == nullptr) ? tensorInfo.inputDatatype :
                                                             context->GetOptionalInputDesc(BIAS_INDEX)->GetDataType();
@@ -951,7 +951,7 @@ static ge::graphStatus BatchMatMulReduceScatterAlltoAllTilingFunc(gert::TilingCo
     return ge::GRAPH_SUCCESS;
 }
 struct BatchMatMulReduceScatterAlltoAllCompileInfo {};
-ge::graphStatus TilingParseForBatchMatMulReduceScatterAlltoAll(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForBatchMatMulReduceScatterAlltoAll(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

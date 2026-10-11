@@ -22,7 +22,7 @@
 #if RUNTIME_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION && METADEF_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION
 namespace Mc2Exception {
 
-inline void MoeEpExceptionImpl(aclrtExceptionInfo *args, void *userdata, const char *op)
+inline void MoeEpExceptionImpl(aclrtExceptionInfo* args, void* userdata, const char* op)
 {
     (void)userdata;
     if (args == nullptr || op == nullptr) {
@@ -36,7 +36,7 @@ inline void MoeEpExceptionImpl(aclrtExceptionInfo *args, void *userdata, const c
         return;
     }
 
-    void *devArgsPtr = nullptr;
+    void* devArgsPtr = nullptr;
     uint32_t devArgsLen = 0U;
     aclError ret = getArgsFunc(args, &devArgsPtr, &devArgsLen);
     if (ret != ACL_SUCCESS) {
@@ -52,7 +52,7 @@ inline void MoeEpExceptionImpl(aclrtExceptionInfo *args, void *userdata, const c
     }
 
     Mc2Aclnn::MoeCommContext context{};
-    ret = aclrtMemcpy(&context, sizeof(context), reinterpret_cast<void *>(contextAddr), sizeof(context),
+    ret = aclrtMemcpy(&context, sizeof(context), reinterpret_cast<void*>(contextAddr), sizeof(context),
                       ACL_MEMCPY_DEVICE_TO_HOST);
     if (ret != ACL_SUCCESS) {
         OP_LOGE(OP_NAME, "aclrtMemcpy MoeCommContext failed for %s. ret=%d", op, ret);
@@ -62,7 +62,7 @@ inline void MoeEpExceptionImpl(aclrtExceptionInfo *args, void *userdata, const c
     const uint32_t epRankId = context.epRankId;
     const uint64_t winBase = context.epHcclBuffer[epRankId];
     std::vector<uint8_t> metadataBuffer(MOE_EP_DUMP_METADATA_BYTES, 0U);
-    ret = aclrtMemcpy(metadataBuffer.data(), metadataBuffer.size(), reinterpret_cast<void *>(winBase),
+    ret = aclrtMemcpy(metadataBuffer.data(), metadataBuffer.size(), reinterpret_cast<void*>(winBase),
                       metadataBuffer.size(), ACL_MEMCPY_DEVICE_TO_HOST);
     if (ret != ACL_SUCCESS) {
         OP_LOGE(OP_NAME, "aclrtMemcpy Moe EP metadata failed for %s rank %u. ret=%d", op, epRankId, ret);
@@ -76,7 +76,7 @@ inline void MoeEpExceptionImpl(aclrtExceptionInfo *args, void *userdata, const c
         OP_LOGE(OP_NAME, "Failed to load acldumpGetPath function for %s.", op);
         return;
     }
-    const char *dumpPath = getDumpPathFunc(acldumpType::AIC_ERR_BRIEF_DUMP);
+    const char* dumpPath = getDumpPathFunc(acldumpType::AIC_ERR_BRIEF_DUMP);
     if (dumpPath == nullptr) {
         OP_LOGE(OP_NAME, "acldumpGetPath returned null for %s.", op);
         return;
@@ -90,16 +90,16 @@ inline void MoeEpExceptionImpl(aclrtExceptionInfo *args, void *userdata, const c
         return;
     }
 
-    static constexpr std::array<const char *, MOE_EP_DUMP_REGION_COUNT> REGION_NAMES = {
+    static constexpr std::array<const char*, MOE_EP_DUMP_REGION_COUNT> REGION_NAMES = {
         "per_core_diag",       "count_notify",        "expert_count",
         "dispatch_slot_state", "combine_token_state", "hybrid_scaleout_status"};
     for (uint32_t regionIndex = 0U; regionIndex < MOE_EP_DUMP_REGION_COUNT; ++regionIndex) {
-        const MoeEpDumpRegion &region = metadata.regions[regionIndex];
+        const MoeEpDumpRegion& region = metadata.regions[regionIndex];
         if (region.size == 0UL) {
             continue;
         }
         std::vector<uint8_t> regionBuffer(region.size, 0U);
-        ret = aclrtMemcpy(regionBuffer.data(), regionBuffer.size(), reinterpret_cast<void *>(winBase + region.offset),
+        ret = aclrtMemcpy(regionBuffer.data(), regionBuffer.size(), reinterpret_cast<void*>(winBase + region.offset),
                           regionBuffer.size(), ACL_MEMCPY_DEVICE_TO_HOST);
         if (ret != ACL_SUCCESS) {
             OP_LOGE(OP_NAME, "aclrtMemcpy Moe EP region %s failed for %s rank %u. ret=%d", REGION_NAMES[regionIndex],

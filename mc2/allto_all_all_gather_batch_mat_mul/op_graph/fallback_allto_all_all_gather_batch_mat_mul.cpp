@@ -18,9 +18,9 @@
 #include "mc2_common_log.h"
 
 namespace fallback {
-static const char *fallbackInfo = "AlltoAllAllGatherBmmFallback";
+static const char* fallbackInfo = "AlltoAllAllGatherBmmFallback";
 
-static ge::graphStatus AlltoAllAllGatherBmmExecuteFunc(gert::OpExecuteContext *host_api_ctx)
+static ge::graphStatus AlltoAllAllGatherBmmExecuteFunc(gert::OpExecuteContext* host_api_ctx)
 {
     OPS_LOG_D("Start to fallback for all to all allgather bmm.");
     OPS_ERR_IF(host_api_ctx == nullptr, OPS_LOG_E(fallbackInfo, "host_api_ctx is null"), return ge::GRAPH_FAILED);
@@ -47,16 +47,16 @@ static ge::graphStatus AlltoAllAllGatherBmmExecuteFunc(gert::OpExecuteContext *h
     const auto attrs = host_api_ctx->GetAttrs();
     OPS_ERR_IF(attrs == nullptr, OPS_LOG_E(fallbackInfo, "attrs is null"), return ge::GRAPH_FAILED);
 
-    const char *groupEp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_EP));
-    const char *groupTp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_TP));
-    const int64_t *epWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_EP_WORLD_SIZE));
-    const int64_t *tpWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_TP_WORLD_SIZE));
-    const int64_t *xShardType = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_X_SHARD_TYPE));
-    const bool *isTransW = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_IS_TRANS_W));
-    const int64_t *actType = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_ACT_TYPE));
+    const char* groupEp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_EP));
+    const char* groupTp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_TP));
+    const int64_t* epWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_EP_WORLD_SIZE));
+    const int64_t* tpWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_TP_WORLD_SIZE));
+    const int64_t* xShardType = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_X_SHARD_TYPE));
+    const bool* isTransW = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_IS_TRANS_W));
+    const int64_t* actType = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_ACT_TYPE));
     // 读取 flag 判断是否需要 optional output
-    const bool *outputY2Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y2_FLAG));
-    const bool *outputY3Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y3_FLAG));
+    const bool* outputY2Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y2_FLAG));
+    const bool* outputY3Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y3_FLAG));
     if (!(*outputY2Flag)) {
         OPS_LOG_D(fallbackInfo, "do not output y2");
         y2 = nullptr;

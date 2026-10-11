@@ -27,16 +27,16 @@ constexpr uint32_t B_L2_DISABLE_BIT = 2;
 constexpr uint32_t BIAS_L2_DISABLE_BIT = 3;
 constexpr uint32_t C_L2_DISABLE_BIT = 4;
 
-void Mc2L2Cache::SetL2CacheFlagBase(bool &aEnableL2Cache, bool &bEnableL2Cache) const
+void Mc2L2Cache::SetL2CacheFlagBase(bool& aEnableL2Cache, bool& bEnableL2Cache) const
 {
-    auto &tileL2cache = tilingData_.tileL2cacheTiling;
+    auto& tileL2cache = tilingData_.tileL2cacheTiling;
     if (tileL2cache.mTileCntL2 > 1 || tileL2cache.nTileCntL2 > 1) {
         bEnableL2Cache = tileL2cache.mTileCntL2 > 1;
         aEnableL2Cache = tileL2cache.nTileCntL2 > 1;
         return;
     }
 
-    auto &matmulTiling = tilingData_.matmulTiling;
+    auto& matmulTiling = tilingData_.matmulTiling;
     // m切多核
     if (static_cast<uint64_t>(matmulTiling.singleCoreM) < args_.mValue) {
         bEnableL2Cache = true;
@@ -57,9 +57,9 @@ void Mc2L2Cache::SetL2CacheFlagBase(bool &aEnableL2Cache, bool &bEnableL2Cache) 
     }
 }
 
-void Mc2L2Cache::SetL2CacheFlagSingleCoreSplitK(bool &aEnableL2Cache, bool &bEnableL2Cache) const
+void Mc2L2Cache::SetL2CacheFlagSingleCoreSplitK(bool& aEnableL2Cache, bool& bEnableL2Cache) const
 {
-    auto &matmulTiling = tilingData_.matmulTiling;
+    auto& matmulTiling = tilingData_.matmulTiling;
     // m切多核
     bEnableL2Cache = static_cast<uint64_t>(matmulTiling.singleCoreM) < args_.mValue;
     // n切多核
@@ -75,9 +75,9 @@ void Mc2L2Cache::SetL2CacheFlagSingleCoreSplitK(bool &aEnableL2Cache, bool &bEna
     }
 }
 
-void Mc2L2Cache::SetL2CacheFlagMultiCoreSplitK(bool &aEnableL2Cache, bool &bEnableL2Cache) const
+void Mc2L2Cache::SetL2CacheFlagMultiCoreSplitK(bool& aEnableL2Cache, bool& bEnableL2Cache) const
 {
-    auto &matmulTiling = tilingData_.matmulTiling;
+    auto& matmulTiling = tilingData_.matmulTiling;
     // m切多核
     bEnableL2Cache = static_cast<uint64_t>(matmulTiling.singleCoreM) < args_.mValue;
     // 判断单核是否可以全载
@@ -96,7 +96,7 @@ void Mc2L2Cache::SetL2CacheFlagMultiCoreSplitK(bool &aEnableL2Cache, bool &bEnab
 }
 
 void Mc2L2Cache::SetL2CacheFlag(bool aEnableL2Cache, bool bEnableL2Cache, bool cEnableL2Cache, bool biasEnableL2Cache,
-                                uint32_t &l2CacheFlag)
+                                uint32_t& l2CacheFlag)
 {
     if (aEnableL2Cache && bEnableL2Cache && cEnableL2Cache && biasEnableL2Cache) {
         l2CacheFlag |= (1U << ALL_L2_ENABLE_BIT);
@@ -123,13 +123,13 @@ void Mc2L2Cache::SetL2CacheFlag(bool aEnableL2Cache, bool bEnableL2Cache, bool c
     OP_LOGI(args_.opName, "l2CacheFlag: %u", l2CacheFlag);
 }
 
-void Mc2L2Cache::SetL2CacheFlag(Mc2TilingEnable tilingEnable, uint64_t l2Size, uint32_t &l2CacheFlag)
+void Mc2L2Cache::SetL2CacheFlag(Mc2TilingEnable tilingEnable, uint64_t l2Size, uint32_t& l2CacheFlag)
 {
     bool aEnableL2Cache = false;
     bool bEnableL2Cache = false;
     bool cEnableL2Cache = false;
     bool biasEnableL2Cache = true;
-    auto &matmulTiling = tilingData_.matmulTiling;
+    auto& matmulTiling = tilingData_.matmulTiling;
 
     OP_LOGI(args_.opName,
             "mValue: %lu nValue: %lu kValue: %lu "

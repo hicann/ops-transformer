@@ -33,7 +33,7 @@ struct InferShapeBatchTensor {
 
 class InferShapeBatchMatMul {
 public:
-    InferShapeBatchMatMul(gert::InferShapeContext *context, const InferShapeBatchTensor &inferShapeTensor,
+    InferShapeBatchMatMul(gert::InferShapeContext* context, const InferShapeBatchTensor& inferShapeTensor,
                           size_t batch_matmul_bias_index = BATCH_MATMUL_BIAS_IDX)
         : op_name(context->GetNodeName()),
           shape_a(inferShapeTensor.input_shape_a),
@@ -54,7 +54,7 @@ public:
         shape_out.SetDimNum(num_dim);
     };
 
-    InferShapeBatchMatMul(gert::InferShapeContext *context, const Shape &input_shape_a, const Shape &input_shape_b)
+    InferShapeBatchMatMul(gert::InferShapeContext* context, const Shape& input_shape_a, const Shape& input_shape_b)
         : op_name(context->GetNodeName()),
           shape_a(input_shape_a),
           shape_b(input_shape_b),
@@ -87,16 +87,16 @@ protected:
     size_t num_dimb = 0;
     size_t num_dim_bias = 0;
 
-    const char *op_name;
-    const Shape &shape_a;
-    const Shape &shape_b;
+    const char* op_name;
+    const Shape& shape_a;
+    const Shape& shape_b;
     bool trans_a = false;
     bool trans_b = false;
-    Shape &shape_out;
-    const Shape *shape_bias;
+    Shape& shape_out;
+    const Shape* shape_bias;
 };
 
-static void CopyOutShapeFromInputShape(const Shape &shape_in, Shape &shape_out, int64_t valid_offset)
+static void CopyOutShapeFromInputShape(const Shape& shape_in, Shape& shape_out, int64_t valid_offset)
 {
     for (auto i = 0; i < valid_offset; ++i) {
         shape_out.SetDim(i, shape_in.GetDim(i));
@@ -106,8 +106,8 @@ static void CopyOutShapeFromInputShape(const Shape &shape_in, Shape &shape_out, 
 bool InferShapeBatchMatMul::InferBatch() const
 {
     auto valid_offset = num_dim - std::min(num_dima, num_dimb);
-    const Shape &shape_long = num_dima < num_dimb ? shape_b : shape_a;
-    const Shape &shape_short = num_dima < num_dimb ? shape_a : shape_b;
+    const Shape& shape_long = num_dima < num_dimb ? shape_b : shape_a;
+    const Shape& shape_short = num_dima < num_dimb ? shape_a : shape_b;
     int64_t shape_value_long;
     int64_t shape_value_short;
 
@@ -131,7 +131,7 @@ bool InferShapeBatchMatMul::InferBatch() const
     return true;
 }
 
-static bool BroadcastBatchDim(const char *op_name, const int64_t dim_a, const int64_t dim_b, int64_t &dim)
+static bool BroadcastBatchDim(const char* op_name, const int64_t dim_a, const int64_t dim_b, int64_t& dim)
 {
     if (dim_a > 1 && dim_b > 1) {
         OP_CHECK_IF(dim_a != dim_b,
@@ -156,7 +156,7 @@ static bool BroadcastBatchDim(const char *op_name, const int64_t dim_a, const in
     return true;
 }
 
-static bool InferNWithBias(const char *op_name, const int64_t bias_n, const int64_t out_n, int64_t &n)
+static bool InferNWithBias(const char* op_name, const int64_t bias_n, const int64_t out_n, int64_t& n)
 {
     if (bias_n == UNKNOWN_DIM || bias_n == UNKNOWN_DIM_NUM) {
         // 当bias中的n为动态shape，不改变最终输出的n
@@ -238,7 +238,7 @@ bool InferShapeBatchMatMul::InferBias()
     return true;
 }
 
-static bool CheckBatchMatMulInputDimensions(const char *op_name, const Shape &shape_a, const Shape &shape_b)
+static bool CheckBatchMatMulInputDimensions(const char* op_name, const Shape& shape_a, const Shape& shape_b)
 {
     if (shape_a.GetDimNum() < BATCH_MATMUL_MIN_SHAPE_SIZE || shape_b.GetDimNum() < BATCH_MATMUL_MIN_SHAPE_SIZE) {
         OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(op_name, "x1 and x2", "less than 2D",
@@ -318,7 +318,7 @@ bool InferShapeBatchMatMul::InferShape()
     return true;
 }
 
-static void InferComplementedOutput(bool shape_x1_reshape_flag, bool shape_x2_reshape_flag, Shape &shape_out)
+static void InferComplementedOutput(bool shape_x1_reshape_flag, bool shape_x2_reshape_flag, Shape& shape_out)
 {
     size_t dim_num = shape_out.GetDimNum();
     if (dim_num >= BATCH_MATMUL_MIN_SHAPE_SIZE) {
@@ -336,12 +336,12 @@ static void InferComplementedOutput(bool shape_x1_reshape_flag, bool shape_x2_re
 
 namespace Ops {
 namespace Transformer {
-bool CheckIsUnknownDimNum(const gert::Shape &shape)
+bool CheckIsUnknownDimNum(const gert::Shape& shape)
 {
     return shape.GetDimNum() == 1 && shape.GetDim(0) == UNKNOWN_DIM_NUM;
 }
 
-bool CalculateTransX2Float(const gert::InferShapeContext *context, const Shape &shape_x2, bool trans_x1, bool trans_x2)
+bool CalculateTransX2Float(const gert::InferShapeContext* context, const Shape& shape_x2, bool trans_x1, bool trans_x2)
 {
     auto shape_x1 = context->GetInputShape(0);
     auto x1_dim_num = shape_x1->GetDimNum();
@@ -354,7 +354,7 @@ bool CalculateTransX2Float(const gert::InferShapeContext *context, const Shape &
     return false;
 }
 
-ge::graphStatus UpdateX2NewShape(const gert::InferShapeContext *context, Shape &new_shape, bool &reshape_flag,
+ge::graphStatus UpdateX2NewShape(const gert::InferShapeContext* context, Shape& new_shape, bool& reshape_flag,
                                  bool trans_x1, bool trans_x2, const bool is_packed)
 {
     auto op_name = context->GetNodeName();
@@ -367,7 +367,7 @@ ge::graphStatus UpdateX2NewShape(const gert::InferShapeContext *context, Shape &
     }
 
     if (is_packed) {
-        auto *desc = context->GetInputDesc(1);
+        auto* desc = context->GetInputDesc(1);
         OP_CHECK_IF(desc == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "x2 desc"), return ge::GRAPH_FAILED);
         size_t dim_num = new_shape.GetDimNum();
         size_t x2_dim_num = new_shape.GetDimNum();
@@ -391,7 +391,7 @@ ge::graphStatus UpdateX2NewShape(const gert::InferShapeContext *context, Shape &
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferShapeForBatchMatMul(gert::InferShapeContext *context, const int32_t attr_adj_idx,
+ge::graphStatus InferShapeForBatchMatMul(gert::InferShapeContext* context, const int32_t attr_adj_idx,
                                          const size_t input_bias_index, const bool is_x2_packed)
 {
     auto shape_x1 = context->GetInputShape(0);
@@ -409,8 +409,8 @@ ge::graphStatus InferShapeForBatchMatMul(gert::InferShapeContext *context, const
     }
     OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "attrs"), return ge::GRAPH_FAILED);
 
-    const bool *adj_x1 = attrs->GetAttrPointer<bool>(attr_adj_idx);
-    const bool *adj_x2 = attrs->GetAttrPointer<bool>(attr_adj_idx + 1);
+    const bool* adj_x1 = attrs->GetAttrPointer<bool>(attr_adj_idx);
+    const bool* adj_x2 = attrs->GetAttrPointer<bool>(attr_adj_idx + 1);
 
     OP_CHECK_IF(adj_x1 == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "adj_x1"), return ge::GRAPH_FAILED);
     OP_CHECK_IF(adj_x2 == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "adj_x2"), return ge::GRAPH_FAILED);
@@ -466,8 +466,8 @@ ge::graphStatus InferShapeForBatchMatMul(gert::InferShapeContext *context, const
 constexpr int64_t INFINITE_RANGE = -1;
 constexpr int64_t NORMALIZE_INFINITE_RANGE = std::numeric_limits<int64_t>::max();
 static const std::pair<int64_t, int64_t> NORMALIZE_FULL_RANGE = {0, NORMALIZE_INFINITE_RANGE};
-bool InitializeRange(size_t num, const std::vector<std::pair<int64_t, int64_t>> &range,
-                     std::vector<std::pair<int64_t, int64_t>> &new_range)
+bool InitializeRange(size_t num, const std::vector<std::pair<int64_t, int64_t>>& range,
+                     std::vector<std::pair<int64_t, int64_t>>& new_range)
 {
     // 扩充batch轴为1
     for (size_t i = 0; i < num - range.size(); ++i) {
@@ -494,8 +494,8 @@ bool InitializeRange(size_t num, const std::vector<std::pair<int64_t, int64_t>> 
     return true;
 }
 
-bool GetBatchIntersection(const char *op_name, std::pair<int64_t, int64_t> &a, std::pair<int64_t, int64_t> &b,
-                          std::pair<int64_t, int64_t> &out)
+bool GetBatchIntersection(const char* op_name, std::pair<int64_t, int64_t>& a, std::pair<int64_t, int64_t>& b,
+                          std::pair<int64_t, int64_t>& out)
 {
     // 存在1的情况，按范围比较大的情况broadcast
     if (a.first == 1 && b.first == 1) {
@@ -528,8 +528,8 @@ bool GetBatchIntersection(const char *op_name, std::pair<int64_t, int64_t> &a, s
     return true;
 }
 
-bool GetKNIntersection(const char *op_name, const std::pair<int64_t, int64_t> &a, const std::pair<int64_t, int64_t> &b,
-                       std::pair<int64_t, int64_t> &out)
+bool GetKNIntersection(const char* op_name, const std::pair<int64_t, int64_t>& a, const std::pair<int64_t, int64_t>& b,
+                       std::pair<int64_t, int64_t>& out)
 {
     // 取交集
     out.first = std::max(a.first, b.first);
@@ -546,8 +546,8 @@ bool GetKNIntersection(const char *op_name, const std::pair<int64_t, int64_t> &a
     return true;
 }
 
-void ExpendOneDimRange(size_t num_dim_x1, size_t num_dim_x2, std::vector<std::pair<int64_t, int64_t>> &shape_range_x1,
-                       std::vector<std::pair<int64_t, int64_t>> &shape_range_x2)
+void ExpendOneDimRange(size_t num_dim_x1, size_t num_dim_x2, std::vector<std::pair<int64_t, int64_t>>& shape_range_x1,
+                       std::vector<std::pair<int64_t, int64_t>>& shape_range_x2)
 {
     // bmmv3支持x1为1维
     if (num_dim_x1 == 1) {
@@ -561,8 +561,8 @@ void ExpendOneDimRange(size_t num_dim_x1, size_t num_dim_x2, std::vector<std::pa
     }
 }
 
-void ReduceOneDimRange(size_t num_dim_x1, size_t num_dim_x2, size_t &num_dim_out,
-                       std::vector<std::pair<int64_t, int64_t>> &shape_range_out)
+void ReduceOneDimRange(size_t num_dim_x1, size_t num_dim_x2, size_t& num_dim_out,
+                       std::vector<std::pair<int64_t, int64_t>>& shape_range_out)
 {
     // bmmv3支持x1为1维的还原
     if (num_dim_x1 == 1 && num_dim_x2 > 1) {
@@ -576,9 +576,9 @@ void ReduceOneDimRange(size_t num_dim_x1, size_t num_dim_x2, size_t &num_dim_out
     }
 }
 
-bool InferRangeBias(const char *op_name, std::vector<std::pair<int64_t, int64_t>> &new_shape_range_out, size_t idx_n,
-                    const gert::Range<gert::Shape> *bias_shape_range,
-                    const std::vector<std::pair<int64_t, int64_t>> &new_shape_range_x2)
+bool InferRangeBias(const char* op_name, std::vector<std::pair<int64_t, int64_t>>& new_shape_range_out, size_t idx_n,
+                    const gert::Range<gert::Shape>* bias_shape_range,
+                    const std::vector<std::pair<int64_t, int64_t>>& new_shape_range_x2)
 {
     size_t num_dim_out = new_shape_range_out.size();
     if (bias_shape_range == nullptr) {
@@ -628,7 +628,7 @@ bool InferRangeBias(const char *op_name, std::vector<std::pair<int64_t, int64_t>
 
 class InferShapeRangeBatchMatMul {
 public:
-    InferShapeRangeBatchMatMul(gert::InferShapeRangeContext *in_context, int32_t in_attr_adj_idx,
+    InferShapeRangeBatchMatMul(gert::InferShapeRangeContext* in_context, int32_t in_attr_adj_idx,
                                size_t input_bias_index)
         : context(in_context),
           op_name(in_context->GetNodeName()),
@@ -641,30 +641,30 @@ public:
     bool InferShapeRange();
 
 protected:
-    bool InitializeBroadcastRanges(std::vector<std::pair<int64_t, int64_t>> &new_shape_range_x1,
-                                   std::vector<std::pair<int64_t, int64_t>> &new_shape_range_x2);
+    bool InitializeBroadcastRanges(std::vector<std::pair<int64_t, int64_t>>& new_shape_range_x1,
+                                   std::vector<std::pair<int64_t, int64_t>>& new_shape_range_x2);
     void SetOutput();
-    gert::InferShapeRangeContext *context;
-    const char *op_name;
+    gert::InferShapeRangeContext* context;
+    const char* op_name;
     int32_t attr_adj_idx;
 
-    const gert::Range<gert::Shape> *x1_shape_range;
-    const gert::Range<gert::Shape> *x2_shape_range;
-    const gert::Range<gert::Shape> *bias_shape_range;
+    const gert::Range<gert::Shape>* x1_shape_range;
+    const gert::Range<gert::Shape>* x2_shape_range;
+    const gert::Range<gert::Shape>* bias_shape_range;
 
-    const bool *adj_x1;
-    const bool *adj_x2;
-    const gert::Shape *x1_min_shape;
-    const gert::Shape *x1_max_shape;
-    const gert::Shape *x2_min_shape;
-    const gert::Shape *x2_max_shape;
+    const bool* adj_x1;
+    const bool* adj_x2;
+    const gert::Shape* x1_min_shape;
+    const gert::Shape* x1_max_shape;
+    const gert::Shape* x2_min_shape;
+    const gert::Shape* x2_max_shape;
     size_t num_dim_x1;
     size_t num_dim_x2;
     size_t num_dim_out;
     std::vector<std::pair<int64_t, int64_t>> src_shape_range_x1;
     std::vector<std::pair<int64_t, int64_t>> src_shape_range_x2;
 
-    gert::Range<gert::Shape> *out_shape_range;
+    gert::Range<gert::Shape>* out_shape_range;
     std::vector<std::pair<int64_t, int64_t>> new_shape_range_out;
 };
 bool InferShapeRangeBatchMatMul::Init()
@@ -672,7 +672,7 @@ bool InferShapeRangeBatchMatMul::Init()
     OP_CHECK_IF(x1_shape_range == nullptr || x2_shape_range == nullptr || out_shape_range == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(op_name, "x1/x2/out shape range"), return false);
 
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(op_name, "attrs"), return false);
 
     adj_x1 = attrs->GetAttrPointer<bool>(attr_adj_idx);
@@ -702,8 +702,8 @@ bool InferShapeRangeBatchMatMul::Init()
     return true;
 }
 
-bool InferShapeRangeBatchMatMul::InitializeBroadcastRanges(std::vector<std::pair<int64_t, int64_t>> &new_shape_range_x1,
-                                                           std::vector<std::pair<int64_t, int64_t>> &new_shape_range_x2)
+bool InferShapeRangeBatchMatMul::InitializeBroadcastRanges(std::vector<std::pair<int64_t, int64_t>>& new_shape_range_x1,
+                                                           std::vector<std::pair<int64_t, int64_t>>& new_shape_range_x2)
 {
     // bmmv3支持x1和x2为1维，输入的都为k轴
     ExpendOneDimRange(num_dim_x1, num_dim_x2, src_shape_range_x1, src_shape_range_x2);
@@ -796,7 +796,7 @@ void InferShapeRangeBatchMatMul::SetOutput()
     }
 }
 
-ge::graphStatus InferShapeRangeForBatchMatMul(gert::InferShapeRangeContext *context, const int32_t attr_adj_idx,
+ge::graphStatus InferShapeRangeForBatchMatMul(gert::InferShapeRangeContext* context, const int32_t attr_adj_idx,
                                               const size_t input_bias_index)
 {
     InferShapeRangeBatchMatMul batchMatMulInferRange(context, attr_adj_idx, input_bias_index);

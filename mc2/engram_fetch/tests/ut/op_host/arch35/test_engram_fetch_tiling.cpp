@@ -56,7 +56,7 @@ struct EngramFetchTestParam {
     std::vector<size_t> expectWorkspaces;
 };
 
-inline std::ostream &operator<<(std::ostream &os, const EngramFetchTestParam &param)
+inline std::ostream& operator<<(std::ostream& os, const EngramFetchTestParam& param)
 {
     return os << param.caseName;
 }
@@ -723,7 +723,7 @@ protected:
 static struct EngramFetchCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const EngramFetchTestParam &param)
+static gert::TilingContextPara BuildTilingContextPara(const EngramFetchTestParam& param)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     gert::StorageShape commContextShape = {param.commContextShape, param.commContextShape};

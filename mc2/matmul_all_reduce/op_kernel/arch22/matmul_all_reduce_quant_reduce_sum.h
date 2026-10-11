@@ -33,7 +33,7 @@ template <class T> // commQuantScaleType = yType bf16/fp16
 class MatmulAllReduceReduceSum {
 public:
     __aicore__ inline MatmulAllReduceReduceSum() {}
-    __aicore__ inline void Init(TPipe *tPipe, uint32_t quantUbSize)
+    __aicore__ inline void Init(TPipe* tPipe, uint32_t quantUbSize)
     {
         pipe = tPipe;
         uint32_t scaleUbSize = quantUbSize;
@@ -55,9 +55,9 @@ public:
         pipe->InitBuffer(tBufScaleDivFP32, scaleUbSize * sizeof(float));
     }
 
-    __aicore__ inline void MatmulAllReduceReduceSumSplitM(const uint32_t quantUbSize, int64_t &blockAddrOffset,
-                                                          uint32_t &tileCalCntM, uint32_t &tailCalCntM,
-                                                          uint32_t &aivLoopNum)
+    __aicore__ inline void MatmulAllReduceReduceSumSplitM(const uint32_t quantUbSize, int64_t& blockAddrOffset,
+                                                          uint32_t& tileCalCntM, uint32_t& tailCalCntM,
+                                                          uint32_t& aivLoopNum)
     {
         uint32_t vectorIndex = GetBlockIdx();
         uint32_t singleAivM = this->tileRankM / this->aivCoreNum;
@@ -96,9 +96,9 @@ public:
         }
     }
 
-    __aicore__ inline void MatmulAllReduceReduceSumSplitMAndN(int32_t &quantUbSize, uint32_t &needAivCoreNum,
-                                                              uint32_t &tileBlockCnt, uint32_t &tailBlockCnt,
-                                                              uint32_t &aivLoopNum, uint32_t &blockNumPerRow)
+    __aicore__ inline void MatmulAllReduceReduceSumSplitMAndN(int32_t& quantUbSize, uint32_t& needAivCoreNum,
+                                                              uint32_t& tileBlockCnt, uint32_t& tailBlockCnt,
+                                                              uint32_t& aivLoopNum, uint32_t& blockNumPerRow)
     {
         quantUbSize = TOTAL_UBSIZE_MATMUL_ALLREDUCE_INT8 /
                       (BUF_CNT_SPLIT_MN_MATMUL_ALLREDUCE_INT8 * static_cast<int32_t>(sizeof(T)));
@@ -138,20 +138,20 @@ public:
             curScaleCnt = blockCntSpiltMN;
             curScaleAddrOffset = scaleAddrOffsetSplitMN;
         }
-        tempBufferGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(this->tempBufferGM) + curBlockAddrOffset,
+        tempBufferGm_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(this->tempBufferGM) + curBlockAddrOffset,
                                       this->M * this->N - curBlockAddrOffset);
         if (((loopIdx == 0) && (this->splitMode == SPLIT_M_MATMUL_ALLREDUCE_INT8)) ||
             (this->splitMode == SPLIT_MN_MATMUL_ALLREDUCE_INT8)) {
-            quantScale1Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(this->quantScale1GM) + curScaleAddrOffset,
+            quantScale1Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(this->quantScale1GM) + curScaleAddrOffset,
                                            curScaleCnt);
-            quantScale2Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(this->quantScale2GM) + curScaleAddrOffset,
+            quantScale2Gm_.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(this->quantScale2GM) + curScaleAddrOffset,
                                            curScaleCnt);
         }
     }
 
     // 将 scale1 和 scale2 搬运到 ub 并计算 s2/s1
-    __aicore__ inline void CopyAndCalScale(uint32_t copyBlockLen, DataCopyParams &copyParamsScaleQuant,
-                                           DataCopyPadParams &padParams)
+    __aicore__ inline void CopyAndCalScale(uint32_t copyBlockLen, DataCopyParams& copyParamsScaleQuant,
+                                           DataCopyPadParams& padParams)
     {
         scale1Local = queueScale1.AllocTensor<T>();
         scale2Local = queueScale2.AllocTensor<T>();
@@ -265,10 +265,10 @@ public:
     }
 
     __aicore__ inline void SetParams(GM_ADDR tempBufferGM, GM_ADDR quantScale1GM, GM_ADDR quantScale2GM, uint32_t M,
-                                     uint32_t N, Hccl<HCCL_SERVER_TYPE_AICPU> &hccl_, uint32_t aivCoreNum,
-                                     uint32_t &tileBlockCnt, uint32_t &tailBlockCnt, uint32_t &aivLoopNum,
-                                     int64_t &blockAddrOffset, uint32_t &tailCalCntM, uint32_t &tileCalCntM,
-                                     uint32_t &needAivCoreNum, uint32_t &blockNumPerRow, int32_t &nowQuantUbSize)
+                                     uint32_t N, Hccl<HCCL_SERVER_TYPE_AICPU>& hccl_, uint32_t aivCoreNum,
+                                     uint32_t& tileBlockCnt, uint32_t& tailBlockCnt, uint32_t& aivLoopNum,
+                                     int64_t& blockAddrOffset, uint32_t& tailCalCntM, uint32_t& tileCalCntM,
+                                     uint32_t& needAivCoreNum, uint32_t& blockNumPerRow, int32_t& nowQuantUbSize)
     {
         int32_t nowAlginN = Ceil(N * sizeof(int8_t), BYTE512_MATMUL_ALLREDUCE_INT8) * BYTE512_MATMUL_ALLREDUCE_INT8;
         nowQuantUbSize =
@@ -300,7 +300,7 @@ public:
         }
     }
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> queueX;
     TQue<QuePosition::VECIN, 1> queueScale1;
     TQue<QuePosition::VECIN, 1> queueScale2;
@@ -331,8 +331,8 @@ public:
 
 template <class T>
 __aicore__ inline void MatmulAllReduceReduceSumInt8(GM_ADDR tempBufferGM, GM_ADDR quantScale1GM, GM_ADDR quantScale2GM,
-                                                    uint32_t M, uint32_t N, TPipe *tPipe,
-                                                    Hccl<HCCL_SERVER_TYPE_AICPU> &hccl_)
+                                                    uint32_t M, uint32_t N, TPipe* tPipe,
+                                                    Hccl<HCCL_SERVER_TYPE_AICPU>& hccl_)
 {
     uint32_t aivCoreNum = GetBlockNum() * GetTaskRation();
     if ((g_coreType == AIC) || (GetBlockIdx() >= aivCoreNum)) {

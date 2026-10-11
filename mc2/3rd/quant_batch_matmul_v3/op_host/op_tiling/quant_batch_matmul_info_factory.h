@@ -26,9 +26,9 @@ public:
     Mc2QuantBatchMatmulInfoFactory() = default;
     ~Mc2QuantBatchMatmulInfoFactory() = default;
 
-    Mc2QuantBatchMatmulInfo *Get()
+    Mc2QuantBatchMatmulInfo* Get()
     {
-        Mc2QuantBatchMatmulInfo *ptr = nullptr;
+        Mc2QuantBatchMatmulInfo* ptr = nullptr;
         auto threadId = pthread_self();
         lock_.rdlock();
         auto it = inst_.find(threadId);

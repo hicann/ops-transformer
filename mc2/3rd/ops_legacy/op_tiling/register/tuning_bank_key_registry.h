@@ -64,16 +64,16 @@
 // v1 stub
 #define DECLARE_STRUCT_RELATE_WITH_OP(op, bank_key, ...) \
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(bank_key, __VA_ARGS__); \
-    static bool ParseFunc##op##bank_key(const std::shared_ptr<void> &in_args, size_t len, \
-                                        ge::AscendString &bank_key_str) \
+    static bool ParseFunc##op##bank_key(const std::shared_ptr<void>& in_args, size_t len, \
+                                        ge::AscendString& bank_key_str) \
     { \
         if (sizeof(bank_key_str) != len || in_args == nullptr) { \
             return false; \
         } \
         return false; \
     } \
-    static bool LoadFunc##op##bank_key(std::shared_ptr<void> &in_args, size_t &len, \
-                                       const ge::AscendString &bank_key_str) \
+    static bool LoadFunc##op##bank_key(std::shared_ptr<void>& in_args, size_t& len, \
+                                       const ge::AscendString& bank_key_str) \
     { \
         len = sizeof(bank_key_str); \
         TUNING_TILING_MAKE_SHARED(in_args = std::make_shared<bank_key>(), return false); \
@@ -85,8 +85,8 @@
 // v2
 #define DECLARE_STRUCT_RELATE_WITH_OP_V2(op, bank_key, ...) \
     NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(bank_key, __VA_ARGS__); \
-    static bool ParseFuncV2##op##bank_key(const std::shared_ptr<void> &in_args, size_t len, \
-                                          ge::AscendString &bank_key_json_str) \
+    static bool ParseFuncV2##op##bank_key(const std::shared_ptr<void>& in_args, size_t len, \
+                                          ge::AscendString& bank_key_json_str) \
     { \
         if (sizeof(bank_key) != len || in_args == nullptr) { \
             return false; \
@@ -101,8 +101,8 @@
         } \
         return true; \
     } \
-    static bool LoadFuncV2##op##bank_key(std::shared_ptr<void> &in_args, size_t &len, \
-                                         const ge::AscendString &bank_key_json_str) \
+    static bool LoadFuncV2##op##bank_key(std::shared_ptr<void>& in_args, size_t& len, \
+                                         const ge::AscendString& bank_key_json_str) \
     { \
         len = sizeof(bank_key); \
         TUNING_TILING_MAKE_SHARED(in_args = std::make_shared<bank_key>(), return false); \
@@ -120,27 +120,27 @@
 
 namespace tuningtiling {
 // v1兼容老版本om
-using OpBankKeyConvertFun = std::function<bool(const gert::TilingContext *, std::shared_ptr<void> &, size_t &)>;
-using OpBankParseFun = std::function<bool(const std::shared_ptr<void> &, size_t, ge::AscendString &)>;
-using OpBankLoadFun = std::function<bool(std::shared_ptr<void> &, size_t &, const ge::AscendString &)>;
+using OpBankKeyConvertFun = std::function<bool(const gert::TilingContext*, std::shared_ptr<void>&, size_t&)>;
+using OpBankParseFun = std::function<bool(const std::shared_ptr<void>&, size_t, ge::AscendString&)>;
+using OpBankLoadFun = std::function<bool(std::shared_ptr<void>&, size_t&, const ge::AscendString&)>;
 
 // v2
-using OpBankKeyConvertFunV2 = std::function<bool(const gert::TilingContext *, std::shared_ptr<void> &, size_t &)>;
-using OpBankParseFunV2 = std::function<bool(const std::shared_ptr<void> &, size_t, ge::AscendString &)>;
-using OpBankLoadFunV2 = std::function<bool(std::shared_ptr<void> &, size_t &, const ge::AscendString &)>;
+using OpBankKeyConvertFunV2 = std::function<bool(const gert::TilingContext*, std::shared_ptr<void>&, size_t&)>;
+using OpBankParseFunV2 = std::function<bool(const std::shared_ptr<void>&, size_t, ge::AscendString&)>;
+using OpBankLoadFunV2 = std::function<bool(std::shared_ptr<void>&, size_t&, const ge::AscendString&)>;
 // v1兼容老版本om
 class FMK_FUNC_HOST_VISIBILITY OpBankKeyFuncInfo {
 public:
-    explicit OpBankKeyFuncInfo(const ge::AscendString &optype);
+    explicit OpBankKeyFuncInfo(const ge::AscendString& optype);
     OpBankKeyFuncInfo() = default;
     ~OpBankKeyFuncInfo() = default;
-    void SetOpConvertFunc(const OpBankKeyConvertFun &convert_func);
-    void SetOpParseFunc(const OpBankParseFun &parse_func);
-    void SetOpLoadFunc(const OpBankLoadFun &load_func);
-    const OpBankKeyConvertFun &GetBankKeyConvertFunc() const;
-    const OpBankParseFun &GetBankKeyParseFunc() const;
-    const OpBankLoadFun &GetBankKeyLoadFunc() const;
-    const ge::AscendString &GetOpType() const
+    void SetOpConvertFunc(const OpBankKeyConvertFun& convert_func);
+    void SetOpParseFunc(const OpBankParseFun& parse_func);
+    void SetOpLoadFunc(const OpBankLoadFun& load_func);
+    const OpBankKeyConvertFun& GetBankKeyConvertFunc() const;
+    const OpBankParseFun& GetBankKeyParseFunc() const;
+    const OpBankLoadFun& GetBankKeyLoadFunc() const;
+    const ge::AscendString& GetOpType() const
     {
         return optype_;
     }
@@ -155,16 +155,16 @@ private:
 // v2
 class FMK_FUNC_HOST_VISIBILITY OpBankKeyFuncInfoV2 {
 public:
-    explicit OpBankKeyFuncInfoV2(const ge::AscendString &optypeV2);
+    explicit OpBankKeyFuncInfoV2(const ge::AscendString& optypeV2);
     OpBankKeyFuncInfoV2() = default;
     ~OpBankKeyFuncInfoV2() = default;
-    void SetOpConvertFuncV2(const OpBankKeyConvertFunV2 &convert_funcV2);
-    void SetOpParseFuncV2(const OpBankParseFunV2 &parse_funcV2);
-    void SetOpLoadFuncV2(const OpBankLoadFunV2 &load_funcV2);
-    const OpBankKeyConvertFunV2 &GetBankKeyConvertFuncV2() const;
-    const OpBankParseFunV2 &GetBankKeyParseFuncV2() const;
-    const OpBankLoadFunV2 &GetBankKeyLoadFuncV2() const;
-    const ge::AscendString &GetOpTypeV2() const
+    void SetOpConvertFuncV2(const OpBankKeyConvertFunV2& convert_funcV2);
+    void SetOpParseFuncV2(const OpBankParseFunV2& parse_funcV2);
+    void SetOpLoadFuncV2(const OpBankLoadFunV2& load_funcV2);
+    const OpBankKeyConvertFunV2& GetBankKeyConvertFuncV2() const;
+    const OpBankParseFunV2& GetBankKeyParseFuncV2() const;
+    const OpBankLoadFunV2& GetBankKeyLoadFuncV2() const;
+    const ge::AscendString& GetOpTypeV2() const
     {
         return optypeV2_;
     }
@@ -179,21 +179,21 @@ private:
 // v1兼容老版本om
 class FMK_FUNC_HOST_VISIBILITY OpBankKeyFuncRegistry {
 public:
-    OpBankKeyFuncRegistry(const ge::AscendString &optype, const OpBankKeyConvertFun &convert_func);
-    OpBankKeyFuncRegistry(const ge::AscendString &optype, const OpBankParseFun &parse_func,
-                          const OpBankLoadFun &load_func);
+    OpBankKeyFuncRegistry(const ge::AscendString& optype, const OpBankKeyConvertFun& convert_func);
+    OpBankKeyFuncRegistry(const ge::AscendString& optype, const OpBankParseFun& parse_func,
+                          const OpBankLoadFun& load_func);
     ~OpBankKeyFuncRegistry() = default;
-    static std::unordered_map<ge::AscendString, OpBankKeyFuncInfo> &RegisteredOpFuncInfo();
+    static std::unordered_map<ge::AscendString, OpBankKeyFuncInfo>& RegisteredOpFuncInfo();
 };
 
 // v2
 class FMK_FUNC_HOST_VISIBILITY OpBankKeyFuncRegistryV2 {
 public:
-    OpBankKeyFuncRegistryV2(const ge::AscendString &optype, const OpBankKeyConvertFunV2 &convert_funcV2);
-    OpBankKeyFuncRegistryV2(const ge::AscendString &optype, const OpBankParseFunV2 &parse_funcV2,
-                            const OpBankLoadFunV2 &load_funcV2);
+    OpBankKeyFuncRegistryV2(const ge::AscendString& optype, const OpBankKeyConvertFunV2& convert_funcV2);
+    OpBankKeyFuncRegistryV2(const ge::AscendString& optype, const OpBankParseFunV2& parse_funcV2,
+                            const OpBankLoadFunV2& load_funcV2);
     ~OpBankKeyFuncRegistryV2() = default;
-    static std::unordered_map<ge::AscendString, OpBankKeyFuncInfoV2> &RegisteredOpFuncInfoV2();
+    static std::unordered_map<ge::AscendString, OpBankKeyFuncInfoV2>& RegisteredOpFuncInfoV2();
 };
 } // namespace tuningtiling
 #endif

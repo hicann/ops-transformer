@@ -41,13 +41,13 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnMatmulAllReduce)
     TensorDesc x1 = TensorDesc({16, 32}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2 = TensorDesc({32, 16}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc bias = TensorDesc({16}, ACL_FLOAT16, ACL_FORMAT_ND);
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 8;
     int64_t streamMode = 1;
     TensorDesc output = TensorDesc({16, 16}, ACL_FLOAT16, ACL_FORMAT_ND);
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut_null_x1 = OP_API_UT(aclnnMatmulAllReduce, INPUT(nullptr, x2, bias, group, reduceOp, commTurn, streamMode),
                                 OUTPUT(output));
@@ -74,13 +74,13 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnMatmulAllReduceV2)
     TensorDesc x3 = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc dequantScale = {{128}, ACL_FLOAT, ACL_FORMAT_ND};
     TensorDesc pertokenScale = {{32}, ACL_FLOAT, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     TensorDesc output = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut_null_x1 =
         OP_API_UT(aclnnQuantMatmulAllReduceV2,
@@ -112,13 +112,13 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnQuantMatmulAllReduce)
     TensorDesc bias = TensorDesc({16}, ACL_INT32, ACL_FORMAT_ND);
     TensorDesc x3 = TensorDesc({16, 16}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc dequantScale = TensorDesc({16}, ACL_UINT64, ACL_FORMAT_ND);
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     TensorDesc output = TensorDesc({16, 16}, ACL_FLOAT16, ACL_FORMAT_ND);
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut_null_x1 =
         OP_API_UT(aclnnQuantMatmulAllReduce,
@@ -160,13 +160,13 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnQuantMatmulAllReduceV2)
     TensorDesc x3 = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc dequantScale = {{128}, ACL_FLOAT, ACL_FORMAT_ND};
     TensorDesc pertokenScale = {{32}, ACL_FLOAT, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     TensorDesc output = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut_null_x1 =
         OP_API_UT(aclnnQuantMatmulAllReduceV2,
@@ -201,13 +201,13 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnQuantMatmulAllReduceV3)
     TensorDesc pertokenScale = {{32}, ACL_FLOAT, ACL_FORMAT_ND};
     TensorDesc commQuantScale1 = {{128}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc commQuantScale2 = {{128}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     TensorDesc output = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut_null_x1 = OP_API_UT(aclnnQuantMatmulAllReduceV3,
                                 INPUT(nullptr, x2, bias, x3, dequantScale, pertokenScale, commQuantScale1,
@@ -244,15 +244,15 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnQuantMatmulAllReduceV4)
     TensorDesc x2Scale = {{128}, ACL_FLOAT, ACL_FORMAT_ND};
     TensorDesc commQuantScale1 = {{128}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc commQuantScale2 = {{128}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     int64_t groupSize = 0;
     int64_t commQuantMode = 0;
     TensorDesc output = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut_null_x1 = OP_API_UT(aclnnQuantMatmulAllReduceV4,
                                 INPUT(nullptr, x2, bias, x3, x1Scale, x2Scale, commQuantScale1, commQuantScale2, group,
@@ -295,14 +295,14 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, AclnnWeightQuantMatmulAllReduce)
     TensorDesc antiquantScale = TensorDesc({128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc antiquantOffset = TensorDesc({128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x3 = TensorDesc({32, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     int64_t groupSize = 0;
     TensorDesc output = TensorDesc({32, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut_null_x1 = OP_API_UT(
         aclnnWeightQuantMatmulAllReduce,
@@ -335,13 +335,13 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnQuantMatmulAllReduceV2_Int64De
     TensorDesc x1 = {{16, 32}, ACL_INT8, ACL_FORMAT_ND};
     TensorDesc x2 = {{32, 16}, ACL_INT8, ACL_FORMAT_ND};
     TensorDesc dequantScale = {{16}, ACL_INT64, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     TensorDesc output = {{16, 16}, ACL_FLOAT16, ACL_FORMAT_ND};
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantMatmulAllReduceV2,
                         INPUT(x1, x2, nullptr, nullptr, dequantScale, nullptr, group, reduceOp, commTurn, streamMode),
@@ -359,13 +359,13 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnQuantMatmulAllReduceV3_OnlyCom
     TensorDesc dequantScale = {{128}, ACL_FLOAT, ACL_FORMAT_ND};
     TensorDesc pertokenScale = {{32}, ACL_FLOAT, ACL_FORMAT_ND};
     TensorDesc commQuantScale1 = {{128}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     TensorDesc output = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantMatmulAllReduceV3,
                         INPUT(x1, x2, bias, nullptr, dequantScale, pertokenScale, commQuantScale1, nullptr, group,
@@ -380,13 +380,13 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnQuantMatmulAllReduceV3_Int64De
     TensorDesc x1 = {{16, 32}, ACL_INT8, ACL_FORMAT_ND};
     TensorDesc x2 = {{32, 16}, ACL_INT8, ACL_FORMAT_ND};
     TensorDesc dequantScale = {{16}, ACL_INT64, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     TensorDesc output = {{16, 16}, ACL_FLOAT16, ACL_FORMAT_ND};
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantMatmulAllReduceV3,
@@ -480,13 +480,13 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnQuantMatmulAllReduce_Int64Dequ
     TensorDesc bias = {{16}, ACL_INT32, ACL_FORMAT_ND};
     TensorDesc x3 = {{16, 16}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc dequantScale = {{16}, ACL_INT64, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     TensorDesc output = {{16, 16}, ACL_FLOAT16, ACL_FORMAT_ND};
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantMatmulAllReduce,
                         INPUT(x1, x2, bias, x3, dequantScale, group, reduceOp, commTurn, streamMode), OUTPUT(output));
@@ -503,15 +503,15 @@ TEST_F(MatmulAllReduceAclnnInputNullPtrTest, aclnnQuantMatmulAllReduceV4_Int64X2
     TensorDesc x3 = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc x1Scale = {{32}, ACL_FLOAT, ACL_FORMAT_ND};
     TensorDesc x2Scale = {{128}, ACL_INT64, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     int64_t groupSize = 0;
     int64_t commQuantMode = 0;
     TensorDesc output = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantMatmulAllReduceV4,
                         INPUT(x1, x2, bias, x3, x1Scale, x2Scale, nullptr, nullptr, group, reduceOp, commTurn,

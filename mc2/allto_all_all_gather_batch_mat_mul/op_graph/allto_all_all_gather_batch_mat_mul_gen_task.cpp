@@ -16,15 +16,15 @@
 
 namespace ops {
 
-ge::Status AlltoAllAllGatherBatchMatMulCalcParamFunc(gert::ExeResGenerationContext *context)
+ge::Status AlltoAllAllGatherBatchMatMulCalcParamFunc(gert::ExeResGenerationContext* context)
 {
     const ge::AscendString name = "aicpu kfc server";
     const ge::AscendString reuseKey = "kfc_stream";
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, name, reuseKey);
 }
 
-ge::Status AlltoAllAllGatherBatchMatMulGenTaskFunc(const gert::ExeResGenerationContext *context,
-                                                   std::vector<std::vector<uint8_t>> &tasks)
+ge::Status AlltoAllAllGatherBatchMatMulGenTaskFunc(const gert::ExeResGenerationContext* context,
+                                                   std::vector<std::vector<uint8_t>>& tasks)
 {
     return Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallback(context, tasks);
 }

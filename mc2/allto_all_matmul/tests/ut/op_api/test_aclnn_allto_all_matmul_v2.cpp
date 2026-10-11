@@ -63,8 +63,8 @@ struct AlltoAllMatmulV2AclnnTestParam {
     aclFormat alltoalloutputFormat; // alltoalloutputoutput数据format，仅支持ND
     // 其它属性
     vector<int64_t> alltoAllAxesOptional; // alltoall数据交换的方向，只能为空或者[-2,-1]
-    char *group;                          // 通信域标识，字符串，长度要求（0，128）
-    const char *commMode;                 // 新增：通信引擎参数
+    char* group;                          // 通信域标识，字符串，长度要求（0，128）
+    const char* commMode;                 // 新增：通信引擎参数
     bool transposeX1;                     // x1是否转置，现不支持为true
     bool transposeX2;                     // x2是否转置，为true时x2shape为（H2，H1）
     // ut用例期望返回状态
@@ -1237,7 +1237,7 @@ static AlltoAllMatmulV2AclnnTestParam casesParamsV2[] = {
      false,
      ACLNN_ERR_PARAM_INVALID}};
 
-static void TestV2OneParamCase(const AlltoAllMatmulV2AclnnTestParam &param)
+static void TestV2OneParamCase(const AlltoAllMatmulV2AclnnTestParam& param)
 {
     std::cout << "run case " << param.caseName << std::endl;
     // 从结构体list中获取实际用例属性
@@ -1257,9 +1257,9 @@ static void TestV2OneParamCase(const AlltoAllMatmulV2AclnnTestParam &param)
     aclFormat outputFormat = param.outputFormat;
     aclFormat alltoalloutFormat = param.alltoalloutputFormat;
     vector<int64_t> axesAcl = param.alltoAllAxesOptional;
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
-    const char *group = param.group;
-    const char *commMode = param.commMode;
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    const char* group = param.group;
+    const char* commMode = param.commMode;
     bool transposeX1 = param.transposeX1;
     bool transposeX2 = param.transposeX2;
     aclnnStatus retStatus = param.aclnnStatusUt;
@@ -1268,7 +1268,7 @@ static void TestV2OneParamCase(const AlltoAllMatmulV2AclnnTestParam &param)
     TensorDesc output = TensorDesc(outputShape, outputDtype, outputFormat);
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     if (biasShape.empty() && alltoalloutShape.empty()) {
         auto ut = OP_API_UT(aclnnAlltoAllMatmulV2,
                             INPUT(x1, x2, nullptr, alltoAllAxesOptional, group, commMode, transposeX1, transposeX2),

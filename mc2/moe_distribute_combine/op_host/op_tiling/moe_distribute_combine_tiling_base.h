@@ -25,27 +25,27 @@
 namespace optiling {
 class MoeDistributeCombineTilingBase : public MoeTilingBase {
 public:
-    explicit MoeDistributeCombineTilingBase(gert::TilingContext *context)
+    explicit MoeDistributeCombineTilingBase(gert::TilingContext* context)
         : MoeTilingBase(context) {};
-    ge::graphStatus MoeDistributeCombineTilingFunc(gert::TilingContext *context);
-    bool CheckEpWorldSizeAttrs(gert::TilingContext *context, MoeDistributeCombineTilingData &tilingData,
-                               const char *nodeName);
-    bool CheckAttrs(gert::TilingContext *context, MoeDistributeCombineTilingData &tilingData, const char *nodeName,
-                    uint32_t &localMoeExpertNum);
-    bool CheckTensorShape(gert::TilingContext *context, MoeDistributeCombineTilingData &tilingData,
-                          const char *nodeName, bool isShared, uint32_t localExpertNum);
-    ge::graphStatus SetWorkspace(gert::TilingContext *context, const char *nodeName);
-    ge::graphStatus GetAttrAndSetTilingData(gert::TilingContext *context, MoeDistributeCombineTilingData &tilingData,
-                                            const char *nodeName, std::string &groupEp, std::string &groupTp,
-                                            uint32_t &commQuantMode);
-    ge::graphStatus SetHCommCfg(const gert::TilingContext *context, MoeDistributeCombineTilingData *tiling,
+    ge::graphStatus MoeDistributeCombineTilingFunc(gert::TilingContext* context);
+    bool CheckEpWorldSizeAttrs(gert::TilingContext* context, MoeDistributeCombineTilingData& tilingData,
+                               const char* nodeName);
+    bool CheckAttrs(gert::TilingContext* context, MoeDistributeCombineTilingData& tilingData, const char* nodeName,
+                    uint32_t& localMoeExpertNum);
+    bool CheckTensorShape(gert::TilingContext* context, MoeDistributeCombineTilingData& tilingData,
+                          const char* nodeName, bool isShared, uint32_t localExpertNum);
+    ge::graphStatus SetWorkspace(gert::TilingContext* context, const char* nodeName);
+    ge::graphStatus GetAttrAndSetTilingData(gert::TilingContext* context, MoeDistributeCombineTilingData& tilingData,
+                                            const char* nodeName, std::string& groupEp, std::string& groupTp,
+                                            uint32_t& commQuantMode);
+    ge::graphStatus SetHCommCfg(const gert::TilingContext* context, MoeDistributeCombineTilingData* tiling,
                                 const std::string groupEp, const std::string groupTp, const uint32_t tpWorldSize);
-    ge::graphStatus CheckWinSize(const gert::TilingContext *context, MoeDistributeCombineTilingData *tilingData,
-                                 const char *nodeName, uint32_t localMoeExpertNum);
-    void PrintTilingDataInfo(const char *nodeName, MoeDistributeCombineTilingData &tilingData);
-    virtual ge::graphStatus MoeDistributeCombineTilingFuncImpl(std::string &socVersion,
-                                                               gert::TilingContext *context) = 0;
-    virtual bool CheckEpWorldSize(const char *nodeName, uint32_t epWorldSize) = 0;
+    ge::graphStatus CheckWinSize(const gert::TilingContext* context, MoeDistributeCombineTilingData* tilingData,
+                                 const char* nodeName, uint32_t localMoeExpertNum);
+    void PrintTilingDataInfo(const char* nodeName, MoeDistributeCombineTilingData& tilingData);
+    virtual ge::graphStatus MoeDistributeCombineTilingFuncImpl(std::string& socVersion,
+                                                               gert::TilingContext* context) = 0;
+    virtual bool CheckEpWorldSize(const char* nodeName, uint32_t epWorldSize) = 0;
 
 protected:
     ge::graphStatus DoOpTiling() override;

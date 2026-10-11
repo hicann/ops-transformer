@@ -17,12 +17,12 @@
 
 using namespace ge;
 namespace ops {
-static ge::graphStatus InferShapeAttentionToFFN(gert::InferShapeContext *)
+static ge::graphStatus InferShapeAttentionToFFN(gert::InferShapeContext*)
 {
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeAttentionToFFN(gert::InferDataTypeContext *)
+static ge::graphStatus InferDataTypeAttentionToFFN(gert::InferDataTypeContext*)
 {
     return ge::GRAPH_SUCCESS;
 }

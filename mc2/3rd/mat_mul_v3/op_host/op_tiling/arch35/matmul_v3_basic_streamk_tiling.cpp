@@ -22,12 +22,12 @@ namespace {
 using namespace optiling;
 using namespace optiling::mc2_matmul_v3_advanced;
 // ------------------------------ CheckStreamKSKTiling -------------------------------------------//
-bool CheckStreamKSKTilingDefault(const Mc2MatmulV3CompileInfo & /* compileInfo */, const Mc2MatMulV3Args & /* args */)
+bool CheckStreamKSKTilingDefault(const Mc2MatmulV3CompileInfo& /* compileInfo */, const Mc2MatMulV3Args& /* args */)
 {
     return false;
 }
 
-bool CheckStreamKSKTiling91095(const Mc2MatmulV3CompileInfo &compileInfo, const Mc2MatMulV3Args &args)
+bool CheckStreamKSKTiling91095(const Mc2MatmulV3CompileInfo& compileInfo, const Mc2MatMulV3Args& args)
 {
     constexpr uint64_t STREAM_K_MAX_K_THRESHOLD = 2000000UL;
     // 如果dtype是fp32且k轴大于200万 则走基础模板来保证fp32的精度
@@ -62,19 +62,19 @@ bool CheckStreamKSKTiling91095(const Mc2MatmulV3CompileInfo &compileInfo, const 
     return true;
 }
 
-using CheckStreamKSKTilingFunc = bool (*)(const Mc2MatmulV3CompileInfo &, const Mc2MatMulV3Args &);
+using CheckStreamKSKTilingFunc = bool (*)(const Mc2MatmulV3CompileInfo&, const Mc2MatMulV3Args&);
 
 const static std::map<NpuArch, CheckStreamKSKTilingFunc> CheckStreamKSKTilingFuncMap = {
     {Ops::Base::DAV_3510, CheckStreamKSKTiling91095},
 };
 
 // ------------------------------ CheckStreamKDPSKTiling -------------------------------------------//
-bool CheckStreamKDPSKTilingDefault(const Mc2MatmulV3CompileInfo & /* compileInfo */, const Mc2MatMulV3Args & /* args */)
+bool CheckStreamKDPSKTilingDefault(const Mc2MatmulV3CompileInfo& /* compileInfo */, const Mc2MatMulV3Args& /* args */)
 {
     return false;
 }
 
-bool CheckStreamKDPSKTiling91095(const Mc2MatmulV3CompileInfo &compileInfo, const Mc2MatMulV3Args &args)
+bool CheckStreamKDPSKTiling91095(const Mc2MatmulV3CompileInfo& compileInfo, const Mc2MatMulV3Args& args)
 {
     constexpr uint64_t STREAM_K_MIN_K_THRESHOLD = 8192UL;
     // 如果k轴小于32*256/DtypeSize_ 或 mn轴不是256对齐 或 输入是fp32类型，不走stream-k-dpsk
@@ -92,19 +92,19 @@ bool CheckStreamKDPSKTiling91095(const Mc2MatmulV3CompileInfo &compileInfo, cons
            (totalMNCnt % compileInfo.aicNum <= compileInfo.aicNum / NUM_TWO);
 }
 
-using CheckStreamKDPSKTilingFunc = bool (*)(const Mc2MatmulV3CompileInfo &, const Mc2MatMulV3Args &);
+using CheckStreamKDPSKTilingFunc = bool (*)(const Mc2MatmulV3CompileInfo&, const Mc2MatMulV3Args&);
 
 const static std::map<NpuArch, CheckStreamKDPSKTilingFunc> CheckStreamKDPSKTilingFuncMap = {
     {Ops::Base::DAV_3510, CheckStreamKDPSKTiling91095},
 };
 
 // ------------------------------ GetL0C2OutFlag -------------------------------------------//
-Mc2MatMulV3L0C2Out GetL0C2OutFlagDefault(const Mc2MatMulV3Args & /* args */)
+Mc2MatMulV3L0C2Out GetL0C2OutFlagDefault(const Mc2MatMulV3Args& /* args */)
 {
     return Mc2MatMulV3L0C2Out::ON_THE_FLY;
 }
 
-Mc2MatMulV3L0C2Out GetL0C2OutFlag91095(const Mc2MatMulV3Args &args)
+Mc2MatMulV3L0C2Out GetL0C2OutFlag91095(const Mc2MatMulV3Args& args)
 {
     if (args.nValue > BASIC_BLOCK_SIZE_64 && args.nValue % BASIC_BLOCK_SIZE_16 != 0 && args.mValue > NUM_TWO &&
         args.mValue * args.nValue >= BASIC_BLOCK_SIZE_256) {
@@ -113,7 +113,7 @@ Mc2MatMulV3L0C2Out GetL0C2OutFlag91095(const Mc2MatMulV3Args &args)
     return Mc2MatMulV3L0C2Out::ON_THE_FLY;
 }
 
-using GetL0C2OutFlagFunc = Mc2MatMulV3L0C2Out (*)(const Mc2MatMulV3Args &);
+using GetL0C2OutFlagFunc = Mc2MatMulV3L0C2Out (*)(const Mc2MatMulV3Args&);
 
 const static std::map<NpuArch, GetL0C2OutFlagFunc> GetL0C2OutFlagFuncMap = {
     {Ops::Base::DAV_3510, GetL0C2OutFlag91095},

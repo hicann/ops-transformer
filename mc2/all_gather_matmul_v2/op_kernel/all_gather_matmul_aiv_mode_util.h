@@ -65,7 +65,7 @@ using Block256B = BaseBlock<T, BLOCK_256_BYTES>;
 template <typename T>
 using Block512B = BaseBlock<T, BLOCK_512_BYTES>;
 
-FORCE_INLINE_AICORE void CheckBuffFlag(__gm__ int32_t *buff, TBuf<AscendC::TPosition::VECCALC> uBuf_, int32_t flag)
+FORCE_INLINE_AICORE void CheckBuffFlag(__gm__ int32_t* buff, TBuf<AscendC::TPosition::VECCALC> uBuf_, int32_t flag)
 {
     SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
@@ -81,7 +81,7 @@ FORCE_INLINE_AICORE void CheckBuffFlag(__gm__ int32_t *buff, TBuf<AscendC::TPosi
     uBuf_.FreeTensor<int32_t>(ubTensor);
 }
 
-FORCE_INLINE_AICORE void SetBuffFlag(__gm__ int32_t *buff, TBuf<AscendC::TPosition::VECCALC> uBuf_, int32_t flag)
+FORCE_INLINE_AICORE void SetBuffFlag(__gm__ int32_t* buff, TBuf<AscendC::TPosition::VECCALC> uBuf_, int32_t flag)
 {
     SetFlag<HardEvent::MTE3_S>(EVENT_ID2);
     WaitFlag<HardEvent::MTE3_S>(EVENT_ID2);

@@ -34,9 +34,9 @@
     } while (0)
 
 constexpr int DEV_NUM = 2;
-constexpr const char *COMM_MODE = "ccu";
+constexpr const char* COMM_MODE = "ccu";
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -46,8 +46,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -70,7 +70,7 @@ struct Args {
     aclrtContext context;
 };
 
-int LaunchOneThreadMmReduceScatterV2(Args &args)
+int LaunchOneThreadMmReduceScatterV2(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret = %d\n", ret); return ret);
@@ -85,29 +85,29 @@ int LaunchOneThreadMmReduceScatterV2(Args &args)
     std::vector<int64_t> x1ScaleShape = {1};
     std::vector<int64_t> x2ScaleShape = {1};
     std::vector<int64_t> outShape = {1024 / DEV_NUM, 512};
-    void *x1DeviceAddr = nullptr;
-    void *x2DeviceAddr = nullptr;
-    void *biasDeviceAddr = nullptr;
-    void *x1ScaleDeviceAddr = nullptr;
-    void *x2ScaleDeviceAddr = nullptr;
-    void *outDeviceAddr = nullptr;
+    void* x1DeviceAddr = nullptr;
+    void* x2DeviceAddr = nullptr;
+    void* biasDeviceAddr = nullptr;
+    void* x1ScaleDeviceAddr = nullptr;
+    void* x2ScaleDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
 
-    aclTensor *x1 = nullptr;
-    aclTensor *x2 = nullptr;
-    aclTensor *bias = nullptr;
-    aclTensor *x1Scale = nullptr;
-    aclTensor *x2Scale = nullptr;
-    aclTensor *quantScale = nullptr;
-    aclTensor *out = nullptr;
-    aclTensor *amaxOut = nullptr;
+    aclTensor* x1 = nullptr;
+    aclTensor* x2 = nullptr;
+    aclTensor* bias = nullptr;
+    aclTensor* x1Scale = nullptr;
+    aclTensor* x2Scale = nullptr;
+    aclTensor* quantScale = nullptr;
+    aclTensor* out = nullptr;
+    aclTensor* amaxOut = nullptr;
 
     int32_t commTurn = 0;
     int32_t streamMode = 1;
     int32_t blockSize = 0;
     int32_t groupSize = 0;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     long long x1ShapeSize = GetShapeSize(x1Shape);
     long long x2ShapeSize = GetShapeSize(x2Shape);
@@ -211,16 +211,16 @@ int LaunchOneThreadMmReduceScatterV2(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     class EnvGuard {
     public:
-        EnvGuard(const char *key, const char *val, bool enable = true)
+        EnvGuard(const char* key, const char* val, bool enable = true)
             : key_(enable ? key : nullptr)
         {
             if (!enable)
                 return;
-            const char *old = getenv(key);
+            const char* old = getenv(key);
             if (old != nullptr) {
                 strncpy(saved_, old, sizeof(saved_) - 1);
             }
@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
         }
 
     private:
-        const char *key_;
+        const char* key_;
         char saved_[256] = {0};
     };
 

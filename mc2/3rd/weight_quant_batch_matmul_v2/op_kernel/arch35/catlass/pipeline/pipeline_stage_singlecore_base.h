@@ -33,25 +33,25 @@ struct PipelineStageSingleCoreBase {
     PipelineStageSingleCoreBase() {}
 
     DEVICE
-    void ProducerWait(PipelineState<Stages> const &state) const
+    void ProducerWait(PipelineState<Stages> const& state) const
     {
         ProducerWait(state.index());
     }
 
     DEVICE
-    void ProducerRelease(PipelineState<Stages> const &state) const
+    void ProducerRelease(PipelineState<Stages> const& state) const
     {
-        static_cast<const Derived *>(this)->ProducerRelease(state.index());
+        static_cast<const Derived*>(this)->ProducerRelease(state.index());
     }
 
     DEVICE
-    void ConsumerWait(PipelineState<Stages> const &state) const
+    void ConsumerWait(PipelineState<Stages> const& state) const
     {
-        static_cast<const Derived *>(this)->ConsumerWait(state.index());
+        static_cast<const Derived*>(this)->ConsumerWait(state.index());
     }
 
     DEVICE
-    void ConsumerRelease(PipelineState<Stages> const &state) const
+    void ConsumerRelease(PipelineState<Stages> const& state) const
     {
         ConsumerRelease(state.index());
     }

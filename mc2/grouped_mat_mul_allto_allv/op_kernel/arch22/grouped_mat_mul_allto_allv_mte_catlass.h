@@ -39,7 +39,7 @@ public:
     __aicore__ inline CatlassGroupedMatmulOp() = default;
 
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR output,
-                                const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo)
+                                const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo)
     {
         if ASCEND_IS_AIV {
             return;
@@ -68,7 +68,7 @@ public:
     // chunk count).
     template <typename ExpertCompletion>
     __aicore__ inline void ProcessExperts(uint32_t startExpertIdx, uint32_t expertNum,
-                                          ExpertCompletion &&onExpertComplete)
+                                          ExpertCompletion&& onExpertComplete)
     {
         ProcessRange<true>(startExpertIdx, expertNum, onExpertComplete);
     }
@@ -82,7 +82,7 @@ public:
 
 private:
     template <bool CompleteEachExpert, typename ExpertCompletion>
-    __aicore__ inline void ProcessRange(uint32_t startExpertIdx, uint32_t expertNum, ExpertCompletion &onExpertComplete)
+    __aicore__ inline void ProcessRange(uint32_t startExpertIdx, uint32_t expertNum, ExpertCompletion& onExpertComplete)
     {
         if ASCEND_IS_AIV {
             return;
@@ -120,7 +120,7 @@ private:
     }
 
     template <typename BlockMmad>
-    __aicore__ inline void DrainExpertOutput(BlockMmad &blockMmad)
+    __aicore__ inline void DrainExpertOutput(BlockMmad& blockMmad)
     {
         if constexpr (BlockMmad::DispatchPolicy::ASYNC) {
             blockMmad.SynchronizeBlock();
@@ -135,7 +135,7 @@ private:
 
     template <bool CompleteEachExpert, typename ExpertCompletion>
     __aicore__ inline void Run(uint32_t m, uint32_t k, uint32_t n, uint32_t startExpertIdx, uint32_t expertNum,
-                               bool isSharedExpert, ExpertCompletion &onExpertComplete)
+                               bool isSharedExpert, ExpertCompletion& onExpertComplete)
     {
         using namespace Catlass;
         // Every AIC owns an independent CATLASS resource and processes its
@@ -202,9 +202,9 @@ private:
                 AscendC::GlobalTensor<T> gmA;
                 AscendC::GlobalTensor<T> gmB;
                 AscendC::GlobalTensor<T> gmC;
-                gmA.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(x_) + groupOffsetA);
-                gmB.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(weight_) + groupOffsetB);
-                gmC.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(output_) + groupOffsetC);
+                gmA.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(x_) + groupOffsetA);
+                gmB.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(weight_) + groupOffsetB);
+                gmC.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(output_) + groupOffsetC);
                 // Keep the same small-M weight-load policy as CATLASS
                 // GroupedMatmulSliceM.  Every expert in the current model cases
                 // occupies one M tile; bypassing L2 avoids reusing a stale weight
@@ -263,7 +263,7 @@ private:
     GM_ADDR x_{nullptr};
     GM_ADDR weight_{nullptr};
     GM_ADDR output_{nullptr};
-    const GroupedMatMulAlltoAllvMteTaskTilingInfo *taskTilingInfo_{nullptr};
+    const GroupedMatMulAlltoAllvMteTaskTilingInfo* taskTilingInfo_{nullptr};
 };
 
 } // namespace MC2KernelTemplate

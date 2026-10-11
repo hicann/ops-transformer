@@ -43,8 +43,8 @@ static constexpr size_t DIM_2 = 2;
 
 static constexpr int64_t FIRST_ELE_SIZE = -1;
 
-static graphStatus CheckDims(const gert::InferShapeContext *context, const gert::Shape *gmmXShape,
-                             const gert::Shape *gmmWeightShape, bool transGmmWeight)
+static graphStatus CheckDims(const gert::InferShapeContext* context, const gert::Shape* gmmXShape,
+                             const gert::Shape* gmmWeightShape, bool transGmmWeight)
 {
     auto result = ge::GRAPH_SUCCESS;
 
@@ -73,8 +73,8 @@ static graphStatus CheckDims(const gert::InferShapeContext *context, const gert:
     return result;
 }
 
-static graphStatus CheckDimsOptional(const gert::InferShapeContext *context, const gert::Shape *mmXShape,
-                                     const gert::Shape *mmWeightShape, bool transMmWeight)
+static graphStatus CheckDimsOptional(const gert::InferShapeContext* context, const gert::Shape* mmXShape,
+                                     const gert::Shape* mmWeightShape, bool transMmWeight)
 {
     auto result = ge::GRAPH_SUCCESS;
 
@@ -102,9 +102,9 @@ static graphStatus CheckDimsOptional(const gert::InferShapeContext *context, con
     return result;
 }
 
-static ge::graphStatus InferGMMOutputShape(const gert::InferShapeContext *context, gert::Shape *gmmYShape,
-                                           const int64_t *epWorldSizePtr, const gert::ContinuousVector *recvCountsPtr,
-                                           const gert::ContinuousVector *sendCountsPtr, const int64_t e, int64_t &a,
+static ge::graphStatus InferGMMOutputShape(const gert::InferShapeContext* context, gert::Shape* gmmYShape,
+                                           const int64_t* epWorldSizePtr, const gert::ContinuousVector* recvCountsPtr,
+                                           const gert::ContinuousVector* sendCountsPtr, const int64_t e, int64_t& a,
                                            const int64_t n1)
 {
     gmmYShape->SetDimNum(DIM_NUM_2);
@@ -124,7 +124,7 @@ static ge::graphStatus InferGMMOutputShape(const gert::InferShapeContext *contex
                    VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "recvCounts GetData is nullptr."),
                    return ge::GRAPH_FAILED);
         for (int64_t i = 0; i < arraySize; i++) {
-            a += static_cast<const int64_t *>(recvCountsPtr->GetData())[i];
+            a += static_cast<const int64_t*>(recvCountsPtr->GetData())[i];
         }
         gmmYShape->SetDim(DIM_0, a);
         gmmYShape->SetDim(DIM_1, n1);
@@ -132,9 +132,9 @@ static ge::graphStatus InferGMMOutputShape(const gert::InferShapeContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferMMOutputShape(const gert::InferShapeContext *context, const gert::Shape *mmXShape,
-                                          const gert::Shape *mmWeightShape, const bool *transMmWeightPtr,
-                                          gert::Shape *mmYShape)
+static ge::graphStatus InferMMOutputShape(const gert::InferShapeContext* context, const gert::Shape* mmXShape,
+                                          const gert::Shape* mmWeightShape, const bool* transMmWeightPtr,
+                                          gert::Shape* mmYShape)
 {
     OPS_ERR_IF(mmYShape == nullptr,
                VECTOR_INFER_SHAPE_INNER_ERR_REPORT(context->GetNodeName(), "the shape of output mm_y is nullptr."),
@@ -159,9 +159,9 @@ static ge::graphStatus InferMMOutputShape(const gert::InferShapeContext *context
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferPermuteOutputShape(const gert::InferShapeContext *context, const bool *permuteOutFlagPtr,
+static ge::graphStatus InferPermuteOutputShape(const gert::InferShapeContext* context, const bool* permuteOutFlagPtr,
                                                const int64_t e, const int64_t a, const int64_t h,
-                                               gert::Shape *permuteOutShape)
+                                               gert::Shape* permuteOutShape)
 {
     OPS_ERR_IF(
         permuteOutShape == nullptr,
@@ -181,23 +181,23 @@ static ge::graphStatus InferPermuteOutputShape(const gert::InferShapeContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShapeAlltoAllvGroupedMatMul(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeAlltoAllvGroupedMatMul(gert::InferShapeContext* context)
 {
-    auto *gmmXShape = context->GetInputShape(INDEX_IN_GMM_X);
-    auto *gmmWeightShape = context->GetInputShape(INDEX_IN_GMM_WEIGHT);
-    auto *mmXShape = context->GetOptionalInputShape(INDEX_IN_MM_X);
-    auto *mmWeightShape = context->GetOptionalInputShape(INDEX_IN_MM_WEIGHT);
-    auto *gmmYShape = context->GetOutputShape(INDEX_OUT_GMM_Y);
-    auto *mmYShape = context->GetOutputShape(INDEX_OUT_MM_Y);
-    auto *permuteOutShape = context->GetOutputShape(INDEX_PERMUTE_OUT);
+    auto* gmmXShape = context->GetInputShape(INDEX_IN_GMM_X);
+    auto* gmmWeightShape = context->GetInputShape(INDEX_IN_GMM_WEIGHT);
+    auto* mmXShape = context->GetOptionalInputShape(INDEX_IN_MM_X);
+    auto* mmWeightShape = context->GetOptionalInputShape(INDEX_IN_MM_WEIGHT);
+    auto* gmmYShape = context->GetOutputShape(INDEX_OUT_GMM_Y);
+    auto* mmYShape = context->GetOutputShape(INDEX_OUT_MM_Y);
+    auto* permuteOutShape = context->GetOutputShape(INDEX_PERMUTE_OUT);
 
-    auto *attrs = context->GetAttrs();
-    auto *epWorldSizePtr = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_EP_WORLD_SIZE);
-    auto *recvCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(INDEX_ATTR_RECV_COUNTS);
-    auto *sendCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(INDEX_ATTR_SEND_COUNTS);
-    auto *transGmmWeightPtr = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_GMM_WEIGHT_INDEX);
-    auto *transMmWeightPtr = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_MM_WEIGHT_INDEX);
-    auto *permuteOutFlagPtr = attrs->GetAttrPointer<bool>(INDEX_ATTR_PERMUTE_OUT_FLAG_INDEX);
+    auto* attrs = context->GetAttrs();
+    auto* epWorldSizePtr = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_EP_WORLD_SIZE);
+    auto* recvCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(INDEX_ATTR_RECV_COUNTS);
+    auto* sendCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(INDEX_ATTR_SEND_COUNTS);
+    auto* transGmmWeightPtr = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_GMM_WEIGHT_INDEX);
+    auto* transMmWeightPtr = attrs->GetAttrPointer<bool>(INDEX_ATTR_TRANS_MM_WEIGHT_INDEX);
+    auto* permuteOutFlagPtr = attrs->GetAttrPointer<bool>(INDEX_ATTR_PERMUTE_OUT_FLAG_INDEX);
 
     OPS_CHECK_NULL_WITH_CONTEXT(context, gmmXShape);
     OPS_CHECK_NULL_WITH_CONTEXT(context, gmmWeightShape);
@@ -233,7 +233,7 @@ static ge::graphStatus InferShapeAlltoAllvGroupedMatMul(gert::InferShapeContext 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeAlltoAllvGroupedMatMul(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeAlltoAllvGroupedMatMul(gert::InferDataTypeContext* context)
 {
     auto dType = context->GetInputDataType(INDEX_IN_GMM_X);
     context->SetOutputDataType(INDEX_OUT_GMM_Y, dType);

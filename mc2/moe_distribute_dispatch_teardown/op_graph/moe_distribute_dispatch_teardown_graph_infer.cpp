@@ -28,7 +28,7 @@ static constexpr size_t DISPATCH_OUTPUT_ASSIST_INFO_FOR_COMBINE_INDEX = 2;
 static constexpr size_t DISPATCH_OUTPUT_EXPERT_TOKEN_NUMS_INDEX = 3;
 static constexpr size_t DISPATCH_INPUT_ATTR_QUANT_MODE_INDEX = 7;
 
-static ge::graphStatus InferDataTypeMoeDistributeDispatchTeardown(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMoeDistributeDispatchTeardown(gert::InferDataTypeContext* context)
 {
     OPS_LOG_D(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeDispatchTeardown.");
     auto yDtype = context->GetInputDataType(DISPATCH_INPUT_Y_INDEX);

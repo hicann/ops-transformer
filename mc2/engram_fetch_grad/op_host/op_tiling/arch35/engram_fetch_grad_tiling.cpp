@@ -60,7 +60,7 @@ constexpr uint32_t SCHEDULE_MODE_BATCH = 1U;
 
 static const std::vector<ge::DataType> GRAD_DTYPE_LIST = {ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT};
 
-static bool IsContains(const std::vector<ge::DataType> &list, ge::DataType value)
+static bool IsContains(const std::vector<ge::DataType>& list, ge::DataType value)
 {
     return std::find(list.begin(), list.end(), value) != list.end();
 }
@@ -75,7 +75,7 @@ static int64_t AlignTo(int64_t x, int64_t y)
     return CeilDiv(x, y) * y;
 }
 
-static void PrintEngramFetchGradTilingData(const EngramFetchGradTilingData *tilingData, const char *nodeName)
+static void PrintEngramFetchGradTilingData(const EngramFetchGradTilingData* tilingData, const char* nodeName)
 {
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return);
 
@@ -92,7 +92,7 @@ static void PrintEngramFetchGradTilingData(const EngramFetchGradTilingData *tili
     OP_LOGD(nodeName, "outputDtype is %d", tilingData->outputDtype);
 }
 
-static ge::graphStatus CheckTensorPtrNullptr(const gert::TilingContext *context)
+static ge::graphStatus CheckTensorPtrNullptr(const gert::TilingContext* context)
 {
     auto commContextDesc = context->GetInputDesc(IN_COMM_CONTEXT);
     auto gradDesc = context->GetInputDesc(IN_GRAD_FETCHED);
@@ -119,9 +119,9 @@ static ge::graphStatus CheckTensorPtrNullptr(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckTensorDataType(const gert::TilingContext *context)
+static ge::graphStatus CheckTensorDataType(const gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
 
     auto commContextDesc = context->GetInputDesc(IN_COMM_CONTEXT);
     OP_TILING_CHECK(commContextDesc->GetDataType() != ge::DT_INT32,
@@ -196,12 +196,12 @@ static ge::graphStatus CheckTensorDataType(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_t &numTokens, uint32_t &rankSize,
-                                      int64_t &totalRecv, int64_t &hiddenDim)
+static ge::graphStatus CheckTensorDim(const gert::TilingContext* context, int64_t& numTokens, uint32_t& rankSize,
+                                      int64_t& totalRecv, int64_t& hiddenDim)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
 
-    const gert::StorageShape *commContextShape = context->GetInputShape(IN_COMM_CONTEXT);
+    const gert::StorageShape* commContextShape = context->GetInputShape(IN_COMM_CONTEXT);
     OP_TILING_CHECK(commContextShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "commContext"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
@@ -218,7 +218,7 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
         return ge::GRAPH_FAILED);
 
     // gradFetched: 2D (T, H)
-    const gert::StorageShape *gradShape = context->GetInputShape(IN_GRAD_FETCHED);
+    const gert::StorageShape* gradShape = context->GetInputShape(IN_GRAD_FETCHED);
     OP_TILING_CHECK(gradShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "gradFetched"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         gradShape->GetStorageShape().GetDimNum() != DIM_TWO,
@@ -238,7 +238,7 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
                     return ge::GRAPH_FAILED);
 
     // perm: 1D (T,), dim0 == numTokens
-    const gert::StorageShape *permShape = context->GetInputShape(IN_PERM);
+    const gert::StorageShape* permShape = context->GetInputShape(IN_PERM);
     OP_TILING_CHECK(permShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "perm"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(permShape->GetStorageShape().GetDimNum() != DIM_ONE,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
@@ -253,7 +253,7 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
         return ge::GRAPH_FAILED);
 
     // sendCounts: 1D (W,)
-    const gert::StorageShape *sendCountsShape = context->GetInputShape(IN_SEND_COUNTS);
+    const gert::StorageShape* sendCountsShape = context->GetInputShape(IN_SEND_COUNTS);
     OP_TILING_CHECK(sendCountsShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "sendCounts"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
@@ -283,7 +283,7 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
                     return ge::GRAPH_FAILED);
 
     // recvCounts: 1D (W,)
-    const gert::StorageShape *recvCountsShape = context->GetInputShape(IN_RECV_COUNTS);
+    const gert::StorageShape* recvCountsShape = context->GetInputShape(IN_RECV_COUNTS);
     OP_TILING_CHECK(recvCountsShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "recvCounts"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
@@ -300,7 +300,7 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
         return ge::GRAPH_FAILED);
 
     // recvLocalEntry: 1D (R,)
-    const gert::StorageShape *recvLocalEntryShape = context->GetInputShape(IN_RECV_LOCAL_ENTRY);
+    const gert::StorageShape* recvLocalEntryShape = context->GetInputShape(IN_RECV_LOCAL_ENTRY);
     OP_TILING_CHECK(recvLocalEntryShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "recvLocalEntry"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(recvLocalEntryShape->GetStorageShape().GetDimNum() != DIM_ONE,
@@ -318,7 +318,7 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
     totalRecv = recvLocalEntryShape->GetStorageShape().GetDim(0);
 
     // numRecv: 1D, dim0 == 1
-    const gert::StorageShape *numRecvShape = context->GetInputShape(IN_NUM_RECV);
+    const gert::StorageShape* numRecvShape = context->GetInputShape(IN_NUM_RECV);
     OP_TILING_CHECK(numRecvShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "numRecv"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         numRecvShape->GetStorageShape().GetDimNum() != DIM_ONE,
@@ -334,7 +334,7 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
                     return ge::GRAPH_FAILED);
 
     // gradUniqueOut: 2D
-    const gert::StorageShape *gradUniqueShape = context->GetOutputShape(OUT_GRAD_UNIQUE);
+    const gert::StorageShape* gradUniqueShape = context->GetOutputShape(OUT_GRAD_UNIQUE);
     OP_TILING_CHECK(gradUniqueShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "gradUniqueOut"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
@@ -345,7 +345,7 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
         return ge::GRAPH_FAILED);
 
     // uniqueLocalEntryOut: 1D
-    const gert::StorageShape *uniqueLocalEntryShape = context->GetOutputShape(OUT_UNIQUE_LOCAL_ENTRY);
+    const gert::StorageShape* uniqueLocalEntryShape = context->GetOutputShape(OUT_UNIQUE_LOCAL_ENTRY);
     OP_TILING_CHECK(uniqueLocalEntryShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "uniqueLocalEntryOut"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(uniqueLocalEntryShape->GetStorageShape().GetDimNum() != DIM_ONE,
@@ -356,7 +356,7 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
                     return ge::GRAPH_FAILED);
 
     // numUniqueOut: 1D, dim0 == 1
-    const gert::StorageShape *numUniqueShape = context->GetOutputShape(OUT_NUM_UNIQUE);
+    const gert::StorageShape* numUniqueShape = context->GetOutputShape(OUT_NUM_UNIQUE);
     OP_TILING_CHECK(numUniqueShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "numUniqueOut"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
@@ -375,9 +375,9 @@ static ge::graphStatus CheckTensorDim(const gert::TilingContext *context, int64_
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckTensorFormat(const gert::TilingContext *context)
+static ge::graphStatus CheckTensorFormat(const gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
 
     auto commContextDesc = context->GetInputDesc(IN_COMM_CONTEXT);
     ge::Format commContextFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(commContextDesc->GetStorageFormat()));
@@ -451,10 +451,10 @@ static ge::graphStatus CheckTensorFormat(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingCheckEngramFetchGrad(const gert::TilingContext *context, int64_t &numTokens,
-                                                  uint32_t &rankSize, int64_t &totalRecv, int64_t &hiddenDim)
+static ge::graphStatus TilingCheckEngramFetchGrad(const gert::TilingContext* context, int64_t& numTokens,
+                                                  uint32_t& rankSize, int64_t& totalRecv, int64_t& hiddenDim)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
 
     OP_TILING_CHECK(CheckTensorPtrNullptr(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(nodeName, "params check nullptr failed."), return ge::GRAPH_FAILED);
@@ -468,9 +468,9 @@ static ge::graphStatus TilingCheckEngramFetchGrad(const gert::TilingContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckAttrs(const gert::TilingContext *context)
+static ge::graphStatus CheckAttrs(const gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return ge::GRAPH_FAILED);
 
@@ -493,9 +493,9 @@ static ge::graphStatus CheckAttrs(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetPlatformInfo(gert::TilingContext *context, EngramFetchGradTilingData &tilingData)
+static ge::graphStatus SetPlatformInfo(gert::TilingContext* context, EngramFetchGradTilingData& tilingData)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
 
     auto platformInfo = context->GetPlatformInfo();
     OPS_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
@@ -525,10 +525,10 @@ static ge::graphStatus SetPlatformInfo(gert::TilingContext *context, EngramFetch
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramFetchGradTilingData &tilingData,
+static ge::graphStatus SetTilingData(const gert::TilingContext* context, EngramFetchGradTilingData& tilingData,
                                      int64_t numTokens, uint32_t rankSize, int64_t totalRecv, int64_t hiddenDim)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     auto attrs = context->GetAttrs();
 
     // 布局常量已收敛至 tiling_data.h（Mc2Kernel 单一权威定义），此处直接引用、不再镜像；
@@ -708,18 +708,18 @@ static ge::graphStatus SetTilingData(const gert::TilingContext *context, EngramF
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetTilingKey(gert::TilingContext *context)
+static void SetTilingKey(gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     const uint64_t tilingKey = GET_TPL_TILING_KEY(ENGRAM_FETCH_GRAD_DEFAULT_MODE);
     context->SetTilingKey(tilingKey);
     OP_LOGD(nodeName, "tilingKey is [%llu] in engram_fetch_grad.", tilingKey);
 }
 
-static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const EngramFetchGradTilingData &tilingData)
+static ge::graphStatus SetWorkSpace(gert::TilingContext* context, const EngramFetchGradTilingData& tilingData)
 {
-    const char *nodeName = context->GetNodeName();
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    const char* nodeName = context->GetNodeName();
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
 
     int64_t numRanks = static_cast<int64_t>(tilingData.rankSize);
@@ -788,16 +788,16 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext *context, const EngramFe
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus EngramFetchGradTilingFunc(gert::TilingContext *context)
+static ge::graphStatus EngramFetchGradTilingFunc(gert::TilingContext* context)
 {
     OP_TILING_CHECK(context == nullptr, OP_LOGE("engram_fetch_grad_tiling", "failed to get tiling context."),
                     return ge::GRAPH_FAILED);
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_TILING_CHECK(nodeName == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "nodeName"), return ge::GRAPH_FAILED);
 
     OP_LOGI(nodeName, "Enter EngramFetchGrad tiling func.");
 
-    EngramFetchGradTilingData *tilingData = context->GetTilingData<EngramFetchGradTilingData>();
+    EngramFetchGradTilingData* tilingData = context->GetTilingData<EngramFetchGradTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
 
     int64_t numTokens = 0;

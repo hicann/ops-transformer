@@ -26,7 +26,7 @@ struct AlltoAllMatmulV2HostUtParamBase {
     bool transpose_x2;
     ge::graphStatus expectResult;
 
-    explicit AlltoAllMatmulV2HostUtParamBase(const csv_map &csvMap)
+    explicit AlltoAllMatmulV2HostUtParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->group = ReadMap(csvMap, "group");
@@ -37,7 +37,7 @@ struct AlltoAllMatmulV2HostUtParamBase {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AlltoAllMatmulV2HostUtParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const AlltoAllMatmulV2HostUtParamBase& param)
 {
     return os << param.case_name;
 }
@@ -53,7 +53,7 @@ struct AlltoAllMatmulV2InferShapeUtParam : public AlltoAllMatmulV2HostUtParamBas
     gert::InfershapeContextPara::TensorDescription all2allOut = ID_DEFAULT;
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    explicit AlltoAllMatmulV2InferShapeUtParam(const csv_map &csvMap)
+    explicit AlltoAllMatmulV2InferShapeUtParam(const csv_map& csvMap)
         : AlltoAllMatmulV2HostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(
@@ -90,7 +90,7 @@ struct AlltoAllMatmulV2InferDataTypeUtParam : public AlltoAllMatmulV2HostUtParam
     ge::DataType y = ge::DT_UNDEFINED;
     ge::DataType all2all_out = ge::DT_UNDEFINED;
 
-    explicit AlltoAllMatmulV2InferDataTypeUtParam(const csv_map &csvMap)
+    explicit AlltoAllMatmulV2InferDataTypeUtParam(const csv_map& csvMap)
         : AlltoAllMatmulV2HostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(1); // context always exists

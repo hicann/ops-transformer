@@ -21,7 +21,7 @@
 namespace MC2Tiling {
 class MoeDistributeCombineSetupTilingA3 : public MoeDistributeCombineSetupTilingBase {
 public:
-    explicit MoeDistributeCombineSetupTilingA3(gert::TilingContext *context)
+    explicit MoeDistributeCombineSetupTilingA3(gert::TilingContext* context)
         : MoeDistributeCombineSetupTilingBase(context)
     {
         socTilingName_ = "MoeDistributeCombineSetupA3";

@@ -18,8 +18,8 @@ namespace MatmulAllReduceUT {
 
 namespace {
 
-void RunQuantMatmulAllReduceV2Ut(op::SocVersion soc, const TensorDesc &x1, const TensorDesc &x2, const aclTensor *bias,
-                                 const aclTensor *x3, const TensorDesc &dequantScale, const aclTensor *pertokenScale,
+void RunQuantMatmulAllReduceV2Ut(op::SocVersion soc, const TensorDesc& x1, const TensorDesc& x2, const aclTensor* bias,
+                                 const aclTensor* x3, const TensorDesc& dequantScale, const aclTensor* pertokenScale,
                                  aclnnStatus expectResult)
 {
     op::SetPlatformSocVersion(soc);
@@ -27,12 +27,12 @@ void RunQuantMatmulAllReduceV2Ut(op::SocVersion soc, const TensorDesc &x1, const
     if (x1.GetViewDims().size() == 3) {
         output = {{x1.GetViewDims()[0], x1.GetViewDims()[1], x2.GetViewDims()[1]}, ACL_FLOAT16, ACL_FORMAT_ND};
     }
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAllReduceV2,
                         INPUT(x1, x2, bias, x3, dequantScale, pertokenScale, group, reduceOp, commTurn, streamMode),
                         OUTPUT(output));
@@ -71,7 +71,7 @@ TEST_P(AclnnQuantMatmulAllReduceV2Test, param)
                               param.group.c_str(), param.reduceOp.c_str(), param.commTurn, param.streamMode),
                         OUTPUT(param.output));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(ACLNN_ERR_PARAM_INVALID, aclnnRet);

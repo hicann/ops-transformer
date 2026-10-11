@@ -36,12 +36,12 @@ using namespace op;
 extern "C" {
 #endif
 
-aclnnStatus aclnnMatmulAllReduceAddRmsNormGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2,
-                                                           const aclTensor *bias, const aclTensor *residual,
-                                                           const aclTensor *gamma, double epsilon, const char *group,
-                                                           const char *reduceOp, int64_t commTurn, int64_t streamMode,
-                                                           const aclTensor *y, const aclTensor *normOut,
-                                                           uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMatmulAllReduceAddRmsNormGetWorkspaceSize(const aclTensor* x1, const aclTensor* x2,
+                                                           const aclTensor* bias, const aclTensor* residual,
+                                                           const aclTensor* gamma, double epsilon, const char* group,
+                                                           const char* reduceOp, int64_t commTurn, int64_t streamMode,
+                                                           const aclTensor* y, const aclTensor* normOut,
+                                                           uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     // inplace接口复用非inplace接口 告警内提示两个接口都将被废弃
     DEPRECATED_MM_ARN_API_WARN_ONCE("aclnnMatmulAllReduceAddRmsNormGetWorkspaceSize",
@@ -79,7 +79,7 @@ aclnnStatus aclnnMatmulAllReduceAddRmsNormGetWorkspaceSize(const aclTensor *x1, 
     return ret;
 }
 
-aclnnStatus aclnnMatmulAllReduceAddRmsNorm(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMatmulAllReduceAddRmsNorm(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            const aclrtStream stream)
 {
     DEPRECATED_MM_ARN_API_WARN_ONCE("aclnnMatmulAllReduceAddRmsNorm", "aclnnInplaceMatmulAllReduceAddRmsNorm",

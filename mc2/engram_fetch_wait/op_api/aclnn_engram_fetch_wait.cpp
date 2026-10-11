@@ -23,14 +23,14 @@
 
 using namespace op;
 
-static bool CheckNotNull(const aclTensor *commContext, aclTensor *fetched)
+static bool CheckNotNull(const aclTensor* commContext, aclTensor* fetched)
 {
     OP_CHECK_NULL(commContext, return false);
     OP_CHECK_NULL(fetched, return false);
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *commContext, aclTensor *fetched)
+static aclnnStatus CheckParams(const aclTensor* commContext, aclTensor* fetched)
 {
     CHECK_RET(CheckNotNull(commContext, fetched), ACLNN_ERR_PARAM_NULLPTR);
     return ACLNN_SUCCESS;
@@ -40,8 +40,8 @@ static aclnnStatus CheckParams(const aclTensor *commContext, aclTensor *fetched)
 extern "C" {
 #endif
 
-aclnnStatus aclnnEngramFetchWaitGetWorkspaceSize(const aclTensor *commContext, aclTensor *fetched,
-                                                 uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnEngramFetchWaitGetWorkspaceSize(const aclTensor* commContext, aclTensor* fetched,
+                                                 uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     auto retParam = CheckParams(commContext, fetched);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
@@ -49,7 +49,7 @@ aclnnStatus aclnnEngramFetchWaitGetWorkspaceSize(const aclTensor *commContext, a
     return ret;
 }
 
-aclnnStatus aclnnEngramFetchWait(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnEngramFetchWait(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     aclnnStatus ret = aclnnInnerEngramFetchWait(workspace, workspaceSize, executor, stream);
     return ret;

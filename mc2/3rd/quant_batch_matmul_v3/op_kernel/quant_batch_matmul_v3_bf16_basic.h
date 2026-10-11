@@ -24,7 +24,7 @@ class BmmBasicDequantBf16 {
 public:
     __aicore__ inline BmmBasicDequantBf16() {}
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR scale, GM_ADDR bias, GM_ADDR y, GM_ADDR workSpace,
-                                const Mc2QuantBatchMatmulV3TilingData *__restrict tilingData, TPipe *tPipe)
+                                const Mc2QuantBatchMatmulV3TilingData* __restrict tilingData, TPipe* tPipe)
     {
         blockIdx = GetBlockIdx();
         blockIdx /= GetTaskRation();
@@ -76,13 +76,13 @@ public:
         End();
     }
 
-    __aicore__ inline UPDATE_TYPE &GetUpdateObj()
+    __aicore__ inline UPDATE_TYPE& GetUpdateObj()
     {
         return update_;
     }
 
 private:
-    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData *tilingData)
+    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData* tilingData)
     {
         isPerTensor_ = tilingData->params.isPerTensor;
 
@@ -110,27 +110,27 @@ private:
                                              GM_ADDR workSpace)
     {
         if (isPerTensor_) {
-            scaleScalar_ = *((__gm__ scaleType *)scale);
+            scaleScalar_ = *((__gm__ scaleType*)scale);
         }
-        xGm_.SetGlobalBuffer((__gm__ x1Type *)x1);
-        weightGm_.SetGlobalBuffer((__gm__ x2Type *)x2);
+        xGm_.SetGlobalBuffer((__gm__ x1Type*)x1);
+        weightGm_.SetGlobalBuffer((__gm__ x2Type*)x2);
         if (m_ <= baseM_) {
             weightGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
         }
         if (hasBias_ != 0U) {
             if (biasDtype_ == DT_BF16) {
-                biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t *)bias);
+                biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t*)bias);
             } else if (biasDtype_ == DT_FLOAT16) {
-                biasGmFp16_.SetGlobalBuffer((__gm__ half *)bias);
+                biasGmFp16_.SetGlobalBuffer((__gm__ half*)bias);
             } else if (biasDtype_ == DT_FLOAT) {
-                biasGmFp32_.SetGlobalBuffer((__gm__ float *)bias);
+                biasGmFp32_.SetGlobalBuffer((__gm__ float*)bias);
             } else {
-                biasGmInt32_.SetGlobalBuffer((__gm__ int32_t *)bias);
+                biasGmInt32_.SetGlobalBuffer((__gm__ int32_t*)bias);
             }
         }
-        yGm_.SetGlobalBuffer((__gm__ yType *)y);
-        scaleGm_.SetGlobalBuffer((__gm__ scaleType *)scale);
-        mmOutGm_.SetGlobalBuffer((__gm__ int32_t *)workSpace, BUFFER_NUM * usedCoreNum_ * baseM_ * baseN_);
+        yGm_.SetGlobalBuffer((__gm__ yType*)y);
+        scaleGm_.SetGlobalBuffer((__gm__ scaleType*)scale);
+        mmOutGm_.SetGlobalBuffer((__gm__ int32_t*)workSpace, BUFFER_NUM * usedCoreNum_ * baseM_ * baseN_);
     }
 
     __aicore__ inline void InitLocalBuffers()
@@ -149,7 +149,7 @@ private:
     }
 
     __aicore__ inline void OneTileCompute(uint64_t mTileIndex, uint64_t nTileIndex, uint64_t pingOffsetC,
-                                          bool &pongSwitch)
+                                          bool& pongSwitch)
     {
         for (uint64_t j = 0; j < block_.realRound_; j++) {
             // 更新此次基本块的大小和输入输出地址
@@ -194,7 +194,7 @@ private:
         mm_.GetTensorC(mmOutGm_[offsetWorkspaceC_], 0, true);
     }
 
-    __aicore__ inline void BasicDequantCompute(GlobalTensor<int32_t> &curMmOutGm, uint32_t curAicM, uint32_t curAicN)
+    __aicore__ inline void BasicDequantCompute(GlobalTensor<int32_t>& curMmOutGm, uint32_t curAicM, uint32_t curAicN)
     {
         LocalTensor<float> dstLocalFp32;
         LocalTensor<float> biasFp32;
@@ -266,9 +266,9 @@ private:
         }
     }
 
-    __aicore__ inline void BiasTensorInit(LocalTensor<float> &dstLocalFp32, LocalTensor<float> &biasFp32,
-                                          LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                          LocalTensor<float> &oriBiasFp32)
+    __aicore__ inline void BiasTensorInit(LocalTensor<float>& dstLocalFp32, LocalTensor<float>& biasFp32,
+                                          LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                          LocalTensor<float>& oriBiasFp32)
     {
         dstLocalFp32 = outFp32Tmp_.Get<float>();
         biasFp32 = biasFp32Tmp_.Get<float>();
@@ -281,8 +281,8 @@ private:
         }
     }
 
-    __aicore__ inline void BiasGm2Ub(LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                     LocalTensor<float> &oriBiasFp32, DataCopyPadParams padParams, uint32_t curAivN)
+    __aicore__ inline void BiasGm2Ub(LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                     LocalTensor<float>& oriBiasFp32, DataCopyPadParams padParams, uint32_t curAivN)
     {
         DataCopyParams bias2UbParams{1, 0, 0, 0};
         bias2UbParams.blockLen = curAivN * biasDtypeSize_;
@@ -296,17 +296,17 @@ private:
         }
     }
 
-    __aicore__ inline void Bf16ScaleGm2Ub(LocalTensor<scaleType> &scaleLocal, GlobalTensor<scaleType> &scaleGm_,
-                                          DataCopyPadParams &padParams, uint32_t curAivN)
+    __aicore__ inline void Bf16ScaleGm2Ub(LocalTensor<scaleType>& scaleLocal, GlobalTensor<scaleType>& scaleGm_,
+                                          DataCopyPadParams& padParams, uint32_t curAivN)
     {
         DataCopyParams scale2UbParams{1, 0, 0, 0};
         scale2UbParams.blockLen = curAivN * sizeof(scaleType);
         DataCopyPad(scaleLocal, scaleGm_[offset_.offsetScale], scale2UbParams, padParams);
     }
 
-    __aicore__ inline void CalBiasAdd(LocalTensor<float> &dstLocalFp32, LocalTensor<float> &biasFp32,
-                                      LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                      LocalTensor<float> &oriBiasFp32, LocalTensor<yType> &dstLocal, uint32_t curAivN,
+    __aicore__ inline void CalBiasAdd(LocalTensor<float>& dstLocalFp32, LocalTensor<float>& biasFp32,
+                                      LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                      LocalTensor<float>& oriBiasFp32, LocalTensor<yType>& dstLocal, uint32_t curAivN,
                                       uint32_t curAivM)
     {
         uint32_t computedAivN = DequantBmm::Align(curAivN, 8U); // 8: 32B aligned for int32_t
@@ -371,7 +371,7 @@ private:
     GlobalTensor<scaleType> scaleGm_;
     GlobalTensor<int32_t> mmOutGm_;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     // define the que
     TQue<QuePosition::VECIN, 1> vecQueSrc_;
     TQue<QuePosition::VECIN, 1> vecQueScale_;

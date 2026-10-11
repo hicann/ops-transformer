@@ -40,7 +40,7 @@ using matmul::MatmulType;
 namespace Mc2WeightQuantBatchMatmulV2::Arch35 {
 
 #define WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM \
-    template <typename xType, typename biasType, typename yType, const WqmmConfig &wqmmConfig, typename MatmulImplType>
+    template <typename xType, typename biasType, typename yType, const WqmmConfig& wqmmConfig, typename MatmulImplType>
 
 #define WQBMM_CUBE_COMPUTE_CLASS WeightQuantBatchMatmulV2CubeCompute<xType, biasType, yType, wqmmConfig, MatmulImplType>
 
@@ -48,27 +48,27 @@ WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 class WeightQuantBatchMatmulV2CubeCompute {
 public:
     __aicore__ inline WeightQuantBatchMatmulV2CubeCompute(){};
-    __aicore__ inline void UpdateGlobalAddr(__gm__ xType *x, __gm__ yType *y, __gm__ biasType *bias,
-                                            __gm__ uint64_t *quantScale, const bool isBias);
-    __aicore__ inline void Init(TBuf<TPosition::TSCM> &l1Tbuf, uint64_t weightL1Space, uint64_t aPreloadSize,
-                                const TCubeTiling *__restrict matmulTiling, AscendC::TPipe *tPipe);
-    __aicore__ inline void LaunchMatmul(const LocalTensor<xType> &weightF16L1, int64_t kbOffset, uint64_t kbL1RealSize,
-                                        const BasicBlockOffsetParam &param, uint64_t cvLoopIdx);
+    __aicore__ inline void UpdateGlobalAddr(__gm__ xType* x, __gm__ yType* y, __gm__ biasType* bias,
+                                            __gm__ uint64_t* quantScale, const bool isBias);
+    __aicore__ inline void Init(TBuf<TPosition::TSCM>& l1Tbuf, uint64_t weightL1Space, uint64_t aPreloadSize,
+                                const TCubeTiling* __restrict matmulTiling, AscendC::TPipe* tPipe);
+    __aicore__ inline void LaunchMatmul(const LocalTensor<xType>& weightF16L1, int64_t kbOffset, uint64_t kbL1RealSize,
+                                        const BasicBlockOffsetParam& param, uint64_t cvLoopIdx);
     __aicore__ inline void WaitMTE1ToMTE2(uint64_t cvLoopIdx);
     __aicore__ inline void SetMTE1ToMTE2(uint64_t cvLoopIdx);
-    __aicore__ inline void CopyAAndBiasGmToL1(const BasicBlockOffsetParam &param, int64_t kaGmOffset,
+    __aicore__ inline void CopyAAndBiasGmToL1(const BasicBlockOffsetParam& param, int64_t kaGmOffset,
                                               int64_t kbL1RealSize, int64_t biasRealN, uint64_t cvLoopIdx);
-    __aicore__ inline void GetTensorC(const BasicBlockOffsetParam &param);
-    __aicore__ inline void GetTensorC(LocalTensor<yType> &yUb);
+    __aicore__ inline void GetTensorC(const BasicBlockOffsetParam& param);
+    __aicore__ inline void GetTensorC(LocalTensor<yType>& yUb);
     __aicore__ inline void EndSync(uint64_t cvLoopIdx);
     __aicore__ inline void ClearAFullLoadFlag();
 
 private:
-    __aicore__ inline void PreloadA(uint64_t aPreloadSize, const LocalTensor<xType> &perloadBuffer,
-                                    const TCubeTiling *__restrict matmulTiling);
+    __aicore__ inline void PreloadA(uint64_t aPreloadSize, const LocalTensor<xType>& perloadBuffer,
+                                    const TCubeTiling* __restrict matmulTiling);
     __aicore__ inline void InitSync();
-    __aicore__ inline uint64_t CheckMaxSpace(const BasicBlockOffsetParam &param);
-    __aicore__ inline void CopyAGmToL1SingleBuffer(const BasicBlockOffsetParam &param, int64_t kaGmOffset,
+    __aicore__ inline uint64_t CheckMaxSpace(const BasicBlockOffsetParam& param);
+    __aicore__ inline void CopyAGmToL1SingleBuffer(const BasicBlockOffsetParam& param, int64_t kaGmOffset,
                                                    int64_t kbL1RealSize, int64_t biasRealN, uint64_t cvLoopIdx,
                                                    int64_t aGmOffset);
 
@@ -97,7 +97,7 @@ private:
 };
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline uint64_t WQBMM_CUBE_COMPUTE_CLASS::CheckMaxSpace(const BasicBlockOffsetParam &param)
+__aicore__ inline uint64_t WQBMM_CUBE_COMPUTE_CLASS::CheckMaxSpace(const BasicBlockOffsetParam& param)
 {
     uint64_t maxSpace = aL1MaxHalfCount_ * param.kbL1Size * CeilAlign(param.mL1Size, static_cast<uint64_t>(BLOCK_CUBE));
     if (param.kbL1Size > 0 && param.kSize % param.kbL1Size == 0 && !wqmmConfig.aTrans && maxSpace <= aF16L1DbOffset_) {
@@ -107,8 +107,8 @@ __aicore__ inline uint64_t WQBMM_CUBE_COMPUTE_CLASS::CheckMaxSpace(const BasicBl
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::LaunchMatmul(const LocalTensor<xType> &weightF16L1, int64_t kbOffset,
-                                                              uint64_t kbL1RealSize, const BasicBlockOffsetParam &param,
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::LaunchMatmul(const LocalTensor<xType>& weightF16L1, int64_t kbOffset,
+                                                              uint64_t kbL1RealSize, const BasicBlockOffsetParam& param,
                                                               uint64_t cvLoopIdx)
 {
     mmObj_.SetOrgShape(CeilAlign(param.mL1Size, static_cast<uint64_t>(BLOCK_CUBE)),
@@ -183,7 +183,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::SetMTE1ToMTE2(uint64_t cvLoopId
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAGmToL1SingleBuffer(const BasicBlockOffsetParam &param,
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAGmToL1SingleBuffer(const BasicBlockOffsetParam& param,
                                                                          int64_t kaGmOffset, int64_t kbL1RealSize,
                                                                          int64_t biasRealN, uint64_t cvLoopIdx,
                                                                          int64_t aGmOffset)
@@ -226,7 +226,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAGmToL1SingleBuffer(const B
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAAndBiasGmToL1(const BasicBlockOffsetParam &param,
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::CopyAAndBiasGmToL1(const BasicBlockOffsetParam& param,
                                                                     int64_t kaGmOffset, int64_t kbL1RealSize,
                                                                     int64_t biasRealN, uint64_t cvLoopIdx)
 {
@@ -307,8 +307,8 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::InitSync()
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::UpdateGlobalAddr(__gm__ xType *x, __gm__ yType *y,
-                                                                  __gm__ biasType *bias, __gm__ uint64_t *quantScale,
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::UpdateGlobalAddr(__gm__ xType* x, __gm__ yType* y,
+                                                                  __gm__ biasType* bias, __gm__ uint64_t* quantScale,
                                                                   const bool isBias)
 {
     isBias_ = isBias;
@@ -324,8 +324,8 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::UpdateGlobalAddr(__gm__ xType *
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
 __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::PreloadA(uint64_t aPreloadSize,
-                                                          const LocalTensor<xType> &perloadBuffer,
-                                                          const TCubeTiling *__restrict matmulTiling)
+                                                          const LocalTensor<xType>& perloadBuffer,
+                                                          const TCubeTiling* __restrict matmulTiling)
 {
     uint64_t xOffset = GetBlockIdx() * aPreloadSize;
     uint64_t xSizeLimit = matmulTiling->M * matmulTiling->Ka;
@@ -345,9 +345,9 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::PreloadA(uint64_t aPreloadSize,
 // 场景1： 使能a preload。必须先更新地址再init
 // 场景2： gm地址变化需要实时获取场景，必须先init再更新地址
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::Init(TBuf<TPosition::TSCM> &l1Tbuf, uint64_t weightL1Space,
-                                                      uint64_t aPreloadSize, const TCubeTiling *__restrict matmulTiling,
-                                                      AscendC::TPipe *tPipe)
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::Init(TBuf<TPosition::TSCM>& l1Tbuf, uint64_t weightL1Space,
+                                                      uint64_t aPreloadSize, const TCubeTiling* __restrict matmulTiling,
+                                                      AscendC::TPipe* tPipe)
 {
     // (1) y 数据类型为 int8 时，quantScale需要预留一份空间
     //  ① 有bias
@@ -403,7 +403,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::Init(TBuf<TPosition::TSCM> &l1T
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(const BasicBlockOffsetParam &param)
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(const BasicBlockOffsetParam& param)
 {
     uint64_t outOffset = param.mOffset * param.nSize + param.nOffset;
 #ifndef __CCE_KT_TEST__
@@ -412,7 +412,7 @@ __aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(const BasicBlockOffs
 }
 
 WQBMM_CUBE_COMPUTE_TEMPLATE_PARAM
-__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(LocalTensor<yType> &yUb)
+__aicore__ inline void WQBMM_CUBE_COMPUTE_CLASS::GetTensorC(LocalTensor<yType>& yUb)
 {
 #ifndef __CCE_KT_TEST__
     mmObj_.GetTensorC(yUb, 0, true);

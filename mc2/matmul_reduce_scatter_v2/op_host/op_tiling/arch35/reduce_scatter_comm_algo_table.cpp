@@ -84,7 +84,7 @@ static constexpr Mc2Hcom::CommAlgoEntry REDUCE_SCATTER_COMM_ALGO_TABLE[] = {
      MAX_DATA_BYTES_UNLIMITED, RANK_SIZE_4, MAX_RANK_SIZE, MEDIUM, "sole[mesh.multi_channel]"},
 };
 
-const Mc2Hcom::CommAlgoEntry *GetReduceScatterCommAlgoTable(uint32_t &count)
+const Mc2Hcom::CommAlgoEntry* GetReduceScatterCommAlgoTable(uint32_t& count)
 {
     count = sizeof(REDUCE_SCATTER_COMM_ALGO_TABLE) / sizeof(REDUCE_SCATTER_COMM_ALGO_TABLE[0]);
     return REDUCE_SCATTER_COMM_ALGO_TABLE;

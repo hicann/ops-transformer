@@ -22,10 +22,10 @@ constexpr int64_t NETWORK_DIRECT = 0;
 constexpr int64_t NETWORK_HYBRID = 1;
 } // namespace
 
-static aclnnStatus CheckNotNull(const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx,
-                                const aclTensor *numRecvTokensPerRank, const aclTensor *numRecvTokensPerExpert,
-                                const aclTensor *recvX, const aclTensor *recvSrcMetadata,
-                                const aclTensor *recvTopkWeights, const aclTensor *recvScales)
+static aclnnStatus CheckNotNull(const aclTensor* context, const aclTensor* x, const aclTensor* topkIdx,
+                                const aclTensor* numRecvTokensPerRank, const aclTensor* numRecvTokensPerExpert,
+                                const aclTensor* recvX, const aclTensor* recvSrcMetadata,
+                                const aclTensor* recvTopkWeights, const aclTensor* recvScales)
 {
     CHECK_RET(context != nullptr, ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(x != nullptr, ACLNN_ERR_PARAM_NULLPTR);
@@ -56,11 +56,11 @@ static aclnnStatus CheckParams(int64_t epWorldSize, int64_t epRankId, int64_t nu
 extern "C" {
 #endif
 aclnnStatus MoeEpDispatchEpilogueGetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx, const aclTensor *numRecvTokensPerRank,
-    const aclTensor *numRecvTokensPerExpert, const aclTensor *cachedRecvSrcMetadata, int64_t epWorldSize,
+    const aclTensor* context, const aclTensor* x, const aclTensor* topkIdx, const aclTensor* numRecvTokensPerRank,
+    const aclTensor* numRecvTokensPerExpert, const aclTensor* cachedRecvSrcMetadata, int64_t epWorldSize,
     int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank, int64_t cclBufferSize, bool hasTopkWeights,
-    int64_t topoType, int64_t rankNumPerServer, aclTensor *recvX, aclTensor *recvSrcMetadata,
-    aclTensor *recvTopkWeights, aclTensor *recvScales, uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t topoType, int64_t rankNumPerServer, aclTensor* recvX, aclTensor* recvSrcMetadata,
+    aclTensor* recvTopkWeights, aclTensor* recvScales, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("MoeEpDispatchEpilogue", "Begin to do MoeEpDispatchEpilogueGetWorkspaceSize");
     auto retNotNull = CheckNotNull(context, x, topkIdx, numRecvTokensPerRank, numRecvTokensPerExpert, recvX,
@@ -78,11 +78,11 @@ aclnnStatus MoeEpDispatchEpilogueGetWorkspaceSize(
 }
 
 aclnnStatus aclnnMoeEpDispatchEpilogueGetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x, const aclTensor *topkIdx, const aclTensor *numRecvTokensPerRank,
-    const aclTensor *numRecvTokensPerExpert, const aclTensor *cachedRecvSrcMetadata, int64_t epWorldSize,
+    const aclTensor* context, const aclTensor* x, const aclTensor* topkIdx, const aclTensor* numRecvTokensPerRank,
+    const aclTensor* numRecvTokensPerExpert, const aclTensor* cachedRecvSrcMetadata, int64_t epWorldSize,
     int64_t epRankId, int64_t numExperts, int64_t numMaxTokensPerRank, int64_t cclBufferSize, bool hasTopkWeights,
-    int64_t topoType, int64_t rankNumPerServer, aclTensor *recvX, aclTensor *recvSrcMetadata,
-    aclTensor *recvTopkWeights, aclTensor *recvScales, uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t topoType, int64_t rankNumPerServer, aclTensor* recvX, aclTensor* recvSrcMetadata,
+    aclTensor* recvTopkWeights, aclTensor* recvScales, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     return MoeEpDispatchEpilogueGetWorkspaceSize(
         context, x, topkIdx, numRecvTokensPerRank, numRecvTokensPerExpert, cachedRecvSrcMetadata, epWorldSize, epRankId,
@@ -94,9 +94,9 @@ enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_MTE = 0,
     NNOPBASE_HCCL_SERVER_TYPE_AICPU = 1
 };
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
-aclnnStatus aclnnMoeEpDispatchEpilogue(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMoeEpDispatchEpilogue(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                        aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {

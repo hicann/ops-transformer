@@ -23,7 +23,7 @@
 namespace ops {
 #define OPS_CHECK_NULL_WITH_CONTEXT(context, ptr) \
     if ((ptr) == nullptr) { \
-        const char *name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
+        const char* name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
         OP_LOGE_WITHOUT_REPORT(name, "%s is nullptr!", #ptr); \
         REPORT_INNER_ERR_MSG("EZ9999", "op[%s], %s is nullptr!", name, #ptr); \
         return ge::GRAPH_FAILED; \
@@ -31,7 +31,7 @@ namespace ops {
 
 #define OPS_CHECK_NULL_WITH_CONTEXT_RET(context, ptr, ret) \
     if ((ptr) == nullptr) { \
-        const char *name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
+        const char* name = ((context)->GetNodeName() == nullptr) ? "nil" : (context)->GetNodeName(); \
         OP_LOGE_WITHOUT_REPORT(name, "%s is nullptr!", #ptr); \
         REPORT_INNER_ERR_MSG("EZ9999", "op[%s], %s is nullptr!", name, #ptr); \
         return ret; \

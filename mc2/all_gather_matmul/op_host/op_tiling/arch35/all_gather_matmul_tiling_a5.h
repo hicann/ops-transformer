@@ -19,13 +19,13 @@
 namespace optiling {
 class AllGatherMatmulTilingA5 : public AllGatherMatmulTilingBase {
 public:
-    CutResult GetCutResult(Mc2Tiling::AllGatherMatmulTilingData &tilingData, mc2tiling::TilingArgs &args) override;
-    ge::graphStatus CheckValidRank(Mc2Tiling::AllGatherMatmulTilingData *tilingData,
+    CutResult GetCutResult(Mc2Tiling::AllGatherMatmulTilingData& tilingData, mc2tiling::TilingArgs& args) override;
+    ge::graphStatus CheckValidRank(Mc2Tiling::AllGatherMatmulTilingData* tilingData,
                                    const std::map<uint32_t, std::vector<uint32_t>> VALID_RANK,
-                                   gert::TilingContext *context, uint32_t rankSize) override;
-    void SetSocParam(Mc2Tiling::AllGatherMatmulTilingData *tilingData, const char *group) override;
-    std::string GetAlgConfig(Mc2Tiling::AllGatherMatmulTilingData *tilingData,
-                             const mc2tiling::TilingArgs &args) override;
+                                   gert::TilingContext* context, uint32_t rankSize) override;
+    void SetSocParam(Mc2Tiling::AllGatherMatmulTilingData* tilingData, const char* group) override;
+    std::string GetAlgConfig(Mc2Tiling::AllGatherMatmulTilingData* tilingData,
+                             const mc2tiling::TilingArgs& args) override;
 };
 } // namespace optiling
 #endif //__ALL_GATHER_MATMUL_TILING_A5_H__

@@ -84,8 +84,8 @@ struct TilingRunInfo {
 
 class QuantReduceScatterUtilTiling {
 public:
-    static ge::graphStatus CheckNpuArch(const gert::TilingContext *context);
-    static ge::graphStatus CheckTilingFunc(gert::TilingContext *context, TilingRunInfo &runInfo, const OpType opType);
+    static ge::graphStatus CheckNpuArch(const gert::TilingContext* context);
+    static ge::graphStatus CheckTilingFunc(gert::TilingContext* context, TilingRunInfo& runInfo, const OpType opType);
 };
 
 }; // namespace MC2Tiling

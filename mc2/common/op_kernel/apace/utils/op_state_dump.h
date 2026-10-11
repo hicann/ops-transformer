@@ -48,7 +48,7 @@ class OpStateDump {
 public:
     __aicore__ inline OpStateDump() = default;
 
-    __aicore__ inline void Init(GM_ADDR workspaceGM, const Utils::DfxWorkspaceLayoutInfo *wsLayout, uint32_t aicCoreNum)
+    __aicore__ inline void Init(GM_ADDR workspaceGM, const Utils::DfxWorkspaceLayoutInfo* wsLayout, uint32_t aicCoreNum)
     {
         opStateDumpBase_ = nullptr;
         slotIdx_ = 0;
@@ -68,7 +68,7 @@ public:
             }
             if (wsLayout->segments[i].type == Utils::WS_SEG_STATE_DUMP) {
                 uint64_t userOffset = wsLayout->segments[i].offset - libApiSize;
-                opStateDumpBase_ = reinterpret_cast<__gm__ Utils::StateDumpPerCore *>(workspaceGM + userOffset);
+                opStateDumpBase_ = reinterpret_cast<__gm__ Utils::StateDumpPerCore*>(workspaceGM + userOffset);
                 break;
             }
         }
@@ -83,7 +83,7 @@ public:
             slotIdx_ = aicCoreNum + AscendC::GetBlockIdx();
         }
 
-        __gm__ Utils::StateDumpPerCore *mySlot = &opStateDumpBase_[slotIdx_];
+        __gm__ Utils::StateDumpPerCore* mySlot = &opStateDumpBase_[slotIdx_];
         mySlot->magicNum = 0x5A5A5A5AU;
         mySlot->coreId = static_cast<uint16_t>(slotIdx_);
         mySlot->execTurn = 0;
@@ -105,7 +105,7 @@ public:
         if (opStateDumpBase_ == nullptr) {
             return;
         }
-        __gm__ Utils::StateDumpPerCore *mySlot = &opStateDumpBase_[slotIdx_];
+        __gm__ Utils::StateDumpPerCore* mySlot = &opStateDumpBase_[slotIdx_];
         if (fields & DUMP_FIELD_TURN_INC) {
             mySlot->execTurn++;
         } else if (fields & DUMP_FIELD_TURN) {
@@ -136,14 +136,14 @@ private:
             cacheLine);
     }
 
-    __gm__ Utils::StateDumpPerCore *opStateDumpBase_ = nullptr;
+    __gm__ Utils::StateDumpPerCore* opStateDumpBase_ = nullptr;
     uint32_t slotIdx_ = 0;
 };
 #else  // !MC2_DFX_ENABLE
 class OpStateDump {
 public:
     __aicore__ inline OpStateDump() = default;
-    __aicore__ inline void Init(GM_ADDR, const Utils::DfxWorkspaceLayoutInfo *, uint32_t) {}
+    __aicore__ inline void Init(GM_ADDR, const Utils::DfxWorkspaceLayoutInfo*, uint32_t) {}
     __aicore__ inline void DoDump(uint8_t, uint8_t = 0, uint8_t = 0, uint8_t = 0, uint8_t = 1, uint8_t = 1) {}
 };
 #endif // MC2_DFX_ENABLE

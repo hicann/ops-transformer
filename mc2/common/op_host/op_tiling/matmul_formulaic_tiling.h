@@ -269,18 +269,18 @@ public:
     // Constructor
     explicit MatmulFormulaicTiling(std::string opName)
         : opName_(opName) {};
-    static uint32_t GetRankSize(const char *group);
+    static uint32_t GetRankSize(const char* group);
     void SetWeightFormat(const matmul_tiling::CubeFormat weightFormat);
-    void SetSocVersion(const platform_ascendc::SocVersion &version)
+    void SetSocVersion(const platform_ascendc::SocVersion& version)
     {
         socInfo_.socVersion = version;
     }
-    ge::graphStatus GetCubeTiling(TilingArgs &args, AscendC::tiling::TCubeTiling &cubeTiling,
-                                  Mc2Tiling::TileL2Tiling &tileL2Tiling);
-    ge::graphStatus GetCubeTiling(TilingArgs &args, AscendC::tiling::TCubeTiling &cubeTiling);
-    static void GetBaseBlockParm(const platform_ascendc::SocVersion &version, uint64_t &blockBaseM,
-                                 uint64_t &blockBaseN, uint64_t &blockBaseK, uint64_t &blockDepthA1,
-                                 uint64_t &blockDepthB1);
+    ge::graphStatus GetCubeTiling(TilingArgs& args, AscendC::tiling::TCubeTiling& cubeTiling,
+                                  Mc2Tiling::TileL2Tiling& tileL2Tiling);
+    ge::graphStatus GetCubeTiling(TilingArgs& args, AscendC::tiling::TCubeTiling& cubeTiling);
+    static void GetBaseBlockParm(const platform_ascendc::SocVersion& version, uint64_t& blockBaseM,
+                                 uint64_t& blockBaseN, uint64_t& blockBaseK, uint64_t& blockDepthA1,
+                                 uint64_t& blockDepthB1);
 
 private:
     MatmulRunInfo runInfo_;
@@ -292,14 +292,14 @@ private:
     void UpdateDepth();
     bool DoL2CacheTiling();
     void InitBaseBlockTiling();
-    void InitTilingArgs(TilingArgs &args);
+    void InitTilingArgs(TilingArgs& args);
     std::string opTypeStr_;
     platform_ascendc::SocVersion socVer_ = platform_ascendc::SocVersion::ASCEND910B;
     bool IsShapeAlign(uint64_t aValue, uint64_t bValue) const;
-    uint32_t GetTilingKey(TilingArgs &args, bool &aligned) const;
-    void CalcBaseBlockTiling(TilingArgs &args, uint64_t &baseM, uint64_t &baseN, uint64_t &baseK) const;
-    void UpdateDepth(TilingArgs &args, uint64_t &depthA1, uint64_t &depthB1, uint64_t &baseM, uint64_t &baseN,
-                     uint64_t &baseK) const;
+    uint32_t GetTilingKey(TilingArgs& args, bool& aligned) const;
+    void CalcBaseBlockTiling(TilingArgs& args, uint64_t& baseM, uint64_t& baseN, uint64_t& baseK) const;
+    void UpdateDepth(TilingArgs& args, uint64_t& depthA1, uint64_t& depthB1, uint64_t& baseM, uint64_t& baseN,
+                     uint64_t& baseK) const;
 };
 
 template <typename T>

@@ -36,7 +36,7 @@ private:
     AscendC::GlobalTensor<uint32_t> outIdxGm_;
 
     // === UB queues ===
-    AscendC::TPipe *pipe_;
+    AscendC::TPipe* pipe_;
     AscendC::TQue<AscendC::QuePosition::VECIN, 1> inQueueX_;
     AscendC::TQue<AscendC::QuePosition::VECOUT, 1> outValueQueue_;
     AscendC::TQue<AscendC::QuePosition::VECOUT, 1> outIdxQueue_;
@@ -50,15 +50,15 @@ private:
 public:
     __aicore__ inline SortRadixOneCore(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR value, GM_ADDR sortIndex, GM_ADDR workspace,
-                                const SortLib::SortParams &params, AscendC::TPipe *pipe);
+                                const SortLib::SortParams& params, AscendC::TPipe* pipe);
     __aicore__ inline void Process();
 };
 
 template <typename ValT, typename IdxT, bool isDescend>
 __aicore__ inline void SortRadixOneCore<ValT, IdxT, isDescend>::Init(GM_ADDR x, GM_ADDR value, GM_ADDR sortIndex,
                                                                      GM_ADDR workspace,
-                                                                     const SortLib::SortParams &params,
-                                                                     AscendC::TPipe *pipe)
+                                                                     const SortLib::SortParams& params,
+                                                                     AscendC::TPipe* pipe)
 {
     // 单核路径不使用 GM workspace，忽略 workspace 参数。
     pipe_ = pipe;
@@ -70,9 +70,9 @@ __aicore__ inline void SortRadixOneCore<ValT, IdxT, isDescend>::Init(GM_ADDR x, 
     halfIndex_ = idxUbSize32 / static_cast<uint32_t>(sizeof(uint32_t));
     uint32_t idxBufferBytes = (sizeof(IdxT) == sizeof(int64_t)) ? (2U * idxUbSize32) : idxUbSize32;
 
-    inputXGm_.SetGlobalBuffer((__gm__ ValT *)x);
-    outValueGm_.SetGlobalBuffer((__gm__ ValT *)value);
-    outIdxGm_.SetGlobalBuffer((__gm__ uint32_t *)sortIndex);
+    inputXGm_.SetGlobalBuffer((__gm__ ValT*)x);
+    outValueGm_.SetGlobalBuffer((__gm__ ValT*)value);
+    outIdxGm_.SetGlobalBuffer((__gm__ uint32_t*)sortIndex);
 
     pipe_->InitBuffer(inQueueX_, 1, RoundUpAlign(static_cast<uint32_t>(numTileData_ * sizeof(ValT))));
     pipe_->InitBuffer(outValueQueue_, 1, RoundUpAlign(static_cast<uint32_t>(numTileData_ * sizeof(ValT))));

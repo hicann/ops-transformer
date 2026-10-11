@@ -25,7 +25,7 @@ struct TileBroadcastOneBlk {
     TileBroadcastOneBlk() {}
 
     CATLASS_DEVICE
-    void operator()(AscendC::LocalTensor<ElementCompute> const &ubOut, AscendC::LocalTensor<ElementCompute> const &ubIn)
+    void operator()(AscendC::LocalTensor<ElementCompute> const& ubOut, AscendC::LocalTensor<ElementCompute> const& ubIn)
     {
         constexpr uint32_t maxRepeatNum = 255;
         constexpr uint32_t eleNumPerBlk = BYTE_PER_BLK / sizeof(ElementCompute);

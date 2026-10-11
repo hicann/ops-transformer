@@ -23,14 +23,14 @@ namespace optiling {
 struct Mc2TilingResult {
     uint64_t tilingKey;
     uint64_t blockDim;
-    void *tilingData;
+    void* tilingData;
     size_t tilingDataSize;
     std::vector<size_t> workspaceSize;
 };
 
 class Mc2MatMulTilingCfg {
 public:
-    Mc2MatMulTilingCfg(bool needUpdateIn, const void *compileInfoIn, const void *argsIn)
+    Mc2MatMulTilingCfg(bool needUpdateIn, const void* compileInfoIn, const void* argsIn)
         : needUpdate(needUpdateIn),
           compileInfo(compileInfoIn),
           args(argsIn)
@@ -38,15 +38,15 @@ public:
 
     virtual ~Mc2MatMulTilingCfg() {};
 
-    virtual void Update(const Mc2TilingResult &result)
+    virtual void Update(const Mc2TilingResult& result)
     {
         (void)result;
     };
 
 public:
     const bool needUpdate = false;     // true: Tiling结果通过Update返回； false: Tiling结果填充到context中
-    const void *compileInfo = nullptr; // 编译信息，用于生成TilingKey
-    const void *args = nullptr;        // 算子参数，用于生成TilingKey
+    const void* compileInfo = nullptr; // 编译信息，用于生成TilingKey
+    const void* args = nullptr;        // 算子参数，用于生成TilingKey
 };
 } // namespace optiling
 

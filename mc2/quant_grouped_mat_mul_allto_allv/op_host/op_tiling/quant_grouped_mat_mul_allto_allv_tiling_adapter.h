@@ -36,12 +36,12 @@ using optiling::Mc2GroupedMatmulTiling::QuantMode;
 namespace Mc2GroupedMatmul {
 class QuantGroupedMatmulAllToAllvAdapter : public Mc2GroupedQbmmTiling {
 public:
-    explicit QuantGroupedMatmulAllToAllvAdapter(gert::TilingContext *context)
+    explicit QuantGroupedMatmulAllToAllvAdapter(gert::TilingContext* context)
         : Mc2GroupedQbmmTiling(context) {};
 
     ~QuantGroupedMatmulAllToAllvAdapter() override = default;
 
-    const Mc2GroupedMatmulTilingData::GMMQuantTilingData &GetGmmQuantTilingAdapterData() const
+    const Mc2GroupedMatmulTilingData::GMMQuantTilingData& GetGmmQuantTilingAdapterData() const
     {
         return tilingData_;
     }
@@ -61,10 +61,10 @@ public:
     void Reset() override {}
 
     ge::graphStatus Process();
-    ge::graphStatus SetCommonInputParams(const QuantGmmAlltoAllvParamsInfo &params);
-    ge::graphStatus SetGroupExpertInputParameters(const QuantGmmAlltoAllvParamsInfo &params, uint64_t gmmX,
+    ge::graphStatus SetCommonInputParams(const QuantGmmAlltoAllvParamsInfo& params);
+    ge::graphStatus SetGroupExpertInputParameters(const QuantGmmAlltoAllvParamsInfo& params, uint64_t gmmX,
                                                   uint64_t expertNum = 1);
-    ge::graphStatus SetSharedExpertInputParameters(const QuantGmmAlltoAllvParamsInfo &params);
+    ge::graphStatus SetSharedExpertInputParameters(const QuantGmmAlltoAllvParamsInfo& params);
 };
 
 } // namespace Mc2GroupedMatmul

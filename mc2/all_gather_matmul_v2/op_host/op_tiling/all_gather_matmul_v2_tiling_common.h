@@ -19,7 +19,7 @@
 #include "graph/utils/type_utils.h"
 
 namespace optiling {
-ge::graphStatus AllGatherMatmulTilingV2Func(gert::TilingContext *context);
+ge::graphStatus AllGatherMatmulTilingV2Func(gert::TilingContext* context);
 } // namespace optiling
 
 #endif // ALL_GATHER_MATMUL_V2_TILING_COMMON_H

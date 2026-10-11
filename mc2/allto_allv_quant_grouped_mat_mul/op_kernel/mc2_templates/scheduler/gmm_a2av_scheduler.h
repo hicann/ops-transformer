@@ -27,8 +27,8 @@ namespace MC2KernelTemplate {
 template <typename CommOpType, typename ComputationOpType, typename SharedComputationOpType, bool IsNeedMM>
 class GmmA2avScheduler {
 public:
-    __aicore__ inline GmmA2avScheduler(CommOpType &hcclOp, ComputationOpType &computeOp,
-                                       SharedComputationOpType &shareComputeOp, TaskTilingInfo *taskTilingInfo)
+    __aicore__ inline GmmA2avScheduler(CommOpType& hcclOp, ComputationOpType& computeOp,
+                                       SharedComputationOpType& shareComputeOp, TaskTilingInfo* taskTilingInfo)
         : hcclOp_(hcclOp),
           computeOp_(computeOp),
           shareComputeOp_(shareComputeOp),
@@ -40,8 +40,8 @@ public:
         ProcessAiv(hcclOp_, taskTilingInfo_);
     }
 
-    static __aicore__ inline void ProcessAic(ComputationOpType &computeOp, SharedComputationOpType &shareComputeOp,
-                                             const TaskTilingInfo *taskTilingInfo)
+    static __aicore__ inline void ProcessAic(ComputationOpType& computeOp, SharedComputationOpType& shareComputeOp,
+                                             const TaskTilingInfo* taskTilingInfo)
     {
         if ASCEND_IS_AIC {
             uint32_t e = taskTilingInfo->e;
@@ -62,7 +62,7 @@ public:
         }
     }
 
-    static __aicore__ inline void ProcessAiv(CommOpType &hcclOp, const TaskTilingInfo *taskTilingInfo)
+    static __aicore__ inline void ProcessAiv(CommOpType& hcclOp, const TaskTilingInfo* taskTilingInfo)
     {
         if ASCEND_IS_AIV {
             uint32_t e = taskTilingInfo->e;
@@ -87,10 +87,10 @@ public:
     }
 
 private:
-    CommOpType &hcclOp_;
-    ComputationOpType &computeOp_;
-    SharedComputationOpType &shareComputeOp_;
-    const TaskTilingInfo *taskTilingInfo_;
+    CommOpType& hcclOp_;
+    ComputationOpType& computeOp_;
+    SharedComputationOpType& shareComputeOp_;
+    const TaskTilingInfo* taskTilingInfo_;
 };
 } // namespace MC2KernelTemplate
 #endif

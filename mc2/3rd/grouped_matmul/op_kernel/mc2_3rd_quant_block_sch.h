@@ -62,17 +62,17 @@ class QuantASWBlockSch {
 public:
     __aicore__ inline QuantASWBlockSch() {}
     template <bool isGmm>
-    __aicore__ inline void Init(const TCubeTiling *__restrict &tilingData, uint32_t blockIdx);
-    __aicore__ inline void SetRankFirstLayout(uint32_t rankDim, const __gm__ uint64_t *cGroupOffsetTableGm)
+    __aicore__ inline void Init(const TCubeTiling* __restrict& tilingData, uint32_t blockIdx);
+    __aicore__ inline void SetRankFirstLayout(uint32_t rankDim, const __gm__ uint64_t* cGroupOffsetTableGm)
     {
         rankDim_ = rankDim;
         cGroupOffsetTableGm_ = cGroupOffsetTableGm;
     }
-    __aicore__ inline void SetAGroupOffsetTable(const __gm__ uint64_t *aGroupOffsetTableGm)
+    __aicore__ inline void SetAGroupOffsetTable(const __gm__ uint64_t* aGroupOffsetTableGm)
     {
         aGroupOffsetTableGm_ = aGroupOffsetTableGm;
     }
-    __aicore__ inline void SetXScaleGroupOffsetTable(const __gm__ uint64_t *xScaleGroupOffsetTableGm)
+    __aicore__ inline void SetXScaleGroupOffsetTable(const __gm__ uint64_t* xScaleGroupOffsetTableGm)
     {
         xScaleGroupOffsetTableGm_ = xScaleGroupOffsetTableGm;
     }
@@ -94,7 +94,7 @@ public:
 public:
     ASWTilingParam params_;
     ASWOffsetParam offset_;
-    const TCubeTiling *__restrict tilingData_;
+    const TCubeTiling* __restrict tilingData_;
 
 private:
     const uint64_t WINDOW_LEN = 4;
@@ -102,13 +102,13 @@ private:
     uint32_t startBlockIdx_;
     uint32_t endBlockIdx_;
     uint32_t rankDim_ = 1U;
-    const __gm__ uint64_t *cGroupOffsetTableGm_ = nullptr;
-    const __gm__ uint64_t *aGroupOffsetTableGm_ = nullptr;
-    const __gm__ uint64_t *xScaleGroupOffsetTableGm_ = nullptr;
+    const __gm__ uint64_t* cGroupOffsetTableGm_ = nullptr;
+    const __gm__ uint64_t* aGroupOffsetTableGm_ = nullptr;
+    const __gm__ uint64_t* xScaleGroupOffsetTableGm_ = nullptr;
 };
 
 template <bool isGmm>
-__aicore__ inline void QuantASWBlockSch::Init(const TCubeTiling *__restrict &tilingData, uint32_t blockIdx)
+__aicore__ inline void QuantASWBlockSch::Init(const TCubeTiling* __restrict& tilingData, uint32_t blockIdx)
 {
     blockIdx_ = blockIdx;
     tilingData_ = tilingData;

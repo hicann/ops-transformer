@@ -36,9 +36,9 @@ struct MC2TransposeContext {
 template <typename transposeDataType>
 class MC2VecTranspose {
 public:
-    __aicore__ inline MC2VecTranspose(TPipe *tPipe)
+    __aicore__ inline MC2VecTranspose(TPipe* tPipe)
         : tPipe_(tPipe){};
-    __aicore__ inline MC2TransposeContext *GetContextPtr();
+    __aicore__ inline MC2TransposeContext* GetContextPtr();
     __aicore__ inline void Init() {};
     __aicore__ inline void Process(uint32_t taskIndex);
 
@@ -56,7 +56,7 @@ protected:
     MC2TransposeContext context_;
     GlobalTensor<transposeDataType> tranposeGm_;
     GlobalTensor<transposeDataType> ubOutGm_;
-    TPipe *tPipe_;
+    TPipe* tPipe_;
     TQue<QuePosition::VECIN, 1> vecInQueue_;
 
     // 定义切块变量
@@ -94,8 +94,8 @@ protected:
         CrossCoreWaitFlag(SYNC_AIV_ONLY_ALL);
     }
 
-    __aicore__ inline void CopyInToUB(const uint64_t &srcGmOffset, const uint64_t &curTileMCntIdx,
-                                      const uint64_t &curInnerAxisCntIdx)
+    __aicore__ inline void CopyInToUB(const uint64_t& srcGmOffset, const uint64_t& curTileMCntIdx,
+                                      const uint64_t& curInnerAxisCntIdx)
     {
         LocalTensor<transposeDataType> vecInBuf = vecInQueue_.template AllocTensor<transposeDataType>();
 
@@ -113,14 +113,14 @@ protected:
         loadGm2UbParams.dstStride = static_cast<int64_t>(0);
 
         DataCopyPadExtParams<transposeDataType> padExtParams{true, 0, 0,
-                                                             *reinterpret_cast<transposeDataType *>(uint8_t(0))};
+                                                             *reinterpret_cast<transposeDataType*>(uint8_t(0))};
 
         DataCopyPad<transposeDataType>(vecInBuf, tranposeGm_[srcGmOffset], loadGm2UbParams, padExtParams);
         vecInQueue_.EnQue(vecInBuf);
     }
 
-    __aicore__ inline void CopyOutToGm(const uint64_t &dstGmOffset, const uint64_t &curTileMCntIdx,
-                                       const uint64_t &curInnerAxisCntIdx)
+    __aicore__ inline void CopyOutToGm(const uint64_t& dstGmOffset, const uint64_t& curTileMCntIdx,
+                                       const uint64_t& curInnerAxisCntIdx)
     {
         LocalTensor<transposeDataType> vecOutBuf = vecInQueue_.template DeQue<transposeDataType>();
 
@@ -141,8 +141,8 @@ protected:
         vecInQueue_.FreeTensor(vecOutBuf);
     }
 
-    __aicore__ inline void VecTransposeProcess(const uint64_t &srcGmOffset, const uint64_t &dstGmOffset,
-                                               const uint64_t &curTileMCntIdx, const uint64_t &curInnerAxisCntIdx)
+    __aicore__ inline void VecTransposeProcess(const uint64_t& srcGmOffset, const uint64_t& dstGmOffset,
+                                               const uint64_t& curTileMCntIdx, const uint64_t& curInnerAxisCntIdx)
     {
         CopyInToUB(srcGmOffset, curTileMCntIdx, curInnerAxisCntIdx);
         PipeBarrier<PIPE_ALL>();
@@ -152,7 +152,7 @@ protected:
 };
 
 template <typename transposeDataType>
-__aicore__ inline MC2TransposeContext *MC2VecTranspose<transposeDataType>::GetContextPtr()
+__aicore__ inline MC2TransposeContext* MC2VecTranspose<transposeDataType>::GetContextPtr()
 {
     return &context_;
 }
@@ -173,8 +173,8 @@ __aicore__ inline void MC2VecTranspose<transposeDataType>::Init(GM_ADDR transpos
     usedCoreNum_ = GetBlockNum() * ONE_RATIO_TWO; // CV(1:2) 先初始化为满核
     getSplitCnt();
 
-    tranposeGm_.SetGlobalBuffer((__gm__ transposeDataType *)transposeSrcAddr);
-    ubOutGm_.SetGlobalBuffer((__gm__ transposeDataType *)transposeDstAddr);
+    tranposeGm_.SetGlobalBuffer((__gm__ transposeDataType*)transposeSrcAddr);
+    ubOutGm_.SetGlobalBuffer((__gm__ transposeDataType*)transposeDstAddr);
 
     const uint32_t twoUbSize = AscendC::TOTAL_UB_SIZE / TWO_FACTOR;
     tPipe_->InitBuffer(vecInQueue_, 1, twoUbSize);

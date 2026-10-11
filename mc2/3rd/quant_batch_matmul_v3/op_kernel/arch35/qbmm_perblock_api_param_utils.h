@@ -33,23 +33,23 @@ MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 class MatMulCommonParam {
 public:
     __aicore__ inline MatMulCommonParam(){};
-    __aicore__ inline void Init(blockType &block, const TCubeTiling &tilingData);
-    __aicore__ inline uint64_t CalcAGMOffsetInnerLoop(const uint64_t &mOffset, const uint64_t &kOffset);
-    __aicore__ inline uint64_t CalcBGMOffsetInnerLoop(const uint64_t &nOffset, const uint64_t &kOffset);
-    __aicore__ inline void CalNd2NzParamA(AscendC::Nd2NzParams &nd2nzParam, const bool &isTailAL1);
-    __aicore__ inline void CalNd2NzParamB(AscendC::Nd2NzParams &nd2nzParam, const bool &isTailBL1);
-    __aicore__ inline uint32_t CalcAL1Offset(const uint64_t &mAL1Offset, const uint64_t &kAL1Offset,
-                                             const bool &isKTail);
-    __aicore__ inline uint32_t CalcBL1Offset(const uint64_t &nBL1Offset, const uint64_t &kBL1Offset,
-                                             const bool &isKTail);
-    __aicore__ inline void LoadData2dParamsA(LoadData2DParamsV2 &loadData2dParams, const uint64_t &kOffset,
-                                             const bool &isTailAL1);
-    __aicore__ inline void LoadData2dParamsB(LoadData2DParamsV2 &loadData2dParams, const uint64_t &kOffset,
-                                             const bool &isTailBL1);
+    __aicore__ inline void Init(blockType& block, const TCubeTiling& tilingData);
+    __aicore__ inline uint64_t CalcAGMOffsetInnerLoop(const uint64_t& mOffset, const uint64_t& kOffset);
+    __aicore__ inline uint64_t CalcBGMOffsetInnerLoop(const uint64_t& nOffset, const uint64_t& kOffset);
+    __aicore__ inline void CalNd2NzParamA(AscendC::Nd2NzParams& nd2nzParam, const bool& isTailAL1);
+    __aicore__ inline void CalNd2NzParamB(AscendC::Nd2NzParams& nd2nzParam, const bool& isTailBL1);
+    __aicore__ inline uint32_t CalcAL1Offset(const uint64_t& mAL1Offset, const uint64_t& kAL1Offset,
+                                             const bool& isKTail);
+    __aicore__ inline uint32_t CalcBL1Offset(const uint64_t& nBL1Offset, const uint64_t& kBL1Offset,
+                                             const bool& isKTail);
+    __aicore__ inline void LoadData2dParamsA(LoadData2DParamsV2& loadData2dParams, const uint64_t& kOffset,
+                                             const bool& isTailAL1);
+    __aicore__ inline void LoadData2dParamsB(LoadData2DParamsV2& loadData2dParams, const uint64_t& kOffset,
+                                             const bool& isTailBL1);
 
 protected:
-    blockType *block_;
-    const TCubeTiling *matmulTiling_;
+    blockType* block_;
+    const TCubeTiling* matmulTiling_;
     uint64_t kA1_;
     uint64_t kB1_;
     uint64_t mA1C0_;
@@ -61,8 +61,8 @@ protected:
 };
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::Init(blockType &block,
-                                                                            const TCubeTiling &tilingData)
+__aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::Init(blockType& block,
+                                                                            const TCubeTiling& tilingData)
 {
     matmulTiling_ = &tilingData;
     block_ = &block;
@@ -88,7 +88,7 @@ __aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::Init(bloc
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline uint64_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcAGMOffsetInnerLoop(
-    const uint64_t &mOffset, const uint64_t &kOffset)
+    const uint64_t& mOffset, const uint64_t& kOffset)
 {
     uint64_t offsetA = block_->offset_.offsetA;
     if constexpr (aTrans) {
@@ -101,7 +101,7 @@ __aicore__ inline uint64_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcA
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline uint64_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcBGMOffsetInnerLoop(
-    const uint64_t &nOffset, const uint64_t &kOffset)
+    const uint64_t& nOffset, const uint64_t& kOffset)
 {
     uint64_t offsetB = block_->offset_.offsetB;
     if constexpr (bTrans) {
@@ -113,8 +113,8 @@ __aicore__ inline uint64_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcB
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalNd2NzParamA(AscendC::Nd2NzParams &nd2nzParam,
-                                                                                      const bool &isTailAL1)
+__aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalNd2NzParamA(AscendC::Nd2NzParams& nd2nzParam,
+                                                                                      const bool& isTailAL1)
 {
     uint64_t currentK = isTailAL1 ? kA1Tail_ : kA1_;
     nd2nzParam.ndNum = 1;
@@ -135,8 +135,8 @@ __aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalNd2NzP
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalNd2NzParamB(AscendC::Nd2NzParams &nd2nzParam,
-                                                                                      const bool &isTailBL1)
+__aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalNd2NzParamB(AscendC::Nd2NzParams& nd2nzParam,
+                                                                                      const bool& isTailBL1)
 {
     uint64_t currentK = isTailBL1 ? kB1Tail_ : kB1_;
     nd2nzParam.ndNum = 1;
@@ -157,9 +157,9 @@ __aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalNd2NzP
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline uint32_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcAL1Offset(const uint64_t &mAL1Offset,
-                                                                                         const uint64_t &kAL1Offset,
-                                                                                         const bool &isKTail)
+__aicore__ inline uint32_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcAL1Offset(const uint64_t& mAL1Offset,
+                                                                                         const uint64_t& kAL1Offset,
+                                                                                         const bool& isKTail)
 {
     uint64_t kAL1 = isKTail ? kA1Tail_ : kA1_;
     kAL1 = DequantBmm::Align(kAL1, static_cast<uint64_t>(K0_INT8));
@@ -174,9 +174,9 @@ __aicore__ inline uint32_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcA
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline uint32_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcBL1Offset(const uint64_t &nBL1Offset,
-                                                                                         const uint64_t &kBL1Offset,
-                                                                                         const bool &isKTail)
+__aicore__ inline uint32_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcBL1Offset(const uint64_t& nBL1Offset,
+                                                                                         const uint64_t& kBL1Offset,
+                                                                                         const bool& isKTail)
 {
     uint64_t kBL1 = isKTail ? kB1Tail_ : kB1_;
     kBL1 = DequantBmm::Align(kBL1, static_cast<uint64_t>(K0_INT8));
@@ -192,7 +192,7 @@ __aicore__ inline uint32_t MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::CalcB
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::LoadData2dParamsA(
-    LoadData2DParamsV2 &loadData2dParams, const uint64_t &kOffset, const bool &isTailAL1)
+    LoadData2DParamsV2& loadData2dParams, const uint64_t& kOffset, const bool& isTailAL1)
 {
     uint64_t currM = DequantBmm::Min(block_->params_.singleCoreM, static_cast<uint64_t>(matmulTiling_->baseM));
     uint64_t currK = DequantBmm::Min(static_cast<uint64_t>(matmulTiling_->Ka) - kOffset,
@@ -217,7 +217,7 @@ __aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::LoadData2
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline void MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS>::LoadData2dParamsB(
-    LoadData2DParamsV2 &loadData2dParams, const uint64_t &kOffset, const bool &isTailBL1)
+    LoadData2DParamsV2& loadData2dParams, const uint64_t& kOffset, const bool& isTailBL1)
 {
     uint64_t currN = DequantBmm::Min(block_->params_.singleCoreN, static_cast<uint64_t>(matmulTiling_->baseN));
     uint64_t currK = DequantBmm::Min(matmulTiling_->Kb - kOffset, static_cast<uint64_t>(matmulTiling_->baseK));

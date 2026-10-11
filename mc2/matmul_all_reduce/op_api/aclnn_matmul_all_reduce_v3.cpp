@@ -27,33 +27,33 @@ extern "C" {
 #endif
 
 extern "C" uint64_t NnopbaseMsprofSysTime();
-extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
-extern "C" aclnnStatus __attribute__((weak)) NnopbaseDisableOptionalInput(void *executor, const size_t irIndex);
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
-extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
-extern "C" void *NnopbaseGetUserHandle(void *executor);
+extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId& dfxId);
+extern "C" aclnnStatus __attribute__((weak)) NnopbaseDisableOptionalInput(void* executor, const size_t irIndex);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
+extern "C" void NnopbaseSetUserHandle(void* executor, void* handle);
+extern "C" void* NnopbaseGetUserHandle(void* executor);
 
-static aclnnStatus InnerMatmulAllReduceV3GetWorkspaceSize(const aclTensor *x1, const aclTensor *x2,
-                                                          const aclTensor *bias, const aclTensor *x3, const char *group,
-                                                          const char *reduceOp, const char *commMode, int64_t commTurn,
-                                                          const aclTensor *output, uint64_t *workspaceSize,
-                                                          aclOpExecutor **executor)
+static aclnnStatus InnerMatmulAllReduceV3GetWorkspaceSize(const aclTensor* x1, const aclTensor* x2,
+                                                          const aclTensor* bias, const aclTensor* x3, const char* group,
+                                                          const char* reduceOp, const char* commMode, int64_t commTurn,
+                                                          const aclTensor* output, uint64_t* workspaceSize,
+                                                          aclOpExecutor** executor)
 {
     // 目前不支持x1进行transpose
     bool transposeX1 = false;
     bool transposeX2 = IsTransposeLastTwoDims(x2);
-    aclTensor *pertokenScale = nullptr;
-    aclTensor *dequantScale = nullptr;
-    aclTensor *commQuantScale1 = nullptr;
-    aclTensor *commQuantScale2 = nullptr;
-    aclTensor *scale = nullptr;
-    aclTensor *offset = nullptr;
+    aclTensor* pertokenScale = nullptr;
+    aclTensor* dequantScale = nullptr;
+    aclTensor* commQuantScale1 = nullptr;
+    aclTensor* commQuantScale2 = nullptr;
+    aclTensor* scale = nullptr;
+    aclTensor* offset = nullptr;
     int64_t antiquantGroupSize = 0;
     uint64_t yDtype = static_cast<uint64_t>(output->GetDataType());
     aclnnStatus ret = aclnnInnerMatmulAllReduceGetWorkspaceSize(
         x1, x2, bias, x3, scale, offset, dequantScale, pertokenScale, commQuantScale1, commQuantScale2,
-        const_cast<char *>(group), const_cast<char *>(reduceOp), transposeX1, transposeX2, commTurn, antiquantGroupSize,
-        0, yDtype, 0, const_cast<char *>(commMode), output, workspaceSize, executor);
+        const_cast<char*>(group), const_cast<char*>(reduceOp), transposeX1, transposeX2, commTurn, antiquantGroupSize,
+        0, yDtype, 0, const_cast<char*>(commMode), output, workspaceSize, executor);
     OP_LOGD("MatmulAllReduceV3, aclnnMatmulAllReduceGetWorkspaceSize ret %d", ret);
     if (ret == ACLNN_SUCCESS && executor != nullptr && *executor != nullptr && commMode != nullptr) {
         // SetUserHandle to pass comm_mode to aclnnMatmulAllReduceV3
@@ -67,7 +67,7 @@ static aclnnStatus InnerMatmulAllReduceV3GetWorkspaceSize(const aclTensor *x1, c
                                       "'ccu' or 'ai_cpu'");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        void *arg = reinterpret_cast<void *>(static_cast<uintptr_t>(commModeEnum));
+        void* arg = reinterpret_cast<void*>(static_cast<uintptr_t>(commModeEnum));
         NnopbaseSetUserHandle(*executor, arg);
     }
 #ifdef MC2_UT
@@ -86,11 +86,11 @@ static aclnnStatus InnerMatmulAllReduceV3GetWorkspaceSize(const aclTensor *x1, c
     return ret;
 }
 
-aclnnStatus aclnnMatmulAllReduceV3GetWorkspaceSize(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                                   const aclTensor *x3, const char *group, const char *reduceOp,
-                                                   const char *commMode, int64_t commTurn, int64_t streamMode,
-                                                   const aclTensor *output, uint64_t *workspaceSize,
-                                                   aclOpExecutor **executor)
+aclnnStatus aclnnMatmulAllReduceV3GetWorkspaceSize(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                                   const aclTensor* x3, const char* group, const char* reduceOp,
+                                                   const char* commMode, int64_t commTurn, int64_t streamMode,
+                                                   const aclTensor* output, uint64_t* workspaceSize,
+                                                   aclOpExecutor** executor)
 {
     uint64_t timeStampVal = NnopbaseMsprofSysTime();
     // 固定写法，参数检查
@@ -107,7 +107,7 @@ aclnnStatus aclnnMatmulAllReduceV3GetWorkspaceSize(const aclTensor *x1, const ac
     return ret;
 }
 
-aclnnStatus aclnnMatmulAllReduceV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMatmulAllReduceV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                    const aclrtStream stream)
 {
     uint64_t timeStampVal = NnopbaseMsprofSysTime();
@@ -117,7 +117,7 @@ aclnnStatus aclnnMatmulAllReduceV3(void *workspace, uint64_t workspaceSize, aclO
     }
     if (NnopbaseSetHcclServerType) {
         if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
-            void *arg = NnopbaseGetUserHandle(executor);
+            void* arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);
             if (commMode == Mc2Comm::COMM_MODE_CCU) {

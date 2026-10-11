@@ -32,7 +32,7 @@ struct MatmulAllReduceHostUtParamBase {
     std::string comm_mode;
     ge::graphStatus expectResult;
 
-    MatmulAllReduceHostUtParamBase(const csv_map &csvMap)
+    MatmulAllReduceHostUtParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->group = ReadMap(csvMap, "group");
@@ -49,7 +49,7 @@ struct MatmulAllReduceHostUtParamBase {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MatmulAllReduceHostUtParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const MatmulAllReduceHostUtParamBase& param)
 {
     return os << param.case_name;
 }
@@ -73,7 +73,7 @@ struct MatmulAllReduceTilingUtParam : public MatmulAllReduceHostUtParamBase {
     uint64_t expectTilingKey;
     std::string expectTilingDataHash;
 
-    MatmulAllReduceTilingUtParam(const csv_map &csvMap)
+    MatmulAllReduceTilingUtParam(const csv_map& csvMap)
         : MatmulAllReduceHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "x1_shape", "x1_dtype", "x1_format", this->x1));
@@ -124,7 +124,7 @@ struct MatmulAllReduceInferShapeUtParam : public MatmulAllReduceHostUtParamBase 
     uint64_t ranksize;
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    MatmulAllReduceInferShapeUtParam(const csv_map &csvMap)
+    MatmulAllReduceInferShapeUtParam(const csv_map& csvMap)
         : MatmulAllReduceHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "x1_shape", "x1_dtype", "x1_format", this->x1));
@@ -166,7 +166,7 @@ struct MatmulAllReduceInferDataTypeUtParam : public MatmulAllReduceHostUtParamBa
     ge::DataType comm_quant_scale_2 = ge::DT_UNDEFINED;
     ge::DataType y = ge::DT_UNDEFINED;
 
-    MatmulAllReduceInferDataTypeUtParam(const csv_map &csvMap)
+    MatmulAllReduceInferDataTypeUtParam(const csv_map& csvMap)
         : MatmulAllReduceHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetDataTypeGE(csvMap, "x1_dtype", this->x1));

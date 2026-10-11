@@ -51,23 +51,23 @@ inline int64_t Align(int64_t x, int64_t base)
     return ((x + base - 1) / base) * base;
 }
 
-static ge::graphStatus InferShapeMoeDistributeDispatchSetup(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMoeDistributeDispatchSetup(gert::InferShapeContext* context)
 {
     OPS_LOG_D(context->GetNodeName(), "Begin to do InferShapeMoeDistributeDispatchSetup.");
     // 获取输入shape
-    const gert::Shape *xShape = context->GetInputShape(DISPATCH_INPUT_X_INDEX);
+    const gert::Shape* xShape = context->GetInputShape(DISPATCH_INPUT_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
 
-    const gert::Shape *expertIdsShape = context->GetInputShape(DISPATCH_INPUT_EXPERT_IDS_INDEX);
+    const gert::Shape* expertIdsShape = context->GetInputShape(DISPATCH_INPUT_EXPERT_IDS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
 
-    gert::Shape *yShape = context->GetOutputShape(DISPATCH_OUTPUT_Y_INDEX);
+    gert::Shape* yShape = context->GetOutputShape(DISPATCH_OUTPUT_Y_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, yShape);
 
-    gert::Shape *expandIdxShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_IDX_INDEX);
+    gert::Shape* expandIdxShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_IDX_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expandIdxShape);
 
-    gert::Shape *commCmdInfoShape = context->GetOutputShape(DISPATCH_OUTPUT_COMM_CMD_INFO_INDEX);
+    gert::Shape* commCmdInfoShape = context->GetOutputShape(DISPATCH_OUTPUT_COMM_CMD_INFO_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, commCmdInfoShape);
 
     const auto attrs = context->GetAttrs();

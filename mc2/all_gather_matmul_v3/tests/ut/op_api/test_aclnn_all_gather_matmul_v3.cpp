@@ -18,11 +18,11 @@ using namespace op;
 using namespace std;
 
 extern "C" aclnnStatus aclnnAllGatherQuantMatmulV3GetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
-    const aclTensor *x1ScaleOptional, const aclTensor *x2ScaleOptional, const char *group, int64_t rankSize,
-    int64_t hcclBufferSize, int64_t groupSize, const char *commMode, const aclTensor *output,
-    const aclTensor *gatherOut, uint64_t *workspaceSize, aclOpExecutor **executor);
-extern "C" aclnnStatus aclnnAllGatherQuantMatmulV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+    const aclTensor* context, const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional,
+    const aclTensor* x1ScaleOptional, const aclTensor* x2ScaleOptional, const char* group, int64_t rankSize,
+    int64_t hcclBufferSize, int64_t groupSize, const char* commMode, const aclTensor* output,
+    const aclTensor* gatherOut, uint64_t* workspaceSize, aclOpExecutor** executor);
+extern "C" aclnnStatus aclnnAllGatherQuantMatmulV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                    aclrtStream stream);
 
 namespace AllGatherMatmulV3UT {
@@ -47,21 +47,21 @@ TEST_P(TestAclnnAllGatherMatmulV3, param)
     auto param = GetParam();
     std::cout << "[TEST_CASE] " << param.case_name << std::endl;
 
-    aclTensor *context = param.context.GetViewDims().empty() ? nullptr : param.context.ToAclTypeRawPtr();
-    aclTensor *x1 = param.x1.GetViewDims().empty() ? nullptr : param.x1.ToAclTypeRawPtr();
-    aclTensor *x2 = param.x2.GetViewDims().empty() ? nullptr : param.x2.ToAclTypeRawPtr();
-    aclTensor *bias = param.bias.GetViewDims().empty() ? nullptr : param.bias.ToAclTypeRawPtr();
-    aclTensor *x1Scale = param.x1Scale.GetViewDims().empty() ? nullptr : param.x1Scale.ToAclTypeRawPtr();
-    aclTensor *x2Scale = param.x2Scale.GetViewDims().empty() ? nullptr : param.x2Scale.ToAclTypeRawPtr();
-    aclTensor *output = param.output.GetViewDims().empty() ? nullptr : param.output.ToAclTypeRawPtr();
-    aclTensor *gatherOut = param.gatherOut.GetViewDims().empty() ? nullptr : param.gatherOut.ToAclTypeRawPtr();
+    aclTensor* context = param.context.GetViewDims().empty() ? nullptr : param.context.ToAclTypeRawPtr();
+    aclTensor* x1 = param.x1.GetViewDims().empty() ? nullptr : param.x1.ToAclTypeRawPtr();
+    aclTensor* x2 = param.x2.GetViewDims().empty() ? nullptr : param.x2.ToAclTypeRawPtr();
+    aclTensor* bias = param.bias.GetViewDims().empty() ? nullptr : param.bias.ToAclTypeRawPtr();
+    aclTensor* x1Scale = param.x1Scale.GetViewDims().empty() ? nullptr : param.x1Scale.ToAclTypeRawPtr();
+    aclTensor* x2Scale = param.x2Scale.GetViewDims().empty() ? nullptr : param.x2Scale.ToAclTypeRawPtr();
+    aclTensor* output = param.output.GetViewDims().empty() ? nullptr : param.output.ToAclTypeRawPtr();
+    aclTensor* gatherOut = param.gatherOut.GetViewDims().empty() ? nullptr : param.gatherOut.ToAclTypeRawPtr();
 
     auto ut = OP_API_UT(aclnnAllGatherQuantMatmulV3,
                         INPUT(context, x1, x2, bias, x1Scale, x2Scale, param.group.c_str(), param.rankSize,
                               param.hcclBufferSize, param.groupSize, param.commMode.c_str()),
                         OUTPUT(output, gatherOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -86,11 +86,11 @@ TEST_F(TestAclnnAllGatherMatmulV3, NullGroupTest)
     TensorDesc outputDesc = TensorDesc({8192, 2560}, ACL_BF16, ACL_FORMAT_ND);
     TensorDesc gatherOutDesc = TensorDesc({8192, 4096}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
     auto ut = OP_API_UT(aclnnAllGatherQuantMatmulV3,
-                        INPUT(contextDesc, x1Desc, x2Desc, nullptr, x1ScaleDesc, x2ScaleDesc, (const char *)nullptr, 4,
+                        INPUT(contextDesc, x1Desc, x2Desc, nullptr, x1ScaleDesc, x2ScaleDesc, (const char*)nullptr, 4,
                               200, 4295032864L, "aiv_urma"),
                         OUTPUT(outputDesc, gatherOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -109,7 +109,7 @@ TEST_F(TestAclnnAllGatherMatmulV3, EmptyGroupTest)
         INPUT(contextDesc, x1Desc, x2Desc, nullptr, x1ScaleDesc, x2ScaleDesc, "", 4, 200, 4295032864L, "aiv_urma"),
         OUTPUT(outputDesc, gatherOutDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }

@@ -32,12 +32,12 @@ enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
 // check nullptr
-static bool CheckNotNull(const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *expandIdx,
-                         const aclTensor *epSendCounts, const aclTensor *expertScales, const char *groupEp,
-                         aclTensor *x)
+static bool CheckNotNull(const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* expandIdx,
+                         const aclTensor* epSendCounts, const aclTensor* expertScales, const char* groupEp,
+                         aclTensor* x)
 {
     OP_LOGD("aclnn_moe_distribute_combine CheckNotNull start");
     OP_CHECK_NULL(expandX, return false);
@@ -55,9 +55,9 @@ static bool CheckNotNull(const aclTensor *expandX, const aclTensor *expertIds, c
 }
 
 // 入参校验
-static aclnnStatus CheckParams(const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *expandIdx,
-                               const aclTensor *epSendCounts, const aclTensor *expertScales, const char *groupEp,
-                               const char *groupTp, aclTensor *x)
+static aclnnStatus CheckParams(const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* expandIdx,
+                               const aclTensor* epSendCounts, const aclTensor* expertScales, const char* groupEp,
+                               const char* groupTp, aclTensor* x)
 {
     OP_LOGD("aclnn_moe_distribute_combine checkparams start");
     CHECK_RET(CheckNotNull(expandX, expertIds, expandIdx, epSendCounts, expertScales, groupEp, x),
@@ -88,36 +88,36 @@ static aclnnStatus CheckParams(const aclTensor *expandX, const aclTensor *expert
 }
 
 aclnnStatus MoeDistributeCombineGetWorkspaceSize(
-    const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *expandIdx, const aclTensor *epSendCounts,
-    const aclTensor *expertScales, const aclTensor *tpSendCounts, const aclTensor *xActiveMask,
-    const aclTensor *activationScale, const aclTensor *weightScale, const aclTensor *groupList,
-    const aclTensor *expandScales, const char *groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
-    const char *groupTp, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
+    const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* expandIdx, const aclTensor* epSendCounts,
+    const aclTensor* expertScales, const aclTensor* tpSendCounts, const aclTensor* xActiveMask,
+    const aclTensor* activationScale, const aclTensor* weightScale, const aclTensor* groupList,
+    const aclTensor* expandScales, const char* groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
+    const char* groupTp, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t outDtype, int64_t commQuantMode, int64_t groupListType,
-    aclTensor *x, uint64_t *workspaceSize, aclOpExecutor **executor)
+    aclTensor* x, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     auto ret_param = CheckParams(expandX, expertIds, expandIdx, epSendCounts, expertScales, groupEp, groupTp, x);
     CHECK_RET(ret_param == ACLNN_SUCCESS, ret_param);
 
     aclnnStatus ret = aclnnInnerMoeDistributeCombineGetWorkspaceSize(
         expandX, expertIds, expandIdx, epSendCounts, expertScales, tpSendCounts, xActiveMask, activationScale,
-        weightScale, groupList, expandScales, const_cast<char *>(groupEp), epWorldSize, epRankId, moeExpertNum,
-        const_cast<char *>(groupTp), tpWorldSize, tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum,
+        weightScale, groupList, expandScales, const_cast<char*>(groupEp), epWorldSize, epRankId, moeExpertNum,
+        const_cast<char*>(groupTp), tpWorldSize, tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum,
         globalBs, outDtype, commQuantMode, groupListType, x, workspaceSize, executor);
     return ret;
 }
 
 aclnnStatus aclnnMoeDistributeCombineGetWorkspaceSize(
-    const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *expandIdx, const aclTensor *epSendCounts,
-    const aclTensor *expertScales, const aclTensor *tpSendCounts, const aclTensor *xActiveMask,
-    const aclTensor *activationScale, const aclTensor *weightScale, const aclTensor *groupList,
-    const aclTensor *expandScales, const char *groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
-    const char *groupTp, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
+    const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* expandIdx, const aclTensor* epSendCounts,
+    const aclTensor* expertScales, const aclTensor* tpSendCounts, const aclTensor* xActiveMask,
+    const aclTensor* activationScale, const aclTensor* weightScale, const aclTensor* groupList,
+    const aclTensor* expandScales, const char* groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
+    const char* groupTp, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t outDtype, int64_t commQuantMode, int64_t groupListType,
-    aclTensor *x, uint64_t *workspaceSize, aclOpExecutor **executor)
+    aclTensor* x, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B) {
-        const char *groupTpEmptyWord = "";
+        const char* groupTpEmptyWord = "";
         aclnnStatus distributeCombineRet = MoeDistributeCombineGetWorkspaceSize(
             expandX, expertIds, expandIdx, epSendCounts, expertScales, tpSendCounts, xActiveMask, activationScale,
             weightScale, groupList, expandScales, groupEp, epWorldSize, epRankId, moeExpertNum, groupTpEmptyWord,
@@ -133,7 +133,7 @@ aclnnStatus aclnnMoeDistributeCombineGetWorkspaceSize(
     return ret;
 }
 
-aclnnStatus aclnnMoeDistributeCombine(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMoeDistributeCombine(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                       aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {

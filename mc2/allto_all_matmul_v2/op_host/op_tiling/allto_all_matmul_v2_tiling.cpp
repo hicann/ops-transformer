@@ -29,7 +29,7 @@ namespace MC2Tiling {
 
 using Ops::Transformer::OpTiling::TilingRegistryArch;
 
-static ge::graphStatus AlltoAllMatmulV2TilingFunc(gert::TilingContext *context)
+static ge::graphStatus AlltoAllMatmulV2TilingFunc(gert::TilingContext* context)
 {
     auto platformInfo = context->GetPlatformInfo();
     if (platformInfo == nullptr) {
@@ -46,7 +46,7 @@ static ge::graphStatus AlltoAllMatmulV2TilingFunc(gert::TilingContext *context)
     return TilingRegistryArch::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus TilingParseForAlltoAllMatmulV2(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForAlltoAllMatmulV2(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
@@ -59,9 +59,9 @@ IMPL_OP_OPTILING(AlltoAllMatmulV2)
     .TilingParse<AlltoAllMatmulV2CompileInfo>(TilingParseForAlltoAllMatmulV2);
 
 #if MC2_DFX_ENABLE
-inline void AlltoAllMatmulV2ExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+inline void AlltoAllMatmulV2ExceptionImplWrapper(aclrtExceptionInfo* args, void* userdata)
 {
-    const char *socName = aclrtGetSocName();
+    const char* socName = aclrtGetSocName();
     if (std::strstr(socName, "Ascend950") == nullptr) {
         return;
     }

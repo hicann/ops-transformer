@@ -42,8 +42,8 @@ public:
      * \param dataTiling   [out] 数据通信切分
      * \param scaleTiling  [out] Scale 通信切分（nonSplitAxisSize = ka / 32）
      */
-    static void GetCommTilingData(uint64_t m, uint64_t n, uint64_t ka, const QuantMatmulTilingData &mmTiling,
-                                  CommTilingData &dataTiling, CommTilingData &scaleTiling)
+    static void GetCommTilingData(uint64_t m, uint64_t n, uint64_t ka, const QuantMatmulTilingData& mmTiling,
+                                  CommTilingData& dataTiling, CommTilingData& scaleTiling)
     {
         uint64_t baseM = mmTiling.baseM;
         uint64_t baseN = mmTiling.baseN;

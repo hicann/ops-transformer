@@ -47,11 +47,11 @@
 #include "tiling/hccl/hccl_tiling.h"
 #include "apace_qmrs_kernel_launcher.h"
 
-extern "C" HcclResult HcclCommInitAll(uint32_t commNum, int32_t *devIds, HcclComm *comm);
+extern "C" HcclResult HcclCommInitAll(uint32_t commNum, int32_t* devIds, HcclComm* comm);
 extern "C" HcclResult HcclCommDestroy(HcclComm comm);
-extern "C" HcclResult HcclGetCommName(HcclComm comm, char *commName);
-extern "C" HcclResult HcomGetCommHandleByGroup(const char *groupName, void **commHandle);
-extern "C" HcclResult HcclAllocComResourceByTiling(HcclComm comm, void *stream, void *mc2Tiling, void **commContext);
+extern "C" HcclResult HcclGetCommName(HcclComm comm, char* commName);
+extern "C" HcclResult HcomGetCommHandleByGroup(const char* groupName, void** commHandle);
+extern "C" HcclResult HcclAllocComResourceByTiling(HcclComm comm, void* stream, void* mc2Tiling, void** commContext);
 
 static constexpr int32_t BENCHMARK_ITERATIONS = 20;
 static constexpr int64_t MAX_RANK_NUM = 64;
@@ -76,7 +76,7 @@ inline uint64_t CeilDivHost(uint64_t a, uint32_t b)
     return (a + b - 1) / b;
 }
 
-void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum, std::string &mode)
+void ParseArgs(int argc, char* argv[], int* m, int* k, int* n, int* rankNum, std::string& mode)
 {
     if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
         std::cerr << "Usage: " << argv[0] << " m k n rankNum [mode]" << std::endl;
@@ -95,7 +95,7 @@ void ParseArgs(int argc, char *argv[], int *m, int *k, int *n, int *rankNum, std
         *k = std::stoi(argv[2]);
         *n = std::stoi(argv[3]);
         *rankNum = std::stoi(argv[4]);
-    } catch (const std::invalid_argument &) {
+    } catch (const std::invalid_argument&) {
         throw std::invalid_argument("ERROR: m k n rankNum must be Integer");
     }
     if (*m <= 0 || *k <= 0 || *n <= 0 || *rankNum <= 0) {
@@ -125,10 +125,10 @@ struct QuantMatmulReduceScatterTilingData {
     QuantMatmulTilingData mmTile;
 };
 
-int CreateTilingDataAndContext(const char *hcomName, aclrtStream stream, int m, int k, int n, int rankNum,
-                               void **deviceTilingAddr, void **deviceContextAddr, uint32_t *usedCoreNum)
+int CreateTilingDataAndContext(const char* hcomName, aclrtStream stream, int m, int k, int n, int rankNum,
+                               void** deviceTilingAddr, void** deviceContextAddr, uint32_t* usedCoreNum)
 {
-    QuantMatmulReduceScatterTilingData *tilingData = new QuantMatmulReduceScatterTilingData();
+    QuantMatmulReduceScatterTilingData* tilingData = new QuantMatmulReduceScatterTilingData();
     if (tilingData == nullptr) {
         ERROR_LOG("tilingData alloc failed");
         return -1;
@@ -182,11 +182,11 @@ int CreateTilingDataAndContext(const char *hcomName, aclrtStream stream, int m, 
               aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; delete tilingData; return ret);
 
     HcclComm commHandle;
-    ret = HcomGetCommHandleByGroup(hcomName, reinterpret_cast<void **>(&commHandle));
+    ret = HcomGetCommHandleByGroup(hcomName, reinterpret_cast<void**>(&commHandle));
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("HcomGetCommHandleByGroup failed. ret = %d", ret);
               aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; delete tilingData; return ret);
 
-    void *mc2Context = nullptr;
+    void* mc2Context = nullptr;
     ret = HcclAllocComResourceByTiling(commHandle, stream, tilingData, &mc2Context);
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("HcclAllocComResourceByTiling failed. ret = %d", ret);
               aclrtFree(*deviceTilingAddr); *deviceTilingAddr = nullptr; delete tilingData; return ret);
@@ -215,7 +215,7 @@ struct Args {
     std::string mode;
 };
 
-int LaunchOneThread(Args &args)
+int LaunchOneThread(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("aclrtSetCurrentContext failed. ret = %d", ret); return ret);
@@ -225,8 +225,8 @@ int LaunchOneThread(Args &args)
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("HcclGetCommName failed. ret = %d", ret); return ret);
     INFO_LOG("rank=%d hcomName=%s", args.rankId, hcomName);
 
-    void *tilingAddr = nullptr;
-    void *mc2ContextAddr = nullptr;
+    void* tilingAddr = nullptr;
+    void* mc2ContextAddr = nullptr;
     uint32_t usedCoreNum = 0;
     ret = CreateTilingDataAndContext(hcomName, args.stream, args.m, args.k, args.n, args.rankDim, &tilingAddr,
                                      &mc2ContextAddr, &usedCoreNum);
@@ -381,13 +381,13 @@ int LaunchOneThread(Args &args)
     return ACL_SUCCESS;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int m = 0, k = 0, n = 0, rankNum = 0;
     std::string mode;
     try {
         ParseArgs(argc, argv, &m, &k, &n, &rankNum, mode);
-    } catch (const std::invalid_argument &e) {
+    } catch (const std::invalid_argument& e) {
         std::cerr << e.what() << std::endl;
         return -1;
     }

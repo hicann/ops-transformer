@@ -28,8 +28,8 @@ extern "C" {
 #endif
 
 extern "C" uint64_t NnopbaseMsprofSysTime();
-extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId& dfxId);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
 // 根据API定义，需要列出所能支持的所有dtype
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST_BIAS = {op::DataType::DT_INT32,
@@ -58,8 +58,8 @@ static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST_FLOAT = {
     op::DataType::DT_FLOAT16, op::DataType::DT_BF16, op::DataType::DT_FLOAT};
 
 // 检查入参是否为nullptr
-static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTensor *x2Scale, const aclTensor *output,
-                         const char *reduceOp)
+static bool CheckNotNull(const aclTensor* x1, const aclTensor* x2, const aclTensor* x2Scale, const aclTensor* output,
+                         const char* reduceOp)
 {
     OP_CHECK_NULL(x1, return false);
     OP_CHECK_NULL(x2, return false);
@@ -72,9 +72,9 @@ static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTens
     return true;
 }
 
-static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *x2Scale,
-                            const aclTensor *x1Scale, const aclTensor *x3, const aclTensor *commQuantScale1Optional,
-                            const aclTensor *commQuantScale2Optional, const aclTensor *output)
+static bool CheckDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* x2Scale,
+                            const aclTensor* x1Scale, const aclTensor* x3, const aclTensor* commQuantScale1Optional,
+                            const aclTensor* commQuantScale2Optional, const aclTensor* output)
 {
     // 检查x1、x2、bias、scale、offset、x3、output的数据类型是否在算子的支持列表内
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, DTYPE_SUPPORT_LIST_QUANT, return false);
@@ -119,7 +119,7 @@ static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclT
 }
 
 // 检查传入的reduction数值是否在可选范围内
-static bool CheckAttr(const char *reduceOp, int64_t streamMode)
+static bool CheckAttr(const char* reduceOp, int64_t streamMode)
 {
     if (strncmp(reduceOp, REDUCE_OP_SUM, NUM_THREE) != 0) {
         OP_LOGE_FOR_INVALID_VALUE("aclnnQuantMatmulAllReduceV4", "reduceOp", reduceOp, "\"sum\"");
@@ -133,8 +133,8 @@ static bool CheckAttr(const char *reduceOp, int64_t streamMode)
     return true;
 }
 
-static bool CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *x3,
-                       const aclTensor *output)
+static bool CheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* x3,
+                       const aclTensor* output)
 {
     OP_CHECK_MIN_DIM(x1, TWO_DIMS, return false);
     OP_CHECK_MAX_DIM(x1, THREE_DIMS, return false);
@@ -199,10 +199,10 @@ static bool CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                               const aclTensor *x2Scale, const aclTensor *x1Scale, const aclTensor *x3,
-                               const aclTensor *commQuantScale1Optional, const aclTensor *commQuantScale2Optional,
-                               const char *reduceOp, int64_t streamMode, const aclTensor *output)
+static aclnnStatus CheckParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                               const aclTensor* x2Scale, const aclTensor* x1Scale, const aclTensor* x3,
+                               const aclTensor* commQuantScale1Optional, const aclTensor* commQuantScale2Optional,
+                               const char* reduceOp, int64_t streamMode, const aclTensor* output)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(CheckNotNull(x1, x2, x2Scale, output, reduceOp), ACLNN_ERR_PARAM_NULLPTR);
@@ -221,7 +221,7 @@ static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const a
     return ACLNN_SUCCESS;
 }
 
-static const aclTensor *CopyTensor(const aclTensor *x2)
+static const aclTensor* CopyTensor(const aclTensor* x2)
 {
     uint64_t storageDimsNum = x2->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDims(storageDimsNum);
@@ -245,8 +245,8 @@ static const aclTensor *CopyTensor(const aclTensor *x2)
                            storageDims.data(), storageDimsNum, x2->GetTensor()->GetAddr());
 }
 
-static aclnnStatus PrepareTransposedX2(const aclTensor *x2, const aclTensor *x2Scale, bool transposeX2,
-                                       const aclTensor *&transX2, const aclTensor *&transX2Scale)
+static aclnnStatus PrepareTransposedX2(const aclTensor* x2, const aclTensor* x2Scale, bool transposeX2,
+                                       const aclTensor*& transX2, const aclTensor*& transX2Scale)
 {
     auto tempX2 = x2;
     if (op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2002 && MatmulAllReduceIsWeightNZFormat(x2)) {
@@ -272,11 +272,11 @@ static aclnnStatus PrepareTransposedX2(const aclTensor *x2, const aclTensor *x2S
 }
 
 aclnnStatus aclnnQuantMatmulAllReduceV4GetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, const aclTensor *x3Optional,
-    const aclTensor *x1ScaleOptional, const aclTensor *x2Scale, const aclTensor *commQuantScale1Optional,
-    const aclTensor *commQuantScale2Optional, const char *group, const char *reduceOp, int64_t commTurn,
-    int64_t streamMode, int64_t groupSize, int64_t commQuantMode, const aclTensor *output, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional, const aclTensor* x3Optional,
+    const aclTensor* x1ScaleOptional, const aclTensor* x2Scale, const aclTensor* commQuantScale1Optional,
+    const aclTensor* commQuantScale2Optional, const char* group, const char* reduceOp, int64_t commTurn,
+    int64_t streamMode, int64_t groupSize, int64_t commQuantMode, const aclTensor* output, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
     // 固定写法，参数检查
@@ -284,7 +284,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4GetWorkspaceSize(
                                 commQuantScale2Optional, reduceOp, streamMode, output);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     // x2Scale转为uint64
-    auto dequant = const_cast<aclTensor *>(x2Scale);
+    auto dequant = const_cast<aclTensor*>(x2Scale);
     if (dequant == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnQuantMatmulAllReduceV4", "x2Scale");
         return ACLNN_ERR_INNER;
@@ -295,20 +295,20 @@ aclnnStatus aclnnQuantMatmulAllReduceV4GetWorkspaceSize(
 
     bool transposeX1 = false;
     bool transposeX2 = IsTransposeLastTwoDims(x2) || QuantMatmulAllReduceIsAclnnPreTransposed(x2);
-    aclTensor *scale = nullptr;
-    aclTensor *offset = nullptr;
+    aclTensor* scale = nullptr;
+    aclTensor* offset = nullptr;
     int64_t antiquantGroupSize = 0;
-    const aclTensor *transX2 = nullptr;
-    const aclTensor *transX2Scale = nullptr;
+    const aclTensor* transX2 = nullptr;
+    const aclTensor* transX2Scale = nullptr;
     auto transRet = PrepareTransposedX2(x2, x2Scale, transposeX2, transX2, transX2Scale);
     CHECK_RET(transRet == ACLNN_SUCCESS, transRet);
 
     uint64_t yDtype = static_cast<uint64_t>(output->GetDataType());
-    const char *commModePtr = "ai_cpu";
+    const char* commModePtr = "ai_cpu";
     aclnnStatus ret = aclnnInnerMatmulAllReduceGetWorkspaceSize(
         x1, transX2, biasOptional, x3Optional, scale, offset, transX2Scale, x1ScaleOptional, commQuantScale1Optional,
-        commQuantScale2Optional, const_cast<char *>(group), const_cast<char *>(reduceOp), transposeX1, transposeX2,
-        commTurn, antiquantGroupSize, groupSize, yDtype, commQuantMode, const_cast<char *>(commModePtr), output,
+        commQuantScale2Optional, const_cast<char*>(group), const_cast<char*>(reduceOp), transposeX1, transposeX2,
+        commTurn, antiquantGroupSize, groupSize, yDtype, commQuantMode, const_cast<char*>(commModePtr), output,
         workspaceSize, executor);
 
     OP_LOGI("Group=%s, reduce op=%s, transposeX1=%u, transposeX2=%u, ret=%d.", group, reduceOp, transposeX1,
@@ -318,7 +318,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4GetWorkspaceSize(
     return ret;
 }
 
-aclnnStatus aclnnQuantMatmulAllReduceV4(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnQuantMatmulAllReduceV4(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         const aclrtStream stream)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();

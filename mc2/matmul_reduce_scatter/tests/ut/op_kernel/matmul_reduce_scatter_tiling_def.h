@@ -20,7 +20,7 @@
 constexpr uint16_t MAX_TENSOR_CONT = 256;
 constexpr uint16_t MAX_CORE_CONT = 64;
 
-inline void InitMatmulReduceScatterTilingData(uint8_t *tiling, MatmulReduceScatterTilingData *constData)
+inline void InitMatmulReduceScatterTilingData(uint8_t* tiling, MatmulReduceScatterTilingData* constData)
 {
     memcpy(constData, tiling, sizeof(MatmulReduceScatterTilingData));
 }

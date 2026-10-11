@@ -15,14 +15,14 @@
 #include "new_mc2_matmul_tiling_cfg.h"
 
 namespace Mc2MatmulHelper {
-void NewMc2MatmulTilingCfg::SetMatMulV3TilingData(optiling::MC2MatmulV3TilingData &tilingData)
+void NewMc2MatmulTilingCfg::SetMatMulV3TilingData(optiling::MC2MatmulV3TilingData& tilingData)
 {
     mc2MmV3TilingData_ = &tilingData;
 }
 
-void NewMc2MatmulTilingCfg::Update(const optiling::Mc2TilingResult &result)
+void NewMc2MatmulTilingCfg::Update(const optiling::Mc2TilingResult& result)
 {
-    mmv3TilingData_ = static_cast<Mc2MatMulV3TilingData *>(result.tilingData);
+    mmv3TilingData_ = static_cast<Mc2MatMulV3TilingData*>(result.tilingData);
 
     if ((mmv3TilingData_ == nullptr) || (mc2MmV3TilingData_ == nullptr)) {
         OP_LOGE_WITH_INVALID_INPUT("Mc2MatmulTilingCfg", "mc2MmV3TilingData_, mmv3TilingData_");

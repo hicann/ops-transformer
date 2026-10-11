@@ -21,7 +21,7 @@ namespace optiling {
 namespace mc2_matmul_v3_advanced {
 class Mc2MatMulV3BasicStreamKTiling : public Mc2MatMulV3BaseTiling {
 public:
-    Mc2MatMulV3BasicStreamKTiling(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg)
+    Mc2MatMulV3BasicStreamKTiling(gert::TilingContext* context, Mc2MatMulTilingCfg& cfg)
         : Mc2MatMulV3BaseTiling(context, cfg) {};
 
     ~Mc2MatMulV3BasicStreamKTiling() override {};

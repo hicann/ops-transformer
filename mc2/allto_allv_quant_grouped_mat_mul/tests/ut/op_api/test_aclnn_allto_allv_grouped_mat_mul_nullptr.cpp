@@ -48,17 +48,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int64_t groupSize = 0;
     std::vector<int64_t> sendCountsList(8, 1024);
     std::vector<int64_t> recvCountsList(8, 1024);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut_null_gmm_x =
@@ -91,17 +91,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int64_t groupSize = 0;
     std::vector<int64_t> sendCountsList(8, 1024);
     std::vector<int64_t> recvCountsList(8, 1024);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut_null_gmm_weight =
@@ -135,17 +135,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int64_t groupSize = 0;
     std::vector<int64_t> sendCountsList(8, 1024);
     std::vector<int64_t> recvCountsList(8, 1024);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut_null_gmm_x_scale =
@@ -179,17 +179,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int64_t groupSize = 0;
     std::vector<int64_t> sendCountsList(8, 1024);
     std::vector<int64_t> recvCountsList(8, 1024);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut_null_gmm_weight_scale = OP_API_UT(
@@ -222,17 +222,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int64_t groupSize = 0;
     std::vector<int64_t> sendCountsList(8, 1024);
     std::vector<int64_t> recvCountsList(8, 1024);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut_not_null_send_tensor =
@@ -266,17 +266,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int64_t groupSize = 0;
     std::vector<int64_t> sendCountsList(8, 1024);
     std::vector<int64_t> recvCountsList(8, 1024);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut_not_null_recv_tensor =
@@ -310,17 +310,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int64_t groupSize = 0;
     std::vector<int64_t> sendCountsList(8, 1024);
     std::vector<int64_t> recvCountsList(8, 1024);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut_not_null_permuteout_false =
@@ -354,17 +354,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int64_t groupSize = 0;
     std::vector<int64_t> sendCountsList(8, 1024);
     std::vector<int64_t> recvCountsList(8, 1024);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut_null_permuteout_true =
@@ -398,17 +398,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int64_t groupSize = 0;
     std::vector<int64_t> sendCountsList(8, 1024);
     std::vector<int64_t> recvCountsList(8, 1024);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut_quant_mode_not_vaild = OP_API_UT(
@@ -442,16 +442,16 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int listValue = 1024;
     std::vector<int64_t> sendCountsList(listSize, listValue);
     std::vector<int64_t> recvCountsList(listSize, listValue);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
 
     auto ut_null_gmm_y =
@@ -487,17 +487,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int listValue = 1024;
     std::vector<int64_t> sendCountsList(listSize, listValue);
     std::vector<int64_t> recvCountsList(listSize, listValue);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 1; // transGmmWeight=true with non-contiguous → error
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
 
     auto ut_trans_not_contiguous =
@@ -533,17 +533,17 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int listValue = 1024;
     std::vector<int64_t> sendCountsList(listSize, listValue);
     std::vector<int64_t> recvCountsList(listSize, listValue);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 1; // transMmWeight=true with non-contiguous → error
     int32_t permuteOutFlag = 1;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc permuteOutOptional = {{8192, 7168}, ACL_HIFLOAT8, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
 
     auto ut_mm_trans_not_contiguous =
@@ -579,16 +579,16 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int listValue = 1024;
     std::vector<int64_t> sendCountsList(listSize, listValue);
     std::vector<int64_t> recvCountsList(listSize, listValue);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 0;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut = OP_API_UT(aclnnAlltoAllvQuantGroupedMatMul,
@@ -622,16 +622,16 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int listValue = 1024;
     std::vector<int64_t> sendCountsList(listSize, listValue);
     std::vector<int64_t> recvCountsList(listSize, listValue);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 0;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut = OP_API_UT(aclnnAlltoAllvQuantGroupedMatMul,
@@ -667,16 +667,16 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int listValue = 1024;
     std::vector<int64_t> sendCountsList(listSize, listValue);
     std::vector<int64_t> recvCountsList(listSize, listValue);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 0;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut = OP_API_UT(aclnnAlltoAllvQuantGroupedMatMul,
@@ -713,16 +713,16 @@ TEST_F(AclnnAlltoAllvQuantGroupedMatMulNullptrTest, aclnnAlltoAllvQuantGroupedMa
     int listValue = 1024;
     std::vector<int64_t> sendCountsList(listSize, listValue);
     std::vector<int64_t> recvCountsList(listSize, listValue);
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     int32_t transGmmWeight = 0;
     int32_t transMmWeight = 0;
     int32_t permuteOutFlag = 0;
     TensorDesc gmmY = {{8192, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
     TensorDesc mmYOptional = {{4096, 4096}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     op::SetPlatformNpuArch(Ops::Base::DAV_3510);
 
     auto ut = OP_API_UT(aclnnAlltoAllvQuantGroupedMatMul,

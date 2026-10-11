@@ -94,12 +94,12 @@ struct Mc2TilingEnable {
 class Mc2BatchMatmulV3BaseTiling : public mc2_matmul_v3::Mc2MatmulV3BaseTiling {
 public:
 public:
-    explicit Mc2BatchMatmulV3BaseTiling(gert::TilingContext *context)
+    explicit Mc2BatchMatmulV3BaseTiling(gert::TilingContext* context)
         : Mc2MatmulV3BaseTiling(context, &bmmTilingDataSelf_.matmulTiling),
           bmmTilingData_(bmmTilingDataSelf_)
     {}
 
-    Mc2BatchMatmulV3BaseTiling(gert::TilingContext *context, Mc2BatchMatmulTilingData &bmmTilingData,
+    Mc2BatchMatmulV3BaseTiling(gert::TilingContext* context, Mc2BatchMatmulTilingData& bmmTilingData,
                                Mc2TilingCalcSelect tilingSelect = Mc2TilingCalcSelect::COMMON)
         : Mc2MatmulV3BaseTiling(context, &bmmTilingData.matmulTiling),
           bmmTilingData_(bmmTilingData)
@@ -142,7 +142,7 @@ protected:
 
 protected:
     Mc2BatchShapeInfo batchInfo_;
-    Mc2BatchMatmulTilingData &bmmTilingData_;
+    Mc2BatchMatmulTilingData& bmmTilingData_;
     Mc2TilingCalcSelect tilingSelect_ = Mc2TilingCalcSelect::ALL;
 
 private:

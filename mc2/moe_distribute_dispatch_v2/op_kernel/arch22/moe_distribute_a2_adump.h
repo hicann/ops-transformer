@@ -32,8 +32,8 @@ public:
                                 uint32_t aivNum, LocalTensor<uint8_t> dataStateLocalTensor, uint32_t axisH,
                                 uint32_t axisBS)
     {
-        selfDataStatusGMTensor_.SetGlobalBuffer((__gm__ uint32_t *)(aDumpWinStartAddr + aivId * WIN_ADDR_ALIGN));
-        selfTokenNumGMTensor_.SetGlobalBuffer((__gm__ uint32_t *)(aDumpWinStartAddr + (aivNum + 1) * WIN_ADDR_ALIGN));
+        selfDataStatusGMTensor_.SetGlobalBuffer((__gm__ uint32_t*)(aDumpWinStartAddr + aivId * WIN_ADDR_ALIGN));
+        selfTokenNumGMTensor_.SetGlobalBuffer((__gm__ uint32_t*)(aDumpWinStartAddr + (aivNum + 1) * WIN_ADDR_ALIGN));
         aivId_ = aivId;
         uint32_t dataSize = UB_ALIGN * 2U;
         dataStateLocalTensor_ = dataStateLocalTensor.template ReinterpretCast<uint32_t>();

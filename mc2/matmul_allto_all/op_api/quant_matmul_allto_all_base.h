@@ -19,13 +19,13 @@
 #include "aclnn_util.h"
 
 ACLNN_API aclnnStatus aclnnQuantMatmulAlltoAllBaseGetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, const aclTensor *x1Scale,
-    const aclTensor *x2Scale, const aclTensor *commScaleOptional, const aclTensor *x1OffsetOptional,
-    const aclTensor *x2OffsetOptional, const aclIntArray *alltoAllAxesOptional, const char *group, const char *commMode,
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional, const aclTensor* x1Scale,
+    const aclTensor* x2Scale, const aclTensor* commScaleOptional, const aclTensor* x1OffsetOptional,
+    const aclTensor* x2OffsetOptional, const aclIntArray* alltoAllAxesOptional, const char* group, const char* commMode,
     int64_t x1QuantMode, int64_t x2QuantMode, int64_t commQuantMode, int64_t commQuantDtype, int64_t groupSize,
-    bool transposeX1, bool transposeX2, const aclTensor *output, uint64_t *workspaceSize, aclOpExecutor **executor);
+    bool transposeX1, bool transposeX2, const aclTensor* output, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-ACLNN_API aclnnStatus aclnnQuantMatmulAlltoAllBase(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnQuantMatmulAlltoAllBase(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                    aclrtStream stream);
 
 #endif // OP_API_INC_QUANT_MATMUL_ALL_TO_ALL_BASE_

@@ -46,20 +46,20 @@ class MatmulAllReduceQuantFP16CommInt8 {
 public:
     __aicore__ inline MatmulAllReduceQuantFP16CommInt8() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR dequantGM, GM_ADDR biasGM, GM_ADDR addGM, GM_ADDR cGM,
-                                GM_ADDR workspaceGM, Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData,
-                                TPipe *tPipe);
+                                GM_ADDR workspaceGM, Mc2Tiling::QuantMatmulAllReduceTilingData* tilingData,
+                                TPipe* tPipe);
     __aicore__ inline void InitScale(GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InnerProcess(uint32_t isAdd, uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData &quant_tiling,
+    __aicore__ inline void InnerProcess(uint32_t isAdd, uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData& quant_tiling,
                                         uint32_t padM, uint32_t prePadM, bool isTiletoTileFlag);
     __aicore__ inline void PrepareInit();
     __aicore__ inline uint32_t SendCountCheck(uint32_t prepareIndex);
 
 private:
-    Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData_;
-    TPipe *tPipe_;
+    Mc2Tiling::QuantMatmulAllReduceTilingData* tilingData_;
+    TPipe* tPipe_;
     GM_ADDR cGM_;
     GM_ADDR aGM_;
     GM_ADDR bGM_;
@@ -100,9 +100,9 @@ template <typename aType, typename bType, typename biasType, typename cType, typ
           bool bTrans>
 __aicore__ inline void MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, cType, commType, aTrans, bTrans>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR dequantGM, GM_ADDR biasGM, GM_ADDR addGM, GM_ADDR cGM, GM_ADDR workspaceGM,
-    Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData, TPipe *tPipe)
+    Mc2Tiling::QuantMatmulAllReduceTilingData* tilingData, TPipe* tPipe)
 {
-    __gm__ HcclCombinOpParam *context = (__gm__ HcclCombinOpParam *)(GetHcclContext<0>());
+    __gm__ HcclCombinOpParam* context = (__gm__ HcclCombinOpParam*)(GetHcclContext<0>());
     OOMInit(context);
     hccl_.Init(GetHcclContext<0>());
     tilingData_ = tilingData;
@@ -155,7 +155,7 @@ template <typename aType, typename bType, typename biasType, typename cType, typ
 __aicore__ inline void
 MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, cType, commType, aTrans, bTrans>::PrepareInit()
 {
-    auto &&mc2Tiling = tilingData_->param;
+    auto&& mc2Tiling = tilingData_->param;
     uint32_t rankNum = mc2Tiling.rankDim;
     uint32_t tileM = tilingData_->tilematmulTiling.matmulTiling.M; // 头块 pad 大小更新
     tilePadM_ = tileM;
@@ -233,7 +233,7 @@ template <typename aType, typename bType, typename biasType, typename cType, typ
 __aicore__ inline void
 MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, cType, commType, aTrans, bTrans>::Process()
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     if (g_coreType == AscendC::AIV) {
         PrepareInit();
     }
@@ -305,7 +305,7 @@ template <typename aType, typename bType, typename biasType, typename cType, typ
           bool bTrans>
 __aicore__ inline void
 MatmulAllReduceQuantFP16CommInt8<aType, bType, biasType, cType, commType, aTrans, bTrans>::InnerProcess(
-    uint32_t isAdd, uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData &quant_tiling, uint32_t padM, uint32_t prePadM,
+    uint32_t isAdd, uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData& quant_tiling, uint32_t padM, uint32_t prePadM,
     bool isTiletoTailFlag)
 {
     const int64_t aOffset = static_cast<int64_t>(quant_tiling.matmulTiling.M) *

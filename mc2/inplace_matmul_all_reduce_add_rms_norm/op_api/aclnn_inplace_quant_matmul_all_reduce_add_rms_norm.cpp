@@ -36,16 +36,16 @@ extern "C" {
 #endif
 
 aclnnStatus aclnnInplaceQuantMatmulAllReduceAddRmsNormGetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *dequantScale,
-    const aclTensor *residual, const aclTensor *gamma, double epsilon, const char *group, const char *reduceOp,
-    int64_t commTurn, int64_t streamMode, const aclTensor *normOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* dequantScale,
+    const aclTensor* residual, const aclTensor* gamma, double epsilon, const char* group, const char* reduceOp,
+    int64_t commTurn, int64_t streamMode, const aclTensor* normOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     return aclnnQuantMatmulAllReduceAddRmsNormGetWorkspaceSize(x1, x2, bias, dequantScale, residual, gamma, epsilon,
                                                                group, reduceOp, commTurn, streamMode, residual, normOut,
                                                                workspaceSize, executor);
 }
 
-aclnnStatus aclnnInplaceQuantMatmulAllReduceAddRmsNorm(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnInplaceQuantMatmulAllReduceAddRmsNorm(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                        const aclrtStream stream)
 {
     return aclnnQuantMatmulAllReduceAddRmsNorm(workspace, workspaceSize, executor, stream);

@@ -20,10 +20,10 @@
 
 namespace optiling {
 #if defined(BUILD_OPEN_PROJECT) && !defined(MC2_LEGACY_DECOUPLED)
-bool TilingPrepareForOpCache(gert::TilingContext *context)
+bool TilingPrepareForOpCache(gert::TilingContext* context)
 {
-    using FuncType = bool (*)(gert::TilingContext *);
-    const char *symbolName = "LegacyTilingPrepareForOpCache";
+    using FuncType = bool (*)(gert::TilingContext*);
+    const char* symbolName = "LegacyTilingPrepareForOpCache";
     static FuncType func = Ops::MC2::LegacyCommonMgr::GetInstance().GetFunc<FuncType>(symbolName);
     if (func == nullptr) {
         OP_LOGW("LegacyCommonMgr", "dest func %s pointer is null.", symbolName);
@@ -33,10 +33,10 @@ bool TilingPrepareForOpCache(gert::TilingContext *context)
     }
 }
 
-bool TilingPrepareForOpCache(gert::TilingParseContext *context)
+bool TilingPrepareForOpCache(gert::TilingParseContext* context)
 {
-    using FuncType = bool (*)(gert::TilingParseContext *);
-    const char *symbolName = "LegacyTilingParsePrepareForOpCache";
+    using FuncType = bool (*)(gert::TilingParseContext*);
+    const char* symbolName = "LegacyTilingParsePrepareForOpCache";
     static FuncType func = Ops::MC2::LegacyCommonMgr::GetInstance().GetFunc<FuncType>(symbolName);
     if (func == nullptr) {
         OP_LOGW("LegacyCommonMgr", "dest func %s pointer is null.", symbolName);
@@ -46,12 +46,12 @@ bool TilingPrepareForOpCache(gert::TilingParseContext *context)
     }
 }
 
-bool GenTiling(const std::string &op_type, const BatchmatmulCompileParas &compile_params,
-               BatchmatmulRunParas &run_params, CacheTilingData &tiling, gert::TilingContext *context)
+bool GenTiling(const std::string& op_type, const BatchmatmulCompileParas& compile_params,
+               BatchmatmulRunParas& run_params, CacheTilingData& tiling, gert::TilingContext* context)
 {
-    using FuncType = bool (*)(const std::string &, const BatchmatmulCompileParas &, BatchmatmulRunParas &,
-                              CacheTilingData &, gert::TilingContext *);
-    const char *symbolName = "LegacyGenTbeMatmulTiling";
+    using FuncType = bool (*)(const std::string&, const BatchmatmulCompileParas&, BatchmatmulRunParas&,
+                              CacheTilingData&, gert::TilingContext*);
+    const char* symbolName = "LegacyGenTbeMatmulTiling";
     static FuncType func = Ops::MC2::LegacyCommonMgr::GetInstance().GetFunc<FuncType>(symbolName);
     if (func == nullptr) {
         OP_LOGW("LegacyCommonMgr", "dest func %s pointer is null.", symbolName);
@@ -61,11 +61,11 @@ bool GenTiling(const std::string &op_type, const BatchmatmulCompileParas &compil
     }
 }
 
-bool CheckSupportConditionQbmm(QbmmType type, QuantBatchMatmulRunParas &inputParams, uint64_t aicNum,
+bool CheckSupportConditionQbmm(QbmmType type, QuantBatchMatmulRunParas& inputParams, uint64_t aicNum,
                                bool supportL0c2Out)
 {
-    using FuncType = bool (*)(QbmmType, QuantBatchMatmulRunParas &, uint64_t, bool);
-    const char *symbolName = "LegacyCheckSupportConditionQbmm";
+    using FuncType = bool (*)(QbmmType, QuantBatchMatmulRunParas&, uint64_t, bool);
+    const char* symbolName = "LegacyCheckSupportConditionQbmm";
     static FuncType func = Ops::MC2::LegacyCommonMgr::GetInstance().GetFunc<FuncType>(symbolName);
     if (func == nullptr) {
         OP_LOGW("LegacyCommonMgr", "dest func %s pointer is null.", symbolName);
@@ -75,12 +75,12 @@ bool CheckSupportConditionQbmm(QbmmType type, QuantBatchMatmulRunParas &inputPar
     }
 }
 
-bool GenWqbmmTiling(const std::string &op_type, const WeightQuantBatchMatmulCacheTilingParas &compile_params,
-                    WeightQuantBatchMatmulCacheTilingData &cacheTiling)
+bool GenWqbmmTiling(const std::string& op_type, const WeightQuantBatchMatmulCacheTilingParas& compile_params,
+                    WeightQuantBatchMatmulCacheTilingData& cacheTiling)
 {
-    using FuncType = bool (*)(const std::string &, const WeightQuantBatchMatmulCacheTilingParas &,
-                              WeightQuantBatchMatmulCacheTilingData &);
-    const char *symbolName = "LegacyGenWqbmmTiling";
+    using FuncType = bool (*)(const std::string&, const WeightQuantBatchMatmulCacheTilingParas&,
+                              WeightQuantBatchMatmulCacheTilingData&);
+    const char* symbolName = "LegacyGenWqbmmTiling";
     static FuncType func = Ops::MC2::LegacyCommonMgr::GetInstance().GetFunc<FuncType>(symbolName);
     if (func == nullptr) {
         OP_LOGW("LegacyCommonMgr", "dest func %s pointer is null.", symbolName);
@@ -90,30 +90,30 @@ bool GenWqbmmTiling(const std::string &op_type, const WeightQuantBatchMatmulCach
     }
 }
 #else
-bool TilingPrepareForOpCache(gert::TilingContext * /*context*/)
+bool TilingPrepareForOpCache(gert::TilingContext* /*context*/)
 {
     return true;
 }
 
-bool TilingPrepareForOpCache(gert::TilingParseContext * /*context*/)
+bool TilingPrepareForOpCache(gert::TilingParseContext* /*context*/)
 {
     return true;
 }
 
-bool GenTiling(const std::string & /*op_type*/, const BatchmatmulCompileParas & /*compile_params*/,
-               BatchmatmulRunParas & /*run_params*/, CacheTilingData & /*tiling*/, gert::TilingContext * /*context*/)
+bool GenTiling(const std::string& /*op_type*/, const BatchmatmulCompileParas& /*compile_params*/,
+               BatchmatmulRunParas& /*run_params*/, CacheTilingData& /*tiling*/, gert::TilingContext* /*context*/)
 {
     return true;
 }
 
-bool CheckSupportConditionQbmm(QbmmType /*type*/, QuantBatchMatmulRunParas & /*inputParams*/, uint64_t /*aicNum*/,
+bool CheckSupportConditionQbmm(QbmmType /*type*/, QuantBatchMatmulRunParas& /*inputParams*/, uint64_t /*aicNum*/,
                                bool /*supportL0c2Out*/)
 {
     return true;
 }
 
-bool GenWqbmmTiling(const std::string & /*op_type*/, const WeightQuantBatchMatmulCacheTilingParas & /*compile_params*/,
-                    WeightQuantBatchMatmulCacheTilingData & /*cacheTiling*/)
+bool GenWqbmmTiling(const std::string& /*op_type*/, const WeightQuantBatchMatmulCacheTilingParas& /*compile_params*/,
+                    WeightQuantBatchMatmulCacheTilingData& /*cacheTiling*/)
 {
     return true;
 }

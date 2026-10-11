@@ -39,7 +39,7 @@ ge::graphStatus MatmulAllToAllTilingBase::GetShapeAttrsInfo()
  */
 ge::graphStatus MatmulAllToAllTilingBase::GetPlatformInfo()
 {
-    fe::PlatFormInfos *platformInfo = context_->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context_->GetPlatformInfo();
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE(opName_, "Fail to get platform info."), return ge::GRAPH_FAILED);
     platform_ascendc::PlatformAscendC ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     socVersion_ = ascendcPlatform.GetSocVersion();
@@ -66,7 +66,7 @@ ge::graphStatus MatmulAllToAllTilingBase::DoLibApiTiling()
  */
 ge::graphStatus MatmulAllToAllTilingBase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "Get workspace failed"), return ge::GRAPH_FAILED);
     SetUserWorkSpace();
     uint64_t workspaceSize_ = libApiWorkSpaceSize_ + inferredInfo.mmResultLen + inferredInfo.permuteLen;
@@ -128,16 +128,16 @@ void MatmulAllToAllTilingBase::SetUserWorkSpace()
  *
  * @return ge::graphStatus
  */
-ge::graphStatus MatmulAllToAllTilingBase::Check2DMatrixMulShapes(const gert::TilingContext *context, const char *opName)
+ge::graphStatus MatmulAllToAllTilingBase::Check2DMatrixMulShapes(const gert::TilingContext* context, const char* opName)
 {
     bool x2TransFlag = false;
     // attr及其元素的非空校验在前置的Check方法里都校验过，所以这里不需要额外判断
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
-    const bool *isTransX2 = attrs->GetAttrPointer<bool>(ATTR_X2_TRANSPOSE_INDEX);
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
+    const bool* isTransX2 = attrs->GetAttrPointer<bool>(ATTR_X2_TRANSPOSE_INDEX);
     if (isTransX2) {
         x2TransFlag = *isTransX2;
     }
-    const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
+    const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
 
     int64_t rankDim = 0;
     if (MatmulAlltoAllTilingUtil::GetAndValidateRankSize(context, opName, group, rankDim) != ge::GRAPH_SUCCESS) {
@@ -179,8 +179,8 @@ ge::graphStatus MatmulAllToAllTilingBase::Check2DMatrixMulShapes(const gert::Til
  *
  * @return ge::graphStatus
  */
-ge::graphStatus MatmulAllToAllTilingBase::CheckKcQuantMatrixMulShapes(const gert::TilingContext *context,
-                                                                      const char *opName)
+ge::graphStatus MatmulAllToAllTilingBase::CheckKcQuantMatrixMulShapes(const gert::TilingContext* context,
+                                                                      const char* opName)
 {
     OP_TILING_CHECK(Check2DMatrixMulShapes(context, opName) != ge::GRAPH_SUCCESS,
                     OP_LOGE(opName_, "Kc quant tiling check x1 x2 and y shape failed."), return ge::GRAPH_FAILED);
@@ -194,12 +194,12 @@ ge::graphStatus MatmulAllToAllTilingBase::CheckKcQuantMatrixMulShapes(const gert
  *
  * @return ge::graphStatus
  */
-ge::graphStatus MatmulAllToAllTilingBase::CheckKcQuantScaleShapes(const gert::TilingContext *context,
-                                                                  const char *opName)
+ge::graphStatus MatmulAllToAllTilingBase::CheckKcQuantScaleShapes(const gert::TilingContext* context,
+                                                                  const char* opName)
 {
     bool TransX2Flag = false;
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
-    const bool *isX2TransX2 = attrs->GetAttrPointer<bool>(ATTR_X2_TRANSPOSE_INDEX);
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
+    const bool* isX2TransX2 = attrs->GetAttrPointer<bool>(ATTR_X2_TRANSPOSE_INDEX);
 
     if (isX2TransX2) {
         TransX2Flag = *isX2TransX2;
@@ -207,8 +207,8 @@ ge::graphStatus MatmulAllToAllTilingBase::CheckKcQuantScaleShapes(const gert::Ti
     Matrix2DShapes shapeInfo;
     MatmulAlltoAllTilingUtil::GetMatrix2DShapes(context, shapeInfo);
     uint64_t nAxis = TransX2Flag ? shapeInfo.x2Dim0 : shapeInfo.x2Dim1;
-    const gert::StorageShape *x1ScaleShape = context->GetOptionalInputShape(INPUT_X1_SCALE_INDEX);
-    const gert::StorageShape *x2ScaleShape = context->GetOptionalInputShape(INPUT_X2_SCALE_INDEX);
+    const gert::StorageShape* x1ScaleShape = context->GetOptionalInputShape(INPUT_X1_SCALE_INDEX);
+    const gert::StorageShape* x2ScaleShape = context->GetOptionalInputShape(INPUT_X2_SCALE_INDEX);
     uint64_t x1ScaleDim = x1ScaleShape->GetStorageShape().GetDim(0);
     uint64_t x2ScaleDim = x2ScaleShape->GetStorageShape().GetDim(0);
     OP_TILING_CHECK(

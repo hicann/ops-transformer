@@ -26,8 +26,8 @@ extern "C" {
 #endif
 
 // check nullptr
-static bool CheckNotNull(const aclTensor *x, const aclTensor *weight, const char *groupEp, const char *groupTp,
-                         aclTensor *y1Out)
+static bool CheckNotNull(const aclTensor* x, const aclTensor* weight, const char* groupEp, const char* groupTp,
+                         aclTensor* y1Out)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(weight, return false);
@@ -44,8 +44,8 @@ static bool CheckNotNull(const aclTensor *x, const aclTensor *weight, const char
 }
 
 // check input/output dtype
-static bool CheckDtypeValid(const aclTensor *x, const aclTensor *weight, const aclTensor *bias, const aclTensor *y1Out,
-                            const aclTensor *y2OutOptional, const aclTensor *y3OutOptional)
+static bool CheckDtypeValid(const aclTensor* x, const aclTensor* weight, const aclTensor* bias, const aclTensor* y1Out,
+                            const aclTensor* y2OutOptional, const aclTensor* y3OutOptional)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x, MOE_X_DTYPE_SUPPORT_LIST, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(weight, MOE_X_DTYPE_SUPPORT_LIST, return false);
@@ -79,9 +79,9 @@ static bool CheckDtypeValid(const aclTensor *x, const aclTensor *weight, const a
 }
 
 // check shape dim
-static bool CheckIfTensorThreeDim(const aclTensor *x, const aclTensor *weight, const aclTensor *bias,
-                                  const aclTensor *y1Out, const aclTensor *y2OutOptional,
-                                  const aclTensor *y3OutOptional)
+static bool CheckIfTensorThreeDim(const aclTensor* x, const aclTensor* weight, const aclTensor* bias,
+                                  const aclTensor* y1Out, const aclTensor* y2OutOptional,
+                                  const aclTensor* y3OutOptional)
 {
     if (x->GetViewShape().GetDimNum() != SUPPORTED_DIMENSIONAL) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
@@ -132,8 +132,8 @@ static bool CheckIfTensorThreeDim(const aclTensor *x, const aclTensor *weight, c
 }
 
 // 维度判断
-static bool CheckTensorDimCommonShape(const aclTensor *x, const aclTensor *weight, int64_t epWorldSize,
-                                      const aclTensor *y1Out)
+static bool CheckTensorDimCommonShape(const aclTensor* x, const aclTensor* weight, int64_t epWorldSize,
+                                      const aclTensor* y1Out)
 {
     // E = E/ep * ep, x_0 == w_0 * ep
     if ((weight->GetViewShape().GetDim(DIM_0) * epWorldSize) != x->GetViewShape().GetDim(DIM_0)) {
@@ -168,8 +168,8 @@ static bool CheckTensorDimCommonShape(const aclTensor *x, const aclTensor *weigh
     return true;
 }
 
-static bool CheckTensorDimUniqueShape(const aclTensor *x, const aclTensor *weight, int64_t epWorldSize,
-                                      int64_t tpWorldSize, int64_t xShardType, const aclTensor *y1Out)
+static bool CheckTensorDimUniqueShape(const aclTensor* x, const aclTensor* weight, int64_t epWorldSize,
+                                      int64_t tpWorldSize, int64_t xShardType, const aclTensor* y1Out)
 {
     if (xShardType == 0) {
         // H = H/tp * tp, w_1 = x_2 * tp
@@ -221,7 +221,7 @@ static bool CheckTensorDimUniqueShape(const aclTensor *x, const aclTensor *weigh
     return true;
 }
 
-static bool CheckBiasDim(const aclTensor *weight, const aclTensor *bias, const aclTensor *y1Out)
+static bool CheckBiasDim(const aclTensor* weight, const aclTensor* bias, const aclTensor* y1Out)
 {
     // bias 维度判断
     if (bias != nullptr) {
@@ -243,8 +243,8 @@ static bool CheckBiasDim(const aclTensor *weight, const aclTensor *bias, const a
     return true;
 }
 
-static bool CheckOutOptionalDim(const aclTensor *weight, const aclTensor *y1Out, const aclTensor *y2OutOptional,
-                                const aclTensor *y3OutOptional)
+static bool CheckOutOptionalDim(const aclTensor* weight, const aclTensor* y1Out, const aclTensor* y2OutOptional,
+                                const aclTensor* y3OutOptional)
 {
     // y2OutOptional 维度判断
     if (y2OutOptional != nullptr) {
@@ -277,9 +277,9 @@ static bool CheckOutOptionalDim(const aclTensor *weight, const aclTensor *y1Out,
     return true;
 }
 
-static bool CheckTensorDim(const aclTensor *x, const aclTensor *weight, const aclTensor *bias, int64_t epWorldSize,
-                           int64_t tpWorldSize, int64_t xShardType, aclTensor *y1Out, aclTensor *y2OutOptional,
-                           aclTensor *y3OutOptional)
+static bool CheckTensorDim(const aclTensor* x, const aclTensor* weight, const aclTensor* bias, int64_t epWorldSize,
+                           int64_t tpWorldSize, int64_t xShardType, aclTensor* y1Out, aclTensor* y2OutOptional,
+                           aclTensor* y3OutOptional)
 {
     // 是否为三维判断
     if (!CheckIfTensorThreeDim(x, weight, bias, y1Out, y2OutOptional, y3OutOptional)) {
@@ -341,7 +341,7 @@ static bool CheckAttr(int64_t epWorldSize, int64_t tpWorldSize, int64_t xShardTy
 }
 
 // 范围校验
-static bool CheckShapeRange(const aclTensor *x, const aclTensor *weight)
+static bool CheckShapeRange(const aclTensor* x, const aclTensor* weight)
 {
     // 暂不支持空tensor场景
     // M/tp in [1, 65535], 空tensor N校验
@@ -385,10 +385,10 @@ static bool CheckShapeRange(const aclTensor *x, const aclTensor *weight)
 }
 
 // 入参校验
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *weight, const aclTensor *biasOptional,
-                               const char *groupEp, const char *groupTp, int64_t epWorldSize, int64_t tpWorldSize,
-                               int64_t xShardType, int64_t actType, aclTensor *y1Out, aclTensor *y2OutOptional,
-                               aclTensor *y3OutOptional)
+static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* weight, const aclTensor* biasOptional,
+                               const char* groupEp, const char* groupTp, int64_t epWorldSize, int64_t tpWorldSize,
+                               int64_t xShardType, int64_t actType, aclTensor* y1Out, aclTensor* y2OutOptional,
+                               aclTensor* y3OutOptional)
 {
     CHECK_RET(CheckNotNull(x, weight, groupEp, groupTp, y1Out), ACLNN_ERR_PARAM_NULLPTR);
 
@@ -417,7 +417,7 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *weight, cons
     return ACLNN_SUCCESS;
 }
 
-static const aclTensor *TransTensor(const aclTensor *x2)
+static const aclTensor* TransTensor(const aclTensor* x2)
 {
     uint64_t storageDimsNum = x2->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDims(storageDimsNum);
@@ -450,13 +450,13 @@ static const aclTensor *TransTensor(const aclTensor *x2)
                            storageDims.data(), storageDimsNum, x2->GetTensor()->GetAddr());
 }
 
-aclnnStatus aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize(const aclTensor *x, const aclTensor *weight,
-                                                              const aclTensor *biasOptional, const char *groupEp,
-                                                              const char *groupTp, int64_t epWorldSize,
+aclnnStatus aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize(const aclTensor* x, const aclTensor* weight,
+                                                              const aclTensor* biasOptional, const char* groupEp,
+                                                              const char* groupTp, int64_t epWorldSize,
                                                               int64_t tpWorldSize, int64_t xShardType, int64_t actType,
-                                                              aclTensor *y1Out, aclTensor *y2OutOptional,
-                                                              aclTensor *y3OutOptional, uint64_t *workspaceSize,
-                                                              aclOpExecutor **executor)
+                                                              aclTensor* y1Out, aclTensor* y2OutOptional,
+                                                              aclTensor* y3OutOptional, uint64_t* workspaceSize,
+                                                              aclOpExecutor** executor)
 {
     auto ret_param = CheckParams(x, weight, biasOptional, groupEp, groupTp, epWorldSize, tpWorldSize, xShardType,
                                  actType, y1Out, y2OutOptional, y3OutOptional);
@@ -475,20 +475,20 @@ aclnnStatus aclnnAlltoAllAllGatherBatchMatMulGetWorkspaceSize(const aclTensor *x
     if (transposeWeight) {
         auto weightTrans = TransTensor(weight);
         aclnnStatus ret = aclnnInnerAlltoAllAllGatherBatchMatMulGetWorkspaceSize(
-            x, weightTrans, biasOptional, const_cast<char *>(groupEp), const_cast<char *>(groupTp), epWorldSize,
+            x, weightTrans, biasOptional, const_cast<char*>(groupEp), const_cast<char*>(groupTp), epWorldSize,
             tpWorldSize, xShardType, actType, transposeWeight, isY2Out, isY3Out, y1Out, y2OutOptional, y3OutOptional,
             workspaceSize, executor);
         return ret;
     } else {
         aclnnStatus ret = aclnnInnerAlltoAllAllGatherBatchMatMulGetWorkspaceSize(
-            x, weight, biasOptional, const_cast<char *>(groupEp), const_cast<char *>(groupTp), epWorldSize, tpWorldSize,
+            x, weight, biasOptional, const_cast<char*>(groupEp), const_cast<char*>(groupTp), epWorldSize, tpWorldSize,
             xShardType, actType, transposeWeight, isY2Out, isY3Out, y1Out, y2OutOptional, y3OutOptional, workspaceSize,
             executor);
         return ret;
     }
 }
 
-aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnAlltoAllAllGatherBatchMatMul(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                               aclrtStream stream)
 {
     aclnnStatus ret = aclnnInnerAlltoAllAllGatherBatchMatMul(workspace, workspaceSize, executor, stream);

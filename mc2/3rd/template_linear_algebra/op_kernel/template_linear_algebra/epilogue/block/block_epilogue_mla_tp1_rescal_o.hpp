@@ -52,7 +52,7 @@ public:
     static constexpr uint32_t NUM4 = 4;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, uint32_t kvSplitCoreNum_ = 1)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource, uint32_t kvSplitCoreNum_ = 1)
     {
         // Allocate UB space
         constexpr uint32_t LO_UB_TENSOR_OFFSET = 4 * UB_UINT8_BLOCK_SIZE_MLA;
@@ -105,10 +105,10 @@ public:
     CATLASS_DEVICE
     void SubCoreCompute(AscendC::GlobalTensor<ElementInput> gInput, AscendC::GlobalTensor<ElementUpdate> gUpdate,
                         AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementUpdate> gOCoreTmp,
-                        AscendC::GlobalTensor<ElementUpdate> gl, const LayoutInput &layoutInput,
-                        const LayoutOutput &layoutOutput, const LayoutUpdate &layoutUpdate, uint32_t nIdx,
+                        AscendC::GlobalTensor<ElementUpdate> gl, const LayoutInput& layoutInput,
+                        const LayoutOutput& layoutOutput, const LayoutUpdate& layoutUpdate, uint32_t nIdx,
                         uint32_t isLastNTile, uint32_t needRowLoop, uint32_t rowLoopIdx, uint32_t rescaleOPingPongFlag,
-                        uint32_t &glFlag)
+                        uint32_t& glFlag)
     {
         uint32_t curRowNum = layoutInput.shape(0);
         uint32_t embed = layoutInput.shape(1);
@@ -262,9 +262,9 @@ public:
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementInput> gInput, AscendC::GlobalTensor<ElementUpdate> gUpdate,
                     AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementUpdate> gOCoreTmp,
-                    AscendC::GlobalTensor<ElementUpdate> gl, const LayoutInput &layoutInput,
-                    const LayoutUpdate &layoutUpdate, const LayoutOutput &layoutOutput, GemmCoord actualBlockShape,
-                    uint32_t nIdx, uint32_t isLastNTile, uint32_t rescaleOPingPongFlag, uint32_t &glFlag)
+                    AscendC::GlobalTensor<ElementUpdate> gl, const LayoutInput& layoutInput,
+                    const LayoutUpdate& layoutUpdate, const LayoutOutput& layoutOutput, GemmCoord actualBlockShape,
+                    uint32_t nIdx, uint32_t isLastNTile, uint32_t rescaleOPingPongFlag, uint32_t& glFlag)
     {
         uint32_t embed = layoutInput.shape(1);
         uint32_t rowActual = actualBlockShape.m();

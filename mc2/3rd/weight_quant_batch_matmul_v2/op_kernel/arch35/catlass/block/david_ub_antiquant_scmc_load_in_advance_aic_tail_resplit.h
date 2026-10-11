@@ -84,9 +84,9 @@ private:
 
 public:
     struct Params {
-        __gm__ DtypeA *aGmAddr = nullptr;
-        __gm__ DtypeC *cGmAddr = nullptr;
-        __gm__ DtypeBias *biasGmAddr = nullptr;
+        __gm__ DtypeA* aGmAddr = nullptr;
+        __gm__ DtypeC* cGmAddr = nullptr;
+        __gm__ DtypeBias* biasGmAddr = nullptr;
 
         TileShapeL1 tileShapeL1;
 
@@ -133,7 +133,7 @@ public:
     DEVICE BlockMmad() {}
 
     template <class ProblemShape, typename TilingData>
-    DEVICE static Params GetParams(ProblemShape const &problemShape, Arguments const &args, TilingData const &tiling)
+    DEVICE static Params GetParams(ProblemShape const& problemShape, Arguments const& args, TilingData const& tiling)
     {
         decltype(auto) sizeM = get<0>(problemShape);
         decltype(auto) sizeN = get<1>(problemShape);
@@ -189,11 +189,11 @@ public:
     }
 
     template <class ProblemShape>
-    DEVICE static Params GetParams(ProblemShape const &problemShape, Arguments const &args)
+    DEVICE static Params GetParams(ProblemShape const& problemShape, Arguments const& args)
     {}
 
     template <class ProblemShape>
-    DEVICE auto Init(ProblemShape const &problemShape, Params const &params)
+    DEVICE auto Init(ProblemShape const& problemShape, Params const& params)
     {
         tensorXGm_.SetGlobalBuffer(params.aGmAddr);
         tensorCGm_.SetGlobalBuffer(params.cGmAddr);
@@ -230,8 +230,8 @@ public:
 
     // 辅助函数：处理X数据加载
     template <typename ProblemShape, typename Iterators, typename Params>
-    DEVICE void HandleXLoad(ProblemShape const &problemShape, PipelineTuple const &pipelines,
-                            PipelineStateTuple &states, Params const &params, Iterators &iters)
+    DEVICE void HandleXLoad(ProblemShape const& problemShape, PipelineTuple const& pipelines,
+                            PipelineStateTuple& states, Params const& params, Iterators& iters)
     {
         decltype(auto) sizeM = get<0>(problemShape);
         decltype(auto) sizeK = get<2>(problemShape);
@@ -250,8 +250,8 @@ public:
 
     // 辅助函数：处理Bias数据加载
     template <typename Params, typename Iterators, typename PipelineTuple, typename PipelineStateTuple>
-    DEVICE void HandleBiasLoad(Params const &params, Iterators &iters, PipelineTuple const &pipelines,
-                               PipelineStateTuple &states)
+    DEVICE void HandleBiasLoad(Params const& params, Iterators& iters, PipelineTuple const& pipelines,
+                               PipelineStateTuple& states)
     {
         decltype(auto) iterNBiasLoad = get<3>(iters);
         decltype(auto) pipelineStateBiasLoad = get<3>(states);
@@ -262,8 +262,8 @@ public:
 
     // 重构后的LoadInAdvance函数
     template <typename ProblemShape, typename Iterators>
-    DEVICE void LoadInAdvance(ProblemShape const &problemShape, PipelineTuple const &pipelines,
-                              PipelineStateTuple &states, Params const &params, Iterators &iters)
+    DEVICE void LoadInAdvance(ProblemShape const& problemShape, PipelineTuple const& pipelines,
+                              PipelineStateTuple& states, Params const& params, Iterators& iters)
     {
         HandleXLoad(problemShape, pipelines, states, params, iters);
         decltype(auto) pipelineBiasGm2L1 = get<1>(pipelines);
@@ -291,8 +291,8 @@ public:
 
     // 辅助函数：处理计算阶段的Bias加载
     template <typename Params, typename Iterators, typename PipelineTuple, typename PipelineStateTuple>
-    DEVICE void ProcessBiasLoad(Params const &params, Iterators &itersLoad, PipelineTuple const &pipelines,
-                                PipelineStateTuple &states)
+    DEVICE void ProcessBiasLoad(Params const& params, Iterators& itersLoad, PipelineTuple const& pipelines,
+                                PipelineStateTuple& states)
     {
         decltype(auto) iterMBiasLoad = get<2>(itersLoad);
         if (iterMBiasLoad.End())
@@ -310,8 +310,8 @@ public:
     // 辅助函数：处理计算阶段的X加载
     template <typename ProblemShape, typename Iterators, typename PipelineTuple, typename PipelineStateTuple,
               typename Params>
-    DEVICE void ProcessXLoad(ProblemShape const &problemShape, Iterators &itersLoad, PipelineTuple const &pipelines,
-                             PipelineStateTuple &states, Params const &params)
+    DEVICE void ProcessXLoad(ProblemShape const& problemShape, Iterators& itersLoad, PipelineTuple const& pipelines,
+                             PipelineStateTuple& states, Params const& params)
     {
         decltype(auto) iterMLoad = get<0>(itersLoad);
         decltype(auto) iterNLoad = get<1>(itersLoad);
@@ -331,8 +331,8 @@ public:
 
     // 重构后的Process函数
     template <typename ProblemShape, typename Iterators>
-    DEVICE void Process(ProblemShape const &problemShape, PipelineTuple const &pipelines, PipelineStateTuple &states,
-                        Params const &params, Iterators &itersLoad, Iterators const &itersCompute)
+    DEVICE void Process(ProblemShape const& problemShape, PipelineTuple const& pipelines, PipelineStateTuple& states,
+                        Params const& params, Iterators& itersLoad, Iterators const& itersCompute)
     {
         decltype(auto) sizeM = get<0>(problemShape);
         decltype(auto) sizeN = get<1>(problemShape);
@@ -380,7 +380,7 @@ public:
         CopyL0c2GM(crd2idx(params.strideC, *get<0>(itersCompute), *get<1>(itersCompute)));
     }
 
-    DEVICE void ClearPipeline(PipelineTuple const &pipelines, PipelineStateTuple &states)
+    DEVICE void ClearPipeline(PipelineTuple const& pipelines, PipelineStateTuple& states)
     {
         decltype(auto) pipelineXGm2L1 = get<0>(pipelines);
         decltype(auto) pipelineBiasGm2L1 = get<1>(pipelines);
@@ -413,7 +413,7 @@ private:
 
     DEVICE void Mmad(uint64_t offsetXL1, uint64_t offsetWL1, uint64_t offsetBiasL1, uint64_t tileSizeM,
                      uint64_t tileSizeN, uint64_t tileSizeKa, uint64_t realTileSizeKa, uint64_t realTileSizeKb,
-                     bool enPartialSum, uint64_t sizeN, PipelineStateAiv2Aic &pipelineStateAiv2Aic, bool hasBias,
+                     bool enPartialSum, uint64_t sizeN, PipelineStateAiv2Aic& pipelineStateAiv2Aic, bool hasBias,
                      uint64_t strideM, uint64_t strideKa)
     {
         mmObj_.SetOrgShape(strideM, CeilAlign(tileSizeN, static_cast<uint64_t>(BLOCK_CUBE)), strideKa,
@@ -440,7 +440,7 @@ private:
     }
 
     template <typename IterM, typename IterN>
-    DEVICE void UpdateKNMIterators(IterM &iterMLoad, IterN &iterNLoad)
+    DEVICE void UpdateKNMIterators(IterM& iterMLoad, IterN& iterNLoad)
     {
         ++iterKaLoad_;
         if (iterKaLoad_.End()) {
@@ -454,7 +454,7 @@ private:
     }
 
     template <typename IterM, typename IterN>
-    DEVICE void UpdateNMIterators(IterM &iterMLoad, IterN &iterNLoad)
+    DEVICE void UpdateNMIterators(IterM& iterMLoad, IterN& iterNLoad)
     {
         ++iterNLoad;
         if (iterNLoad.End()) {

@@ -114,7 +114,7 @@ struct GMMAllReduceTilingData {
 };
 #pragma pack()
 
-inline void InitGroupedMatMulAllReduceTilingData(uint8_t *tiling, GMMAllReduceTilingData *constData)
+inline void InitGroupedMatMulAllReduceTilingData(uint8_t* tiling, GMMAllReduceTilingData* constData)
 {
     memcpy(constData, tiling, sizeof(GMMAllReduceTilingData));
 }
@@ -124,8 +124,8 @@ inline void InitGroupedMatMulAllReduceTilingData(uint8_t *tiling, GMMAllReduceTi
     InitGroupedMatMulAllReduceTilingData(tilingArg, &tilingData)
 
 #define GET_TILING_DATA_MEMBER(tilingType, member, var, tiling) \
-    auto var = ((tilingType *)((uint8_t *)AscendC::GmAlloc(1024)))->member; \
-    size_t offset##var = (size_t)(&((tilingType *)0)->member); \
+    auto var = ((tilingType*)((uint8_t*)AscendC::GmAlloc(1024)))->member; \
+    size_t offset##var = (size_t)(&((tilingType*)0)->member); \
     InitTilingData<decltype(var)>(tiling + offset##var, &var);
 
 #endif // GROUPED_MATMUL_ALL_REDUCE_TILING_DEF_H

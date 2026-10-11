@@ -115,17 +115,17 @@ private:
     __aicore__ inline void AllGatherPerTokenScale(int64_t buff_st);
     __aicore__ inline void CatlassMatmul();
     template <typename LayoutB>
-    __aicore__ inline void DispatchMatmul(const LayoutB &layoutB);
+    __aicore__ inline void DispatchMatmul(const LayoutB& layoutB);
     template <typename LayoutB, int32_t TileM, int32_t TileN>
-    __aicore__ inline void LaunchMatmul(const LayoutB &layoutB);
-    __aicore__ inline void MoveWithSplit(__gm__ supportX1Type *gm_src, int64_t rank_offset, int64_t len);
-    __aicore__ inline void MoveToOtherRankWithSkip(__gm__ supportX1Type *gm_src, int64_t rank_offset, int32_t len,
+    __aicore__ inline void LaunchMatmul(const LayoutB& layoutB);
+    __aicore__ inline void MoveWithSplit(__gm__ supportX1Type* gm_src, int64_t rank_offset, int64_t len);
+    __aicore__ inline void MoveToOtherRankWithSkip(__gm__ supportX1Type* gm_src, int64_t rank_offset, int32_t len,
                                                    int32_t rank_st, int32_t skip_num, int32_t group_num,
                                                    int32_t rank_scope);
-    __aicore__ inline void MoveResultFromPeerMemToOut(__gm__ supportX1Type *gm_src, __gm__ supportX1Type *gm_dst,
+    __aicore__ inline void MoveResultFromPeerMemToOut(__gm__ supportX1Type* gm_src, __gm__ supportX1Type* gm_dst,
                                                       int32_t actual_m);
-    __aicore__ inline void MoveResultToDst(__gm__ supportX1Type *gm_src, __gm__ supportX1Type *gm_dst, int32_t len);
-    __aicore__ inline void MoveResultFromSrcToDst(__gm__ supportX1Type *gm_src, __gm__ supportX1Type *gm_dst,
+    __aicore__ inline void MoveResultToDst(__gm__ supportX1Type* gm_src, __gm__ supportX1Type* gm_dst, int32_t len);
+    __aicore__ inline void MoveResultFromSrcToDst(__gm__ supportX1Type* gm_src, __gm__ supportX1Type* gm_dst,
                                                   int32_t len);
     __aicore__ inline void CrossRankSyncV1(int32_t flag_idx, int32_t flag_data);
     __aicore__ inline void CrossRankSyncV2(int32_t flag_idx, int32_t flag_data);
@@ -201,13 +201,13 @@ private:
     bool needPerToken;
     bool accumWorkSpacePingPong{false};
 
-    __gm__ supportX1Type *gm_peer_mem;
+    __gm__ supportX1Type* gm_peer_mem;
 
     GM_ADDR gm_a_align;
     GM_ADDR gm_b_align;
-    __gm__ supportX1Type *gm_a_src;
-    __gm__ supportX2Type *gm_b_src;
-    __gm__ int32_t *gm_accum;
+    __gm__ supportX1Type* gm_a_src;
+    __gm__ supportX2Type* gm_b_src;
+    __gm__ int32_t* gm_accum;
     GM_ADDR gm_scale_workspace;
 
     DequantRunner<YType> dequantRunner;
@@ -221,7 +221,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Init(GM_ADDR aG
                                                                       GM_ADDR allgatherGM, GM_ADDR workspaceGM,
                                                                       GM_ADDR tilingGM)
 {
-    auto tiling = (__gm__ AllGatherMatmulAIVModeTilingData *)tilingGM;
+    auto tiling = (__gm__ AllGatherMatmulAIVModeTilingData*)tilingGM;
     GET_TILING_DATA(tilingData, tilingGM);
 
     auto contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
@@ -265,9 +265,9 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Init(GM_ADDR aG
     hasBAlign = (tilingData.allGatherMatmulInfo.hasBAlign && !(weightNZ));
     gm_a_align = reinterpret_cast<GM_ADDR>(hasAAlign ? workspaceGM : 0);
     gm_b_align = reinterpret_cast<GM_ADDR>(hasBAlign ? workspaceGM + aAlignSize : 0);
-    gm_a_src = reinterpret_cast<__gm__ supportX1Type *>(hasAAlign ? gm_a_align : aGM_);
-    gm_b_src = reinterpret_cast<__gm__ supportX2Type *>(hasBAlign ? gm_b_align : bGM_);
-    gm_accum = reinterpret_cast<__gm__ int32_t *>(quantFlag ? workspaceGM + aAlignSize + bAlignSize : 0);
+    gm_a_src = reinterpret_cast<__gm__ supportX1Type*>(hasAAlign ? gm_a_align : aGM_);
+    gm_b_src = reinterpret_cast<__gm__ supportX2Type*>(hasBAlign ? gm_b_align : bGM_);
+    gm_accum = reinterpret_cast<__gm__ int32_t*>(quantFlag ? workspaceGM + aAlignSize + bAlignSize : 0);
 
     m_align = Block512B<X1Type>::AlignUp(m);
     k_align = Block512B<X1Type>::AlignUp(k);
@@ -284,19 +284,19 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Init(GM_ADDR aG
 
     bool is910C = tilingData.allGatherMatmulInfo.is910C;
     if (is910C) {
-        __gm__ HcclOpResParam *winContext_{nullptr};
-        winContext_ = (__gm__ HcclOpResParam *)contextGM0;
+        __gm__ HcclOpResParam* winContext_{nullptr};
+        winContext_ = (__gm__ HcclOpResParam*)contextGM0;
         rankId = winContext_->localUsrRankId;
         worldSize = winContext_->rankSize;
         for (int i = 0; i < worldSize; i++) {
             stateAddrPerRank[i] =
                 (GM_ADDR)((i == rankId) ?
                               winContext_->localWindowsIn :
-                              ((HcclRankRelationResV2 *)(winContext_->remoteRes[i].nextDevicePtr))->windowsIn);
+                              ((HcclRankRelationResV2*)(winContext_->remoteRes[i].nextDevicePtr))->windowsIn);
         }
     } else {
-        __gm__ HcclA2CombineOpParam *winContext_{nullptr};
-        winContext_ = (__gm__ HcclA2CombineOpParam *)contextGM0;
+        __gm__ HcclA2CombineOpParam* winContext_{nullptr};
+        winContext_ = (__gm__ HcclA2CombineOpParam*)contextGM0;
         rankId = winContext_->rankId;
         worldSize = winContext_->rankNum;
         for (int i = 0; i < worldSize; i++) {
@@ -322,7 +322,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::AICInit()
         SetLoadDataPaddingValue(0);
         SetAtomicNone();
         SetFixpipeNz2ndFlag(1, 0, 0);
-        gm_peer_mem = reinterpret_cast<__gm__ supportX1Type *>(stateAddrPerRank[rankId]);
+        gm_peer_mem = reinterpret_cast<__gm__ supportX1Type*>(stateAddrPerRank[rankId]);
     }
 }
 
@@ -333,9 +333,9 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::AIVInit()
         SetAtomicNone();
         SetMaskNormImpl();
         SetVectorMask<int32_t>((uint64_t)-1, (uint64_t)-1);
-        __gm__ supportX1Type *buff[8];
+        __gm__ supportX1Type* buff[8];
         for (int i = 0; i < worldSize; ++i) {
-            buff[i] = reinterpret_cast<__gm__ supportX1Type *>(stateAddrPerRank[i]);
+            buff[i] = reinterpret_cast<__gm__ supportX1Type*>(stateAddrPerRank[i]);
         }
 
         cal_count = DivCeil(m_loop, pValue);
@@ -387,10 +387,10 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Process()
             if (cal_idx < cal_count && aivIdx == 0 && blockIdx < core_count) {
                 int64_t gm_rank_offset = static_cast<int64_t>(flag_idx) * gm_a_pingpong_size + rank_offset;
                 if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                    MoveWithSplit(reinterpret_cast<__gm__ int8_t *>(gm_a_src) + src_offset / 2, gm_rank_offset,
+                    MoveWithSplit(reinterpret_cast<__gm__ int8_t*>(gm_a_src) + src_offset / 2, gm_rank_offset,
                                   num_per_rank_move);
                 } else {
-                    MoveWithSplit(reinterpret_cast<__gm__ X1Type *>(gm_a_src) + src_offset, gm_rank_offset,
+                    MoveWithSplit(reinterpret_cast<__gm__ X1Type*>(gm_a_src) + src_offset, gm_rank_offset,
                                   num_per_rank_move);
                 }
                 src_offset += num_per_rank_move;
@@ -418,7 +418,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::Process()
         Mc2AivSync::SetAndWaitAivSync(FLAG_ONE_IDX);
 
         if (blockIdx < worldSize && aivIdx == 1) {
-            CheckBuffFlag((__gm__ int32_t *)stateAddrPerRank[blockIdx] + FLAG_OFFSET + FLAG_ZERO_IDX, uBuf_, 0);
+            CheckBuffFlag((__gm__ int32_t*)stateAddrPerRank[blockIdx] + FLAG_OFFSET + FLAG_ZERO_IDX, uBuf_, 0);
         }
 
         PipeBarrier<PIPE_ALL>();
@@ -433,7 +433,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::ResetFlags(int3
 {
     for (int32_t idx = 0; idx < num_flags; ++idx) {
         if (blockIdx == 0 && aivIdx == 0) {
-            SetBuffFlag((__gm__ int32_t *)stateAddrPerRank[rankId] + FLAG_OFFSET + idx, uBuf_, 0);
+            SetBuffFlag((__gm__ int32_t*)stateAddrPerRank[rankId] + FLAG_OFFSET + idx, uBuf_, 0);
         }
     }
 }
@@ -460,21 +460,21 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::CopyGatherResul
 
         if (s2_other_rank != rankId) {
             if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                MoveResultFromPeerMemToOut((__gm__ int8_t *)stateAddrPerRank[rankId] + other_rank_offset / 2,
-                                           reinterpret_cast<__gm__ int8_t *>(allgatherGM_) + dst_offset / 2,
+                MoveResultFromPeerMemToOut((__gm__ int8_t*)stateAddrPerRank[rankId] + other_rank_offset / 2,
+                                           reinterpret_cast<__gm__ int8_t*>(allgatherGM_) + dst_offset / 2,
                                            s2_actual_m);
             } else {
-                MoveResultFromPeerMemToOut((__gm__ X1Type *)stateAddrPerRank[rankId] + other_rank_offset,
-                                           reinterpret_cast<__gm__ X1Type *>(allgatherGM_) + dst_offset, s2_actual_m);
+                MoveResultFromPeerMemToOut((__gm__ X1Type*)stateAddrPerRank[rankId] + other_rank_offset,
+                                           reinterpret_cast<__gm__ X1Type*>(allgatherGM_) + dst_offset, s2_actual_m);
             }
         } else {
             if constexpr (std::is_same_v<X1Type, AscendC::int4b_t>) {
-                MoveResultFromPeerMemToOut(reinterpret_cast<__gm__ int8_t *>(gm_a_src) + src_offset / 2,
-                                           reinterpret_cast<__gm__ int8_t *>(allgatherGM_) + dst_offset / 2,
+                MoveResultFromPeerMemToOut(reinterpret_cast<__gm__ int8_t*>(gm_a_src) + src_offset / 2,
+                                           reinterpret_cast<__gm__ int8_t*>(allgatherGM_) + dst_offset / 2,
                                            s2_actual_m);
             } else {
-                MoveResultFromPeerMemToOut(reinterpret_cast<__gm__ X1Type *>(gm_a_src) + src_offset,
-                                           reinterpret_cast<__gm__ X1Type *>(allgatherGM_) + dst_offset, s2_actual_m);
+                MoveResultFromPeerMemToOut(reinterpret_cast<__gm__ X1Type*>(gm_a_src) + src_offset,
+                                           reinterpret_cast<__gm__ X1Type*>(allgatherGM_) + dst_offset, s2_actual_m);
             }
         }
     }

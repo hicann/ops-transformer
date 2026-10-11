@@ -38,7 +38,7 @@ struct MatmulAlltoAllTilingValue {
 
 class MatmulAlltoAllTiling910B : public MatmulAllToAllTilingBase {
 public:
-    explicit MatmulAlltoAllTiling910B(gert::TilingContext *context);
+    explicit MatmulAlltoAllTiling910B(gert::TilingContext* context);
     ~MatmulAlltoAllTiling910B() override = default;
 
 protected:
@@ -48,18 +48,18 @@ protected:
     ge::graphStatus PostTiling() override;
     uint64_t GetTilingKey() const override;
 
-    ge::graphStatus CheckOpInputInfo(MatmulAlltoAllInfo &info);
-    ge::graphStatus CheckAndSetAttrsInfo(MatmulAlltoAllInfo &info);
-    ge::graphStatus CheckTensorDataType(MatmulAlltoAllInfo &info);
-    ge::graphStatus CheckShapeInfo(MatmulAlltoAllInfo &info);
-    ge::graphStatus DoMmCommTiling(CoCTiling &cocTilingData, MatmulAlltoAllInfo &info);
-    void DoTwoRankTiling(CoCTiling &cocTilingData, MatmulAlltoAllInfo &info);
-    void DoFourRankTiling(CoCTiling &cocTilingData, MatmulAlltoAllInfo &info);
-    void DoEightRankTiling(CoCTiling &cocTilingData, MatmulAlltoAllInfo &info);
-    void CalTilingParam(CoCTiling &cocTilingData, const std::map<int *, MatmulAlltoAllTilingValue> &TilingParamMap,
-                        MatmulAlltoAllInfo &info);
-    ge::graphStatus SetHcclTiling(MatmulAlltoAllTilingData *tilingData);
-    void PrintMatmulAlltoAllTilingData(CoCTiling &cocTilingData, MatmulAlltoAllInfo &info);
+    ge::graphStatus CheckOpInputInfo(MatmulAlltoAllInfo& info);
+    ge::graphStatus CheckAndSetAttrsInfo(MatmulAlltoAllInfo& info);
+    ge::graphStatus CheckTensorDataType(MatmulAlltoAllInfo& info);
+    ge::graphStatus CheckShapeInfo(MatmulAlltoAllInfo& info);
+    ge::graphStatus DoMmCommTiling(CoCTiling& cocTilingData, MatmulAlltoAllInfo& info);
+    void DoTwoRankTiling(CoCTiling& cocTilingData, MatmulAlltoAllInfo& info);
+    void DoFourRankTiling(CoCTiling& cocTilingData, MatmulAlltoAllInfo& info);
+    void DoEightRankTiling(CoCTiling& cocTilingData, MatmulAlltoAllInfo& info);
+    void CalTilingParam(CoCTiling& cocTilingData, const std::map<int*, MatmulAlltoAllTilingValue>& TilingParamMap,
+                        MatmulAlltoAllInfo& info);
+    ge::graphStatus SetHcclTiling(MatmulAlltoAllTilingData* tilingData);
+    void PrintMatmulAlltoAllTilingData(CoCTiling& cocTilingData, MatmulAlltoAllInfo& info);
     void SetTilingKey();
 
 private:

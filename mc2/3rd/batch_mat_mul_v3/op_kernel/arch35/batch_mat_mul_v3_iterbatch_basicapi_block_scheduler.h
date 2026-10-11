@@ -43,12 +43,12 @@ public:
     using ProblemShape = ProblemShape_;
 
     struct Params {
-        const BatchMatMulV3IterBatchBasicTilingData *tilingData;
+        const BatchMatMulV3IterBatchBasicTilingData* tilingData;
     };
 
 public:
-    __aicore__ inline Mc2BlockSchedulerIterBatchBuiltIn(const ProblemShape &shape, int64_t blockIdx, int64_t blockNum,
-                                                        const Params &params)
+    __aicore__ inline Mc2BlockSchedulerIterBatchBuiltIn(const ProblemShape& shape, int64_t blockIdx, int64_t blockNum,
+                                                        const Params& params)
     {
         m_ = shape.m;
         n_ = shape.n;

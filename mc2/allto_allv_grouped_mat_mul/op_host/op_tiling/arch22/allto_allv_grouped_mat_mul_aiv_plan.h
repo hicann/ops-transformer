@@ -24,7 +24,7 @@ namespace AlltoAllvGroupedMatMulAivPlan {
 constexpr uint32_t kMaxCountNum = A2AVGMM_MAX_COUNT_NUM;
 constexpr uint32_t kMaxLocalExpertNum = A2AVGMM_MAX_LOCAL_EXPERT_NUM;
 
-inline bool SafeAddU64(uint64_t lhs, uint64_t rhs, uint64_t &result)
+inline bool SafeAddU64(uint64_t lhs, uint64_t rhs, uint64_t& result)
 {
     if (lhs > std::numeric_limits<uint64_t>::max() - rhs) {
         return false;
@@ -33,7 +33,7 @@ inline bool SafeAddU64(uint64_t lhs, uint64_t rhs, uint64_t &result)
     return true;
 }
 
-inline bool SafeMulU64(uint64_t lhs, uint64_t rhs, uint64_t &result)
+inline bool SafeMulU64(uint64_t lhs, uint64_t rhs, uint64_t& result)
 {
     if (lhs != 0U && rhs > std::numeric_limits<uint64_t>::max() / lhs) {
         return false;
@@ -42,7 +42,7 @@ inline bool SafeMulU64(uint64_t lhs, uint64_t rhs, uint64_t &result)
     return true;
 }
 
-inline bool IsValidCountShape(uint32_t rankSize, uint32_t expertPerRank, uint32_t &countNum)
+inline bool IsValidCountShape(uint32_t rankSize, uint32_t expertPerRank, uint32_t& countNum)
 {
     if (rankSize == 0U || expertPerRank == 0U || expertPerRank > kMaxLocalExpertNum) {
         return false;
@@ -58,9 +58,9 @@ inline bool IsValidCountShape(uint32_t rankSize, uint32_t expertPerRank, uint32_
     return true;
 }
 
-inline bool BuildInclusivePrefixes(const int64_t *sendCounts, const int64_t *recvCounts, uint32_t rankSize,
-                                   uint32_t expertPerRank, uint32_t inputM, uint32_t outputM, int32_t *sendPrefix,
-                                   int32_t *recvPrefix)
+inline bool BuildInclusivePrefixes(const int64_t* sendCounts, const int64_t* recvCounts, uint32_t rankSize,
+                                   uint32_t expertPerRank, uint32_t inputM, uint32_t outputM, int32_t* sendPrefix,
+                                   int32_t* recvPrefix)
 {
     uint32_t countNum = 0U;
     if (sendCounts == nullptr || recvCounts == nullptr || sendPrefix == nullptr || recvPrefix == nullptr ||

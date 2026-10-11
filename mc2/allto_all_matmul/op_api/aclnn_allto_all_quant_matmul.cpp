@@ -17,18 +17,18 @@
 
 // 两段式接口
 extern "C" aclnnStatus aclnnAlltoAllQuantMatmulGetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, const aclTensor *x1ScaleOptional,
-    const aclTensor *x2Scale, const aclTensor *commScaleOptional, const aclTensor *x1OffsetOptional,
-    const aclTensor *x2OffsetOptional, const char *group, const aclIntArray *alltoAllAxesOptional, int64_t x1QuantMode,
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional, const aclTensor* x1ScaleOptional,
+    const aclTensor* x2Scale, const aclTensor* commScaleOptional, const aclTensor* x1OffsetOptional,
+    const aclTensor* x2OffsetOptional, const char* group, const aclIntArray* alltoAllAxesOptional, int64_t x1QuantMode,
     int64_t x2QuantMode, int64_t commQuantMode, int64_t commQuantDtype, int64_t x1QuantDtype, int64_t groupSize,
-    bool transposeX1, bool transposeX2, const aclTensor *output, const aclTensor *alltoAllOutOptional,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    bool transposeX1, bool transposeX2, const aclTensor* output, const aclTensor* alltoAllOutOptional,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("aclnnAlltoAllQuantMatmulGetWorkspaceSize start");
 
     auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
     auto socVersion = op::GetCurrentPlatformInfo().GetSocVersion();
-    const char *commMode =
+    const char* commMode =
         (npuArch == Ops::Base::DAV_3510 || socVersion == op::SocVersion::ASCEND910_93) ? "ai_cpu" : "aiv";
 
     return aclnnAlltoAllQuantMatmulBaseGetWorkspaceSize(
@@ -37,7 +37,7 @@ extern "C" aclnnStatus aclnnAlltoAllQuantMatmulGetWorkspaceSize(
         groupSize, transposeX1, transposeX2, output, alltoAllOutOptional, workspaceSize, executor);
 }
 
-extern "C" aclnnStatus aclnnAlltoAllQuantMatmul(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnAlltoAllQuantMatmul(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                 aclrtStream stream)
 {
     OP_LOGD("aclnnAlltoAllQuantMatmul start");

@@ -35,7 +35,7 @@ template <class T>
 class MatmulAllReduceDequantPerchannel {
 public:
     __aicore__ inline MatmulAllReduceDequantPerchannel() {}
-    __aicore__ inline void Init(TPipe *tPipe, uint32_t quantUbSize)
+    __aicore__ inline void Init(TPipe* tPipe, uint32_t quantUbSize)
     {
         pipe = tPipe;
         uint32_t scaleUbSize = quantUbSize;
@@ -56,9 +56,9 @@ public:
         }
     }
 
-    __aicore__ inline void MatmulAllReduceDequantPerchannelSplitM(const uint32_t quantUbSize, int64_t &blockAddrOffset,
-                                                                  uint32_t &tileCalCntM, uint32_t &tailCalCntM,
-                                                                  uint32_t &aivLoopNum)
+    __aicore__ inline void MatmulAllReduceDequantPerchannelSplitM(const uint32_t quantUbSize, int64_t& blockAddrOffset,
+                                                                  uint32_t& tileCalCntM, uint32_t& tailCalCntM,
+                                                                  uint32_t& aivLoopNum)
     {
         uint32_t vectorIndex = GetBlockIdx();                 // [0, 23]
         uint32_t singleAivM = dequantM_ / dequantAivCoreNum_; // 单核要计算的总行数（多次循环累计）
@@ -99,9 +99,9 @@ public:
         }
     }
 
-    __aicore__ inline void MatmulAllReduceDequantPerchannelSplitMAndN(int32_t &quantUbSize, uint32_t &needAivCoreNum,
-                                                                      uint32_t &tileBlockCnt, uint32_t &tailBlockCnt,
-                                                                      uint32_t &aivLoopNum, uint32_t &blockNumPerRow)
+    __aicore__ inline void MatmulAllReduceDequantPerchannelSplitMAndN(int32_t& quantUbSize, uint32_t& needAivCoreNum,
+                                                                      uint32_t& tileBlockCnt, uint32_t& tailBlockCnt,
+                                                                      uint32_t& aivLoopNum, uint32_t& blockNumPerRow)
     {
         quantUbSize = TOTAL_UBSIZE_MATMUL_ALLREDUCE_INT8 /
                       (FP16_BUF_SPLIT_MN_CNT_MATMUL_ALLREDUCE_INT8 * static_cast<int32_t>(sizeof(T))); // 1+1+0.5+1
@@ -148,13 +148,13 @@ public:
             curScaleAddrOffset = scaleAddrOffsetSplitMN;
         }
 
-        allgatherOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(this->allgatherOut) + curBlockAddrOffset,
+        allgatherOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(this->allgatherOut) + curBlockAddrOffset,
                                        curBlockCnt); // 用于读入数据
-        dequantedOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(this->dequantedOut) + curBlockAddrOffset,
+        dequantedOutGm.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(this->dequantedOut) + curBlockAddrOffset,
                                        curBlockCnt); // 用于输出数据
         if (((loopIdx == 0) && (this->splitMode == SPLIT_M_MATMUL_ALLREDUCE_INT8)) ||
             (this->splitMode == SPLIT_MN_MATMUL_ALLREDUCE_INT8)) {
-            dequantScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(this->dequantScale) + curScaleAddrOffset,
+            dequantScaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(this->dequantScale) + curScaleAddrOffset,
                                            curScaleCnt);
         }
     }
@@ -255,7 +255,7 @@ public:
         outQueueZ.FreeTensor(zLocal);
     }
 
-    TPipe *pipe;
+    TPipe* pipe;
     TQue<QuePosition::VECIN, 1> inQueueX;
     TQue<QuePosition::VECIN, 1> inQueueS;
     TQue<QuePosition::VECOUT, 1> outQueueZ;
@@ -285,7 +285,7 @@ public:
  */
 template <class T>
 __aicore__ inline void MatmulAllReduceDequantPerchannelCommInt8(GM_ADDR allgatherOut, GM_ADDR dequantScale,
-                                                                GM_ADDR dequantedOut, TPipe *tPipe, uint32_t N,
+                                                                GM_ADDR dequantedOut, TPipe* tPipe, uint32_t N,
                                                                 uint32_t M)
 {
     uint32_t nowDequantAivCoreNum = GetBlockNum() * GetTaskRation();

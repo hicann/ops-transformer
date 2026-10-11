@@ -32,13 +32,13 @@ using namespace ge;
 using namespace AscendC;
 using namespace Ops::Transformer::OpTiling;
 namespace Mc2Tiling {
-static ge::graphStatus QuantGroupedMatMulAlltoAllvTilingFunc(gert::TilingContext *context)
+static ge::graphStatus QuantGroupedMatMulAlltoAllvTilingFunc(gert::TilingContext* context)
 {
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
 struct QuantGroupedMatMulAlltoAllvCompileInfo {};
-static ge::graphStatus TilingParseForQuantGroupedMatMulAlltoAllv(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForQuantGroupedMatMulAlltoAllv(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

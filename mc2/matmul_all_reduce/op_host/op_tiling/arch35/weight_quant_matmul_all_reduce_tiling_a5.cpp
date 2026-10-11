@@ -40,11 +40,11 @@ bool WeightQuantMatmulAllReduceTilingA5::IsCapable()
 ge::graphStatus WeightQuantTilingTransferHelperA5::GetShapeAttrsInfo()
 {
     OP_LOGI(tilingProcesser_.opName_, "Start fill matmul info.");
-    auto &&tilingArgs = tilingProcesser_.args_;
+    auto&& tilingArgs = tilingProcesser_.args_;
     opName_ = tilingProcesser_.opName_;
     try {
         matmulInfoPtr_ = std::make_unique<Mc2WeightQuantBatchMatmulInfo>();
-    } catch (const std::bad_alloc &e) {
+    } catch (const std::bad_alloc& e) {
         OP_LOGE(opName_, "Failed to create matmul info.");
         return ge::GRAPH_FAILED;
     }
@@ -86,11 +86,11 @@ WeightQuantMMAllReduceTilingKeyParams WeightQuantTilingTransferHelperA5::GetWeig
 ge::graphStatus WeightQuantAsTilingTransferHelper::GetShapeAttrsInfo()
 {
     OP_LOGI(tilingProcesser_.opName_, "Start fill weight fp8/hif8 matmul info.");
-    auto &&fp8Hif8TilingArgs = tilingProcesser_.args_;
+    auto&& fp8Hif8TilingArgs = tilingProcesser_.args_;
     opName_ = tilingProcesser_.opName_;
     try {
         matmulInfoPtr_ = std::make_unique<Mc2WeightQuantBatchMatmulInfo>();
-    } catch (const std::bad_alloc &e) {
+    } catch (const std::bad_alloc& e) {
         OP_LOGE(opName_, "Failed to create matmul info.");
         return ge::GRAPH_FAILED;
     }
@@ -136,7 +136,7 @@ WeightQuantMMAllReduceTilingKeyParams WeightQuantAsTilingTransferHelper::GetWeig
 }
 
 void WeightQuantAsTilingTransferHelper::PrintTilingInputParam(
-    std::unique_ptr<Mc2WeightQuantBatchMatmulInfo> &matmulInfo)
+    std::unique_ptr<Mc2WeightQuantBatchMatmulInfo>& matmulInfo)
 {
     OP_LOGD(tilingProcesser_.opName_, "The transA_=%d, transB_=%d, hasBias_=%d, hasAntiQuantOffset_=%d.",
             matmulInfo->transA, matmulInfo->transB, matmulInfo->hasBias, matmulInfo->hasAntiQuantOffset);
@@ -275,14 +275,14 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::GetWorkspaceSize()
         myWorkSpaceSize_ += workspaceSize_;
     }
     OP_LOGI(opName_, "Set max workspace size=%lu to context.", myWorkSpaceSize_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     workspaces[0] = myWorkSpaceSize_;
     return ge::GRAPH_SUCCESS;
 }
 
 void WeightQuantMatmulAllReduceTilingA5::PrintMatmulAsTiling(bool isTail)
 {
-    auto &tiling = weightQuantMatmulAllReduceA5Fp8TilingData_.tileMmASTiling;
+    auto& tiling = weightQuantMatmulAllReduceA5Fp8TilingData_.tileMmASTiling;
     if (isTail) {
         tiling = weightQuantMatmulAllReduceA5Fp8TilingData_.tailMmASTiling;
     }
@@ -312,7 +312,7 @@ void WeightQuantMatmulAllReduceTilingA5::PrintExtendMatmulTiling(bool isTail)
         return;
     }
 
-    auto &tiling = weightQuantMatmulAllReduceA5TilingData_.tileRegBaseMmTiling;
+    auto& tiling = weightQuantMatmulAllReduceA5TilingData_.tileRegBaseMmTiling;
     if (isTail) {
         tiling = weightQuantMatmulAllReduceA5TilingData_.tailRegBaseMmTiling;
     }
@@ -350,14 +350,14 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::PostTiling()
 
     if (antiQuantType_ != AntiQuantType::PER_GROUP) {
         errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                               reinterpret_cast<void *>(&weightQuantMatmulAllReduceA5Fp8TilingData_), dataSize);
+                               reinterpret_cast<void*>(&weightQuantMatmulAllReduceA5Fp8TilingData_), dataSize);
         if (ret != EOK) {
             OP_LOGE(context_->GetNodeName(), "Memcpy_s failed, ret=%d", ret);
             return ge::GRAPH_FAILED;
         }
     } else {
         errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                               reinterpret_cast<void *>(&weightQuantMatmulAllReduceA5TilingData_), dataSize);
+                               reinterpret_cast<void*>(&weightQuantMatmulAllReduceA5TilingData_), dataSize);
         if (ret != EOK) {
             OP_LOGE(context_->GetNodeName(), "Memcpy_s failed, ret=%d", ret);
             return ge::GRAPH_FAILED;
@@ -371,7 +371,7 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus WeightQuantMatmulAllReduceTilingA5::SetMc2HcommAllReduce(const char *groupName,
+ge::graphStatus WeightQuantMatmulAllReduceTilingA5::SetMc2HcommAllReduce(const char* groupName,
                                                                          const uint32_t reduceType)
 {
     const std::string algConfig = "AllReduce=level0:fullmesh";
@@ -404,7 +404,7 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::SetMc2HcommAllReduce(const c
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus WeightQuantMatmulAllReduceTilingA5::SetMc2HcommTwoShot(const char *groupName, const uint32_t reduceType)
+ge::graphStatus WeightQuantMatmulAllReduceTilingA5::SetMc2HcommTwoShot(const char* groupName, const uint32_t reduceType)
 {
     uint32_t opType1 = static_cast<uint32_t>(HcclCMDType::HCCL_CMD_ALLTOALL);
     uint32_t opType2 = static_cast<uint32_t>(HcclCMDType::HCCL_CMD_ALLGATHER);
@@ -462,7 +462,7 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::SetMc2Hcomm()
     OP_TILING_CHECK(context_->GetAttrs() == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_mode"),
                     return ge::GRAPH_FAILED);
     const uint32_t reduceType = HcclReduceOp::HCCL_REDUCE_SUM;
-    const char *groupName = context_->GetAttrs()->GetAttrPointer<char>(static_cast<int>(0));
+    const char* groupName = context_->GetAttrs()->GetAttrPointer<char>(static_cast<int>(0));
     bool isUseA2APath = mc2tiling::IsUseA2APath(args_.rankDim, npuArch_);
     const uint64_t k = MatmulAllReduceTilingBase::GetKValue();
     uint8_t commMode = GetCommMode();
@@ -654,7 +654,7 @@ ge::graphStatus WeightQuantMatmulAllReduceTilingA5::CheckInput()
 
     return CheckAxisSize();
 }
-WeightQuantMatmulAllReduceTilingA5::WeightQuantMatmulAllReduceTilingA5(gert::TilingContext *context)
+WeightQuantMatmulAllReduceTilingA5::WeightQuantMatmulAllReduceTilingA5(gert::TilingContext* context)
     : MatmulAllReduceTilingBase(context),
       weightQuantMatmulAllReduceA5TilingData_(weightQuantMatmulAllReduceA5TilingDataSelf_),
       weightQuantMatmulAllReduceA5Fp8TilingData_(weightQuantMatmulAllReduceA5Fp8TilingDataSelf_)
@@ -665,8 +665,8 @@ CutResult WeightQuantMatmulAllReduceTilingA5::GetTilingResult()
     CutResult mCutAllreduceOutput;
     SocVersion_2201 inputSocVer = SocVersion_2201::SOC910_B;
     SetMCutSocVersion(inputSocVer);
-    const gert::StorageShape *commQuantScaleFirst = mmrCtxInfo_.comm_quant_scale_1_shape;
-    const gert::StorageShape *commQuantScaleSecond = mmrCtxInfo_.comm_quant_scale_2_shape;
+    const gert::StorageShape* commQuantScaleFirst = mmrCtxInfo_.comm_quant_scale_1_shape;
+    const gert::StorageShape* commQuantScaleSecond = mmrCtxInfo_.comm_quant_scale_2_shape;
     if (mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
         MMAllReduceFitBalanceTiling allReduceTilingHcclInst(args_, KernelType::ALL_REDUCE_VIA_TWO_SHOT,
                                                             TopoType::STANDARD_CARD);

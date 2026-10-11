@@ -74,7 +74,7 @@ private:
     __aicore__ inline void CatlassMatmulImpl();
     __aicore__ inline void LoadCastAndSmoothToken(event_t eventId, LocalTensor<float> copyTensor,
                                                   LocalTensor<float> smoothScaleTensor, int32_t castOffset,
-                                                  __gm__ AType *dataSrc, int64_t dataTokenOffset,
+                                                  __gm__ AType* dataSrc, int64_t dataTokenOffset,
                                                   int32_t dataSegmentOffset, int32_t smoothScaleCastOffset,
                                                   int32_t actualMoveSize);
     __aicore__ inline void AlltoAll();
@@ -87,9 +87,9 @@ private:
                                          LocalTensor<float> quantScaleTensor, int32_t actualMoveSize,
                                          int32_t actualMoveToken, int32_t tokenPerMove, int32_t moveIdx,
                                          event_t eventId);
-    __aicore__ inline void QuantToken(__gm__ AType *dataSrc, int64_t dataOffset, int32_t coreTokenOffset,
+    __aicore__ inline void QuantToken(__gm__ AType* dataSrc, int64_t dataOffset, int32_t coreTokenOffset,
                                       int32_t dataLen, int32_t commIdx);
-    __aicore__ inline void QuantTokenSegment(__gm__ AType *dataSrc, int64_t dataOffset, int32_t coreTokenOffset,
+    __aicore__ inline void QuantTokenSegment(__gm__ AType* dataSrc, int64_t dataOffset, int32_t coreTokenOffset,
                                              int32_t dataLen, int32_t commIdx);
     __aicore__ inline void SmoothQuantProc(event_t eventId, int32_t dataSegmentOffset, int32_t smoothScaleCastOffset,
                                            int32_t actualMoveSize, LocalTensor<float> copyTensor,
@@ -98,13 +98,13 @@ private:
                                              LocalTensor<float> absTensor0, LocalTensor<float> absTensor1,
                                              LocalTensor<float> smoothScaleTensor0,
                                              LocalTensor<float> smoothScaleTensor1, int32_t castOffset,
-                                             __gm__ AType *dataSrc, int64_t dataTokenOffset,
+                                             __gm__ AType* dataSrc, int64_t dataTokenOffset,
                                              int32_t smoothScaleCastOffset, int32_t sizeScale,
                                              LocalTensor<float> reduceMaxTensor);
     __aicore__ inline void QuantPerSegment(LocalTensor<float> copyTensor0, LocalTensor<float> copyTensor1,
                                            LocalTensor<float> absTensor0, LocalTensor<float> absTensor1,
                                            LocalTensor<float> smoothScaleTensor0, LocalTensor<float> smoothScaleTensor1,
-                                           int32_t castOffset, __gm__ AType *dataSrc, int64_t dataTokenOffset,
+                                           int32_t castOffset, __gm__ AType* dataSrc, int64_t dataTokenOffset,
                                            int32_t smoothScaleCastOffset, int32_t sizeScale, float quantScaleReciproal);
 
 private:
@@ -117,9 +117,9 @@ private:
     GM_ADDR allToAllResultGM_;
     GM_ADDR workspaceGM_;
 
-    __gm__ AType *gmPeerMem_;
-    __gm__ int8_t *quantAGM_;
-    __gm__ int32_t *dequantCGM_;
+    __gm__ AType* gmPeerMem_;
+    __gm__ int8_t* quantAGM_;
+    __gm__ int32_t* dequantCGM_;
     GM_ADDR quantScaleGM_;
 
     Catlass::Arch::Resource<Catlass::Arch::AtlasA2> resource;
@@ -132,11 +132,11 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::Init(GM_ADDR aGM, GM_A
                                                                GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(AlltoAllMatmulTilingData);
-    auto tiling = (__gm__ AlltoAllMatmulTilingData *)tilingGM;
+    auto tiling = (__gm__ AlltoAllMatmulTilingData*)tilingGM;
     GET_TILING_DATA(tilingData, tilingGM);
 
     auto contextGM = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-    winContext_ = (__gm__ HcclCombineOpParam *)contextGM;
+    winContext_ = (__gm__ HcclCombineOpParam*)contextGM;
     rank = winContext_->rankId;
     rankSize = tilingData.allToAllMatmulInfo.rankSize;
 
@@ -153,13 +153,13 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::Init(GM_ADDR aGM, GM_A
     this->ub_offset = Catlass::BytesToBits(UB_OFFSET) / Catlass::SizeOfBits<int8_t>::value;
 
     if constexpr (QuantType == MC2_DYNAMIC_QUANT) {
-        quantAGM_ = reinterpret_cast<__gm__ int8_t *>(workspaceGM_);
-        dequantCGM_ = reinterpret_cast<__gm__ int32_t *>(workspaceGM_ + quantSize);
+        quantAGM_ = reinterpret_cast<__gm__ int8_t*>(workspaceGM_);
+        dequantCGM_ = reinterpret_cast<__gm__ int32_t*>(workspaceGM_ + quantSize);
         quantScaleGM_ = reinterpret_cast<GM_ADDR>(workspaceGM_ + quantSize + dequantSize);
     }
     if constexpr (QuantType == MC2_STATIC_QUANT) {
         x1ScaleGM_ += rank * (m / rankSize) * sizeof(PerTokenScaleType); // 全量化场景，对x1Scale进行偏移
-        dequantCGM_ = reinterpret_cast<__gm__ int32_t *>(workspaceGM_);
+        dequantCGM_ = reinterpret_cast<__gm__ int32_t*>(workspaceGM_);
     }
     kBytes = Catlass::BitsToBytes(k * Catlass::SizeOfBits<AType>::value);
     tokenBytes = Catlass::BitsToBytes(tokenSize * Catlass::SizeOfBits<AType>::value);
@@ -175,7 +175,7 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::AICInit()
         SetLoadDataPaddingValue(0);
         SetAtomicNone();
         SetFixpipeNz2ndFlag(1, 0, 0);
-        gmPeerMem_ = reinterpret_cast<__gm__ AType *>(buff[rank]);
+        gmPeerMem_ = reinterpret_cast<__gm__ AType*>(buff[rank]);
     }
 }
 
@@ -228,8 +228,8 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::AlltoAll()
                 uint32_t copyBytes = Catlass::BitsToBytes(dataLen * Catlass::SizeOfBits<AType>::value);
 
                 if (dataLen > 0) {
-                    CopyTokensFromGMToGM(reinterpret_cast<__gm__ int8_t *>(aGM_) + ElemNumToBytes<AType>(dataSrc),
-                                         (__gm__ int8_t *)buff[dstRank] + ElemNumToBytes<AType>(dataDst), copyBytes,
+                    CopyTokensFromGMToGM(reinterpret_cast<__gm__ int8_t*>(aGM_) + ElemNumToBytes<AType>(dataSrc),
+                                         (__gm__ int8_t*)buff[dstRank] + ElemNumToBytes<AType>(dataDst), copyBytes,
                                          kBytes, tokenBytes);
                 }
                 src_offset += allToAllSizePerRankPerLoop;
@@ -244,8 +244,8 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::AlltoAll()
                 int64_t dstSt = (static_cast<int64_t>(commIdx - 1) * mPerLoop + mSt) * tokenSize;
                 if (mThisCoreThisLoop > 0) {
                     CopyTokensFromGMToGM(
-                        (__gm__ int8_t *)buff[rank] + ElemNumToBytes<AType>(srcSt),
-                        reinterpret_cast<__gm__ int8_t *>(allToAllResultGM_) + ElemNumToBytes<AType>(dstSt),
+                        (__gm__ int8_t*)buff[rank] + ElemNumToBytes<AType>(srcSt),
+                        reinterpret_cast<__gm__ int8_t*>(allToAllResultGM_) + ElemNumToBytes<AType>(dstSt),
                         mThisCoreThisLoop * tokenBytes, tokenBytes, tokenBytes);
                 }
             }

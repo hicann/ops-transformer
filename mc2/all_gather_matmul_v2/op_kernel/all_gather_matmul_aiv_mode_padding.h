@@ -42,9 +42,9 @@ public:
     CATLASS_DEVICE
     TemplatePadder() {}
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params const &params);
+    CATLASS_DEVICE void operator()(Params const& params);
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const& params)
     {
         Mc2MatmulAivPadding::PadMatmulInputs<ArchTag, AType_, BType_>(resource, params);
         Mc2MatmulAivPadding::NotifyMatmulPaddingFinished(flagAivFinishPadding);

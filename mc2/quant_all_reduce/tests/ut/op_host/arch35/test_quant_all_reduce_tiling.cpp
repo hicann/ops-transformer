@@ -53,7 +53,7 @@ struct QuantAllReduceTestParam {
     uint64_t mc2TilingDataReservedLen;
 };
 
-inline std::ostream &operator<<(std::ostream &os, const QuantAllReduceTestParam &param)
+inline std::ostream& operator<<(std::ostream& os, const QuantAllReduceTestParam& param)
 {
     return os << param.caseName;
 }
@@ -460,7 +460,7 @@ protected:
 static struct QuantAllReduceCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const QuantAllReduceTestParam &param)
+static gert::TilingContextPara BuildTilingContextPara(const QuantAllReduceTestParam& param)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     // 参数封装
@@ -483,7 +483,7 @@ static gert::TilingContextPara BuildTilingContextPara(const QuantAllReduceTestPa
                                    param.socVersion);
 }
 
-static void ThreadFunction(const QuantAllReduceTestParam *testCases, size_t caseNum, size_t threadIdx, size_t threadNum)
+static void ThreadFunction(const QuantAllReduceTestParam* testCases, size_t caseNum, size_t threadIdx, size_t threadNum)
 {
     for (size_t idx = threadIdx; idx < caseNum; idx += threadNum) {
         auto param = testCases[idx];
@@ -493,7 +493,7 @@ static void ThreadFunction(const QuantAllReduceTestParam *testCases, size_t case
     }
 }
 
-static void TestExecMultiThread(const QuantAllReduceTestParam *testCases, size_t testCaseNum, size_t threadNum)
+static void TestExecMultiThread(const QuantAllReduceTestParam* testCases, size_t testCaseNum, size_t threadNum)
 {
     std::thread threads[threadNum];
     for (size_t idx = 0; idx < threadNum; ++idx) {

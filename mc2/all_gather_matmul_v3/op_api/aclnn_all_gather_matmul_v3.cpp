@@ -53,7 +53,7 @@ const std::initializer_list<op::DataType> OUT_DTYPE_SUPPORT_LIST = {op::DataType
 const std::initializer_list<op::DataType> BIAS_DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT};
 
 // 用户传 [N,K].t() (viewShape [K,N]) → 翻回 [N,K] 连续视图，保留原始物理存储
-static const aclTensor *TransX2Tensor(const aclTensor *x2)
+static const aclTensor* TransX2Tensor(const aclTensor* x2)
 {
     uint64_t storageDimsNum = x2->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDims(storageDimsNum);
@@ -87,8 +87,8 @@ static const aclTensor *TransX2Tensor(const aclTensor *x2)
 }
 
 // CheckNullParams: 校验 REQUIRED 输入/输出非空（本次交付不使能 gather_out/amax_out，不做校验）
-static bool CheckNullParams(const aclTensor *context, const aclTensor *x1, const aclTensor *x2, const aclTensor *output,
-                            uint64_t *workspaceSize, aclOpExecutor **executor)
+static bool CheckNullParams(const aclTensor* context, const aclTensor* x1, const aclTensor* x2, const aclTensor* output,
+                            uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (context == nullptr || x1 == nullptr || x2 == nullptr || output == nullptr || workspaceSize == nullptr ||
         executor == nullptr) {
@@ -110,8 +110,8 @@ static bool CheckNullParams(const aclTensor *context, const aclTensor *x1, const
 }
 
 // CheckDtype: dtype 校验
-aclnnStatus CheckDtype(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *x1Scale,
-                       const aclTensor *x2Scale, const aclTensor *output)
+aclnnStatus CheckDtype(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* x1Scale,
+                       const aclTensor* x2Scale, const aclTensor* output)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, X_DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
     OP_CHECK_DTYPE_NOT_SUPPORT(x2, X_DTYPE_SUPPORT_LIST, return ACLNN_ERR_PARAM_INVALID);
@@ -135,7 +135,7 @@ aclnnStatus CheckDtype(const aclTensor *x1, const aclTensor *x2, const aclTensor
 }
 
 // 通用维度数校验：tensor 维度数须等于 expectedDimNum（调用方保证 tensor 非空）
-aclnnStatus CheckTensorDimNum(const aclTensor *tensor, const char *paramName, int64_t expectedDimNum)
+aclnnStatus CheckTensorDimNum(const aclTensor* tensor, const char* paramName, int64_t expectedDimNum)
 {
     if (tensor->GetViewShape().GetDimNum() != expectedDimNum) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
@@ -148,7 +148,7 @@ aclnnStatus CheckTensorDimNum(const aclTensor *tensor, const char *paramName, in
 }
 
 // 通用 format 校验：仅支持 ND；空指针放行（兼容 OPTIONAL 输入）
-aclnnStatus CheckTensorFormatND(const aclTensor *tensor, const char *paramName)
+aclnnStatus CheckTensorFormatND(const aclTensor* tensor, const char* paramName)
 {
     if (tensor != nullptr && tensor->GetStorageFormat() != op::Format::FORMAT_ND) {
         OP_LOGE_FOR_INVALID_FORMATS_WITH_REASON("aclnnAllGatherQuantMatmulV3", paramName,
@@ -160,8 +160,8 @@ aclnnStatus CheckTensorFormatND(const aclTensor *tensor, const char *paramName)
 }
 
 // CheckFormat: ND 校验（scale 兼容 NCL，同 v2 CheckScale）
-aclnnStatus CheckFormat(const aclTensor *context, const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                        const aclTensor *x1Scale, const aclTensor *x2Scale, const aclTensor *output)
+aclnnStatus CheckFormat(const aclTensor* context, const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                        const aclTensor* x1Scale, const aclTensor* x2Scale, const aclTensor* output)
 {
     aclnnStatus ret = CheckTensorFormatND(context, "context");
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -191,7 +191,7 @@ aclnnStatus CheckFormat(const aclTensor *context, const aclTensor *x1, const acl
 }
 
 // 校验 MX scale shape: [dim0, Ceil(K/64), 2]；scale 为 OPTIONAL，空指针直接放行
-aclnnStatus CheckScaleShape(const aclTensor *scale, const char *paramName, int64_t dim0, int64_t scaleKDim)
+aclnnStatus CheckScaleShape(const aclTensor* scale, const char* paramName, int64_t dim0, int64_t scaleKDim)
 {
     if (scale == nullptr) {
         return ACLNN_SUCCESS;
@@ -211,8 +211,8 @@ aclnnStatus CheckScaleShape(const aclTensor *scale, const char *paramName, int64
 }
 
 // CheckShape: scale dim(0) 校验（gather_out/amax_out 不使能，不校验）
-aclnnStatus CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *x1Scale, const aclTensor *x2Scale,
-                       const aclTensor *output)
+aclnnStatus CheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor* x1Scale, const aclTensor* x2Scale,
+                       const aclTensor* output)
 {
     aclnnStatus ret = CheckTensorDimNum(x1, "x1", TWO_DIMS);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -249,7 +249,7 @@ aclnnStatus CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor
 }
 
 // CheckAttrs: 仅校验 REQUIRED 属性（group、hccl_buffer_size）；OPTIONAL 属性（comm_mode 等）不在此拦截
-aclnnStatus CheckAttrs(const char *group, int64_t hcclBufferSize)
+aclnnStatus CheckAttrs(const char* group, int64_t hcclBufferSize)
 {
     if (group == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnAllGatherQuantMatmulV3", "group");
@@ -272,13 +272,13 @@ aclnnStatus CheckAttrs(const char *group, int64_t hcclBufferSize)
 
 } // namespace
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
 extern "C" aclnnStatus aclnnAllGatherQuantMatmulV3GetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional,
-    const aclTensor *x1ScaleOptional, const aclTensor *x2ScaleOptional, const char *group, int64_t rankSize,
-    int64_t hcclBufferSize, int64_t groupSize, const char *commMode, const aclTensor *output,
-    const aclTensor *gatherOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* context, const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional,
+    const aclTensor* x1ScaleOptional, const aclTensor* x2ScaleOptional, const char* group, int64_t rankSize,
+    int64_t hcclBufferSize, int64_t groupSize, const char* commMode, const aclTensor* output,
+    const aclTensor* gatherOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("aclnnAllGatherQuantMatmulV3GetWorkspaceSize start");
 
@@ -325,8 +325,8 @@ extern "C" aclnnStatus aclnnAllGatherQuantMatmulV3GetWorkspaceSize(
     // gather_out 本次交付不使能（def 为 REQUIRED，torch 侧传 {0} 空占位 tensor），aclnn 原样透传 inner，
     // aclnn/tiling 不做处理；amax_out 为 OPTIONAL，inner 固定传 nullptr
     ret = aclnnInnerAllGatherMatmulV3GetWorkspaceSize(
-        context, x1, transX2, biasOptional, x1ScaleOptional, transX2Scale, const_cast<char *>(group), hcclBufferSize,
-        kIsTransA, kIsTransB, rankSize, groupSize, static_cast<int64_t>(outDtype), const_cast<char *>(commMode), output,
+        context, x1, transX2, biasOptional, x1ScaleOptional, transX2Scale, const_cast<char*>(group), hcclBufferSize,
+        kIsTransA, kIsTransB, rankSize, groupSize, static_cast<int64_t>(outDtype), const_cast<char*>(commMode), output,
         gatherOut, nullptr, workspaceSize, executor);
 
     OP_LOGD("aclnnInnerAllGatherMatmulV3GetWorkspaceSize ret = %d.", ret);
@@ -338,7 +338,7 @@ extern "C" aclnnStatus aclnnAllGatherQuantMatmulV3GetWorkspaceSize(
     return ret;
 }
 
-extern "C" aclnnStatus aclnnAllGatherQuantMatmulV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnAllGatherQuantMatmulV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                    aclrtStream stream)
 {
     OP_LOGD("aclnnAllGatherQuantMatmulV3 start");

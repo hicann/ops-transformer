@@ -15,10 +15,10 @@
 #include "opdev/make_op_executor.h"
 
 namespace l0op {
-const aclTensor *Cast(const aclTensor *self, op::DataType dstDtype, aclOpExecutor *executor);
+const aclTensor* Cast(const aclTensor* self, op::DataType dstDtype, aclOpExecutor* executor);
 
 // 专攻卷积反向定制
-const aclTensor *CastOnlyForConvBackward(const aclTensor *self, op::DataType dstDtype, aclOpExecutor *executor);
+const aclTensor* CastOnlyForConvBackward(const aclTensor* self, op::DataType dstDtype, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_CAST_H

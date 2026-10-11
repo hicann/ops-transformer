@@ -45,9 +45,9 @@ int64_t CheckAndGetGroupSizeAg(at::IntArrayRef groupSizeList)
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> NpuAllGatherQuantMatmul(
-    const at::Tensor &context, const at::Tensor &x1, const at::Tensor &x2, int64_t hcclBufferSize, std::string group,
-    int64_t rankSize, const c10::optional<at::Tensor> &biasOptional, const c10::optional<at::Tensor> &x1ScaleOptional,
-    const c10::optional<at::Tensor> &x2ScaleOptional, c10::IntArrayRef groupSizes, c10::optional<int64_t> x1Dtype,
+    const at::Tensor& context, const at::Tensor& x1, const at::Tensor& x2, int64_t hcclBufferSize, std::string group,
+    int64_t rankSize, const c10::optional<at::Tensor>& biasOptional, const c10::optional<at::Tensor>& x1ScaleOptional,
+    const c10::optional<at::Tensor>& x2ScaleOptional, c10::IntArrayRef groupSizes, c10::optional<int64_t> x1Dtype,
     c10::optional<int64_t> x2Dtype, c10::optional<int64_t> x1ScaleDtype, c10::optional<int64_t> x2ScaleDtype,
     c10::optional<int64_t> yDtype, std::string commMode)
 {
@@ -79,10 +79,10 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> NpuAllGatherQuantMatmul(
     at::Tensor y = at::empty({mPerRank * rankSize, n}, x1.options().dtype(outScalarType));
 
     std::string commModeStr = std::string(commMode);
-    char *commModePtr = const_cast<char *>(commModeStr.c_str());
+    char* commModePtr = const_cast<char*>(commModeStr.c_str());
 
     std::string groupStr = std::string(group);
-    char *groupPtr = const_cast<char *>(groupStr.c_str());
+    char* groupPtr = const_cast<char*>(groupStr.c_str());
 
     // x1/x2 原始 dtype 校验：仅支持原生 fp8 (e4m3fn/e5m2) 或 uint8 (fp4 packed, 搭配 296 枚举)。
     // 必须在使用 dtype 枚举覆盖之前校验，防止 fp32 等非法 dtype 用枚举掩盖后放行。
@@ -107,8 +107,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> NpuAllGatherQuantMatmul(
     at::Tensor gatherOut = at::empty({0}, x1.options().dtype(x1.scalar_type()));
     at::Tensor amaxOut = at::empty({0}, x1.options().dtype(at::kFloat));
 
-    const at::Tensor &x1ScaleReal = x1ScaleOptional.value_or(at::Tensor());
-    const at::Tensor &x2ScaleReal = x2ScaleOptional.value_or(at::Tensor());
+    const at::Tensor& x1ScaleReal = x1ScaleOptional.value_or(at::Tensor());
+    const at::Tensor& x2ScaleReal = x2ScaleOptional.value_or(at::Tensor());
 
     // scale 原始 dtype 校验：仅支持 uint8(packed, 搭配 e8m0 枚举) 或原生 float8_e8m0fnu。
     // 必须在使用 dtype 枚举覆盖之前校验，防止 fp32 等非法 dtype 用枚举掩盖后放行。

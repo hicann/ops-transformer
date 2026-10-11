@@ -341,13 +341,13 @@ struct HcclA2CombineOpParam {
                                                      // and others are cross-card mapping addresses.
     uint8_t res[8328];
     uint8_t multiFlag;
-    __gm__ AscendC::IbVerbsData *data;
+    __gm__ AscendC::IbVerbsData* data;
     uint64_t dataSize;
     // 追加字段
     uint64_t sizeOfAiRMAInfo; // sizeof(HcclAiRMAInfo)
     uint64_t aiRMAInfo;       // HcclAiRMAInfo* 单个结构体指针
 
-    CombinedCapability *capability; // address of the communication capability information structure on the Device
+    CombinedCapability* capability; // address of the communication capability information structure on the Device
     uint64_t capabilitySize;        // size of the communication capability information structure
 };
 enum class DataplaneMode : uint32_t {
@@ -409,12 +409,12 @@ struct ReadTokenMetaDataStruct {
     uint32_t curTokenTopkOffset;
 };
 
-__aicore__ inline void cacheWriteThrough(__gm__ uint8_t *sourceAddr, uint64_t length)
+__aicore__ inline void cacheWriteThrough(__gm__ uint8_t* sourceAddr, uint64_t length)
 {
-    __gm__ uint8_t *start =
-        (__gm__ uint8_t *)((uint64_t)sourceAddr / AscendC::CACHE_LINE_SIZE * AscendC::CACHE_LINE_SIZE);
-    __gm__ uint8_t *end =
-        (__gm__ uint8_t *)(((uint64_t)sourceAddr + length) / AscendC::CACHE_LINE_SIZE * AscendC::CACHE_LINE_SIZE);
+    __gm__ uint8_t* start =
+        (__gm__ uint8_t*)((uint64_t)sourceAddr / AscendC::CACHE_LINE_SIZE * AscendC::CACHE_LINE_SIZE);
+    __gm__ uint8_t* end =
+        (__gm__ uint8_t*)(((uint64_t)sourceAddr + length) / AscendC::CACHE_LINE_SIZE * AscendC::CACHE_LINE_SIZE);
     AscendC::GlobalTensor<uint8_t> global;
     global.SetGlobalBuffer(start);
     for (uint32_t i = 0; i <= end - start; i += AscendC::CACHE_LINE_SIZE) {
@@ -424,8 +424,8 @@ __aicore__ inline void cacheWriteThrough(__gm__ uint8_t *sourceAddr, uint64_t le
 }
 __aicore__ inline DataplaneMode GetDataplaneMode(GM_ADDR contextGM0)
 {
-    __gm__ HcclA2CombineOpParam *winContext_ = (__gm__ HcclA2CombineOpParam *)contextGM0;
-    CombinedCapability *capability = winContext_->capability;
+    __gm__ HcclA2CombineOpParam* winContext_ = (__gm__ HcclA2CombineOpParam*)contextGM0;
+    CombinedCapability* capability = winContext_->capability;
     uint64_t capabilitySize = winContext_->capabilitySize;
     DataplaneMode dataplaneMode = DataplaneMode::AICPU;
     if (capability == 0) {
@@ -458,33 +458,33 @@ namespace Mc2Kernel {
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510) // A5 implmentation
 using HcclOpParam = HcclCombinOpParam;
 
-__aicore__ inline uint32_t GetRankId(__gm__ HcclOpParam *winContext)
+__aicore__ inline uint32_t GetRankId(__gm__ HcclOpParam* winContext)
 {
     return winContext->rankId;
 }
 
-__aicore__ inline uint32_t GetRankDim(__gm__ HcclOpParam *winContext)
+__aicore__ inline uint32_t GetRankDim(__gm__ HcclOpParam* winContext)
 {
     return winContext->rankDim;
 }
 
-__aicore__ inline uint64_t GetWinSize(__gm__ HcclOpParam *winContext)
+__aicore__ inline uint64_t GetWinSize(__gm__ HcclOpParam* winContext)
 {
     return winContext->winSize;
 }
 
-__aicore__ inline GM_ADDR GetStatusDataSpaceGm(__gm__ HcclOpParam *winContext)
+__aicore__ inline GM_ADDR GetStatusDataSpaceGm(__gm__ HcclOpParam* winContext)
 {
     return (GM_ADDR)(winContext->windowsIn[winContext->rankId] + winContext->rankId * EP_RANK_OFFSET_STEP);
 }
 
-__aicore__ inline GM_ADDR GetBaseWindAddrByRankId(__gm__ HcclOpParam *winContext, const int32_t rankId,
+__aicore__ inline GM_ADDR GetBaseWindAddrByRankId(__gm__ HcclOpParam* winContext, const int32_t rankId,
                                                   const int32_t curRankId)
 {
     return (GM_ADDR)(winContext->windowsIn[rankId] + A5_MTE_STATE_WIN_SIZE + rankId * EP_RANK_OFFSET_STEP);
 }
 
-__aicore__ inline GM_ADDR GetBaseWindStateAddrByRankId(__gm__ HcclOpParam *winContext, const int32_t rankId,
+__aicore__ inline GM_ADDR GetBaseWindStateAddrByRankId(__gm__ HcclOpParam* winContext, const int32_t rankId,
                                                        const int32_t curRankId)
 {
     return (GM_ADDR)(winContext->windowsIn[rankId] + rankId * EP_RANK_OFFSET_STEP);
@@ -492,42 +492,42 @@ __aicore__ inline GM_ADDR GetBaseWindStateAddrByRankId(__gm__ HcclOpParam *winCo
 #else  // A3 implementation
 using HcclOpParam = HcclOpResParam;
 
-__aicore__ inline uint32_t GetRankId(__gm__ HcclOpParam *winContext)
+__aicore__ inline uint32_t GetRankId(__gm__ HcclOpParam* winContext)
 {
     return winContext->localUsrRankId;
 }
 
-__aicore__ inline uint32_t GetRankDim(__gm__ HcclOpParam *winContext)
+__aicore__ inline uint32_t GetRankDim(__gm__ HcclOpParam* winContext)
 {
     return winContext->rankSize;
 }
 
-__aicore__ inline uint64_t GetWinSize(__gm__ HcclOpParam *winContext)
+__aicore__ inline uint64_t GetWinSize(__gm__ HcclOpParam* winContext)
 {
     return winContext->winSize;
 }
 
-__aicore__ inline GM_ADDR GetStatusDataSpaceGm(__gm__ HcclOpParam *winContext)
+__aicore__ inline GM_ADDR GetStatusDataSpaceGm(__gm__ HcclOpParam* winContext)
 {
     return (GM_ADDR)(winContext->localWindowsExp);
 }
 
-__aicore__ inline GM_ADDR GetBaseWindAddrByRankId(__gm__ HcclOpParam *winContext, const int32_t rankId,
+__aicore__ inline GM_ADDR GetBaseWindAddrByRankId(__gm__ HcclOpParam* winContext, const int32_t rankId,
                                                   const int32_t curRankId)
 {
     if (rankId == curRankId) {
         return (GM_ADDR)(winContext->localWindowsIn);
     }
-    return (GM_ADDR)(((HcclRankRelationResV2 *)(winContext->remoteRes[rankId].nextDevicePtr))->windowsIn);
+    return (GM_ADDR)(((HcclRankRelationResV2*)(winContext->remoteRes[rankId].nextDevicePtr))->windowsIn);
 }
 
-__aicore__ inline GM_ADDR GetBaseWindStateAddrByRankId(__gm__ HcclOpParam *winContext, const int32_t rankId,
+__aicore__ inline GM_ADDR GetBaseWindStateAddrByRankId(__gm__ HcclOpParam* winContext, const int32_t rankId,
                                                        const int32_t curRankId)
 {
     if (rankId == curRankId) {
         return (GM_ADDR)(winContext->localWindowsExp);
     }
-    return (GM_ADDR)(((HcclRankRelationResV2 *)(winContext->remoteRes[rankId].nextDevicePtr))->windowsExp);
+    return (GM_ADDR)(((HcclRankRelationResV2*)(winContext->remoteRes[rankId].nextDevicePtr))->windowsExp);
 }
 #endif // __NPU_ARCH__ == 3510
 } // namespace Mc2Kernel

@@ -122,12 +122,12 @@ ge::graphStatus AlltoAllvQuantGmmTilingBase::GetAttrsInfo()
     sendCountsPtr_ = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_SEND_COUNTS_INDEX);
     OP_TILING_CHECK(sendCountsPtr_ == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "sendCounts"),
                     return ge::GRAPH_FAILED);
-    sendCounts = static_cast<const int64_t *>(sendCountsPtr_->GetData());
+    sendCounts = static_cast<const int64_t*>(sendCountsPtr_->GetData());
     // recvCounts
     recvCountsPtr_ = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_RECV_COUNTS_INDEX);
     OP_TILING_CHECK(recvCountsPtr_ == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "recvCounts"),
                     return ge::GRAPH_FAILED);
-    recvCounts = static_cast<const int64_t *>(recvCountsPtr_->GetData());
+    recvCounts = static_cast<const int64_t*>(recvCountsPtr_->GetData());
     // transGmmWeight
     transGmmWeightPtr_ = attrs->GetAttrPointer<bool>(ATTR_TRANS_GMM_WEIGHT_INDEX);
     if (transGmmWeightPtr_ != nullptr) {
@@ -589,9 +589,9 @@ ge::graphStatus AlltoAllvQuantGmmTilingBase::CheckMmYShapeInfo()
 {
     OP_LOGD(context_->GetNodeName(), "start CheckMmYShapeInfo.");
     // check mmX, mmWeight and mmY all be nullptr or all be not nullptr
-    const gert::StorageShape *mmXStorageShape = context_->GetOptionalInputShape(MM_X_INDEX);
-    const gert::StorageShape *mmWeightStorageShape = context_->GetOptionalInputShape(MM_WEIGHT_INDEX);
-    const gert::StorageShape *outputMmYStorageShape = context_->GetOutputShape(OUTPUT_MM_Y_INDEX);
+    const gert::StorageShape* mmXStorageShape = context_->GetOptionalInputShape(MM_X_INDEX);
+    const gert::StorageShape* mmWeightStorageShape = context_->GetOptionalInputShape(MM_WEIGHT_INDEX);
+    const gert::StorageShape* outputMmYStorageShape = context_->GetOutputShape(OUTPUT_MM_Y_INDEX);
     if (!((mmXStorageShape == nullptr) && (mmWeightStorageShape == nullptr) &&
           (outputMmYStorageShape == nullptr || outputMmYStorageShape->GetStorageShape().GetDimNum() == DIM_ZERO)) &&
         !((mmXStorageShape != nullptr) && (mmWeightStorageShape != nullptr) &&

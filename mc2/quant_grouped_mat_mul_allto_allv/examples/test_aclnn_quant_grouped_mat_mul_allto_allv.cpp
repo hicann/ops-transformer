@@ -33,7 +33,7 @@
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -43,8 +43,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -77,10 +77,10 @@ constexpr int64_t N1 = 4096;
 constexpr int64_t N2 = 4096;
 constexpr int64_t A = BS * K;
 
-std::vector<int16_t> pGmmYData(BS *K *N1, 0);
-std::vector<int16_t> pmmYData(BS *N2, 0);
+std::vector<int16_t> pGmmYData(BS* K* N1, 0);
+std::vector<int16_t> pmmYData(BS* N2, 0);
 
-int LaunchOneThreadAlltoAllvGmm(Args &args)
+int LaunchOneThreadAlltoAllvGmm(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret: %d\n", ret); return ret);
@@ -105,32 +105,32 @@ int LaunchOneThreadAlltoAllvGmm(Args &args)
     std::vector<int64_t> sendCountsList(EP_WORLD_SIZE * e, A / (EP_WORLD_SIZE * e));
     std::vector<int64_t> recvCountsList(EP_WORLD_SIZE * e, A / (EP_WORLD_SIZE * e));
 
-    void *gmmXDeviceAddr = nullptr;
-    void *gmmWDeviceAddr = nullptr;
-    void *gmmXScaleDeviceAddr = nullptr;
-    void *gmmWScaleDeviceAddr = nullptr;
-    void *yDeviceAddr = nullptr;
-    void *mmXDeviceAddr = nullptr;
-    void *mmWDeviceAddr = nullptr;
-    void *mmXScaleDeviceAddr = nullptr;
-    void *mmWScaleDeviceAddr = nullptr;
-    void *mmYDeviceAddr = nullptr;
+    void* gmmXDeviceAddr = nullptr;
+    void* gmmWDeviceAddr = nullptr;
+    void* gmmXScaleDeviceAddr = nullptr;
+    void* gmmWScaleDeviceAddr = nullptr;
+    void* yDeviceAddr = nullptr;
+    void* mmXDeviceAddr = nullptr;
+    void* mmWDeviceAddr = nullptr;
+    void* mmXScaleDeviceAddr = nullptr;
+    void* mmWScaleDeviceAddr = nullptr;
+    void* mmYDeviceAddr = nullptr;
 
-    aclTensor *gmmX = nullptr;
-    aclTensor *gmmW = nullptr;
-    aclTensor *gmmXScale = nullptr;
-    aclTensor *gmmWScale = nullptr;
-    aclTensor *y = nullptr;
+    aclTensor* gmmX = nullptr;
+    aclTensor* gmmW = nullptr;
+    aclTensor* gmmXScale = nullptr;
+    aclTensor* gmmWScale = nullptr;
+    aclTensor* y = nullptr;
 
-    aclTensor *mmX = nullptr;
-    aclTensor *mmW = nullptr;
-    aclTensor *mmXScale = nullptr;
-    aclTensor *mmWScale = nullptr;
-    aclTensor *mmY = nullptr;
+    aclTensor* mmX = nullptr;
+    aclTensor* mmW = nullptr;
+    aclTensor* mmXScale = nullptr;
+    aclTensor* mmWScale = nullptr;
+    aclTensor* mmY = nullptr;
 
-    aclTensor *sendCountsTensor = nullptr;
-    aclTensor *recvCountsTensor = nullptr;
-    aclTensor *commQuantScaleOptional = nullptr;
+    aclTensor* sendCountsTensor = nullptr;
+    aclTensor* recvCountsTensor = nullptr;
+    aclTensor* commQuantScaleOptional = nullptr;
 
     int64_t gmmXQuantMode = 1;
     int64_t gmmWQuantMode = 1;
@@ -141,8 +141,8 @@ int LaunchOneThreadAlltoAllvGmm(Args &args)
     int64_t groupSize = 0;
 
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor = nullptr;
+    void* workspaceAddr = nullptr;
 
     long long gmmXShapeSize = GetShapeSize(gmmXShape);
     long long gmmWShapeSize = GetShapeSize(gmmWShape);
@@ -189,8 +189,8 @@ int LaunchOneThreadAlltoAllvGmm(Args &args)
     ret = CreateAclTensor(mmYHostData, mmYShape, &mmYDeviceAddr, aclDataType::ACL_FLOAT16, &mmY);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
 
     // 调用第一阶段接口
     ret = aclnnQuantGroupedMatMulAlltoAllvGetWorkspaceSize(
@@ -290,7 +290,7 @@ int LaunchOneThreadAlltoAllvGmm(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclInit failed. ret = %d \n", ret); return ret);

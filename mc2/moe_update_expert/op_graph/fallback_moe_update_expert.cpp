@@ -29,7 +29,7 @@ static constexpr size_t IDX_ATTR_BALANCE_MODE = 2;
 
 static constexpr size_t IDX_OUT_EXPERT_IDS = 0;
 static constexpr size_t IDX_OUT_ACTIVE_MASK = 1;
-static ge::graphStatus MoeUpdateExpertExecuteFunc(gert::OpExecuteContext *host_api_ctx)
+static ge::graphStatus MoeUpdateExpertExecuteFunc(gert::OpExecuteContext* host_api_ctx)
 {
     OP_LOGD("Start MoeUpdateExpertFallback.");
     OPS_CHECK(host_api_ctx == nullptr, OP_LOGE_WITH_INVALID_INPUT("MoeUpdateExpertFallback", "host_api_ctx"),

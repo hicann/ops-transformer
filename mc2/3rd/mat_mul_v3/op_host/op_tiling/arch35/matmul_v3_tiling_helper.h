@@ -23,13 +23,13 @@ namespace optiling {
 namespace mc2_matmul_v3_advanced {
 class Mc2MatMulV3TilingHelper {
 public:
-    static void ResetBase(const gert::TilingContext *context, const Mc2MatmulV3CompileInfo &compileInfo,
-                          const Mc2MatMulV3Args &args, Mc2MatMulV3RunInfo &runInfo);
-    static void CalL1Tiling(const Mc2MatmulV3CompileInfo &compileInfo, const Mc2MatMulV3Args &args,
-                            Mc2MatMulV3RunInfo &runInfo);
-    static Mc2MatMulV3L0C2Out GetL0C2Out(const gert::TilingContext *context, const Mc2MatmulV3CompileInfo &compileInfo,
-                                         const Mc2MatMulV3Args &args, const Mc2MatMulV3RunInfo &runInfo);
-    static bool CheckIfDoubleAswt(const gert::TilingContext *context, const Mc2MatMulV3Args &args,
+    static void ResetBase(const gert::TilingContext* context, const Mc2MatmulV3CompileInfo& compileInfo,
+                          const Mc2MatMulV3Args& args, Mc2MatMulV3RunInfo& runInfo);
+    static void CalL1Tiling(const Mc2MatmulV3CompileInfo& compileInfo, const Mc2MatMulV3Args& args,
+                            Mc2MatMulV3RunInfo& runInfo);
+    static Mc2MatMulV3L0C2Out GetL0C2Out(const gert::TilingContext* context, const Mc2MatmulV3CompileInfo& compileInfo,
+                                         const Mc2MatMulV3Args& args, const Mc2MatMulV3RunInfo& runInfo);
+    static bool CheckIfDoubleAswt(const gert::TilingContext* context, const Mc2MatMulV3Args& args,
                                   const uint64_t batchC);
 };
 } // namespace mc2_matmul_v3_advanced

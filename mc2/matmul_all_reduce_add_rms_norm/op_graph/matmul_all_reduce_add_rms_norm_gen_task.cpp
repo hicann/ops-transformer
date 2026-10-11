@@ -26,15 +26,15 @@
 
 namespace ops {
 
-ge::Status MatmulAllReduceAddRmsNormCalcParamFunc(gert::ExeResGenerationContext *context)
+ge::Status MatmulAllReduceAddRmsNormCalcParamFunc(gert::ExeResGenerationContext* context)
 {
     const ge::AscendString name = "aicpu kfc server";
     const ge::AscendString reuseKey = "kfc_stream";
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, name, reuseKey);
 }
 
-ge::Status MatmulAllReduceAddRmsNormGenTaskFunc(const gert::ExeResGenerationContext *context,
-                                                std::vector<std::vector<uint8_t>> &tasks)
+ge::Status MatmulAllReduceAddRmsNormGenTaskFunc(const gert::ExeResGenerationContext* context,
+                                                std::vector<std::vector<uint8_t>>& tasks)
 {
     return MatmulAllReduceGenTaskOpsUtils::MatmulAllReduceGenTaskCallback(context, tasks);
 }

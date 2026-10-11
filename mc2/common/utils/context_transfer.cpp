@@ -20,8 +20,8 @@
 #include "op_mc2.h"
 
 namespace optiling {
-ge::graphStatus ContextTransfer::AssembleMMRCtxInfoFromMRNCtx(const gert::TilingContext *const context,
-                                                              MMRCtxInfo &mmrCtxInfo)
+ge::graphStatus ContextTransfer::AssembleMMRCtxInfoFromMRNCtx(const gert::TilingContext* const context,
+                                                              MMRCtxInfo& mmrCtxInfo)
 {
     MC2_CHECK_NOTNULL_RET(context->GetNodeName(), context);
     MC2_CHECK_NOTNULL_RET(context->GetNodeName(), context->GetAttrs());
@@ -67,8 +67,8 @@ ge::graphStatus ContextTransfer::AssembleMMRCtxInfoFromMRNCtx(const gert::Tiling
     mmrCtxInfo.y_shape = nullptr;
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus ContextTransfer::AssembleARNCtxInfoFromMRNCtx(const gert::TilingContext *const context,
-                                                              ARNCtxInfo &arnCtxInfo)
+ge::graphStatus ContextTransfer::AssembleARNCtxInfoFromMRNCtx(const gert::TilingContext* const context,
+                                                              ARNCtxInfo& arnCtxInfo)
 {
     MC2_CHECK_NOTNULL_RET(context->GetNodeName(), context);
 
@@ -119,21 +119,21 @@ ge::graphStatus ContextTransfer::AssembleARNCtxInfoFromMRNCtx(const gert::Tiling
 
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus ContextTransfer::AssembleMMRCtxInfoFromIMRNCtx(const gert::TilingContext *const context,
-                                                               MMRCtxInfo &mmrCtxInfo)
+ge::graphStatus ContextTransfer::AssembleMMRCtxInfoFromIMRNCtx(const gert::TilingContext* const context,
+                                                               MMRCtxInfo& mmrCtxInfo)
 {
     // Inplace的场景，mmr的解析跟非inplace是一样的，区别体现在arn的解析
     return AssembleMMRCtxInfoFromMRNCtx(context, mmrCtxInfo);
 }
-ge::graphStatus ContextTransfer::AssembleARNCtxInfoFromIMRNCtx(const gert::TilingContext *const context,
-                                                               ARNCtxInfo &arnCtxInfo)
+ge::graphStatus ContextTransfer::AssembleARNCtxInfoFromIMRNCtx(const gert::TilingContext* const context,
+                                                               ARNCtxInfo& arnCtxInfo)
 {
     // Inplace的场景，arn的原型个数跟inplace arn一样，排列也一样，只是名字不一样
     // 暂时按照认为arnCtxInfo等价于inplace arnCtxInfo
     return AssembleARNCtxInfoFromMRNCtx(context, arnCtxInfo);
 }
-ge::graphStatus ContextTransfer::AssembleMRNCtxInfoFromMRNCtx(const gert::TilingContext *const context,
-                                                              MRNCtxInfo &mrnCtxInfo)
+ge::graphStatus ContextTransfer::AssembleMRNCtxInfoFromMRNCtx(const gert::TilingContext* const context,
+                                                              MRNCtxInfo& mrnCtxInfo)
 {
     MC2_CHECK_LOG_RET(context->GetNodeName(), AssembleMMRCtxInfoFromMRNCtx(context, mrnCtxInfo.mmrCtxInfo));
     MC2_CHECK_LOG_RET(context->GetNodeName(), AssembleARNCtxInfoFromMRNCtx(context, mrnCtxInfo.arnCtxInfo));
@@ -141,11 +141,11 @@ ge::graphStatus ContextTransfer::AssembleMRNCtxInfoFromMRNCtx(const gert::Tiling
     mrnCtxInfo.mmrCtxInfo.y = mrnCtxInfo.arnCtxInfo.x2;
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus ContextTransfer::CheckMRNCtxInfo(const gert::TilingContext *context, const MRNCtxInfo &mrnCtxInfo)
+ge::graphStatus ContextTransfer::CheckMRNCtxInfo(const gert::TilingContext* context, const MRNCtxInfo& mrnCtxInfo)
 {
     // x1 和residual的b*s
-    const gert::StorageShape *x1Shape = mrnCtxInfo.mmrCtxInfo.x1_shape;
-    const gert::StorageShape *residualShape = mrnCtxInfo.arnCtxInfo.x2_shape;
+    const gert::StorageShape* x1Shape = mrnCtxInfo.mmrCtxInfo.x1_shape;
+    const gert::StorageShape* residualShape = mrnCtxInfo.arnCtxInfo.x2_shape;
     uint64_t x1DimNum = x1Shape->GetStorageShape().GetDimNum();
     OP_LOGD(context->GetNodeName(), "the dim of x1 is %lu.", x1DimNum);
     OP_TILING_CHECK(
@@ -169,8 +169,8 @@ ge::graphStatus ContextTransfer::CheckMRNCtxInfo(const gert::TilingContext *cont
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus ContextTransfer::AssembleIMRNCtxInfoFromIMRNCtx(const gert::TilingContext *const context,
-                                                                IMRNCtxInfo &imrnCtxInfo)
+ge::graphStatus ContextTransfer::AssembleIMRNCtxInfoFromIMRNCtx(const gert::TilingContext* const context,
+                                                                IMRNCtxInfo& imrnCtxInfo)
 {
     MC2_CHECK_LOG_RET(context->GetNodeName(), AssembleMMRCtxInfoFromIMRNCtx(context, imrnCtxInfo.mmrCtxInfo));
     MC2_CHECK_LOG_RET(context->GetNodeName(), AssembleARNCtxInfoFromIMRNCtx(context, imrnCtxInfo.arnCtxInfo));
@@ -178,8 +178,8 @@ ge::graphStatus ContextTransfer::AssembleIMRNCtxInfoFromIMRNCtx(const gert::Tili
     imrnCtxInfo.mmrCtxInfo.y = imrnCtxInfo.arnCtxInfo.x2;
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus ContextTransfer::AssembleMMRCtxInfoFromMMRCtx(const gert::TilingContext *const context,
-                                                              MMRCtxInfo &mmrCtxInfo)
+ge::graphStatus ContextTransfer::AssembleMMRCtxInfoFromMMRCtx(const gert::TilingContext* const context,
+                                                              MMRCtxInfo& mmrCtxInfo)
 {
     MC2_CHECK_NOTNULL_RET(context->GetNodeName(), context);
     MC2_CHECK_NOTNULL_RET(context->GetNodeName(), context->GetAttrs());

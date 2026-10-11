@@ -217,7 +217,7 @@ uint64_t Mc2WeightQuantBatchMatmulV2TilingFixpipe::GetTilingKey() const
 // 6、计算Workspace 大小
 ge::graphStatus Mc2WeightQuantBatchMatmulV2TilingFixpipe::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OPS_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = compileInfoPtr_->workspaceNum;
     return ge::GRAPH_SUCCESS;

@@ -104,7 +104,7 @@ struct PlatFormMemSize {
     {}
 };
 
-static void PrintTilingData(optiling::Mc2Msg &msg)
+static void PrintTilingData(optiling::Mc2Msg& msg)
 {
     OP_LOGD("GMMAllReduce", " aicpuTiling.sendOff %lu.", msg.get_sendOff());
     OP_LOGD("GMMAllReduce", " aicpuTiling.recvOff %lu.", msg.get_recvOff());
@@ -140,7 +140,7 @@ static void PrintTilingData(optiling::Mc2Msg &msg)
     OP_LOGD("GMMAllReduce", " aicpuTiling.preparePosition %u", msg.get_preparePosition());
 }
 
-static void PrintTilingData(optiling::GMMAllReduceCoreTiling &msg)
+static void PrintTilingData(optiling::GMMAllReduceCoreTiling& msg)
 {
     OP_LOGD("GMMAllReduce", " aicoreTiling.notifyOff %u.", msg.get_notifyOff());
     OP_LOGD("GMMAllReduce", " aicoreTiling.baseParams.groupNum %u.", msg.baseParams.get_groupNum());
@@ -177,22 +177,22 @@ public:
     GMMAllReduceTilingData tilingData;
     mc2tiling::TilingArgs args_;
 
-    ge::graphStatus Init(const gert::TilingContext *context);
-    ge::graphStatus RunFusionKernelTiling(gert::TilingContext *context);
+    ge::graphStatus Init(const gert::TilingContext* context);
+    ge::graphStatus RunFusionKernelTiling(gert::TilingContext* context);
 
 protected:
-    ge::graphStatus CalMMTiling(const gert::TilingContext *context);
-    ge::graphStatus GMMAllReduceSetMMTiling(const gert::TilingContext *context, matmul_tiling::DataType matmulDtype);
+    ge::graphStatus CalMMTiling(const gert::TilingContext* context);
+    ge::graphStatus GMMAllReduceSetMMTiling(const gert::TilingContext* context, matmul_tiling::DataType matmulDtype);
     ge::graphStatus DoAllReduceTiling();
-    ge::graphStatus DoAiCoreTiling(const gert::TilingContext *context);
+    ge::graphStatus DoAiCoreTiling(const gert::TilingContext* context);
     ge::graphStatus SetBaseParams();
     inline void SetArgsValue(uint32_t i);
-    ge::graphStatus InitializeLoopDataType(const gert::TilingContext *context, int64_t &maxMKN);
+    ge::graphStatus InitializeLoopDataType(const gert::TilingContext* context, int64_t& maxMKN);
     void SetFusionArguments(uint32_t AIC_NUM);
-    void SetMessageBufferMetadata(Mc2Msg &msg);
-    ge::graphStatus InitForLoop(const gert::TilingContext *context, uint32_t &groupNum);
-    inline void SetMsgValue(Mc2Msg &msg) const;
-    void CalculateMMTiling(CoreTilingInfo &coreTilingInfo) const;
+    void SetMessageBufferMetadata(Mc2Msg& msg);
+    ge::graphStatus InitForLoop(const gert::TilingContext* context, uint32_t& groupNum);
+    inline void SetMsgValue(Mc2Msg& msg) const;
+    void CalculateMMTiling(CoreTilingInfo& coreTilingInfo) const;
 
 private:
     int32_t mList[MAX_TENSOR_CONT] = {0};
@@ -215,15 +215,15 @@ private:
     ge::DataType biasDType;
     uint8_t hcclDataType;  // data type in hccl
     int64_t splitItem_;    // attr
-    const char *group_;    // attr
-    const char *reduceOp_; // attr
+    const char* group_;    // attr
+    const char* reduceOp_; // attr
     int64_t commTurn_;     // communication turn num
     uint32_t rankSize_;
     uint32_t libApiWorkSpaceSize_;
-    const char *opName;
+    const char* opName;
 };
 
-ge::graphStatus GMMAllReduceTiling::InitializeLoopDataType(const gert::TilingContext *context, int64_t &maxMKN)
+ge::graphStatus GMMAllReduceTiling::InitializeLoopDataType(const gert::TilingContext* context, int64_t& maxMKN)
 {
     // Determine whether all data types are consistent.
     if (mmDType == ge::DT_UNDEFINED) { // if is first loop
@@ -244,7 +244,7 @@ ge::graphStatus GMMAllReduceTiling::InitializeLoopDataType(const gert::TilingCon
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMAllReduceTiling::InitForLoop(const gert::TilingContext *context, uint32_t &groupNum)
+ge::graphStatus GMMAllReduceTiling::InitForLoop(const gert::TilingContext* context, uint32_t& groupNum)
 {
     // Get shape, dtype information, and the total number of data.
     int64_t maxMKN = 0;
@@ -293,7 +293,7 @@ ge::graphStatus GMMAllReduceTiling::InitForLoop(const gert::TilingContext *conte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMAllReduceTiling::Init(const gert::TilingContext *context)
+ge::graphStatus GMMAllReduceTiling::Init(const gert::TilingContext* context)
 {
     opName = context->GetNodeName();
     uint32_t groupNum = 0;          // 0: init value
@@ -345,7 +345,7 @@ void GMMAllReduceTiling::SetFusionArguments(uint32_t AIC_NUM)
     args_.usedCoreNum = AIC_NUM; // cube num
 }
 
-ge::graphStatus GMMAllReduceTiling::RunFusionKernelTiling(gert::TilingContext *context)
+ge::graphStatus GMMAllReduceTiling::RunFusionKernelTiling(gert::TilingContext* context)
 {
     OP_LOGD(opName, "begin RunFusionKernelTiling.");
     auto platformInfo = context->GetPlatformInfo();
@@ -387,7 +387,7 @@ ge::graphStatus GMMAllReduceTiling::RunFusionKernelTiling(gert::TilingContext *c
                     OP_LOGE(opName, "GMM_All_Reduce DoAllReduceTiling failed."), return ge::GRAPH_FAILED);
 
     // set workspsces
-    size_t *workspaces = context->GetWorkspaceSizes(1); // 1: fixed value
+    size_t* workspaces = context->GetWorkspaceSizes(1); // 1: fixed value
     workspaces[0] = SYS_WORKSPACE_SIZE;                 // 0: fixed value
     context->SetTilingKey(TILING_KEY);                  // set tilingkey
     tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
@@ -406,7 +406,7 @@ inline void GMMAllReduceTiling::SetArgsValue(uint32_t i)
     args_.orgNValue = nList[i];
 }
 
-inline void GMMAllReduceTiling::SetMsgValue(Mc2Msg &msg) const
+inline void GMMAllReduceTiling::SetMsgValue(Mc2Msg& msg) const
 {
     msg.set_debugMode(mc2tiling::Mc2TilingUtils::GetDebugMode());
     msg.set_commType(static_cast<uint8_t>(mc2tiling::AicpuComType::HCCL_CMD_ALLREDUCE));
@@ -422,7 +422,7 @@ inline void GMMAllReduceTiling::SetMsgValue(Mc2Msg &msg) const
     msg.set_preparePosition(0);
 }
 
-void GMMAllReduceTiling::CalculateMMTiling(CoreTilingInfo &coreTilingInfo) const
+void GMMAllReduceTiling::CalculateMMTiling(CoreTilingInfo& coreTilingInfo) const
 {
     coreTilingInfo.lambdaN = Ceil(uint32_t(args_.orgNValue), args_.usedCoreNum * uint32_t(baseN_));
     coreTilingInfo.singleN = coreTilingInfo.lambdaN * baseN_;
@@ -445,7 +445,7 @@ void GMMAllReduceTiling::CalculateMMTiling(CoreTilingInfo &coreTilingInfo) const
             numBlocksN, coreTilingInfo.lambdaN, coreTilingInfo.singleN);
 }
 
-void GMMAllReduceTiling::SetMessageBufferMetadata(Mc2Msg &msg)
+void GMMAllReduceTiling::SetMessageBufferMetadata(Mc2Msg& msg)
 {
     // workspace 地址
     msg.set_useBufferType(static_cast<uint8_t>(mc2tiling::MC2_BUFFER_TYPE::MC2_BUFFER_TYPE_OUTPUT));
@@ -466,7 +466,7 @@ ge::graphStatus GMMAllReduceTiling::DoAllReduceTiling()
     tilingData.aicpuTiling.set_groupNum(groupNum);
     tilingData.aicpuTiling.set_groupTilingMagicNum(GMM_ALL_REDUCE_FLAG);
 
-    uint8_t *argsU8 = tilingData.aicpuTiling.get_msg();
+    uint8_t* argsU8 = tilingData.aicpuTiling.get_msg();
     Mc2Msg msg(argsU8);
     size_t dataSize = msg.GetDataSize(); // Mc2Msg size
     OP_TILING_CHECK(dataSize != MC2_MSG_SIZE,
@@ -508,7 +508,7 @@ ge::graphStatus GMMAllReduceTiling::DoAllReduceTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMAllReduceTiling::DoAiCoreTiling(const gert::TilingContext *context)
+ge::graphStatus GMMAllReduceTiling::DoAiCoreTiling(const gert::TilingContext* context)
 {
     OP_LOGD(opName, "begin DoAiCoreTiling.");
 
@@ -545,7 +545,7 @@ ge::graphStatus GMMAllReduceTiling::SetBaseParams()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMAllReduceTiling::CalMMTiling(const gert::TilingContext *context)
+ge::graphStatus GMMAllReduceTiling::CalMMTiling(const gert::TilingContext* context)
 {
     OP_LOGD(opName, "begin CalMMTlingData.");
 
@@ -594,7 +594,7 @@ ge::graphStatus GMMAllReduceTiling::CalMMTiling(const gert::TilingContext *conte
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GMMAllReduceTiling::GMMAllReduceSetMMTiling(const gert::TilingContext *context,
+ge::graphStatus GMMAllReduceTiling::GMMAllReduceSetMMTiling(const gert::TilingContext* context,
                                                             matmul_tiling::DataType matmulDtype)
 {
     OP_LOGD(opName, "Begin GMMAllReduceSetMMTiling.");
@@ -653,7 +653,7 @@ ge::graphStatus GMMAllReduceTiling::GMMAllReduceSetMMTiling(const gert::TilingCo
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus TilingGMMAllReduce(gert::TilingContext *context)
+static ge::graphStatus TilingGMMAllReduce(gert::TilingContext* context)
 {
     GMMAllReduceTiling tiling;
     OP_TILING_CHECK(tiling.Init(context) != ge::GRAPH_SUCCESS,
@@ -663,7 +663,7 @@ static ge::graphStatus TilingGMMAllReduce(gert::TilingContext *context)
 
 struct GMMAllReduceCompileInfo {};
 
-static ge::graphStatus TilingPrepareForGMMAllReduce(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForGMMAllReduce(gert::TilingParseContext* context)
 {
     auto compileInfo = context->GetCompiledInfo<GMMAllReduceCompileInfo>();
     OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);

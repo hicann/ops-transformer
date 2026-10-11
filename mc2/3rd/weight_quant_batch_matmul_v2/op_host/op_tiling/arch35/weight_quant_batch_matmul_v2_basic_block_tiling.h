@@ -115,16 +115,16 @@ public:
 
     void Init();
     void Reset();
-    void SetPlatformParam(const PlatformParam &param);
+    void SetPlatformParam(const PlatformParam& param);
     void SetShape(int64_t mSize, int64_t nSize, int64_t kSize, int64_t groupSize);
-    void SetAttr(const char *opName, const WeightQuantBmmAttr &attr);
+    void SetAttr(const char* opName, const WeightQuantBmmAttr& attr);
     void SetDtypeBits(int64_t aDtypeBits, int64_t bDtypeBits, int64_t biasDtypeBits);
     void SetQuantType(Mc2QuantType antiquantType);
     double GetMinMte2BW(int64_t baseM, int64_t baseN, int64_t mDim, int64_t nDim) const;
     double GetMte2BW(int64_t baseM, int64_t baseN, int64_t mDim, int64_t nDim) const;
     double GetMte2BWRatio(int64_t baseM, int64_t baseN, int64_t mDim, int64_t nDim) const;
     bool GetBasicBlockTiling();
-    const BasicBlockParam &GetTilingResult() const
+    const BasicBlockParam& GetTilingResult() const
     {
         return basicBlockParam_;
     }
@@ -134,7 +134,7 @@ protected:
     void InitL1TilingParam();
     void InitPlatformParam();
     void GetBasicBlockTable();
-    void SingleShapeTiling(const std::vector<BasicBlock> &basicBlockTable);
+    void SingleShapeTiling(const std::vector<BasicBlock>& basicBlockTable);
     bool ValidateInputParam() const;
     bool GetCachelineAlignFlag(int64_t dtypeBits, int64_t cacheline) const;
     int64_t GetBaseK(int64_t baseM, int64_t baseN) const;
@@ -146,12 +146,12 @@ protected:
     bool GetInvalidFlag(bool isCubeBoundSolution, int64_t stepKMax) const;
     void GetL1Param(bool isCubeBoundSolution, int64_t stepKMax, int64_t stepKaTmp, int64_t stepKbTmp);
     void DoL1Tiling(bool isCubeBoundSolution);
-    bool GetHalfSingleShape(const std::vector<BasicBlock> &basicBlockTable, int64_t &halfSingleM, int64_t &halfSingleN);
+    bool GetHalfSingleShape(const std::vector<BasicBlock>& basicBlockTable, int64_t& halfSingleM, int64_t& halfSingleN);
     bool GetFinalResult();
     bool DoL1TilingForCubeBoundResult();
     bool ValidateTilingResult() const;
-    void PrintFinalResult(const BasicBlockParam &param, bool enable) const;
-    int64_t GetL1LoadSize(const BasicBlock &basicBlock, const L1TilingParam &l1Param) const;
+    void PrintFinalResult(const BasicBlockParam& param, bool enable) const;
+    int64_t GetL1LoadSize(const BasicBlock& basicBlock, const L1TilingParam& l1Param) const;
     bool GetDefaultBasicBlockTiling();
 
     /*
@@ -161,7 +161,7 @@ protected:
      *    3）无尾块解中，比主块带宽比mte2BWRatio
      *    4）有尾块解中，比尾块带宽比mte2TailBWRatio
      */
-    static bool CompareCubeBoundResult(const BasicBlockParam &param1, const BasicBlockParam &param2)
+    static bool CompareCubeBoundResult(const BasicBlockParam& param1, const BasicBlockParam& param2)
     {
         if (param1.mDim * param1.nDim != param2.mDim * param2.nDim) {
             return param1.mDim * param1.nDim > param2.mDim * param2.nDim;
@@ -185,25 +185,25 @@ protected:
         return param1.basicBlock.mte2TailBWRatio > param2.basicBlock.mte2TailBWRatio;
     }
 
-    static int64_t GetAInnerSize(const BasicBlockParam &param)
+    static int64_t GetAInnerSize(const BasicBlockParam& param)
     {
         return param.transA ? std::min(param.l1Param.stepM * param.basicBlock.baseM, param.singleM) :
                               std::min(param.l1Param.stepKa * param.basicBlock.baseK, param.singleK);
     }
 
-    static int64_t GetBInnerSize(const BasicBlockParam &param)
+    static int64_t GetBInnerSize(const BasicBlockParam& param)
     {
         return param.transB ? std::min(param.l1Param.stepKb * param.basicBlock.baseK, param.singleK) :
                               std::min(param.l1Param.stepN * param.basicBlock.baseN, param.singleN);
     }
 
-    static int64_t GetBFullInnerSize(const BasicBlockParam &param)
+    static int64_t GetBFullInnerSize(const BasicBlockParam& param)
     {
         return param.transB ? param.kSize : param.nSize;
     }
 
-    static bool PreferFullloadKInPergroupNKLessCacheline(const BasicBlockParam &param1, const BasicBlockParam &param2,
-                                                         bool &result)
+    static bool PreferFullloadKInPergroupNKLessCacheline(const BasicBlockParam& param1, const BasicBlockParam& param2,
+                                                         bool& result)
     {
         // Early return not weightND pergroup nk
         if (param1.weightNzFlag || param1.groupSize <= 0 || !param1.transB) {
@@ -232,7 +232,7 @@ protected:
         return false;
     }
 
-    static bool CompareMTE2BoundResultA16W4PriorBND(const BasicBlockParam &param1, const BasicBlockParam &param2)
+    static bool CompareMTE2BoundResultA16W4PriorBND(const BasicBlockParam& param1, const BasicBlockParam& param2)
     {
         int64_t innerSizeA1 = GetAInnerSize(param1);
         int64_t innerSizeA2 = GetAInnerSize(param2);
@@ -290,7 +290,7 @@ protected:
         return al1LoadSize1 > al1LoadSize2;
     }
 
-    static bool CompareMTE2BoundResultA16W4PriorBNZ(const BasicBlockParam &param1, const BasicBlockParam &param2)
+    static bool CompareMTE2BoundResultA16W4PriorBNZ(const BasicBlockParam& param1, const BasicBlockParam& param2)
     {
         int64_t nBl1TailSize1 = param1.singleN % std::max(param1.l1Param.stepN * param1.basicBlock.baseN, BLOCK_CUBE);
         nBl1TailSize1 = nBl1TailSize1 == 0 ? param1.l1Param.stepN * param1.basicBlock.baseN : nBl1TailSize1;
@@ -327,7 +327,7 @@ protected:
         }
     }
 
-    static bool CompareMTE2BoundResultA16W4PriorB(const BasicBlockParam &param1, const BasicBlockParam &param2)
+    static bool CompareMTE2BoundResultA16W4PriorB(const BasicBlockParam& param1, const BasicBlockParam& param2)
     {
         if (param1.weightNzFlag) {
             return CompareMTE2BoundResultA16W4PriorBNZ(param1, param2);
@@ -336,7 +336,7 @@ protected:
         }
     }
 
-    static bool CompareMTE2BoundResultA16W4PriorA(const BasicBlockParam &param1, const BasicBlockParam &param2)
+    static bool CompareMTE2BoundResultA16W4PriorA(const BasicBlockParam& param1, const BasicBlockParam& param2)
     {
         int64_t innerSizeA1 = GetAInnerSize(param1);
         int64_t innerSizeA2 = GetAInnerSize(param2);
@@ -397,7 +397,7 @@ protected:
         return bL1LoadSize1 > bL1LoadSize2;
     }
 
-    static bool CompareMTE2BoundResultA16W4(const BasicBlockParam &param1, const BasicBlockParam &param2)
+    static bool CompareMTE2BoundResultA16W4(const BasicBlockParam& param1, const BasicBlockParam& param2)
     {
         if (param1.mDim * param1.nDim >= MIN_CORE_DIM && param2.mDim * param2.nDim < MIN_CORE_DIM) {
             return true;
@@ -414,7 +414,7 @@ protected:
         }
     }
 
-    static bool CompareMTE2BoundResultA16W8(const BasicBlockParam &param1, const BasicBlockParam &param2)
+    static bool CompareMTE2BoundResultA16W8(const BasicBlockParam& param1, const BasicBlockParam& param2)
     {
         if (param1.mDim * param1.nDim != param2.mDim * param2.nDim) {
             return param1.mDim * param1.nDim > param2.mDim * param2.nDim;
@@ -455,7 +455,7 @@ protected:
      *   1）若mte2Cost相近，则优先选择kL1无尾块的tiling
      *   2）优先选择mte2Cost较小的tiling
      */
-    static bool CompareMTE2BoundResult(const BasicBlockParam &param1, const BasicBlockParam &param2)
+    static bool CompareMTE2BoundResult(const BasicBlockParam& param1, const BasicBlockParam& param2)
     {
         if (param1.bDtypeBits == BITS_4) {
             return CompareMTE2BoundResultA16W4(param1, param2);
@@ -488,7 +488,7 @@ protected:
         return num1 / num2 * num2;
     }
 
-    const char *opName_;
+    const char* opName_;
     bool hasOffset_;
     double aByteSize_;
     double bByteSize_;

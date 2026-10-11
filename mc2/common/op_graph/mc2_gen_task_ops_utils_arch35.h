@@ -69,17 +69,17 @@ static const std::map<const std::string, const GroupInfo> GROUP_INFO_MAP_ARCH35{
 
 class Mc2Arch35GenTaskOpsUtils {
 public:
-    static ge::Status CreateCCUFusionTask(const gert::ExeResGenerationContext *context,
-                                          std::vector<std::vector<uint8_t>> &tasks);
+    static ge::Status CreateCCUFusionTask(const gert::ExeResGenerationContext* context,
+                                          std::vector<std::vector<uint8_t>>& tasks);
 
-    static const std::string GetCommAlg(const gert::ExeResGenerationContext *context, const size_t commAlgIdx)
+    static const std::string GetCommAlg(const gert::ExeResGenerationContext* context, const size_t commAlgIdx)
     {
-        auto *attrs = context->GetAttrs();
+        auto* attrs = context->GetAttrs();
         if (attrs == nullptr) {
             OPS_LOG_E(context->GetNodeName(), "Attrs pointer is null.");
             return "";
         }
-        const char *commAlgPtr = attrs->GetStr(commAlgIdx);
+        const char* commAlgPtr = attrs->GetStr(commAlgIdx);
         if (commAlgPtr == nullptr) {
             OPS_LOG_E(context->GetNodeName(), "Comm alg pointer is null.");
             return "";
@@ -92,8 +92,8 @@ public:
         OPS_LOG_D(context->GetNodeName(), "Comm alg is %s.", commAlg.c_str());
         return commAlg;
     }
-    static ge::Status Mc2Arch35GenTaskCallBack(const gert::ExeResGenerationContext *context,
-                                               std::vector<std::vector<uint8_t>> &tasks)
+    static ge::Status Mc2Arch35GenTaskCallBack(const gert::ExeResGenerationContext* context,
+                                               std::vector<std::vector<uint8_t>>& tasks)
     {
         if (context == nullptr) {
             OPS_LOG_E("Mc2Arch35GenTaskOpsUtils::Mc2Arch35GenTaskCallBack", "Failed to get context.");
@@ -115,9 +115,9 @@ public:
     }
 
 private:
-    static bool GetGroupInfo(const gert::ExeResGenerationContext *context, GroupInfo &groupInfo)
+    static bool GetGroupInfo(const gert::ExeResGenerationContext* context, GroupInfo& groupInfo)
     {
-        const char *opType = context->GetNodeType();
+        const char* opType = context->GetNodeType();
         if (opType == nullptr) {
             OPS_LOG_E(context->GetNodeName(), "Op type is nullptr.");
             return false;

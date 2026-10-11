@@ -56,7 +56,7 @@ public:
     static constexpr uint32_t QK_READY_ID = 1;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, half tor_, uint32_t kvSplitCoreNum_ = 1)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource, half tor_, uint32_t kvSplitCoreNum_ = 1)
     {
         // Allocate UB space
         constexpr uint32_t LS_UB_TENSOR_OFFSET = 0;
@@ -124,8 +124,8 @@ public:
     }
 
     CATLASS_DEVICE
-    void RowsumSPECTILE512(const AscendC::LocalTensor<float> &srcUb, const AscendC::LocalTensor<float> &rowsumUb,
-                           const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
+    void RowsumSPECTILE512(const AscendC::LocalTensor<float>& srcUb, const AscendC::LocalTensor<float>& rowsumUb,
+                           const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
                            uint32_t numElemsAligned)
     {
         AscendC::BlockReduceSum<float, false>(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0,
@@ -143,8 +143,8 @@ public:
     }
 
     CATLASS_DEVICE
-    void RowsumSPECTILE256(const AscendC::LocalTensor<float> &srcUb, const AscendC::LocalTensor<float> &rowsumUb,
-                           const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
+    void RowsumSPECTILE256(const AscendC::LocalTensor<float>& srcUb, const AscendC::LocalTensor<float>& rowsumUb,
+                           const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
                            uint32_t numElemsAligned)
     {
         AscendC::BlockReduceSum<float, false>(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0,
@@ -162,8 +162,8 @@ public:
     }
 
     CATLASS_DEVICE
-    void RowsumTAILTILE(const AscendC::LocalTensor<float> &srcUb, const AscendC::LocalTensor<float> &rowsumUb,
-                        const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
+    void RowsumTAILTILE(const AscendC::LocalTensor<float>& srcUb, const AscendC::LocalTensor<float>& rowsumUb,
+                        const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
                         uint32_t numElemsAligned)
     {
         if (numElems >= FLOAT_VECTOR_SIZE) {
@@ -215,8 +215,8 @@ public:
     }
 
     CATLASS_DEVICE
-    void RowmaxSPECTILE512(const AscendC::LocalTensor<float> &srcUb, const AscendC::LocalTensor<float> &rowmaxUb,
-                           const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
+    void RowmaxSPECTILE512(const AscendC::LocalTensor<float>& srcUb, const AscendC::LocalTensor<float>& rowmaxUb,
+                           const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
                            uint32_t numElemsAligned)
     {
         AscendC::BlockReduceMax<float, false>(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0,
@@ -233,8 +233,8 @@ public:
     }
 
     CATLASS_DEVICE
-    void RowmaxSPECTILE256(const AscendC::LocalTensor<float> &srcUb, const AscendC::LocalTensor<float> &rowmaxUb,
-                           const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
+    void RowmaxSPECTILE256(const AscendC::LocalTensor<float>& srcUb, const AscendC::LocalTensor<float>& rowmaxUb,
+                           const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
                            uint32_t numElemsAligned)
     {
         AscendC::BlockReduceMax<float, false>(tvUbTensor, srcUb, numRowsRound * numElemsAligned / FLOAT_VECTOR_SIZE, 0,
@@ -252,8 +252,8 @@ public:
     }
 
     CATLASS_DEVICE
-    void RowmaxTAILTILE(const AscendC::LocalTensor<float> &srcUb, const AscendC::LocalTensor<float> &rowmaxUb,
-                        const AscendC::LocalTensor<float> &tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
+    void RowmaxTAILTILE(const AscendC::LocalTensor<float>& srcUb, const AscendC::LocalTensor<float>& rowmaxUb,
+                        const AscendC::LocalTensor<float>& tvUbTensor, uint32_t numRowsRound, uint32_t numElems,
                         uint32_t numElemsAligned)
     {
         if (numElems >= FLOAT_VECTOR_SIZE) {
@@ -307,7 +307,7 @@ public:
     CATLASS_DEVICE
     void SubCoreCompute(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
                         uint32_t m, uint32_t nReal, uint32_t nStride, uint32_t pingpongFlag, uint32_t rowOffset,
-                        uint32_t sUbOffset, uint32_t nIdx, uint32_t &glFlag)
+                        uint32_t sUbOffset, uint32_t nIdx, uint32_t& glFlag)
     {
         uint32_t round_m = (m + FLOAT_BLOCK_SIZE - 1) / FLOAT_BLOCK_SIZE * FLOAT_BLOCK_SIZE;
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(pingpongFlag);
@@ -442,8 +442,8 @@ public:
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
-                    const LayoutOutput &layoutOutput, const LayoutInput &layoutInput, GemmCoord actualBlockShape,
-                    uint32_t nIdx, uint32_t &glFlag)
+                    const LayoutOutput& layoutOutput, const LayoutInput& layoutInput, GemmCoord actualBlockShape,
+                    uint32_t nIdx, uint32_t& glFlag)
     {
         uint32_t cur_head_num = actualBlockShape.m();
         uint32_t qkN = actualBlockShape.n();

@@ -33,30 +33,30 @@ namespace Mc2Kernel {
 
 template <typename ComputationContextType>
 struct MatmulAlltoAllAddBiasPipelineContext : public MatmulAlltoAllPipelineContext<ComputationContextType> {
-    MC2KernelTemplate::MC2AddBiasContext *addBiasContext = nullptr;
+    MC2KernelTemplate::MC2AddBiasContext* addBiasContext = nullptr;
 };
 
 template <typename ComputationType, typename TransposeType, typename CommunicationType, typename AddBiasType,
           typename ContextType>
 class MatmulAlltoAllAddBiasPipeLine {
 public:
-    __aicore__ inline MatmulAlltoAllAddBiasPipeLine(ComputationType *computeStage, TransposeType *transStage,
-                                                    CommunicationType *commStage, AddBiasType *addBiasStage)
+    __aicore__ inline MatmulAlltoAllAddBiasPipeLine(ComputationType* computeStage, TransposeType* transStage,
+                                                    CommunicationType* commStage, AddBiasType* addBiasStage)
         : computeStage_(computeStage),
           transStage_(transStage),
           commStage_(commStage),
           addBiasStage_(addBiasStage){};
 
     __aicore__ inline void Init();
-    __aicore__ inline void GetContext(ContextType *context);
+    __aicore__ inline void GetContext(ContextType* context);
     __aicore__ inline void Process(uint32_t taskCnt);
     __aicore__ inline void End();
 
 private:
-    ComputationType *computeStage_;
-    TransposeType *transStage_;
-    CommunicationType *commStage_;
-    AddBiasType *addBiasStage_;
+    ComputationType* computeStage_;
+    TransposeType* transStage_;
+    CommunicationType* commStage_;
+    AddBiasType* addBiasStage_;
 };
 
 template <typename ComputationType, typename TransposeType, typename CommunicationType, typename AddBiasType,
@@ -71,7 +71,7 @@ MatmulAlltoAllAddBiasPipeLine<ComputationType, TransposeType, CommunicationType,
 template <typename ComputationType, typename TransposeType, typename CommunicationType, typename AddBiasType,
           typename ContextType>
 __aicore__ inline void MatmulAlltoAllAddBiasPipeLine<ComputationType, TransposeType, CommunicationType, AddBiasType,
-                                                     ContextType>::GetContext(ContextType *context)
+                                                     ContextType>::GetContext(ContextType* context)
 {
     context->computationContext = computeStage_->GetContextPtr();
     context->transposeContext = transStage_->GetContextPtr();

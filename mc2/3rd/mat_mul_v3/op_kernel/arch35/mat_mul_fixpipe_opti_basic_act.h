@@ -27,7 +27,7 @@ using namespace Act::Gemm;
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class A_LAYOUT, class B_LAYOUT, class C_LAYOUT,
           uint64_t FULL_LOAD_MODE = 0>
 __aicore__ inline void Mc2MatMulFixpipeOptiActKernel(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM,
-                                                     GM_ADDR workspaceGM, const Mc2MatMulV3BasicTilingData &tilingData,
+                                                     GM_ADDR workspaceGM, const Mc2MatMulV3BasicTilingData& tilingData,
                                                      int64_t batch = 0)
 {
     // 定义L1和L0的TileShape

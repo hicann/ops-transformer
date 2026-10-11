@@ -41,7 +41,7 @@ struct MatmulAllReduceApiUtParam {
     op::SocVersion soc;
     aclnnStatus expectResult;
 
-    MatmulAllReduceApiUtParam(const csv_map &csvMap)
+    MatmulAllReduceApiUtParam(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->x1 = GetTensorACL(csvMap, "x1_shape", "x1_dtype", "x1_format");
@@ -77,7 +77,7 @@ struct MatmulAllReduceApiUtParam {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MatmulAllReduceApiUtParam &param)
+inline std::ostream& operator<<(std::ostream& os, const MatmulAllReduceApiUtParam& param)
 {
     return os << param.case_name;
 }

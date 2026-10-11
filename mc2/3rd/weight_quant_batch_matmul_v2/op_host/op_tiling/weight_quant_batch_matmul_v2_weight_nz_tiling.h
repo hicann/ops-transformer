@@ -40,7 +40,7 @@ public:
 
 class Mc2WeightQuantBatchMatmulV2WeightNz : public TilingBaseClass {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2WeightNz(gert::TilingContext *context)
+    explicit Mc2WeightQuantBatchMatmulV2WeightNz(gert::TilingContext* context)
         : TilingBaseClass(context)
     {
         Reset();
@@ -48,8 +48,8 @@ public:
             InitCompileInfo();
         }
     }
-    explicit Mc2WeightQuantBatchMatmulV2WeightNz(gert::TilingContext *context,
-                                                 Mc2WeightQuantBatchMatmulV2NzTilingData *out)
+    explicit Mc2WeightQuantBatchMatmulV2WeightNz(gert::TilingContext* context,
+                                                 Mc2WeightQuantBatchMatmulV2NzTilingData* out)
         : TilingBaseClass(context)
     {
         Reset();
@@ -57,7 +57,7 @@ public:
         InitCompileInfo();
     }
     ~Mc2WeightQuantBatchMatmulV2WeightNz() override = default;
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -93,27 +93,27 @@ protected:
     // 6、计算Workspace 大小
     ge::graphStatus GetWorkspaceSize() override;
 
-    bool GetMmTilingInput(Mc2MmTilingInput &mmTilingInput);
+    bool GetMmTilingInput(Mc2MmTilingInput& mmTilingInput);
     bool CheckUBSize();
     bool GetMatMulTiling();
     ge::graphStatus CheckContext() const;
     bool AnalyzeDtype();
-    bool AnalyzeBiasDtype(const gert::CompileTimeTensorDesc *biasDesc);
+    bool AnalyzeBiasDtype(const gert::CompileTimeTensorDesc* biasDesc);
     bool AnalyzeAntiQuantDtype(ge::DataType antiQuantScaleDtype,
-                               const gert::CompileTimeTensorDesc *antiQuantOffsetDesc) const;
+                               const gert::CompileTimeTensorDesc* antiQuantOffsetDesc) const;
     bool AnalyzeAttrs();
     bool AnalyzeInputs();
-    bool AnalyzeInputShape(const gert::StorageShape *xShape, const gert::StorageShape *weightShape,
-                           const gert::StorageShape *outShape);
-    bool AnalyzeAntiQuantShape(const gert::StorageShape *antiQuantScaleShape,
-                               const gert::StorageShape *antiQuantOffsetShape);
-    bool AnalyzeBiasShape(const gert::StorageShape *outShape);
-    bool SetAntiQuantType(const gert::StorageShape *antiQuantScaleShape);
-    void Convert2AscendCTiling(const CacheTilingData &tbeTiling, AscendC::tiling::TCubeTiling &matmulTiling);
-    void SetAscendCTiling(AscendC::tiling::TCubeTiling &matmulTiling);
-    MatrixTraverse GetIteratorOrder(const CacheTilingData &tbeTiling, int32_t singleCoreM, int32_t singleCoreN,
+    bool AnalyzeInputShape(const gert::StorageShape* xShape, const gert::StorageShape* weightShape,
+                           const gert::StorageShape* outShape);
+    bool AnalyzeAntiQuantShape(const gert::StorageShape* antiQuantScaleShape,
+                               const gert::StorageShape* antiQuantOffsetShape);
+    bool AnalyzeBiasShape(const gert::StorageShape* outShape);
+    bool SetAntiQuantType(const gert::StorageShape* antiQuantScaleShape);
+    void Convert2AscendCTiling(const CacheTilingData& tbeTiling, AscendC::tiling::TCubeTiling& matmulTiling);
+    void SetAscendCTiling(AscendC::tiling::TCubeTiling& matmulTiling);
+    MatrixTraverse GetIteratorOrder(const CacheTilingData& tbeTiling, int32_t singleCoreM, int32_t singleCoreN,
                                     int32_t singleCoreK) const;
-    void GetBaseMKNByTrans(matmul_tiling::MatmulApiTiling &mmTiling) const;
+    void GetBaseMKNByTrans(matmul_tiling::MatmulApiTiling& mmTiling) const;
     bool GetLoopOrder();
 
     // 判断A/B在L1是否开pingpong
@@ -129,8 +129,8 @@ protected:
     Mc2WeightQuantBatchMatmulInfo inputParams_;
     std::unique_ptr<Mc2WeightQuantBatchMatmulV2NzTilingData> tilingDataManager_;
     std::unique_ptr<Mc2WeightQuantBatchMatmulV2CompileInfo> compileInfoPtr_;
-    Mc2WeightQuantBatchMatmulV2NzTilingData *tilingData_ = nullptr;
-    const char *opName_;
+    Mc2WeightQuantBatchMatmulV2NzTilingData* tilingData_ = nullptr;
+    const char* opName_;
     bool InvokeCacheTiling();
     virtual bool GetTilingFromCache();
     void Reset();

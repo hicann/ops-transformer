@@ -27,17 +27,17 @@ MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 class MatMulPerBlockNonContiguous : public MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS> {
 public:
     __aicore__ inline MatMulPerBlockNonContiguous(){};
-    __aicore__ inline void Iterate(const uint64_t tmpScaleX1Offset, const uint32_t *batchWeight,
+    __aicore__ inline void Iterate(const uint64_t tmpScaleX1Offset, const uint32_t* batchWeight,
                                    const uint64_t strideCount, const bool offsetFlag);
-    __aicore__ inline void ProcessAivSingleK(const uint64_t tmpScaleMOffset, const uint32_t *batchWeight,
+    __aicore__ inline void ProcessAivSingleK(const uint64_t tmpScaleMOffset, const uint32_t* batchWeight,
                                              const uint64_t strideCount, const bool offsetFlag);
-    __aicore__ inline void UpdateUBOffsetC(const uint32_t *batchWeight, const uint64_t strideCount,
+    __aicore__ inline void UpdateUBOffsetC(const uint32_t* batchWeight, const uint64_t strideCount,
                                            const bool offsetFlag);
 };
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline void MatMulPerBlockNonContiguous<MATMUL_PERBLOCK_FUNC_PARAMS>::Iterate(const uint64_t tmpScaleMOffset,
-                                                                                         const uint32_t *batchWeight,
+                                                                                         const uint32_t* batchWeight,
                                                                                          const uint64_t strideCount,
                                                                                          const bool offsetFlag)
 {
@@ -55,7 +55,7 @@ __aicore__ inline void MatMulPerBlockNonContiguous<MATMUL_PERBLOCK_FUNC_PARAMS>:
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline void MatMulPerBlockNonContiguous<MATMUL_PERBLOCK_FUNC_PARAMS>::UpdateUBOffsetC(
-    const uint32_t *batchWeight, const uint64_t strideCount, const bool offsetFlag)
+    const uint32_t* batchWeight, const uint64_t strideCount, const bool offsetFlag)
 {
     if (offsetFlag) {
         uint32_t idx = static_cast<uint32_t>(this->block_->offset_.batchCOffset);
@@ -67,7 +67,7 @@ __aicore__ inline void MatMulPerBlockNonContiguous<MATMUL_PERBLOCK_FUNC_PARAMS>:
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline void MatMulPerBlockNonContiguous<MATMUL_PERBLOCK_FUNC_PARAMS>::ProcessAivSingleK(
-    const uint64_t tmpScaleMOffset, const uint32_t *batchWeight, const uint64_t strideCount, const bool offsetFlag)
+    const uint64_t tmpScaleMOffset, const uint32_t* batchWeight, const uint64_t strideCount, const bool offsetFlag)
 {
     this->block_->UpdatePerBlockUBParam();
     UpdateUBOffsetC(batchWeight, strideCount, offsetFlag);
@@ -89,11 +89,11 @@ __aicore__ inline void MatMulPerBlockNonContiguous<MATMUL_PERBLOCK_FUNC_PARAMS>:
         ptScaleType scaleX1 = 0;
         scaleType scaleX2 = 0;
         // Currently only supports aTrans being false. To support aTrans being true, 'scaleX1' must be recalculated.
-        scaleX1 = *((__gm__ ptScaleType *)(scaleX1AddrOff + sizeof(ptScaleType) * kOffset));
+        scaleX1 = *((__gm__ ptScaleType*)(scaleX1AddrOff + sizeof(ptScaleType) * kOffset));
         if constexpr (bTrans) {
-            scaleX2 = *((__gm__ scaleType *)(scaleX2AddrOff + sizeof(scaleType) * kOffset));
+            scaleX2 = *((__gm__ scaleType*)(scaleX2AddrOff + sizeof(scaleType) * kOffset));
         } else {
-            scaleX2 = *((__gm__ scaleType *)(scaleX2AddrOff + sizeof(scaleType) * kOffset * this->scaleN_));
+            scaleX2 = *((__gm__ scaleType*)(scaleX2AddrOff + sizeof(scaleType) * kOffset * this->scaleN_));
         }
         scaleType scaleMul = scaleX1 * scaleX2;
         AscendC::CrossCoreWaitFlag<AIC_SYNC_AIV_MODE, PIPE_V>(AIV_SYNC_AIC_FLAG + this->crossPingPongID_);
@@ -103,11 +103,11 @@ __aicore__ inline void MatMulPerBlockNonContiguous<MATMUL_PERBLOCK_FUNC_PARAMS>:
         AscendC::PipeBarrier<PIPE_V>();
         if (kb == 0) {
             MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::template AivPerTensor<true>(
-                (__ubuf__ l0cDtype *)mmAddUbAddr, (__ubuf__ l0cDtype *)mmUbInputAddr, scaleMul,
+                (__ubuf__ l0cDtype*)mmAddUbAddr, (__ubuf__ l0cDtype*)mmUbInputAddr, scaleMul,
                 this->block_->ubParams_.validM, this->block_->ubParams_.validN, this->block_->ubParams_.singleN);
         } else {
             MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::template AivPerTensor<false>(
-                (__ubuf__ l0cDtype *)mmAddUbAddr, (__ubuf__ l0cDtype *)mmUbInputAddr, scaleMul,
+                (__ubuf__ l0cDtype*)mmAddUbAddr, (__ubuf__ l0cDtype*)mmUbInputAddr, scaleMul,
                 this->block_->ubParams_.validM, this->block_->ubParams_.validN, this->block_->ubParams_.singleN);
         }
         AscendC::CrossCoreSetFlag<AIC_SYNC_AIV_MODE, PIPE_V>(AIC_SYNC_AIV_FLAG + this->crossPingPongID_);

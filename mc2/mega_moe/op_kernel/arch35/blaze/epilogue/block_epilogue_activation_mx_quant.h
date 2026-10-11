@@ -74,13 +74,13 @@ public:
 
     __aicore__ inline BlockEpilogueActivationMxQuant() {}
 
-    __aicore__ inline void Init(Params const &params);
-    __aicore__ inline void UpdateGlobalAddr(const BlockCoord &baseOffset);
-    __aicore__ inline void UpdateNextProblem(const ProblemShape &problemShape);
+    __aicore__ inline void Init(Params const& params);
+    __aicore__ inline void UpdateGlobalAddr(const BlockCoord& baseOffset);
+    __aicore__ inline void UpdateNextProblem(const ProblemShape& problemShape);
     __aicore__ inline auto GetTopkWeightTensor();
 
     // 计算并写回一个激活/量化 tile，不包含流水通知。
-    __aicore__ inline void operator()(const BlockShape &blockShape, const BlockCoord &blockCoord,
+    __aicore__ inline void operator()(const BlockShape& blockShape, const BlockCoord& blockCoord,
                                       uint16_t pingpongIdx = 0);
 
 private:
@@ -104,26 +104,26 @@ private:
     static constexpr uint32_t ubFirstOffset = ubLayout.firstInputOffsetBytes;
     static constexpr uint32_t ubInputElementCapacity = ubLayout.firstInputElementCapacity;
 
-    __aicore__ inline TileExecutionContext PrepareTileExecutionContext(const BlockShape &blockShape,
-                                                                       const BlockCoord &blockCoord,
+    __aicore__ inline TileExecutionContext PrepareTileExecutionContext(const BlockShape& blockShape,
+                                                                       const BlockCoord& blockCoord,
                                                                        uint16_t pingpongIdx);
 
     __aicore__ static inline void ConfigureGatedActivationTail(
-        Activation::GatedActivationTileContext<DataTypeIn> &context, uint16_t validColumnCount);
+        Activation::GatedActivationTileContext<DataTypeIn>& context, uint16_t validColumnCount);
 
     __aicore__ inline Activation::GatedActivationTileContext<DataTypeIn> BuildGatedActivationContext(
-        const TileExecutionContext &tileContext);
+        const TileExecutionContext& tileContext);
 
-    __aicore__ inline void RunGatedActivationTile(const TileExecutionContext &tileContext);
+    __aicore__ inline void RunGatedActivationTile(const TileExecutionContext& tileContext);
 
-    __aicore__ inline void RunMxQuantTile(const TileExecutionContext &tileContext);
+    __aicore__ inline void RunMxQuantTile(const TileExecutionContext& tileContext);
 
-    __aicore__ inline void StoreQuantTile(const TileExecutionContext &tileContext);
+    __aicore__ inline void StoreQuantTile(const TileExecutionContext& tileContext);
 
-    __aicore__ inline void StoreQuantOutput(AscendC::GlobalTensor<int8_t> &dst, AscendC::LocalTensor<int8_t> &src,
+    __aicore__ inline void StoreQuantOutput(AscendC::GlobalTensor<int8_t>& dst, AscendC::LocalTensor<int8_t>& src,
                                             uint64_t blockCount, uint64_t offset, uint64_t n, uint64_t singleN);
 
-    __aicore__ inline void StoreQuantScaleCompact(AscendC::GlobalTensor<int8_t> &dst, AscendC::LocalTensor<int8_t> &src,
+    __aicore__ inline void StoreQuantScaleCompact(AscendC::GlobalTensor<int8_t>& dst, AscendC::LocalTensor<int8_t>& src,
                                                   uint64_t blockCount, uint64_t offset, uint64_t scaleN,
                                                   uint64_t singleN);
 
@@ -155,7 +155,7 @@ private:
 };
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
-__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::Init(Params const &params)
+__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::Init(Params const& params)
 {
     if constexpr (g_coreType == AIC) {
         return;
@@ -187,17 +187,17 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::Init(P
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
-__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::UpdateGlobalAddr(const BlockCoord &baseOffset)
+__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::UpdateGlobalAddr(const BlockCoord& baseOffset)
 {
     if constexpr (g_coreType == AIV) {
-        quantOutputGlobal_.SetGlobalBuffer((__gm__ int8_t *)yGmAddr_ + Get<Y_IDX>(baseOffset));
-        quantScaleGlobal_.SetGlobalBuffer((__gm__ int8_t *)yScaleGmAddr_ + Get<Y_SCALE_IDX>(baseOffset));
+        quantOutputGlobal_.SetGlobalBuffer((__gm__ int8_t*)yGmAddr_ + Get<Y_IDX>(baseOffset));
+        quantScaleGlobal_.SetGlobalBuffer((__gm__ int8_t*)yScaleGmAddr_ + Get<Y_SCALE_IDX>(baseOffset));
     }
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::UpdateNextProblem(
-    const ProblemShape &problemShape)
+    const ProblemShape& problemShape)
 {
     intermediateHiddenSize_ = Get<N_VALUE>(problemShape);
     intermediateHiddenScaleElements_ =
@@ -213,8 +213,8 @@ __aicore__ inline auto BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::GetTop
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 __aicore__ inline typename BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::TileExecutionContext
-BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::PrepareTileExecutionContext(const BlockShape &blockShape,
-                                                                               const BlockCoord &blockCoord,
+BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::PrepareTileExecutionContext(const BlockShape& blockShape,
+                                                                               const BlockCoord& blockCoord,
                                                                                uint16_t pingpongIdx)
 {
     TileExecutionContext tileContext{};
@@ -230,9 +230,9 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::PrepareTileExecutionContext(c
     // Ping/pong bases use TileM * TileN capacity; gate/up separation uses this
     // activation tile's columnCount, so it follows the scheduler's compute width.
     tileContext.buffers = ResolveActivationMxQuantUbPointers<DataTypeIn, MAX_SINGLE_MN>(
-        (__ubuf__ DataTypeIn *)activationInputUb_.GetPhyAddr(), (__ubuf__ bfloat16_t *)gluRes_.GetPhyAddr(),
-        (__ubuf__ int8_t *)quantOutput_.GetPhyAddr(), (__ubuf__ uint16_t *)quantScaleOutput_.GetPhyAddr(),
-        (__ubuf__ uint16_t *)maxExp_.GetPhyAddr(), (__ubuf__ uint16_t *)inverseMxScale_.GetPhyAddr(),
+        (__ubuf__ DataTypeIn*)activationInputUb_.GetPhyAddr(), (__ubuf__ bfloat16_t*)gluRes_.GetPhyAddr(),
+        (__ubuf__ int8_t*)quantOutput_.GetPhyAddr(), (__ubuf__ uint16_t*)quantScaleOutput_.GetPhyAddr(),
+        (__ubuf__ uint16_t*)maxExp_.GetPhyAddr(), (__ubuf__ uint16_t*)inverseMxScale_.GetPhyAddr(),
         tileContext.geometry.columnCount, tileContext.pingpongIndex);
     return tileContext;
 }
@@ -240,7 +240,7 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::PrepareTileExecutionContext(c
 // 保留主循环、尾 Vector 计算和两段补零能力，兼容后续放宽列方向对齐约束。
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::ConfigureGatedActivationTail(
-    Activation::GatedActivationTileContext<DataTypeIn> &context, uint16_t validColumnCount)
+    Activation::GatedActivationTileContext<DataTypeIn>& context, uint16_t validColumnCount)
 {
     const uint32_t vectorLength = Activation::VECTOR_LENGTH_FP32;
     context.fullVectorLoopCount = validColumnCount / vectorLength;
@@ -279,9 +279,9 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::Config
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 __aicore__ inline Activation::GatedActivationTileContext<DataTypeIn>
-BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::BuildGatedActivationContext(const TileExecutionContext &tileContext)
+BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::BuildGatedActivationContext(const TileExecutionContext& tileContext)
 {
-    const UbPointers &ubPointers = tileContext.buffers;
+    const UbPointers& ubPointers = tileContext.buffers;
     const uint16_t validColumnCount = static_cast<uint16_t>(tileContext.geometry.columnCount);
     Activation::GatedActivationTileContext<DataTypeIn> gatedActivationContext{};
     gatedActivationContext.gate = ubPointers.firstInput;
@@ -294,7 +294,7 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::BuildGatedActivationContext(c
     gatedActivationContext.rowLoopCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
     ConfigureGatedActivationTail(gatedActivationContext, validColumnCount);
     if constexpr (TopkWeightsPrefetch) {
-        gatedActivationContext.topkWeights = (__ubuf__ float *)weightUb_.GetPhyAddr();
+        gatedActivationContext.topkWeights = (__ubuf__ float*)weightUb_.GetPhyAddr();
     } else {
         gatedActivationContext.topkWeights = nullptr;
     }
@@ -303,7 +303,7 @@ BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::BuildGatedActivationContext(c
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGatedActivationTile(
-    const TileExecutionContext &tileContext)
+    const TileExecutionContext& tileContext)
 {
     Activation::GatedActivationTileContext<DataTypeIn> gatedActivationContext =
         BuildGatedActivationContext(tileContext);
@@ -335,9 +335,9 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunGat
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunMxQuantTile(
-    const TileExecutionContext &tileContext)
+    const TileExecutionContext& tileContext)
 {
-    const UbPointers &ubPointers = tileContext.buffers;
+    const UbPointers& ubPointers = tileContext.buffers;
     const uint16_t validRowCount = static_cast<uint16_t>(tileContext.geometry.rowCount);
     const uint32_t outputRowStrideElements = tileContext.geometry.outputRowStrideElements;
     const uint32_t dataCount = validRowCount * outputRowStrideElements;
@@ -357,9 +357,9 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::RunMxQ
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQuantTile(
-    const TileExecutionContext &tileContext)
+    const TileExecutionContext& tileContext)
 {
-    const TileGeometry &tileGeometry = tileContext.geometry;
+    const TileGeometry& tileGeometry = tileContext.geometry;
     const uint32_t bufferOffset = tileContext.buffers.selectedInt8BufferOffsetElements;
     LocalTensor<int8_t> quantOutputTile = quantOutput_[bufferOffset];
     LocalTensor<int8_t> quantScaleTile = quantScaleOutput_[bufferOffset];
@@ -373,7 +373,7 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQ
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQuantOutput(
-    AscendC::GlobalTensor<int8_t> &dst, AscendC::LocalTensor<int8_t> &src, uint64_t blockCount, uint64_t offset,
+    AscendC::GlobalTensor<int8_t>& dst, AscendC::LocalTensor<int8_t>& src, uint64_t blockCount, uint64_t offset,
     uint64_t n, uint64_t singleN)
 {
     AscendC::DataCopyExtParams ub2GmParams{1, 0, 0, 0, 0};
@@ -395,7 +395,7 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQ
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
 __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQuantScaleCompact(
-    AscendC::GlobalTensor<int8_t> &dst, AscendC::LocalTensor<int8_t> &src, uint64_t blockCount, uint64_t offset,
+    AscendC::GlobalTensor<int8_t>& dst, AscendC::LocalTensor<int8_t>& src, uint64_t blockCount, uint64_t offset,
     uint64_t scaleN, uint64_t singleN)
 {
     AscendC::DataCopyExtParams ub2GmParams{0, 0, 0, 0, 0};
@@ -410,8 +410,8 @@ __aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::StoreQ
 }
 
 BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_TEMPLATE_PARAMS
-__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::operator()(const BlockShape &blockShape,
-                                                                                     const BlockCoord &blockCoord,
+__aicore__ inline void BLOCK_EPILOGUE_ACTIVATION_MX_QUANT_SPECIALIZATION::operator()(const BlockShape& blockShape,
+                                                                                     const BlockCoord& blockCoord,
                                                                                      uint16_t pingpongIdx)
 {
     if (Get<M_VALUE>(blockShape) == 0) {

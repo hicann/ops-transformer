@@ -64,7 +64,7 @@ public:
     __aicore__ inline QuantMatmulReduceScatterImpl() {}
     __aicore__ inline ~QuantMatmulReduceScatterImpl() {}
 
-    __aicore__ inline void operator()(Params &params)
+    __aicore__ inline void operator()(Params& params)
     {
         KernelImpl kernel;
         kernel(params.matmulKernelParams);
@@ -76,16 +76,16 @@ public:
     }
 
 private:
-    __aicore__ inline void ReduceAddInit(const Params &params);
+    __aicore__ inline void ReduceAddInit(const Params& params);
     __aicore__ inline void ReduceAddProcess();
     __aicore__ inline void WriteStatusToWin();
     __aicore__ inline void ReadStatus();
     __aicore__ inline void ReadRemoteDataAdd();
     __aicore__ inline void SplitToCore(const uint32_t curSendCnt, const uint32_t curUseAivNum, const uint32_t coreId,
-                                       uint32_t &startId, uint32_t &endId, uint32_t &sendNum);
+                                       uint32_t& startId, uint32_t& endId, uint32_t& sendNum);
 
 private:
-    __gm__ Apace::HcclOpParam *winContext_{nullptr};
+    __gm__ Apace::HcclOpParam* winContext_{nullptr};
     uint32_t rankId_{0};
     uint32_t coreVid_{0};
     uint32_t tpWorldSize_{0};
@@ -99,9 +99,9 @@ private:
 
 template <typename ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
 __aicore__ inline void QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue,
-                                                    BlockScheduler>::ReduceAddInit(const Params &params)
+                                                    BlockScheduler>::ReduceAddInit(const Params& params)
 {
-    winContext_ = (__gm__ Apace::HcclOpParam *)params.hcclContext;
+    winContext_ = (__gm__ Apace::HcclOpParam*)params.hcclContext;
     rankId_ = Apace::GetRankId(winContext_);
     coreVid_ = AscendC::GetBlockIdx();
     tpWorldSize_ = Apace::GetRankDim(winContext_);
@@ -125,8 +125,8 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
 template <typename ProblemShape, class BlockMmad, class BlockEpilogue, class BlockScheduler>
 __aicore__ inline void
 QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>::SplitToCore(
-    const uint32_t curSendCnt, const uint32_t curUseCoreNum, const uint32_t coreId, uint32_t &startId, uint32_t &endId,
-    uint32_t &sendNum)
+    const uint32_t curSendCnt, const uint32_t curUseCoreNum, const uint32_t coreId, uint32_t& startId, uint32_t& endId,
+    uint32_t& sendNum)
 {
     sendNum = curSendCnt / curUseCoreNum;
     uint32_t remainderNum = curSendCnt % curUseCoreNum;
@@ -154,10 +154,10 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
     auto layoutTensorC = asc::te::frame_layout_format<LayoutC, CType>{}(m_, n_);
     auto layoutTensorY = asc::te::frame_layout_format<LayoutC, CType>{}(tpRankM, n_);
     auto gmC = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(
-                                        (__gm__ CType *)Apace::GetBaseWindAddrByRankId(winContext_, rankId_)),
+                                        (__gm__ CType*)Apace::GetBaseWindAddrByRankId(winContext_, rankId_)),
                                     layoutTensorC);
     auto gmY =
-        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ bfloat16_t *)yGM_), layoutTensorY);
+        asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ bfloat16_t*)yGM_), layoutTensorY);
 
     uint64_t rowPaddedBytes =
         Blaze::Gemm::CeilDiv(static_cast<uint64_t>(n_ * sizeof(CType)), UB_ALIGN_BYTES) * UB_ALIGN_BYTES;
@@ -219,7 +219,7 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
     auto ubStatusTensor = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, float>(0), layoutStatus);
     auto gmStatusTensor = asc::te::make_tensor(
         asc::te::make_mem_ptr<asc::te::location::gm>(
-            (__gm__ float *)(Apace::GetBaseWindStateAddrByRankId(winContext_, coreVid_) + curOffset)),
+            (__gm__ float*)(Apace::GetBaseWindStateAddrByRankId(winContext_, coreVid_) + curOffset)),
         layoutStatus);
 
     ubStatusTensor[asc::te::make_coord(0, 0)] = (float)1;
@@ -246,7 +246,7 @@ QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockSchedu
         asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::ub, float>(ubResetOffset), layoutStatus);
     auto gmStatusTensor = asc::te::make_tensor(
         asc::te::make_mem_ptr<asc::te::location::gm>(
-            (__gm__ float *)(Apace::GetBaseWindStateAddrByRankId(winContext_, rankId_) + gmStatusoffset)),
+            (__gm__ float*)(Apace::GetBaseWindStateAddrByRankId(winContext_, rankId_) + gmStatusoffset)),
         layoutStatus);
 
     float flag = STATUS_FLAG_VAL;

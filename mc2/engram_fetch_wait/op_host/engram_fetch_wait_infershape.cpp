@@ -22,12 +22,12 @@ namespace ops {
 static constexpr size_t FETCH_WAIT_INPUT_FETCHED_INDEX = 1UL;
 static constexpr size_t FETCH_WAIT_OUTPUT_FETCHED_INDEX = 0UL;
 
-static ge::graphStatus InferShapeEngramFetchWait(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeEngramFetchWait(gert::InferShapeContext* context)
 {
     OPS_LOG_D(context->GetNodeName(), "Begin to do InferShapeEngramFetchWait.");
-    const gert::Shape *fetchedInputShape = context->GetInputShape(FETCH_WAIT_INPUT_FETCHED_INDEX);
+    const gert::Shape* fetchedInputShape = context->GetInputShape(FETCH_WAIT_INPUT_FETCHED_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, fetchedInputShape);
-    gert::Shape *fetchedOutputShape = context->GetOutputShape(FETCH_WAIT_OUTPUT_FETCHED_INDEX);
+    gert::Shape* fetchedOutputShape = context->GetOutputShape(FETCH_WAIT_OUTPUT_FETCHED_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, fetchedOutputShape);
 
     *fetchedOutputShape = *fetchedInputShape;
@@ -37,7 +37,7 @@ static ge::graphStatus InferShapeEngramFetchWait(gert::InferShapeContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeEngramFetchWait(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeEngramFetchWait(gert::InferDataTypeContext* context)
 {
     OPS_LOG_D(context->GetNodeName(), "Begin to do InferDataTypeEngramFetchWait.");
     auto fetchedDtype = context->GetInputDataType(FETCH_WAIT_INPUT_FETCHED_INDEX);

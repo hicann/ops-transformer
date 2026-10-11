@@ -55,7 +55,7 @@ bool EpTpSizeCheck(const int64_t epSize, const int64_t tpSize)
     return true;
 }
 
-bool DimNumCheck(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape)
+bool DimNumCheck(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape)
 {
     if ((xShape->GetDimNum() != SUPPORT_DIM_NUM) || (weightShape->GetDimNum() != SUPPORT_DIM_NUM)) {
         OPS_LOG_E(nodeName, "Dim of input x and weight must be the same with %zu dims, but got dim x %zu, dim w %zu.",
@@ -65,7 +65,7 @@ bool DimNumCheck(const char *nodeName, const gert::Shape *xShape, const gert::Sh
     return true;
 }
 
-bool GroupCheck(const char *nodeName, const char *groupEp, const char *groupTp)
+bool GroupCheck(const char* nodeName, const char* groupEp, const char* groupTp)
 {
     const size_t maxGroupNameLength = 128UL;
     if ((groupEp == nullptr) || (strnlen(groupEp, maxGroupNameLength) == 0)) {
@@ -85,8 +85,8 @@ bool GroupCheck(const char *nodeName, const char *groupEp, const char *groupTp)
     return true;
 }
 
-void DynamicShapeCheck(const gert::Shape *xShape, const gert::Shape *weightShape, const size_t wDim,
-                       OutShapeInfo &outShapeInfo)
+void DynamicShapeCheck(const gert::Shape* xShape, const gert::Shape* weightShape, const size_t wDim,
+                       OutShapeInfo& outShapeInfo)
 {
     if (xShape->GetDim(DIM_E) == -1) {
         outShapeInfo.e = -1;
@@ -100,8 +100,8 @@ void DynamicShapeCheck(const gert::Shape *xShape, const gert::Shape *weightShape
     return;
 }
 
-void EmptyShapeCheck(const gert::Shape *xShape, const gert::Shape *weightShape, const size_t wDim,
-                     OutShapeInfo &outShapeInfo)
+void EmptyShapeCheck(const gert::Shape* xShape, const gert::Shape* weightShape, const size_t wDim,
+                     OutShapeInfo& outShapeInfo)
 {
     if ((xShape->GetDim(DIM_E) == 0) || (weightShape->GetDim(DIM_E) == 0)) {
         outShapeInfo.e = 0;
@@ -115,7 +115,7 @@ void EmptyShapeCheck(const gert::Shape *xShape, const gert::Shape *weightShape, 
     return;
 }
 
-bool CheckBiasDtype(const char *nodeName, const ge::DataType xType, const ge::DataType biasType)
+bool CheckBiasDtype(const char* nodeName, const ge::DataType xType, const ge::DataType biasType)
 {
     if (std::find(BIAS_DTYPE_SUPPORT.begin(), BIAS_DTYPE_SUPPORT.end(), biasType) == BIAS_DTYPE_SUPPORT.end()) {
         OPS_LOG_E(nodeName, "input bias support dtype is fp16 fp32, but got %u", static_cast<uint32_t>(biasType));
@@ -138,7 +138,7 @@ bool CheckBiasDtype(const char *nodeName, const ge::DataType xType, const ge::Da
     return true;
 }
 
-bool CheckTensorDtype(const char *nodeName, const ge::DataType xType, const ge::DataType weightType,
+bool CheckTensorDtype(const char* nodeName, const ge::DataType xType, const ge::DataType weightType,
                       const ge::DataType biasType)
 {
     if (std::find(DTYPE_SUPPORT_LIST.begin(), DTYPE_SUPPORT_LIST.end(), xType) == DTYPE_SUPPORT_LIST.end()) {
@@ -166,7 +166,7 @@ bool CheckTensorDtype(const char *nodeName, const ge::DataType xType, const ge::
     return true;
 }
 
-void SetShape(gert::Shape *shape, const OutShapeInfo &outShapeInfo)
+void SetShape(gert::Shape* shape, const OutShapeInfo& outShapeInfo)
 {
     shape->SetDimNum(SUPPORT_DIM_NUM);
     shape->SetDim(0, outShapeInfo.e);
@@ -175,7 +175,7 @@ void SetShape(gert::Shape *shape, const OutShapeInfo &outShapeInfo)
     return;
 }
 
-void TransDimHMIdx(const bool isTransW, size_t &wDimH, size_t &wDimM)
+void TransDimHMIdx(const bool isTransW, size_t& wDimH, size_t& wDimM)
 {
     if (isTransW) {
         size_t tmp = wDimM;
@@ -185,7 +185,7 @@ void TransDimHMIdx(const bool isTransW, size_t &wDimH, size_t &wDimM)
     return;
 }
 
-void PrintTensorShape(const char *nodeName, const gert::Shape *shape, const char *shapeName)
+void PrintTensorShape(const char* nodeName, const gert::Shape* shape, const char* shapeName)
 {
     for (size_t i = 0; i < shape->GetDimNum(); i++) {
         OPS_LOG_D(nodeName, "%s %lu is %ld.", shapeName, i, shape->GetDim(i));

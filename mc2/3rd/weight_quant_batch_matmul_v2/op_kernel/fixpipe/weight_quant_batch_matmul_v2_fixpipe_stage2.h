@@ -32,9 +32,9 @@ template <bool hasBias>
 class Mc2WeightQuantBatchMatmulV2FixpipeStage2 {
 public:
     __aicore__ inline Mc2WeightQuantBatchMatmulV2FixpipeStage2(){};
-    __aicore__ inline void Init(const LocalTensor<half> &a16L0A, const LocalTensor<half> &w16L0B,
-                                const LocalTensor<float> &biasBT, const LocalTensor<float> &y32C01,
-                                const GlobalTensor<half> &yGm)
+    __aicore__ inline void Init(const LocalTensor<half>& a16L0A, const LocalTensor<half>& w16L0B,
+                                const LocalTensor<float>& biasBT, const LocalTensor<float>& y32C01,
+                                const GlobalTensor<half>& yGm)
     {
         // L0A DB
         a16L0A_ = a16L0A;
@@ -108,19 +108,19 @@ public:
         mmadParams_.k = kSize;
     }
 
-    __aicore__ inline void LoadA16InA2(const LocalTensor<half> &a16A1)
+    __aicore__ inline void LoadA16InA2(const LocalTensor<half>& a16A1)
     {
         for (uint64_t i = 0; i < mBaseFracBlk_; ++i) {
             LoadData(a16L0A_[i * kaFracStride_], a16A1[i * FRAC_SIZE_HALF], a16InA01Params_); // nz->zz
         }
     }
 
-    __aicore__ inline void LoadBias16InBT(const LocalTensor<half> &bias16L1)
+    __aicore__ inline void LoadBias16InBT(const LocalTensor<half>& bias16L1)
     {
         DataCopy(biasBT_, bias16L1, bias16InBTParams_);
     }
 
-    __aicore__ inline void LoadW16InB2Trans(const LocalTensor<half> &w16B1)
+    __aicore__ inline void LoadW16InB2Trans(const LocalTensor<half>& w16B1)
     {
         for (uint64_t i = 0; i < nProcessFracBlk_; ++i) {
             LoadData(w16L0B_[pingPongOffset_ + i * FRAC_SIZE_HALF], w16B1[i * kbFracStride_],
@@ -147,7 +147,7 @@ public:
         }
     }
 
-    __aicore__ inline void Process1(const LocalTensor<half> &w16B1)
+    __aicore__ inline void Process1(const LocalTensor<half>& w16B1)
     {
         pingPongOffset_ = (processCount_ & 1) ? pingpongSize_ : 0;
         LoadW16InB2Trans(w16B1);

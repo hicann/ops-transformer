@@ -34,12 +34,12 @@ const std::set<int64_t> SUPPORT_X_DTYPE_LIST{aclDataType::ACL_INT8,        aclDa
 // scales valid dtype
 const std::set<int64_t> SUPPORT_SCALES_DTYPE_LIST{aclDataType::ACL_FLOAT, aclDataType::ACL_FLOAT8_E8M0};
 
-inline TensorWrapper make_wrapper(const at::Tensor &tensor, aclDataType tensorAcltype)
+inline TensorWrapper make_wrapper(const at::Tensor& tensor, aclDataType tensorAcltype)
 {
     return {tensor, tensorAcltype};
 }
 
-at::Tensor NpuQuantAllReduce(const at::Tensor &context, const at::Tensor &x, const at::Tensor &scales,
+at::Tensor NpuQuantAllReduce(const at::Tensor& context, const at::Tensor& x, const at::Tensor& scales,
                              int64_t hcclBufferSize, int64_t worldSize, c10::optional<std::string> reduceOp,
                              c10::optional<int64_t> outputDtype, c10::optional<int64_t> xDtype,
                              c10::optional<int64_t> scalesDtype)
@@ -127,7 +127,7 @@ at::Tensor NpuQuantAllReduce(const at::Tensor &context, const at::Tensor &x, con
 
     // attr
     std::string reduceOpValueStr = std::string(reduceOp.value_or("sum"));
-    char *reduceOpPtr = const_cast<char *>(reduceOpValueStr.c_str());
+    char* reduceOpPtr = const_cast<char*>(reduceOpValueStr.c_str());
 
     // 自定义dtype，使用wrapper封装，相当于打一个标签，标记真实的属性，让aclnn接口识别到传入tensor具体的dtype
     aclDataType xAclDtype = xDtype.has_value() ? GetAclDataType(xDtype.value()) : ConvertToAclDataType(x.scalar_type());

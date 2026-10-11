@@ -66,9 +66,9 @@ enum HcclOperatorType {
 };
 
 struct HcomParam {
-    void *context;
-    void *aicpuStream;
-    void *aicpuNotify;
+    void* context;
+    void* aicpuStream;
+    void* aicpuNotify;
 };
 
 typedef struct tagAicpuRpcServerModeLaunchOpAPI {
@@ -99,7 +99,7 @@ typedef struct tagHcclCombinOpParam {
 
 typedef struct tagHcclAndAicpuResource {
     HcclCombinOpParam hccl_param = {0};
-    void *aicpu_win_addr = nullptr;
+    void* aicpu_win_addr = nullptr;
 } HcclAndAicpuResource;
 
 // all_to_all allgather/reducescatter bmm算子X type支持fp16和bf16

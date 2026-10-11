@@ -21,12 +21,12 @@
 namespace optiling {
 class Mc2WeightQuantBatchMatmulV2TilingSplitK : public Mc2WeightQuantBatchMatmulV2Tiling {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2TilingSplitK(gert::TilingContext *context)
+    explicit Mc2WeightQuantBatchMatmulV2TilingSplitK(gert::TilingContext* context)
         : Mc2WeightQuantBatchMatmulV2Tiling(context)
     {
         Reset();
     }
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();

@@ -42,17 +42,17 @@ public:
     __aicore__ inline FFNToAttention(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR sessionIds, GM_ADDR microBatchIds, GM_ADDR tokenIds,
                                 GM_ADDR expertOffsets, GM_ADDR actualTokenNum, GM_ADDR attnRankTable,
-                                GM_ADDR workspaceGM, TPipe *pipe, const FFNToAttentionTilingData *tilingData);
+                                GM_ADDR workspaceGM, TPipe* pipe, const FFNToAttentionTilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline uint32_t GetCoreSendTokenCount();
-    __aicore__ inline void SendTokenDataToWindow(uint32_t tokenCnt, GlobalTensor<xType> &tokenDataGMTensor,
-                                                 GlobalTensor<int32_t> &tokenInfoTableGMTensor,
-                                                 DataCopyExtParams &xCopyParams, DataCopyExtParams &dataCopyParams);
+    __aicore__ inline void SendTokenDataToWindow(uint32_t tokenCnt, GlobalTensor<xType>& tokenDataGMTensor,
+                                                 GlobalTensor<int32_t>& tokenInfoTableGMTensor,
+                                                 DataCopyExtParams& xCopyParams, DataCopyExtParams& dataCopyParams);
     __aicore__ inline GM_ADDR GetWindowAddr(uint32_t curAttenWorkRank);
-    __aicore__ inline void ReadTokenMetaData(ReadTokenMetaDataStruct &metaDataStruct, uint32_t YOffset);
-    TPipe *tpipe_{nullptr};
+    __aicore__ inline void ReadTokenMetaData(ReadTokenMetaDataStruct& metaDataStruct, uint32_t YOffset);
+    TPipe* tpipe_{nullptr};
     GlobalTensor<xType> xGMTensor_;
     GlobalTensor<int32_t> layerIdsGMTensor_;
     GlobalTensor<int32_t> sessionIdsGMTensor_;
@@ -84,19 +84,19 @@ private:
     uint64_t hSize_{0};
     uint64_t winTokenInfoTableSize_{0};
     uint8_t windowType_{0};
-    __gm__ HcclOpResParam *winContext_{nullptr};
+    __gm__ HcclOpResParam* winContext_{nullptr};
 };
 
 template <TemplateFFNToAttentionTypeClass>
 __aicore__ inline void FFNToAttention<TemplateFFNToAttentionTypeFunc>::Init(
     GM_ADDR x, GM_ADDR sessionIds, GM_ADDR microBatchIds, GM_ADDR tokenIds, GM_ADDR expertOffsets,
-    GM_ADDR actualTokenNum, GM_ADDR attnRankTable, GM_ADDR workspaceGM, TPipe *pipe,
-    const FFNToAttentionTilingData *tilingData)
+    GM_ADDR actualTokenNum, GM_ADDR attnRankTable, GM_ADDR workspaceGM, TPipe* pipe,
+    const FFNToAttentionTilingData* tilingData)
 {
     tpipe_ = pipe;
     aivId_ = GetBlockIdx();
     auto contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-    winContext_ = (__gm__ HcclOpResParam *)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
+    winContext_ = (__gm__ HcclOpResParam*)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
     axisBS_ = tilingData->ffnToAttentionInfo.BS;
     axisH_ = tilingData->ffnToAttentionInfo.H;
     axisHS_ = tilingData->ffnToAttentionInfo.HS;
@@ -107,14 +107,14 @@ __aicore__ inline void FFNToAttention<TemplateFFNToAttentionTypeFunc>::Init(
     worldSize_ = tilingData->ffnToAttentionInfo.worldSize;
     windowType_ = tilingData->ffnToAttentionInfo.windowType;
 
-    xGMTensor_.SetGlobalBuffer((__gm__ xType *)x);
-    sessionIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t *)sessionIds);
-    microBatchIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t *)microBatchIds);
-    tokenIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t *)tokenIds);
-    expertOffsetsGMTensor_.SetGlobalBuffer((__gm__ int32_t *)expertOffsets);
-    actualTokenNumGMTensor_.SetGlobalBuffer((__gm__ int64_t *)actualTokenNum);
+    xGMTensor_.SetGlobalBuffer((__gm__ xType*)x);
+    sessionIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t*)sessionIds);
+    microBatchIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t*)microBatchIds);
+    tokenIdsGMTensor_.SetGlobalBuffer((__gm__ int32_t*)tokenIds);
+    expertOffsetsGMTensor_.SetGlobalBuffer((__gm__ int32_t*)expertOffsets);
+    actualTokenNumGMTensor_.SetGlobalBuffer((__gm__ int64_t*)actualTokenNum);
     if constexpr (isInputRankTable) {
-        attnRankTableGMTensor_.SetGlobalBuffer((__gm__ int32_t *)(attnRankTable));
+        attnRankTableGMTensor_.SetGlobalBuffer((__gm__ int32_t*)(attnRankTable));
     }
 
     DataCacheCleanAndInvalid<int64_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(actualTokenNumGMTensor_);
@@ -137,16 +137,16 @@ __aicore__ inline GM_ADDR FFNToAttention<TemplateFFNToAttentionTypeFunc>::GetWin
 {
     // 当 userMemType 为 0 时，使用远程设备内存; 当 userMemType 不为 0 时，使用用户自定义内存
     if (winContext_->userMemType == 0) {
-        return (__gm__ uint8_t *)(((HcclRankRelationResV2 *)(winContext_->remoteRes[curAttenWorkRank].nextDevicePtr))
-                                      ->windowsIn);
+        return (__gm__ uint8_t*)(((HcclRankRelationResV2*)(winContext_->remoteRes[curAttenWorkRank].nextDevicePtr))
+                                     ->windowsIn);
     } else {
-        return (__gm__ uint8_t *)(winContext_->userMemRes[curAttenWorkRank].addr);
+        return (__gm__ uint8_t*)(winContext_->userMemRes[curAttenWorkRank].addr);
     }
 }
 
 template <TemplateFFNToAttentionTypeClass>
 __aicore__ inline void FFNToAttention<TemplateFFNToAttentionTypeFunc>::ReadTokenMetaData(
-    ReadTokenMetaDataStruct &metaDataStruct, uint32_t YOffset)
+    ReadTokenMetaDataStruct& metaDataStruct, uint32_t YOffset)
 {
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(
         sessionIdsGMTensor_[YOffset]);
@@ -192,8 +192,8 @@ __aicore__ inline uint32_t FFNToAttention<TemplateFFNToAttentionTypeFunc>::GetCo
 
 template <TemplateFFNToAttentionTypeClass>
 __aicore__ inline void FFNToAttention<TemplateFFNToAttentionTypeFunc>::SendTokenDataToWindow(
-    uint32_t tokenCnt, GlobalTensor<xType> &tokenDataGMTensor, GlobalTensor<int32_t> &tokenInfoTableGMTensor,
-    DataCopyExtParams &xCopyParams, DataCopyExtParams &dataCopyParams)
+    uint32_t tokenCnt, GlobalTensor<xType>& tokenDataGMTensor, GlobalTensor<int32_t>& tokenInfoTableGMTensor,
+    DataCopyExtParams& xCopyParams, DataCopyExtParams& dataCopyParams)
 {
     if (tokenCnt == 0) {
         SyncFunc<AscendC::HardEvent::S_MTE3>();
@@ -238,12 +238,12 @@ __aicore__ inline void FFNToAttention<TemplateFFNToAttentionTypeFunc>::Process()
                  metaDataStruct.curTokenBatchOffset * perExpertOffset_ + metaDataStruct.curTokenTopkOffset * axisHS_) *
                 sizeof(xType);
             tokenInfoTableGMTensor.SetGlobalBuffer(
-                (__gm__ int32_t *)(curRankWinAddr +
-                                   (tokenInfoTableOffset + metaDataStruct.curTokenBatchOffset * expertNumPerToken_ +
-                                    metaDataStruct.curTokenTopkOffset) *
-                                       sizeof(int32_t))); // win区分布，前面放info 后面放data
+                (__gm__ int32_t*)(curRankWinAddr +
+                                  (tokenInfoTableOffset + metaDataStruct.curTokenBatchOffset * expertNumPerToken_ +
+                                   metaDataStruct.curTokenTopkOffset) *
+                                      sizeof(int32_t))); // win区分布，前面放info 后面放data
             tokenDataGMTensor.SetGlobalBuffer(
-                (__gm__ xType *)(curRankWinAddr + winTokenInfoTableSize_ + tokenDataOffset));
+                (__gm__ xType*)(curRankWinAddr + winTokenInfoTableSize_ + tokenDataOffset));
 
             // 5. 复制数据到win区
             SendTokenDataToWindow(tokenCnt, tokenDataGMTensor, tokenInfoTableGMTensor, xCopyParams, dataCopyParams);

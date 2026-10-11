@@ -32,7 +32,7 @@ extern "C" __global__ __aicore__ void moe_distribute_dispatch_setup(GM_ADDR cont
 {
     REGISTER_TILING_DEFAULT(MoeDistributeDispatchSetupTilingData);
     TPipe pipe;
-    auto tiling = (__gm__ MoeDistributeDispatchSetupTilingData *)tilingGM;
+    auto tiling = (__gm__ MoeDistributeDispatchSetupTilingData*)tilingGM;
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
 #if (ORIG_DTYPE_Y == DT_BF16 || ORIG_DTYPE_Y == DT_FLOAT16)

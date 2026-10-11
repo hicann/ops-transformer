@@ -57,7 +57,7 @@ public:
     __aicore__ inline void InitTilingData();
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                                const Mc2WeightQuantBatchMatmulV2NzTilingData *tilingData, TPipe *tPipe);
+                                const Mc2WeightQuantBatchMatmulV2NzTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void CopyInBias(LocalTensor<xType> biasLocal, int64_t biasSrcOffset, int32_t biasDstOffset,
                                       int32_t biasLen);
     __aicore__ inline void CopyInAddMul(int64_t addOffset, int32_t realNLen, int64_t groupIdx);
@@ -102,8 +102,8 @@ public:
     using inputBiasType = MatmulType<TPosition::VECOUT, CubeFormat::ND, float>;
     MatmulImpl<inputXType, inputWType, outputYType, inputBiasType, CFG_MDL> mmObj_;
 
-    TPipe *pipe_;
-    const Mc2WeightQuantBatchMatmulV2NzTilingData *tiling_;
+    TPipe* pipe_;
+    const Mc2WeightQuantBatchMatmulV2NzTilingData* tiling_;
 
     bool biasFlag_ = false;
     bool isTailNBlock_;
@@ -260,17 +260,17 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
     biasGM_ = bias;
     yGM_ = y;
 
-    xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(x), tiling_->mSize * tiling_->kSize);
-    wGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ wType *>(weight), tiling_->kSize * tiling_->nSize);
-    yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType *>(y), tiling_->mSize * tiling_->nSize);
-    biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ biasType *>(bias), tiling_->nSize);
+    xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(x), tiling_->mSize * tiling_->kSize);
+    wGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ wType*>(weight), tiling_->kSize * tiling_->nSize);
+    yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType*>(y), tiling_->mSize * tiling_->nSize);
+    biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ biasType*>(bias), tiling_->nSize);
 
     groupNum_ = 1;
     if constexpr (antiQuantType == Mc2QuantType::PER_GROUP) {
         groupNum_ = CeilDiv(tiling_->kSize, tiling_->groupSize);
     }
-    mulGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(antiquantScale), groupNum_ * tiling_->nSize);
-    addGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(antiquantOffset), groupNum_ * tiling_->nSize);
+    mulGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(antiquantScale), groupNum_ * tiling_->nSize);
+    addGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(antiquantOffset), groupNum_ * tiling_->nSize);
 
     if constexpr (antiQuantType == Mc2QuantType::PER_TENSOR) {
         scaleValue_ = mulGlobal_.GetValue(0);
@@ -418,7 +418,7 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2WeightNzBasePerformanceKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType,
     hasAntiQuantOffset>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                               GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                              const Mc2WeightQuantBatchMatmulV2NzTilingData *tilingData, TPipe *tPipe)
+                              const Mc2WeightQuantBatchMatmulV2NzTilingData* tilingData, TPipe* tPipe)
 {
     tiling_ = tilingData;
     pipe_ = tPipe;

@@ -22,7 +22,7 @@
 namespace optiling {
 constexpr uint32_t ATTR_COMMMODE = 10;
 
-ge::graphStatus MatmulReduceScatterTilingV2Func(gert::TilingContext *context)
+ge::graphStatus MatmulReduceScatterTilingV2Func(gert::TilingContext* context)
 {
     OP_LOGI("MatmulReduceScatterTilingV2", "Start to do tiling in MatmulReduceScatterTilingV2Func A2/A3");
     auto attrs = context->GetAttrs();

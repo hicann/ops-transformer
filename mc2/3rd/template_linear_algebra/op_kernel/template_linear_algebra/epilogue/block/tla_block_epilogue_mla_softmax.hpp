@@ -58,7 +58,7 @@ public:
     static constexpr uint32_t HALF_LL_UB_SIZE = 256;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, half tor_, uint32_t kvSplitCoreNum_)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource, half tor_, uint32_t kvSplitCoreNum_)
     {
         // Allocate UB space
         constexpr uint32_t LS_UB_TENSOR_OFFSET = 0;
@@ -105,7 +105,7 @@ public:
     }
 
     CATLASS_DEVICE
-    void ReduceSumRepeatM(const AscendC::LocalTensor<float> &dst, const AscendC::LocalTensor<float> &src,
+    void ReduceSumRepeatM(const AscendC::LocalTensor<float>& dst, const AscendC::LocalTensor<float>& src,
                           uint32_t curRowNum, uint32_t kSeqTile, uint32_t kSeqTileRound)
     {
         if (kSeqTile <= FLOAT_VECTOR_SIZE) {
@@ -134,9 +134,9 @@ public:
     }
 
     CATLASS_DEVICE
-    void TensorSubValueRepeatM(const AscendC::LocalTensor<float> &dst, const AscendC::LocalTensor<float> &src,
-                               const AscendC::LocalTensor<float> &MaxTensor,
-                               const AscendC::LocalTensor<float> &tempMaxTensor, uint32_t curRowNum, uint32_t subMRound,
+    void TensorSubValueRepeatM(const AscendC::LocalTensor<float>& dst, const AscendC::LocalTensor<float>& src,
+                               const AscendC::LocalTensor<float>& MaxTensor,
+                               const AscendC::LocalTensor<float>& tempMaxTensor, uint32_t curRowNum, uint32_t subMRound,
                                uint32_t kSeqTile, uint32_t kSeqTileRound)
     {
         AscendC::Brcb(tempMaxTensor.ReinterpretCast<uint32_t>(), MaxTensor.ReinterpretCast<uint32_t>(),
@@ -161,8 +161,8 @@ public:
     }
 
     CATLASS_DEVICE
-    void ReduceMaxRepeatM(const AscendC::LocalTensor<float> &dst, const AscendC::LocalTensor<float> &src,
-                          const AscendC::LocalTensor<float> &tempTensor, uint32_t curRowNum, uint32_t kSeqTile,
+    void ReduceMaxRepeatM(const AscendC::LocalTensor<float>& dst, const AscendC::LocalTensor<float>& src,
+                          const AscendC::LocalTensor<float>& tempTensor, uint32_t curRowNum, uint32_t kSeqTile,
                           uint32_t kSeqTileRound)
     {
         if (kSeqTile <= FLOAT_VECTOR_SIZE) {
@@ -198,8 +198,8 @@ public:
 
     CATLASS_DEVICE
     void SubCoreCompute(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
-                        const LayoutOutput &layoutOutput, const LayoutInput &layoutInput, uint32_t nIdx,
-                        uint32_t softmaxPingPongFlag, uint32_t &glFlag)
+                        const LayoutOutput& layoutOutput, const LayoutInput& layoutInput, uint32_t nIdx,
+                        uint32_t softmaxPingPongFlag, uint32_t& glFlag)
     {
         uint32_t curRowNum = layoutInput.shape(0);
         uint32_t kSeqTile = layoutInput.shape(1);
@@ -306,8 +306,8 @@ public:
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
-                    const LayoutOutput &layoutOutput, const LayoutInput &layoutInput, GemmCoord actualBlockShape,
-                    uint32_t nIdx, uint32_t curHeadNum, uint32_t softmaxPingPongFlag, uint32_t &glFlag)
+                    const LayoutOutput& layoutOutput, const LayoutInput& layoutInput, GemmCoord actualBlockShape,
+                    uint32_t nIdx, uint32_t curHeadNum, uint32_t softmaxPingPongFlag, uint32_t& glFlag)
     {
         uint32_t rowActual = actualBlockShape.m();
         uint32_t nActual = actualBlockShape.n();

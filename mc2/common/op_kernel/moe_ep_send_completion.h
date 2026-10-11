@@ -17,7 +17,7 @@
 namespace MoeEpCompletion {
 using namespace AscendC;
 
-__aicore__ inline void DrainChannels(__gm__ Mc2Aclnn::MoeCommContext *context, uint32_t worldSize, TPipe *pipe)
+__aicore__ inline void DrainChannels(__gm__ Mc2Aclnn::MoeCommContext* context, uint32_t worldSize, TPipe* pipe)
 {
     PipeBarrier<PIPE_ALL>();
     pipe->Reset();
@@ -36,7 +36,7 @@ __aicore__ inline void DrainChannels(__gm__ Mc2Aclnn::MoeCommContext *context, u
         ASCENDC_ASSERT(ret == 0, { KERNEL_LOG(KERNEL_ERROR, "MoE send drain failed: %d", ret); });
     }
     GlobalTensor<uint32_t> contextTensor;
-    contextTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t *>(context));
+    contextTensor.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(context));
     DataCacheCleanAndInvalid<uint32_t, CacheLine::ENTIRE_DATA_CACHE, DcciDst::CACHELINE_OUT>(contextTensor);
 }
 

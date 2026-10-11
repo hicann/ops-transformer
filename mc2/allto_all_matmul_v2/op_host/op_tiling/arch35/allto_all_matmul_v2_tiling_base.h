@@ -32,7 +32,7 @@ using namespace Ops::Transformer::OpTiling;
 
 class AlltoAllMatmulV2TilingClass : public TilingBaseClass {
 public:
-    explicit AlltoAllMatmulV2TilingClass(gert::TilingContext *context)
+    explicit AlltoAllMatmulV2TilingClass(gert::TilingContext* context)
         : TilingBaseClass(context)
     {}
     ~AlltoAllMatmulV2TilingClass() override = default;
@@ -78,35 +78,35 @@ protected:
 
     ge::graphStatus CheckTensorAttrs();
 
-    bool CheckInputDescs(const char *opName);
+    bool CheckInputDescs(const char* opName);
 
-    bool CheckWorldSizeAttr(const char *opName);
+    bool CheckWorldSizeAttr(const char* opName);
 
-    bool CheckGroupAttr(const char *opName);
+    bool CheckGroupAttr(const char* opName);
 
-    bool CheckTensorFormats(const char *opName);
+    bool CheckTensorFormats(const char* opName);
 
-    bool CheckTensorDtypes(const char *opName);
+    bool CheckTensorDtypes(const char* opName);
 
-    bool CheckScaleDesc(const char *opName);
+    bool CheckScaleDesc(const char* opName);
 
-    bool CheckBiasDesc(const char *opName);
+    bool CheckBiasDesc(const char* opName);
 
-    bool CheckQuantAndYDtypeAttr(const char *opName);
+    bool CheckQuantAndYDtypeAttr(const char* opName);
 
-    bool CheckOtherAttrs(const char *opName);
+    bool CheckOtherAttrs(const char* opName);
 
-    bool CheckGroupSizeAttr(const char *opName);
+    bool CheckGroupSizeAttr(const char* opName);
 
     ge::graphStatus CheckTensorShapes();
 
-    bool CheckMatmulDimsAndBounds(const char *opName);
+    bool CheckMatmulDimsAndBounds(const char* opName);
 
-    bool CheckMatmulDivisibility(const char *opName);
+    bool CheckMatmulDivisibility(const char* opName);
 
-    bool CheckBiasShape(const char *opName);
+    bool CheckBiasShape(const char* opName);
 
-    bool CheckScaleShapes(const char *opName);
+    bool CheckScaleShapes(const char* opName);
 
     ge::graphStatus CheckOpInputInfo();
 

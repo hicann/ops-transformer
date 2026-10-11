@@ -29,7 +29,7 @@ struct AlltoAllMatmulApiUtParam {
     TensorDesc commScale;
     TensorDesc x1Offset;
     TensorDesc x2Offset;
-    aclIntArray *alltoAllAxes;
+    aclIntArray* alltoAllAxes;
     TensorDesc output;
     TensorDesc alltoAllOut;
     std::string group;
@@ -44,7 +44,7 @@ struct AlltoAllMatmulApiUtParam {
     op::SocVersion soc;
     aclnnStatus expectResult;
 
-    explicit AlltoAllMatmulApiUtParam(const csv_map &csvMap)
+    explicit AlltoAllMatmulApiUtParam(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->x1 = GetTensorACL(csvMap, "x1_shape", "x1_dtype", "x1_format");
@@ -73,7 +73,7 @@ struct AlltoAllMatmulApiUtParam {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AlltoAllMatmulApiUtParam &param)
+inline std::ostream& operator<<(std::ostream& os, const AlltoAllMatmulApiUtParam& param)
 {
     return os << param.case_name;
 }

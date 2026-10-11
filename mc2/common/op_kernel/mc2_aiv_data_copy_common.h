@@ -22,7 +22,7 @@ namespace Mc2AivDataCopy {
 using namespace AscendC;
 
 template <typename T>
-__attribute__((always_inline)) inline __aicore__ void CopyUbufToGm(__gm__ T *dst, LocalTensor<T> ubTensor,
+__attribute__((always_inline)) inline __aicore__ void CopyUbufToGm(__gm__ T* dst, LocalTensor<T> ubTensor,
                                                                    uint16_t nBurst, uint16_t lenBurst,
                                                                    uint16_t srcStride, uint16_t dstStride)
 {
@@ -37,7 +37,7 @@ __attribute__((always_inline)) inline __aicore__ void CopyUbufToGm(__gm__ T *dst
 }
 
 template <typename T>
-__attribute__((always_inline)) inline __aicore__ void CopyGmToUbuf(LocalTensor<T> ubTensor, __gm__ T *src,
+__attribute__((always_inline)) inline __aicore__ void CopyGmToUbuf(LocalTensor<T> ubTensor, __gm__ T* src,
                                                                    uint16_t nBurst, uint32_t lenBurst,
                                                                    uint16_t srcStride, uint16_t dstStride)
 {
@@ -52,7 +52,7 @@ __attribute__((always_inline)) inline __aicore__ void CopyGmToUbuf(LocalTensor<T
 }
 
 template <typename T>
-__attribute__((always_inline)) inline __aicore__ void CopyGmToUbufAlignB16(LocalTensor<T> ubTensor, __gm__ T *src,
+__attribute__((always_inline)) inline __aicore__ void CopyGmToUbufAlignB16(LocalTensor<T> ubTensor, __gm__ T* src,
                                                                            uint16_t nBurst, uint32_t lenBurst,
                                                                            uint16_t srcStride, uint16_t dstStride)
 {
@@ -68,7 +68,7 @@ __attribute__((always_inline)) inline __aicore__ void CopyGmToUbufAlignB16(Local
 }
 
 template <typename T>
-__attribute__((always_inline)) inline __aicore__ void CopyUbufToGmAlignB16(__gm__ T *dst, LocalTensor<T> ubTensor,
+__attribute__((always_inline)) inline __aicore__ void CopyUbufToGmAlignB16(__gm__ T* dst, LocalTensor<T> ubTensor,
                                                                            uint16_t nBurst, uint32_t lenBurst,
                                                                            uint16_t srcStride, uint16_t dstStride)
 {

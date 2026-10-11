@@ -23,11 +23,11 @@ namespace Mc2Kernel {
 template <typename ComputationContextType>
 struct MatmulAlltoAllPipelineContext {
     // computation
-    ComputationContextType *computationContext;
+    ComputationContextType* computationContext;
     // transpose
-    MC2KernelTemplate::MC2TransposeContext *transposeContext;
+    MC2KernelTemplate::MC2TransposeContext* transposeContext;
     // communication
-    MC2KernelTemplate::MC2AlltoAllContext *communicationContext;
+    MC2KernelTemplate::MC2AlltoAllContext* communicationContext;
 };
 
 // 计算转置通信模板
@@ -35,24 +35,24 @@ template <typename ComputationType, typename TransposeType, typename Communicati
           bool IsKCQuantMode = false>
 class MatmulAlltoAllPipeLine {
 public:
-    __aicore__ inline MatmulAlltoAllPipeLine(ComputationType *computeStage, TransposeType *transStage,
-                                             CommunicationType *commStage)
+    __aicore__ inline MatmulAlltoAllPipeLine(ComputationType* computeStage, TransposeType* transStage,
+                                             CommunicationType* commStage)
         : computeStage_(computeStage),
           transStage_(transStage),
           commStage_(commStage){};
 
     __aicore__ inline void Init();
 
-    __aicore__ inline void GetContext(ContextType *context);
+    __aicore__ inline void GetContext(ContextType* context);
 
     __aicore__ inline void Process(uint32_t taskCnt);
 
     __aicore__ inline void End();
 
 private:
-    ComputationType *computeStage_; // 矩阵乘的计算节点
-    TransposeType *transStage_;     // 转置计算的计算节点
-    CommunicationType *commStage_;  // 通信节点
+    ComputationType* computeStage_; // 矩阵乘的计算节点
+    TransposeType* transStage_;     // 转置计算的计算节点
+    CommunicationType* commStage_;  // 通信节点
     __aicore__ inline void ProcessKC(uint32_t taskCnt);
     __aicore__ inline void ProcessDefault(uint32_t taskCnt);
 };
@@ -69,7 +69,7 @@ MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, Contex
 template <typename ComputationType, typename TransposeType, typename CommunicationType, typename ContextType,
           bool IsKCQuantMode>
 __aicore__ inline void MatmulAlltoAllPipeLine<ComputationType, TransposeType, CommunicationType, ContextType,
-                                              IsKCQuantMode>::GetContext(ContextType *context)
+                                              IsKCQuantMode>::GetContext(ContextType* context)
 {
     context->computationContext = computeStage_->GetContextPtr();
     context->transposeContext = transStage_->GetContextPtr();

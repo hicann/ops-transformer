@@ -28,7 +28,7 @@ static const std::initializer_list<DataType> NPUARCH3510_CONVBP_DTYPE_SUPPORT_LI
     DataType::DT_FLOAT, DataType::DT_FLOAT16, DataType::DT_BF16, DataType::DT_HIFLOAT8, DataType::DT_FLOAT8_E4M3FN};
 } // namespace
 // 根据dtype进行初步拦截，后续需要再和cubemathtype + 芯片再进行一次拦截
-const std::initializer_list<DataType> &GetDtypeSupportListBySocVersion()
+const std::initializer_list<DataType>& GetDtypeSupportListBySocVersion()
 {
     auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
     if (npuArch == Ops::Base::DAV_3510) {
@@ -37,7 +37,7 @@ const std::initializer_list<DataType> &GetDtypeSupportListBySocVersion()
     return (IsCubeSupportFp32()) ? V200_DTYPE_SUPPORT_LIST : V100_DTYPE_SUPPORT_LIST;
 }
 
-const std::initializer_list<DataType> &GetDtypeSupportListBySocVersion4ConvBackward(bool transposed)
+const std::initializer_list<DataType>& GetDtypeSupportListBySocVersion4ConvBackward(bool transposed)
 {
     auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
     if (npuArch == Ops::Base::DAV_3510) {
@@ -60,7 +60,7 @@ static bool CheckSocSupportDtype(const op::DataType cubeTensorDtype, bool allowF
     return true;
 }
 
-bool CheckUnSupportDtype(const aclTensor *input, const aclTensor *weight)
+bool CheckUnSupportDtype(const aclTensor* input, const aclTensor* weight)
 {
     if ((input->GetDataType() == op::DataType::DT_HIFLOAT8) != (weight->GetDataType() == op::DataType::DT_HIFLOAT8)) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR, "Hif8 not in aclnn framework support dtype list");

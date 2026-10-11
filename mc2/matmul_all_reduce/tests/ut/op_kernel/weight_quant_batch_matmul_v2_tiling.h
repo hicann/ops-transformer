@@ -34,9 +34,9 @@
     InitTilingData<tiling_struct>(tiling_arg, &tiling_data);
 
 #define GET_TILING_DATA_MEMBER(tiling_type, member, var, tiling) \
-    auto typeVar##var = ((tiling_type *)0)->member; \
+    auto typeVar##var = ((tiling_type*)0)->member; \
     decltype(typeVar##var) var; \
-    size_t offset##var = (size_t)(&((tiling_type *)0)->member); \
+    size_t offset##var = (size_t)(&((tiling_type*)0)->member); \
     InitTilingData<decltype(typeVar##var)>(tiling + offset##var, &var);
 
 #endif

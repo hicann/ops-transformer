@@ -28,9 +28,9 @@ using namespace ge;
  * @param tilingData: 框架根据context的opName匹配tiling模板，计算产生的tilingData
  * @return
  */
-static void PrintTilingDataInfo(const gert::TilingContext *context, QuantAllReduceTilingData &tilingData)
+static void PrintTilingDataInfo(const gert::TilingContext* context, QuantAllReduceTilingData& tilingData)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGD(nodeName, "bs is %lu in quant_all_reduce.", tilingData.quantAllReduceTilingInfo.bs);
     OP_LOGD(nodeName, "hiddenSize is %u in quant_all_reduce.", tilingData.quantAllReduceTilingInfo.hiddenSize);
     OP_LOGD(nodeName, "scaleHiddenSize is %lu in quant_all_reduce.",
@@ -44,9 +44,9 @@ static void PrintTilingDataInfo(const gert::TilingContext *context, QuantAllRedu
  * @param tilingData: 框架根据context的opName匹配tiling模板，计算产生的tilingData
  * @return
  */
-static void SetTilingData(gert::TilingContext *context, QuantAllReduceTilingData &tilingData)
+static void SetTilingData(gert::TilingContext* context, QuantAllReduceTilingData& tilingData)
 {
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     platform_ascendc::PlatformAscendC ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     // set tilingData
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -68,7 +68,7 @@ static void SetTilingData(gert::TilingContext *context, QuantAllReduceTilingData
 }
 
 // 基于 TARGET_ITER 公式计算 host 推荐的 xPerBlock，写入 tilingData
-static void SetXPerBlock(QuantAllReduceTilingData &tilingData)
+static void SetXPerBlock(QuantAllReduceTilingData& tilingData)
 {
     constexpr uint32_t TARGET_ITER = 3U;  // T=3 命中 DoubleBuffer 甜点
     constexpr uint32_t MIN_BLOCK = 2048U; // 与 QRS MIN 统一，QAR per_core 够大不会被 MIN 主导
@@ -88,9 +88,9 @@ static void SetXPerBlock(QuantAllReduceTilingData &tilingData)
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @return
  */
-static void SetTilingKey(gert::TilingContext *context)
+static void SetTilingKey(gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     const uint64_t tilingKey = GET_TPL_TILING_KEY(MTE_ONE_SHOT);
     OP_LOGD(nodeName, "tilingKey is [%lu] in quant_all_reduce.", tilingKey);
     context->SetTilingKey(tilingKey);
@@ -101,15 +101,15 @@ static void SetTilingKey(gert::TilingContext *context)
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @return
  */
-static ge::graphStatus QuantAllReduceTilingFunc(gert::TilingContext *context)
+static ge::graphStatus QuantAllReduceTilingFunc(gert::TilingContext* context)
 {
     OP_TILING_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT("quant_all_reduce", "context"),
                     return ge::GRAPH_FAILED);
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_TILING_CHECK(nodeName == nullptr, OP_LOGE_WITH_INVALID_INPUT("quant_all_reduce", "nodeName"),
                     return ge::GRAPH_FAILED);
 
-    QuantAllReduceTilingData *tilingData = context->GetTilingData<QuantAllReduceTilingData>();
+    QuantAllReduceTilingData* tilingData = context->GetTilingData<QuantAllReduceTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
 
     TilingRunInfo runInfo = {};
@@ -130,7 +130,7 @@ static ge::graphStatus QuantAllReduceTilingFunc(gert::TilingContext *context)
 
 struct QuantAllReduceCompileInfo {};
 
-ge::graphStatus TilingParseForQuantAllReduce(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForQuantAllReduce(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

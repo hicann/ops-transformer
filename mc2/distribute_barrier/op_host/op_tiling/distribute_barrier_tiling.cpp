@@ -40,8 +40,8 @@ using namespace ge;
 using namespace Ops::Transformer::OpTiling;
 
 namespace optiling {
-const char *A_INNER_DEBUG_BARRIER = "DistributeBarrier Tiling Debug";
-static void PrintTilingDataInfo(DistributeBarrierTilingData &tilingData)
+const char* A_INNER_DEBUG_BARRIER = "DistributeBarrier Tiling Debug";
+static void PrintTilingDataInfo(DistributeBarrierTilingData& tilingData)
 {
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "worldSize is %u.", tilingData.distributeBarrierInfo.worldSize);
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "rankId is %u.", tilingData.distributeBarrierInfo.rankId);
@@ -50,10 +50,10 @@ static void PrintTilingDataInfo(DistributeBarrierTilingData &tilingData)
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "isInputTimeOut is %u.", tilingData.distributeBarrierInfo.isInputTimeOut);
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "isInputElasticInfo is %u.", tilingData.distributeBarrierInfo.isInputElasticInfo);
 }
-static bool CheckTimeOut(const gert::TilingContext *context, const DistributeBarrierConfig &config)
+static bool CheckTimeOut(const gert::TilingContext* context, const DistributeBarrierConfig& config)
 {
-    const char *nodeName = context->GetNodeName();
-    const gert::StorageShape *timeOutStorageShape = context->GetOptionalInputShape(config.timeOutIndex);
+    const char* nodeName = context->GetNodeName();
+    const gert::StorageShape* timeOutStorageShape = context->GetOptionalInputShape(config.timeOutIndex);
     OP_TILING_CHECK(timeOutStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(
                         nodeName, "timeOut",
@@ -79,11 +79,11 @@ static bool CheckTimeOut(const gert::TilingContext *context, const DistributeBar
                     return false);
     return true;
 }
-static bool CheckElasticInfo(const gert::TilingContext *context, const uint32_t worldsize,
-                             const DistributeBarrierConfig &config)
+static bool CheckElasticInfo(const gert::TilingContext* context, const uint32_t worldsize,
+                             const DistributeBarrierConfig& config)
 {
-    const char *nodeName = context->GetNodeName();
-    const gert::StorageShape *elasticInfoStorageShape = context->GetOptionalInputShape(config.elasticInfoIndex);
+    const char* nodeName = context->GetNodeName();
+    const gert::StorageShape* elasticInfoStorageShape = context->GetOptionalInputShape(config.elasticInfoIndex);
     OP_TILING_CHECK(elasticInfoStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(
                         nodeName, "elasticInfo",
@@ -112,9 +112,9 @@ static bool CheckElasticInfo(const gert::TilingContext *context, const uint32_t 
         return false);
     return true;
 }
-static bool CheckAndSetAttrs(const gert::TilingContext *context, DistributeBarrierTilingData &tilingData,
-                             std::string &group, bool isInputTimeOut, bool isInputElasticInfo,
-                             const DistributeBarrierConfig &config)
+static bool CheckAndSetAttrs(const gert::TilingContext* context, DistributeBarrierTilingData& tilingData,
+                             std::string& group, bool isInputTimeOut, bool isInputElasticInfo,
+                             const DistributeBarrierConfig& config)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OPS_LOG_E(A_INNER_DEBUG_BARRIER, "GetAttrs returned nullptr!"), return false);
@@ -157,17 +157,17 @@ static bool CheckAndSetAttrs(const gert::TilingContext *context, DistributeBarri
     return true;
 }
 
-static ge::graphStatus SetWorkSpace(gert::TilingContext *context)
+static ge::graphStatus SetWorkSpace(gert::TilingContext* context)
 {
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OPS_LOG_E(A_INNER_DEBUG_BARRIER, "workSpaces is nullptr."),
                     return ge::GRAPH_FAILED);
     workSpaces[0] = SYSTEM_NEED_WORKSPACE;
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetHcommCfg([[maybe_unused]] const gert::TilingContext *context,
-                                   DistributeBarrierTilingData *tiling, const std::string group)
+static ge::graphStatus SetHcommCfg([[maybe_unused]] const gert::TilingContext* context,
+                                   DistributeBarrierTilingData* tiling, const std::string group)
 {
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "distributeBarrier group = %s", group.c_str());
     uint32_t opType1 = OP_TYPE_ALL_TO_ALL;
@@ -184,7 +184,7 @@ static ge::graphStatus SetHcommCfg([[maybe_unused]] const gert::TilingContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-static void DistributeBarrierConfigIndexSet(DistributeBarrierConfig &config)
+static void DistributeBarrierConfigIndexSet(DistributeBarrierConfig& config)
 {
     config.xRefIndex = INPUT_X_INDEX;     // 根据disributeBarrierExtend算子原型标志位初始化xRef索引
     config.timeOutIndex = TIME_OUT_INDEX; // 根据disributeBarrierExtend算子原型标志位初始化timeOut索引
@@ -197,10 +197,10 @@ static void DistributeBarrierConfigIndexSet(DistributeBarrierConfig &config)
     return;
 }
 
-static ge::graphStatus CheckMc2Context(const gert::TilingContext *context, const char *nodeName,
-                                       const DistributeBarrierConfig &config)
+static ge::graphStatus CheckMc2Context(const gert::TilingContext* context, const char* nodeName,
+                                       const DistributeBarrierConfig& config)
 {
-    const gert::StorageShape *contextStorageShape = context->GetInputShape(config.contextIndex);
+    const gert::StorageShape* contextStorageShape = context->GetInputShape(config.contextIndex);
     OP_TILING_CHECK(contextStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "contextShape"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(contextStorageShape->GetStorageShape().GetDimNum() != ONE_DIM,
@@ -230,17 +230,17 @@ static ge::graphStatus CheckMc2Context(const gert::TilingContext *context, const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DistributeBarrierExtendTilingFuncNew(gert::TilingContext *context,
-                                                     const DistributeBarrierConfig &config)
+ge::graphStatus DistributeBarrierExtendTilingFuncNew(gert::TilingContext* context,
+                                                     const DistributeBarrierConfig& config)
 {
-    const char *nodeName = context->GetNodeName();
-    DistributeBarrierTilingData *tilingData = context->GetTilingData<DistributeBarrierTilingData>();
+    const char* nodeName = context->GetNodeName();
+    DistributeBarrierTilingData* tilingData = context->GetTilingData<DistributeBarrierTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OPS_LOG_E(nodeName, "tilingData is nullptr."), return ge::GRAPH_FAILED);
     std::string group = "";
     bool isInputTimeOut = false;
     bool isInputElasticInfo = false;
-    const gert::StorageShape *timeOutStorageShape = context->GetOptionalInputShape(config.timeOutIndex);
-    const gert::StorageShape *elasticInfoStorageShape = context->GetOptionalInputShape(config.elasticInfoIndex);
+    const gert::StorageShape* timeOutStorageShape = context->GetOptionalInputShape(config.timeOutIndex);
+    const gert::StorageShape* elasticInfoStorageShape = context->GetOptionalInputShape(config.elasticInfoIndex);
     isInputTimeOut = (timeOutStorageShape != nullptr);
     isInputElasticInfo = (elasticInfoStorageShape != nullptr);
     tilingData->distributeBarrierInfo.isInputTimeOut = isInputTimeOut;
@@ -284,7 +284,7 @@ ge::graphStatus DistributeBarrierExtendTilingFuncNew(gert::TilingContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DistributeBarrierTilingFunc(gert::TilingContext *context)
+ge::graphStatus DistributeBarrierTilingFunc(gert::TilingContext* context)
 {
     DistributeBarrierConfig config;
     DistributeBarrierConfigIndexSet(config);
@@ -293,9 +293,9 @@ ge::graphStatus DistributeBarrierTilingFunc(gert::TilingContext *context)
 }
 
 struct DistributeBarrierCompileInfo {};
-ge::graphStatus TilingParseForDistributeBarrier(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForDistributeBarrier(gert::TilingParseContext* context)
 {
-    const gert::TilingParseContext *const_context = context;
+    const gert::TilingParseContext* const_context = context;
     // 避免未使用变量警告
     (void)const_context;
     (void)context;

@@ -35,16 +35,16 @@ using AscendC::TPosition;
 namespace Mc2WeightQuantBatchMatmulV2::Arch35 {
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 class WeightQuantMatmulBasicBlock {
 public:
     __aicore__ inline WeightQuantMatmulBasicBlock(){};
-    __aicore__ inline void Init(uint64_t aPreloadSize, const TCubeTiling *__restrict matmulTiling, TPipe *tPipe);
-    __aicore__ inline void UpdateGlobalAddr(__gm__ xType *x, __gm__ wType *weight,
-                                            __gm__ antiQuantScaleType *antiquantScale, __gm__ xType *antiquantOffset,
-                                            __gm__ uint64_t *quantScale, __gm__ biasType *bias, __gm__ yType *y,
+    __aicore__ inline void Init(uint64_t aPreloadSize, const TCubeTiling* __restrict matmulTiling, TPipe* tPipe);
+    __aicore__ inline void UpdateGlobalAddr(__gm__ xType* x, __gm__ wType* weight,
+                                            __gm__ antiQuantScaleType* antiquantScale, __gm__ xType* antiquantOffset,
+                                            __gm__ uint64_t* quantScale, __gm__ biasType* bias, __gm__ yType* y,
                                             const bool hasBias, const bool weightL2Cacheable);
-    __aicore__ inline void ComputeBasicBlock(const BasicBlockOffsetParam &offsetParam);
+    __aicore__ inline void ComputeBasicBlock(const BasicBlockOffsetParam& offsetParam);
     __aicore__ inline void End();
 
 protected:
@@ -52,9 +52,9 @@ protected:
     __aicore__ inline void WaitAivToAic();
     __aicore__ inline void SetAicToAiv();
     __aicore__ inline void WaitAicToAiv();
-    __aicore__ inline void ComputeBasicBlockAivNdNkNzKn(const BasicBlockOffsetParam &offsetParam);
-    __aicore__ inline void ComputeBasicBlockAivNdKn(const BasicBlockOffsetParam &offsetParam);
-    __aicore__ inline void ComputeBasicBlockAic(const BasicBlockOffsetParam &offsetParam);
+    __aicore__ inline void ComputeBasicBlockAivNdNkNzKn(const BasicBlockOffsetParam& offsetParam);
+    __aicore__ inline void ComputeBasicBlockAivNdKn(const BasicBlockOffsetParam& offsetParam);
+    __aicore__ inline void ComputeBasicBlockAic(const BasicBlockOffsetParam& offsetParam);
 
     BasicBlockLibVectorAntiQuantCompute<xType, wType, antiQuantScaleType, yType, wqmmConfig, vecConfig> vectorCompute_;
     using MMImpl = MatmulImpl<MatmulL1GmType<TPosition::TSCM, CubeFormat::NZ, xType, wqmmConfig.aTrans>,
@@ -70,11 +70,11 @@ protected:
 };
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig,
                                                    vecConfig>::Init(uint64_t aPreloadSize,
-                                                                    const TCubeTiling *__restrict matmulTiling,
-                                                                    TPipe *tPipe)
+                                                                    const TCubeTiling* __restrict matmulTiling,
+                                                                    TPipe* tPipe)
 {
     TBuf<TPosition::TSCM> l1Tbuf;
     uint64_t weightL1Space = matmulTiling->baseN * matmulTiling->stepKb * matmulTiling->baseK; // weight单块大小
@@ -94,11 +94,11 @@ __aicore__ inline void WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleT
 }
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>::UpdateGlobalAddr(
-    __gm__ xType *x, __gm__ wType *weight, __gm__ antiQuantScaleType *antiquantScale, __gm__ xType *antiquantOffset,
-    __gm__ uint64_t *quantScale, __gm__ biasType *bias, __gm__ yType *y, const bool hasBias,
+    __gm__ xType* x, __gm__ wType* weight, __gm__ antiQuantScaleType* antiquantScale, __gm__ xType* antiquantOffset,
+    __gm__ uint64_t* quantScale, __gm__ biasType* bias, __gm__ yType* y, const bool hasBias,
     const bool weightL2Cacheable)
 {
     if ASCEND_IS_AIC {
@@ -115,10 +115,10 @@ WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, w
  * NZ TransB = False 两个vec核的mte2搬运量为 (CeilDiv(curVecCoreMte2RealN,16), CeilDiv(curVecCoreMte2RealK,16), 16 ,16)
  */
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig,
-                            vecConfig>::ComputeBasicBlockAivNdNkNzKn(const BasicBlockOffsetParam &offsetParam)
+                            vecConfig>::ComputeBasicBlockAivNdNkNzKn(const BasicBlockOffsetParam& offsetParam)
 {
     UbConsumeConfig ubConsumeConfig;
     L1ConsumeConfig l1ConsumeConfig;
@@ -173,10 +173,10 @@ WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, w
  * ND TransB = False 两个vec核的mte2搬运量为 (curVecCoreMte2RealK, curVecCoreMte2RealN)
  */
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig,
-                            vecConfig>::ComputeBasicBlockAivNdKn(const BasicBlockOffsetParam &offsetParam)
+                            vecConfig>::ComputeBasicBlockAivNdKn(const BasicBlockOffsetParam& offsetParam)
 {
 // nd-kn场景下，搬运消费比为1:1
 #if defined(__DAV_310R6__)
@@ -223,10 +223,10 @@ WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, w
 }
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig,
-                            vecConfig>::ComputeBasicBlockAic(const BasicBlockOffsetParam &offsetParam)
+                            vecConfig>::ComputeBasicBlockAic(const BasicBlockOffsetParam& offsetParam)
 {
     // 当前方案下，不会出现N方向计算量小于载入量的情况，所以没有N的循环
     for (uint64_t kbL1Offset = 0; kbL1Offset < offsetParam.kSize; kbL1Offset += offsetParam.kbL1Size, cvLoopIdx_++) {
@@ -247,10 +247,10 @@ WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, w
 }
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig,
-                            vecConfig>::ComputeBasicBlock(const BasicBlockOffsetParam &offsetParam)
+                            vecConfig>::ComputeBasicBlock(const BasicBlockOffsetParam& offsetParam)
 {
     if ASCEND_IS_AIV {
         if constexpr (wqmmConfig.weightFormat != CubeFormat::NZ && !wqmmConfig.bTrans) {
@@ -264,7 +264,7 @@ WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, w
 }
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>::End()
 {
@@ -282,7 +282,7 @@ WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, w
 }
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>::SetAivToAic()
 {
@@ -292,7 +292,7 @@ WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, w
 }
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>::WaitAivToAic()
 {
@@ -305,7 +305,7 @@ WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, w
 }
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>::SetAicToAiv()
 {
@@ -318,7 +318,7 @@ WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, w
 }
 
 template <typename xType, typename wType, typename antiQuantScaleType, typename biasType, typename yType,
-          const WqmmConfig &wqmmConfig, const VecAntiQuantConfig &vecConfig>
+          const WqmmConfig& wqmmConfig, const VecAntiQuantConfig& vecConfig>
 __aicore__ inline void
 WeightQuantMatmulBasicBlock<xType, wType, antiQuantScaleType, biasType, yType, wqmmConfig, vecConfig>::WaitAicToAiv()
 {

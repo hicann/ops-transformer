@@ -27,7 +27,7 @@
 namespace optiling {
 namespace mc2_matmul_v3_advanced {
 
-inline ge::graphStatus InitCompileInfo(fe::PlatFormInfos *platformInfo, Mc2MatmulV3CompileInfo *compileInfoPtr)
+inline ge::graphStatus InitCompileInfo(fe::PlatFormInfos* platformInfo, Mc2MatmulV3CompileInfo* compileInfoPtr)
 {
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE_WITH_INVALID_INPUT("Mc2MatMul", "platformInfo"),
                     return ge::GRAPH_FAILED);
@@ -62,10 +62,10 @@ inline ge::graphStatus InitCompileInfo(fe::PlatFormInfos *platformInfo, Mc2Matmu
     return ge::GRAPH_SUCCESS;
 }
 
-inline ge::graphStatus InitCompileInfo(gert::TilingParseContext *context)
+inline ge::graphStatus InitCompileInfo(gert::TilingParseContext* context)
 {
     OP_TILING_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT("Mc2MatMul", "context"), return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     auto compileInfoPtr = context->GetCompiledInfo<Mc2MatmulV3CompileInfo>();
     return InitCompileInfo(platformInfo, compileInfoPtr);
 }

@@ -37,10 +37,10 @@ ge::graphStatus Mc2BatchMatMulV3Tiling::DoTiling()
     OP_TILING_CHECK((GetBatchInfo(*context_, args_, tempBatchInfo) != ge::GRAPH_SUCCESS),
                     OP_LOGE(args_.opName, "GetBatchInfo failed."), return ge::GRAPH_FAILED);
     args_.batchInfo = &tempBatchInfo;
-    Mc2MatMulTilingCfg tilingCfg(false, context_->GetCompileInfo(), static_cast<void *>(&args_));
+    Mc2MatMulTilingCfg tilingCfg(false, context_->GetCompileInfo(), static_cast<void*>(&args_));
     OPS_CHECK_NULL_WITH_CONTEXT(context_, tilingCfg.compileInfo);
     platform_ascendc::SocVersion socVersion =
-        static_cast<const Mc2MatmulV3CompileInfo *>(tilingCfg.compileInfo)->socVersion;
+        static_cast<const Mc2MatmulV3CompileInfo*>(tilingCfg.compileInfo)->socVersion;
     auto platformInfo = context_->GetPlatformInfo();
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     NpuArch npuArch = ascendcPlatform.GetCurNpuArch();
@@ -48,8 +48,8 @@ ge::graphStatus Mc2BatchMatMulV3Tiling::DoTiling()
     return Mc2MMTilingRegistry::GetInstance().DoTilingImpl(context_, tilingCfg, registerCfg);
 }
 
-ge::graphStatus Mc2BatchMatMulV3Tiling::GetBmmBiasInfo(const gert::TilingContext &context, Mc2MatMulV3Args &args,
-                                                       Mc2MatMulV3BatchInfo &batchInfo)
+ge::graphStatus Mc2BatchMatMulV3Tiling::GetBmmBiasInfo(const gert::TilingContext& context, Mc2MatMulV3Args& args,
+                                                       Mc2MatMulV3BatchInfo& batchInfo)
 {
     if (!args_.hasBias) {
         return ge::GRAPH_SUCCESS;
@@ -101,8 +101,8 @@ ge::graphStatus Mc2BatchMatMulV3Tiling::GetBmmBiasInfo(const gert::TilingContext
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus Mc2BatchMatMulV3Tiling::GetBatchInfo(const gert::TilingContext &context, Mc2MatMulV3Args &args,
-                                                     Mc2MatMulV3BatchInfo &batchInfo)
+ge::graphStatus Mc2BatchMatMulV3Tiling::GetBatchInfo(const gert::TilingContext& context, Mc2MatMulV3Args& args,
+                                                     Mc2MatMulV3BatchInfo& batchInfo)
 {
     auto aShape = context.GetInputShape(0)->GetOriginShape();
     auto bShape = context.GetInputShape(1)->GetOriginShape();
@@ -163,7 +163,7 @@ ge::graphStatus Mc2BatchMatMulV3Tiling::GetBatchInfo(const gert::TilingContext &
     return ge::GRAPH_SUCCESS;
 }
 
-void Mc2BatchMatMulV3Tiling::MergeBatchAndMAxis(Mc2MatMulV3Args &args, Mc2MatMulV3BatchInfo &batchInfo)
+void Mc2BatchMatMulV3Tiling::MergeBatchAndMAxis(Mc2MatMulV3Args& args, Mc2MatMulV3BatchInfo& batchInfo)
 {
     if (batchInfo.batchB != 1UL || args.isATrans) {
         return;

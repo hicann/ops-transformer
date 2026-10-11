@@ -46,9 +46,9 @@ extern "C" {
  */
 ACL_DEPRECATED_MESSAGE("aclnnGroupedMatMulAllReduceGetWorkspaceSize will be deprecated")
 ACLNN_API aclnnStatus aclnnGroupedMatMulAllReduceGetWorkspaceSize(
-    const aclTensorList *x, const aclTensorList *weight, const aclTensorList *bias,
-    const aclIntArray *groupListOptional, int64_t splitItem, const char *group, const char *reduceOp, int64_t commTurn,
-    int64_t streamMode, const aclTensorList *y, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensorList* x, const aclTensorList* weight, const aclTensorList* bias,
+    const aclIntArray* groupListOptional, int64_t splitItem, const char* group, const char* reduceOp, int64_t commTurn,
+    int64_t streamMode, const aclTensorList* y, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnGroupedMatMulAllReduce的第二段接口，用于执行计算。
@@ -59,7 +59,7 @@ ACLNN_API aclnnStatus aclnnGroupedMatMulAllReduceGetWorkspaceSize(
  * @return aclnnStatus: 返回状态码。
  */
 ACL_DEPRECATED_MESSAGE("aclnnGroupedMatMulAllReduce will be deprecated")
-ACLNN_API aclnnStatus aclnnGroupedMatMulAllReduce(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnGroupedMatMulAllReduce(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                   aclrtStream stream);
 
 #ifdef __cplusplus

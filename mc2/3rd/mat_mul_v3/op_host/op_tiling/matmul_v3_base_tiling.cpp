@@ -110,7 +110,7 @@ inline uint64_t CalBaseSize(uint64_t cnt, uint64_t totalCoreNum, uint64_t size, 
 namespace optiling {
 namespace mc2_matmul_v3 {
 using ge::float32_t;
-bool Mc2MatmulV3BaseTiling::CheckAoeTilingEnable(uint32_t aoeTilingEnable, const std::string &opName)
+bool Mc2MatmulV3BaseTiling::CheckAoeTilingEnable(uint32_t aoeTilingEnable, const std::string& opName)
 {
     if (aoeTilingEnable <= 1U) {
         return true;
@@ -144,7 +144,7 @@ bool Mc2MatmulV3BaseTiling::CheckAoeTilingEnable(uint32_t aoeTilingEnable, const
 ge::graphStatus Mc2MatmulV3BaseTiling::GetPlatformInfo() // 检查平台信息是否支持
 {
     if (!compileInfoInit_) {
-        auto compileInfoPtr = reinterpret_cast<const Mc2MatmulV3CompileInfo *>(context_->GetCompileInfo());
+        auto compileInfoPtr = reinterpret_cast<const Mc2MatmulV3CompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_NULL_WITH_CONTEXT(context_, compileInfoPtr);
         compileInfo_ = *compileInfoPtr;
     }
@@ -230,7 +230,7 @@ ge::graphStatus Mc2MatmulV3BaseTiling::CheckArgs()
     return ge::GRAPH_SUCCESS;
 }
 
-static inline void GetFormat(const gert::TilingContext &context, Mc2MatmulV3Args &args)
+static inline void GetFormat(const gert::TilingContext& context, Mc2MatmulV3Args& args)
 {
     ge::Format formatA = static_cast<ge::Format>(ge::GetPrimaryFormat(context.GetInputDesc(0)->GetStorageFormat()));
     ge::Format formatB = static_cast<ge::Format>(ge::GetPrimaryFormat(context.GetInputDesc(1)->GetStorageFormat()));
@@ -240,7 +240,7 @@ static inline void GetFormat(const gert::TilingContext &context, Mc2MatmulV3Args
     args.outFormat = (formatOut != ge::FORMAT_FRACTAL_NZ) ? ge::FORMAT_ND : formatOut;
 }
 
-static inline void GetDtype(const gert::TilingContext &context, Mc2MatmulV3Args &args)
+static inline void GetDtype(const gert::TilingContext& context, Mc2MatmulV3Args& args)
 {
     // op_impl_mode_enum: 0x1: default 0x2: high_performance 0x4: high_precision 0x8: super_performance
     // 0x10: support_of_bound_index 0x20: enable_float_32_execution 0x40: enable_hi_float_32_execution
@@ -257,7 +257,7 @@ static inline void GetDtype(const gert::TilingContext &context, Mc2MatmulV3Args 
     }
 }
 
-static ge::graphStatus GetInputDims(const gert::Shape &storageShape, ge::Format format, int64_t (&dims)[TWO_BATCH_DIM])
+static ge::graphStatus GetInputDims(const gert::Shape& storageShape, ge::Format format, int64_t (&dims)[TWO_BATCH_DIM])
 {
     const size_t dimNum = storageShape.GetDimNum();
     if (format == ge::FORMAT_ND) {
@@ -276,7 +276,7 @@ static ge::graphStatus GetInputDims(const gert::Shape &storageShape, ge::Format 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus OpSpecificCheck(const gert::TilingContext &context, const Mc2MatmulV3Args &args)
+static ge::graphStatus OpSpecificCheck(const gert::TilingContext& context, const Mc2MatmulV3Args& args)
 {
     const bool isMatMulV3 = (strcmp(context.GetNodeType(), "Mc2MatMulV3") == 0);
     const bool isBatchMatMulV3 = (strcmp(context.GetNodeType(), "Mc2BatchMatMulV3") == 0);
@@ -287,7 +287,7 @@ static ge::graphStatus OpSpecificCheck(const gert::TilingContext &context, const
 
     // check input dim num equals to 2
     if (isMatMulV3) {
-        auto isMatrix = [](const gert::Shape &oriShape) { return oriShape.GetDimNum() == TWO_BATCH_DIM; };
+        auto isMatrix = [](const gert::Shape& oriShape) { return oriShape.GetDimNum() == TWO_BATCH_DIM; };
         if (!isMatrix(context.GetInputShape(0)->GetOriginShape()) ||
             !isMatrix(context.GetInputShape(1)->GetOriginShape())) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
@@ -300,7 +300,7 @@ static ge::graphStatus OpSpecificCheck(const gert::TilingContext &context, const
 
     // check bias
     if (args.hasBias) {
-        const gert::Shape &biasShape = context.GetInputShape(BIAS_IDX)->GetOriginShape();
+        const gert::Shape& biasShape = context.GetInputShape(BIAS_IDX)->GetOriginShape();
         const int64_t biasValue = biasShape[biasShape.GetDimNum() - 1];
         if (args.nOriValue != static_cast<uint64_t>(biasValue)) {
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(args.opName, "bias", std::to_string(biasValue).c_str(),
@@ -314,14 +314,14 @@ static ge::graphStatus OpSpecificCheck(const gert::TilingContext &context, const
     if (args.hasBias) {
         dtype.push_back(args.biasType);
     }
-    auto isValidDtype = [&args](const std::vector<ge::DataType> &dtypeList) -> ge::graphStatus {
+    auto isValidDtype = [&args](const std::vector<ge::DataType>& dtypeList) -> ge::graphStatus {
         const std::vector<std::vector<ge::DataType>> dtypeSuportList = {
             // x1,              x2,             y,              bias
             {ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16},
             {ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT},
             {ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT},
             {ge::DT_BF16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT}};
-        for (auto &supported : dtypeSuportList) {
+        for (auto& supported : dtypeSuportList) {
             if (std::equal(dtypeList.begin(), dtypeList.end(), supported.begin())) {
                 return ge::GRAPH_SUCCESS;
             }
@@ -333,7 +333,7 @@ static ge::graphStatus OpSpecificCheck(const gert::TilingContext &context, const
     return isValidDtype(dtype);
 }
 
-static ge::graphStatus GetShape(const gert::TilingContext &context, Mc2MatmulV3Args &args)
+static ge::graphStatus GetShape(const gert::TilingContext& context, Mc2MatmulV3Args& args)
 {
     // get transpose
     args.isATrans = *context.GetAttrs()->GetAttrPointer<bool>(0);
@@ -383,7 +383,7 @@ static ge::graphStatus GetShape(const gert::TilingContext &context, Mc2MatmulV3A
     args.nValue = static_cast<uint64_t>(n);
 
     // get origin (m, n)
-    const gert::Shape &cShape = context.GetOutputShape(0)->GetOriginShape();
+    const gert::Shape& cShape = context.GetOutputShape(0)->GetOriginShape();
     const size_t cDimNum = cShape.GetDimNum();
     if (cDimNum < TWO_BATCH_DIM) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(args.opName, "output", (std::to_string(cDimNum) + "D").c_str(),
@@ -410,7 +410,7 @@ ge::graphStatus Mc2MatmulV3BaseTiling::GetArgs()
     return OpSpecificCheck(*context_, args_);
 }
 
-inline bool GetNd2nzA(const Mc2MatmulV3Args &args_, const Mc2MatmulV3CompileInfo &compileInfo_)
+inline bool GetNd2nzA(const Mc2MatmulV3Args& args_, const Mc2MatmulV3CompileInfo& compileInfo_)
 {
     constexpr uint64_t nMataThread = 16384;
     constexpr uint64_t mMataThread = 4096;
@@ -422,7 +422,7 @@ inline bool GetNd2nzA(const Mc2MatmulV3Args &args_, const Mc2MatmulV3CompileInfo
            (args_.aType == ge::DT_FLOAT16 || args_.aType == ge::DT_BF16);
 }
 
-inline bool GetNd2nzB(const Mc2MatmulV3Args &args_, const Mc2MatmulV3CompileInfo &compileInfo_)
+inline bool GetNd2nzB(const Mc2MatmulV3Args& args_, const Mc2MatmulV3CompileInfo& compileInfo_)
 {
     constexpr uint64_t kMataCond = 16384;
     constexpr uint64_t nMataCond = 7168;
@@ -504,7 +504,7 @@ ge::graphStatus Mc2MatmulV3BaseTiling::GetMoreArgs()
     return ge::GRAPH_SUCCESS;
 }
 
-inline void ResetBase(Mc2MatmulV3RunInfo &runInfo, const uint64_t l0CSize, const uint64_t dTypeSize = 2)
+inline void ResetBase(Mc2MatmulV3RunInfo& runInfo, const uint64_t l0CSize, const uint64_t dTypeSize = 2)
 {
     runInfo.baseM = (l0CSize == L0C_SIZE_256_KB) ? BASIC_BLOCK_SIZE_256 : BASIC_BLOCK_SIZE_128;
     runInfo.baseN = BASIC_BLOCK_SIZE_256; // 256 is better base
@@ -819,12 +819,12 @@ bool Mc2MatmulV3BaseTiling::GetTilingFromRepo()
     return TranslateAoeTiling(tuningTiling);
 }
 
-bool Mc2MatmulV3BaseTiling::GetTilingInputArgs(std::shared_ptr<void> &inputArgs, size_t &size)
+bool Mc2MatmulV3BaseTiling::GetTilingInputArgs(std::shared_ptr<void>& inputArgs, size_t& size)
 {
     std::shared_ptr<tuningtiling::Mc2MatMulV3InputArgs> matmulInputArgs = nullptr;
     try {
         matmulInputArgs = std::make_shared<tuningtiling::Mc2MatMulV3InputArgs>();
-    } catch (const std::bad_alloc &) {
+    } catch (const std::bad_alloc&) {
         OP_LOGI(args_.opName, "get tiling from repo error: input args is nullptr.");
         return false;
     }
@@ -872,7 +872,7 @@ bool Mc2MatmulV3BaseTiling::GetTilingInputArgs(std::shared_ptr<void> &inputArgs,
     return true;
 }
 
-void Mc2MatmulV3BaseTiling::DebugLog(const std::shared_ptr<tuningtiling::Mc2MatMulV3InputArgs> &inputArgs)
+void Mc2MatmulV3BaseTiling::DebugLog(const std::shared_ptr<tuningtiling::Mc2MatMulV3InputArgs>& inputArgs)
 {
     OP_LOGD(args_.opName,
             "Binary tiling info dict, "
@@ -900,7 +900,7 @@ void Mc2MatmulV3BaseTiling::DebugLog(const std::shared_ptr<tuningtiling::Mc2MatM
             static_cast<int32_t>(inputArgs->trans_b_flag));
 }
 
-bool Mc2MatmulV3BaseTiling::TranslateAoeTiling(tuningtiling::TuningTilingDefPtr &tuningTiling)
+bool Mc2MatmulV3BaseTiling::TranslateAoeTiling(tuningtiling::TuningTilingDefPtr& tuningTiling)
 {
     auto aoeTiling = std::dynamic_pointer_cast<tuningtiling::Mc2MatMulV3TunnerTiling>(tuningTiling);
     if (aoeTiling == nullptr) {
@@ -996,8 +996,8 @@ void Mc2MatmulV3BaseTiling::SetBaseBlockTiling()
     return;
 }
 
-inline void Convert2AscendCTiling(CacheTilingData &tbeTiling, const BatchmatmulRunParas &runParams,
-                                  const Mc2MatmulV3Args &args, uint64_t aicNum, Mc2MatmulV3RunInfo &runInfo)
+inline void Convert2AscendCTiling(CacheTilingData& tbeTiling, const BatchmatmulRunParas& runParams,
+                                  const Mc2MatmulV3Args& args, uint64_t aicNum, Mc2MatmulV3RunInfo& runInfo)
 {
     if (tbeTiling.al1_full_load && !runParams.pattern_flag) {
         tbeTiling.kal1_16 = runParams.k / tbeTiling.k_dim;
@@ -1034,8 +1034,8 @@ inline void Convert2AscendCTiling(CacheTilingData &tbeTiling, const BatchmatmulR
     runInfo.l2Info.nTileBlock = 1;
 }
 
-inline void InitRunParams(const BatchmatmulCompileParas &compileParams, const Mc2MatmulV3Args &args,
-                          BatchmatmulRunParas &runParams)
+inline void InitRunParams(const BatchmatmulCompileParas& compileParams, const Mc2MatmulV3Args& args,
+                          BatchmatmulRunParas& runParams)
 {
     runParams.trans_a_flag = args.isATrans;
     runParams.trans_b_flag = args.isBTrans;
@@ -1104,8 +1104,8 @@ void Mc2MatmulV3BaseTiling::GetV2Tiling()
     return;
 }
 
-bool Mc2MatmulV3BaseTiling::CheckUbOverFlow(uint64_t nAligned16, uint64_t nValue, const uint64_t &baseN,
-                                            const uint64_t &baseD, uint64_t dtypeSize)
+bool Mc2MatmulV3BaseTiling::CheckUbOverFlow(uint64_t nAligned16, uint64_t nValue, const uint64_t& baseN,
+                                            const uint64_t& baseD, uint64_t dtypeSize)
 {
     uint64_t nAlignedLoop = MathUtil::CeilDivision(nAligned16, baseN);
     uint64_t nValueLoop = MathUtil::CeilDivision(nValue, baseN);
@@ -1116,8 +1116,8 @@ bool Mc2MatmulV3BaseTiling::CheckUbOverFlow(uint64_t nAligned16, uint64_t nValue
             ((nAligned16 - ((nValue / baseN) - 1) * baseN) * baseD > (compileInfo_.ubSize / NUMBER_TWO / dtypeSize)));
 }
 
-void Mc2MatmulV3BaseTiling::CalcNd2NzTiling(uint64_t dtypeSize, uint64_t nValue, uint64_t dValue, uint64_t &baseN,
-                                            uint64_t &baseD)
+void Mc2MatmulV3BaseTiling::CalcNd2NzTiling(uint64_t dtypeSize, uint64_t nValue, uint64_t dValue, uint64_t& baseN,
+                                            uint64_t& baseD)
 {
     constexpr uint64_t mataD = 16384;
     constexpr uint64_t minN = 7168;
@@ -1299,8 +1299,8 @@ void Mc2MatmulV3BaseTiling::DoBasicTiling()
     }
 
     if (compileInfo_.supportL12BtBf16) {
-        const gert::Shape &shapeA = context_->GetInputShape(0)->GetStorageShape();
-        const gert::Shape &shapeB = context_->GetInputShape(1)->GetStorageShape();
+        const gert::Shape& shapeA = context_->GetInputShape(0)->GetStorageShape();
+        const gert::Shape& shapeB = context_->GetInputShape(1)->GetStorageShape();
         const uint64_t dimsA = shapeA.GetDimNum();
         const uint64_t dimsB = shapeB.GetDimNum();
         // isolate bmm which input dims over 2
@@ -1500,7 +1500,7 @@ bool Mc2MatmulV3BaseTiling::CheckBTSize(uint64_t baseN)
 }
 
 template <Mc2CalcType T>
-void Mc2MatmulV3BaseTiling::CalcBase(const std::vector<std::vector<uint64_t>> &baseMNK)
+void Mc2MatmulV3BaseTiling::CalcBase(const std::vector<std::vector<uint64_t>>& baseMNK)
 {
     std::vector<std::vector<uint64_t>> calBaseMNK;
     size_t index = 0;
@@ -1538,7 +1538,7 @@ void Mc2MatmulV3BaseTiling::CalcBase(const std::vector<std::vector<uint64_t>> &b
     runInfo_.baseK = calBaseMNK[index][2] / aDtypeSize_; // 2: k index
 }
 
-void Mc2MatmulV3BaseTiling::CalBaseMBaseN(uint64_t &baseM, uint64_t &baseN, uint64_t maxBaseM, uint64_t maxBaseN)
+void Mc2MatmulV3BaseTiling::CalBaseMBaseN(uint64_t& baseM, uint64_t& baseN, uint64_t maxBaseM, uint64_t maxBaseN)
 {
     // 根据 m方向和n方向上谁的基本块多，更新base块的大小
     uint64_t mCore = MathUtil::CeilDivision(args_.mValue, maxBaseM);
@@ -1637,7 +1637,7 @@ void Mc2MatmulV3BaseTiling::CalL1Tiling()
     return;
 }
 
-void Mc2MatmulV3BaseTiling::UpdateL1TilingStepK(uint64_t &stepK)
+void Mc2MatmulV3BaseTiling::UpdateL1TilingStepK(uint64_t& stepK)
 {
     if (stepK * runInfo_.baseK >= args_.kValue) {
         return;
@@ -1660,7 +1660,7 @@ void Mc2MatmulV3BaseTiling::UpdateL1TilingStepK(uint64_t &stepK)
     }
 }
 
-void Mc2MatmulV3BaseTiling::InitL2SplitParams(Mc2MatmulV3L2SplitParams &l2SplitParams) const
+void Mc2MatmulV3BaseTiling::InitL2SplitParams(Mc2MatmulV3L2SplitParams& l2SplitParams) const
 {
     l2SplitParams.outBase = std::max(runInfo_.baseM, 1UL);
     l2SplitParams.innerBase = std::max(runInfo_.baseN, 1UL);
@@ -1685,7 +1685,7 @@ void Mc2MatmulV3BaseTiling::InitL2SplitParams(Mc2MatmulV3L2SplitParams &l2SplitP
     }
 }
 
-bool Mc2MatmulV3BaseTiling::IsTailSmall(Mc2MatmulV3L2SplitParams &l2SplitParams, uint64_t outL2Split,
+bool Mc2MatmulV3BaseTiling::IsTailSmall(Mc2MatmulV3L2SplitParams& l2SplitParams, uint64_t outL2Split,
                                         uint64_t innerL2Split, uint64_t innerMaxConflict) const
 {
     if (outL2Split == 0UL || innerL2Split == 0UL) {
@@ -1700,8 +1700,8 @@ bool Mc2MatmulV3BaseTiling::IsTailSmall(Mc2MatmulV3L2SplitParams &l2SplitParams,
     return (isOutTailSmall || isInnerTailSmall);
 }
 
-bool Mc2MatmulV3BaseTiling::CalcTile(uint64_t &outTile, uint64_t &innerTile, uint64_t &outL2Split,
-                                     uint64_t &innerL2Split, const bool isInnerBad) const
+bool Mc2MatmulV3BaseTiling::CalcTile(uint64_t& outTile, uint64_t& innerTile, uint64_t& outL2Split,
+                                     uint64_t& innerL2Split, const bool isInnerBad) const
 {
     Mc2MatmulV3L2SplitParams l2SplitParams;
     InitL2SplitParams(l2SplitParams);
@@ -2063,7 +2063,7 @@ bool Mc2MatmulV3BaseTiling::DoL2CacheTiling310P()
     return true;
 }
 
-void Mc2MatmulV3BaseTiling::CalTileFactor(uint64_t &nTile)
+void Mc2MatmulV3BaseTiling::CalTileFactor(uint64_t& nTile)
 {
     // set the factor of 20 core
     vector<uint64_t> factor = {1, 2, 4, 5, 10, 20};
@@ -2094,7 +2094,7 @@ void Mc2MatmulV3BaseTiling::CalTileFactor(uint64_t &nTile)
     return;
 }
 
-void Mc2MatmulV3BaseTiling::SetBasicBlockOfNK33(Mc2MatmulV3RunInfo &runInfo)
+void Mc2MatmulV3BaseTiling::SetBasicBlockOfNK33(Mc2MatmulV3RunInfo& runInfo)
 {
     // 128是3*3算法的基本块
     runInfo.baseM = BASIC_BLOCK_SIZE_128;
@@ -2112,7 +2112,7 @@ void Mc2MatmulV3BaseTiling::SetBasicBlockOfNK33(Mc2MatmulV3RunInfo &runInfo)
     runInfo.iterateOrder = ITER_COL_FIRST;
 }
 
-void Mc2MatmulV3BaseTiling::SetBasicBlockOfMK33(Mc2MatmulV3RunInfo &runInfo)
+void Mc2MatmulV3BaseTiling::SetBasicBlockOfMK33(Mc2MatmulV3RunInfo& runInfo)
 {
     // 128是3*3算法的基本块
     runInfo.baseM = BASIC_BLOCK_SIZE_128;
@@ -2130,8 +2130,8 @@ void Mc2MatmulV3BaseTiling::SetBasicBlockOfMK33(Mc2MatmulV3RunInfo &runInfo)
     runInfo.iterateOrder = ITER_ROW_FIRST;
 }
 
-void Mc2MatmulV3BaseTiling::SetBasicBlockOf24(Mc2MatmulV3RunInfo &runInfo, const uint64_t &mTile,
-                                              const uint64_t &nTile) const
+void Mc2MatmulV3BaseTiling::SetBasicBlockOf24(Mc2MatmulV3RunInfo& runInfo, const uint64_t& mTile,
+                                              const uint64_t& nTile) const
 {
     // 2*4算法
     if (mTile * nTile < compileInfo_.aicNum) {
@@ -2311,7 +2311,7 @@ void Mc2MatmulV3BaseTiling::IsGmToL1ByShape()
     }
 }
 
-bool Mc2MatmulV3BaseTiling::CheckSingleTilingOk(Mc2MatmulV3RunInfo &tmpRunInfo)
+bool Mc2MatmulV3BaseTiling::CheckSingleTilingOk(Mc2MatmulV3RunInfo& tmpRunInfo)
 {
     // 判断是否走NKM模板
     bool isNKM = args_.aType == ge::DT_FLOAT && args_.nValue <= NMK_N_THERS && args_.mValue >= NMK_M_THERS &&
@@ -2348,7 +2348,7 @@ bool Mc2MatmulV3BaseTiling::CheckSingleTilingOk(Mc2MatmulV3RunInfo &tmpRunInfo)
     return true;
 }
 
-bool Mc2MatmulV3BaseTiling::CheckSingleCoreSplitKEdgeCases(const Mc2MatmulV3RunInfo &tmpRunInfo, bool isNKM,
+bool Mc2MatmulV3BaseTiling::CheckSingleCoreSplitKEdgeCases(const Mc2MatmulV3RunInfo& tmpRunInfo, bool isNKM,
                                                            bool isMKNsmallK, bool isNKMsmallK)
 {
     if (!isNKM && !isMKNsmallK && !isNKMsmallK) {
@@ -2772,7 +2772,7 @@ ge::graphStatus Mc2MatmulV3BaseTiling::PostTiling()
                     return ge::GRAPH_FAILED);
     OPS_CHECK_NULL_WITH_CONTEXT(context_, context_->GetRawTilingData());
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -2780,7 +2780,7 @@ ge::graphStatus Mc2MatmulV3BaseTiling::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingDataSize);
     context_->SetBlockDim(tilingData_.matmulTiling.usedCoreNum);
     context_->SetScheduleMode(1);
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "workspaces"),
                     return ge::GRAPH_FAILED);
     workspaces[0] = workspaceSize_;

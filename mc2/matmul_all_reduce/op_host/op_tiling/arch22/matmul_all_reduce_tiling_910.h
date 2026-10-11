@@ -31,9 +31,9 @@ class MatmulAllReduceTiling910 : public MatmulAllReduceTilingBase {
     friend class MatmulAllReduceAddRmsNormTiling;
 
 public:
-    explicit MatmulAllReduceTiling910(gert::TilingContext *context);
-    MatmulAllReduceTiling910(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                             Mc2Tiling::MatmulAllReduce910TilingData *out);
+    explicit MatmulAllReduceTiling910(gert::TilingContext* context);
+    MatmulAllReduceTiling910(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                             Mc2Tiling::MatmulAllReduce910TilingData* out);
     ~MatmulAllReduceTiling910() override = default;
 
 protected:
@@ -49,13 +49,13 @@ protected:
 
     ge::graphStatus Do910Tiling();
 
-    Mc2Tiling::Mc2Msg &MutableMc2MsgData() override;
+    Mc2Tiling::Mc2Msg& MutableMc2MsgData() override;
 
-    Mc2Tiling::RCSTiling &MutableRCSTilingData() override;
+    Mc2Tiling::RCSTiling& MutableRCSTilingData() override;
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTileTilingData() override;
+    AscendC::tiling::TCubeTiling& MutableTCubeTileTilingData() override;
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTailTilingData() override;
+    AscendC::tiling::TCubeTiling& MutableTCubeTailTilingData() override;
 
     void DoEmptyTensorTiling() override;
 
@@ -69,21 +69,21 @@ private:
     ge::graphStatus CheckInputFormat();
     ge::graphStatus CheckInputShape();
     Mc2Tiling::MatmulAllReduce910TilingData matmulAllReduce910TilingDataSelf_{};
-    Mc2Tiling::MatmulAllReduce910TilingData &matmulAllReduce910TilingData_;
+    Mc2Tiling::MatmulAllReduce910TilingData& matmulAllReduce910TilingData_;
     uint64_t myWorkSpaceSize_{0U};
     MatmulTPLParam matmulTPLParam_;
 };
 
 class TilingTransferHelper : public mc2_matmul_v3::Mc2MatmulV3BaseTiling {
 public:
-    TilingTransferHelper(MatmulAllReduceTiling910 &matmulAllReduceTiling910, Mc2MatmulV3TilingData &data);
+    TilingTransferHelper(MatmulAllReduceTiling910& matmulAllReduceTiling910, Mc2MatmulV3TilingData& data);
 
     ge::graphStatus GetShapeAttrsInfo() override;
     ge::graphStatus PostTiling() override;
     MatmulTPLParam GetMatmulTPLParam();
 
 private:
-    MatmulAllReduceTiling910 &tilingProcesser_;
+    MatmulAllReduceTiling910& tilingProcesser_;
 };
 } // namespace optiling
 #endif // MATMUL_ALL_REDUCE_TILING_910_H

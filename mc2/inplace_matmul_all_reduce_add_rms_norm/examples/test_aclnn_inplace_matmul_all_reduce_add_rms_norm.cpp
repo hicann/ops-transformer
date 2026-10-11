@@ -34,7 +34,7 @@ int ndev = 2;
         printf(message, ##__VA_ARGS__); \
     } while (0)
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -44,8 +44,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请device侧内存
@@ -72,7 +72,7 @@ struct Args {
     aclrtContext context;
 };
 
-int launchOneThreadMatmulAllReduceAddRmsNorm(Args &args)
+int launchOneThreadMatmulAllReduceAddRmsNorm(Args& args)
 {
     int ret;
     ret = aclrtSetCurrentContext(args.context);
@@ -89,27 +89,27 @@ int launchOneThreadMatmulAllReduceAddRmsNorm(Args &args)
     std::vector<int64_t> gammaShape = {128};
     std::vector<int64_t> yShape = {1, 32, 128};
     std::vector<int64_t> normOutShape = {1, 32, 128};
-    void *x1DeviceAddr = nullptr;
-    void *x2DeviceAddr = nullptr;
-    void *biasDeviceAddr = nullptr;
-    void *residualDeviceAddr = nullptr;
-    void *gammaDeviceAddr = nullptr;
-    void *yDeviceAddr = nullptr;
-    void *normOutDeviceAddr = nullptr;
-    aclTensor *x1 = nullptr;
-    aclTensor *x2 = nullptr;
-    aclTensor *bias = nullptr;
-    aclTensor *residual = nullptr;
-    aclTensor *gamma = nullptr;
-    aclTensor *y = nullptr;
-    aclTensor *normOut = nullptr;
+    void* x1DeviceAddr = nullptr;
+    void* x2DeviceAddr = nullptr;
+    void* biasDeviceAddr = nullptr;
+    void* residualDeviceAddr = nullptr;
+    void* gammaDeviceAddr = nullptr;
+    void* yDeviceAddr = nullptr;
+    void* normOutDeviceAddr = nullptr;
+    aclTensor* x1 = nullptr;
+    aclTensor* x2 = nullptr;
+    aclTensor* bias = nullptr;
+    aclTensor* residual = nullptr;
+    aclTensor* gamma = nullptr;
+    aclTensor* y = nullptr;
+    aclTensor* normOut = nullptr;
 
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     double epsilon = 0.000001;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
-    void *workspaceAddr = nullptr;
+    aclOpExecutor* executor;
+    void* workspaceAddr = nullptr;
 
     long long x1ShapeSize = GetShapeSize(x1Shape);
     long long x2ShapeSize = GetShapeSize(x2Shape);
@@ -216,7 +216,7 @@ int launchOneThreadMatmulAllReduceAddRmsNorm(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // 本样例基于Atlas A2实现，必须在Atlas A2上运行
     int ret;

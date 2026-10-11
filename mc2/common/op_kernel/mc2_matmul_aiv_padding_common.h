@@ -55,7 +55,7 @@ struct MatmulPaddingParams {
 };
 
 template <class ArchTag, class Element, class Layout>
-CATLASS_DEVICE void PadMatrix(Catlass::Arch::Resource<ArchTag> &resource, const MatrixPaddingParams<Layout> &params)
+CATLASS_DEVICE void PadMatrix(Catlass::Arch::Resource<ArchTag>& resource, const MatrixPaddingParams<Layout>& params)
 {
     if (!params.required) {
         return;
@@ -65,21 +65,21 @@ CATLASS_DEVICE void PadMatrix(Catlass::Arch::Resource<ArchTag> &resource, const 
     using Padding = Catlass::Gemm::Kernel::PaddingMatrix<ArchTag, Element, Layout, computeLength>;
     AscendC::GlobalTensor<Element> src;
     AscendC::GlobalTensor<Element> dst;
-    src.SetGlobalBuffer(reinterpret_cast<__gm__ Element *>(params.src));
-    dst.SetGlobalBuffer(reinterpret_cast<__gm__ Element *>(params.dst));
+    src.SetGlobalBuffer(reinterpret_cast<__gm__ Element*>(params.src));
+    dst.SetGlobalBuffer(reinterpret_cast<__gm__ Element*>(params.dst));
     Padding padding(resource);
     padding(dst, src, params.dstLayout, params.srcLayout);
 }
 
 template <class ArchTag, class AType, class BType>
-CATLASS_DEVICE void PadMatmulInputs(Catlass::Arch::Resource<ArchTag> &resource,
-                                    const MatmulPaddingParams<typename AType::Layout, typename BType::Layout> &params)
+CATLASS_DEVICE void PadMatmulInputs(Catlass::Arch::Resource<ArchTag>& resource,
+                                    const MatmulPaddingParams<typename AType::Layout, typename BType::Layout>& params)
 {
     PadMatrix<ArchTag, typename AType::Element>(resource, params.matrixA);
     PadMatrix<ArchTag, typename BType::Element>(resource, params.matrixB);
 }
 
-CATLASS_DEVICE void NotifyMatmulPaddingFinished(Catlass::Arch::CrossCoreFlag &finishFlag)
+CATLASS_DEVICE void NotifyMatmulPaddingFinished(Catlass::Arch::CrossCoreFlag& finishFlag)
 {
     Catlass::Arch::CrossCoreBarrier<0x0, PIPE_MTE3>();
     Catlass::Arch::CrossCoreSetFlag<0x2, PIPE_MTE3>(finishFlag);

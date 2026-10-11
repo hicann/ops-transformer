@@ -363,7 +363,7 @@ ge::graphStatus Mc2BatchMatmulV3BaseTiling::DoLibApiTiling()
  * Choosing different starting point can sometimes get better performance.
  * The starting point of `divisor = 2` is half of that of `divisor = 1`
  */
-static void CalcBaseMN(uint64_t &baseM, uint64_t &baseN, const mc2_matmul_v3::Mc2MatmulV3Args &args,
+static void CalcBaseMN(uint64_t& baseM, uint64_t& baseN, const mc2_matmul_v3::Mc2MatmulV3Args& args,
                        uint64_t divisor = 1UL)
 {
     uint64_t dtypeSize = GetSizeByDataType(args.aType);
@@ -411,11 +411,11 @@ static void CalcBaseMN(uint64_t &baseM, uint64_t &baseN, const mc2_matmul_v3::Mc
     baseN = getBestBaseN(args.isBTrans, args.nValue, args.kValue);
 }
 
-static void TuneBaseMN(mc2_matmul_v3::Mc2MatmulV3RunInfo &runInfo, const mc2_matmul_v3::Mc2MatmulV3Args &args,
+static void TuneBaseMN(mc2_matmul_v3::Mc2MatmulV3RunInfo& runInfo, const mc2_matmul_v3::Mc2MatmulV3Args& args,
                        uint64_t batchC, uint64_t aicNum)
 {
-    uint64_t &oriBaseM = runInfo.baseM;
-    uint64_t &oriBaseN = runInfo.baseN;
+    uint64_t& oriBaseM = runInfo.baseM;
+    uint64_t& oriBaseN = runInfo.baseN;
     CalcBaseMN(oriBaseM, oriBaseN, args);
     if (args.aType == ge::DT_FLOAT) {
         return;
@@ -445,12 +445,12 @@ static void TuneBaseMN(mc2_matmul_v3::Mc2MatmulV3RunInfo &runInfo, const mc2_mat
     }
 }
 
-static void TuneBaseMKN(mc2_matmul_v3::Mc2MatmulV3RunInfo &runInfo, const mc2_matmul_v3::Mc2MatmulV3Args &args,
+static void TuneBaseMKN(mc2_matmul_v3::Mc2MatmulV3RunInfo& runInfo, const mc2_matmul_v3::Mc2MatmulV3Args& args,
                         uint64_t batchC, uint64_t aicNum)
 {
-    uint64_t &baseM = runInfo.baseM;
-    uint64_t &baseN = runInfo.baseN;
-    uint64_t &baseK = runInfo.baseK;
+    uint64_t& baseM = runInfo.baseM;
+    uint64_t& baseN = runInfo.baseN;
+    uint64_t& baseK = runInfo.baseK;
     OP_LOGD(args.opName, "before DoCommonTiling baseM, baseN, baseK[%lu, %lu, %lu]", baseM, baseN, baseK);
     bool isSmallShape = (args.mValue < BASIC_BLOCK_SIZE_256 || args.nValue <= BASIC_BLOCK_SIZE_256);
     bool useBaseBlock = ((baseM == BASIC_BLOCK_SIZE_128 || baseM == BASIC_BLOCK_SIZE_256) &&
@@ -825,7 +825,7 @@ void Mc2BatchMatmulV3BaseTiling::CalculateNd2nzWorkspaceSize()
  *          `step` - the step length (i.e. the minimum variation value) of x. Default is 1.
  * Note:    `x` is assumed to be aligned to `step`, that makes `step` the minimum of `x`.
  */
-static void TuneDownParam(uint64_t target, uint64_t &y, uint64_t &x, uint64_t dydx, uint64_t step = 1UL)
+static void TuneDownParam(uint64_t target, uint64_t& y, uint64_t& x, uint64_t dydx, uint64_t step = 1UL)
 {
     if ((y <= target) || (x <= step)) {
         return;
@@ -842,8 +842,8 @@ static void TuneDownParam(uint64_t target, uint64_t &y, uint64_t &x, uint64_t dy
     }
 }
 
-static void TuneDownBaseBlock(bool isTensorA, const mc2_matmul_v3::Mc2MatmulV3Args &args, uint64_t l1Size,
-                              uint64_t &baseMN, uint64_t &baseK)
+static void TuneDownBaseBlock(bool isTensorA, const mc2_matmul_v3::Mc2MatmulV3Args& args, uint64_t l1Size,
+                              uint64_t& baseMN, uint64_t& baseK)
 {
     const uint64_t mnDim = isTensorA ? args.mValue : args.nValue;
     const uint64_t kDim = args.kValue;
@@ -871,8 +871,8 @@ static void TuneDownBaseBlock(bool isTensorA, const mc2_matmul_v3::Mc2MatmulV3Ar
     }
 }
 
-static void AL1FullLoadTiling(const mc2_matmul_v3::Mc2MatmulV3Args &args, uint64_t l1Size, uint64_t l0CSize,
-                              AscendC::tiling::TCubeTiling &tilingData)
+static void AL1FullLoadTiling(const mc2_matmul_v3::Mc2MatmulV3Args& args, uint64_t l1Size, uint64_t l0CSize,
+                              AscendC::tiling::TCubeTiling& tilingData)
 {
     uint64_t baseK = static_cast<uint64_t>(tilingData.baseK);
     uint64_t baseM = static_cast<uint64_t>(tilingData.baseM);
@@ -912,8 +912,8 @@ static void AL1FullLoadTiling(const mc2_matmul_v3::Mc2MatmulV3Args &args, uint64
     tilingData.dbL0C = (baseM * baseN * 4 * NUM_TWO > l0CSize ? 1 : NUM_TWO); // 4 is data size within l0c
 }
 
-static void BL1FullLoadTiling(const mc2_matmul_v3::Mc2MatmulV3Args &args, uint64_t l1Size, uint64_t l0CSize,
-                              AscendC::tiling::TCubeTiling &tilingData)
+static void BL1FullLoadTiling(const mc2_matmul_v3::Mc2MatmulV3Args& args, uint64_t l1Size, uint64_t l0CSize,
+                              AscendC::tiling::TCubeTiling& tilingData)
 {
     uint64_t baseK = static_cast<uint64_t>(tilingData.baseK);
     uint64_t baseN = static_cast<uint64_t>(tilingData.baseN);
@@ -953,9 +953,9 @@ static void BL1FullLoadTiling(const mc2_matmul_v3::Mc2MatmulV3Args &args, uint64
     tilingData.dbL0C = (baseM * baseN * 4 * NUM_TWO > l0CSize ? 1 : NUM_TWO); // 4 is data size within l0c
 }
 
-static void UpdateUsedCoreNum(uint64_t batchC, uint64_t aicNum, Mc2BatchMatmulTilingData &tilingData)
+static void UpdateUsedCoreNum(uint64_t batchC, uint64_t aicNum, Mc2BatchMatmulTilingData& tilingData)
 {
-    AscendC::tiling::TCubeTiling &matmulTiling = tilingData.matmulTiling.matmulTiling;
+    AscendC::tiling::TCubeTiling& matmulTiling = tilingData.matmulTiling.matmulTiling;
     uint64_t mWideNum = static_cast<uint64_t>(ops::CeilDiv(matmulTiling.M, matmulTiling.singleCoreM));
     uint64_t nWideNum = static_cast<uint64_t>(ops::CeilDiv(matmulTiling.N, matmulTiling.singleCoreN));
     uint64_t usedCoreNum = std::min(batchC * mWideNum * nWideNum, aicNum);
@@ -977,8 +977,8 @@ void Mc2BatchMatmulV3BaseTiling::DoL1FullLoadTiling()
     };
     const uint64_t totalL1Size = compileInfo_.l1Size + 256; // 256B为预留给rpc使用，单算子不涉及
     auto getL1FullLoad = [totalL1Size](uint64_t aBatchDim, uint64_t bBatchDim,
-                                       const Mc2MatmulV3CompileInfo &compileInfo,
-                                       const mc2_matmul_v3::Mc2MatmulV3Args &args) -> enum L1FullLoad {
+                                       const Mc2MatmulV3CompileInfo& compileInfo,
+                                       const mc2_matmul_v3::Mc2MatmulV3Args& args) -> enum L1FullLoad {
         const bool aNoBatch = aBatchDim <= 1UL; const bool bNoBatch = bBatchDim <= 1UL;
             if ((aNoBatch == bNoBatch) && !(bNoBatch && !args.isATrans)){
                 // do l1 full-load if and only if exactly 1 matrix has no batch
@@ -1034,7 +1034,7 @@ ge::graphStatus Mc2BatchMatmulV3BaseTiling::PostTiling()
                     OP_LOGE(args_.opName, "tiling data size[%zu] is not aligned to 8", tilingDataSize),
                     return ge::GRAPH_FAILED);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&bmmTilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&bmmTilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -1049,7 +1049,7 @@ ge::graphStatus Mc2BatchMatmulV3BaseTiling::PostTiling()
         workspaceSize_ += RPC_WORKSIZE * MB_SIZE;
     }
     workspaceSize_ = std::max(workspaceSize_, DEFAULT_SIZE);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "workspaces"),
                     return ge::GRAPH_FAILED);
     workspaces[0] = workspaceSize_;

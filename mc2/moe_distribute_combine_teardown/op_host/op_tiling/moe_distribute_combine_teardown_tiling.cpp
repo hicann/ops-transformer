@@ -23,7 +23,7 @@ using namespace ge;
 
 namespace MC2Tiling {
 
-ge::graphStatus MoeDistributeCombineTeardownTilingFunc(gert::TilingContext *context)
+ge::graphStatus MoeDistributeCombineTeardownTilingFunc(gert::TilingContext* context)
 {
     OP_TILING_CHECK(
         context == nullptr,
@@ -33,7 +33,7 @@ ge::graphStatus MoeDistributeCombineTeardownTilingFunc(gert::TilingContext *cont
 }
 
 struct MoeDistributeCombineTeardownCompileInfo {};
-ge::graphStatus TilingParseForMoeDistributeCombineTeardown(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForMoeDistributeCombineTeardown(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

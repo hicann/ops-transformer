@@ -76,7 +76,7 @@ A2AVGMM_HOST_DEVICE bool IsSupportedPeerRankSize(uint32_t rankSize, bool isA3)
 }
 
 A2AVGMM_HOST_DEVICE bool NormalizePeerContextMetadata(uint32_t rankId, uint32_t rankSize, uint64_t windowBytes,
-                                                      PeerContextMetadata &metadata)
+                                                      PeerContextMetadata& metadata)
 {
     if (rankSize == 0U || rankSize > kMaxRankSize || rankId >= rankSize || windowBytes == 0U) {
         return false;
@@ -87,7 +87,7 @@ A2AVGMM_HOST_DEVICE bool NormalizePeerContextMetadata(uint32_t rankId, uint32_t 
     return true;
 }
 
-A2AVGMM_HOST_DEVICE bool SafeAddU64(uint64_t lhs, uint64_t rhs, uint64_t &result)
+A2AVGMM_HOST_DEVICE bool SafeAddU64(uint64_t lhs, uint64_t rhs, uint64_t& result)
 {
     constexpr uint64_t maxValue = ~static_cast<uint64_t>(0U);
     if (lhs > maxValue - rhs) {
@@ -97,7 +97,7 @@ A2AVGMM_HOST_DEVICE bool SafeAddU64(uint64_t lhs, uint64_t rhs, uint64_t &result
     return true;
 }
 
-A2AVGMM_HOST_DEVICE bool SafeMulU64(uint64_t lhs, uint64_t rhs, uint64_t &result)
+A2AVGMM_HOST_DEVICE bool SafeMulU64(uint64_t lhs, uint64_t rhs, uint64_t& result)
 {
     constexpr uint64_t maxValue = ~static_cast<uint64_t>(0U);
     if (lhs != 0U && rhs > maxValue / lhs) {
@@ -108,7 +108,7 @@ A2AVGMM_HOST_DEVICE bool SafeMulU64(uint64_t lhs, uint64_t rhs, uint64_t &result
 }
 
 A2AVGMM_HOST_DEVICE bool BuildRuntimeControlLayout(uint32_t rankSize, uint32_t expertPerRank,
-                                                   RuntimeControlLayout &layout)
+                                                   RuntimeControlLayout& layout)
 {
     if (rankSize == 0U || rankSize > kMaxRankSize || expertPerRank == 0U) {
         return false;
@@ -138,7 +138,7 @@ A2AVGMM_HOST_DEVICE uint64_t MulU32ToU64(uint32_t lhs, uint32_t rhs)
     return low + (middle << 16U) + (high << 32U);
 }
 
-A2AVGMM_HOST_DEVICE bool AlignUpU64(uint64_t value, uint64_t alignment, uint64_t &result)
+A2AVGMM_HOST_DEVICE bool AlignUpU64(uint64_t value, uint64_t alignment, uint64_t& result)
 {
     if (alignment == 0U || (alignment & (alignment - 1U)) != 0U) {
         return false;
@@ -157,7 +157,7 @@ A2AVGMM_HOST_DEVICE uint64_t AlignDownU64(uint64_t value, uint64_t alignment)
 }
 
 A2AVGMM_HOST_DEVICE bool BuildWorkspaceLayout(uint64_t tokenNum, uint64_t hiddenSize, uint64_t dtypeBytes,
-                                              WorkspaceLayout &layout)
+                                              WorkspaceLayout& layout)
 {
     uint64_t elementNum = 0U;
     uint64_t rawPayloadBytes = 0U;
@@ -173,8 +173,8 @@ A2AVGMM_HOST_DEVICE bool BuildWorkspaceLayout(uint64_t tokenNum, uint64_t hidden
 }
 
 template <typename PrefixPtr>
-A2AVGMM_HOST_DEVICE bool PrefixRange(PrefixPtr inclusivePrefix, uint32_t countNum, uint32_t index, uint32_t &begin,
-                                     uint32_t &end)
+A2AVGMM_HOST_DEVICE bool PrefixRange(PrefixPtr inclusivePrefix, uint32_t countNum, uint32_t index, uint32_t& begin,
+                                     uint32_t& end)
 {
     begin = 0U;
     end = 0U;
@@ -193,8 +193,8 @@ A2AVGMM_HOST_DEVICE bool PrefixRange(PrefixPtr inclusivePrefix, uint32_t countNu
 }
 
 A2AVGMM_HOST_DEVICE bool BuildWindowLayout(uint64_t inputTokenNum, uint64_t hiddenSize, uint64_t countNum,
-                                           const RuntimeControlLayout &control, uint64_t windowBytes,
-                                           A2avWindowLayout &layout)
+                                           const RuntimeControlLayout& control, uint64_t windowBytes,
+                                           A2avWindowLayout& layout)
 {
     uint64_t rawCountBytes = 0U;
     uint64_t countAreaBytes = 0U;
@@ -266,7 +266,7 @@ public:
 
         PeerContextMetadata metadata = {};
         if (is910C != 0U) {
-            a3Context_ = reinterpret_cast<__gm__ AscendC::HcclContextDef::HcclOpResParam *>(contextAddress);
+            a3Context_ = reinterpret_cast<__gm__ AscendC::HcclContextDef::HcclOpResParam*>(contextAddress);
             if (!NormalizePeerContextMetadata(a3Context_->rankId, a3Context_->rankNum,
                                               a3Context_->winSize == 0U ? queriedWindowBytes : a3Context_->winSize,
                                               metadata)) {
@@ -274,7 +274,7 @@ public:
             }
             isA3_ = true;
         } else {
-            a2Context_ = reinterpret_cast<__gm__ AscendC::HcclCombineOpParam *>(contextAddress);
+            a2Context_ = reinterpret_cast<__gm__ AscendC::HcclCombineOpParam*>(contextAddress);
             if (!NormalizePeerContextMetadata(a2Context_->rankId, a2Context_->rankNum,
                                               a2Context_->winSize == 0U ? queriedWindowBytes : a2Context_->winSize,
                                               metadata)) {
@@ -326,7 +326,7 @@ public:
             if (rank == rankId_) {
                 return reinterpret_cast<GM_ADDR>(a3Context_->localWindowsIn);
             }
-            auto *relation = AscendC::GetRemoteRankAddrs(a3Context_, rank);
+            auto* relation = AscendC::GetRemoteRankAddrs(a3Context_, rank);
             return relation == nullptr ? nullptr : reinterpret_cast<GM_ADDR>(relation->windowsIn);
         }
         if (a2Context_->multiFlag == 0U) {
@@ -337,8 +337,8 @@ public:
     }
 
 private:
-    __gm__ AscendC::HcclCombineOpParam *a2Context_ = nullptr;
-    __gm__ AscendC::HcclContextDef::HcclOpResParam *a3Context_ = nullptr;
+    __gm__ AscendC::HcclCombineOpParam* a2Context_ = nullptr;
+    __gm__ AscendC::HcclContextDef::HcclOpResParam* a3Context_ = nullptr;
     uint32_t rankId_ = 0U;
     uint32_t rankSize_ = 0U;
     uint64_t windowBytes_ = 0U;
@@ -347,8 +347,8 @@ private:
 
 template <typename T>
 __aicore__ inline void CopyPeerGmToLocalGm(AscendC::GlobalTensor<T> dst, AscendC::GlobalTensor<T> src, uint64_t count,
-                                           uint32_t ubMoveNum, AscendC::TBuf<AscendC::TPosition::VECCALC> &buffer0,
-                                           AscendC::TBuf<AscendC::TPosition::VECCALC> &buffer1)
+                                           uint32_t ubMoveNum, AscendC::TBuf<AscendC::TPosition::VECCALC>& buffer0,
+                                           AscendC::TBuf<AscendC::TPosition::VECCALC>& buffer1)
 {
     if (count == 0U || ubMoveNum == 0U) {
         return;
@@ -394,18 +394,18 @@ __aicore__ inline void CopyPeerGmToLocalGm(AscendC::GlobalTensor<T> dst, AscendC
 
 template <typename T>
 __aicore__ inline void CopyLocalGmToWindow(AscendC::GlobalTensor<T> dst, AscendC::GlobalTensor<T> src, uint64_t count,
-                                           uint32_t ubMoveNum, AscendC::TBuf<AscendC::TPosition::VECCALC> &buffer0,
-                                           AscendC::TBuf<AscendC::TPosition::VECCALC> &buffer1)
+                                           uint32_t ubMoveNum, AscendC::TBuf<AscendC::TPosition::VECCALC>& buffer0,
+                                           AscendC::TBuf<AscendC::TPosition::VECCALC>& buffer1)
 {
     CopyPeerGmToLocalGm(dst, src, count, ubMoveNum, buffer0, buffer1);
 }
 
-__aicore__ inline __gm__ int32_t *GetFlagAddress(GM_ADDR window, uint64_t controlOffset, uint64_t flagOffset)
+__aicore__ inline __gm__ int32_t* GetFlagAddress(GM_ADDR window, uint64_t controlOffset, uint64_t flagOffset)
 {
-    return reinterpret_cast<__gm__ int32_t *>(window + controlOffset + flagOffset);
+    return reinterpret_cast<__gm__ int32_t*>(window + controlOffset + flagOffset);
 }
 
-__aicore__ inline void StoreFlag(__gm__ int32_t *address, AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer,
+__aicore__ inline void StoreFlag(__gm__ int32_t* address, AscendC::TBuf<AscendC::TPosition::VECCALC>& flagBuffer,
                                  int32_t value)
 {
     AscendC::LocalTensor<int32_t> local = flagBuffer.Get<int32_t>();
@@ -420,7 +420,7 @@ __aicore__ inline void StoreFlag(__gm__ int32_t *address, AscendC::TBuf<AscendC:
     AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID2);
 }
 
-__aicore__ inline int32_t LoadFlag(__gm__ int32_t *address, AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer)
+__aicore__ inline int32_t LoadFlag(__gm__ int32_t* address, AscendC::TBuf<AscendC::TPosition::VECCALC>& flagBuffer)
 {
     AscendC::LocalTensor<int32_t> local = flagBuffer.Get<int32_t>();
     AscendC::GlobalTensor<int32_t> global;
@@ -433,44 +433,44 @@ __aicore__ inline int32_t LoadFlag(__gm__ int32_t *address, AscendC::TBuf<Ascend
     return local.GetValue(0U);
 }
 
-__aicore__ inline void WaitFlagValue(__gm__ int32_t *address, AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer,
+__aicore__ inline void WaitFlagValue(__gm__ int32_t* address, AscendC::TBuf<AscendC::TPosition::VECCALC>& flagBuffer,
                                      int32_t value)
 {
     while (LoadFlag(address, flagBuffer) != value) {
     }
 }
 
-__aicore__ inline int32_t NextInvocationEpoch(const PeerWindowContext &context, const A2avWindowLayout &layout,
-                                              AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer)
+__aicore__ inline int32_t NextInvocationEpoch(const PeerWindowContext& context, const A2avWindowLayout& layout,
+                                              AscendC::TBuf<AscendC::TPosition::VECCALC>& flagBuffer)
 {
-    __gm__ int32_t *epochAddress = GetFlagAddress(context.Window(context.RankId()), layout.controlOffset, kEpochOffset);
+    __gm__ int32_t* epochAddress = GetFlagAddress(context.Window(context.RankId()), layout.controlOffset, kEpochOffset);
     const int32_t current = LoadFlag(epochAddress, flagBuffer);
     const int32_t next = (current <= 0 || current == 0x7fffffff) ? 1 : current + 1;
     StoreFlag(epochAddress, flagBuffer, next);
     return next;
 }
 
-__aicore__ inline void PublishPeerPhase(const PeerWindowContext &context, const A2avWindowLayout &layout,
+__aicore__ inline void PublishPeerPhase(const PeerWindowContext& context, const A2avWindowLayout& layout,
                                         uint64_t phaseOffset, int32_t epoch, uint32_t workerIdx, uint32_t workerNum,
-                                        uint32_t subBlockIdx, AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer)
+                                        uint32_t subBlockIdx, AscendC::TBuf<AscendC::TPosition::VECCALC>& flagBuffer)
 {
     if (subBlockIdx != 0U || workerNum == 0U || workerIdx >= workerNum) {
         return;
     }
     for (uint32_t rank = workerIdx; rank < context.RankSize(); rank += workerNum) {
-        __gm__ int32_t *slot =
+        __gm__ int32_t* slot =
             GetFlagAddress(context.Window(rank), layout.controlOffset,
                            phaseOffset + static_cast<uint64_t>(context.RankId()) * kControlFlagStride);
         StoreFlag(slot, flagBuffer, epoch);
     }
 }
 
-__aicore__ inline void WaitPeerPhase(const PeerWindowContext &context, const A2avWindowLayout &layout,
+__aicore__ inline void WaitPeerPhase(const PeerWindowContext& context, const A2avWindowLayout& layout,
                                      uint64_t phaseOffset, int32_t epoch,
-                                     AscendC::TBuf<AscendC::TPosition::VECCALC> &flagBuffer)
+                                     AscendC::TBuf<AscendC::TPosition::VECCALC>& flagBuffer)
 {
     for (uint32_t sourceRank = 0U; sourceRank < context.RankSize(); ++sourceRank) {
-        __gm__ int32_t *slot = GetFlagAddress(context.Window(context.RankId()), layout.controlOffset,
+        __gm__ int32_t* slot = GetFlagAddress(context.Window(context.RankId()), layout.controlOffset,
                                               phaseOffset + static_cast<uint64_t>(sourceRank) * kControlFlagStride);
         WaitFlagValue(slot, flagBuffer, epoch);
     }

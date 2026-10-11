@@ -57,7 +57,7 @@ struct MatmulAlltoAllAclnnTestParam {
     aclFormat outputFormat; // output数据format，仅支持ND
     // 其它属性
     vector<int64_t> alltoAllAxesOptional; // alltoall数据交换的方向，只能为空或者[-1,-2]
-    char *group;                          // 通信域标识，字符串，长度要求（0，128）
+    char* group;                          // 通信域标识，字符串，长度要求（0，128）
     bool transposeX1;                     // x1是否转置，现不支持为true
     bool transposeX2;                     // x2是否转置，为true时x2shape为（H2，H1）
     // ut用例期望返回状态
@@ -791,19 +791,19 @@ static MatmulAlltoAllAclnnTestParam g_casesParams[] = {
      false,
      ACLNN_ERR_PARAM_INVALID}};
 
-static aclTensor *CreateAclTensor(const std::vector<int64_t> &shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensor(const std::vector<int64_t>& shape, aclDataType dataType, aclFormat format)
 {
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
         strides[i] = shape[i + 1] * strides[i + 1];
     }
-    aclTensor *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
+    aclTensor* tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
                                         shape.size(), nullptr);
     assert(tensor != nullptr);
     return tensor;
 }
 
-static void TestOneParamCase(const MatmulAlltoAllAclnnTestParam &param)
+static void TestOneParamCase(const MatmulAlltoAllAclnnTestParam& param)
 {
     std::cout << "run case " << param.caseName << std::endl;
     // 从结构体list中获取实际用例属性
@@ -820,20 +820,20 @@ static void TestOneParamCase(const MatmulAlltoAllAclnnTestParam &param)
     aclFormat biasFormat = param.biasFormat;
     aclFormat outputFormat = param.outputFormat;
     vector<int64_t> axesAcl = param.alltoAllAxesOptional;
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
-    const char *group = param.group;
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    const char* group = param.group;
     bool transposeX1 = param.transposeX1;
     bool transposeX2 = param.transposeX2;
     aclnnStatus retStatus = param.aclnnStatusUt;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet;
 
     if (param.x1Null || param.x2Null || param.outputNull) {
-        aclTensor *x1Ptr = param.x1Null ? nullptr : CreateAclTensor(x1Shape, x1Dtype, x1Format);
-        aclTensor *x2Ptr = param.x2Null ? nullptr : CreateAclTensor(x2Shape, x2Dtype, x2Format);
-        aclTensor *outputPtr = param.outputNull ? nullptr : CreateAclTensor(outputShape, outputDtype, outputFormat);
-        aclTensor *biasPtr = biasShape.empty() ? nullptr : CreateAclTensor(biasShape, biasDtype, biasFormat);
+        aclTensor* x1Ptr = param.x1Null ? nullptr : CreateAclTensor(x1Shape, x1Dtype, x1Format);
+        aclTensor* x2Ptr = param.x2Null ? nullptr : CreateAclTensor(x2Shape, x2Dtype, x2Format);
+        aclTensor* outputPtr = param.outputNull ? nullptr : CreateAclTensor(outputShape, outputDtype, outputFormat);
+        aclTensor* biasPtr = biasShape.empty() ? nullptr : CreateAclTensor(biasShape, biasDtype, biasFormat);
         auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                             INPUT(x1Ptr, x2Ptr, biasPtr, alltoAllAxesOptional, group, transposeX1, transposeX2),
                             OUTPUT(outputPtr));
@@ -1147,12 +1147,12 @@ TEST_F(TestAclnnMatmulAlltoAll, NullX1)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(nullptr, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -1164,12 +1164,12 @@ TEST_F(TestAclnnMatmulAlltoAll, NullX2)
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, nullptr, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -1181,12 +1181,12 @@ TEST_F(TestAclnnMatmulAlltoAll, NullOutput)
     TensorDesc x1Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(nullptr));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -1200,12 +1200,12 @@ TEST_F(TestAclnnMatmulAlltoAll, Dtypes910BBf16BiasBf16)
     TensorDesc biasDesc = TensorDesc({256}, ACL_BF16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, biasDesc, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -1219,12 +1219,12 @@ TEST_F(TestAclnnMatmulAlltoAll, Dtypes910BBf16BiasInvalid)
     TensorDesc biasDesc = TensorDesc({256}, ACL_INT8, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, biasDesc, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -1237,12 +1237,12 @@ TEST_F(TestAclnnMatmulAlltoAll, ReFormatX1NCHW)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     // ReFormat may succeed or fail depending on mock; ensure no crash
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -1256,12 +1256,12 @@ TEST_F(TestAclnnMatmulAlltoAll, ReFormatX2NCHW)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_NCHW);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -1275,12 +1275,12 @@ TEST_F(TestAclnnMatmulAlltoAll, ReFormatBiasNCHW)
     TensorDesc biasDesc = TensorDesc({256}, ACL_FLOAT16, ACL_FORMAT_NCHW);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, biasDesc, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -1293,12 +1293,12 @@ TEST_F(TestAclnnMatmulAlltoAll, ReFormatOutputNCHW)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_NCHW);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -1314,12 +1314,12 @@ TEST_F(TestAclnnMatmulAlltoAll, NonContiguousX2)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND, {1, 128}, 0, {128, 256});
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     // Non-contiguous x2 with transposeX2=false should be handled (TransX2Tensor called)
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -1335,12 +1335,12 @@ TEST_F(TestAclnnMatmulAlltoAll, NonContiguousX2WithTranspose)
     TensorDesc x2Desc = TensorDesc({256, 128}, ACL_FLOAT16, ACL_FORMAT_ND, {1, 256}, 0, {256, 128});
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, true),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -1353,12 +1353,12 @@ TEST_F(TestAclnnMatmulAlltoAll, Phase2ApiDav3510)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     // Phase-2 call directly to cover lines 335-357
     if (aclRet == ACLNN_SUCCESS) {
@@ -1376,12 +1376,12 @@ TEST_F(TestAclnnMatmulAlltoAll, Phase2Api910B)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     // Phase-2 call to cover 910B branch (NNOPBASE_HCCL_SERVER_TYPE_MTE)
     if (aclRet == ACLNN_SUCCESS) {
@@ -1398,12 +1398,12 @@ TEST_F(TestAclnnMatmulAlltoAll, Phase2Api91093)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     // Phase-2 call to cover ASCEND910_93 branch (NNOPBASE_HCCL_SERVER_TYPE_AICPU)
     if (aclRet == ACLNN_SUCCESS) {
@@ -1420,12 +1420,12 @@ TEST_F(TestAclnnMatmulAlltoAll, DtypeMismatchX1X2)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_BF16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -1438,12 +1438,12 @@ TEST_F(TestAclnnMatmulAlltoAll, DtypeMismatchX1Output)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -1457,12 +1457,12 @@ TEST_F(TestAclnnMatmulAlltoAll, BiasInvalidDtypeDav3510)
     TensorDesc biasDesc = TensorDesc({256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, biasDesc, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -1475,12 +1475,12 @@ TEST_F(TestAclnnMatmulAlltoAll, EmptyTensorM0Dav3510)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({0, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_SUCCESS);
 }
@@ -1493,12 +1493,12 @@ TEST_F(TestAclnnMatmulAlltoAll, Phase2DirectCall)
     TensorDesc x2Desc = TensorDesc({128, 256}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc outputDesc = TensorDesc({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesData = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesData.data(), axesData.size());
     auto ut = OP_API_UT(aclnnMatmulAlltoAll,
                         INPUT(x1Desc, x2Desc, nullptr, alltoAllAxesOptional, "ut_test_matmul_allto_all", false, false),
                         OUTPUT(outputDesc));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     // Always call phase-2 to cover lines 335-357, regardless of phase-1 result
     aclnnStatus phase2Ret = aclnnMatmulAlltoAll(nullptr, workspaceSize, executor, nullptr);

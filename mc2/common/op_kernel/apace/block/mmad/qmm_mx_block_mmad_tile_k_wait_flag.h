@@ -156,8 +156,8 @@ public:
     }
 
 public:
-    __aicore__ inline void Init(const ProblemShape &problemShape, const BlockShape &l0TileShape,
-                                const L1Params &l1Params, bool isBias, bool dbL0C, uint64_t splitKNum = 1)
+    __aicore__ inline void Init(const ProblemShape& problemShape, const BlockShape& l0TileShape,
+                                const L1Params& l1Params, bool isBias, bool dbL0C, uint64_t splitKNum = 1)
     {
         k_ = asc::te::get<IDX_K_IDX>(problemShape);
         kL1_ = l1Params.kL1;
@@ -223,8 +223,8 @@ public:
     }
 
     template <typename TensorScaleA, typename TensorScaleB>
-    __aicore__ inline auto CopyScalesInL1(TensorScaleA const &gmScaleA, TensorScaleB const &gmScaleB,
-                                          const TileL1L0Param &tileL1L0Param, uint64_t scaleL1BufId, uint64_t kL1Offset,
+    __aicore__ inline auto CopyScalesInL1(TensorScaleA const& gmScaleA, TensorScaleB const& gmScaleB,
+                                          const TileL1L0Param& tileL1L0Param, uint64_t scaleL1BufId, uint64_t kL1Offset,
                                           uint64_t scaleGmOffset, bool needCopyScale)
     {
         const uint64_t scaleKL1Len = (Align64(scaleKL1_) >> ALIGN_64_BYTES_SHIFT) * MXFP_MULTI_BASE_SIZE;
@@ -284,7 +284,7 @@ public:
     }
 
     template <typename TensorA>
-    __aicore__ inline auto CopyAInL1(TensorA const &gmA, const TileL1L0Param &tileL1L0Param, uint64_t l1BufId,
+    __aicore__ inline auto CopyAInL1(TensorA const& gmA, const TileL1L0Param& tileL1L0Param, uint64_t l1BufId,
                                      uint64_t kL1Offset)
     {
         auto copyGM2L1 = asc::te::make_copy(asc::te::copy_gm_to_l1{});
@@ -317,11 +317,11 @@ public:
 
     template <typename TensorScaleAL1, typename TensorScaleBL1, typename TensorAL1, typename TensorBL1,
               typename TensorBiasL1, typename TensorL0C>
-    __aicore__ inline void Iterate(const TileL1L0Param &tileL1L0Param, uint64_t iter0, uint64_t scaleKL1Len,
+    __aicore__ inline void Iterate(const TileL1L0Param& tileL1L0Param, uint64_t iter0, uint64_t scaleKL1Len,
                                    uint64_t scaleKOffset, uint64_t scaleAKOffset, uint64_t biasBtOffset,
-                                   bool isFirstSplitK, bool isLastSplitK, TensorScaleAL1 &tensorScaleAL1,
-                                   TensorScaleBL1 &tensorScaleBL1, TensorAL1 &tensorAL1, TensorBL1 &tensorBL1,
-                                   TensorBiasL1 &tensorBiasL1, TensorL0C &tensorL0C)
+                                   bool isFirstSplitK, bool isLastSplitK, TensorScaleAL1& tensorScaleAL1,
+                                   TensorScaleBL1& tensorScaleBL1, TensorAL1& tensorAL1, TensorBL1& tensorBL1,
+                                   TensorBiasL1& tensorBiasL1, TensorL0C& tensorL0C)
     {
         // Slice scaleKL1 to current kL1 window.
         auto tensorBlockScaleBL1 = tensorScaleBL1.slice(asc::te::make_coord(scaleKOffset, 0),
@@ -409,9 +409,9 @@ public:
 
     template <typename TensorA, typename TensorB, typename TensorScaleA, typename TensorScaleB, typename TensorBias,
               typename TensorC>
-    __aicore__ inline void operator()(TensorA const &gmA, TensorB const &gmB, TensorScaleA const &gmScaleA,
-                                      TensorScaleB const &gmScaleB, TensorBias const &gmBias, TensorC const &gmC,
-                                      BlockShape const &singleShape, uint64_t splitKIdx = 0)
+    __aicore__ inline void operator()(TensorA const& gmA, TensorB const& gmB, TensorScaleA const& gmScaleA,
+                                      TensorScaleB const& gmScaleB, TensorBias const& gmBias, TensorC const& gmC,
+                                      BlockShape const& singleShape, uint64_t splitKIdx = 0)
     {
         TileL1L0Param tileL1L0Param;
         tileL1L0Param.curM = asc::te::get<IDX_M_TILEIDX>(singleShape);
@@ -453,8 +453,8 @@ public:
             // scaleA, scaleB GM->L1
             auto scalePair = CopyScalesInL1(gmScaleA, gmScaleB, tileL1L0Param, scaleL1BufId, kL1Offset, scaleGmOffset,
                                             scaleKIterIdx == 0);
-            auto &tensorScaleAL1 = scalePair.scaleA;
-            auto &tensorScaleBL1 = scalePair.scaleB;
+            auto& tensorScaleAL1 = scalePair.scaleA;
+            auto& tensorScaleBL1 = scalePair.scaleB;
 
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BufId);
             tileL1L0Param.curGmKL1 = (iter0 + 1 == kL1Iter_) ? (k_ - kL1Offset) : kL1_;
@@ -535,9 +535,9 @@ public:
 
 private:
     template <typename TensorL0C, typename TensorAL0, typename TensorBL0, typename TensorBT>
-    __aicore__ inline void Mmad(const TileL1L0Param &tileL1L0Param, bool isFinalAccumulation, bool initCMatrix,
-                                bool needBias, uint64_t curKL0, TensorL0C &tensorL0C, TensorAL0 const &tensorAL0,
-                                TensorBL0 const &tensorBL0, TensorBT const &tensorBt)
+    __aicore__ inline void Mmad(const TileL1L0Param& tileL1L0Param, bool isFinalAccumulation, bool initCMatrix,
+                                bool needBias, uint64_t curKL0, TensorL0C& tensorL0C, TensorAL0 const& tensorAL0,
+                                TensorBL0 const& tensorBL0, TensorBT const& tensorBt)
     {
         asc::te::mmad_params params;
         params.m = static_cast<uint16_t>(tileL1L0Param.curM);

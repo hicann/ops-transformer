@@ -21,7 +21,7 @@
 
 class MMAllReduceFitBalanceTiling : public Mc2FitBasedBalanceTiling {
 public:
-    explicit MMAllReduceFitBalanceTiling(const mc2tiling::TilingArgs &args, KernelType kernelType,
+    explicit MMAllReduceFitBalanceTiling(const mc2tiling::TilingArgs& args, KernelType kernelType,
                                          TopoType topoType = TopoType::STANDARD_CARD,
                                          uint8_t commMode = Mc2Comm::COMM_MODE_AICPU, bool isPertileFp8 = false)
         : Mc2FitBasedBalanceTiling(args, kernelType, topoType)

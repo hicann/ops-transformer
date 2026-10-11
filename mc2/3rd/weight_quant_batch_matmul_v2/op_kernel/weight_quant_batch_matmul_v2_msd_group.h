@@ -65,17 +65,17 @@ public:
     __aicore__ inline Mc2WeightQuantBatchMatMulV2MsdGroupKernel() {}
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                                const Mc2WeightQuantBatchMatmulV2MsdGroupTilingData *tilingData, TPipe *tPipe);
+                                const Mc2WeightQuantBatchMatmulV2MsdGroupTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void CopyInVector1(uint32_t m, uint32_t k);
     __aicore__ inline void ProcessVector1(uint32_t m, uint32_t k);
     __aicore__ inline void UnfoldAMatrix(uint32_t m, uint32_t k);
-    __aicore__ inline void ComputeAMatrixSum(uint32_t m, uint32_t k, BinaryRepeatParams &maxAddReatParams,
-                                             DataCopyParams &dataCopyParams, BrcbRepeatParams &brcbRepeatParams);
-    __aicore__ inline void ComputeAMatrixMax(uint32_t m, uint32_t k, BinaryRepeatParams &maxAddReatParams,
-                                             DataCopyParams &dataCopyParams, BrcbRepeatParams &brcbRepeatParams);
+    __aicore__ inline void ComputeAMatrixSum(uint32_t m, uint32_t k, BinaryRepeatParams& maxAddReatParams,
+                                             DataCopyParams& dataCopyParams, BrcbRepeatParams& brcbRepeatParams);
+    __aicore__ inline void ComputeAMatrixMax(uint32_t m, uint32_t k, BinaryRepeatParams& maxAddReatParams,
+                                             DataCopyParams& dataCopyParams, BrcbRepeatParams& brcbRepeatParams);
     __aicore__ inline void CopyOutVector1(uint32_t m, uint32_t k);
     __aicore__ inline void ProcessCube(uint32_t m, uint32_t cubeSingleCoreN, uint32_t idxN, uint32_t baseN,
                                        uint32_t realBaseN, uint32_t groupIdx, uint32_t nloopIdx);
@@ -94,8 +94,8 @@ private:
     __aicore__ inline void ProcessMatmulResultHalf(uint64_t cOffset, uint64_t v4EndM, int64_t vecSingleCoreN);
     __aicore__ inline void ProcessVector5(int32_t singleCoreRealN);
 
-    __aicore__ inline void CopyInBL1(uint64_t wOffset, uint64_t singleCoreRealN, Nd2NzParams &nd2nzParams);
-    __aicore__ inline void CopyInBL1Nz(const LocalTensor<int8_t> &bL1Tensor, uint64_t kOffset, uint64_t nOffset,
+    __aicore__ inline void CopyInBL1(uint64_t wOffset, uint64_t singleCoreRealN, Nd2NzParams& nd2nzParams);
+    __aicore__ inline void CopyInBL1Nz(const LocalTensor<int8_t>& bL1Tensor, uint64_t kOffset, uint64_t nOffset,
                                        uint64_t l1BaseKb, uint64_t singleCoreRealN);
     __aicore__ inline void CopyInAL1(uint64_t singleCoreRealK, uint64_t kOffset);
     __aicore__ inline void LaunchMatmul(uint64_t singleCoreRealN, uint64_t cOffset, uint64_t aOffset);
@@ -184,8 +184,8 @@ private:
     using InputBiasType = MatmulType<TPosition::GM, CubeFormat::ND, preciseType>;
     MatmulImpl<InputXType, InputWType, OutputYType, InputBiasType> mmObj;
 
-    TPipe *pipe_;
-    const Mc2WeightQuantBatchMatmulV2MsdGroupTilingData *tiling_;
+    TPipe* pipe_;
+    const Mc2WeightQuantBatchMatmulV2MsdGroupTilingData* tiling_;
 
     // int8系数默认取127,254，且只需要展开两次
     float multiFactor1_ = 127;
@@ -260,13 +260,13 @@ __aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
     preciseType>::InitGlobalBuffer(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                    GM_ADDR bias, GM_ADDR y, GM_ADDR workspace)
 {
-    xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(x), tiling_->mSize * tiling_->kSize);
-    wGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(weight), tiling_->kSize * tiling_->nSize);
-    antiQuantScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(antiquantScale), tiling_->nSize);
-    antiQuantOffsetGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(antiquantOffset), tiling_->nSize);
-    yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType *>(y), tiling_->mSize * tiling_->nSize);
+    xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(x), tiling_->mSize * tiling_->kSize);
+    wGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(weight), tiling_->kSize * tiling_->nSize);
+    antiQuantScaleGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(antiquantScale), tiling_->nSize);
+    antiQuantOffsetGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(antiquantOffset), tiling_->nSize);
+    yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType*>(y), tiling_->mSize * tiling_->nSize);
     if (tiling_->hasBias) {
-        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ biasType *>(bias), tiling_->nSize);
+        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ biasType*>(bias), tiling_->nSize);
     }
 
     // int4场景展开4份，但每份的size减半，总体空间占用等于2份的int8
@@ -277,17 +277,17 @@ __aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
     uint64_t reduceSumSize =
         CeilDiv(tiling_->mSize * groupNum_ * GROUP_DIM, GM_ADDR_ALIGN_BASIC_BLOCK) * GM_ADDR_ALIGN_BASIC_BLOCK;
 
-    aUnfoldGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ wType *>(workspace));
-    aUnfoldGlobalS8_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t *>(workspace));
-    workspaceReduceSumBrc_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspace + aUnfoldSize), reduceSumSize);
-    workspaceReduceMaxBrc_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspace + aUnfoldSize + reduceSumSize),
+    aUnfoldGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ wType*>(workspace));
+    aUnfoldGlobalS8_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(workspace));
+    workspaceReduceSumBrc_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace + aUnfoldSize), reduceSumSize);
+    workspaceReduceMaxBrc_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace + aUnfoldSize + reduceSumSize),
                                            reduceSumSize);
-    workspaceAtomicGlobal_.SetGlobalBuffer(
-        reinterpret_cast<__gm__ float *>(workspace + aUnfoldSize + 2 * reduceSumSize), atomicAddSize);
+    workspaceAtomicGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace + aUnfoldSize + 2 * reduceSumSize),
+                                           atomicAddSize);
 
     // reduce sum和reduce max各需要占用一份reduceSumSize的空间
     workspaceCGlobal_.SetGlobalBuffer(
-        reinterpret_cast<__gm__ preciseType *>(workspace + aUnfoldSize + atomicAddSize + 2 * reduceSumSize),
+        reinterpret_cast<__gm__ preciseType*>(workspace + aUnfoldSize + atomicAddSize + 2 * reduceSumSize),
         multiScaleTimes_ * tiling_->mSize * tiling_->nSize * DOUBLE_BUFFER_NUM * sizeof(preciseType));
 
     InitAtomicAddr(workspaceAtomicGlobal_, atomicAddSize, curBlockIdx_);
@@ -300,7 +300,7 @@ __aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
     preciseType>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR quantScale,
                        GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                       const Mc2WeightQuantBatchMatmulV2MsdGroupTilingData *tilingData, TPipe *tPipe)
+                       const Mc2WeightQuantBatchMatmulV2MsdGroupTilingData* tilingData, TPipe* tPipe)
 {
     tiling_ = tilingData;
     pipe_ = tPipe;
@@ -417,7 +417,7 @@ template <typename xType, typename wType, typename biasType, typename yType, boo
           typename preciseType>
 __aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
-    preciseType>::CopyInBL1(uint64_t wOffset, uint64_t singleCoreRealN, Nd2NzParams &nd2nzParams)
+    preciseType>::CopyInBL1(uint64_t wOffset, uint64_t singleCoreRealN, Nd2NzParams& nd2nzParams)
 {
     if (IsSameType<wType, int4b_t>::value) {
         nd2nzParams.dValue = singleCoreRealN >> 1;
@@ -440,7 +440,7 @@ template <typename xType, typename wType, typename biasType, typename yType, boo
           typename preciseType>
 __aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
-    preciseType>::CopyInBL1Nz(const LocalTensor<int8_t> &bL1Tensor, uint64_t kOffset, uint64_t nOffset,
+    preciseType>::CopyInBL1Nz(const LocalTensor<int8_t>& bL1Tensor, uint64_t kOffset, uint64_t nOffset,
                               uint64_t l1BaseKb, uint64_t singleCoreRealN)
 {
     uint64_t tilingKSizeNz = CeilAlign(tiling_->kSize, 16UL);
@@ -552,8 +552,8 @@ template <typename xType, typename wType, typename biasType, typename yType, boo
           typename preciseType>
 __aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
-    preciseType>::ComputeAMatrixSum(uint32_t m, uint32_t k, BinaryRepeatParams &maxAddReatParams,
-                                    DataCopyParams &dataCopyParams, BrcbRepeatParams &brcbRepeatParams)
+    preciseType>::ComputeAMatrixSum(uint32_t m, uint32_t k, BinaryRepeatParams& maxAddReatParams,
+                                    DataCopyParams& dataCopyParams, BrcbRepeatParams& brcbRepeatParams)
 {
     if (tiling_->groupSize == 128) {
         // groupSize为128的场景，先将128 reduce 至64(即FP32_MAX_MASK_SIZE)
@@ -591,8 +591,8 @@ template <typename xType, typename wType, typename biasType, typename yType, boo
           typename preciseType>
 __aicore__ inline void Mc2WeightQuantBatchMatMulV2MsdGroupKernel<
     xType, wType, biasType, yType, aTrans, bTrans, antiQuantType, hasAntiQuantOffset, quantType, weightFormat,
-    preciseType>::ComputeAMatrixMax(uint32_t m, uint32_t k, BinaryRepeatParams &maxAddReatParams,
-                                    DataCopyParams &dataCopyParams, BrcbRepeatParams &brcbRepeatParams)
+    preciseType>::ComputeAMatrixMax(uint32_t m, uint32_t k, BinaryRepeatParams& maxAddReatParams,
+                                    DataCopyParams& dataCopyParams, BrcbRepeatParams& brcbRepeatParams)
 {
     Abs(aF32MultiScaleTensor_, aF32Tensor_, m * k);
     PipeBarrier<PIPE_V>();

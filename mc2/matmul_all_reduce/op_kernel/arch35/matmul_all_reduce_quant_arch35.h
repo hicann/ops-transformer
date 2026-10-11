@@ -33,12 +33,12 @@ template <typename XType, typename WType, typename YType, class MmType, Mc2CoreT
           int commMode>
 class MatmulAllReduceQuant : public MatmulAllReduceBase<XType, YType, CoreType, basedA2aRsAg, commMode> {
 public:
-    __aicore__ inline MatmulAllReduceQuant(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs, ArnGmAddrs *arnAddrs,
-                                           MC2TilingHeader *tilingData, TPipe *tPipe, bool isMX)
+    __aicore__ inline MatmulAllReduceQuant(MC2GmAddrs* addrs, QuantGmAddrs* quantAddrs, ArnGmAddrs* arnAddrs,
+                                           MC2TilingHeader* tilingData, TPipe* tPipe, bool isMX)
         : MatmulAllReduceBase<XType, YType, CoreType, basedA2aRsAg, commMode>(addrs, quantAddrs, arnAddrs, tilingData,
                                                                               tPipe)
     {
-        mc2TilingData_ = (Mc2Tiling::QuantMatmulAllReduceTilingDataA5 *)tilingData;
+        mc2TilingData_ = (Mc2Tiling::QuantMatmulAllReduceTilingDataA5*)tilingData;
         this->tileInfo_.mmTiling = &mc2TilingData_->tilematmulTiling.matmulTiling;
         this->tailInfo_.mmTiling = &mc2TilingData_->tailmatmulTiling.matmulTiling;
         isMXScene_ = isMX;
@@ -59,9 +59,9 @@ public:
     }
 
 protected:
-    __aicore__ inline void InnerProcess(MmType &mmOp, bool tailFlag, uint32_t turnCnt, const MC2TileInfo &tileInfo)
+    __aicore__ inline void InnerProcess(MmType& mmOp, bool tailFlag, uint32_t turnCnt, const MC2TileInfo& tileInfo)
     {
-        const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *tiling =
+        const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* tiling =
             (tailFlag ? &mc2TilingData_->tailmatmulTiling : &mc2TilingData_->tilematmulTiling);
         uint64_t pertokenOffset = 0UL;
         uint32_t MX_GROUP_SIZE = 64U;
@@ -91,7 +91,7 @@ protected:
     }
 
 private:
-    Mc2Tiling::QuantMatmulAllReduceTilingDataA5 *mc2TilingData_;
+    Mc2Tiling::QuantMatmulAllReduceTilingDataA5* mc2TilingData_;
     bool isMXScene_ = false;
 };
 
@@ -103,7 +103,7 @@ private:
         using OpType = templateClass<DTYPE_X1, DTYPE_X2, scaleType, DTYPE_BIAS, DTYPE_Y, X1_FORMAT, X2_FORMAT, \
                                      Y_FORMAT, __VA_ARGS__>; \
         MatmulAllReduceQuant<DTYPE_X1, DTYPE_X2, DTYPE_Y, OpType, coreType, basedA2aRsAg, commMode> op( \
-            &addrs, &quantAddrs, nullptr, (MC2TilingHeader *)&tilingData, &tPipe, false); \
+            &addrs, &quantAddrs, nullptr, (MC2TilingHeader*)&tilingData, &tPipe, false); \
         op.Init(); \
         op.Process(); \
     } while (0)
@@ -116,7 +116,7 @@ private:
         using OpType = templateClass<DTYPE_X1, DTYPE_X2, AscendC::fp8_e8m0_t, DTYPE_BIAS, DTYPE_Y, X1_FORMAT, \
                                      X2_FORMAT, Y_FORMAT, __VA_ARGS__>; \
         MatmulAllReduceQuant<DTYPE_X1, DTYPE_X2, DTYPE_Y, OpType, coreType, basedA2aRsAg, commMode> op( \
-            &addrs, &quantAddrs, nullptr, (MC2TilingHeader *)&tilingData, &tPipe, true); \
+            &addrs, &quantAddrs, nullptr, (MC2TilingHeader*)&tilingData, &tPipe, true); \
         op.Init(); \
         op.Process(); \
     } while (0)

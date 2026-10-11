@@ -85,7 +85,7 @@ static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {DataType:
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST_WITHOUT_BF16 = {DataType::DT_FLOAT,
                                                                                     DataType::DT_FLOAT16};
 
-static inline bool CheckMathType(const aclTensor *self, const aclTensor *mat2, int8_t cubeMathType)
+static inline bool CheckMathType(const aclTensor* self, const aclTensor* mat2, int8_t cubeMathType)
 {
     bool mat2Float = mat2->GetDataType() == DataType::DT_FLOAT;
     bool selfFloat = self->GetDataType() == DataType::DT_FLOAT;
@@ -104,7 +104,7 @@ static inline bool CheckSocVersionIsSupportBf16(void)
            GetCurrentPlatformInfo().GetSocVersion() >= SocVersion::ASCEND910B;
 }
 
-static bool CheckDtypeValid(const aclTensor *self, const aclTensor *mat2, const aclTensor *bias, const aclTensor *out,
+static bool CheckDtypeValid(const aclTensor* self, const aclTensor* mat2, const aclTensor* bias, const aclTensor* out,
                             int8_t cubeMathType)
 {
     bool bf16flag = CheckSocVersionIsSupportBf16();
@@ -145,7 +145,7 @@ static bool CheckDtypeValid(const aclTensor *self, const aclTensor *mat2, const 
     return true;
 }
 
-static bool CheckShapeValid(const aclTensor *self, const aclTensor *mat2, bool transposeX2 = false)
+static bool CheckShapeValid(const aclTensor* self, const aclTensor* mat2, bool transposeX2 = false)
 {
     if (mat2->GetViewShape().GetDimNum() != DIMS_TWO) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("Matmul", "mat2",
@@ -171,7 +171,7 @@ static bool CheckShapeValid(const aclTensor *self, const aclTensor *mat2, bool t
     return true;
 }
 
-static bool CheckSupportSingleSplitKFp16Bf16(const aclTensor *self, const aclTensor *mat2, const DataType selfDtype,
+static bool CheckSupportSingleSplitKFp16Bf16(const aclTensor* self, const aclTensor* mat2, const DataType selfDtype,
                                              const DataType mat2Dtype)
 {
     // 判决门限
@@ -203,7 +203,7 @@ static bool CheckSupportSingleSplitKFp16Bf16(const aclTensor *self, const aclTen
            kDim >= splitKMultiThres * std::max(selfShape.GetDim(0), mat2Shape.GetDim(1));
 }
 
-static aclnnStatus SetMatmulOpSupportInfo(const aclTensor *self, const aclTensor *mat2, MmOpInfo &mmOpInfo,
+static aclnnStatus SetMatmulOpSupportInfo(const aclTensor* self, const aclTensor* mat2, MmOpInfo& mmOpInfo,
                                           int8_t cubeMathType)
 {
     // 判断传入L0接口，用于计算的Dtype
@@ -261,7 +261,7 @@ static inline int64_t ComputePadNum(int64_t kDim, int64_t dataSize)
     return CeilAlign(kDim, CeilDiv(ALIGN_UNIT, dataSize)) - kDim;
 }
 
-static inline const aclTensor *GetPadTensor(int64_t padNum, int64_t padDim, aclOpExecutor *executor)
+static inline const aclTensor* GetPadTensor(int64_t padNum, int64_t padDim, aclOpExecutor* executor)
 {
     // pad: top bottom left right
     size_t dims = 4;
@@ -279,7 +279,7 @@ static inline const aclTensor *GetPadTensor(int64_t padNum, int64_t padDim, aclO
     return padTensor;
 }
 
-static bool CheckStreamKSKTiling(MmOpInfo &mmOpInfo)
+static bool CheckStreamKSKTiling(MmOpInfo& mmOpInfo)
 {
     // 判断k轴是否大于32*512 / DtypeSize_, 小于就不走stream-k-sk
     uint64_t kAlign =
@@ -302,7 +302,7 @@ static bool CheckStreamKSKTiling(MmOpInfo &mmOpInfo)
     return !(mCnt * nCnt > aiCoreCnt / NUM_HALF);
 }
 
-static bool CheckStreamKDPSKTiling(MmOpInfo &mmOpInfo)
+static bool CheckStreamKDPSKTiling(MmOpInfo& mmOpInfo)
 {
     uint64_t aiCoreCnt = std::max(uint64_t{1}, static_cast<uint64_t>(mmOpInfo.aiCoreCnt));
     uint64_t dtypeASize = std::max(uint64_t{1}, static_cast<uint64_t>(mmOpInfo.shapeInfo.dtypeASize));
@@ -325,7 +325,7 @@ static bool CheckStreamKDPSKTiling(MmOpInfo &mmOpInfo)
 }
 
 // 判断shape是否支持GemmV3
-static bool CheckShapeSupport(MmOpInfo &mmOpInfo)
+static bool CheckShapeSupport(MmOpInfo& mmOpInfo)
 {
     // 判断是否不走stream-k
     bool notSkTiling = !CheckStreamKSKTiling(mmOpInfo) && !CheckStreamKDPSKTiling(mmOpInfo);
@@ -363,7 +363,7 @@ op::Shape SwapLastTwoDimValue(const op::Shape tensorShape)
     return swapedShape;
 }
 
-MmOpInfo GetMatmulOpInfo(const aclTensor *self, const aclTensor *mat2, int8_t cubeMathType)
+MmOpInfo GetMatmulOpInfo(const aclTensor* self, const aclTensor* mat2, int8_t cubeMathType)
 {
     // 获取m、k、n轴的大小
     op::Shape selfShape = self->GetViewShape();
@@ -415,8 +415,8 @@ MmOpInfo GetMatmulOpInfo(const aclTensor *self, const aclTensor *mat2, int8_t cu
     return mmOpInfo;
 }
 
-bool ContiguousAndCast(const aclTensor *&contiguousInput, const aclTensor *&castOut, bool &transposeFlag,
-                       op::DataType dtype, aclOpExecutor *executor)
+bool ContiguousAndCast(const aclTensor*& contiguousInput, const aclTensor*& castOut, bool& transposeFlag,
+                       op::DataType dtype, aclOpExecutor* executor)
 {
     auto contiguousOut = contiguousInput;
     if (IsTransposeLastTwoDims(contiguousInput)) {
@@ -434,7 +434,7 @@ bool ContiguousAndCast(const aclTensor *&contiguousInput, const aclTensor *&cast
     return true;
 }
 
-bool CheckGemmV3Support(const aclTensor *mat1, const aclTensor *mat2, MmOpInfo &mmOpInfo, int8_t cubeMathType)
+bool CheckGemmV3Support(const aclTensor* mat1, const aclTensor* mat2, MmOpInfo& mmOpInfo, int8_t cubeMathType)
 {
     CHECK_RET(mat1 != nullptr, false);
     CHECK_RET(mat2 != nullptr, false);
@@ -474,7 +474,7 @@ bool IsInputSupportFp32()
     return true;
 }
 
-bool CheckBatchDimBroadcast(size_t batch1DimNum, size_t batch2DimNum, const op::Shape &batch1, const op::Shape &batch2)
+bool CheckBatchDimBroadcast(size_t batch1DimNum, size_t batch2DimNum, const op::Shape& batch1, const op::Shape& batch2)
 {
     size_t batchIndex = MM_DIM;
     while (batch1DimNum > batchIndex && batch2DimNum > batchIndex) {
@@ -497,7 +497,7 @@ int64_t GetOffSet(int64_t DimNum)
 }
 
 // 检查单Tensor是否为支持带bias的mm的dtype
-static inline bool CheckDtypeSupport(const aclTensor *tensor)
+static inline bool CheckDtypeSupport(const aclTensor* tensor)
 {
     if (!IsInputSupportFp32()) {
         auto iter = std::find(V100_DTYPE_SUPPORT.begin(), V100_DTYPE_SUPPORT.end(), tensor->GetDataType());
@@ -508,7 +508,7 @@ static inline bool CheckDtypeSupport(const aclTensor *tensor)
 }
 
 // 检查是否为支持带bias的mm的dtype
-static inline bool CheckDtypeSupportBias(const aclTensor *self, const aclTensor *mat1, const aclTensor *mat2)
+static inline bool CheckDtypeSupportBias(const aclTensor* self, const aclTensor* mat1, const aclTensor* mat2)
 {
     bool matMulDtypeCorrect = CheckDtypeSupport(mat1) && CheckDtypeSupport(mat2);
     if (mat1->GetDataType() == DataType::DT_BF16) {
@@ -519,8 +519,8 @@ static inline bool CheckDtypeSupportBias(const aclTensor *self, const aclTensor 
 }
 
 // 如果beta==1 && alpha == 1 && self.shape[0] == mat2.shape[1] && 不属于切k，直接走matmul的bias模式
-bool NeedToConvertBias(const aclTensor *self, const aclTensor *mat1, const aclTensor *mat2, const aclScalar *beta,
-                       const aclScalar *alpha)
+bool NeedToConvertBias(const aclTensor* self, const aclTensor* mat1, const aclTensor* mat2, const aclScalar* beta,
+                       const aclScalar* alpha)
 {
     int64_t mat1DimNum = static_cast<int64_t>(mat1->GetViewShape().GetDimNum());
     // rightMove to distinguish different shape of mm and bmm
@@ -559,7 +559,7 @@ bool NeedToConvertBias(const aclTensor *self, const aclTensor *mat1, const aclTe
 }
 
 // Nz fp16 in fp32 out experimental rules
-bool GetNzSplitKFlag(const aclTensor *self, const aclTensor *mat2, const Format selfSuppFormat,
+bool GetNzSplitKFlag(const aclTensor* self, const aclTensor* mat2, const Format selfSuppFormat,
                      const Format outSuppFormat)
 {
     if ((selfSuppFormat == Format::FORMAT_ND) && (outSuppFormat == Format::FORMAT_ND)) {
@@ -579,7 +579,7 @@ bool GetNzSplitKFlag(const aclTensor *self, const aclTensor *mat2, const Format 
     return (m * n * k < MKN_MAX) && mn_multi;
 }
 
-bool IsSplitk(const TensorInfo *self, const TensorInfo *mat2)
+bool IsSplitk(const TensorInfo* self, const TensorInfo* mat2)
 {
     op::Shape selfShape = self->tensor->GetViewShape();
     op::Shape mat2Shape = mat2->tensor->GetViewShape();
@@ -601,7 +601,7 @@ bool IsSplitk(const TensorInfo *self, const TensorInfo *mat2)
            NzSplitKFlag;
 }
 
-bool IsFormatSupportNd(const aclTensor *self, const aclTensor *mat2)
+bool IsFormatSupportNd(const aclTensor* self, const aclTensor* mat2)
 {
     if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
         return true;
@@ -629,7 +629,7 @@ bool IsFormatSupportNd(const aclTensor *self, const aclTensor *mat2)
     return true;
 }
 
-bool IsSupportNzNzNd(const aclTensor *self, const aclTensor *mat2)
+bool IsSupportNzNzNd(const aclTensor* self, const aclTensor* mat2)
 {
     op::Shape selfShape = self->GetViewShape();
     op::Shape mat2Shape = mat2->GetViewShape();
@@ -643,7 +643,7 @@ bool IsSupportNzNzNd(const aclTensor *self, const aclTensor *mat2)
     return false;
 }
 
-bool IsNdToNzOnTheFly(const aclTensor *self, const aclTensor *mat2)
+bool IsNdToNzOnTheFly(const aclTensor* self, const aclTensor* mat2)
 {
     uint64_t kInnerAxisMinLimit = 128U;
     uint64_t kInnerAxisMaxLimit = 65535U;
@@ -691,7 +691,7 @@ bool IsNdToNzOnTheFly(const aclTensor *self, const aclTensor *mat2)
             (mat2InnerAxis < kInnerAxisMinLimit && ((mat2InnerAxis & 0xF) == 0)));
 }
 
-bool IsTransposeLastTwoDims(const aclTensor *tensor)
+bool IsTransposeLastTwoDims(const aclTensor* tensor)
 {
     // 当输入tensor的shape小于2或者大于6的时候，返回错误
     if (tensor->GetViewShape().GetDimNum() < 2 || tensor->GetViewShape().GetDimNum() > 6) {
@@ -717,7 +717,7 @@ bool IsTransposeLastTwoDims(const aclTensor *tensor)
     return false;
 }
 
-aclnnStatus SetMmSupportDType(MmOpInfo &mmOpInfo, int8_t cubeMathType)
+aclnnStatus SetMmSupportDType(MmOpInfo& mmOpInfo, int8_t cubeMathType)
 {
     bool dtypeMismatch = mmOpInfo.ori_info.self_dtype != mmOpInfo.ori_info.mat2_dtype;
     bool tensorFloat =
@@ -742,7 +742,7 @@ aclnnStatus SetMmSupportDType(MmOpInfo &mmOpInfo, int8_t cubeMathType)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus SetMmSupportFormat(const aclTensor *self, const aclTensor *mat2, MmOpInfo &mmOpInfo)
+aclnnStatus SetMmSupportFormat(const aclTensor* self, const aclTensor* mat2, MmOpInfo& mmOpInfo)
 {
     if (IsFormatSupportNd(self, mat2)) {
         OP_LOGD("Matmul support NDNDND");
@@ -786,7 +786,7 @@ aclnnStatus GetMmInfo(MmOpInfo mmOpInfo)
     return ACLNN_SUCCESS;
 }
 
-aclIntArray *NeedTransPerm(const aclTensor *x, aclOpExecutor *executor)
+aclIntArray* NeedTransPerm(const aclTensor* x, aclOpExecutor* executor)
 {
     op::Shape shape = x->GetViewShape();
     int64_t dimSize = x->GetViewShape().GetDimNum();
@@ -798,7 +798,7 @@ aclIntArray *NeedTransPerm(const aclTensor *x, aclOpExecutor *executor)
     return executor->AllocIntArray(valuePerm.data(), dimSize);
 }
 
-bool checkBF16SizeValid(const aclTensor *&mat2, const bool &transX2Flag)
+bool checkBF16SizeValid(const aclTensor*& mat2, const bool& transX2Flag)
 {
     // 校验N轴是否在优化范围内
     int64_t nDimNumWhenNoTrans = mat2->GetViewShape().GetDimNum() - INNER_AXIS;
@@ -811,7 +811,7 @@ bool checkBF16SizeValid(const aclTensor *&mat2, const bool &transX2Flag)
     return true;
 }
 
-bool checkBF16MMValid(const aclTensor *&self, const aclTensor *&mat2, const bool &transX2Flag)
+bool checkBF16MMValid(const aclTensor*& self, const aclTensor*& mat2, const bool& transX2Flag)
 {
     // 校验MN轴是否在优化范围内
     int64_t mDimNumWhenNoTrans = self->GetViewShape().GetDimNum() - OUTER_AXIS;
@@ -828,7 +828,7 @@ bool checkBF16MMValid(const aclTensor *&self, const aclTensor *&mat2, const bool
     return true;
 }
 
-bool IfKEqual1(const aclTensor *&selfInput, const MmOpInfo &mmOpInfo, const bool &transX1Flag, const aclTensor *&bias)
+bool IfKEqual1(const aclTensor*& selfInput, const MmOpInfo& mmOpInfo, const bool& transX1Flag, const aclTensor*& bias)
 {
     // 不支持nz场景
     if (mmOpInfo.support_info.self_format == Format::FORMAT_FRACTAL_NZ ||
@@ -855,8 +855,8 @@ bool IfKEqual1(const aclTensor *&selfInput, const MmOpInfo &mmOpInfo, const bool
     return true;
 }
 
-aclnnStatus IfKEqual1SelfToMK(const aclTensor *&selfInput, const aclTensor *&selfReshapeOutput, bool &transX1Flag,
-                              aclOpExecutor *executor)
+aclnnStatus IfKEqual1SelfToMK(const aclTensor*& selfInput, const aclTensor*& selfReshapeOutput, bool& transX1Flag,
+                              aclOpExecutor* executor)
 {
     auto x1Perm = NeedTransPerm(selfInput, executor);
     selfReshapeOutput = transX1Flag ? l0op::Reshape(selfInput, x1Perm, executor) : selfInput;
@@ -865,8 +865,8 @@ aclnnStatus IfKEqual1SelfToMK(const aclTensor *&selfInput, const aclTensor *&sel
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus IfKEqual1Mat2ToKN(const aclTensor *&mat2Input, const aclTensor *&mat2ReshapeOutput, bool &transX2Flag,
-                              aclOpExecutor *executor)
+aclnnStatus IfKEqual1Mat2ToKN(const aclTensor*& mat2Input, const aclTensor*& mat2ReshapeOutput, bool& transX2Flag,
+                              aclOpExecutor* executor)
 {
     auto x2Perm = NeedTransPerm(mat2Input, executor);
     mat2ReshapeOutput = transX2Flag ? l0op::Reshape(mat2Input, x2Perm, executor) : mat2Input;
@@ -875,8 +875,8 @@ aclnnStatus IfKEqual1Mat2ToKN(const aclTensor *&mat2Input, const aclTensor *&mat
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus IfMEqual1SelfToMK(const aclTensor *&selfInput, const aclTensor *&selfReshapeOutput,
-                              const Format selfInputFormat, bool &transX1Flag, aclOpExecutor *executor)
+aclnnStatus IfMEqual1SelfToMK(const aclTensor*& selfInput, const aclTensor*& selfReshapeOutput,
+                              const Format selfInputFormat, bool& transX1Flag, aclOpExecutor* executor)
 {
     // 不支持nz场景
     if (selfInputFormat == Format::FORMAT_FRACTAL_NZ) {
@@ -901,8 +901,8 @@ aclnnStatus IfMEqual1SelfToMK(const aclTensor *&selfInput, const aclTensor *&sel
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus IfNEqual1Mat2ToNK(const aclTensor *&mat2Input, const aclTensor *&mat2ReshapeOutput,
-                              const Format mat2InputFormat, bool &transX2Flag, aclOpExecutor *executor)
+aclnnStatus IfNEqual1Mat2ToNK(const aclTensor*& mat2Input, const aclTensor*& mat2ReshapeOutput,
+                              const Format mat2InputFormat, bool& transX2Flag, aclOpExecutor* executor)
 {
     // 不支持nz场景。
     if (mat2InputFormat == Format::FORMAT_FRACTAL_NZ) {
@@ -938,7 +938,7 @@ uint64_t TransDequantScaleToM1(const float deqScale)
     return fixpipeDeqScale;
 }
 
-op::FVector<int64_t> GetShape(const aclTensor *tensor)
+op::FVector<int64_t> GetShape(const aclTensor* tensor)
 {
     op::FVector<int64_t> shape;
     if (tensor == nullptr) {
@@ -958,7 +958,7 @@ op::FVector<int64_t> GetShape(const aclTensor *tensor)
     return shape;
 }
 
-const aclTensor *ContiguousBias(const aclTensor *self, const aclTensor *bias, aclOpExecutor *executor)
+const aclTensor* ContiguousBias(const aclTensor* self, const aclTensor* bias, aclOpExecutor* executor)
 {
     auto contiguousBias = l0op::Contiguous(bias, executor);
     CHECK_RET(contiguousBias != nullptr, nullptr);

@@ -82,7 +82,7 @@ public:
         Params() {}
 
         CATLASS_HOST_DEVICE
-        Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
+        Params(GemmCoord const& problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR ptrScale_, LayoutScale layoutScale_, GM_ADDR ptrPerTokenScale_,
                LayoutPerTokenScale layoutPerTokenScale_, GM_ADDR ptrBias_, LayoutBias layoutBias_, GM_ADDR ptrPeerMem_,
                LayoutD layoutD_, GM_ADDR ptrWorkspace_, GM_ADDR ptrOut_, CommBase commUtil_, int32_t pipeDepth_,
@@ -122,16 +122,16 @@ public:
     }
 
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params &params);
+    CATLASS_DEVICE void operator()(Params& params);
 
 #if 1
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIC>(Params &params)
+    CATLASS_DEVICE void operator()<AscendC::AIC>(Params& params)
     {
         AscendC::GlobalTensor<ElementA> gmA;
-        gmA.SetGlobalBuffer((__gm__ ElementA *)params.ptrA);
+        gmA.SetGlobalBuffer((__gm__ ElementA*)params.ptrA);
         AscendC::GlobalTensor<ElementB> gmB;
-        gmB.SetGlobalBuffer((__gm__ ElementB *)params.ptrB);
+        gmB.SetGlobalBuffer((__gm__ ElementB*)params.ptrB);
 
         BlockMmad blockMmad(resource);
 
@@ -139,7 +139,7 @@ public:
         int32_t coreNum = AscendC::GetBlockNum();
 
         AscendC::GlobalTensor<ElementC> gmC;
-        gmC.SetGlobalBuffer((__gm__ ElementC *)params.ptrWorkspace);
+        gmC.SetGlobalBuffer((__gm__ ElementC*)params.ptrWorkspace);
         auto layoutC = layout::RowMajor{L1TileShape::M * coreNum * WORKSPACE_STAGES, L1TileShape::N};
 
         int32_t mLoops = (params.problemShape.m() + L1TileShape::M - 1) / L1TileShape::M;
@@ -232,7 +232,7 @@ public:
     }
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIV>(Params &params)
+    CATLASS_DEVICE void operator()<AscendC::AIV>(Params& params)
     {
         BlockEpilogue blockEpilogue(resource);
 
@@ -240,9 +240,9 @@ public:
         uint32_t coreNum = AscendC::GetBlockNum();
 
         AscendC::GlobalTensor<ElementD> gmD;
-        gmD.SetGlobalBuffer((__gm__ ElementD *)params.ptrPeerMem);
+        gmD.SetGlobalBuffer((__gm__ ElementD*)params.ptrPeerMem);
         AscendC::GlobalTensor<ElementC> gmC;
-        gmC.SetGlobalBuffer((__gm__ ElementC *)params.ptrWorkspace);
+        gmC.SetGlobalBuffer((__gm__ ElementC*)params.ptrWorkspace);
         auto layoutC = layout::RowMajor{L1TileShape::M * coreNum * WORKSPACE_STAGES, L1TileShape::N};
 
         LayoutScale layoutScale = params.layoutScale;
@@ -358,8 +358,8 @@ public:
                                      static_cast<int64_t>(commIdx) * L1TileShape::M * params.commUtil.p_value *
                                          (params.problemShape.n() / params.commUtil.rank_size);
                 params.commUtil.CopyGMToGM(
-                    (__gm__ ElementD *)params.commUtil.buff[params.commUtil.core_idx] + src_offset,
-                    reinterpret_cast<__gm__ ElementD *>(params.ptrOut) + dst_offset, token_per_rank);
+                    (__gm__ ElementD*)params.commUtil.buff[params.commUtil.core_idx] + src_offset,
+                    reinterpret_cast<__gm__ ElementD*>(params.ptrOut) + dst_offset, token_per_rank);
             }
 
             params.commUtil.SetAndWaitAivSync(flag_idx + WORKSPACE_STAGES);
@@ -389,7 +389,7 @@ private:
             Arch::CrossCoreWaitFlag(ptr->flagAivFinishComputeList[stageId]);
         }
 
-        MatmulKernel *ptr{nullptr};
+        MatmulKernel* ptr{nullptr};
         uint32_t stageId;
     };
 
@@ -405,7 +405,7 @@ private:
             Arch::CrossCoreSetFlag<0x2, PIPE_FIX>(ptr->flagAicFinishStoreList[stageId]);
         }
 
-        MatmulKernel *ptr{nullptr};
+        MatmulKernel* ptr{nullptr};
         uint32_t stageId;
     };
 

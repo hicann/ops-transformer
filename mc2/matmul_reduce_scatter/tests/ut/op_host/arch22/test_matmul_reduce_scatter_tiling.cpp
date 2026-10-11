@@ -542,7 +542,7 @@ TEST_F(MatmulReduceScatterArch22TilingTest, CheckUbOverflowLargeD_FP16)
 
 TEST_F(MatmulReduceScatterArch22TilingTest, IsDeterministic_True_FP16)
 {
-    const char *envValue = getenv("HCCL_DETERMINISTIC");
+    const char* envValue = getenv("HCCL_DETERMINISTIC");
     std::string originalStr = (envValue != nullptr) ? std::string(envValue) : "";
     setenv("HCCL_DETERMINISTIC", "TRUE", 1);
 
@@ -581,7 +581,7 @@ TEST_F(MatmulReduceScatterArch22TilingTest, IsDeterministic_True_FP16)
 
 TEST_F(MatmulReduceScatterArch22TilingTest, IsDeterministic_False_FP16)
 {
-    const char *envValue = getenv("HCCL_DETERMINISTIC");
+    const char* envValue = getenv("HCCL_DETERMINISTIC");
     std::string originalStr = (envValue != nullptr) ? std::string(envValue) : "";
     setenv("HCCL_DETERMINISTIC", "0", 1);
 

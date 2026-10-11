@@ -33,7 +33,7 @@ protected:
     }
 };
 
-static aclnnStatus RunActivationParamCase(const char *activation, const std::vector<float> &activationParams)
+static aclnnStatus RunActivationParamCase(const char* activation, const std::vector<float>& activationParams)
 {
     auto contextDesc = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 1);
     auto xDesc = TensorDesc({128, 4096}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-1, 1);
@@ -96,7 +96,7 @@ TEST_F(AclnnMegaMoeTest, dav3510_nullptr_context)
         OUTPUT(y_desc, expert_token_nums_desc));
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -124,7 +124,7 @@ TEST_F(AclnnMegaMoeTest, dav3510_nullptr_x)
                         OUTPUT(y_desc, expert_token_nums_desc));
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -152,7 +152,7 @@ TEST_F(AclnnMegaMoeTest, dav3510_nullptr_topk_ids)
         OUTPUT(y_desc, expert_token_nums_desc));
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -180,7 +180,7 @@ TEST_F(AclnnMegaMoeTest, dav3510_nullptr_topk_weights)
         OUTPUT(y_desc, expert_token_nums_desc));
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -208,7 +208,7 @@ TEST_F(AclnnMegaMoeTest, dav3510_nullptr_weight1)
         OUTPUT(y_desc, expert_token_nums_desc));
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -236,7 +236,7 @@ TEST_F(AclnnMegaMoeTest, dav3510_nullptr_weight2)
         OUTPUT(y_desc, expert_token_nums_desc));
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -264,7 +264,7 @@ TEST_F(AclnnMegaMoeTest, dav3510_nullptr_y_out)
                         OUTPUT(nullptr, expert_token_nums_desc));
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -292,7 +292,7 @@ TEST_F(AclnnMegaMoeTest, dav3510_nullptr_expert_token_nums_out)
                         OUTPUT(y_desc, nullptr));
 
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }

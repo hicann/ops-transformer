@@ -15,7 +15,7 @@
 
 namespace Mc2Hcom {
 
-uint32_t Mc2CommAlgoSelector::GetL0TopoType(const char *group)
+uint32_t Mc2CommAlgoSelector::GetL0TopoType(const char* group)
 {
     uint32_t topoType = INVALID_TOPO_TYPE;
     HcclResult ret = MC2HcomTopology::TryGetGroupTopoType(group, &topoType);
@@ -26,7 +26,7 @@ uint32_t Mc2CommAlgoSelector::GetL0TopoType(const char *group)
     return topoType;
 }
 
-uint32_t Mc2CommAlgoSelector::GetLayerNum(const char *group)
+uint32_t Mc2CommAlgoSelector::GetLayerNum(const char* group)
 {
     std::vector<uint32_t> layers;
     HcclResult ret = MC2HcomTopology::CommGetNetLayersByGroup(group, layers);
@@ -37,9 +37,9 @@ uint32_t Mc2CommAlgoSelector::GetLayerNum(const char *group)
     return static_cast<uint32_t>(layers.size());
 }
 
-std::string Mc2CommAlgoSelector::SelectAlgoName(const std::string &opName, const char *group, uint8_t commEngine,
-                                                uint64_t commDataBytes, uint32_t rankSize, const CommAlgoEntry *entries,
-                                                uint32_t entryCount, const std::string &defaultAlgoName)
+std::string Mc2CommAlgoSelector::SelectAlgoName(const std::string& opName, const char* group, uint8_t commEngine,
+                                                uint64_t commDataBytes, uint32_t rankSize, const CommAlgoEntry* entries,
+                                                uint32_t entryCount, const std::string& defaultAlgoName)
 {
     if (group == nullptr || entries == nullptr || entryCount == 0) {
         OP_LOGW(opName.c_str(), "[CommAlgoSelector] invalid input, fallback to default: %s", defaultAlgoName.c_str());
@@ -60,7 +60,7 @@ std::string Mc2CommAlgoSelector::SelectAlgoName(const std::string &opName, const
             "commDataBytes=%llu, rankSize=%u, entries=%u",
             group, topoType, topoType, layerNum, commEngine, commDataBytes, rankSize, n);
 
-    const CommAlgoEntry *buf[2][MAX_COMM_ALGO_CANDIDATES];
+    const CommAlgoEntry* buf[2][MAX_COMM_ALGO_CANDIDATES];
     uint32_t cnt[2] = {n, 0};
     uint32_t src = 0;
     uint32_t dst = 1;
@@ -68,7 +68,7 @@ std::string Mc2CommAlgoSelector::SelectAlgoName(const std::string &opName, const
         buf[0][i] = &entries[i];
     }
 
-    auto applyFilter = [&](const char *name, auto &&pred) {
+    auto applyFilter = [&](const char* name, auto&& pred) {
         if (cnt[src] == 0) {
             return;
         }
@@ -88,17 +88,17 @@ std::string Mc2CommAlgoSelector::SelectAlgoName(const std::string &opName, const
     };
 
     applyFilter("commEngine",
-                [&](const CommAlgoEntry *e) { return e->commEngine == 0 || e->commEngine == commEngine; });
+                [&](const CommAlgoEntry* e) { return e->commEngine == 0 || e->commEngine == commEngine; });
     applyFilter("rankSize",
-                [&](const CommAlgoEntry *e) { return rankSize >= e->minRankSize && rankSize <= e->maxRankSize; });
-    applyFilter("layers", [&](const CommAlgoEntry *e) {
+                [&](const CommAlgoEntry* e) { return rankSize >= e->minRankSize && rankSize <= e->maxRankSize; });
+    applyFilter("layers", [&](const CommAlgoEntry* e) {
         return layerNum == 0 || (e->minLayers <= layerNum && e->maxLayers >= layerNum);
     });
-    applyFilter("topoType", [&](const CommAlgoEntry *e) {
+    applyFilter("topoType", [&](const CommAlgoEntry* e) {
         return topoType == INVALID_TOPO_TYPE || e->topoType == WILDCARD_TOPO_TYPE || e->topoType == topoType;
     });
     applyFilter("commDataBytes",
-                [&](const CommAlgoEntry *e) { return commDataBytes >= e->minBytes && commDataBytes <= e->maxBytes; });
+                [&](const CommAlgoEntry* e) { return commDataBytes >= e->minBytes && commDataBytes <= e->maxBytes; });
 
     if (cnt[src] == 0) {
         OP_LOGW(opName.c_str(), "[CommAlgoSelector] no candidate survived all filters, fallback to default: %s",
@@ -106,7 +106,7 @@ std::string Mc2CommAlgoSelector::SelectAlgoName(const std::string &opName, const
         return defaultAlgoName;
     }
 
-    const CommAlgoEntry *best = buf[src][0];
+    const CommAlgoEntry* best = buf[src][0];
     for (uint32_t i = 1; i < cnt[src]; i++) {
         if (buf[src][i]->priority > best->priority) {
             best = buf[src][i];

@@ -90,7 +90,7 @@ struct MoeDistributeCombineSetupTestParam {
     uint64_t mc2TilingDataReservedLen;
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MoeDistributeCombineSetupTestParam &param)
+inline std::ostream& operator<<(std::ostream& os, const MoeDistributeCombineSetupTestParam& param)
 {
     return os << param.caseName;
 }
@@ -2063,7 +2063,7 @@ protected:
     }
 };
 
-gert::StorageShape make_shape(const std::initializer_list<int64_t> &input_shape)
+gert::StorageShape make_shape(const std::initializer_list<int64_t>& input_shape)
 {
     if (input_shape.size() == 0) {
         return gert::StorageShape{};
@@ -2074,7 +2074,7 @@ gert::StorageShape make_shape(const std::initializer_list<int64_t> &input_shape)
 static struct MoeDistributeCombineSetupCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombineSetupTestParam &param)
+static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombineSetupTestParam& param)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
 
@@ -2106,7 +2106,7 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombine
                                    CORE_NUM, UB_SIZE);
 }
 
-static void ThreadFunction(const MoeDistributeCombineSetupTestParam *testCases, size_t caseNum, size_t threadIdx,
+static void ThreadFunction(const MoeDistributeCombineSetupTestParam* testCases, size_t caseNum, size_t threadIdx,
                            size_t threadNum)
 {
     for (size_t idx = threadIdx; idx < caseNum; idx += threadNum) {
@@ -2117,7 +2117,7 @@ static void ThreadFunction(const MoeDistributeCombineSetupTestParam *testCases, 
     }
 }
 
-static void TestExecMultiThread(const MoeDistributeCombineSetupTestParam *testCases, size_t testCaseNum,
+static void TestExecMultiThread(const MoeDistributeCombineSetupTestParam* testCases, size_t testCaseNum,
                                 size_t threadNum)
 {
     std::thread threads[threadNum];

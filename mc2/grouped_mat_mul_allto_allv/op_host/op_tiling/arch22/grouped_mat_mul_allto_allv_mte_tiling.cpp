@@ -58,11 +58,11 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetShapeAttrsInfo()
 
 bool GroupedMatmulAllToAllvMteTiling::IsCapable()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     if (attrs == nullptr) {
         return false;
     }
-    const char *commMode = attrs->GetAttrPointer<char>(ATTR_COMM_MODE);
+    const char* commMode = attrs->GetAttrPointer<char>(ATTR_COMM_MODE);
     return commMode != nullptr && strncmp(commMode, "aiv", 7UL) == 0;
 }
 
@@ -142,7 +142,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckOpInputSingleParamsTensorM
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetGmmDtypes(const gert::StorageShape *&gmmWeightStorageShape)
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetGmmDtypes(const gert::StorageShape*& gmmWeightStorageShape)
 {
     auto gmmXDesc = context_->GetInputDesc(GMM_X_INDEX);
     OP_TILING_CHECK(gmmXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmX"), return ge::GRAPH_FAILED);
@@ -188,10 +188,10 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetGmmDtypes(const gert
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetGmmShapes(const gert::StorageShape *gmmWeightStorageShape)
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetGmmShapes(const gert::StorageShape* gmmWeightStorageShape)
 {
-    const gert::StorageShape *gmmXStorageShape = context_->GetInputShape(GMM_X_INDEX);
-    const gert::StorageShape *yStorageShape = context_->GetOutputShape(OUTPUT_Y_INDEX);
+    const gert::StorageShape* gmmXStorageShape = context_->GetInputShape(GMM_X_INDEX);
+    const gert::StorageShape* yStorageShape = context_->GetOutputShape(OUTPUT_Y_INDEX);
     OP_TILING_CHECK(gmmXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "gmmX"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(yStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "y"), return ge::GRAPH_FAILED);
 
@@ -215,7 +215,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetGmmShapes(const gert
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsGmm()
 {
-    const gert::StorageShape *gmmWeightStorageShape = nullptr;
+    const gert::StorageShape* gmmWeightStorageShape = nullptr;
     auto status = CheckAndSetGmmDtypes(gmmWeightStorageShape);
     if (status != ge::GRAPH_SUCCESS) {
         return status;
@@ -268,9 +268,9 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetMmDtypes()
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetMmShapes()
 {
-    const gert::StorageShape *mmXStorageShape = context_->GetOptionalInputShape(MM_X_OPTIONAL_INDEX);
-    const gert::StorageShape *mmWeightStorageShape = context_->GetOptionalInputShape(MM_WEIGHT_OPTIONAL_INDEX);
-    const gert::StorageShape *mmYStorageShape = context_->GetOutputShape(OUTPUT_MM_Y_OPTIONAL_INDEX);
+    const gert::StorageShape* mmXStorageShape = context_->GetOptionalInputShape(MM_X_OPTIONAL_INDEX);
+    const gert::StorageShape* mmWeightStorageShape = context_->GetOptionalInputShape(MM_WEIGHT_OPTIONAL_INDEX);
+    const gert::StorageShape* mmYStorageShape = context_->GetOutputShape(OUTPUT_MM_Y_OPTIONAL_INDEX);
     OP_TILING_CHECK(mmXStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "mmX"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(mmWeightStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "mmWeight"),
                     return ge::GRAPH_FAILED);
@@ -312,7 +312,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsMm()
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetLocalParamsAttr()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return ge::GRAPH_FAILED);
 
     auto transGmmWeightPtr = attrs->GetAttrPointer<bool>(ATTR_TRANS_GMM_WEIGHT_INDEX);
@@ -408,8 +408,8 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckParamsRelationMm()
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckParamsAttrEpAndSetLocalParams()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
-    const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
+    const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "group"), return ge::GRAPH_FAILED);
 
     int64_t rankDim = 0;
@@ -430,10 +430,10 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckParamsAttrEpAndSetLocalPar
                     return ge::GRAPH_FAILED);
 
     std::string supportRankSizeRange;
-    const std::set<int64_t> &supportRankSize = (npuArch_ == Ops::Base::DAV_3510) ?
+    const std::set<int64_t>& supportRankSize = (npuArch_ == Ops::Base::DAV_3510) ?
                                                    A5_SUPPORT_RANK_SIZE :
                                                    (isA3_ ? A3_SUPPORT_RANK_SIZE : A2_SUPPORT_RANK_SIZE);
-    for (const auto &v : supportRankSize) {
+    for (const auto& v : supportRankSize) {
         supportRankSizeRange += (std::to_string(v) + " ");
     }
     OP_TILING_CHECK(
@@ -456,7 +456,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckParamsAttrEpAndSetLocalPar
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetSendRecvCountsAttr()
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return ge::GRAPH_FAILED);
     const uint64_t expertNum = localParams_.ep * localParams_.epWorldSize;
     auto sendCountsPtr = attrs->GetAttrPointer<gert::ContinuousVector>(ATTR_SEND_COUNTS_INDEX);
@@ -470,8 +470,8 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckAndSetSendRecvCountsAttr()
                             expertNum, sendCountsSize, recvCountsSize),
                     return ge::GRAPH_FAILED);
 
-    const int64_t *sendCounts = static_cast<const int64_t *>(sendCountsPtr->GetData());
-    const int64_t *recvCounts = static_cast<const int64_t *>(recvCountsPtr->GetData());
+    const int64_t* sendCounts = static_cast<const int64_t*>(sendCountsPtr->GetData());
+    const int64_t* recvCounts = static_cast<const int64_t*>(recvCountsPtr->GetData());
     OP_TILING_CHECK(sendCounts == nullptr || recvCounts == nullptr,
                     OP_LOGE_WITH_INVALID_INPUT(opName_, "sendCounts/recvCounts data"), return ge::GRAPH_FAILED);
     uint64_t sendCountsSum = 0UL;
@@ -543,9 +543,9 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetPlatformInfo()
 }
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::FillTaskTiling(
-    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData) const
+    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData& outData) const
 {
-    auto &taskTiling = outData.taskTilingInfo;
+    auto& taskTiling = outData.taskTilingInfo;
     taskTiling.BSK = localParams_.BsK;
     taskTiling.BS = localParams_.Bs;
     taskTiling.H1 = localParams_.H1;
@@ -566,15 +566,15 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::FillTaskTiling(
 }
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::FillCommTiling(
-    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData) const
+    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData& outData) const
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return ge::GRAPH_FAILED);
-    const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
+    const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "group"), return ge::GRAPH_FAILED);
     outData.isA3 = static_cast<uint32_t>(isA3_);
     const uint32_t opType = isA3_ ? OP_TYPE_ALL_TO_ALL : OP_TYPE_MULTI_PUT;
-    const std::string &algConfig = isA3_ ? A3_MTE_HCCL_ALG_CONFIG : A2_MTE_HCCL_ALG_CONFIG;
+    const std::string& algConfig = isA3_ ? A3_MTE_HCCL_ALG_CONFIG : A2_MTE_HCCL_ALG_CONFIG;
     Mc2CcTilingConfig mc2InitConfig(group, opType, algConfig);
     OP_TILING_CHECK(mc2InitConfig.SetCommEngine(Mc2Comm::ENGINE_MTE) != 0,
                     OP_LOGE(opName_, "Failed to select the MTE communication engine."), return ge::GRAPH_FAILED);
@@ -588,7 +588,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::FillCommTiling(
 }
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckCommBuffer(
-    const MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData) const
+    const MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData& outData) const
 {
     const uint64_t countMatrixBytes =
         mc2tiling::AlignUp(localParams_.epWorldSize * localParams_.ep * sizeof(int32_t),
@@ -635,7 +635,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckCommBuffer(
 }
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::FinishPostTiling(
-    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData &outData)
+    MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData& outData)
 {
     MC2_CHECK_LOG_RET(opName_, CheckExpertPipeline());
     MC2_CHECK_LOG_RET(opName_, SetExpertChunkRows(outData.expertChunkRows));
@@ -651,7 +651,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::FinishPostTiling(
     outData.cocTiling.swizzlCount = MC2KernelTemplate::Gmma2avMteTiling::SWIZZLE_COUNT;
     outData.cocTiling.swizzlDirect = MC2KernelTemplate::Gmma2avMteTiling::SWIZZLE_DIRECTION;
 
-    auto *outTilingData = context_->GetTilingData<MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData>();
+    auto* outTilingData = context_->GetTilingData<MC2KernelTemplate::GroupedMatMulAlltoAllvMteTilingData>();
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
     OP_TILING_CHECK(outTilingData == nullptr, OP_LOGE(opName_, "Failed to get MTE tiling data from context"),
                     return ge::GRAPH_FAILED);
@@ -709,7 +709,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::CheckExpertPipeline() const
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus GroupedMatmulAllToAllvMteTiling::SetExpertChunkRows(uint32_t &expertChunkRows) const
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::SetExpertChunkRows(uint32_t& expertChunkRows) const
 {
     using namespace MC2KernelTemplate;
     expertChunkRows = GMMA2AV_MTE_SINGLE_CHUNK;
@@ -746,7 +746,7 @@ ge::graphStatus GroupedMatmulAllToAllvMteTiling::SetExpertChunkRows(uint32_t &ex
 
 ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(opName_, "Failed to get workspace."), return ge::GRAPH_FAILED);
     workspaces[0] = mteWorkspaceSize_;
     OP_LOGD(opName_, "MTE workspace size=%lu", mteWorkspaceSize_);
@@ -758,13 +758,13 @@ uint32_t GroupedMatmulAllToAllvMteTiling::GetCommModeIndex() const
     return ATTR_COMM_MODE;
 }
 
-ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetAndConvertCommMode(gert::TilingContext *context,
-                                                                       uint8_t &commMode) const
+ge::graphStatus GroupedMatmulAllToAllvMteTiling::GetAndConvertCommMode(gert::TilingContext* context,
+                                                                       uint8_t& commMode) const
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "attrs"),
                     return ge::GRAPH_FAILED);
-    const char *commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE);
+    const char* commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE);
     OP_TILING_CHECK(commModeStr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "comm_mode"),
                     return ge::GRAPH_FAILED);
     constexpr size_t maxLength = 7UL;

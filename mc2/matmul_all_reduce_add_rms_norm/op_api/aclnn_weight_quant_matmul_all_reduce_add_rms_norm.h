@@ -55,10 +55,10 @@ __attribute__((deprecated("aclnnWeightQuantMatmulAllReduceAddRmsNormGetWorkspace
                           "We apologize for any inconvenience caused and appreciate your "
                           "timely migration to the other interface."))) ACLNN_API aclnnStatus
 aclnnWeightQuantMatmulAllReduceAddRmsNormGetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *antiquantScale,
-    const aclTensor *antiquantOffset, const aclTensor *residual, const aclTensor *gamma, double epsilon,
-    const char *group, const char *reduceOp, int64_t commTurn, int64_t streamMode, int64_t antiquantGroupSize,
-    const aclTensor *y, const aclTensor *normOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* antiquantScale,
+    const aclTensor* antiquantOffset, const aclTensor* residual, const aclTensor* gamma, double epsilon,
+    const char* group, const char* reduceOp, int64_t commTurn, int64_t streamMode, int64_t antiquantGroupSize,
+    const aclTensor* y, const aclTensor* normOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnWeightQuantMatmulAllReduceAddRmsNorm的第二段接口，用于执行计算。
@@ -74,7 +74,7 @@ __attribute__((deprecated("aclnnWeightQuantMatmulAllReduceAddRmsNorm is schedule
                           "Please migrate to aclnnWeightQuantMatmulAllReduce and aclnnAddRmsNorm. "
                           "We apologize for any inconvenience caused and appreciate your timely migration "
                           "to the other interface."))) ACLNN_API aclnnStatus
-aclnnWeightQuantMatmulAllReduceAddRmsNorm(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnWeightQuantMatmulAllReduceAddRmsNorm(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                           const aclrtStream stream);
 
 #ifdef __cplusplus

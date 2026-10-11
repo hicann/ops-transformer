@@ -22,12 +22,12 @@ namespace optiling {
 namespace mc2_matmul_v3_advanced {
 class Mc2MatMulV3AswFullLoadTiling : public Mc2MatMulV3AswTiling {
 public:
-    Mc2MatMulV3AswFullLoadTiling(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg)
+    Mc2MatMulV3AswFullLoadTiling(gert::TilingContext* context, Mc2MatMulTilingCfg& cfg)
         : Mc2MatMulV3AswTiling(context, cfg) {};
 
     ~Mc2MatMulV3AswFullLoadTiling() override {};
-    bool CheckBL1FullLoadDefault(bool &isKFullLoad, uint64_t kAlignedValue, uint64_t nAlignedValue) const;
-    bool CheckBL1FullLoad91095(bool &isKFullLoad, uint64_t kAlignedValue, uint64_t nAlignedValue);
+    bool CheckBL1FullLoadDefault(bool& isKFullLoad, uint64_t kAlignedValue, uint64_t nAlignedValue) const;
+    bool CheckBL1FullLoad91095(bool& isKFullLoad, uint64_t kAlignedValue, uint64_t nAlignedValue);
     void AdjustTiling91095Basic(uint64_t biasBatchDimAll);
 
 protected:
@@ -43,8 +43,8 @@ private:
     bool CheckABL1FullLoad() const;
     void DoABL1FullLoad();
     void CalcTailBasicBlockBL1Full();
-    bool CheckBL1FullLoad(bool &isKFullLoad);
-    bool CheckAL1FullLoad(bool &isKFullLoad) const;
+    bool CheckBL1FullLoad(bool& isKFullLoad);
+    bool CheckAL1FullLoad(bool& isKFullLoad) const;
     void AdjustTilingDefault(uint64_t biasBatchDimAll);
     void AdjustTilingCommon(uint64_t aBatchDimAll);
     bool ABL1FullLoadExtraCond(uint64_t al1SingleCoreSize, uint64_t bl1SingleCoreSize) const;

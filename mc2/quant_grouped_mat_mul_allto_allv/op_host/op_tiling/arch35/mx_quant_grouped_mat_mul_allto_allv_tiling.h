@@ -33,9 +33,9 @@ constexpr uint64_t MX_GROUP_SIZE_N = 1;
 
 class MxQuantGroupedMatmulAllToAllvTiling : public QuantGroupedMatmulAllToAllvTilingCommon {
 public:
-    explicit MxQuantGroupedMatmulAllToAllvTiling(gert::TilingContext *context)
+    explicit MxQuantGroupedMatmulAllToAllvTiling(gert::TilingContext* context)
         : QuantGroupedMatmulAllToAllvTilingCommon(context) {};
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
     }
@@ -53,7 +53,7 @@ protected:
     ge::graphStatus CheckParamsRelationGmm() override;
     ge::graphStatus CheckParamsRelationMm() override;
     ge::graphStatus CheckParamsAttrEpAndSetLocalParams() override;
-    ge::graphStatus MxCheckShapeDimensions(const gert::StorageShape *shape, uint64_t dims, const char *shapeName);
+    ge::graphStatus MxCheckShapeDimensions(const gert::StorageShape* shape, uint64_t dims, const char* shapeName);
 
 private:
     ge::graphStatus CheckMxQuantGmmScaleShapes();

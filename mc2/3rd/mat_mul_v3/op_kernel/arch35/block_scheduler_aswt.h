@@ -76,16 +76,16 @@ public:
     using ProblemShape = ProblemShape_;
 
     struct Params {
-        const Mc2MatMulV3BasicTilingData *tilingData;
+        const Mc2MatMulV3BasicTilingData* tilingData;
     };
 
     struct BatchMatMulParams {
-        const Mc2BatchMatMulV3BasicTilingData *tilingData;
+        const Mc2BatchMatMulV3BasicTilingData* tilingData;
     };
 
 public:
-    __aicore__ inline Mc2BlockSchedulerAswtBuiltIn(const ProblemShape &shape, int64_t blockIdx, int64_t blockNum,
-                                                   const Params &params)
+    __aicore__ inline Mc2BlockSchedulerAswtBuiltIn(const ProblemShape& shape, int64_t blockIdx, int64_t blockNum,
+                                                   const Params& params)
         : blockIdx_(blockIdx),
           blockNum_(blockNum)
     {

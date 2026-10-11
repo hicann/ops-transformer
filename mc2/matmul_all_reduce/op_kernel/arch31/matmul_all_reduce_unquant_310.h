@@ -38,17 +38,17 @@ class MatmulAllReduceUnquant310 {
 public:
     __aicore__ inline MatmulAllReduceUnquant310() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR workspaceGM,
-                                Mc2Tiling::UnQuantMatmulAllReduceTilingData *tilingData, TPipe *tPipe,
-                                HcclServer *hcclServer);
+                                Mc2Tiling::UnQuantMatmulAllReduceTilingData* tilingData, TPipe* tPipe,
+                                HcclServer* hcclServer);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InnerProcess(uint32_t tileCnt, Mc2MatmulV3TilingData &mm_tiling, uint32_t shift);
+    __aicore__ inline void InnerProcess(uint32_t tileCnt, Mc2MatmulV3TilingData& mm_tiling, uint32_t shift);
 
 private:
-    Mc2Tiling::UnQuantMatmulAllReduceTilingData *tilingData_;
-    HcclServer *hcclServer_;
-    TPipe *tPipe_;
+    Mc2Tiling::UnQuantMatmulAllReduceTilingData* tilingData_;
+    HcclServer* hcclServer_;
+    TPipe* tPipe_;
     GM_ADDR cGM_;
     GM_ADDR aGM_;
     GM_ADDR bGM_;
@@ -60,13 +60,13 @@ private:
 template <typename aType, typename bType, typename biasType, typename cType, bool mixNdNz>
 __aicore__ inline void MatmulAllReduceUnquant310<aType, bType, biasType, cType, mixNdNz>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR workspaceGM,
-    Mc2Tiling::UnQuantMatmulAllReduceTilingData *tilingData, TPipe *tPipe, HcclServer *hcclServer)
+    Mc2Tiling::UnQuantMatmulAllReduceTilingData* tilingData, TPipe* tPipe, HcclServer* hcclServer)
 {
     GetTPipePtr()->InitBuffer(tmpBuf_, TOTAL_UB_SIZE);
-    auto &&cfg = tilingData->param;
+    auto&& cfg = tilingData->param;
 
-    __gm__ HcclCombinOpParam *context = (__gm__ HcclCombinOpParam *)(GetHcclContext<0>());
-    __gm__ uint8_t *workspaceMsg = (__gm__ uint8_t *)(context->WorkSpace + (tilingData->msg).notifyOff);
+    __gm__ HcclCombinOpParam* context = (__gm__ HcclCombinOpParam*)(GetHcclContext<0>());
+    __gm__ uint8_t* workspaceMsg = (__gm__ uint8_t*)(context->WorkSpace + (tilingData->msg).notifyOff);
     hcclServer->Init(workspaceMsg, (tilingData->msg).debugMode, tmpBuf_);
 
     workspaceGM += cfg.nd2NzWorkLen;
@@ -88,7 +88,7 @@ __aicore__ inline void MatmulAllReduceUnquant310<aType, bType, biasType, cType, 
 template <typename aType, typename bType, typename biasType, typename cType, bool mixNdNz>
 __aicore__ inline void MatmulAllReduceUnquant310<aType, bType, biasType, cType, mixNdNz>::Process()
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     if (g_coreType == AIV) {
         return;
     }
@@ -120,7 +120,7 @@ __aicore__ inline void MatmulAllReduceUnquant310<aType, bType, biasType, cType, 
 
 template <typename aType, typename bType, typename biasType, typename cType, bool mixNdNz>
 __aicore__ inline void MatmulAllReduceUnquant310<aType, bType, biasType, cType, mixNdNz>::InnerProcess(
-    uint32_t tileCnt, Mc2MatmulV3TilingData &mm_tiling, uint32_t shift)
+    uint32_t tileCnt, Mc2MatmulV3TilingData& mm_tiling, uint32_t shift)
 {
     const uint64_t aOffset = CalcShapeOffset(sizeof(aType), mm_tiling.matmulTiling.M, mm_tiling.matmulTiling.Ka);
     const uint64_t cOffset = CalcShapeOffset(sizeof(cType), mm_tiling.matmulTiling.M, mm_tiling.matmulTiling.N);
@@ -161,16 +161,16 @@ __aicore__ inline void MatmulAllReduceUnquant310<aType, bType, biasType, cType, 
 }
 
 __aicore__ inline void MatMulEmptyTensorKernelUnquantNzBias(GM_ADDR biasGM, GM_ADDR cGM,
-                                                            Mc2Tiling::UnQuantMatmulAllReduceTilingData *tilingData,
-                                                            TBuf<TPosition::VECCALC> &tmpBuf)
+                                                            Mc2Tiling::UnQuantMatmulAllReduceTilingData* tilingData,
+                                                            TBuf<TPosition::VECCALC>& tmpBuf)
 {
     // 搬运biase对齐部分
     int32_t cSizeHalf = (tilingData->param.rankN * tilingData->param.rankM) * sizeof(DTYPE_X1) / sizeof(DTYPE_Y);
     GlobalTensor<DTYPE_Y> cGlobalHalf;
-    cGlobalHalf.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_Y *>(cGM), cSizeHalf);
+    cGlobalHalf.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_Y*>(cGM), cSizeHalf);
     LocalTensor<DTYPE_Y> bias = tmpBuf.Get<DTYPE_Y>();
     GlobalTensor<DTYPE_Y> biasGlobal;
-    biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_Y *>(biasGM));
+    biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ DTYPE_Y*>(biasGM));
     TBuffAddr buffAddr;
     buffAddr.logicPos = (uint8_t)QuePosition::VECCALC;
     uint32_t eleCnt = 32 / sizeof(DTYPE_Y);
@@ -202,14 +202,14 @@ __aicore__ inline void MatMulEmptyTensorKernelUnquantNzBias(GM_ADDR biasGM, GM_A
 }
 
 __aicore__ inline void MatMulEmptyTensorKernelUnquantNz(GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR workspaceGM,
-                                                        Mc2Tiling::UnQuantMatmulAllReduceTilingData *tilingData,
-                                                        HcclServer *hcclServer)
+                                                        Mc2Tiling::UnQuantMatmulAllReduceTilingData* tilingData,
+                                                        HcclServer* hcclServer)
 {
     TBuf<TPosition::VECCALC> tmpBuf;
     GetTPipePtr()->InitBuffer(tmpBuf, TOTAL_UB_SIZE);
     // 初始化hccl
-    __gm__ HcclCombinOpParam *context = (__gm__ HcclCombinOpParam *)(GetHcclContext<0>());
-    __gm__ uint8_t *workspaceMsg = (__gm__ uint8_t *)(context->WorkSpace + (tilingData->msg).notifyOff);
+    __gm__ HcclCombinOpParam* context = (__gm__ HcclCombinOpParam*)(GetHcclContext<0>());
+    __gm__ uint8_t* workspaceMsg = (__gm__ uint8_t*)(context->WorkSpace + (tilingData->msg).notifyOff);
     hcclServer->Init(workspaceMsg, (tilingData->msg).debugMode, tmpBuf);
     if (tilingData->tilematmulTiling.matmulTiling.usedCoreNum > 1) {
         hcclServer->InitSoftSync(workspaceGM, tilingData->tilematmulTiling.matmulTiling.usedCoreNum, tmpBuf);
@@ -217,7 +217,7 @@ __aicore__ inline void MatMulEmptyTensorKernelUnquantNz(GM_ADDR biasGM, GM_ADDR 
     // 初始化输出tensor
     int32_t cSize = (tilingData->param.rankN * tilingData->param.rankM) * sizeof(DTYPE_X1) / sizeof(int32_t);
     GlobalTensor<int32_t> cGlobal;
-    cGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(cGM), cSize);
+    cGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(cGM), cSize);
     if (block_idx == 0) {
         InitOutput<int32_t>(cGlobal, cSize, (int32_t)0);
         if (tilingData->tilematmulTiling.matmulTiling.isBias) {

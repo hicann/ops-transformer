@@ -340,10 +340,10 @@ bool Mc2QuantBatchMatmulV3Checker::CheckDtype() const
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::CheckInputValidInPerblockMode(const gert::Shape &scaleShape,
-                                                                 const gert::StorageShape *pertokenShape,
-                                                                 const gert::Shape &x1Shape,
-                                                                 const gert::Shape &x2Shape) const
+bool Mc2QuantBatchMatmulV3Checker::CheckInputValidInPerblockMode(const gert::Shape& scaleShape,
+                                                                 const gert::StorageShape* pertokenShape,
+                                                                 const gert::Shape& x1Shape,
+                                                                 const gert::Shape& x2Shape) const
 {
     if (!inputParams_.isPerBlock) {
         return true;
@@ -355,7 +355,7 @@ bool Mc2QuantBatchMatmulV3Checker::CheckInputValidInPerblockMode(const gert::Sha
         return false);
     auto scaleShapeLen = scaleShape.GetDimNum();
     auto x2ShapeLen = x2Shape.GetDimNum();
-    auto &pertoken = pertokenShape->GetStorageShape();
+    auto& pertoken = pertokenShape->GetStorageShape();
     auto pertokenShapeLen = pertoken.GetDimNum();
     auto x1ShapeLen = x1Shape.GetDimNum();
     if (!CheckDimValidInPerblockMode(x1ShapeLen, x2ShapeLen, pertokenShapeLen, scaleShapeLen)) {
@@ -396,10 +396,10 @@ bool Mc2QuantBatchMatmulV3Checker::CheckGroupValidInPerblockMode() const
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::CheckShapeValidInPerblockMode(const gert::Shape &scaleShape,
-                                                                 const gert::Shape &pertoken,
-                                                                 const gert::Shape &x1Shape,
-                                                                 const gert::Shape &x2Shape) const
+bool Mc2QuantBatchMatmulV3Checker::CheckShapeValidInPerblockMode(const gert::Shape& scaleShape,
+                                                                 const gert::Shape& pertoken,
+                                                                 const gert::Shape& x1Shape,
+                                                                 const gert::Shape& x2Shape) const
 {
     auto x1ShapeLen = x1Shape.GetDimNum();
     auto x2ShapeLen = x2Shape.GetDimNum();
@@ -449,10 +449,10 @@ bool Mc2QuantBatchMatmulV3Checker::CheckDimValidInPerblockMode(size_t x1ShapeLen
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::CheckBatchValidInPerblockMode(const gert::Shape &scaleShape,
-                                                                 const gert::Shape &pertoken,
-                                                                 const gert::Shape &x1Shape,
-                                                                 const gert::Shape &x2Shape) const
+bool Mc2QuantBatchMatmulV3Checker::CheckBatchValidInPerblockMode(const gert::Shape& scaleShape,
+                                                                 const gert::Shape& pertoken,
+                                                                 const gert::Shape& x1Shape,
+                                                                 const gert::Shape& x2Shape) const
 {
     auto x2ShapeLen = x2Shape.GetDimNum();
     auto x1ShapeLen = x1Shape.GetDimNum();
@@ -477,9 +477,9 @@ bool Mc2QuantBatchMatmulV3Checker::CheckBatchValidInPerblockMode(const gert::Sha
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::MxPertokenScaleShapeCheck(const gert::StorageShape *pertokenShape) const
+bool Mc2QuantBatchMatmulV3Checker::MxPertokenScaleShapeCheck(const gert::StorageShape* pertokenShape) const
 {
-    auto &pertoken = pertokenShape->GetStorageShape();
+    auto& pertoken = pertokenShape->GetStorageShape();
     auto pertokenShapeLen = pertoken.GetDimNum();
     OP_TILING_CHECK(pertokenShapeLen != SCALE_THREE_DIM,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
@@ -510,7 +510,7 @@ bool Mc2QuantBatchMatmulV3Checker::MxPertokenScaleShapeCheck(const gert::Storage
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::MxScaleShapeCheck(const gert::Shape &scaleShape) const
+bool Mc2QuantBatchMatmulV3Checker::MxScaleShapeCheck(const gert::Shape& scaleShape) const
 {
     auto scaleShapeLen = scaleShape.GetDimNum();
     OP_TILING_CHECK(
@@ -541,9 +541,9 @@ bool Mc2QuantBatchMatmulV3Checker::MxScaleShapeCheck(const gert::Shape &scaleSha
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::CheckInputValidInMxPerGroupMode(const gert::Shape &scaleShape,
-                                                                   const gert::StorageShape *pertokenShape,
-                                                                   const std::vector<int64_t> &dimValueOfMKN) const
+bool Mc2QuantBatchMatmulV3Checker::CheckInputValidInMxPerGroupMode(const gert::Shape& scaleShape,
+                                                                   const gert::StorageShape* pertokenShape,
+                                                                   const std::vector<int64_t>& dimValueOfMKN) const
 {
     if (!inputParams_.isMxPerGroup) {
         return true;
@@ -580,10 +580,10 @@ bool Mc2QuantBatchMatmulV3Checker::CheckInputValidInMxPerGroupMode(const gert::S
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::CheckShapeInRangeForOptionalInputs(const gert::Shape &scaleShape,
-                                                                      const gert::StorageShape *biasShape,
-                                                                      const gert::StorageShape *pertokenShape,
-                                                                      const gert::StorageShape *offsetShape,
+bool Mc2QuantBatchMatmulV3Checker::CheckShapeInRangeForOptionalInputs(const gert::Shape& scaleShape,
+                                                                      const gert::StorageShape* biasShape,
+                                                                      const gert::StorageShape* pertokenShape,
+                                                                      const gert::StorageShape* offsetShape,
                                                                       size_t outDimNum) const
 {
     if (biasShape != nullptr) {
@@ -630,11 +630,11 @@ bool Mc2QuantBatchMatmulV3Checker::CheckShapeInRangeForOptionalInputs(const gert
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::CheckShapeInBoundary(const gert::Shape &shape, uint32_t shapeIdx) const
+bool Mc2QuantBatchMatmulV3Checker::CheckShapeInBoundary(const gert::Shape& shape, uint32_t shapeIdx) const
 {
     int64_t mul = 1;
     int64_t mulBound = 1;
-    const char *dimName = shapeIdx == X1_INDEX ? "x1" : "x2";
+    const char* dimName = shapeIdx == X1_INDEX ? "x1" : "x2";
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
         int64_t curDim = shape.GetDim(i);
 
@@ -661,8 +661,8 @@ bool Mc2QuantBatchMatmulV3Checker::CheckShapeInBoundary(const gert::Shape &shape
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::BiasShapeCheck(const gert::Shape &biasShape, const gert::Shape &scaleShape,
-                                                  const gert::StorageShape *pertokenShape) const
+bool Mc2QuantBatchMatmulV3Checker::BiasShapeCheck(const gert::Shape& biasShape, const gert::Shape& scaleShape,
+                                                  const gert::StorageShape* pertokenShape) const
 {
     auto biasDimNum = biasShape.GetDimNum();
     // 3 dim bias case
@@ -728,10 +728,10 @@ bool Mc2QuantBatchMatmulV3Checker::ExtraInputCheck() const
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::PerTokenDimValueCheck(const gert::Shape &scaleShape,
-                                                         const gert::StorageShape *pertokenShape) const
+bool Mc2QuantBatchMatmulV3Checker::PerTokenDimValueCheck(const gert::Shape& scaleShape,
+                                                         const gert::StorageShape* pertokenShape) const
 {
-    auto &pertoken = pertokenShape->GetStorageShape();
+    auto& pertoken = pertokenShape->GetStorageShape();
     bool isFp8HiF8 = inputParams_.aDtype == ge::DT_FLOAT8_E5M2 || inputParams_.aDtype == ge::DT_FLOAT8_E4M3FN ||
                      inputParams_.aDtype == ge::DT_HIFLOAT8;
     uint64_t perTokenDim0 = static_cast<uint64_t>(pertoken.GetDim(0));
@@ -768,10 +768,10 @@ bool Mc2QuantBatchMatmulV3Checker::PerTokenDimValueCheck(const gert::Shape &scal
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::CheckDimValue(const gert::Shape &scaleShape, const gert::StorageShape *biasShape,
-                                                 const gert::StorageShape *pertokenShape,
-                                                 const gert::StorageShape *offsetShape,
-                                                 const std::vector<int64_t> &dimValueOfMKN) const
+bool Mc2QuantBatchMatmulV3Checker::CheckDimValue(const gert::Shape& scaleShape, const gert::StorageShape* biasShape,
+                                                 const gert::StorageShape* pertokenShape,
+                                                 const gert::StorageShape* offsetShape,
+                                                 const std::vector<int64_t>& dimValueOfMKN) const
 {
     auto x2Inner = dimValueOfMKN[2]; // using index 2 to get x2Inner
     auto x2Outer = dimValueOfMKN[3]; // using index 3 to get x2Outer
@@ -809,14 +809,14 @@ bool Mc2QuantBatchMatmulV3Checker::CheckDimValue(const gert::Shape &scaleShape, 
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Checker::CheckShape(const std::vector<gert::Shape *> &mandtoryShape,
-                                              const gert::StorageShape *biasShape,
-                                              const gert::StorageShape *pertokenShape,
-                                              const std::vector<int64_t> &dimValueOfMKN) const
+bool Mc2QuantBatchMatmulV3Checker::CheckShape(const std::vector<gert::Shape*>& mandtoryShape,
+                                              const gert::StorageShape* biasShape,
+                                              const gert::StorageShape* pertokenShape,
+                                              const std::vector<int64_t>& dimValueOfMKN) const
 {
-    auto &x1Shape = *mandtoryShape[0];    // using index 0 to get x1Shape
-    auto &x2Shape = *mandtoryShape[1];    // using index 1 to get x2Shape
-    auto &scaleShape = *mandtoryShape[2]; // using index 2 to get scaleShape
+    auto& x1Shape = *mandtoryShape[0];    // using index 0 to get x1Shape
+    auto& x2Shape = *mandtoryShape[1];    // using index 1 to get x2Shape
+    auto& scaleShape = *mandtoryShape[2]; // using index 2 to get scaleShape
     auto offsetShape = context_->GetOptionalInputShape(OFFSET_INDEX);
     size_t outDimNum = std::max(x1Shape.GetDimNum(), x2Shape.GetDimNum());
     if (!CheckShapeInRangeForOptionalInputs(scaleShape, biasShape, pertokenShape, offsetShape, outDimNum) ||

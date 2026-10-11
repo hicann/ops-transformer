@@ -50,7 +50,7 @@ public:
     static constexpr uint32_t MULTIPLIER = 2;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, half tor_)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource, half tor_)
     {
         constexpr uint32_t LS32_UB_TENSOR_OFFSET = 2 * UB_TILE_SIZE;
         constexpr uint32_t MASK_UB_TENSOR_OFFSET = 4 * UB_TILE_SIZE;
@@ -119,8 +119,8 @@ public:
 
     CATLASS_DEVICE
     void subCoreCompute(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
-                        AscendC::GlobalTensor<ElementMask> gMask, const LayoutOutput &layoutOutput,
-                        const LayoutInput &layoutInput, const LayoutMask &layoutMask, uint32_t nIdx,
+                        AscendC::GlobalTensor<ElementMask> gMask, const LayoutOutput& layoutOutput,
+                        const LayoutInput& layoutInput, const LayoutMask& layoutMask, uint32_t nIdx,
                         Arch::CrossCoreFlag qkReady)
     {
         uint32_t subM = layoutInput.shape(0);
@@ -267,8 +267,8 @@ public:
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementInput> gInput,
-                    AscendC::GlobalTensor<ElementMask> gMask, const LayoutOutput &layoutOutput,
-                    const LayoutInput &layoutInput, const LayoutMask &layoutMask, GemmCoord actualBlockShape,
+                    AscendC::GlobalTensor<ElementMask> gMask, const LayoutOutput& layoutOutput,
+                    const LayoutInput& layoutInput, const LayoutMask& layoutMask, GemmCoord actualBlockShape,
                     uint32_t nIdx, Arch::CrossCoreFlag qkReady)
     {
         uint32_t mActual = actualBlockShape.m();

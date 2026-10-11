@@ -29,9 +29,9 @@ class QuantMatmulAllReduceTiling : public MatmulAllReduceTilingBase {
     friend class QuantMatmulAllReduceAddRmsNormTiling;
 
 public:
-    explicit QuantMatmulAllReduceTiling(gert::TilingContext *context);
-    QuantMatmulAllReduceTiling(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                               Mc2Tiling::QuantMatmulAllReduceTilingData *out);
+    explicit QuantMatmulAllReduceTiling(gert::TilingContext* context);
+    QuantMatmulAllReduceTiling(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                               Mc2Tiling::QuantMatmulAllReduceTilingData* out);
     ~QuantMatmulAllReduceTiling() override = default;
 
 protected:
@@ -45,13 +45,13 @@ protected:
 
     ge::graphStatus PostTiling() override;
 
-    Mc2Tiling::Mc2Msg &MutableMc2MsgData() override;
+    Mc2Tiling::Mc2Msg& MutableMc2MsgData() override;
 
-    Mc2Tiling::RCSTiling &MutableRCSTilingData() override;
+    Mc2Tiling::RCSTiling& MutableRCSTilingData() override;
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTileTilingData() override;
+    AscendC::tiling::TCubeTiling& MutableTCubeTileTilingData() override;
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTailTilingData() override;
+    AscendC::tiling::TCubeTiling& MutableTCubeTailTilingData() override;
 
     ge::graphStatus DoQuantTiling();
 
@@ -64,7 +64,7 @@ protected:
 private:
     ge::graphStatus CheckAxisSize();
     Mc2Tiling::QuantMatmulAllReduceTilingData quantMatmulAllReduceTilingDataSelf_{};
-    Mc2Tiling::QuantMatmulAllReduceTilingData &quantMatmulAllReduceTilingData_;
+    Mc2Tiling::QuantMatmulAllReduceTilingData& quantMatmulAllReduceTilingData_;
     uint64_t myWorkSpaceSize_{0U};
     bool isCommInt8Enable_ = false;
     QuantMatmulTPLParam quantMatmulTPLParam_;
@@ -72,20 +72,20 @@ private:
 
 class QuantTilingTransferHelper : public Mc2QuantBatchMatmulV3Tiling {
 public:
-    QuantTilingTransferHelper(QuantMatmulAllReduceTiling &quantMatmulAllReduceTiling,
-                              Mc2QuantBatchMatmulV3TilingData &data);
+    QuantTilingTransferHelper(QuantMatmulAllReduceTiling& quantMatmulAllReduceTiling,
+                              Mc2QuantBatchMatmulV3TilingData& data);
     const gert::Shape GetX1Shape(const size_t index) override;
     const gert::Shape GetX2Shape(const size_t index) override;
-    const gert::Shape &GetScaleShape(const size_t index) override;
-    const gert::StorageShape *GetPertokenShape(const size_t index) override;
-    const gert::StorageShape *GetBiasShape(const size_t index) override;
+    const gert::Shape& GetScaleShape(const size_t index) override;
+    const gert::StorageShape* GetPertokenShape(const size_t index) override;
+    const gert::StorageShape* GetBiasShape(const size_t index) override;
     ge::graphStatus GetShapeAttrsInfo() override;
     void PrintTilingInputParam(Mc2QuantBatchMatmulInfo quantBatchMatmulInfo);
     ge::graphStatus PostTiling() override;
     QuantMatmulTPLParam GetQuantMatmulTPLParam();
 
 private:
-    QuantMatmulAllReduceTiling &tilingProcesser_;
+    QuantMatmulAllReduceTiling& tilingProcesser_;
 };
 } // namespace optiling
 #endif // QUANT_MATMUL_ALL_REDUCE_TILING_H

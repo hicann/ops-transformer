@@ -23,7 +23,7 @@ class AlltoAllvMXQuantGmmTiling : public AlltoAllvQuantGmmTilingCommon {
     friend class AlltoAllvMXQuantGmmTilingHelper;
 
 public:
-    explicit AlltoAllvMXQuantGmmTiling(gert::TilingContext *context)
+    explicit AlltoAllvMXQuantGmmTiling(gert::TilingContext* context)
         : AlltoAllvQuantGmmTilingCommon(context) {};
 
 protected:
@@ -52,10 +52,10 @@ private:
 
 class AlltoAllvMXQuantGmmTilingHelper : public Mc2GroupedMatmulTiling::Mc2GroupedQbmmTiling {
 public:
-    AlltoAllvMXQuantGmmTilingHelper(AlltoAllvMXQuantGmmTiling &AlltoAllvMXQuantGmmTiling)
+    AlltoAllvMXQuantGmmTilingHelper(AlltoAllvMXQuantGmmTiling& AlltoAllvMXQuantGmmTiling)
         : Mc2GroupedQbmmTiling(AlltoAllvMXQuantGmmTiling.context_)
     {}
-    const Mc2GroupedMatmulTilingData::GMMQuantTilingData &GetAlltoAllvQuantHelperData() const
+    const Mc2GroupedMatmulTilingData::GMMQuantTilingData& GetAlltoAllvQuantHelperData() const
     {
         return tilingData_;
     }

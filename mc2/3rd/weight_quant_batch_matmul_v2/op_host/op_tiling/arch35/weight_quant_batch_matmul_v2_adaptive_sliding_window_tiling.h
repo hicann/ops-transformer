@@ -58,7 +58,7 @@ struct BasicTiling {
 
 class Mc2WeightQuantBatchMatmulV2TilingASW : public Mc2WeightQuantBatchMatmulV2Tiling {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2TilingASW(gert::TilingContext *context)
+    explicit Mc2WeightQuantBatchMatmulV2TilingASW(gert::TilingContext* context)
         : Mc2WeightQuantBatchMatmulV2Tiling(context)
     {
         if (context->GetCompileInfo() == nullptr) {

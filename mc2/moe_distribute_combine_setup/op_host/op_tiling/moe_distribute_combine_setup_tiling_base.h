@@ -23,7 +23,7 @@
 namespace MC2Tiling {
 class MoeDistributeCombineSetupTilingBase : public optiling::MoeTilingBase {
 public:
-    explicit MoeDistributeCombineSetupTilingBase(gert::TilingContext *context)
+    explicit MoeDistributeCombineSetupTilingBase(gert::TilingContext* context)
         : optiling::MoeTilingBase(context),
           nodeName_(context->GetNodeName()) {};
 
@@ -71,9 +71,9 @@ protected:
     virtual ge::graphStatus CheckTensorShapeSize(int64_t h, int64_t bs, int64_t k) = 0;
     virtual void SetHcommCfg() = 0;
 
-    const char *socTilingName_ = nullptr;
+    const char* socTilingName_ = nullptr;
     std::string nodeName_;
-    MoeDistributeCombineSetupTilingData *tilingData_ = nullptr;
+    MoeDistributeCombineSetupTilingData* tilingData_ = nullptr;
     std::string groupEp_;
 };
 } // namespace MC2Tiling

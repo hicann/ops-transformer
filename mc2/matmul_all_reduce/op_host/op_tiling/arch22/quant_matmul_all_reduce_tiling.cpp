@@ -60,7 +60,7 @@ uint64_t QuantMatmulAllReduceTiling::GetTilingKey() const
 }
 ge::graphStatus QuantMatmulAllReduceTiling::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     uint64_t int8WorkSpace = 0UL;
     if (MutableRCSTilingData().isInputCommQuantScale == 1) {
         uint64_t padTileM = MutableTCubeTileTilingData().M;
@@ -94,7 +94,7 @@ ge::graphStatus QuantMatmulAllReduceTiling::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingDataSize);
 
     errno_t memcpyRet = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                                 reinterpret_cast<void *>(&quantMatmulAllReduceTilingData_), tilingDataSize);
+                                 reinterpret_cast<void*>(&quantMatmulAllReduceTilingData_), tilingDataSize);
     if (memcpyRet != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", memcpyRet);
         return ge::GRAPH_FAILED;
@@ -110,19 +110,19 @@ ge::graphStatus QuantMatmulAllReduceTiling::PostTiling()
 
     return ge::GRAPH_SUCCESS;
 }
-Mc2Tiling::Mc2Msg &QuantMatmulAllReduceTiling::MutableMc2MsgData()
+Mc2Tiling::Mc2Msg& QuantMatmulAllReduceTiling::MutableMc2MsgData()
 {
     return quantMatmulAllReduceTilingData_.msg;
 }
-Mc2Tiling::RCSTiling &QuantMatmulAllReduceTiling::MutableRCSTilingData()
+Mc2Tiling::RCSTiling& QuantMatmulAllReduceTiling::MutableRCSTilingData()
 {
     return quantMatmulAllReduceTilingData_.param;
 }
-AscendC::tiling::TCubeTiling &QuantMatmulAllReduceTiling::MutableTCubeTileTilingData()
+AscendC::tiling::TCubeTiling& QuantMatmulAllReduceTiling::MutableTCubeTileTilingData()
 {
     return quantMatmulAllReduceTilingData_.tilematmulTiling.matmulTiling;
 }
-AscendC::tiling::TCubeTiling &QuantMatmulAllReduceTiling::MutableTCubeTailTilingData()
+AscendC::tiling::TCubeTiling& QuantMatmulAllReduceTiling::MutableTCubeTailTilingData()
 {
     return quantMatmulAllReduceTilingData_.tailmatmulTiling.matmulTiling;
 }
@@ -253,7 +253,7 @@ ge::graphStatus QuantMatmulAllReduceTiling::CheckInput()
 
     return CheckAxisSize();
 }
-QuantMatmulAllReduceTiling::QuantMatmulAllReduceTiling(gert::TilingContext *context)
+QuantMatmulAllReduceTiling::QuantMatmulAllReduceTiling(gert::TilingContext* context)
     : MatmulAllReduceTilingBase(context),
       quantMatmulAllReduceTilingData_(quantMatmulAllReduceTilingDataSelf_)
 {}
@@ -278,12 +278,12 @@ const gert::Shape QuantTilingTransferHelper::GetX2Shape(const size_t index)
         {static_cast<int64_t>(tilingProcesser_.args_.kValue), static_cast<int64_t>(tilingProcesser_.args_.nValue)});
 }
 // 使用外部传入的tilingdata和ctxinfo
-QuantMatmulAllReduceTiling::QuantMatmulAllReduceTiling(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                                                       QuantMatmulAllReduceTilingData *out)
+QuantMatmulAllReduceTiling::QuantMatmulAllReduceTiling(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                                                       QuantMatmulAllReduceTilingData* out)
     : MatmulAllReduceTilingBase(context, mmrCtxInfo),
       quantMatmulAllReduceTilingData_(*out)
 {}
-const gert::Shape &QuantTilingTransferHelper::GetScaleShape(const size_t index)
+const gert::Shape& QuantTilingTransferHelper::GetScaleShape(const size_t index)
 {
     (void)index;
     if (tilingProcesser_.mmrCtxInfo_.dequant_scale_shape == nullptr) {
@@ -293,7 +293,7 @@ const gert::Shape &QuantTilingTransferHelper::GetScaleShape(const size_t index)
     return tilingProcesser_.mmrCtxInfo_.dequant_scale_shape->GetStorageShape();
 }
 
-const gert::StorageShape *QuantTilingTransferHelper::GetPertokenShape(const size_t index)
+const gert::StorageShape* QuantTilingTransferHelper::GetPertokenShape(const size_t index)
 {
     (void)index;
     if (tilingProcesser_.mmrCtxInfo_.pertoken_scale_shape != nullptr) {
@@ -302,7 +302,7 @@ const gert::StorageShape *QuantTilingTransferHelper::GetPertokenShape(const size
     return nullptr;
 }
 
-const gert::StorageShape *QuantTilingTransferHelper::GetBiasShape(const size_t index)
+const gert::StorageShape* QuantTilingTransferHelper::GetBiasShape(const size_t index)
 {
     (void)index;
     return tilingProcesser_.mmrCtxInfo_.bias_shape;
@@ -310,7 +310,7 @@ const gert::StorageShape *QuantTilingTransferHelper::GetBiasShape(const size_t i
 ge::graphStatus QuantTilingTransferHelper::GetShapeAttrsInfo()
 {
     OP_LOGI(tilingProcesser_.opName_, "Start assemble input params for matmul tiling");
-    auto &&tilingArgs = tilingProcesser_.args_;
+    auto&& tilingArgs = tilingProcesser_.args_;
     inputParams_.opName = tilingProcesser_.opName_;
     inputParams_.transA = tilingArgs.isATrans;
     inputParams_.transB = tilingArgs.isBTrans;
@@ -366,8 +366,8 @@ QuantMatmulTPLParam QuantTilingTransferHelper::GetQuantMatmulTPLParam()
     return param;
 }
 
-QuantTilingTransferHelper::QuantTilingTransferHelper(QuantMatmulAllReduceTiling &quantMatmulAllReduceTiling,
-                                                     Mc2QuantBatchMatmulV3TilingData &data)
+QuantTilingTransferHelper::QuantTilingTransferHelper(QuantMatmulAllReduceTiling& quantMatmulAllReduceTiling,
+                                                     Mc2QuantBatchMatmulV3TilingData& data)
     : Mc2QuantBatchMatmulV3Tiling(quantMatmulAllReduceTiling.context_, &data),
       tilingProcesser_(quantMatmulAllReduceTiling)
 {}
@@ -377,8 +377,8 @@ CutResult QuantMatmulAllReduceTiling::GetTilingResult()
     CutResult mCutAllreduceRes;
     SocVersion_2201 socVersion = SocVersion_2201::SOC910_B;
     SetMCutSocVersion(socVersion);
-    const gert::StorageShape *commQuantScaleA = mmrCtxInfo_.comm_quant_scale_1_shape;
-    const gert::StorageShape *commQuantScaleB = mmrCtxInfo_.comm_quant_scale_2_shape;
+    const gert::StorageShape* commQuantScaleA = mmrCtxInfo_.comm_quant_scale_1_shape;
+    const gert::StorageShape* commQuantScaleB = mmrCtxInfo_.comm_quant_scale_2_shape;
     if ((commQuantScaleA != nullptr) && (commQuantScaleB != nullptr)) { // low-bit comm
         OP_LOGD(opName_, "TileCnt enter comm quant.");
         MMPlusQuantAllReduce quantAllReduceTiling(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_, socVersion);

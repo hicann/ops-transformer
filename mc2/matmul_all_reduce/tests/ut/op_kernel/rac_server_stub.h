@@ -176,7 +176,7 @@ public:
         HcclAicpuOpParam2 notifyMsg[AC_MSG_CNT];
         HcclAicpuOpParam2 notifyCnt[AC_MSG_CNT];
     };
-    __gm__ KFCMsg *msgNotify;
+    __gm__ KFCMsg* msgNotify;
 
     int sendPos;
     int lastCnt;

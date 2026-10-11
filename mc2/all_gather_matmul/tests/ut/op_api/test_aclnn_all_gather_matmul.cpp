@@ -38,7 +38,7 @@ TEST_P(AclnnAllGatherMatmulTest, param)
         INPUT(param.x1, param.x2, param.bias, param.group.c_str(), param.gatherIndex, param.commTurn, param.streamMode),
         OUTPUT(param.out, param.gatherOut));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(ACLNN_ERR_PARAM_INVALID, aclnnRet);

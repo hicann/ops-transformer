@@ -73,7 +73,7 @@ TEST_F(L2AclnnMoeDistributeCombineV5Test, TestAclnnMoeDistributeCombineExecuteAp
     constexpr int64_t zeroExpertNum = 0;
     constexpr int64_t copyExpertNum = 0;
     constexpr int64_t constExpertNum = 0;
-    aclTensor *optionalNullTensor = nullptr;
+    aclTensor* optionalNullTensor = nullptr;
 
     auto ut =
         OP_API_UT(aclnnMoeDistributeCombineV5,
@@ -85,7 +85,7 @@ TEST_F(L2AclnnMoeDistributeCombineV5Test, TestAclnnMoeDistributeCombineExecuteAp
                         groupListType, "test", zeroExpertNum, copyExpertNum, constExpertNum),
                   OUTPUT(x));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }

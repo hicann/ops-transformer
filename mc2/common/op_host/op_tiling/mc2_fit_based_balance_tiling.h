@@ -35,7 +35,7 @@ public:
     double ratioCalcComm_ = 1.0;
 
     // A5专用fit balance基类:成员均为Arch35专用模型,A5内蕴于类本身,不再接收档位key
-    explicit Mc2FitBasedBalanceTiling(const mc2tiling::TilingArgs &args, KernelType kernelType,
+    explicit Mc2FitBasedBalanceTiling(const mc2tiling::TilingArgs& args, KernelType kernelType,
                                       TopoType topoType = TopoType::STANDARD_CARD)
         : matmulPerf_(args),
           commPerf_(args.rankDim, kernelType, topoType),

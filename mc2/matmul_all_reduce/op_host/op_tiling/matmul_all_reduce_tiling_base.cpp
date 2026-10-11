@@ -87,8 +87,8 @@ const std::map<ge::DataType, mc2tiling::HcclDataType> HCCL_DATA_TYPE = {
     {ge::DataType::DT_BF16, mc2tiling::HcclDataType::HCCL_DATA_TYPE_BFP16},
 };
 
-ge::graphStatus MatmulAllReduceTilingFunc(gert::TilingContext *context);
-ge::graphStatus TilingParseForMatmulAllReduce(gert::TilingParseContext *context);
+ge::graphStatus MatmulAllReduceTilingFunc(gert::TilingContext* context);
+ge::graphStatus TilingParseForMatmulAllReduce(gert::TilingParseContext* context);
 
 void MatmulAllReduceTilingBase::Reset()
 {
@@ -118,7 +118,7 @@ void MatmulAllReduceTilingBase::Reset()
 
 void MatmulAllReduceTilingBase::CalcAllReduceSendRecvParams()
 {
-    auto &&args = MutableMc2MsgData();
+    auto&& args = MutableMc2MsgData();
     auto columnNum = args_.orgNValue;
     auto debugMode = mc2tiling::Mc2TilingUtils::GetDebugMode();
     if (debugMode == MC2_DEBUG_ONLY_AICPU && args_.orgKValue < args_.orgNValue) {
@@ -136,7 +136,7 @@ void MatmulAllReduceTilingBase::CalcAllReduceSendRecvParams()
 
 void MatmulAllReduceTilingBase::DoAllReduceTiling(bool useHcclApi)
 {
-    auto &&args = MutableMc2MsgData();
+    auto&& args = MutableMc2MsgData();
     auto debugMode = mc2tiling::Mc2TilingUtils::GetDebugMode();
     args.debugMode = debugMode;
     args.commType = MutableRCSTilingData().commtype;
@@ -185,7 +185,7 @@ void MatmulAllReduceTilingBase::DoAllReduceTiling(bool useHcclApi)
     }
 }
 
-void MatmulAllReduceTilingBase::CalcSendOffWithPadM(uint64_t &tileSendOff, uint64_t &tailSendOff)
+void MatmulAllReduceTilingBase::CalcSendOffWithPadM(uint64_t& tileSendOff, uint64_t& tailSendOff)
 {
     uint64_t padTileM = MutableTCubeTileTilingData().M;
     uint64_t padTailM = MutableTCubeTailTilingData().M;
@@ -279,7 +279,7 @@ void MatmulAllReduceTilingBase::DoRCSTiling()
     SetCommQuantScale();
 }
 
-void MatmulAllReduceTilingBase::SetMCutSocVersion(SocVersion_2201 &socVersion_2201)
+void MatmulAllReduceTilingBase::SetMCutSocVersion(SocVersion_2201& socVersion_2201)
 {
     if (npuArch_ == Ops::Base::DAV_2002) {
         // 310P:档位key已迁出枚举(与DAV_2002一一对应),保持调用方初始化的占位值;
@@ -313,8 +313,8 @@ CutResult MatmulAllReduceTilingBase::GetTilingResult()
     MMPlusAllReduce allReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_, isPerBlock_);
     allReduceTilingHccl.GetTiling();
     CutResult mCutAllreduce = allReduceTilingHccl.tilingM_.cutRes;
-    const gert::StorageShape *commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
-    const gert::StorageShape *commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
+    const gert::StorageShape* commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
+    const gert::StorageShape* commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
     if ((commQuantScaleShape1 != nullptr) && (commQuantScaleShape2 != nullptr)) { // 低bit通信
         OP_LOGD(opName_, "TileCnt enter comm quant.");
         MMPlusQuantAllReduce quantAllReduceTilingHccl(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_);
@@ -327,7 +327,7 @@ CutResult MatmulAllReduceTilingBase::GetTilingResult()
 
 void MatmulAllReduceTilingBase::DoSplitMTiling()
 {
-    auto &&param = MutableRCSTilingData();
+    auto&& param = MutableRCSTilingData();
     bool isNotBatchOne = (args_.batchValue != 1ULL);
     bool is128Aligned = ((args_.orgMValue / args_.batchValue) & 127ULL) == 0; // 判断原始输入m是否128对齐,batch默认值为1
     if (args_.enableSplitK || isKZero_ || (isPerBlock_ && isNotBatchOne && !is128Aligned) ||
@@ -367,8 +367,8 @@ void MatmulAllReduceTilingBase::DoSplitMTiling()
 void MatmulAllReduceTilingBase::SetCommQuantScale()
 {
     bool isInput = false;
-    const gert::StorageShape *commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
-    const gert::StorageShape *commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
+    const gert::StorageShape* commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
+    const gert::StorageShape* commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
     if ((commQuantScaleShape1 != nullptr) && (commQuantScaleShape2 != nullptr)) {
         isInput = true;
     }
@@ -376,7 +376,7 @@ void MatmulAllReduceTilingBase::SetCommQuantScale()
     MutableRCSTilingData().isInputCommQuantScale = isInput;
     OP_LOGD(opName_, "Is input comm_quant_scale_1_shape and comm_quant_scale_2_shape? %d.", isInput ? 1 : 0);
 
-    const int64_t *commQuantModePtr = mmrCtxInfo_.commQuantModePtr;
+    const int64_t* commQuantModePtr = mmrCtxInfo_.commQuantModePtr;
     if (commQuantModePtr != nullptr) {
         if (*commQuantModePtr == 1) {
             MutableRCSTilingData().isInputCommQuantScale = COMM_QUANT_MODE_TRUE;
@@ -384,8 +384,8 @@ void MatmulAllReduceTilingBase::SetCommQuantScale()
     }
 }
 
-ge::graphStatus MatmulAllReduceTilingBase::DoMatmulTiling(matmul_tiling::MultiCoreMatmulTiling &mm1,
-                                                          AscendC::tiling::TCubeTiling &cubeTiling)
+ge::graphStatus MatmulAllReduceTilingBase::DoMatmulTiling(matmul_tiling::MultiCoreMatmulTiling& mm1,
+                                                          AscendC::tiling::TCubeTiling& cubeTiling)
 {
     uint64_t mValue = args_.mValue;
     uint64_t nValue = args_.nValue;
@@ -426,7 +426,7 @@ ge::graphStatus MatmulAllReduceTilingBase::DoMatmulTiling(matmul_tiling::MultiCo
     return ge::GRAPH_SUCCESS;
 }
 
-void MatmulAllReduceTilingBase::DoL2CacheTiling(Mc2Tiling::Mc2L2cacheTilePara &l2cacheTiling)
+void MatmulAllReduceTilingBase::DoL2CacheTiling(Mc2Tiling::Mc2L2cacheTilePara& l2cacheTiling)
 {
     L2TilePara tileL2;
     bool enableL2Tile = CalL2TilePara(tileL2, args_.mValue, args_.kValue, args_.nValue, args_.aicCoreNum);
@@ -481,7 +481,7 @@ ge::graphStatus MatmulAllReduceTilingBase::DoLibApiTiling()
 
 ge::graphStatus MatmulAllReduceTilingBase::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "workspaces"),
                     return ge::GRAPH_FAILED);
 
@@ -527,7 +527,7 @@ ge::graphStatus MatmulAllReduceTilingBase::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingDataSize);
 
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "Memcpy_s failed, ret=%d.", ret);
         return ge::GRAPH_FAILED;
@@ -559,7 +559,7 @@ bool MatmulAllReduceTilingBase::AnalyzeAttrs()
     if (commTurn == 0) {
         commTurn = COMM_TILE;
     }
-    const int64_t *antiquantGroupSizePtr = mmrCtxInfo_.antiquantGroupSizePtr;
+    const int64_t* antiquantGroupSizePtr = mmrCtxInfo_.antiquantGroupSizePtr;
     if (antiquantGroupSizePtr != nullptr) {
         antiGroupSize_ = static_cast<uint64_t>(*antiquantGroupSizePtr);
     }
@@ -577,7 +577,7 @@ bool MatmulAllReduceTilingBase::AnalyzeAttrs()
     return true;
 }
 
-bool MatmulAllReduceTilingBase::IsPerTensorDequantScale(const gert::Shape &dequantShape) const
+bool MatmulAllReduceTilingBase::IsPerTensorDequantScale(const gert::Shape& dequantShape) const
 {
     return dequantShape.GetDimNum() == 1 && dequantShape.GetDim(0) == 1;
 }
@@ -585,11 +585,11 @@ bool MatmulAllReduceTilingBase::IsPerTensorDequantScale(const gert::Shape &dequa
 void MatmulAllReduceTilingBase::SetQuantData()
 {
     // 判断是否是量化场景，以及per-tensor还是per-channel
-    const gert::StorageShape *matrixDequant = mmrCtxInfo_.dequant_scale_shape;
-    const gert::StorageShape *matrixPertoken = mmrCtxInfo_.pertoken_scale_shape;
+    const gert::StorageShape* matrixDequant = mmrCtxInfo_.dequant_scale_shape;
+    const gert::StorageShape* matrixPertoken = mmrCtxInfo_.pertoken_scale_shape;
     if (matrixDequant != nullptr) {
         isQuantKey_ = true;
-        const auto &dequantShape = matrixDequant->GetStorageShape();
+        const auto& dequantShape = matrixDequant->GetStorageShape();
         isPerTensor_ = IsPerTensorDequantScale(dequantShape);
         quantType_ = isPerTensor_ ? Mc2QuantType::PER_TENSOR : Mc2QuantType::PER_CHANNEL;
 
@@ -615,7 +615,7 @@ void MatmulAllReduceTilingBase::GetAtomicAddData()
 {
     // 判断是否需要作Atomic add
     bool isAdd = false;
-    const gert::StorageShape *matrixAdd = mmrCtxInfo_.x3_shape;
+    const gert::StorageShape* matrixAdd = mmrCtxInfo_.x3_shape;
     if (matrixAdd != nullptr) {
         isAdd = true;
     }
@@ -627,21 +627,21 @@ uint64_t MatmulAllReduceTilingBase::GetNValue() const
     const uint16_t maxDimNumForND = 3U;
     const uint16_t nIndexFor3Dim = maxDimNumForND - 1U;
     const uint16_t nIndexFor2Dim = maxDimNumForND - 2U;
-    const gert::StorageShape *yShape = mmrCtxInfo_.y_shape;
+    const gert::StorageShape* yShape = mmrCtxInfo_.y_shape;
     return yShape->GetStorageShape().GetDimNum() == maxDimNumForND ? yShape->GetStorageShape().GetDim(nIndexFor3Dim) :
                                                                      yShape->GetStorageShape().GetDim(nIndexFor2Dim);
 }
 
 uint64_t MatmulAllReduceTilingBase::GetKValue() const
 {
-    const gert::StorageShape *inputShape = mmrCtxInfo_.x1_shape;
+    const gert::StorageShape* inputShape = mmrCtxInfo_.x1_shape;
     size_t inputLen = inputShape->GetStorageShape().GetDimNum();
     return inputShape->GetStorageShape().GetDim(inputLen - 1);
 }
 
 uint64_t MatmulAllReduceTilingBase::GetMValue() const
 {
-    const gert::StorageShape *inputShape = mmrCtxInfo_.x1_shape;
+    const gert::StorageShape* inputShape = mmrCtxInfo_.x1_shape;
     size_t inputLen = inputShape->GetStorageShape().GetDimNum();
     uint64_t mValue = inputShape->GetStorageShape().GetDim(0);
     if (inputLen == MAX_M_SHAPE_DIM) {
@@ -652,7 +652,7 @@ uint64_t MatmulAllReduceTilingBase::GetMValue() const
 
 uint64_t MatmulAllReduceTilingBase::GetBatchValue() const
 {
-    const gert::StorageShape *inputShape = mmrCtxInfo_.x1_shape;
+    const gert::StorageShape* inputShape = mmrCtxInfo_.x1_shape;
     size_t inputLen = inputShape->GetStorageShape().GetDimNum();
     uint64_t bValue = 1UL;
     if ((inputLen == MAX_M_SHAPE_DIM) && (inputShape->GetStorageShape().GetDim(0) != 0)) {
@@ -891,7 +891,7 @@ ge::graphStatus MatmulAllReduceTilingBase::CheckA16W8()
 }
 
 bool MatmulAllReduceTilingBase::IsA16W8Scenario(const DataType aType, const DataType bType,
-                                                const gert::StorageShape *antiQuantScale) const
+                                                const gert::StorageShape* antiQuantScale) const
 {
     if ((aType != ge::DT_INT8) && (bType == ge::DT_INT8) && (antiQuantScale != nullptr)) {
         return true;
@@ -905,8 +905,8 @@ bool MatmulAllReduceTilingBase::IsA16W8Scenario(const DataType aType, const Data
 }
 
 static AllReduceScenario GetFP8FP4Scenario(const DataType aType, const DataType bType,
-                                           const gert::CompileTimeTensorDesc *dequantScaleDesc,
-                                           const gert::CompileTimeTensorDesc *pertokeScaleDesc)
+                                           const gert::CompileTimeTensorDesc* dequantScaleDesc,
+                                           const gert::CompileTimeTensorDesc* pertokeScaleDesc)
 {
     // MXFP4: fp4+fp4+fp8
     if ((aType == ge::DT_FLOAT4_E2M1) && (bType == ge::DT_FLOAT4_E2M1) &&
@@ -928,8 +928,8 @@ static AllReduceScenario GetFP8FP4Scenario(const DataType aType, const DataType 
 }
 
 AllReduceScenario MatmulAllReduceTilingBase::GetAllReduceScenario(const DataType aType, const DataType bType,
-                                                                  const gert::StorageShape *dequantScale,
-                                                                  const gert::StorageShape *antiQuantScale) const
+                                                                  const gert::StorageShape* dequantScale,
+                                                                  const gert::StorageShape* antiQuantScale) const
 {
     if ((aType == ge::DT_INT8) && (bType == ge::DT_INT8) && (dequantScale != nullptr)) {
         return AllReduceScenario::A8W8;
@@ -983,7 +983,7 @@ bool MatmulAllReduceTilingBase::SetArgs(ge::DataType aType, ge::DataType bType, 
         args_.bType = D_TYPE_MAP.at(bType);
         args_.cType = D_TYPE_MAP.at(cType);
         args_.biasType = D_TYPE_MAP.at(biasType);
-    } catch (const std::out_of_range &e) {
+    } catch (const std::out_of_range& e) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             opName_, "aType/bType/cType/biasType",
             (std::to_string(static_cast<int32_t>(aType)) + "/" + std::to_string(static_cast<int32_t>(bType)) + "/" +
@@ -1006,8 +1006,8 @@ bool MatmulAllReduceTilingBase::AnalyzeInputs()
     auto aType = mmrCtxInfo_.x1->GetDataType();
     auto bType = mmrCtxInfo_.x2->GetDataType();
     auto cType = mmrCtxInfo_.y->GetDataType();
-    const gert::StorageShape *antiquantScale = mmrCtxInfo_.antiquant_scale_shape;
-    const gert::StorageShape *dequantScale = mmrCtxInfo_.dequant_scale_shape;
+    const gert::StorageShape* antiquantScale = mmrCtxInfo_.antiquant_scale_shape;
+    const gert::StorageShape* dequantScale = mmrCtxInfo_.dequant_scale_shape;
 
     scenario_ = GetAllReduceScenario(aType, bType, dequantScale, antiquantScale);
     isA8W8_ = (scenario_ == AllReduceScenario::A8W8);
@@ -1018,7 +1018,7 @@ bool MatmulAllReduceTilingBase::AnalyzeInputs()
     auto dequantDesc = mmrCtxInfo_.dequant_scale;
     isUbQuant_ = ((dequantDesc != nullptr) ? (dequantDesc->GetDataType() == ge::DT_BF16) : isUbQuant_);
     OP_LOGD(opName_, "MatmulAllReduceTilingBase::AnalyzeInput isUbQuant_: %d ", isUbQuant_ ? 1 : 0);
-    const gert::StorageShape *matrixBias = mmrCtxInfo_.bias_shape;
+    const gert::StorageShape* matrixBias = mmrCtxInfo_.bias_shape;
     if (matrixBias == nullptr) {
         isBias = false;
         biasType = cType;
@@ -1048,7 +1048,7 @@ mc2tiling::HcclDataType MatmulAllReduceTilingBase::GetDataType(ge::DataType type
     return mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED;
 }
 
-void MatmulAllReduceTilingBase::CalcL2TileBlock(L2TilePara &tileL2, uint64_t mValue, uint64_t nValue, uint64_t kValue,
+void MatmulAllReduceTilingBase::CalcL2TileBlock(L2TilePara& tileL2, uint64_t mValue, uint64_t nValue, uint64_t kValue,
                                                 uint64_t blockBaseM, uint64_t blockBaseN, uint32_t tileSize,
                                                 uint32_t tileLimit, uint64_t sizeA, uint64_t sizeB,
                                                 uint32_t cubeCoreNum) const
@@ -1081,7 +1081,7 @@ void MatmulAllReduceTilingBase::CalcL2TileBlock(L2TilePara &tileL2, uint64_t mVa
     (void)cubeCoreNum;
 }
 
-bool MatmulAllReduceTilingBase::CalL2TilePara(L2TilePara &tileL2, uint64_t mValue, uint64_t kValue, uint64_t nValue,
+bool MatmulAllReduceTilingBase::CalL2TilePara(L2TilePara& tileL2, uint64_t mValue, uint64_t kValue, uint64_t nValue,
                                               uint32_t cubeCoreNum)
 {
     uint64_t blockBaseM = 0;
@@ -1128,8 +1128,8 @@ bool MatmulAllReduceTilingBase::HasAntiQuantOffset() const
 {
     return mmrCtxInfo_.antiquant_offset != nullptr;
 }
-void MatmulAllReduceTilingBase::GetScaleMNAndKIdx(const gert::StorageShape *scaleShape, bool isPertoken,
-                                                  uint64_t scaleDimNum, uint64_t &MN, uint64_t &K) const
+void MatmulAllReduceTilingBase::GetScaleMNAndKIdx(const gert::StorageShape* scaleShape, bool isPertoken,
+                                                  uint64_t scaleDimNum, uint64_t& MN, uint64_t& K) const
 {
     if (isPertoken) {
         MN = scaleDimNum - 3U;
@@ -1148,7 +1148,7 @@ void MatmulAllReduceTilingBase::GetScaleMNAndKIdx(const gert::StorageShape *scal
 }
 
 bool MatmulAllReduceTilingBase::CheckMXScenarioScaleShape(const uint64_t dimZeroValue, const uint64_t kValue,
-                                                          const gert::StorageShape *scaleShape, const bool isPertoken,
+                                                          const gert::StorageShape* scaleShape, const bool isPertoken,
                                                           const bool isMXfp4) const
 {
     uint64_t scaleDimNum = scaleShape->GetStorageShape().GetDimNum();
@@ -1194,7 +1194,7 @@ bool MatmulAllReduceTilingBase::CheckMXScenarioScaleShape(const uint64_t dimZero
     return true;
 }
 
-bool MatmulAllReduceTilingBase::CheckDequantScalePerBlock(const gert::StorageShape *dequantScaleShape) const
+bool MatmulAllReduceTilingBase::CheckDequantScalePerBlock(const gert::StorageShape* dequantScaleShape) const
 {
     const auto x2Shape = mmrCtxInfo_.x2_shape;
     const auto dim0Ofscale = dequantScaleShape->GetStorageShape().GetDim(0);
@@ -1405,9 +1405,9 @@ bool MatmulAllReduceTilingBase::CheckAntiQuantScaleShape(const uint64_t kValue, 
     return false;
 }
 
-bool MatmulAllReduceTilingBase::CheckAntiQuantOffsetShape(const gert::StorageShape *scale) const
+bool MatmulAllReduceTilingBase::CheckAntiQuantOffsetShape(const gert::StorageShape* scale) const
 {
-    const gert::StorageShape *antiquantOffset = mmrCtxInfo_.antiquant_offset_shape;
+    const gert::StorageShape* antiquantOffset = mmrCtxInfo_.antiquant_offset_shape;
     if (antiquantOffset == nullptr) {
         return true;
     }
@@ -1439,7 +1439,7 @@ bool MatmulAllReduceTilingBase::CheckAntiQuantOffsetValid() const
         return false;
     }
     // 校验bias dim
-    const gert::StorageShape *matrixBias = mmrCtxInfo_.bias_shape;
+    const gert::StorageShape* matrixBias = mmrCtxInfo_.bias_shape;
     int64_t nValue = GetNValue();
     if (matrixBias != nullptr) {
         int32_t biasShapeSize = matrixBias->GetStorageShape().GetDimNum();
@@ -1511,7 +1511,7 @@ AntiQuantType MatmulAllReduceTilingBase::GetAntiQuantType()
 
 void MatmulAllReduceTilingBase::CalcUbTiling()
 {
-    const int64_t *commQuantModePtr = mmrCtxInfo_.commQuantModePtr;
+    const int64_t* commQuantModePtr = mmrCtxInfo_.commQuantModePtr;
     bool isPertile = false;
     if (commQuantModePtr != nullptr) {
         isPertile = (*commQuantModePtr == 1);
@@ -1575,11 +1575,11 @@ void MatmulAllReduceTilingBase::PrintTilingData()
     PrintExtendMatmulTiling(true);
     PrintTCubeTilingData(context_->GetNodeName(), MutableTCubeTailTilingData());
 }
-ge::graphStatus MatmulAllReduceTilingBase::GetAndConvertCommMode(uint8_t &commMode) const
+ge::graphStatus MatmulAllReduceTilingBase::GetAndConvertCommMode(uint8_t& commMode) const
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_mode"), return ge::GRAPH_FAILED);
-    const char *commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
+    const char* commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
     if (commModeStr == nullptr) {
         commMode = Mc2Comm::COMM_MODE_AICPU;
         OP_LOGI(opName_, "The input attr comm_mode is nullptr, commMode will use default AICPU.");
@@ -1599,10 +1599,10 @@ ge::graphStatus MatmulAllReduceTilingBase::GetAndConvertCommMode(uint8_t &commMo
 }
 uint8_t MatmulAllReduceTilingBase::GetCommMode() const
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_mode"),
                     return Mc2Comm::COMM_MODE_AICPU);
-    const char *commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
+    const char* commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
     if (commModeStr == nullptr) {
         OP_LOGI(opName_, "TilingKey Do AICPU");
         return Mc2Comm::COMM_MODE_AICPU;
@@ -1616,9 +1616,9 @@ uint8_t MatmulAllReduceTilingBase::GetCommMode() const
 }
 ge::graphStatus MatmulAllReduceTilingBase::CheckCommModeA2() const
 {
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_mode"), return ge::GRAPH_FAILED);
-    const char *commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
+    const char* commModeStr = attrs->GetAttrPointer<char>(ATTR_COMM_MODE_INDEX);
     if (commModeStr == nullptr || std::strcmp(commModeStr, "ai_cpu") == 0) {
         return ge::GRAPH_SUCCESS;
     } else {

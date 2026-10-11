@@ -18,7 +18,7 @@ namespace ops {
 constexpr char AICPU_KFC_SERVER_NAME[] = "aicpu kfc server";
 constexpr char KFC_STREAM_NAME[] = "kfc_stream";
 
-ge::Status AttentionToFFNCalcParamFunc(gert::ExeResGenerationContext *context)
+ge::Status AttentionToFFNCalcParamFunc(gert::ExeResGenerationContext* context)
 {
     const ge::AscendString name = AICPU_KFC_SERVER_NAME;
     const ge::AscendString reuseKey = KFC_STREAM_NAME;
@@ -26,10 +26,10 @@ ge::Status AttentionToFFNCalcParamFunc(gert::ExeResGenerationContext *context)
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, name, reuseKey);
 }
 
-ge::Status AttentionToFFNGenTaskFunc(const gert::ExeResGenerationContext *context,
-                                     std::vector<std::vector<uint8_t>> &tasks)
+ge::Status AttentionToFFNGenTaskFunc(const gert::ExeResGenerationContext* context,
+                                     std::vector<std::vector<uint8_t>>& tasks)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OPS_LOG_I(nodeName, "MC2 Generate task start.");
     return Mc2MoeGenTaskOpsUtils::Mc2MoeGenTaskCallbackV2(context, tasks);
 }

@@ -30,20 +30,20 @@ static constexpr size_t MEGA_MOE_OUTPUT_EXPERT_TOKEN_NUMS_INDEX = 1;
 static constexpr size_t MEGA_MOE_ATTR_MOE_EXPERT_NUM_INDEX = 0;
 static constexpr size_t MEGA_MOE_ATTR_EP_WORLD_SIZE_INDEX = 1;
 
-static ge::graphStatus InferShapeMegaMoe(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMegaMoe(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMegaMoe.");
 
-    const gert::Shape *xShape = context->GetInputShape(MEGA_MOE_INPUT_X_INDEX);
+    const gert::Shape* xShape = context->GetInputShape(MEGA_MOE_INPUT_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
 
-    gert::Shape *yShape = context->GetOutputShape(MEGA_MOE_OUTPUT_Y_INDEX);
+    gert::Shape* yShape = context->GetOutputShape(MEGA_MOE_OUTPUT_Y_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, yShape);
 
-    gert::Shape *expertTokenNumsShape = context->GetOutputShape(MEGA_MOE_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    gert::Shape* expertTokenNumsShape = context->GetOutputShape(MEGA_MOE_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertTokenNumsShape);
 
     const auto attrs = context->GetAttrs();
@@ -75,7 +75,7 @@ static ge::graphStatus InferShapeMegaMoe(gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeMegaMoe(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMegaMoe(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMegaMoe.");
 

@@ -27,9 +27,9 @@ constexpr int32_t BASEK_256 = 256;
 constexpr int32_t DEPTHB1_4 = 4;
 constexpr int32_t STEPKB_2 = 2;
 
-bool Mc2ComputeMatmulTiling::GetTiling(AscendC::tiling::TCubeTiling &matmulTiling,
-                                       Mc2MatmulMultiCoreResult &multiCoreResult, const Mc2MatmulParams &params,
-                                       const AiCoreParams &aicoreParams, gert::TilingContext *context)
+bool Mc2ComputeMatmulTiling::GetTiling(AscendC::tiling::TCubeTiling& matmulTiling,
+                                       Mc2MatmulMultiCoreResult& multiCoreResult, const Mc2MatmulParams& params,
+                                       const AiCoreParams& aicoreParams, gert::TilingContext* context)
 {
     bool getTilingResult = false;
     if (params.aDtype == ge::DT_INT4 && params.bDtype == ge::DT_INT4) {
@@ -48,9 +48,9 @@ bool Mc2ComputeMatmulTiling::GetTiling(AscendC::tiling::TCubeTiling &matmulTilin
     return getTilingResult;
 }
 
-bool Mc2ComputeMatmulTiling::GetCacheTiling(AscendC::tiling::TCubeTiling &matmulTiling,
-                                            Mc2MatmulMultiCoreResult &multiCoreResult, const Mc2MatmulParams &params,
-                                            gert::TilingContext *context)
+bool Mc2ComputeMatmulTiling::GetCacheTiling(AscendC::tiling::TCubeTiling& matmulTiling,
+                                            Mc2MatmulMultiCoreResult& multiCoreResult, const Mc2MatmulParams& params,
+                                            gert::TilingContext* context)
 {
     int32_t reduceSize = static_cast<int32_t>(Mc2GetBlockAlignSizeByDataType(params.aDtype));
     bool weightNz = params.format_b == ge::FORMAT_FRACTAL_NZ;
@@ -106,9 +106,9 @@ bool Mc2ComputeMatmulTiling::GetCacheTiling(AscendC::tiling::TCubeTiling &matmul
     return true;
 }
 
-bool Mc2ComputeMatmulTiling::MsdA16W8CommonTiling(AscendC::tiling::TCubeTiling &matmulTiling,
-                                                  Mc2MatmulMultiCoreResult &multiCoreResult,
-                                                  const Mc2MatmulParams &params, const AiCoreParams &aicoreParams)
+bool Mc2ComputeMatmulTiling::MsdA16W8CommonTiling(AscendC::tiling::TCubeTiling& matmulTiling,
+                                                  Mc2MatmulMultiCoreResult& multiCoreResult,
+                                                  const Mc2MatmulParams& params, const AiCoreParams& aicoreParams)
 {
     // weight为NZ-NK/ND-KN暂不支持
     if (((params.transB) && (params.format_b == ge::FORMAT_FRACTAL_NZ)) ||
@@ -157,8 +157,8 @@ bool Mc2ComputeMatmulTiling::MsdA16W8CommonTiling(AscendC::tiling::TCubeTiling &
     return true;
 }
 
-void Mc2ComputeMatmulTiling::CalcMsdBufferSize(AscendC::tiling::TCubeTiling &matmulTiling,
-                                               const Mc2MatmulParams &params)
+void Mc2ComputeMatmulTiling::CalcMsdBufferSize(AscendC::tiling::TCubeTiling& matmulTiling,
+                                               const Mc2MatmulParams& params)
 {
     int32_t a1Length =
         static_cast<int32_t>(Mc2GetShapeSizeWithDataType(matmulTiling.baseM * matmulTiling.baseK, params.aDtype));
@@ -172,8 +172,8 @@ void Mc2ComputeMatmulTiling::CalcMsdBufferSize(AscendC::tiling::TCubeTiling &mat
     matmulTiling.shareL0CSize = c1Length;
 }
 
-void Mc2ComputeMatmulTiling::CalcCommonTiling(AscendC::tiling::TCubeTiling &matmulTiling, const Mc2MatmulParams &params,
-                                              const AiCoreParams &aicoreParams)
+void Mc2ComputeMatmulTiling::CalcCommonTiling(AscendC::tiling::TCubeTiling& matmulTiling, const Mc2MatmulParams& params,
+                                              const AiCoreParams& aicoreParams)
 {
     uint64_t baseM = ops::CeilAlign(params.mSize, static_cast<uint64_t>(BLOCK_CUBE));
     uint64_t baseK = 128;
@@ -225,9 +225,9 @@ void Mc2ComputeMatmulTiling::CalcCommonTiling(AscendC::tiling::TCubeTiling &matm
     matmulTiling.stepKb = stepKb;
 }
 
-bool Mc2ComputeMatmulTiling::SimpleIncreTiling(AscendC::tiling::TCubeTiling &matmulTiling,
-                                               Mc2MatmulMultiCoreResult &multiCoreResult, const Mc2MatmulParams &params,
-                                               const AiCoreParams &aicoreParams)
+bool Mc2ComputeMatmulTiling::SimpleIncreTiling(AscendC::tiling::TCubeTiling& matmulTiling,
+                                               Mc2MatmulMultiCoreResult& multiCoreResult, const Mc2MatmulParams& params,
+                                               const AiCoreParams& aicoreParams)
 {
     if (params.aDtype != ge::DT_INT4 || params.bDtype != ge::DT_INT4) {
         OP_LOGW("Mc2WeightQuantBatchMatmulV2",
@@ -274,10 +274,10 @@ bool Mc2ComputeMatmulTiling::SimpleIncreTiling(AscendC::tiling::TCubeTiling &mat
     return false;
 }
 
-void Mc2ComputeMatmulTiling::Convert2AscendCTiling(const CacheTilingData &tbeTiling,
-                                                   AscendC::tiling::TCubeTiling &matmulTiling,
-                                                   const Mc2MatmulParams &params,
-                                                   Mc2MatmulMultiCoreResult &multiCoreResult)
+void Mc2ComputeMatmulTiling::Convert2AscendCTiling(const CacheTilingData& tbeTiling,
+                                                   AscendC::tiling::TCubeTiling& matmulTiling,
+                                                   const Mc2MatmulParams& params,
+                                                   Mc2MatmulMultiCoreResult& multiCoreResult)
 {
     auto mDim = ops::CeilDiv(params.mSize, ops::CeilDiv(params.mSize, static_cast<uint64_t>(tbeTiling.m_dim)));
     auto nDim = ops::CeilDiv(params.nSize, ops::CeilDiv(params.nSize, static_cast<uint64_t>(tbeTiling.n_dim)));
@@ -344,7 +344,7 @@ void Mc2ComputeMatmulTiling::Convert2AscendCTiling(const CacheTilingData &tbeTil
     multiCoreResult.batchDim = tbeTiling.batch_dim;
 }
 
-MatrixTraverse Mc2ComputeMatmulTiling::GetIteratorOrder(const CacheTilingData &tbeTiling, int32_t singleCoreM,
+MatrixTraverse Mc2ComputeMatmulTiling::GetIteratorOrder(const CacheTilingData& tbeTiling, int32_t singleCoreM,
                                                         int32_t singleCoreN, int32_t singleCoreK, ge::DataType aDtype)
 {
     int32_t reduceSize = static_cast<int32_t>(Mc2GetBlockAlignSizeByDataType(aDtype));
@@ -368,8 +368,8 @@ MatrixTraverse Mc2ComputeMatmulTiling::GetIteratorOrder(const CacheTilingData &t
     }
 }
 
-bool Mc2ComputeMatmulTiling::tryComputeSimpleTiling(AscendC::tiling::TCubeTiling &matmulTiling,
-                                                    const Mc2MatmulParams &params, const AiCoreParams &aicoreParams)
+bool Mc2ComputeMatmulTiling::tryComputeSimpleTiling(AscendC::tiling::TCubeTiling& matmulTiling,
+                                                    const Mc2MatmulParams& params, const AiCoreParams& aicoreParams)
 {
     // 当前只适配baseK大于等于256场景，baseK将划分成1024/512/256三档
     uint64_t baseKOption1024 = 1024;
@@ -420,8 +420,8 @@ bool Mc2ComputeMatmulTiling::tryComputeSimpleTiling(AscendC::tiling::TCubeTiling
     return true;
 }
 
-bool Mc2ComputeMatmulTiling::tryAFullLoad(AscendC::tiling::TCubeTiling &matmulTiling, const Mc2MatmulParams &params,
-                                          const AiCoreParams &aicoreParams)
+bool Mc2ComputeMatmulTiling::tryAFullLoad(AscendC::tiling::TCubeTiling& matmulTiling, const Mc2MatmulParams& params,
+                                          const AiCoreParams& aicoreParams)
 {
     uint64_t kAlign = ops::CeilAlign(params.kSize, INT4_BLK_SIZE);
     uint64_t stepKa = ops::CeilDiv(kAlign, static_cast<uint64_t>(matmulTiling.baseK));
@@ -479,8 +479,8 @@ bool Mc2ComputeMatmulTiling::tryAFullLoad(AscendC::tiling::TCubeTiling &matmulTi
     return true;
 }
 
-bool Mc2ComputeMatmulTiling::trySimpleTilingNormalLoad(AscendC::tiling::TCubeTiling &matmulTiling,
-                                                       const Mc2MatmulParams &params, const AiCoreParams &aicoreParams)
+bool Mc2ComputeMatmulTiling::trySimpleTilingNormalLoad(AscendC::tiling::TCubeTiling& matmulTiling,
+                                                       const Mc2MatmulParams& params, const AiCoreParams& aicoreParams)
 {
     // a不能全载，尽量减少aL1的空间，扩大b的载入量，可以减少a的重复载入
     uint64_t kAlign = ops::CeilAlign(params.kSize, INT4_BLK_SIZE);

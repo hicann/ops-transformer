@@ -26,12 +26,12 @@ class Mc2BatchMatMulDaswBlock : public Mc2BatchMatMulAswBlock {
 public:
     __aicore__ inline Mc2BatchMatMulDaswBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-    __aicore__ inline void Init(const void *tilingData);
+    __aicore__ inline void Init(const void* tilingData);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx, uint64_t newBlockIdx);
 };
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-__aicore__ inline void Mc2BatchMatMulDaswBlock::Init(const void *tilingData)
+__aicore__ inline void Mc2BatchMatMulDaswBlock::Init(const void* tilingData)
 {
     Mc2BatchMatMulAswBlock::Init<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>(tilingData);
     if (params_.totalCnt % (batchMatmulTilingData_->matMulTilingData.tCubeTiling.usedCoreNum * 2) == 0) {

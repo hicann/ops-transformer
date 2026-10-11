@@ -18,7 +18,7 @@
 
 using namespace ge;
 namespace ops {
-static ge::graphStatus CheckMatrixInputShapes(const gert::InferShapeContext *context, CommParas &commParas)
+static ge::graphStatus CheckMatrixInputShapes(const gert::InferShapeContext* context, CommParas& commParas)
 {
     commParas.x1MatrixShape = context->GetInputShape(0);
     OPS_CHECK_NULL_WITH_CONTEXT(context, commParas.x1MatrixShape);
@@ -37,8 +37,8 @@ static ge::graphStatus CheckMatrixInputShapes(const gert::InferShapeContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ResolveRankSize(const gert::InferShapeContext *context, const char *groupStr,
-                                       const int64_t *rankSizeAttr, int64_t &rankSize)
+static ge::graphStatus ResolveRankSize(const gert::InferShapeContext* context, const char* groupStr,
+                                       const int64_t* rankSizeAttr, int64_t& rankSize)
 {
     if (*rankSizeAttr <= 0) {
 #if defined(ENABLE_BUILT_IN)
@@ -58,7 +58,7 @@ static ge::graphStatus ResolveRankSize(const gert::InferShapeContext *context, c
     return ge::GRAPH_SUCCESS;
 }
 
-static void FillMatmulDims(CommParas &commParas, bool isTransA, bool isTransB)
+static void FillMatmulDims(CommParas& commParas, bool isTransA, bool isTransB)
 {
     commParas.dimM = !isTransA ? commParas.x1MatrixShape->GetDim(0) : commParas.x1MatrixShape->GetDim(1);
     commParas.dimKX1 = !isTransA ? commParas.x1MatrixShape->GetDim(1) : commParas.x1MatrixShape->GetDim(0);
@@ -66,7 +66,7 @@ static void FillMatmulDims(CommParas &commParas, bool isTransA, bool isTransB)
     commParas.dimN = !isTransB ? commParas.x2MatrixShape->GetDim(1) : commParas.x2MatrixShape->GetDim(0);
 }
 
-static ge::graphStatus CheckKDimMatch(const gert::InferShapeContext *context, const CommParas &commParas)
+static ge::graphStatus CheckKDimMatch(const gert::InferShapeContext* context, const CommParas& commParas)
 {
     if (commParas.dimKX1 != commParas.dimKX2) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
@@ -79,19 +79,19 @@ static ge::graphStatus CheckKDimMatch(const gert::InferShapeContext *context, co
 }
 
 // infershape 公共函数
-ge::graphStatus CommonParamCheck(const gert::InferShapeContext *context, const size_t isTransAIndex,
-                                 const size_t isTransBIndex, CommParas &commParas)
+ge::graphStatus CommonParamCheck(const gert::InferShapeContext* context, const size_t isTransAIndex,
+                                 const size_t isTransBIndex, CommParas& commParas)
 {
     if (CheckMatrixInputShapes(context, commParas) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     auto attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const bool *isTransA = attrs->GetAttrPointer<bool>(isTransAIndex);
-    const bool *isTransB = attrs->GetAttrPointer<bool>(isTransBIndex);
-    const int64_t *rankSizeAttr = attrs->GetAttrPointer<int64_t>(RANK_SIZE);
+    const bool* isTransA = attrs->GetAttrPointer<bool>(isTransAIndex);
+    const bool* isTransB = attrs->GetAttrPointer<bool>(isTransBIndex);
+    const int64_t* rankSizeAttr = attrs->GetAttrPointer<int64_t>(RANK_SIZE);
 
-    const char *groupStr = attrs->GetAttrPointer<char>(GROUP);
+    const char* groupStr = attrs->GetAttrPointer<char>(GROUP);
     if (groupStr == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "groupStr");
         return ge::GRAPH_FAILED;
@@ -109,7 +109,7 @@ ge::graphStatus CommonParamCheck(const gert::InferShapeContext *context, const s
     return CheckKDimMatch(context, commParas);
 }
 
-ge::graphStatus AllGatherMatmulInferYShape(gert::InferShapeContext *context, CommParas &commParas)
+ge::graphStatus AllGatherMatmulInferYShape(gert::InferShapeContext* context, CommParas& commParas)
 {
     OP_LOGE_IF(CommonParamCheck(context, AG_IS_TRANS_A, AG_IS_TRANS_B, commParas) != GRAPH_SUCCESS, GRAPH_FAILED,
                context->GetNodeName(), "CommonParamCheck execute failed.");
@@ -122,7 +122,7 @@ ge::graphStatus AllGatherMatmulInferYShape(gert::InferShapeContext *context, Com
         OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "dimK", "0", "non-zero value");
         return ge::GRAPH_FAILED;
     }
-    gert::Shape *yShape = context->GetOutputShape(0);
+    gert::Shape* yShape = context->GetOutputShape(0);
     OPS_CHECK_NULL_WITH_CONTEXT(context, yShape);
     yShape->SetDimNum(SUPPORT_DIM_SIZE);
     yShape->SetDim(0, commParas.dimM * commParas.rankSize);
@@ -130,16 +130,16 @@ ge::graphStatus AllGatherMatmulInferYShape(gert::InferShapeContext *context, Com
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AllGatherMatmulInferGatherOutShape(gert::InferShapeContext *context, const CommParas &commParas,
+ge::graphStatus AllGatherMatmulInferGatherOutShape(gert::InferShapeContext* context, const CommParas& commParas,
                                                    const size_t gatherIndex)
 {
     if (context->GetAttrs() == nullptr) {
         OP_LOGE(context->GetNodeName(), "get attrs failed.");
         return ge::GRAPH_FAILED;
     }
-    const bool *isGatherOut = context->GetAttrs()->GetAttrPointer<bool>(gatherIndex);
+    const bool* isGatherOut = context->GetAttrs()->GetAttrPointer<bool>(gatherIndex);
     OPS_CHECK_NULL_WITH_CONTEXT(context, isGatherOut);
-    gert::Shape *gatherOutShape = context->GetOutputShape(1);
+    gert::Shape* gatherOutShape = context->GetOutputShape(1);
     OPS_CHECK_NULL_WITH_CONTEXT(context, gatherOutShape);
     if (*isGatherOut) {
         gatherOutShape->SetDimNum(SUPPORT_DIM_SIZE);
@@ -152,7 +152,7 @@ ge::graphStatus AllGatherMatmulInferGatherOutShape(gert::InferShapeContext *cont
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus AllGatherMatmulCommonInferShape(gert::InferShapeContext *context, const size_t gatherIndex)
+ge::graphStatus AllGatherMatmulCommonInferShape(gert::InferShapeContext* context, const size_t gatherIndex)
 {
     CommParas commParas;
     OP_LOGE_IF(AllGatherMatmulInferYShape(context, commParas) != GRAPH_SUCCESS, GRAPH_FAILED, context->GetNodeName(),
@@ -164,7 +164,7 @@ ge::graphStatus AllGatherMatmulCommonInferShape(gert::InferShapeContext *context
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferMatmulReduceScatterCommon(gert::InferShapeContext *context)
+ge::graphStatus InferMatmulReduceScatterCommon(gert::InferShapeContext* context)
 {
     CommParas commParas;
     OP_LOGE_IF(CommonParamCheck(context, RS_IS_TRANS_A, RS_IS_TRANS_B, commParas) != GRAPH_SUCCESS, GRAPH_FAILED,
@@ -177,7 +177,7 @@ ge::graphStatus InferMatmulReduceScatterCommon(gert::InferShapeContext *context)
         OP_LOGE_FOR_INVALID_VALUE(context->GetNodeName(), "dimK", "0", "non-zero value");
         return ge::GRAPH_FAILED;
     }
-    gert::Shape *yShape = context->GetOutputShape(0);
+    gert::Shape* yShape = context->GetOutputShape(0);
     OPS_CHECK_NULL_WITH_CONTEXT(context, yShape);
     yShape->SetDimNum(SUPPORT_DIM_SIZE);
     yShape->SetDim(0, commParas.dimM / commParas.rankSize);
@@ -185,7 +185,7 @@ ge::graphStatus InferMatmulReduceScatterCommon(gert::InferShapeContext *context)
     return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferMatmulOutputDataType(gert::InferDataTypeContext *context, size_t inputIndex,
+ge::graphStatus InferMatmulOutputDataType(gert::InferDataTypeContext* context, size_t inputIndex,
                                           size_t yDtypeAttrIndex, size_t outputIndex)
 {
     auto attrs = context->GetAttrs();
@@ -196,7 +196,7 @@ ge::graphStatus InferMatmulOutputDataType(gert::InferDataTypeContext *context, s
         return ge::GRAPH_SUCCESS;
     }
 
-    const int64_t *yDtype = attrs->GetInt(yDtypeAttrIndex);
+    const int64_t* yDtype = attrs->GetInt(yDtypeAttrIndex);
     if (yDtype == nullptr || *yDtype == static_cast<int64_t>(ge::DataType::DT_UNDEFINED)) {
         OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "yDtype", "DT_UNDEFINED", "valid dtype value");
         return ge::GRAPH_FAILED;

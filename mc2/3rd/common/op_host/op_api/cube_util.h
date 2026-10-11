@@ -25,8 +25,8 @@ bool CheckCubeMathType(const op::DataType cubeTensorDtype, int8_t cubeMathType);
 bool CheckCubeMathTypeForMm(const op::DataType cubeTensorDtype, int8_t cubeMathType);
 
 // 返回芯片对应支持的数据类型
-const std::initializer_list<op::DataType> &GetDtypeSupportListBySocVersion();
-const std::initializer_list<op::DataType> &GetDtypeSupportListBySocVersion4ConvBackward(bool transposed);
+const std::initializer_list<op::DataType>& GetDtypeSupportListBySocVersion();
+const std::initializer_list<op::DataType>& GetDtypeSupportListBySocVersion4ConvBackward(bool transposed);
 
 // 根据promote type + cubemathtype的组合算出最终算子应用的dtype
 op::DataType CalcPromoteTypeCubemathtype(const op::DataType cubeTensorPromoteType, int8_t cubeMathType);
@@ -59,7 +59,7 @@ inline bool IsCubeSupportHf32()
     return true;
 }
 
-bool CheckUnSupportDtype(const aclTensor *input, const aclTensor *weight);
+bool CheckUnSupportDtype(const aclTensor* input, const aclTensor* weight);
 
 } // namespace Transformer
 } // namespace Ops

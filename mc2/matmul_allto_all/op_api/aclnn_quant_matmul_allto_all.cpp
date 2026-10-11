@@ -20,17 +20,17 @@
 
 // 两段式接口
 extern "C" aclnnStatus aclnnQuantMatmulAlltoAllGetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, const aclTensor *x1Scale,
-    const aclTensor *x2Scale, const aclTensor *commScaleOptional, const aclTensor *x1OffsetOptional,
-    const aclTensor *x2OffsetOptional, const aclIntArray *alltoAllAxesOptional, const char *group, int64_t x1QuantMode,
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional, const aclTensor* x1Scale,
+    const aclTensor* x2Scale, const aclTensor* commScaleOptional, const aclTensor* x1OffsetOptional,
+    const aclTensor* x2OffsetOptional, const aclIntArray* alltoAllAxesOptional, const char* group, int64_t x1QuantMode,
     int64_t x2QuantMode, int64_t commQuantMode, int64_t commQuantDtype, int64_t groupSize, bool transposeX1,
-    bool transposeX2, const aclTensor *output, uint64_t *workspaceSize, aclOpExecutor **executor)
+    bool transposeX2, const aclTensor* output, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("aclnnQuantMatmulAlltoAllGetWorkspaceSize start");
 
     auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
     auto socVersion = op::GetCurrentPlatformInfo().GetSocVersion();
-    const char *commMode =
+    const char* commMode =
         (npuArch == Ops::Base::DAV_3510 || socVersion == op::SocVersion::ASCEND910_93) ? "ai_cpu" : "aiv";
 
     return aclnnQuantMatmulAlltoAllBaseGetWorkspaceSize(
@@ -39,7 +39,7 @@ extern "C" aclnnStatus aclnnQuantMatmulAlltoAllGetWorkspaceSize(
         transposeX1, transposeX2, output, workspaceSize, executor);
 }
 
-extern "C" aclnnStatus aclnnQuantMatmulAlltoAll(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnQuantMatmulAlltoAll(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                 aclrtStream stream)
 {
     OP_LOGD("aclnnQuantMatmulAlltoAll start");

@@ -20,7 +20,7 @@ namespace MoeDistributeDispatchInferShapeUT {
 class MoeDistributeDispatchInfershape : public testing::Test {};
 
 namespace {
-bool Comp(const gert::Shape *x, const gert::Shape y)
+bool Comp(const gert::Shape* x, const gert::Shape y)
 {
     for (int i = 0; i < x->GetDimNum(); i++) {
         std::cout << x->GetDim(i) << " " << y.GetDim(i) << std::endl;

@@ -21,7 +21,7 @@ namespace optiling {
 namespace mc2_matmul_v3_advanced {
 class Mc2MatMulV3AswTiling : public Mc2MatMulV3BaseTiling {
 public:
-    Mc2MatMulV3AswTiling(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg)
+    Mc2MatMulV3AswTiling(gert::TilingContext* context, Mc2MatMulTilingCfg& cfg)
         : Mc2MatMulV3BaseTiling(context, cfg) {};
 
     ~Mc2MatMulV3AswTiling() override = default;
@@ -56,16 +56,16 @@ private:
     void FormulateLoadBalanceBlock();
     void CalcTailBasicBlock();
     void OptimizeEdgeBasicBlock();
-    void GetOuterAxisTailCnt(bool nLoadBalance, uint64_t &baseTailSplitCnt, uint64_t &tailMain);
-    void CalcSingleX(uint64_t &higherSingleX, uint64_t &lowerSingleX);
+    void GetOuterAxisTailCnt(bool nLoadBalance, uint64_t& baseTailSplitCnt, uint64_t& tailMain);
+    void CalcSingleX(uint64_t& higherSingleX, uint64_t& lowerSingleX);
     // 单边大场景处理
     uint64_t UpdateBaseBlock(uint64_t baseBlock, bool isMLarger);
-    void CalcLargeSingleSide(uint64_t maxMN, uint64_t &targetBase, bool isMLarger);
+    void CalcLargeSingleSide(uint64_t maxMN, uint64_t& targetBase, bool isMLarger);
     void HandleLargeSingleSide(uint64_t minMN, uint64_t maxMN, bool isMLarger);
     // 两边都比较大场景处理
-    bool UpdateBothBaseBlock(double balance, CalcParams &params, uint64_t currentBaseM, uint64_t currentBaseN,
+    bool UpdateBothBaseBlock(double balance, CalcParams& params, uint64_t currentBaseM, uint64_t currentBaseN,
                              uint64_t baseK);
-    bool CalcBestBalance(CalcParams &params, bool isMLarger);
+    bool CalcBestBalance(CalcParams& params, bool isMLarger);
     void HandleLargeBothSides(uint64_t higherSingleX, uint64_t lowerSingleX, uint64_t minMN, bool isMLarger);
 };
 } // namespace mc2_matmul_v3_advanced

@@ -23,7 +23,7 @@ using namespace Act::Gemm;
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class A_LAYOUT, class B_LAYOUT, class C_LAYOUT,
           MatMulL0C2Out MATMUL_L0C2OUT>
 __aicore__ inline void MatMulStreamKActKernel(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM,
-                                              GM_ADDR workspaceGM, const Mc2MatMulV3BasicTilingData &tilingData,
+                                              GM_ADDR workspaceGM, const Mc2MatMulV3BasicTilingData& tilingData,
                                               int64_t batch = 0)
 {
     // 定义L1和L0的TileShape

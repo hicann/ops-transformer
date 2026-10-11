@@ -29,7 +29,7 @@ bool MatmulAllReduceTilingA5::IsCapable()
     return true;
 }
 
-ge::graphStatus MatmulAllReduceTilingA5::SetMc2HcommAllReduce(const char *groupName, const uint32_t reduceType)
+ge::graphStatus MatmulAllReduceTilingA5::SetMc2HcommAllReduce(const char* groupName, const uint32_t reduceType)
 {
     OP_TILING_CHECK(
         mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType) == mc2tiling::HcclDataType::HCCL_DATA_TYPE_RESERVED,
@@ -58,7 +58,7 @@ ge::graphStatus MatmulAllReduceTilingA5::SetMc2HcommAllReduce(const char *groupN
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MatmulAllReduceTilingA5::SetMc2HcommTwoShot(const char *groupName, const uint32_t reduceType)
+ge::graphStatus MatmulAllReduceTilingA5::SetMc2HcommTwoShot(const char* groupName, const uint32_t reduceType)
 {
     uint32_t opType1 = static_cast<uint32_t>(HcclCMDType::HCCL_CMD_ALLTOALL);
     uint32_t opType2 = static_cast<uint32_t>(HcclCMDType::HCCL_CMD_ALLGATHER);
@@ -91,7 +91,7 @@ ge::graphStatus MatmulAllReduceTilingA5::SetMc2HcommTwoShot(const char *groupNam
 
 ge::graphStatus MatmulAllReduceTilingA5::SetMc2Hcomm()
 {
-    const char *groupName = context_->GetAttrs()->GetAttrPointer<char>(static_cast<int>(0));
+    const char* groupName = context_->GetAttrs()->GetAttrPointer<char>(static_cast<int>(0));
     bool isUseA2APath = mc2tiling::IsUseA2APath(args_.rankDim, npuArch_);
     const uint32_t reduceType = HcclReduceOp::HCCL_REDUCE_SUM;
     if (isUseA2APath) {
@@ -159,7 +159,7 @@ uint64_t MatmulAllReduceTilingA5::GetTilingKey() const
 
 void MatmulAllReduceTilingA5::PrintExtendMatmulTiling(bool isTail)
 {
-    auto &tiling = matmulAllReduce910TilingData_.mC2Mmv3TailTilingData;
+    auto& tiling = matmulAllReduce910TilingData_.mC2Mmv3TailTilingData;
     if (isTail) {
         tiling = matmulAllReduce910TilingData_.mC2Mmv3TailTilingData;
     }
@@ -199,7 +199,7 @@ ge::graphStatus MatmulAllReduceTilingA5::GetWorkspaceSize()
     OP_LOGI(opName_, "Select max workspace size to context, myWorkSpaceSize_=%lu, workspaceSize_=%lu.",
             myWorkSpaceSize_, workspaceSize_);
     myWorkSpaceSize_ = std::max(myWorkSpaceSize_, workspaceSize_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1);
+    size_t* workspaces = context_->GetWorkspaceSizes(1);
     if (mc2tiling::IsUseA2APath(args_.rankDim, npuArch_)) {
         GetWorkspaceSizeForA2ARSAG();
     }
@@ -220,7 +220,7 @@ ge::graphStatus MatmulAllReduceTilingA5::PostTiling()
 
     errno_t ret =
         memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                 reinterpret_cast<void *>(&matmulAllReduce910TilingData_), sizeof(MatmulAllReduce910TilingDataA5));
+                 reinterpret_cast<void*>(&matmulAllReduce910TilingData_), sizeof(MatmulAllReduce910TilingDataA5));
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "Memcpy_s failed, ret=%d.", ret);
         return ge::GRAPH_FAILED;
@@ -254,22 +254,22 @@ ge::graphStatus MatmulAllReduceTilingA5::Do910Tiling()
     // 获取tileTiling
     mmV3Args_.mValue = tileMValue_;
     OP_LOGD(opName_, "Do Mc2MatmulV3 tile tiling!");
-    Mc2MatmulHelper::Mc2MatmulTilingCfg tileTilingCfg(reinterpret_cast<const void *>(&compileInfo_),
-                                                      reinterpret_cast<const void *>(&mmV3Args_));
+    Mc2MatmulHelper::Mc2MatmulTilingCfg tileTilingCfg(reinterpret_cast<const void*>(&compileInfo_),
+                                                      reinterpret_cast<const void*>(&mmV3Args_));
     MC2_CHECK_LOG_RET(opName_, DoMatmulV3Tiling(tileTilingCfg, registerCfg, MutableMC2MmV3TileTilingData()));
     if (tailMValue_ != 0UL) {
         mmV3Args_.mValue = tailMValue_;
         OP_LOGD(opName_, "Do Mc2MatmulV3 tail tiling!");
-        Mc2MatmulHelper::Mc2MatmulTilingCfg tailTilingCfg(reinterpret_cast<const void *>(&compileInfo_),
-                                                          reinterpret_cast<const void *>(&mmV3Args_));
+        Mc2MatmulHelper::Mc2MatmulTilingCfg tailTilingCfg(reinterpret_cast<const void*>(&compileInfo_),
+                                                          reinterpret_cast<const void*>(&mmV3Args_));
         MC2_CHECK_LOG_RET(opName_, DoMatmulV3Tiling(tileTilingCfg, registerCfg, MutableMC2MmV3TailTilingData()));
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MatmulAllReduceTilingA5::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg &tilingCfg,
-                                                          Mc2MMRegisterCfg &registerCfg,
-                                                          Mc2MatMulV3TilingData &tilingData)
+ge::graphStatus MatmulAllReduceTilingA5::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg& tilingCfg,
+                                                          Mc2MMRegisterCfg& registerCfg,
+                                                          Mc2MatMulV3TilingData& tilingData)
 {
     tilingCfg.SetRankDim(args_.rankDim);
     tilingCfg.SetMatMulV3TilingData(tilingData);
@@ -281,7 +281,7 @@ ge::graphStatus MatmulAllReduceTilingA5::DoMatmulV3Tiling(Mc2MatmulHelper::Mc2Ma
     return ge::GRAPH_SUCCESS;
 }
 
-Mc2Tiling::RCSTiling &MatmulAllReduceTilingA5::MutableRCSTilingData()
+Mc2Tiling::RCSTiling& MatmulAllReduceTilingA5::MutableRCSTilingData()
 {
     return matmulAllReduce910TilingData_.param;
 }
@@ -371,13 +371,13 @@ ge::graphStatus MatmulAllReduceTilingA5::CheckInput()
     return CheckAxisSize();
 }
 
-MatmulAllReduceTilingA5::MatmulAllReduceTilingA5(gert::TilingContext *context)
+MatmulAllReduceTilingA5::MatmulAllReduceTilingA5(gert::TilingContext* context)
     : MatmulAllReduceTilingBase(context),
       matmulAllReduce910TilingData_(matmulAllReduce910TilingDataSelf_)
 {}
 
-MatmulAllReduceTilingA5::MatmulAllReduceTilingA5(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                                                 MatmulAllReduce910TilingDataA5 *out)
+MatmulAllReduceTilingA5::MatmulAllReduceTilingA5(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                                                 MatmulAllReduce910TilingDataA5* out)
     : MatmulAllReduceTilingBase(context, mmrCtxInfo),
       matmulAllReduce910TilingData_(*out)
 {}
@@ -387,8 +387,8 @@ CutResult MatmulAllReduceTilingA5::GetTilingResult()
     CutResult mCutAllreduce;
     SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B;
     SetMCutSocVersion(socVersion_2201);
-    const gert::StorageShape *commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
-    const gert::StorageShape *commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
+    const gert::StorageShape* commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
+    const gert::StorageShape* commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
     if (mc2tiling::IsStandardCard4P(args_.rankDim, npuArch_)) {
         MMAllReduceFitBalanceTiling allReduceTilingHccl(args_, KernelType::ALL_REDUCE_VIA_TWO_SHOT,
                                                         TopoType::STANDARD_CARD);

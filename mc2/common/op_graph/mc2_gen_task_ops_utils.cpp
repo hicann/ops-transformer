@@ -40,11 +40,11 @@ struct HcclCommParamDescTemp {
 namespace ops {
 bool Mc2GenTaskOpsUtils::IsComputationOnly()
 {
-    const char *env = getenv("ASCEND_MC2_DEBUG_MODE");
+    const char* env = getenv("ASCEND_MC2_DEBUG_MODE");
     return (env != nullptr && std::atoi(env) == 1);
 }
 
-int64_t Mc2GenTaskOpsUtils::GetAttachStreamIdByContext(const gert::ExeResGenerationContext *context, size_t idx)
+int64_t Mc2GenTaskOpsUtils::GetAttachStreamIdByContext(const gert::ExeResGenerationContext* context, size_t idx)
 {
 #ifndef ASCEND_OPSPROTO_UT
     const auto stream_infos = context->GetAttachedStreamInfos();
@@ -60,9 +60,9 @@ int64_t Mc2GenTaskOpsUtils::GetAttachStreamIdByContext(const gert::ExeResGenerat
     return stream_id;
 }
 
-ge::Status Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(const gert::ExeResGenerationContext *context,
-                                                         const ge::AscendString &name,
-                                                         const ge::AscendString &reuse_key)
+ge::Status Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(const gert::ExeResGenerationContext* context,
+                                                         const ge::AscendString& name,
+                                                         const ge::AscendString& reuse_key)
 {
     if (context == nullptr) {
         OPS_LOG_E("Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc", "Failed to get context.");
@@ -87,8 +87,8 @@ ge::Status Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(const gert::ExeResGener
 }
 
 ge::Status Mc2GenTaskOpsUtils::InsertHiddenInputsForAicoreTask(
-    const gert::ExeResGenerationContext *context, ge::KernelLaunchInfo &aicore_task,
-    size_t (*get_insert_idx)(const std::vector<ge::ArgDescInfo> &), size_t input_cnt)
+    const gert::ExeResGenerationContext* context, ge::KernelLaunchInfo& aicore_task,
+    size_t (*get_insert_idx)(const std::vector<ge::ArgDescInfo>&), size_t input_cnt)
 {
     if (context == nullptr) {
         OPS_LOG_E(context->GetNodeName(), "Failed to get context.");
@@ -126,10 +126,10 @@ ge::Status Mc2GenTaskOpsUtils::InsertHiddenInputsForAicoreTask(
     return ge::GRAPH_SUCCESS;
 }
 
-ge::Status Mc2GenTaskOpsUtils::InsertHiddenInputForAicoreV1(const gert::ExeResGenerationContext *context,
-                                                            std::vector<std::vector<uint8_t>> &tasks)
+ge::Status Mc2GenTaskOpsUtils::InsertHiddenInputForAicoreV1(const gert::ExeResGenerationContext* context,
+                                                            std::vector<std::vector<uint8_t>>& tasks)
 {
-    const auto get_idx = [](const std::vector<ge::ArgDescInfo> &args_desc_infos) {
+    const auto get_idx = [](const std::vector<ge::ArgDescInfo>& args_desc_infos) {
         size_t insert_idx = 0U;
         for (; insert_idx < args_desc_infos.size(); ++insert_idx) {
             if (args_desc_infos[insert_idx].GetType() == ge::ArgDescType::kIrInput) {
@@ -149,8 +149,8 @@ ge::Status Mc2GenTaskOpsUtils::InsertHiddenInputForAicoreV1(const gert::ExeResGe
     return ge::GRAPH_SUCCESS;
 }
 
-ge::Status Mc2GenTaskOpsUtils::CreateAicpuTaskV1(const gert::ExeResGenerationContext *context,
-                                                 ge::KernelLaunchInfo &aicpu_task)
+ge::Status Mc2GenTaskOpsUtils::CreateAicpuTaskV1(const gert::ExeResGenerationContext* context,
+                                                 ge::KernelLaunchInfo& aicpu_task)
 {
     size_t inputSize = context->GetComputeNodeInfo()->GetIrInputsNum();
     size_t outputSize = context->GetComputeNodeInfo()->GetIrOutputsNum();
@@ -186,8 +186,8 @@ ge::Status Mc2GenTaskOpsUtils::CreateAicpuTaskV1(const gert::ExeResGenerationCon
     return ge::GRAPH_SUCCESS;
 }
 
-ge::Status Mc2GenTaskOpsUtils::CommonKFCMc2GenTask(const gert::ExeResGenerationContext *context,
-                                                   std::vector<std::vector<uint8_t>> &tasks)
+ge::Status Mc2GenTaskOpsUtils::CommonKFCMc2GenTask(const gert::ExeResGenerationContext* context,
+                                                   std::vector<std::vector<uint8_t>>& tasks)
 {
     if (context == nullptr) {
         OPS_LOG_E("Mc2GenTaskOpsUtils::CommonKFCMc2GenTask", "Failed to get context.");
@@ -209,8 +209,8 @@ ge::Status Mc2GenTaskOpsUtils::CommonKFCMc2GenTask(const gert::ExeResGenerationC
 
     // aicpu task
     const bool useA5AicpuServer = IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5);
-    const std::string &soName = useA5AicpuServer ? SO_NAME_MC2_SERVER : SO_NAME_LEGACY;
-    const std::string &kernelName = useA5AicpuServer ? KERNEL_NAME_MC2_SERVER : KERNEL_NAME_V1;
+    const std::string& soName = useA5AicpuServer ? SO_NAME_MC2_SERVER : SO_NAME_LEGACY;
+    const std::string& kernelName = useA5AicpuServer ? KERNEL_NAME_MC2_SERVER : KERNEL_NAME_V1;
     OPS_LOG_I(context->GetNodeName(), "Create AICPU KFC task for MC2, so[%s], kernel[%s], useA5AicpuServer[%d].",
               soName.c_str(), kernelName.c_str(), useA5AicpuServer);
     ge::KernelLaunchInfo aicpu_task =

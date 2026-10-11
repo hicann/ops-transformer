@@ -50,10 +50,10 @@ extern "C" {
  *
  */
 ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(
-    const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine, const char *groupEp,
+    const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* assistInfoForCombine, const char* groupEp,
     int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum,
-    int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char *commAlg,
-    aclTensor *quantExpandXOut, aclTensor *commCmdInfoOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char* commAlg,
+    aclTensor* quantExpandXOut, aclTensor* commCmdInfoOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * 算子功能：进行AlltoAllv通信，将数据写入对端GM。
@@ -79,10 +79,10 @@ ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(
  *
  */
 ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
-    const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine, const char *groupEp,
+    const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* assistInfoForCombine, const char* groupEp,
     int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum,
-    int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char *commAlg,
-    uint64_t &tokenMsgSize, uint64_t &commCmdInfoOutSize);
+    int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char* commAlg,
+    uint64_t& tokenMsgSize, uint64_t& commCmdInfoOutSize);
 
 /**
  * @brief aclnnMoeDistributeCombineSetup的第二段接口，用于执行计算。
@@ -93,7 +93,7 @@ ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码。
  */
-ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetup(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeDistributeCombineSetup(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                      aclrtStream stream);
 
 #ifdef __cplusplus

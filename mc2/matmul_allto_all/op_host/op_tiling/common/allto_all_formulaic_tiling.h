@@ -28,7 +28,7 @@ constexpr uint64_t EXPANSION_RATIO = 2;
 class AlltoAllMM : public OneCalcOneCommBase {
 public:
     // Constructor
-    explicit AlltoAllMM(const mc2tiling::TilingArgs &args, uint32_t inputRankDim, KernelType inputKernelType,
+    explicit AlltoAllMM(const mc2tiling::TilingArgs& args, uint32_t inputRankDim, KernelType inputKernelType,
                         NpuArch npuArch = Ops::Base::DAV_2201, bool isCommunicationBefore = false,
                         SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B)
         : OneCalcOneCommBase(args, inputRankDim, inputKernelType, npuArch, socVersion_2201),

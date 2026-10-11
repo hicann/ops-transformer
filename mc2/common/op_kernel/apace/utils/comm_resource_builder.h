@@ -46,22 +46,22 @@ struct HcclCombinOpParam {
 namespace Apace {
 using HcclOpParam = HcclCombinOpParam;
 
-__aicore__ inline uint32_t GetRankId(__gm__ HcclOpParam *winContext)
+__aicore__ inline uint32_t GetRankId(__gm__ HcclOpParam* winContext)
 {
     return winContext->rankId;
 }
 
-__aicore__ inline uint32_t GetRankDim(__gm__ HcclOpParam *winContext)
+__aicore__ inline uint32_t GetRankDim(__gm__ HcclOpParam* winContext)
 {
     return winContext->rankDim;
 }
 
-__aicore__ inline GM_ADDR GetBaseWindAddrByRankId(__gm__ HcclOpParam *winContext, const int32_t rankId)
+__aicore__ inline GM_ADDR GetBaseWindAddrByRankId(__gm__ HcclOpParam* winContext, const int32_t rankId)
 {
     return (GM_ADDR)(winContext->windowsIn[rankId] + A5_MTE_STATE_WIN_SIZE + rankId * EP_RANK_OFFSET_STEP);
 }
 
-__aicore__ inline GM_ADDR GetBaseWindStateAddrByRankId(__gm__ HcclOpParam *winContext, const int32_t rankId)
+__aicore__ inline GM_ADDR GetBaseWindStateAddrByRankId(__gm__ HcclOpParam* winContext, const int32_t rankId)
 {
     return (GM_ADDR)(winContext->windowsIn[rankId] + rankId * EP_RANK_OFFSET_STEP);
 }

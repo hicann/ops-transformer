@@ -24,7 +24,7 @@
 
 namespace mc2tiling {
 
-uint64_t NewGetDataTypeSize(const std::string &opName, ge::DataType type)
+uint64_t NewGetDataTypeSize(const std::string& opName, ge::DataType type)
 {
     static const std::map<ge::DataType, int64_t> DATA_TYPE_SIZE_MAP = {
         {ge::DT_BF16, 2},     {ge::DT_FLOAT16, 2},       {ge::DT_FLOAT, 4},
@@ -39,8 +39,8 @@ uint64_t NewGetDataTypeSize(const std::string &opName, ge::DataType type)
     OP_LOGI(opName, "cannot find datatype size according to ge datatype: %d", static_cast<int32_t>(type));
     return 0;
 }
-void NewUpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args &mmV3Args, const TilingArgs &args,
-                           const char *opName)
+void NewUpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args& mmV3Args, const TilingArgs& args,
+                           const char* opName)
 {
     mmV3Args.opName = opName;
     mmV3Args.isATrans = args.isATrans;
@@ -61,8 +61,8 @@ void NewUpdateMatmulV3Args(optiling::mc2_matmul_v3_advanced::Mc2MatMulV3Args &mm
     mmV3Args.bDtypeSize = NewGetDataTypeSize(opName, mmV3Args.bType);
 }
 
-ge::graphStatus NewGetMatmulV3PriorityPolicy(const NpuArch npuArch, std::vector<int32_t> &priorities,
-                                             const char *opName)
+ge::graphStatus NewGetMatmulV3PriorityPolicy(const NpuArch npuArch, std::vector<int32_t>& priorities,
+                                             const char* opName)
 {
     const static std::map<NpuArch, std::vector<int32_t>> MATMUL_V3_PRIOR_MAP = {
         {Ops::Base::DAV_3510, {optiling::mc2_matmul_v3_advanced::strategy::BASE}},

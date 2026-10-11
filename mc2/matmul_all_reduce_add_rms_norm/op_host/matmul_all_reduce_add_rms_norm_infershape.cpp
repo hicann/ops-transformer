@@ -23,7 +23,7 @@ using Ops::Base::CeilDiv;
 namespace ops {
 constexpr size_t kMC2MinShapeSize = 2U;
 constexpr size_t kMC2MaxShapeSize = 3U;
-static const char *kInnerDebug = "MC2 Inner Debug";
+static const char* kInnerDebug = "MC2 Inner Debug";
 
 struct MatmulShapeInfo {
     size_t output_dim;
@@ -33,7 +33,7 @@ struct MatmulShapeInfo {
     int64_t k;
 };
 
-static ge::graphStatus CheckScaleShape(const gert::Shape *scale_shape, int64_t group_size, MatmulShapeInfo &shape,
+static ge::graphStatus CheckScaleShape(const gert::Shape* scale_shape, int64_t group_size, MatmulShapeInfo& shape,
                                        bool is_trans_b)
 {
     if (scale_shape == nullptr || group_size == 0) {
@@ -56,7 +56,7 @@ static ge::graphStatus CheckScaleShape(const gert::Shape *scale_shape, int64_t g
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShapeForMatmul(const gert::InferShapeContext *context, MatmulShapeInfo &shape, bool is_arn)
+static ge::graphStatus InferShapeForMatmul(const gert::InferShapeContext* context, MatmulShapeInfo& shape, bool is_arn)
 {
     const auto shape_x1 = context->GetInputShape(static_cast<size_t>(MC2InputIdx::K_X1));
     OPS_CHECK_NULL_WITH_CONTEXT(context, shape_x1);
@@ -76,10 +76,10 @@ static ge::graphStatus InferShapeForMatmul(const gert::InferShapeContext *contex
 
     const auto attrs = context->GetAttrs();
     OPS_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    const bool *trans_a = attrs->GetAttrPointer<bool>(static_cast<size_t>(MmAllReduceAttrIdx::K_TRANS_X1));
+    const bool* trans_a = attrs->GetAttrPointer<bool>(static_cast<size_t>(MmAllReduceAttrIdx::K_TRANS_X1));
     OPS_CHECK(trans_a != nullptr && *trans_a,
               OP_LOGE_WITH_INVALID_ATTR(context->GetNodeName(), "trans_x1", "true", "false"), return ge::GRAPH_FAILED);
-    const bool *trans_b = attrs->GetAttrPointer<bool>(static_cast<size_t>(MmAllReduceAttrIdx::K_TRANS_X2));
+    const bool* trans_b = attrs->GetAttrPointer<bool>(static_cast<size_t>(MmAllReduceAttrIdx::K_TRANS_X2));
     const bool is_trans_b = ((trans_b != nullptr) && (*trans_b));
     if (dim_num_x1 == kMC2MaxShapeSize) {
         shape.s = shape_x1->GetDim(0U);
@@ -101,7 +101,7 @@ static ge::graphStatus InferShapeForMatmul(const gert::InferShapeContext *contex
                   return ge::GRAPH_FAILED);
         const size_t scale_idx =
             is_arn ? static_cast<size_t>(MC2AddRmsNormInputIdx::K_SCALE) : static_cast<size_t>(MC2InputIdx::K_SCALE);
-        const int64_t *p = attrs->GetInt(static_cast<size_t>(MmAllReduceAttrIdx::K_ANTIQUANT_GROUP_SIZE));
+        const int64_t* p = attrs->GetInt(static_cast<size_t>(MmAllReduceAttrIdx::K_ANTIQUANT_GROUP_SIZE));
         const int64_t group_size = (p != nullptr ? *p : 0);
         if (CheckScaleShape(context->GetOptionalInputShape(scale_idx), group_size, shape, is_trans_b) !=
             ge::GRAPH_SUCCESS) {
@@ -115,7 +115,7 @@ static ge::graphStatus InferShapeForMatmul(const gert::InferShapeContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-static bool InferAllZeroShape(const gert::InferShapeContext *context)
+static bool InferAllZeroShape(const gert::InferShapeContext* context)
 {
     const auto shape_x1 = context->GetInputShape(static_cast<size_t>(MC2AddRmsNormInputIdx::K_X1));
     if (shape_x1 == nullptr) {
@@ -135,7 +135,7 @@ static bool InferAllZeroShape(const gert::InferShapeContext *context)
     return true;
 }
 
-static ge::graphStatus InferShapeForMC2AddRmsNorm(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeForMC2AddRmsNorm(gert::InferShapeContext* context)
 {
     OPS_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT(kInnerDebug, "context"), return ge::GRAPH_FAILED);
     MatmulShapeInfo shape;
@@ -175,7 +175,7 @@ static ge::graphStatus InferShapeForMC2AddRmsNorm(gert::InferShapeContext *conte
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDtypeForMC2AddRmsNorm(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDtypeForMC2AddRmsNorm(gert::InferDataTypeContext* context)
 {
     OPS_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT(kInnerDebug, "context"), return ge::GRAPH_FAILED);
     const ge::DataType out_type = context->GetInputDataType(static_cast<size_t>(MC2AddRmsNormInputIdx::K_RESIDUAL));

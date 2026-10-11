@@ -55,7 +55,7 @@ struct Mc2ASWOffsetParam {
 class Mc2WeightQuantBmmAswBlock {
 public:
     __aicore__ inline Mc2WeightQuantBmmAswBlock() {}
-    __aicore__ inline void Init(const WeightQuantBatchMatmulV2ASWTilingData *tilingData, uint32_t blockIdx);
+    __aicore__ inline void Init(const WeightQuantBatchMatmulV2ASWTilingData* tilingData, uint32_t blockIdx);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx);
     __aicore__ inline void UpdateBlockParams(uint64_t roundIdx);
     template <bool aTrans, bool bTrans, CubeFormat formatX2 = CubeFormat::ND>
@@ -65,14 +65,14 @@ public:
 public:
     Mc2ASWTilingParam params_;
     Mc2ASWOffsetParam offset_;
-    const WeightQuantBatchMatmulV2ASWTilingData *tilingData_;
+    const WeightQuantBatchMatmulV2ASWTilingData* tilingData_;
 
 private:
     const uint64_t WINDOW_LEN = 4;
     uint32_t blockIdx_;
 };
 
-__aicore__ inline void Mc2WeightQuantBmmAswBlock::Init(const WeightQuantBatchMatmulV2ASWTilingData *tilingData,
+__aicore__ inline void Mc2WeightQuantBmmAswBlock::Init(const WeightQuantBatchMatmulV2ASWTilingData* tilingData,
                                                        uint32_t blockIdx)
 {
     params_.mSplitAddrOffset = 0;

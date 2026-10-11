@@ -66,7 +66,7 @@ struct PipelineStageSingleCoreCopyInAdvance
     }
 
     DEVICE
-    void Clear(PipelineState<Stages> &state) const
+    void Clear(PipelineState<Stages>& state) const
     {
 #pragma unroll
         for (uint8_t i = 0; i < Stages - 1; ++i) {

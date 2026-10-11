@@ -28,7 +28,7 @@
 #include "mat_mul_v3/op_kernel/mat_mul_v3_tiling_data.h"
 
 template <typename T>
-std::string ConcatString(const T &arg)
+std::string ConcatString(const T& arg)
 {
     std::ostringstream oss;
     oss << arg;
@@ -49,7 +49,7 @@ std::string ConcatString(T arg, Ts... arg_left)
  * @param list: 有效值列表
  */
 template <typename T>
-std::string VectorToString(const std::vector<T> &list)
+std::string VectorToString(const std::vector<T>& list)
 {
     std::ostringstream oss;
     oss << "[";
@@ -64,20 +64,20 @@ std::string VectorToString(const std::vector<T> &list)
 }
 
 namespace Mc2Log {
-void PrintMMV3TilingData(const std::string &opName, Mc2Tiling::MC2MatmulV3TilingData &tiling);
+void PrintMMV3TilingData(const std::string& opName, Mc2Tiling::MC2MatmulV3TilingData& tiling);
 
-void PrintRCSTilingData(const std::string &opName, Mc2Tiling::RCSTiling &rcsTiling);
-void PrintTileL2TilingData(const std::string &opName, Mc2Tiling::TileL2Tiling &tileL2Tiling);
-void PrintMc2MsgData(const std::string &opName, Mc2Tiling::Mc2Msg &msg);
-void PrintTCubeTilingData(const std::string &opName, ::TCubeTiling &tiling);
-void PrintMc2MatmulV3TilingData(const std::string &opName, ::Mc2MatmulV3TilingData &tiling);
-void PrintTCubeTilingWindowParam(const std::string &opName, DequantBmm::Mc2SlidingWindowParams &tiling);
-void PrintTCubeTilingL2cache(const std::string &opName, DequantBmm::Mc2L2cacheTileParams &tiling);
-void PrintTCubeTilingParams(const std::string &opName, DequantBmm::Mc2QuantBatchMatmulV3DataParams &tiling);
-void PrintMMV3TilingData(const std::string &opName, Mc2MatMulV3TilingData &tiling);
+void PrintRCSTilingData(const std::string& opName, Mc2Tiling::RCSTiling& rcsTiling);
+void PrintTileL2TilingData(const std::string& opName, Mc2Tiling::TileL2Tiling& tileL2Tiling);
+void PrintMc2MsgData(const std::string& opName, Mc2Tiling::Mc2Msg& msg);
+void PrintTCubeTilingData(const std::string& opName, ::TCubeTiling& tiling);
+void PrintMc2MatmulV3TilingData(const std::string& opName, ::Mc2MatmulV3TilingData& tiling);
+void PrintTCubeTilingWindowParam(const std::string& opName, DequantBmm::Mc2SlidingWindowParams& tiling);
+void PrintTCubeTilingL2cache(const std::string& opName, DequantBmm::Mc2L2cacheTileParams& tiling);
+void PrintTCubeTilingParams(const std::string& opName, DequantBmm::Mc2QuantBatchMatmulV3DataParams& tiling);
+void PrintMMV3TilingData(const std::string& opName, Mc2MatMulV3TilingData& tiling);
 } // namespace Mc2Log
 
-inline const char *ConvertStringToCstr(const std::string &str)
+inline const char* ConvertStringToCstr(const std::string& str)
 {
     return str.c_str();
 }

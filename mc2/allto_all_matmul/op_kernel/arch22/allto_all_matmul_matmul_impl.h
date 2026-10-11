@@ -178,13 +178,13 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::DequantImpl()
     GemmCoord problemShape{static_cast<uint32_t>(realM), static_cast<uint32_t>(n), static_cast<uint32_t>(realK)};
 
     AscendC::GlobalTensor<ElementD> gmD;
-    gmD.SetGlobalBuffer((__gm__ ElementD *)cGM_);
+    gmD.SetGlobalBuffer((__gm__ ElementD*)cGM_);
     AscendC::GlobalTensor<ElementC> gmC;
-    gmC.SetGlobalBuffer((__gm__ ElementC *)dequantCGM_);
+    gmC.SetGlobalBuffer((__gm__ ElementC*)dequantCGM_);
 
     AscendC::GlobalTensor<ElementBias> gmBias;
     if (biasGM_ != nullptr) {
-        gmBias.SetGlobalBuffer((__gm__ ElementBias *)biasGM_);
+        gmBias.SetGlobalBuffer((__gm__ ElementBias*)biasGM_);
     }
 
     uint32_t rowsPerCore = DivCeil(problemShape.m(), blockNum);

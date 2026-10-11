@@ -134,9 +134,9 @@ __aicore__ inline constexpr uint32_t GetTaskRation()
 #endif
 }
 
-__aicore__ inline int32_t GetSplitValueFromGroupList(uint32_t groupIdx, int32_t &preOffset, int32_t groupType,
+__aicore__ inline int32_t GetSplitValueFromGroupList(uint32_t groupIdx, int32_t& preOffset, int32_t groupType,
                                                      uint32_t groupListType,
-                                                     const AscendC::GlobalTensor<int64_t> &groupListGm)
+                                                     const AscendC::GlobalTensor<int64_t>& groupListGm)
 {
     int32_t splitValue = 0;
     if (likely(groupType != -1)) { // -1: no  need to split
@@ -153,8 +153,8 @@ __aicore__ inline int32_t GetSplitValueFromGroupList(uint32_t groupIdx, int32_t 
 
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ >= 310
 template <typename T>
-__aicore__ inline void InitOutputWithZero(AscendC::GlobalTensor<T> yInitGlobal, AscendC::LocalTensor<T> &initLocal,
-                                          uint64_t ySize, int32_t usedCoreNum, bool &isKZeroInit)
+__aicore__ inline void InitOutputWithZero(AscendC::GlobalTensor<T> yInitGlobal, AscendC::LocalTensor<T>& initLocal,
+                                          uint64_t ySize, int32_t usedCoreNum, bool& isKZeroInit)
 {
     if ASCEND_IS_AIC {
         return;

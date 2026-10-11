@@ -25,7 +25,7 @@ constexpr int64_t MAX_CCU_RANKSIZE = 8;
 }
 
 namespace ops {
-static ge::Status MatmulReduceScatterV2CalcOpParam(gert::ExeResGenerationContext *context)
+static ge::Status MatmulReduceScatterV2CalcOpParam(gert::ExeResGenerationContext* context)
 {
     if (IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5)) {
         ge::AscendString comm_mode;
@@ -48,8 +48,8 @@ static ge::Status MatmulReduceScatterV2CalcOpParam(gert::ExeResGenerationContext
     return ge::GRAPH_FAILED;
 }
 
-static ge::Status MatmulReduceScatterV2GenTask(const gert::ExeResGenerationContext *context,
-                                               std::vector<std::vector<uint8_t>> &tasks)
+static ge::Status MatmulReduceScatterV2GenTask(const gert::ExeResGenerationContext* context,
+                                               std::vector<std::vector<uint8_t>>& tasks)
 {
     if (IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5)) {
         OPS_LOG_D(context->GetNodeName(), "Do A5 GenTaskFunc");

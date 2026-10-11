@@ -31,8 +31,8 @@ struct BlockOffset {
 class MatmulBlock {
 public:
     __aicore__ inline MatmulBlock() {}
-    __aicore__ inline void Init(AscendC::tiling::TCubeTiling &tiling, Mc2Tiling::RCSTiling &cfg,
-                                Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling);
+    __aicore__ inline void Init(AscendC::tiling::TCubeTiling& tiling, Mc2Tiling::RCSTiling& cfg,
+                                Mc2Tiling::Mc2L2cacheTilePara& tileL2cacheTiling);
     __aicore__ inline void UpdateBlockIndex();
     __aicore__ inline void InitBlockIndex();
     __aicore__ inline uint32_t LCM(uint32_t m, uint32_t n); // 计算最小公倍数
@@ -65,8 +65,8 @@ public:
     uint32_t blockCurN; // 当前block块N轴大小
 };
 
-__aicore__ inline void MatmulBlock::Init(AscendC::tiling::TCubeTiling &tiling, Mc2Tiling::RCSTiling &cfg,
-                                         Mc2Tiling::Mc2L2cacheTilePara &tileL2cacheTiling)
+__aicore__ inline void MatmulBlock::Init(AscendC::tiling::TCubeTiling& tiling, Mc2Tiling::RCSTiling& cfg,
+                                         Mc2Tiling::Mc2L2cacheTilePara& tileL2cacheTiling)
 {
     (void)tileL2cacheTiling;
     this->tiling = tiling;

@@ -34,9 +34,9 @@ static inline uint32_t MurmurScramble(uint32_t key)
     return key;
 }
 
-uint32_t MurmurHash(const void *src, uint32_t len, uint32_t seed)
+uint32_t MurmurHash(const void* src, uint32_t len, uint32_t seed)
 {
-    const uint32_t *key = static_cast<const uint32_t *>(src);
+    const uint32_t* key = static_cast<const uint32_t*>(src);
     uint32_t hash_key = seed;
     uint32_t tmp_key;
     // Read in blocks of 4
@@ -49,7 +49,7 @@ uint32_t MurmurHash(const void *src, uint32_t len, uint32_t seed)
         hash_key = hash_key * kChunkOffset + 0xe6546b64;
     }
     // Process the rest
-    const uint8_t *rest_key = static_cast<const uint8_t *>(src);
+    const uint8_t* rest_key = static_cast<const uint8_t*>(src);
     tmp_key = 0U;
     for (uint32_t i = len & 3U; i != 0U; i--) {
         tmp_key <<= kRolTailLeft;

@@ -26,7 +26,7 @@ class BmmDequantBf16Opt {
 public:
     __aicore__ inline BmmDequantBf16Opt() {}
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scale, GM_ADDR y, GM_ADDR workSpace,
-                                const Mc2QuantBatchMatmulV3TilingData *__restrict tilingData, TPipe *tPipe)
+                                const Mc2QuantBatchMatmulV3TilingData* __restrict tilingData, TPipe* tPipe)
     {
         blockIdx_ = GetBlockIdx();
         if constexpr (isAllAiv) {
@@ -45,7 +45,7 @@ public:
         pipe_ = tPipe;
 
         if (isPerTensor_) {
-            scaleScalar_ = *((__gm__ scaleType *)scale);
+            scaleScalar_ = *((__gm__ scaleType*)scale);
         }
 
         // init global buffer
@@ -72,29 +72,29 @@ public:
             return;
         }
         if (isPerTensor_) {
-            scaleScalar_ = *((__gm__ scaleType *)scale);
+            scaleScalar_ = *((__gm__ scaleType*)scale);
         }
         // update global buffer
-        xGm_.SetGlobalBuffer((__gm__ xType *)x1);
-        weightGm_.SetGlobalBuffer((__gm__ wType *)x2);
+        xGm_.SetGlobalBuffer((__gm__ xType*)x1);
+        weightGm_.SetGlobalBuffer((__gm__ wType*)x2);
         if (m_ <= baseM_) {
             weightGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
         }
         if (hasBias_ != 0U) {
             if (biasDtype_ == DT_BF16) {
-                biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t *)bias);
+                biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t*)bias);
             } else if (biasDtype_ == DT_FLOAT16) {
-                biasGmFp16_.SetGlobalBuffer((__gm__ half *)bias);
+                biasGmFp16_.SetGlobalBuffer((__gm__ half*)bias);
             } else if (biasDtype_ == DT_FLOAT) {
-                biasGmFp32_.SetGlobalBuffer((__gm__ float *)bias);
+                biasGmFp32_.SetGlobalBuffer((__gm__ float*)bias);
             } else {
-                biasGmInt32_.SetGlobalBuffer((__gm__ int32_t *)bias);
+                biasGmInt32_.SetGlobalBuffer((__gm__ int32_t*)bias);
             }
         }
 
-        yGm_.SetGlobalBuffer((__gm__ yType *)y);
-        scaleGm_.SetGlobalBuffer((__gm__ scaleType *)scale);
-        mmOutGm_.SetGlobalBuffer((__gm__ int32_t *)workSpace, batch_ * m_ * n_);
+        yGm_.SetGlobalBuffer((__gm__ yType*)y);
+        scaleGm_.SetGlobalBuffer((__gm__ scaleType*)scale);
+        mmOutGm_.SetGlobalBuffer((__gm__ int32_t*)workSpace, batch_ * m_ * n_);
     }
 
     /** main logical function
@@ -163,7 +163,7 @@ protected:
     GlobalTensor<scaleType> scaleGm_;
     GlobalTensor<int32_t> mmOutGm_;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     // define the que
     TQue<QuePosition::VECIN, 1> vecQueSrc_;
     TQue<QuePosition::VECIN, 1> vecQueScale_;
@@ -215,7 +215,7 @@ protected:
 
     /** init function for TilingData of mm1
      */
-    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData *tilingData)
+    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData* tilingData)
     {
         hasBias_ = tilingData->matmulTiling.isBias;
         isPerTensor_ = tilingData->params.isPerTensor;
@@ -363,9 +363,9 @@ protected:
         mm.IterateAll(mmOutGm_[offsetC_], false); // matmultiling singleTimeM_ * singleTimeN_
     }
 
-    __aicore__ inline void BiasGm2Ub(LocalTensor<float> &dstLocalFp32, LocalTensor<float> &biasFp32,
-                                     LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                     LocalTensor<float> &oriBiasFp32, DataCopyPadParams padParams,
+    __aicore__ inline void BiasGm2Ub(LocalTensor<float>& dstLocalFp32, LocalTensor<float>& biasFp32,
+                                     LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                     LocalTensor<float>& oriBiasFp32, DataCopyPadParams padParams,
                                      uint64_t baseNOfffset, uint32_t curAivN)
     {
         dstLocalFp32 = outFp32Tmp_.Get<float>();
@@ -386,7 +386,7 @@ protected:
         }
     }
 
-    __aicore__ inline void Bf16ScaleGm2Ub(LocalTensor<scaleType> &scaleLocal, GlobalTensor<scaleType> &scaleGm_,
+    __aicore__ inline void Bf16ScaleGm2Ub(LocalTensor<scaleType>& scaleLocal, GlobalTensor<scaleType>& scaleGm_,
                                           DataCopyPadParams padParams, uint64_t baseNOfffset, uint32_t curAivN)
     {
         DataCopyParams scale2UbParams{1, 0, 0, 0};
@@ -395,9 +395,9 @@ protected:
         DataCopyPad(scaleLocal, scaleGm_[scaleOffset], scale2UbParams, padParams);
     }
 
-    __aicore__ inline void CalBiasAdd(LocalTensor<float> &dstLocalFp32, LocalTensor<float> &biasFp32,
-                                      LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                      LocalTensor<float> &oriBiasFp32, LocalTensor<yType> &dstLocal, uint32_t curAivN,
+    __aicore__ inline void CalBiasAdd(LocalTensor<float>& dstLocalFp32, LocalTensor<float>& biasFp32,
+                                      LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                      LocalTensor<float>& oriBiasFp32, LocalTensor<yType>& dstLocal, uint32_t curAivN,
                                       uint32_t curAivM)
     {
         uint32_t computedAivN = DequantBmm::Align(curAivN, 8U); // 8: 32B aligned for int32_t
@@ -437,8 +437,8 @@ protected:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void DataCopyGm2Ub(LocalTensor<int32_t> &srcLocal, GlobalTensor<int32_t> &curMmOutGm,
-                                         DataCopyParams &gm2UbParams, DataCopyPadParams &padParams,
+    __aicore__ inline void DataCopyGm2Ub(LocalTensor<int32_t>& srcLocal, GlobalTensor<int32_t>& curMmOutGm,
+                                         DataCopyParams& gm2UbParams, DataCopyPadParams& padParams,
                                          uint64_t curAicOffset)
     {
         if (gm2UbParams.srcStride > 65535) { // instr stride only support uint16 which largest is 65535
@@ -456,7 +456,7 @@ protected:
         DataCopyPad(srcLocal, curMmOutGm[curAicOffset], gm2UbParams, padParams);
     }
 
-    __aicore__ inline void DequantCompute(GlobalTensor<int32_t> &curMmOutGm, uint64_t baseMOfffset,
+    __aicore__ inline void DequantCompute(GlobalTensor<int32_t>& curMmOutGm, uint64_t baseMOfffset,
                                           uint64_t baseNOfffset, uint32_t curAicM, uint32_t curAicN)
     {
         LocalTensor<float> dstLocalFp32;

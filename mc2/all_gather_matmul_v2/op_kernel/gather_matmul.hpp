@@ -89,7 +89,7 @@ public:
         Params() {}
 
         CATLASS_HOST_DEVICE
-        Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
+        Params(GemmCoord const& problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR ptrC_, LayoutC layoutC_, GM_ADDR ptrScale_, LayoutScale layoutScale_, GM_ADDR ptrPeerMem_,
                LayoutA layoutPeerMem_, GM_ADDR ptrWorkSpace_, int32_t pValue_, int32_t swizzlCount_,
                int32_t swizzlDirect_, int32_t rankIdx_, int32_t rankSize_, bool needFixpipe_,
@@ -121,20 +121,20 @@ public:
     AllGatherMatmulV2() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params const &params);
+    CATLASS_DEVICE void operator()(Params const& params);
 
-    inline __aicore__ void InitArgs(Params const &params)
+    inline __aicore__ void InitArgs(Params const& params)
     {
-        gmA.SetGlobalBuffer((__gm__ ElementA *)params.ptrA);
-        gmB.SetGlobalBuffer((__gm__ ElementB *)params.ptrB);
-        gmC.SetGlobalBuffer((__gm__ ElementC *)params.ptrC);
-        gmWorkSpace.SetGlobalBuffer((__gm__ ElementC *)params.ptrWorkSpace);
-        gmPeerMem.SetGlobalBuffer((__gm__ ElementA *)params.ptrPeerMem);
-        gmScale.SetGlobalBuffer((__gm__ ElementScale *)params.ptrScale);
-        gmAInt8.SetGlobalBuffer((__gm__ ElementAInt8 *)params.ptrA);
-        gmBInt8.SetGlobalBuffer((__gm__ ElementBInt8 *)params.ptrB);
-        gmCHalf.SetGlobalBuffer((__gm__ ElementCHalf *)params.ptrC);
-        gmPeerMemInt8.SetGlobalBuffer((__gm__ ElementAInt8 *)params.ptrPeerMem);
+        gmA.SetGlobalBuffer((__gm__ ElementA*)params.ptrA);
+        gmB.SetGlobalBuffer((__gm__ ElementB*)params.ptrB);
+        gmC.SetGlobalBuffer((__gm__ ElementC*)params.ptrC);
+        gmWorkSpace.SetGlobalBuffer((__gm__ ElementC*)params.ptrWorkSpace);
+        gmPeerMem.SetGlobalBuffer((__gm__ ElementA*)params.ptrPeerMem);
+        gmScale.SetGlobalBuffer((__gm__ ElementScale*)params.ptrScale);
+        gmAInt8.SetGlobalBuffer((__gm__ ElementAInt8*)params.ptrA);
+        gmBInt8.SetGlobalBuffer((__gm__ ElementBInt8*)params.ptrB);
+        gmCHalf.SetGlobalBuffer((__gm__ ElementCHalf*)params.ptrC);
+        gmPeerMemInt8.SetGlobalBuffer((__gm__ ElementAInt8*)params.ptrPeerMem);
 
         outputTypeInt32 = std::is_same<ElementC, int32_t>::value;
         coreIdx = AscendC::GetBlockIdx();
@@ -170,7 +170,7 @@ public:
         bool hasNextBlock;
     };
 
-    inline __aicore__ LocalBlockInfo GetLocalBlockInfo(int32_t loopIdx, Params const &params)
+    inline __aicore__ LocalBlockInfo GetLocalBlockInfo(int32_t loopIdx, Params const& params)
     {
         GemmCoord blockIdxCoord = GetBlockIdCoord(loopIdx, mLoops, nLoops, params.swizzlDirect, params.swizzlCount);
         GemmCoord blockLocCoord = Mc2MatmulAiv::GetBlockLocCoord<L1TileShape>(blockIdxCoord);
@@ -213,7 +213,7 @@ public:
     }
 
     CATLASS_DEVICE
-    void DoLocalMatmul(Params const &params)
+    void DoLocalMatmul(Params const& params)
     {
         BlockMmad blockMmad(resource);
 
@@ -230,7 +230,7 @@ public:
     }
 
     CATLASS_DEVICE
-    void DoLocalFixpipeMatmul(Params const &params)
+    void DoLocalFixpipeMatmul(Params const& params)
     {
         FixpipeBlockMmad fixpipeBlockMmad(resource);
 
@@ -276,8 +276,8 @@ public:
         bool hasNextBlock;
     };
 
-    inline __aicore__ RemoteBlockInfo GetRemoteBlockInfo(int32_t loopOffset, RemoteLoopContext const &ctx,
-                                                         bool accumWorkSpacePingPong, Params const &params)
+    inline __aicore__ RemoteBlockInfo GetRemoteBlockInfo(int32_t loopOffset, RemoteLoopContext const& ctx,
+                                                         bool accumWorkSpacePingPong, Params const& params)
     {
         int32_t loopOffsetInBlock = loopOffset / ctx.otherRankNum;
         int32_t dstBlockIdx = loopOffset % ctx.otherRankNum;
@@ -348,7 +348,7 @@ public:
         return info;
     }
 
-    inline __aicore__ RemoteLoopContext GetRemoteLoopContext(int32_t calIdx, Params const &params)
+    inline __aicore__ RemoteLoopContext GetRemoteLoopContext(int32_t calIdx, Params const& params)
     {
         RemoteLoopContext ctx;
         ctx.otherRankNum = params.rankSize;
@@ -368,7 +368,7 @@ public:
         return ctx;
     }
 
-    inline __aicore__ void FixpipeMatmul(Params const &params)
+    inline __aicore__ void FixpipeMatmul(Params const& params)
     {
         FixpipeBlockMmad fixpipeBlockMmad(resource);
 
@@ -394,7 +394,7 @@ public:
         }
     }
 
-    inline __aicore__ void Matmul(Params const &params)
+    inline __aicore__ void Matmul(Params const& params)
     {
         BlockMmad blockMmad(resource);
 
@@ -420,7 +420,7 @@ public:
     }
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const& params)
     {
         Catlass::Arch::CrossCoreWaitFlag(flagAivFinishPadding);
 

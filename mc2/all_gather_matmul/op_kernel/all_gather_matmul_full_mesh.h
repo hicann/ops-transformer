@@ -25,22 +25,22 @@ public:
     __aicore__ inline AllGatherMatmulFullMesh() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR gatherGM,
                                 GM_ADDR workspaceGM, GM_ADDR contextGM,
-                                Mc2Tiling::AllGatherMatmulTilingData *tilingData, __gm__ void *mc2InitTiling,
-                                __gm__ void *mc2CcTiling, TPipe *tPipe);
+                                Mc2Tiling::AllGatherMatmulTilingData* tilingData, __gm__ void* mc2InitTiling,
+                                __gm__ void* mc2CcTiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void HcclPrepare();
     __aicore__ inline void InnerProcess();
 
-    __aicore__ inline void MatmulKernelCompute(GM_ADDR aGM, GM_ADDR cGM, TCubeTiling &tiling,
-                                               Mc2Tiling::TileL2Tiling &l2Tiling, HcclHandle &handleId,
+    __aicore__ inline void MatmulKernelCompute(GM_ADDR aGM, GM_ADDR cGM, TCubeTiling& tiling,
+                                               Mc2Tiling::TileL2Tiling& l2Tiling, HcclHandle& handleId,
                                                uint32_t tileCnt);
-    __aicore__ inline void MatmulKernelComputeL2Cache(GM_ADDR aGM, GM_ADDR cGM, TCubeTiling &tiling,
-                                                      Mc2Tiling::TileL2Tiling &l2Tiling, HcclHandle &handleId,
+    __aicore__ inline void MatmulKernelComputeL2Cache(GM_ADDR aGM, GM_ADDR cGM, TCubeTiling& tiling,
+                                                      Mc2Tiling::TileL2Tiling& l2Tiling, HcclHandle& handleId,
                                                       uint32_t tileCnt);
-    __aicore__ inline void MatmulKernelGather(GM_ADDR aGM, GM_ADDR cGM, TCubeTiling &tiling,
-                                              Mc2Tiling::TileL2Tiling &l2Tiling, HcclHandle &handleId,
+    __aicore__ inline void MatmulKernelGather(GM_ADDR aGM, GM_ADDR cGM, TCubeTiling& tiling,
+                                              Mc2Tiling::TileL2Tiling& l2Tiling, HcclHandle& handleId,
                                               uint32_t tileCnt);
 
     __aicore__ inline void HcclFinalize();
@@ -54,8 +54,8 @@ private:
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
 __aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR gatherGM, GM_ADDR workspaceGM, GM_ADDR contextGM,
-    Mc2Tiling::AllGatherMatmulTilingData *tilingData, __gm__ void *mc2InitTiling, __gm__ void *mc2CcTiling,
-    TPipe *tPipe)
+    Mc2Tiling::AllGatherMatmulTilingData* tilingData, __gm__ void* mc2InitTiling, __gm__ void* mc2CcTiling,
+    TPipe* tPipe)
 {
     this->InitBase(aGM, bGM, biasGM, cGM, gatherGM, workspaceGM, contextGM, tilingData, tPipe);
     hccl_.Init(contextGM, mc2InitTiling);
@@ -80,9 +80,9 @@ __aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE
         if (this->debugOnlyCalc_) {
             return;
         }
-        auto &&cfg = this->tilingData_->param;
-        auto &&tileTiling = this->tilingData_->tileTiling;
-        auto &&tailTiling = this->tilingData_->tailTiling;
+        auto&& cfg = this->tilingData_->param;
+        auto&& tileTiling = this->tilingData_->tileTiling;
+        auto&& tailTiling = this->tilingData_->tailTiling;
 
         const uint64_t aTileCnt = (uint64_t)tileTiling.M * (uint64_t)tileTiling.Ka;
         const uint64_t aTileOffset =
@@ -103,7 +103,7 @@ template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz
 __aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float>::InnerProcess()
 {
     if ASCEND_IS_AIC {
-        auto &&cfg = this->tilingData_->param;
+        auto&& cfg = this->tilingData_->param;
         // 计算本卡数据
         this->MatmulKernelLocal();
 
@@ -113,7 +113,7 @@ __aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE
 
         // 存在尾块
         if (cfg.tailCnt > 0) {
-            auto &&tiling = this->tilingData_->tileTiling;
+            auto&& tiling = this->tilingData_->tileTiling;
             auto tailCGM = this->cGM_ +
                            (uint64_t)cfg.tileCnt * (uint64_t)tiling.M * (uint64_t)tiling.N * sizeof(typename C_TYPE::T);
             auto tailGatherGM = this->gatherGM_ + (uint64_t)cfg.tileCnt * (uint64_t)tiling.M * (uint64_t)tiling.Ka *
@@ -128,13 +128,13 @@ __aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
 __aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz,
                                                Bias2Float>::MatmulKernelCompute(GM_ADDR aGM, GM_ADDR cGM,
-                                                                                TCubeTiling &tiling,
-                                                                                Mc2Tiling::TileL2Tiling &l2Tiling,
-                                                                                HcclHandle &handleId, uint32_t tileCnt)
+                                                                                TCubeTiling& tiling,
+                                                                                Mc2Tiling::TileL2Tiling& l2Tiling,
+                                                                                HcclHandle& handleId, uint32_t tileCnt)
 {
     using A_T = typename A_TYPE::T;
     using C_T = typename C_TYPE::T;
-    auto &&cfg = this->tilingData_->param;
+    auto&& cfg = this->tilingData_->param;
     const uint64_t cOffset = (uint64_t)tiling.M * (uint64_t)tiling.N * sizeof(C_T);
     const uint64_t aOffset = (uint64_t)tiling.M * (uint64_t)tiling.Ka * sizeof(A_T);
     const uint64_t raOffset = (uint64_t)cfg.rankM * (uint64_t)cfg.rankK * sizeof(A_T);
@@ -175,12 +175,12 @@ __aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
 __aicore__ inline void
 AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float>::MatmulKernelComputeL2Cache(
-    GM_ADDR aGM, GM_ADDR cGM, TCubeTiling &tiling, Mc2Tiling::TileL2Tiling &l2Tiling, HcclHandle &handleId,
+    GM_ADDR aGM, GM_ADDR cGM, TCubeTiling& tiling, Mc2Tiling::TileL2Tiling& l2Tiling, HcclHandle& handleId,
     uint32_t tileCnt)
 {
     using A_T = typename A_TYPE::T;
     using C_T = typename C_TYPE::T;
-    auto &&cfg = this->tilingData_->param;
+    auto&& cfg = this->tilingData_->param;
     const uint64_t cOffset = (uint64_t)tiling.M * (uint64_t)tiling.N * sizeof(C_T);
     const uint64_t aOffset = (uint64_t)tiling.M * (uint64_t)tiling.Ka * sizeof(A_T);
     const uint64_t raOffset = (uint64_t)this->rankDim_ * (uint64_t)cfg.rankM * (uint64_t)cfg.rankK * sizeof(A_T);
@@ -208,9 +208,9 @@ AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz, Bias2Float>::
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, bool BNd2Nz, bool Bias2Float>
 __aicore__ inline void AllGatherMatmulFullMesh<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BNd2Nz,
                                                Bias2Float>::MatmulKernelGather(GM_ADDR aGM, GM_ADDR cGM,
-                                                                               TCubeTiling &tiling,
-                                                                               Mc2Tiling::TileL2Tiling &l2Tiling,
-                                                                               HcclHandle &handleId, uint32_t tileCnt)
+                                                                               TCubeTiling& tiling,
+                                                                               Mc2Tiling::TileL2Tiling& l2Tiling,
+                                                                               HcclHandle& handleId, uint32_t tileCnt)
 {
     if (GetBlockIdx() >= tiling.usedCoreNum) {
         return;

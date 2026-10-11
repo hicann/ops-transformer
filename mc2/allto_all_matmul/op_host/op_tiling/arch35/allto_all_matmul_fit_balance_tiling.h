@@ -27,7 +27,7 @@ public:
         MXFP8_QUANT,
         MXFP4_QUANT
     };
-    explicit AlltoAllMatmulFitBalanceTiling(QuantType matmulQuantType, const mc2tiling::TilingArgs &args,
+    explicit AlltoAllMatmulFitBalanceTiling(QuantType matmulQuantType, const mc2tiling::TilingArgs& args,
                                             TopoType topoType = TopoType::STANDARD_CARD,
                                             uint8_t commMode = mc2tiling::A5_AICPU_TS_ENGINE)
         : Mc2FitBasedBalanceTiling(args, KernelType::ALL_TO_ALL, topoType),

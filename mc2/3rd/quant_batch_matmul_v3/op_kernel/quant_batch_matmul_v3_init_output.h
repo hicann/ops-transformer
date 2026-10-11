@@ -22,14 +22,14 @@ template <typename yType>
 class BmmDequantInitOutput {
 public:
     __aicore__ inline BmmDequantInitOutput() {}
-    __aicore__ inline void Init(GM_ADDR y, GM_ADDR workSpace, const Mc2QuantBatchMatmulV3TilingData *tilingData,
-                                TPipe *tPipe)
+    __aicore__ inline void Init(GM_ADDR y, GM_ADDR workSpace, const Mc2QuantBatchMatmulV3TilingData* tilingData,
+                                TPipe* tPipe)
     {
         InitTilingData(tilingData);
         // init global buffer
-        yGm_.SetGlobalBuffer((__gm__ yType *)y);
+        yGm_.SetGlobalBuffer((__gm__ yType*)y);
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 200
-        workspaceGm_.SetGlobalBuffer((__gm__ int32_t *)workSpace);
+        workspaceGm_.SetGlobalBuffer((__gm__ int32_t*)workSpace);
         tPipe->InitBuffer(localBuffer_, tilingData->params.ubSize);
         ClearWorkSpace();
 #else
@@ -110,7 +110,7 @@ public:
         DataCopy(workspaceGm_, tmpUb, size);
     }
 
-    __aicore__ inline void ClearLocalTensor(LocalTensor<yType> &tmpBuf, uint32_t size)
+    __aicore__ inline void ClearLocalTensor(LocalTensor<yType>& tmpBuf, uint32_t size)
     {
         LocalTensor<int16_t> tmpTensor = tmpBuf.template ReinterpretCast<int16_t>();
         // Duplicate not support int8
@@ -127,7 +127,7 @@ public:
         SyncAll(workspaceGm_, ubWorkspace);
     }
 #else
-    __aicore__ inline void ClearLocalTensor(LocalTensor<yType> &tmpBuf, uint32_t size)
+    __aicore__ inline void ClearLocalTensor(LocalTensor<yType>& tmpBuf, uint32_t size)
     {
         uint16_t blockNum = size / ONE_BLK_ITEM_NUM;
         InitConstValue(tmpBuf, {1, blockNum, 0, 0U});
@@ -158,7 +158,7 @@ private:
     static constexpr uint64_t MIN_CLEAR_SIZE = MIN_CLEAR_BYTE / sizeof(yType);
     static constexpr uint64_t ONE_BLK_ITEM_NUM = ONE_BLK_SIZE / sizeof(yType);
 
-    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData *tilingData)
+    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData* tilingData)
     {
         uint32_t batch = tilingData->params.batchC;
         uint32_t mSize = tilingData->matmulTiling.M;

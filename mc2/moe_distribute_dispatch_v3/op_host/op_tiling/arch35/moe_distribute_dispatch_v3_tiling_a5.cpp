@@ -18,20 +18,20 @@
 
 namespace optiling {
 ge::graphStatus MoeDistributeDispatchV3TilingFuncA5::MoeDistributeDispatchA3TilingFuncImplPublic(
-    gert::TilingContext *context, DispatchV2Config &config)
+    gert::TilingContext* context, DispatchV2Config& config)
 {
     MoeDistributeDispatchV2TilingFuncA5 impl;
     return impl.MoeDistributeDispatchA3TilingFuncImplPublic(context, config);
 }
 
 struct MoeDistributeDispatchCompileInfo {};
-static ge::graphStatus TilingParseForMoeDistributeDispatchV3(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForMoeDistributeDispatchV3(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeDistributeDispatchV3TilingFuncImplA5(gert::TilingContext *context)
+static ge::graphStatus MoeDistributeDispatchV3TilingFuncImplA5(gert::TilingContext* context)
 {
     MoeDistributeDispatchV3TilingFuncA5 impl;
     return impl.MoeDistributeDispatchV3TilingFunc(context);

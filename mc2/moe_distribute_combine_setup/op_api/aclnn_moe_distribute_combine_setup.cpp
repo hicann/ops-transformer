@@ -33,9 +33,9 @@ namespace {
 using namespace Mc2Aclnn;
 using namespace op;
 
-static inline bool CheckEmptyTensor(const aclTensor *tensor, const char *name)
+static inline bool CheckEmptyTensor(const aclTensor* tensor, const char* name)
 {
-    const auto &shape = tensor->GetViewShape();
+    const auto& shape = tensor->GetViewShape();
     if (shape.GetDimNum() == 0) {
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON("aclnnMoeDistributeCombineSetup", name, "[]",
                                               (std::string("The shape of ") + name + " cannot be empty.").c_str());
@@ -80,8 +80,8 @@ static inline int64_t AlignUp(int64_t x, int64_t base)
 }
 
 // check nullptr
-static bool CheckNotNull(const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine,
-                         const char *groupEp, aclTensor *quantExpandXOut, aclTensor *commCmdInfoOut)
+static bool CheckNotNull(const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* assistInfoForCombine,
+                         const char* groupEp, aclTensor* quantExpandXOut, aclTensor* commCmdInfoOut)
 {
     OP_LOGD("aclnn_moe_distribute_combine_setup CheckNotNull start");
     OP_CHECK_NULL(expandX, return false);
@@ -98,11 +98,11 @@ static bool CheckNotNull(const aclTensor *expandX, const aclTensor *expertIds, c
 }
 
 // 入参校验
-static aclnnStatus CheckParams(const aclTensor *expandX, const aclTensor *expertIds,
-                               const aclTensor *assistInfoForCombine, const char *groupEp, int64_t epWorldSize,
+static aclnnStatus CheckParams(const aclTensor* expandX, const aclTensor* expertIds,
+                               const aclTensor* assistInfoForCombine, const char* groupEp, int64_t epWorldSize,
                                int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum,
                                int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType,
-                               const char *commAlg, aclTensor *quantExpandXOut, aclTensor *commCmdInfoOut)
+                               const char* commAlg, aclTensor* quantExpandXOut, aclTensor* commCmdInfoOut)
 {
     (void)epWorldSize;
     (void)epRankId;
@@ -134,13 +134,13 @@ static aclnnStatus CheckParams(const aclTensor *expandX, const aclTensor *expert
 
 } // namespace
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
 extern "C" aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(
-    const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine, const char *groupEp,
+    const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* assistInfoForCombine, const char* groupEp,
     int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum,
-    int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char *commAlg,
-    aclTensor *quantExpandXOut, aclTensor *commCmdInfoOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char* commAlg,
+    aclTensor* quantExpandXOut, aclTensor* commCmdInfoOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("aclnnMoeDistributeCombineSetupGetWorkspaceSize start.");
     if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
@@ -158,23 +158,23 @@ extern "C" aclnnStatus aclnnMoeDistributeCombineSetupGetWorkspaceSize(
 
     aclnnStatus retStatus;
     uint64_t hcclBuffSize = 0;
-    aclTensor *mc2Context = nullptr;
-    const char *opName = "moe_distribute_a2av_setup_teardown";
+    aclTensor* mc2Context = nullptr;
+    const char* opName = "moe_distribute_a2av_setup_teardown";
     retStatus = Mc2Aclnn::Mc2Context::GetMc2ContextTensor(groupEp, opName, hcclBuffSize, mc2Context,
                                                           CommProtocol::COMM_PROTOCOL_UBC_CTP);
     CHECK_RET(retStatus == ACLNN_SUCCESS, retStatus);
     retStatus = aclnnInnerMoeDistributeCombineSetupGetWorkspaceSize(
         mc2Context, expandX, expertIds, assistInfoForCombine, epWorldSize, epRankId, moeExpertNum, hcclBuffSize,
         expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, commQuantMode, commType,
-        const_cast<char *>(commAlg), quantExpandXOut, commCmdInfoOut, workspaceSize, executor);
+        const_cast<char*>(commAlg), quantExpandXOut, commCmdInfoOut, workspaceSize, executor);
     return retStatus;
 }
 
 extern "C" aclnnStatus aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
-    const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine, const char *groupEp,
+    const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* assistInfoForCombine, const char* groupEp,
     int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum,
-    int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char *commAlg,
-    uint64_t &tokenMsgSize, uint64_t &commCmdInfoOutSize)
+    int64_t sharedExpertRankNum, int64_t globalBs, int64_t commQuantMode, int64_t commType, const char* commAlg,
+    uint64_t& tokenMsgSize, uint64_t& commCmdInfoOutSize)
 {
     (void)expertIds;
     (void)assistInfoForCombine;
@@ -211,7 +211,7 @@ extern "C" aclnnStatus aclnnMoeDistributeCombineSetupTeardownCalcOutputSize(
     return ACLNN_SUCCESS;
 }
 
-extern "C" aclnnStatus aclnnMoeDistributeCombineSetup(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnMoeDistributeCombineSetup(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                       aclrtStream stream)
 {
     OP_LOGD("aclnnMoeDistributeCombineSetup start");

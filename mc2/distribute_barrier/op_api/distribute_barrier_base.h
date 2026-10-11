@@ -29,16 +29,16 @@ enum NnopbaseHcclServerType : uint32_t {
 };
 
 // check nullptr
-__attribute__((visibility("default"))) bool BarrierCheckNullStatus(const aclTensor *xRef, const char *group);
+__attribute__((visibility("default"))) bool BarrierCheckNullStatus(const aclTensor* xRef, const char* group);
 // 入参校验
-__attribute__((visibility("default"))) aclnnStatus BarrierCheckParams(const aclTensor *xRef, const char *group);
+__attribute__((visibility("default"))) aclnnStatus BarrierCheckParams(const aclTensor* xRef, const char* group);
 
 __attribute__((visibility("default"))) aclnnStatus aclnnDistributeBarrierGetWorkspaceSizeBase(
-    const aclTensor *xRef, const aclTensor *timeOut, const aclTensor *elasticInfo, const char *group, int64_t worldSize,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* xRef, const aclTensor* timeOut, const aclTensor* elasticInfo, const char* group, int64_t worldSize,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
-__attribute__((visibility("default"))) aclnnStatus aclnnDistributeBarrierBase(void *workspace, uint64_t workspaceSize,
-                                                                              aclOpExecutor *executor,
+__attribute__((visibility("default"))) aclnnStatus aclnnDistributeBarrierBase(void* workspace, uint64_t workspaceSize,
+                                                                              aclOpExecutor* executor,
                                                                               aclrtStream stream);
 #ifdef __cplusplus
 }

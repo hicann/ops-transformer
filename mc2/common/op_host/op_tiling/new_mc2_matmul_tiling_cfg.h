@@ -29,14 +29,14 @@
 namespace Mc2MatmulHelper {
 class NewMc2MatmulTilingCfg : public optiling::Mc2MatMulTilingCfg {
 public:
-    NewMc2MatmulTilingCfg(const void *compileInfoIn, const void *argsIn, uint32_t baseMLimit = 0,
+    NewMc2MatmulTilingCfg(const void* compileInfoIn, const void* argsIn, uint32_t baseMLimit = 0,
                           bool needUpdateIn = true)
         : Mc2MatMulTilingCfg(needUpdateIn, compileInfoIn, argsIn),
           baseMLimit_(baseMLimit)
     {}
 
-    void SetMatMulV3TilingData(optiling::MC2MatmulV3TilingData &tilingData);
-    void Update(const optiling::Mc2TilingResult &result) override;
+    void SetMatMulV3TilingData(optiling::MC2MatmulV3TilingData& tilingData);
+    void Update(const optiling::Mc2TilingResult& result) override;
     void SetRankDim(uint64_t rankDim);
     void SetCommCnt(uint64_t commCnt);
 
@@ -48,8 +48,8 @@ private:
     int32_t baseMLimit_{0};
     uint64_t rankDim_{0};
     uint64_t commCnt_{0};
-    optiling::MC2MatmulV3TilingData *mc2MmV3TilingData_{nullptr};
-    Mc2MatMulV3TilingData *mmv3TilingData_{nullptr};
+    optiling::MC2MatmulV3TilingData* mc2MmV3TilingData_{nullptr};
+    Mc2MatMulV3TilingData* mmv3TilingData_{nullptr};
 };
 
 } // namespace Mc2MatmulHelper

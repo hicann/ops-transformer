@@ -45,26 +45,26 @@ struct OutShapeInfo {
 // 当前 ep tp 仅支持 2 4 8 16
 bool EpTpSizeCheck(const int64_t epSize, const int64_t tpSize);
 
-bool DimNumCheck(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape);
+bool DimNumCheck(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape);
 
-bool GroupCheck(const char *nodeName, const char *groupEp, const char *groupTp);
+bool GroupCheck(const char* nodeName, const char* groupEp, const char* groupTp);
 
-void DynamicShapeCheck(const gert::Shape *xShape, const gert::Shape *weightShape, const size_t wDim,
-                       OutShapeInfo &outShapeInfo);
+void DynamicShapeCheck(const gert::Shape* xShape, const gert::Shape* weightShape, const size_t wDim,
+                       OutShapeInfo& outShapeInfo);
 
-void EmptyShapeCheck(const gert::Shape *xShape, const gert::Shape *weightShape, const size_t wDim,
-                     OutShapeInfo &outShapeInfo);
+void EmptyShapeCheck(const gert::Shape* xShape, const gert::Shape* weightShape, const size_t wDim,
+                     OutShapeInfo& outShapeInfo);
 
-bool CheckBiasDtype(const char *nodeName, const ge::DataType xType, const ge::DataType biasType);
+bool CheckBiasDtype(const char* nodeName, const ge::DataType xType, const ge::DataType biasType);
 
-bool CheckTensorDtype(const char *nodeName, const ge::DataType xType, const ge::DataType weightType,
+bool CheckTensorDtype(const char* nodeName, const ge::DataType xType, const ge::DataType weightType,
                       const ge::DataType biasType);
 
-void SetShape(gert::Shape *shape, const OutShapeInfo &outShapeInfo);
+void SetShape(gert::Shape* shape, const OutShapeInfo& outShapeInfo);
 
-void TransDimHMIdx(const bool isTransW, size_t &wDimH, size_t &wDimM);
+void TransDimHMIdx(const bool isTransW, size_t& wDimH, size_t& wDimM);
 
-void PrintTensorShape(const char *nodeName, const gert::Shape *shape, const char *shapeName);
+void PrintTensorShape(const char* nodeName, const gert::Shape* shape, const char* shapeName);
 
 } // namespace Mc2Moe
 

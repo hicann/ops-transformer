@@ -93,12 +93,12 @@ public:
             return;
         }
         aivId_ = GetBlockIdx();
-        header_ = reinterpret_cast<__gm__ Header *>(baseAddr);
-        blockStage_ = reinterpret_cast<__gm__ BlockStage *>(baseAddr + DUMP_HEADER_REGION_SIZE +
-                                                            DUMP_TILING_REGION_SIZE + aivId_ * sizeof(BlockStage));
+        header_ = reinterpret_cast<__gm__ Header*>(baseAddr);
+        blockStage_ = reinterpret_cast<__gm__ BlockStage*>(baseAddr + DUMP_HEADER_REGION_SIZE +
+                                                           DUMP_TILING_REGION_SIZE + aivId_ * sizeof(BlockStage));
 
-        dumpParams_ = reinterpret_cast<__gm__ DumpParams *>(baseAddr + DUMP_HEADER_REGION_SIZE +
-                                                            DUMP_TILING_REGION_SIZE + DUMP_BLOCK_STAGE_REGION_SIZE);
+        dumpParams_ = reinterpret_cast<__gm__ DumpParams*>(baseAddr + DUMP_HEADER_REGION_SIZE +
+                                                           DUMP_TILING_REGION_SIZE + DUMP_BLOCK_STAGE_REGION_SIZE);
         dumpParamsEnd_ = dumpParams_ + MAX_DUMP_ENTRIES;
         headerGlobal_.SetGlobalBuffer(reinterpret_cast<GM_ADDR>(header_));
         blockStageGlobal_.SetGlobalBuffer(reinterpret_cast<GM_ADDR>(blockStage_));
@@ -207,10 +207,10 @@ private:
     }
 
     uint32_t aivId_{0};
-    __gm__ Header *header_{nullptr};
-    __gm__ BlockStage *blockStage_{nullptr};
-    __gm__ DumpParams *dumpParams_{nullptr};
-    __gm__ DumpParams *dumpParamsEnd_{nullptr};
+    __gm__ Header* header_{nullptr};
+    __gm__ BlockStage* blockStage_{nullptr};
+    __gm__ DumpParams* dumpParams_{nullptr};
+    __gm__ DumpParams* dumpParamsEnd_{nullptr};
     GlobalTensor<uint8_t> headerGlobal_;
     GlobalTensor<uint8_t> blockStageGlobal_;
 };

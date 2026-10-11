@@ -34,8 +34,8 @@ static constexpr size_t DIM_1 = 1;
 
 static constexpr size_t DIM_NUM_2 = 2;
 
-static ge::graphStatus CheckDims(const gert::InferShapeContext *context, const gert::Shape *expertIdsShape,
-                                 const gert::Shape *eplbTableShape)
+static ge::graphStatus CheckDims(const gert::InferShapeContext* context, const gert::Shape* expertIdsShape,
+                                 const gert::Shape* eplbTableShape)
 {
     auto result = ge::GRAPH_SUCCESS;
 
@@ -54,12 +54,12 @@ static ge::graphStatus CheckDims(const gert::InferShapeContext *context, const g
     return result;
 }
 
-static ge::graphStatus InferShapeMoeUpdateExpert(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMoeUpdateExpert(gert::InferShapeContext* context)
 {
-    auto *expertIdsShape = context->GetInputShape(IDX_IN_EXPERT_IDS);
-    auto *eplbTableShape = context->GetInputShape(IDX_IN_EPLB_TABLE);
-    auto *balancedExpertIdsShape = context->GetOutputShape(IDX_OUT_EXPERT_IDS);
-    auto *balancedActiveMaskShape = context->GetOutputShape(IDX_OUT_ACTIVE_MASK);
+    auto* expertIdsShape = context->GetInputShape(IDX_IN_EXPERT_IDS);
+    auto* eplbTableShape = context->GetInputShape(IDX_IN_EPLB_TABLE);
+    auto* balancedExpertIdsShape = context->GetOutputShape(IDX_OUT_EXPERT_IDS);
+    auto* balancedActiveMaskShape = context->GetOutputShape(IDX_OUT_ACTIVE_MASK);
 
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
     OPS_CHECK_NULL_WITH_CONTEXT(context, eplbTableShape);
@@ -80,7 +80,7 @@ static ge::graphStatus InferShapeMoeUpdateExpert(gert::InferShapeContext *contex
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeMoeUpdateExpert(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMoeUpdateExpert(gert::InferDataTypeContext* context)
 {
     auto dType = context->GetInputDataType(IDX_IN_EXPERT_IDS);
     context->SetOutputDataType(IDX_OUT_EXPERT_IDS, dType);

@@ -45,7 +45,7 @@ static constexpr int64_t CMP_MAX_LEN = 7;
 
 typedef struct {
     uint32_t id;
-    const char *funcName;
+    const char* funcName;
     bool hasReg;
 } NnopbaseDfxId;
 
@@ -57,13 +57,13 @@ enum class NnopbaseHcclServerType : uint32_t {
 };
 
 extern "C" uint64_t NnopbaseMsprofSysTime();
-extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
-extern "C" void *NnopbaseGetUserHandle(void *executor);
-extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
+extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId& dfxId);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
+extern "C" void* NnopbaseGetUserHandle(void* executor);
+extern "C" void NnopbaseSetUserHandle(void* executor, void* handle);
 
 // check nullptr
-static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTensor *output)
+static bool CheckNotNull(const aclTensor* x1, const aclTensor* x2, const aclTensor* output)
 {
     OP_CHECK_NULL(x1, return false);
     OP_CHECK_NULL(x2, return false);
@@ -92,19 +92,19 @@ static const std::initializer_list<op::DataType> AIV_MODE_INPUT_DTYPE_SUPPORT_LI
 static const std::initializer_list<op::DataType> AIV_MODE_OUTPUT_DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT16,
                                                                                        op::DataType::DT_BF16};
 
-static bool CheckSupportDtype(const aclTensor *x1, const std::initializer_list<op::DataType> &supportTypes)
+static bool CheckSupportDtype(const aclTensor* x1, const std::initializer_list<op::DataType>& supportTypes)
 {
     return std::find(supportTypes.begin(), supportTypes.end(), x1->GetDataType()) != supportTypes.end();
 }
 
-static bool CheckOutDtypeValid(int64_t outDtype, const std::initializer_list<op::DataType> &validTypes)
+static bool CheckOutDtypeValid(int64_t outDtype, const std::initializer_list<op::DataType>& validTypes)
 {
     OP_LOGD("outDtype value is: %ld", outDtype);
     return std::find(validTypes.begin(), validTypes.end(), static_cast<op::DataType>(outDtype)) != validTypes.end();
 }
 
-static bool CheckDataTypeFp16Valid(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                   const aclTensor *output)
+static bool CheckDataTypeFp16Valid(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                   const aclTensor* output)
 {
     OP_CHECK_DTYPE_NOT_SAME(x1, x2, return false);
     OP_CHECK_DTYPE_NOT_SAME(x1, output, return false);
@@ -115,7 +115,7 @@ static bool CheckDataTypeFp16Valid(const aclTensor *x1, const aclTensor *x2, con
     return true;
 }
 
-static bool CheckDataTypeFp8Fp4Valid(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias)
+static bool CheckDataTypeFp8Fp4Valid(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias)
 {
     if (x1->GetDataType() == op::DataType::DT_HIFLOAT8) {
         OP_CHECK_DTYPE_NOT_SAME(x1, x2, return false);
@@ -134,12 +134,12 @@ static bool CheckDataTypeFp8Fp4Valid(const aclTensor *x1, const aclTensor *x2, c
     return true;
 }
 
-static bool IsFp16orBf16Input(const aclTensor *x1)
+static bool IsFp16orBf16Input(const aclTensor* x1)
 {
     return (x1->GetDataType() == op::DataType::DT_FLOAT16) || (x1->GetDataType() == op::DataType::DT_BF16);
 }
 
-static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *output)
+static bool CheckDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* output)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, DTYPE_SUPPORT_LIST, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(x2, DTYPE_SUPPORT_LIST, return false);
@@ -156,7 +156,7 @@ static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclT
     return true;
 }
 
-static bool CheckAIVModeDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *output)
+static bool CheckAIVModeDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclTensor* output)
 {
     OP_CHECK_DTYPE_NOT_SUPPORT(x1, AIV_MODE_INPUT_DTYPE_SUPPORT_LIST, return false);
     OP_CHECK_DTYPE_NOT_SUPPORT(x2, AIV_MODE_INPUT_DTYPE_SUPPORT_LIST, return false);
@@ -173,8 +173,8 @@ static bool CheckAttr(int64_t streamMode)
     return true;
 }
 
-static bool CheckFormat(const aclTensor *x1, const aclTensor *x2, const aclTensor *output, const aclTensor *bias,
-                        const aclTensor *gatherOut, const aclTensor *amaxOut)
+static bool CheckFormat(const aclTensor* x1, const aclTensor* x2, const aclTensor* output, const aclTensor* bias,
+                        const aclTensor* gatherOut, const aclTensor* amaxOut)
 {
     if (x1->GetStorageFormat() != op::Format::FORMAT_ND) {
         OP_LOGE_FOR_INVALID_FORMATS_WITH_REASON("aclnnAllGatherMatmulV2", "x1",
@@ -216,7 +216,7 @@ static bool CheckFormat(const aclTensor *x1, const aclTensor *x2, const aclTenso
     return true;
 }
 
-static bool IsGatherOut(const aclTensor *gatherOut)
+static bool IsGatherOut(const aclTensor* gatherOut)
 {
     OP_CHECK_NULL(gatherOut, return false);
     if (gatherOut->IsEmpty()) {
@@ -226,7 +226,7 @@ static bool IsGatherOut(const aclTensor *gatherOut)
     return true;
 }
 
-static bool CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *output, bool isTransA)
+static bool CheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor* output, bool isTransA)
 {
     if (x1->GetViewShape().GetDimNum() != TWO_DIMS) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("aclnnAllGatherMatmulV2", "x1",
@@ -275,8 +275,8 @@ static bool CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor
 }
 
 // 分别对输入类型为fp8/hif8和fp16/bf16数据类型进行分别校验
-static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, int64_t streamMode,
-                               const aclTensor *output, const aclTensor *gatherOut, const aclTensor *amaxOut)
+static aclnnStatus CheckParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, int64_t streamMode,
+                               const aclTensor* output, const aclTensor* gatherOut, const aclTensor* amaxOut)
 {
     CHECK_RET(CheckNotNull(x1, x2, output), ACLNN_ERR_PARAM_NULLPTR);
 
@@ -289,7 +289,7 @@ static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const a
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParamsForAIVMode(const aclTensor *x1, const aclTensor *x2, const aclTensor *output,
+static aclnnStatus CheckParamsForAIVMode(const aclTensor* x1, const aclTensor* x2, const aclTensor* output,
                                          int64_t streamMode)
 {
     CHECK_RET(CheckNotNull(x1, x2, output), ACLNN_ERR_PARAM_NULLPTR);
@@ -301,8 +301,8 @@ static aclnnStatus CheckParamsForAIVMode(const aclTensor *x1, const aclTensor *x
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckShapeForAIVMode(const aclTensor *x1, const aclTensor *x2, const aclTensor *output,
-                                        const aclTensor *gatherOut, bool isTransA, bool isViewTransB)
+static aclnnStatus CheckShapeForAIVMode(const aclTensor* x1, const aclTensor* x2, const aclTensor* output,
+                                        const aclTensor* gatherOut, bool isTransA, bool isViewTransB)
 {
     if (x1->GetViewShape().GetDimNum() != TWO_DIMS) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("aclnnAllGatherMatmulV2", "x1",
@@ -355,12 +355,12 @@ static aclnnStatus CheckShapeForAIVMode(const aclTensor *x1, const aclTensor *x2
     return ACLNN_SUCCESS;
 }
 
-static inline bool CheckParamDtypeFP8Vaild(const aclTensor *tensor)
+static inline bool CheckParamDtypeFP8Vaild(const aclTensor* tensor)
 {
     return tensor->GetDataType() == op::DataType::DT_FLOAT;
 }
 
-static aclnnStatus CheckScale(const aclTensor *x1Scale, const aclTensor *x2Scale, const aclTensor *quantScale)
+static aclnnStatus CheckScale(const aclTensor* x1Scale, const aclTensor* x2Scale, const aclTensor* quantScale)
 {
     if (x1Scale == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnAllGatherMatmulV2", "x1Scale");
@@ -415,7 +415,7 @@ static aclnnStatus CheckScale(const aclTensor *x1Scale, const aclTensor *x2Scale
     return ACLNN_SUCCESS;
 }
 
-static bool IsAMaxOut(const aclTensor *amaxOut)
+static bool IsAMaxOut(const aclTensor* amaxOut)
 {
     if (amaxOut == nullptr) {
         return false;
@@ -428,7 +428,7 @@ static bool IsAMaxOut(const aclTensor *amaxOut)
 }
 
 // fp16/bf16场景不支持amaxOut输入，fp8/hif8场景amaxOut为scalar且只支持float类型
-static bool CheckAMaxOutVaild(const aclTensor *x1, const aclTensor *amaxOut)
+static bool CheckAMaxOutVaild(const aclTensor* x1, const aclTensor* amaxOut)
 {
     if (IsFp16orBf16Input(x1)) {
         if (amaxOut != nullptr) {
@@ -455,7 +455,7 @@ static bool CheckAMaxOutVaild(const aclTensor *x1, const aclTensor *amaxOut)
     return true;
 }
 
-static aclnnStatus DealWithX1Empty(uint64_t *workspaceSize, aclOpExecutor **executor)
+static aclnnStatus DealWithX1Empty(uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("AllGatherMatmulV2 dealing with empty tensor.");
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -465,7 +465,7 @@ static aclnnStatus DealWithX1Empty(uint64_t *workspaceSize, aclOpExecutor **exec
     return ACLNN_SUCCESS;
 }
 
-static const aclTensor *TransX2Tensor(const aclTensor *x2)
+static const aclTensor* TransX2Tensor(const aclTensor* x2)
 {
     uint64_t storageDimsNum = x2->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDims(storageDimsNum);
@@ -498,7 +498,7 @@ static const aclTensor *TransX2Tensor(const aclTensor *x2)
                            storageDimsNum, x2->GetTensor()->GetAddr());
 }
 
-static bool CheckX1InputEmptyTensor(const aclTensor *x1)
+static bool CheckX1InputEmptyTensor(const aclTensor* x1)
 {
     const auto kValX1 = x1->GetViewShape().GetDim(1);
     if (kValX1 != 0) {
@@ -513,7 +513,7 @@ static bool CheckX1InputEmptyTensor(const aclTensor *x1)
     return false;
 }
 
-static aclnnStatus CheckAndHandleCommMode(const char *commMode, uint8_t &commModeEnum)
+static aclnnStatus CheckAndHandleCommMode(const char* commMode, uint8_t& commModeEnum)
 {
     // 获取通信引擎参数
     if (std::strncmp(commMode, "ai_cpu", CMP_MAX_LEN) == 0) {
@@ -528,13 +528,13 @@ static aclnnStatus CheckAndHandleCommMode(const char *commMode, uint8_t &commMod
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus allGatherMatmulV2GetWorkspaceSizeCCUMode(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                                     const aclTensor *x1Scale, const aclTensor *x2Scale,
-                                                     const aclTensor *quantScale, int64_t blockSize, const char *group,
+aclnnStatus allGatherMatmulV2GetWorkspaceSizeCCUMode(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                                     const aclTensor* x1Scale, const aclTensor* x2Scale,
+                                                     const aclTensor* quantScale, int64_t blockSize, const char* group,
                                                      int64_t gatherIndex, int64_t commTurn, int64_t streamMode,
-                                                     int64_t groupSize, const char *commMode, aclTensor *output,
-                                                     aclTensor *gatherOut, aclTensor *amaxOut, uint64_t *workspaceSize,
-                                                     aclOpExecutor **executor)
+                                                     int64_t groupSize, const char* commMode, aclTensor* output,
+                                                     aclTensor* gatherOut, aclTensor* amaxOut, uint64_t* workspaceSize,
+                                                     aclOpExecutor** executor)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
     auto retParam = CheckParams(x1, x2, bias, streamMode, output, gatherOut, amaxOut);
@@ -583,12 +583,12 @@ aclnnStatus allGatherMatmulV2GetWorkspaceSizeCCUMode(const aclTensor *x1, const 
     CHECK_RET(checkCommModeRet == ACLNN_SUCCESS, checkCommModeRet);
 
     aclnnStatus ret = aclnnInnerAllGatherMatmulV2GetWorkspaceSize(
-        x1, transX2, bias, x1Scale, transX2Scale, quantScale, const_cast<char *>(group), transposeX1, transposeX2,
+        x1, transX2, bias, x1Scale, transX2Scale, quantScale, const_cast<char*>(group), transposeX1, transposeX2,
         gatherIndex, commTurn, rankSize, blockSize, groupSize, isGatherOut, isAMaxOut, outDtype,
-        const_cast<char *>(commMode), output, gatherOut, amaxOut, workspaceSize, executor);
+        const_cast<char*>(commMode), output, gatherOut, amaxOut, workspaceSize, executor);
     OP_LOGD("AllGatherMatmulV2, aclnnInnerGetWorkspaceSize ret = %d.", ret);
     if (ret == ACLNN_SUCCESS && *executor != nullptr) {
-        void *arg = reinterpret_cast<void *>(static_cast<uintptr_t>(commModeEnum));
+        void* arg = reinterpret_cast<void*>(static_cast<uintptr_t>(commModeEnum));
         NnopbaseSetUserHandle(*executor, arg);
     }
     static NnopbaseDfxId dfxId = {0x60000, __func__, false};
@@ -596,7 +596,7 @@ aclnnStatus allGatherMatmulV2GetWorkspaceSizeCCUMode(const aclTensor *x1, const 
     return ret;
 }
 
-bool IsViewTransposeX2(const aclTensor *x1, const aclTensor *x2, bool isTransX1)
+bool IsViewTransposeX2(const aclTensor* x1, const aclTensor* x2, bool isTransX1)
 {
     const auto kValX1 = x1->GetViewShape().GetDim(isTransX1 ? 0 : 1);
     const auto x2Dim0 = x2->GetViewShape().GetDim(0);
@@ -604,13 +604,13 @@ bool IsViewTransposeX2(const aclTensor *x1, const aclTensor *x2, bool isTransX1)
     return (kValX1 != x2Dim0) && (kValX1 == x2Dim1);
 }
 
-aclnnStatus allGatherMatmulV2GetWorkspaceSizeAIVMode(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                                     const aclTensor *x1Scale, const aclTensor *x2Scale,
-                                                     const aclTensor *quantScale, int64_t blockSize, const char *group,
+aclnnStatus allGatherMatmulV2GetWorkspaceSizeAIVMode(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                                     const aclTensor* x1Scale, const aclTensor* x2Scale,
+                                                     const aclTensor* quantScale, int64_t blockSize, const char* group,
                                                      int64_t gatherIndex, int64_t commTurn, int64_t streamMode,
-                                                     int64_t groupSize, const char *commMode, aclTensor *output,
-                                                     aclTensor *gatherOut, aclTensor *amaxOut, uint64_t *workspaceSize,
-                                                     aclOpExecutor **executor)
+                                                     int64_t groupSize, const char* commMode, aclTensor* output,
+                                                     aclTensor* gatherOut, aclTensor* amaxOut, uint64_t* workspaceSize,
+                                                     aclOpExecutor** executor)
 {
     OP_LOGD("allGatherMatmulV2GetWorkspaceSizeAIVMode start");
     // 先检查参数
@@ -639,20 +639,20 @@ aclnnStatus allGatherMatmulV2GetWorkspaceSizeAIVMode(const aclTensor *x1, const 
         }
     }
     aclnnStatus ret = aclnnInnerAllGatherMatmulV2GetWorkspaceSize(
-        x1, x2, bias, x1Scale, x2Scale, quantScale, const_cast<char *>(group), transposeX1, transposeX2, gatherIndex,
-        commTurn, rankSize, blockSize, groupSize, isGatherOut, isAmaxOut, yDtype, const_cast<char *>(commMode), output,
+        x1, x2, bias, x1Scale, x2Scale, quantScale, const_cast<char*>(group), transposeX1, transposeX2, gatherIndex,
+        commTurn, rankSize, blockSize, groupSize, isGatherOut, isAmaxOut, yDtype, const_cast<char*>(commMode), output,
         gatherOut, amaxOut, workspaceSize, executor);
     OP_LOGD("allGatherMatmulV2AIVMode, aclnnInnerGetWorkspaceSize ret = %d.", ret);
     return ret;
 }
 
-aclnnStatus aclnnAllGatherMatmulV2GetWorkspaceSize(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                                   const aclTensor *x1Scale, const aclTensor *x2Scale,
-                                                   const aclTensor *quantScale, int64_t blockSize, const char *group,
+aclnnStatus aclnnAllGatherMatmulV2GetWorkspaceSize(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                                   const aclTensor* x1Scale, const aclTensor* x2Scale,
+                                                   const aclTensor* quantScale, int64_t blockSize, const char* group,
                                                    int64_t gatherIndex, int64_t commTurn, int64_t streamMode,
-                                                   int64_t groupSize, const char *commMode, aclTensor *output,
-                                                   aclTensor *gatherOut, aclTensor *amaxOut, uint64_t *workspaceSize,
-                                                   aclOpExecutor **executor)
+                                                   int64_t groupSize, const char* commMode, aclTensor* output,
+                                                   aclTensor* gatherOut, aclTensor* amaxOut, uint64_t* workspaceSize,
+                                                   aclOpExecutor** executor)
 {
     aclnnStatus ret = ACLNN_SUCCESS;
     if (commMode == nullptr) {
@@ -677,7 +677,7 @@ aclnnStatus aclnnAllGatherMatmulV2GetWorkspaceSize(const aclTensor *x1, const ac
     return ret;
 }
 
-aclnnStatus aclnnAllGatherMatmulV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnAllGatherMatmulV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     if ((workspace == nullptr) || (workspaceSize == 0UL)) {
         OP_LOGD("Skip the api for empty tensor, workspace size %lu.", workspaceSize);
@@ -690,7 +690,7 @@ aclnnStatus aclnnAllGatherMatmulV2(void *workspace, uint64_t workspaceSize, aclO
     }
     if (NnopbaseSetHcclServerType) {
         if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
-            void *arg = NnopbaseGetUserHandle(executor);
+            void* arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);
             if (commMode == Mc2Comm::COMM_MODE_AICPU) {

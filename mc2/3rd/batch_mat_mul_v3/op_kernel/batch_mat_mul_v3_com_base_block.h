@@ -32,7 +32,7 @@ class Mc2BatchMatMulCommonBaseBlock {
 public:
     __aicore__ inline Mc2BatchMatMulCommonBaseBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-    __aicore__ inline void Init(const void *tilingData);
+    __aicore__ inline void Init(const void* tilingData);
     template <class C_TYPE>
     __aicore__ inline void InitBatchCount();
     __aicore__ inline void InitL2Cache();
@@ -57,15 +57,15 @@ public:
 
     Mc2CommonKernelBlockOffset offset_;
     Mc2CommonKernelBaseBlockArgs params_;
-    const Mc2BatchMatmulTilingData *batchMatmulTilingData_;
+    const Mc2BatchMatmulTilingData* batchMatmulTilingData_;
     bool indexInit_ = false;
     bool batchLastFlag_ = false;
 };
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-__aicore__ inline void Mc2BatchMatMulCommonBaseBlock::Init(const void *tilingData)
+__aicore__ inline void Mc2BatchMatMulCommonBaseBlock::Init(const void* tilingData)
 {
-    batchMatmulTilingData_ = static_cast<const Mc2BatchMatmulTilingData *>(tilingData);
+    batchMatmulTilingData_ = static_cast<const Mc2BatchMatmulTilingData*>(tilingData);
 
     InitBatchCount<C_TYPE>();
 
@@ -163,7 +163,7 @@ __aicore__ inline void Mc2BatchMatMulCommonBaseBlock::InitBatchCount()
 
 __aicore__ inline void Mc2BatchMatMulCommonBaseBlock::InitL2Cache()
 {
-    const Mc2L2cacheTilePara &tilingL2 = batchMatmulTilingData_->matmulTiling.tileL2cacheTiling;
+    const Mc2L2cacheTilePara& tilingL2 = batchMatmulTilingData_->matmulTiling.tileL2cacheTiling;
     params_.mTileCntL2 = static_cast<uint64_t>(tilingL2.mTileCntL2); // M 方向上Tile份数
     params_.nTileCntL2 = static_cast<uint64_t>(tilingL2.nTileCntL2); // N 方向上Tile份数
     params_.enableL2Cache = ((params_.mTileCntL2 > 1) || (params_.nTileCntL2 > 1));

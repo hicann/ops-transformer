@@ -41,8 +41,8 @@ struct ExpertOverlapStats {
     uint32_t cappedTotalTokens = 0U;
 };
 
-A2AVGMM_AIV_TILING_HOST_DEVICE bool BuildExpertOverlapStats(const int32_t *recvPrefix, uint32_t rankSize,
-                                                            uint32_t expertPerRank, ExpertOverlapStats &stats)
+A2AVGMM_AIV_TILING_HOST_DEVICE bool BuildExpertOverlapStats(const int32_t* recvPrefix, uint32_t rankSize,
+                                                            uint32_t expertPerRank, ExpertOverlapStats& stats)
 {
     stats = {};
     if (recvPrefix == nullptr || rankSize == 0U || expertPerRank == 0U ||
@@ -86,7 +86,7 @@ A2AVGMM_AIV_TILING_HOST_DEVICE bool BuildExpertOverlapStats(const int32_t *recvP
     return true;
 }
 
-A2AVGMM_AIV_TILING_HOST_DEVICE bool IsExpertOverlapProtocolSafe(const int32_t *recvPrefix, uint32_t rankSize,
+A2AVGMM_AIV_TILING_HOST_DEVICE bool IsExpertOverlapProtocolSafe(const int32_t* recvPrefix, uint32_t rankSize,
                                                                 uint32_t expertPerRank)
 {
     ExpertOverlapStats stats = {};
@@ -96,7 +96,7 @@ A2AVGMM_AIV_TILING_HOST_DEVICE bool IsExpertOverlapProtocolSafe(const int32_t *r
                                                               stats.nonEmptyExperts >= 2U);
 }
 
-A2AVGMM_AIV_TILING_HOST_DEVICE bool ShouldUseAutomaticExpertOverlap(const int32_t *recvPrefix, uint32_t rankSize,
+A2AVGMM_AIV_TILING_HOST_DEVICE bool ShouldUseAutomaticExpertOverlap(const int32_t* recvPrefix, uint32_t rankSize,
                                                                     uint32_t expertPerRank, uint32_t k, uint32_t n)
 {
     ExpertOverlapStats stats = {};

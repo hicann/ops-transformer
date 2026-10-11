@@ -33,7 +33,7 @@ public:
     bool hasLocalAtFront_ = true; // local提前计算
 
     // Constructor
-    explicit AllGatherPlusMM(const mc2tiling::TilingArgs &args, uint32_t inputRankDim, KernelType inputKernelType,
+    explicit AllGatherPlusMM(const mc2tiling::TilingArgs& args, uint32_t inputRankDim, KernelType inputKernelType,
                              NpuArch npuArch = Ops::Base::DAV_2201,
                              SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B)
         : OneCalcOneCommBase(args, inputRankDim, inputKernelType, npuArch, socVersion_2201)

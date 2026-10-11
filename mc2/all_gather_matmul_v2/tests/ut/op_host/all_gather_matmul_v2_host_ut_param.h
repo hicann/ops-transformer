@@ -39,7 +39,7 @@ struct AllGatherMatmulV2HostUtParamBase {
     std::string comm_mode;
     ge::graphStatus expectResult;
 
-    explicit AllGatherMatmulV2HostUtParamBase(const csv_map &csvMap)
+    explicit AllGatherMatmulV2HostUtParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->group = ReadMap(csvMap, "group");
@@ -58,13 +58,13 @@ struct AllGatherMatmulV2HostUtParamBase {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AllGatherMatmulV2HostUtParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const AllGatherMatmulV2HostUtParamBase& param)
 {
     return os << param.case_name;
 }
 
 template <typename T>
-inline std::string GetCaseInfoString(const testing::TestParamInfo<T> &info)
+inline std::string GetCaseInfoString(const testing::TestParamInfo<T>& info)
 {
     return info.param.case_name;
 }
@@ -86,7 +86,7 @@ struct AllGatherMatmulV2TilingUtParam : public AllGatherMatmulV2HostUtParamBase 
     uint64_t expectTilingKey;
     std::string expectTilingDataHash;
 
-    explicit AllGatherMatmulV2TilingUtParam(const csv_map &csvMap)
+    explicit AllGatherMatmulV2TilingUtParam(const csv_map& csvMap)
         : AllGatherMatmulV2HostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "x1_shape", "x1_dtype", "x1_format", x1));

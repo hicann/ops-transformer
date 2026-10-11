@@ -71,7 +71,7 @@ static constexpr uint32_t VERSION_SIZE = 32;
 const std::set<std::string> PLATFORM_A2 = {"Ascend910B"};
 const std::set<std::string> NPUARCH_A5 = {std::to_string(static_cast<uint32_t>(Ops::Base::DAV_3510))};
 
-static bool IsTargetSocVersionInfershape(const char *nodeName, const std::set<std::string> &targetPlatform)
+static bool IsTargetSocVersionInfershape(const char* nodeName, const std::set<std::string>& targetPlatform)
 {
     char versionValVersion[VERSION_SIZE];
     // rtGetSocSpec获取成功返回值是0，获取失败返回非0
@@ -83,7 +83,7 @@ static bool IsTargetSocVersionInfershape(const char *nodeName, const std::set<st
     return (targetPlatform.count(versionValVersion) > 0);
 }
 
-static bool IsTargetNpuArchInfershape(const char *nodeName, const std::set<std::string> &targetPlatform)
+static bool IsTargetNpuArchInfershape(const char* nodeName, const std::set<std::string>& targetPlatform)
 {
     char versionValNpuArch[VERSION_SIZE];
     if (rtGetSocSpec("version", "NpuArch", versionValNpuArch, VERSION_SIZE) != RT_ERROR_NONE) {
@@ -94,7 +94,7 @@ static bool IsTargetNpuArchInfershape(const char *nodeName, const std::set<std::
     return (targetPlatform.count(versionValNpuArch) > 0);
 }
 
-static void InferShapeDynamicScalesA5(gert::Shape *dynamicScalesShape, const gert::Shape *scalesShape,
+static void InferShapeDynamicScalesA5(gert::Shape* dynamicScalesShape, const gert::Shape* scalesShape,
                                       int64_t quantMode, int64_t a, int64_t h)
 {
     if (static_cast<QuantMode>(quantMode) == QuantMode::QUANT_MODE_PERGROUP) {
@@ -130,10 +130,10 @@ static ge::DataType InferDataTypeDynamicScales(int64_t quantMode, ge::DataType s
 }
 
 // 校验ep_rank_id与shared expert相关attr的合法性，并输出moeRankNum及共享专家场景标志
-static ge::graphStatus CheckEpRankAndSharedAttrs(const gert::InferShapeContext *context, const int64_t *epRankId,
-                                                 const int64_t *epWorldSize, const int64_t *sharedExpertNum,
-                                                 const int64_t *sharedExpertRankNum, int64_t &moeRankNum,
-                                                 bool &isSharedDefault, bool &isNoShared)
+static ge::graphStatus CheckEpRankAndSharedAttrs(const gert::InferShapeContext* context, const int64_t* epRankId,
+                                                 const int64_t* epWorldSize, const int64_t* sharedExpertNum,
+                                                 const int64_t* sharedExpertRankNum, int64_t& moeRankNum,
+                                                 bool& isSharedDefault, bool& isNoShared)
 {
     if ((*epRankId < 0) || (*epRankId >= *epWorldSize)) {
         std::string reason = "ep_rank_id should be in [0, epWorldSize)";
@@ -171,11 +171,11 @@ static ge::graphStatus CheckEpRankAndSharedAttrs(const gert::InferShapeContext *
 }
 
 // 计算expandX的token数a及本地专家数localExpertNum
-static void CalcExpandTokenNum(const gert::InferShapeContext *context, const int64_t *epRankId,
-                               const int64_t *epWorldSize, const int64_t *sharedExpertNum,
-                               const int64_t *sharedExpertRankNum, const gert::Shape *elasticInfoShape,
+static void CalcExpandTokenNum(const gert::InferShapeContext* context, const int64_t* epRankId,
+                               const int64_t* epWorldSize, const int64_t* sharedExpertNum,
+                               const int64_t* sharedExpertRankNum, const gert::Shape* elasticInfoShape,
                                const bool isSharedDefault, const bool isNoShared, const int64_t localMoeExpertNum,
-                               const int64_t globalBsReal, const int64_t k, int64_t &a, int64_t &localExpertNum)
+                               const int64_t globalBsReal, const int64_t k, int64_t& a, int64_t& localExpertNum)
 {
     if (*epRankId < *sharedExpertRankNum) {
         localExpertNum = 1;
@@ -203,9 +203,9 @@ static void CalcExpandTokenNum(const gert::InferShapeContext *context, const int
     }
 }
 
-static ge::graphStatus GetAndCheckDispatchShapeV2(const char *nodeName, const gert::Shape *xShape,
-                                                  const gert::Shape *expertIdsShape, int64_t &bs, int64_t &h,
-                                                  int64_t &k)
+static ge::graphStatus GetAndCheckDispatchShapeV2(const char* nodeName, const gert::Shape* xShape,
+                                                  const gert::Shape* expertIdsShape, int64_t& bs, int64_t& h,
+                                                  int64_t& k)
 {
     size_t xDimNum = xShape->GetDimNum();
     size_t expertDimNum = expertIdsShape->GetDimNum();
@@ -223,35 +223,35 @@ static ge::graphStatus GetAndCheckDispatchShapeV2(const char *nodeName, const ge
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferShapeMoeDistributeDispatchV2(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMoeDistributeDispatchV2(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMoeDistributeDispatchV2.");
     // 获取输入shape
-    const gert::Shape *xShape = context->GetInputShape(DISPATCH_INPUT_X_INDEX);
+    const gert::Shape* xShape = context->GetInputShape(DISPATCH_INPUT_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
-    const gert::Shape *expertIdsShape = context->GetInputShape(DISPATCH_INPUT_EXPERT_IDS_INDEX);
+    const gert::Shape* expertIdsShape = context->GetInputShape(DISPATCH_INPUT_EXPERT_IDS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
-    const gert::Shape *scalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_SCALES_IDX_INDEX);
-    const gert::Shape *expertScalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_EXPERT_SCALES_IDX_INDEX);
+    const gert::Shape* scalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_SCALES_IDX_INDEX);
+    const gert::Shape* expertScalesShape = context->GetOptionalInputShape(DISPATCH_INPUT_EXPERT_SCALES_IDX_INDEX);
     bool hasExpertScales = (expertScalesShape != nullptr);
-    const gert::Shape *elasticInfoShape = context->GetOptionalInputShape(DISPATCH_INPUT_ELASTIC_INFO_IDX_INDEX);
+    const gert::Shape* elasticInfoShape = context->GetOptionalInputShape(DISPATCH_INPUT_ELASTIC_INFO_IDX_INDEX);
 
-    gert::Shape *expandXShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_X_INDEX);
+    gert::Shape* expandXShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expandXShape);
-    gert::Shape *dynamicScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_DYNAMIC_SCALES_INDEX);
+    gert::Shape* dynamicScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_DYNAMIC_SCALES_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, dynamicScalesShape);
-    gert::Shape *assistInfoShape = context->GetOutputShape(DISPATCH_OUTPUT_ASSIST_INFO_IDX_INDEX);
+    gert::Shape* assistInfoShape = context->GetOutputShape(DISPATCH_OUTPUT_ASSIST_INFO_IDX_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, assistInfoShape);
-    gert::Shape *expertTokenNumsShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    gert::Shape* expertTokenNumsShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertTokenNumsShape);
-    gert::Shape *epRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_EP_RECV_COUNTS_INDEX);
+    gert::Shape* epRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_EP_RECV_COUNTS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, epRecvCountShape);
-    gert::Shape *tpRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_TP_RECV_COUNTS_INDEX);
+    gert::Shape* tpRecvCountShape = context->GetOutputShape(DISPATCH_OUTPUT_TP_RECV_COUNTS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, tpRecvCountShape);
-    gert::Shape *expandScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_SCALES);
+    gert::Shape* expandScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_SCALES);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expandScalesShape);
 
     const auto attrs = context->GetAttrs();
@@ -375,7 +375,7 @@ static ge::graphStatus InferShapeMoeDistributeDispatchV2(gert::InferShapeContext
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckQuantMode(const gert::InferDataTypeContext *context, const int64_t *quantMode,
+static ge::graphStatus CheckQuantMode(const gert::InferDataTypeContext* context, const int64_t* quantMode,
                                       int64_t yDtype)
 {
     if (static_cast<QuantMode>(*quantMode) == QuantMode::QUANT_MODE_STATIC) {
@@ -413,7 +413,7 @@ static ge::graphStatus CheckQuantMode(const gert::InferDataTypeContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeMoeDistributeDispatchV2(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMoeDistributeDispatchV2(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeDispatchV2.");
     auto xDtype = context->GetInputDataType(DISPATCH_INPUT_X_INDEX);
@@ -422,7 +422,7 @@ static ge::graphStatus InferDataTypeMoeDistributeDispatchV2(gert::InferDataTypeC
     const auto quantMode = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_QUANT_MODE_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, quantMode);
     const auto scalesType = context->GetOptionalInputDataType(DISPATCH_INPUT_SCALES_IDX_INDEX);
-    const int64_t *yDtypePtr = nullptr;
+    const int64_t* yDtypePtr = nullptr;
     if (IsTargetNpuArchInfershape(context->GetNodeName(), NPUARCH_A5)) {
         yDtypePtr = attrs->GetAttrPointer<int64_t>(DISPATCH_INPUT_ATTR_Y_DTYPE_INDEX);
     }

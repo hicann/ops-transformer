@@ -40,25 +40,25 @@ using namespace op;
 extern "C" {
 #endif
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
-extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
-extern "C" void *NnopbaseGetUserHandle(void *executor);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
+extern "C" void NnopbaseSetUserHandle(void* executor, void* handle);
+extern "C" void* NnopbaseGetUserHandle(void* executor);
 
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
 extern aclnnStatus aclnnInnerMoeDistributeCombineV3GetWorkspaceSize(
-    const aclTensor *context, const aclTensor *expandX, const aclTensor *expertIds,
-    const aclTensor *assistInfoForCombine, const aclTensor *epSendCounts, const aclTensor *expertScales,
-    const aclTensor *tpSendCounts, const aclTensor *xActiveMask, const aclTensor *activationScale,
-    const aclTensor *weightScale, const aclTensor *groupList, const aclTensor *expandScales,
-    const aclTensor *sharedExpertX, const aclTensor *elasticInfo, const aclTensor *oriX,
-    const aclTensor *constExpertAlpha1, const aclTensor *constExpertAlpha2, const aclTensor *constExpertV,
-    const aclTensor *performanceInfo, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
+    const aclTensor* context, const aclTensor* expandX, const aclTensor* expertIds,
+    const aclTensor* assistInfoForCombine, const aclTensor* epSendCounts, const aclTensor* expertScales,
+    const aclTensor* tpSendCounts, const aclTensor* xActiveMask, const aclTensor* activationScale,
+    const aclTensor* weightScale, const aclTensor* groupList, const aclTensor* expandScales,
+    const aclTensor* sharedExpertX, const aclTensor* elasticInfo, const aclTensor* oriX,
+    const aclTensor* constExpertAlpha1, const aclTensor* constExpertAlpha2, const aclTensor* constExpertV,
+    const aclTensor* performanceInfo, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum,
     int64_t cclBufferSize, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t outDtype, int64_t commQuantMode, int64_t groupListType,
-    const char *commAlg, int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, aclTensor *x,
-    uint64_t *workspaceSize, aclOpExecutor **executor);
+    const char* commAlg, int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, aclTensor* x,
+    uint64_t* workspaceSize, aclOpExecutor** executor);
 
-extern aclnnStatus aclnnInnerMoeDistributeCombineV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern aclnnStatus aclnnInnerMoeDistributeCombineV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                     aclrtStream stream);
 
 enum class CommType : uint64_t {
@@ -67,9 +67,9 @@ enum class CommType : uint64_t {
 };
 #endif
 
-bool CombineCheckNotNull(const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine,
-                         const aclTensor *epSendCounts, const aclTensor *expertScales, const char *groupEp,
-                         aclTensor *x)
+bool CombineCheckNotNull(const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* assistInfoForCombine,
+                         const aclTensor* epSendCounts, const aclTensor* expertScales, const char* groupEp,
+                         aclTensor* x)
 {
     OP_CHECK_NULL(epSendCounts, return false);
     OP_CHECK_NULL(expertScales, return false);
@@ -85,7 +85,7 @@ bool CombineCheckNotNull(const aclTensor *expandX, const aclTensor *expertIds, c
     return true;
 }
 
-static aclnnStatus CheckGroupNameLength(const char *groupName, const char *paramName)
+static aclnnStatus CheckGroupNameLength(const char* groupName, const char* paramName)
 {
     if (strnlen(groupName, HCCL_GROUP_NAME_MAX) >= HCCL_GROUP_NAME_MAX) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -96,9 +96,9 @@ static aclnnStatus CheckGroupNameLength(const char *groupName, const char *param
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus CombineCheckParams(const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *expandIdx,
-                               const aclTensor *epSendCounts, const aclTensor *expertScales, const char *groupEp,
-                               const char *groupTp, aclTensor *x)
+aclnnStatus CombineCheckParams(const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* expandIdx,
+                               const aclTensor* epSendCounts, const aclTensor* expertScales, const char* groupEp,
+                               const char* groupTp, aclTensor* x)
 {
     CHECK_RET(CombineCheckNotNull(expandX, expertIds, expandIdx, epSendCounts, expertScales, groupEp, x),
               ACLNN_ERR_PARAM_NULLPTR);
@@ -114,14 +114,14 @@ aclnnStatus CombineCheckParams(const aclTensor *expandX, const aclTensor *expert
     return ACLNN_SUCCESS;
 }
 
-static inline void SafeCopyGroupBuf(char *dst, size_t dstSize, const char *src, size_t maxCopyLen)
+static inline void SafeCopyGroupBuf(char* dst, size_t dstSize, const char* src, size_t maxCopyLen)
 {
     if (src != nullptr) {
         (void)strncpy_s(dst, dstSize, src, maxCopyLen);
     }
 }
 
-static void SetCommArgs(aclOpExecutor **executor, const bool is910B, const bool isA5, const char *commAlg)
+static void SetCommArgs(aclOpExecutor** executor, const bool is910B, const bool isA5, const char* commAlg)
 {
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
     if (isA5) {
@@ -129,7 +129,7 @@ static void SetCommArgs(aclOpExecutor **executor, const bool is910B, const bool 
         if (commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0) {
             type = CommType::CCU;
         }
-        void *args = reinterpret_cast<void *>(static_cast<uint64_t>(type));
+        void* args = reinterpret_cast<void*>(static_cast<uint64_t>(type));
         NnopbaseSetUserHandle(*executor, args);
     }
 #endif
@@ -145,10 +145,10 @@ static void SetCommArgs(aclOpExecutor **executor, const bool is910B, const bool 
     }
 }
 
-static void PrepareCommBuffers(const char *groupEp, const char *groupTp, const char *commAlg, bool is910B,
-                               char *groupEpBuf, char *groupTpBuf, char *commAlgBuf)
+static void PrepareCommBuffers(const char* groupEp, const char* groupTp, const char* commAlg, bool is910B,
+                               char* groupEpBuf, char* groupTpBuf, char* commAlgBuf)
 {
-    const char *groupTpCombineV2Temp = groupTp;
+    const char* groupTpCombineV2Temp = groupTp;
     if (is910B) {
         groupTpCombineV2Temp = "";
     }
@@ -157,7 +157,7 @@ static void PrepareCommBuffers(const char *groupEp, const char *groupTp, const c
     SafeCopyGroupBuf(commAlgBuf, HCCL_GROUP_NAME_MAX, commAlg, HCCL_GROUP_NAME_MAX - 1);
 }
 
-static aclnnStatus CheckCcuWorkspaceParams(const aclTensor *performanceInfoOptional, const char *commAlg)
+static aclnnStatus CheckCcuWorkspaceParams(const aclTensor* performanceInfoOptional, const char* commAlg)
 {
     // ccu暂时不支持performanceInfo
     if (commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0) {
@@ -171,18 +171,18 @@ static aclnnStatus CheckCcuWorkspaceParams(const aclTensor *performanceInfoOptio
 }
 
 static aclnnStatus ResolveInnerWorkspaceSize(
-    const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine,
-    const aclTensor *epSendCounts, const aclTensor *expertScales, const aclTensor *tpSendCountsOptional,
-    const aclTensor *xActiveMaskOptional, const aclTensor *activationScaleOptional,
-    const aclTensor *weightScaleOptional, const aclTensor *groupListOptional, const aclTensor *expandScalesOptional,
-    const aclTensor *sharedExpertXOptional, const aclTensor *elasticInfoOptional, const aclTensor *oriXOptional,
-    const aclTensor *constExpertAlpha1Optional, const aclTensor *constExpertAlpha2Optional,
-    const aclTensor *constExpertVOptional, const aclTensor *performanceInfoOptional, const char *groupEp,
-    char *groupEpBuf, char *groupTpBuf, const char *commAlg, char *commAlgBuf, int64_t epWorldSize, int64_t epRankId,
+    const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* assistInfoForCombine,
+    const aclTensor* epSendCounts, const aclTensor* expertScales, const aclTensor* tpSendCountsOptional,
+    const aclTensor* xActiveMaskOptional, const aclTensor* activationScaleOptional,
+    const aclTensor* weightScaleOptional, const aclTensor* groupListOptional, const aclTensor* expandScalesOptional,
+    const aclTensor* sharedExpertXOptional, const aclTensor* elasticInfoOptional, const aclTensor* oriXOptional,
+    const aclTensor* constExpertAlpha1Optional, const aclTensor* constExpertAlpha2Optional,
+    const aclTensor* constExpertVOptional, const aclTensor* performanceInfoOptional, const char* groupEp,
+    char* groupEpBuf, char* groupTpBuf, const char* commAlg, char* commAlgBuf, int64_t epWorldSize, int64_t epRankId,
     int64_t moeExpertNum, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t outDtype, int64_t commQuantMode, int64_t groupListType,
-    int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, bool is910B, bool isA5, aclTensor *xOut,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, bool is910B, bool isA5, aclTensor* xOut,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     aclnnStatus getWorkspaceSizesRes = ACLNN_ERR_INNER;
     // ccu暂时不支持mc2Context，回退到V2接口
@@ -197,9 +197,9 @@ static aclnnStatus ResolveInnerWorkspaceSize(
             xOut, workspaceSize, executor);
     } else {
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-        aclTensor *mc2Context = nullptr;
+        aclTensor* mc2Context = nullptr;
         uint64_t hcclBuffSize = 0;
-        const char *opName = "moe_distribute_v2";
+        const char* opName = "moe_distribute_v2";
         auto aclnnRet = Mc2Aclnn::Mc2Context::GetMc2ContextTensor(groupEp, opName, hcclBuffSize, mc2Context);
         CHECK_RET(aclnnRet == ACLNN_SUCCESS, aclnnRet);
         getWorkspaceSizesRes = aclnnInnerMoeDistributeCombineV3GetWorkspaceSize(
@@ -217,17 +217,17 @@ static aclnnStatus ResolveInnerWorkspaceSize(
 }
 
 aclnnStatus aclnnMoeDistributeCombineBaseGetWorkspaceSize(
-    const aclTensor *expandX, const aclTensor *expertIds, const aclTensor *assistInfoForCombine,
-    const aclTensor *epSendCounts, const aclTensor *expertScales, const aclTensor *tpSendCountsOptional,
-    const aclTensor *xActiveMaskOptional, const aclTensor *activationScaleOptional,
-    const aclTensor *weightScaleOptional, const aclTensor *groupListOptional, const aclTensor *expandScalesOptional,
-    const aclTensor *sharedExpertXOptional, const aclTensor *elasticInfoOptional, const aclTensor *oriXOptional,
-    const aclTensor *constExpertAlpha1Optional, const aclTensor *constExpertAlpha2Optional,
-    const aclTensor *constExpertVOptional, const aclTensor *performanceInfoOptional, const char *groupEp,
-    int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, const char *groupTp, int64_t tpWorldSize,
+    const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* assistInfoForCombine,
+    const aclTensor* epSendCounts, const aclTensor* expertScales, const aclTensor* tpSendCountsOptional,
+    const aclTensor* xActiveMaskOptional, const aclTensor* activationScaleOptional,
+    const aclTensor* weightScaleOptional, const aclTensor* groupListOptional, const aclTensor* expandScalesOptional,
+    const aclTensor* sharedExpertXOptional, const aclTensor* elasticInfoOptional, const aclTensor* oriXOptional,
+    const aclTensor* constExpertAlpha1Optional, const aclTensor* constExpertAlpha2Optional,
+    const aclTensor* constExpertVOptional, const aclTensor* performanceInfoOptional, const char* groupEp,
+    int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, const char* groupTp, int64_t tpWorldSize,
     int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum, int64_t sharedExpertRankNum, int64_t globalBs,
-    int64_t outDtype, int64_t commQuantMode, int64_t groupListType, const char *commAlg, int64_t zeroExpertNum,
-    int64_t copyExpertNum, int64_t constExpertNum, aclTensor *xOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t outDtype, int64_t commQuantMode, int64_t groupListType, const char* commAlg, int64_t zeroExpertNum,
+    int64_t copyExpertNum, int64_t constExpertNum, aclTensor* xOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("enter to the  aclnnMoeDistributeCombineBaseGetWorkspaceSize\n");
     const static bool is910B = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B;
@@ -252,13 +252,13 @@ aclnnStatus aclnnMoeDistributeCombineBaseGetWorkspaceSize(
 }
 
 // aclnn二段式接口
-aclnnStatus aclnnMoeDistributeCombineBase(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMoeDistributeCombineBase(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                           aclrtStream stream)
 {
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
     const static bool isA5 = GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
     if (isA5) {
-        void *arg = NnopbaseGetUserHandle(executor);
+        void* arg = NnopbaseGetUserHandle(executor);
         uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
         CommType commType = static_cast<CommType>(handleVal);
         if (commType == CommType::AIV) {

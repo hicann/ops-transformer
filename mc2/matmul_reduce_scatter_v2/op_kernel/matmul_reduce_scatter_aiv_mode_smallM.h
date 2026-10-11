@@ -164,13 +164,13 @@ public:
     __aicore__ inline void InitOutputMatrixCToZero();
     __aicore__ inline void CatlassMatmul();
     __aicore__ inline void AIVComm();
-    __aicore__ inline void NotifyRemoteDataCopy(const CommColumnSplitter &taskSplit, bool needDequant,
+    __aicore__ inline void NotifyRemoteDataCopy(const CommColumnSplitter& taskSplit, bool needDequant,
                                                 bool needPerChannel, bool needPerToken);
-    __aicore__ inline void CompleteRemoteDataCopy(const CommColumnSplitter &taskSplit, bool needDequant,
+    __aicore__ inline void CompleteRemoteDataCopy(const CommColumnSplitter& taskSplit, bool needDequant,
                                                   bool needPerChannel, bool needPerToken);
     __aicore__ inline void SendCopyCompleteSignal();
     __aicore__ inline void ComfirmRemoteCopyDone();
-    __aicore__ inline void Dequant(Arch::Resource<ArchTag> &resource, int32_t calIdx, int32_t n_st, int32_t n_ed,
+    __aicore__ inline void Dequant(Arch::Resource<ArchTag>& resource, int32_t calIdx, int32_t n_st, int32_t n_ed,
                                    int32_t n_nxt_ed, int32_t n_comm_block, bool needPerChannel, bool needPerToken);
 
     inline __aicore__ GemmCoord GetBlockIdCoord(int32_t loopOffset, int32_t mLoop, int32_t nLoop, int32_t swizzlDirect,
@@ -217,7 +217,7 @@ inline __aicore__ GemmCoord MatmulReduceScatterAivModeSmallM<TemplateMMReduceSca
 
 template <TemplateMMReduceScatterV2Class>
 __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV2Func>::Dequant(
-    Arch::Resource<ArchTag> &resource, int32_t calIdx, int32_t n_st, int32_t n_ed, int32_t n_nxt_ed,
+    Arch::Resource<ArchTag>& resource, int32_t calIdx, int32_t n_st, int32_t n_ed, int32_t n_nxt_ed,
     int32_t n_comm_block, bool needPerChannel, bool needPerToken)
 {
     using CType = Gemm::GemmType<int32_t, layout::RowMajor>;
@@ -245,10 +245,10 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
     using LayoutC = layout::RowMajor;
 
     BlockEpilogue blockEpilogue(resource);
-    __gm__ float32_t *perChannelScale =
-        needPerChannel ? reinterpret_cast<__gm__ float32_t *>(perChannelScaleGM_) : nullptr;
-    __gm__ float32_t *perTokenScale = needPerToken ? reinterpret_cast<__gm__ float32_t *>(perTokenScaleGM_) : nullptr;
-    __gm__ int32_t *workspace = needPerChannel ? reinterpret_cast<__gm__ int32_t *>(gm_accum) : nullptr;
+    __gm__ float32_t* perChannelScale =
+        needPerChannel ? reinterpret_cast<__gm__ float32_t*>(perChannelScaleGM_) : nullptr;
+    __gm__ float32_t* perTokenScale = needPerToken ? reinterpret_cast<__gm__ float32_t*>(perTokenScaleGM_) : nullptr;
+    __gm__ int32_t* workspace = needPerChannel ? reinterpret_cast<__gm__ int32_t*>(gm_accum) : nullptr;
 
     int32_t totalLoop = m_loop * n_loop;
     for (int32_t p = 0; p < p_value; p++) {
@@ -287,13 +287,13 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
             gmOffsetC = static_cast<int64_t>(n0) * n_ed * m + layout_tmp.GetOffset(offsetC_comm);
         }
 
-        __gm__ cType *gmPeerMem = reinterpret_cast<__gm__ cType *>(buff[rank]);
+        __gm__ cType* gmPeerMem = reinterpret_cast<__gm__ cType*>(buff[rank]);
 
         layout::VectorLayout layoutPerChannelScale{blockSizeCoord.n()};
         layout::VectorLayout layoutPerTokenScale{blockSizeCoord.m()};
         layout::VectorLayout layoutBias{blockSizeCoord.n()};
-        __gm__ biasType *gmBiasOffset =
-            (biasGM_ != 0) ? (reinterpret_cast<__gm__ biasType *>(biasGM_) + blockLocCoord.n()) : nullptr;
+        __gm__ biasType* gmBiasOffset =
+            (biasGM_ != 0) ? (reinterpret_cast<__gm__ biasType*>(biasGM_) + blockLocCoord.n()) : nullptr;
         if (needPerChannel & needPerToken) {
             blockEpilogue(perChannelScale + blockLocCoord.n(), layoutPerChannelScale, perTokenScale + blockLocCoord.m(),
                           layoutPerTokenScale, gmBiasOffset, layoutBias, workspace + gmOffsetC, layout_tmp,
@@ -376,12 +376,12 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
         tileLength = formerTileLength;
         lastTileLength = formerLastTileLength;
 
-        cGm.SetGlobalBuffer((__gm__ cType *)cGM_ + formerLength * block_id, formerLength);
+        cGm.SetGlobalBuffer((__gm__ cType*)cGM_ + formerLength * block_id, formerLength);
     } else {
         tileNum = tailTileNum;
         tileLength = tailTileLength;
         lastTileLength = tailLastTileLength;
-        cGm.SetGlobalBuffer((__gm__ cType *)cGM_ + formerLength * formerNum + tailLength * (block_id - formerNum),
+        cGm.SetGlobalBuffer((__gm__ cType*)cGM_ + formerLength * formerNum + tailLength * (block_id - formerNum),
                             tailLength);
     }
 
@@ -401,7 +401,7 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
 
 template <TemplateMMReduceScatterV2Class>
 __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV2Func>::NotifyRemoteDataCopy(
-    const CommColumnSplitter &taskSplit, bool needDequant, bool needPerChannel, bool needPerToken)
+    const CommColumnSplitter& taskSplit, bool needDequant, bool needPerChannel, bool needPerToken)
 {
     Arch::Resource<ArchTag> resource;
     for (int32_t cal_idx = 0; cal_idx < cal_count; ++cal_idx) {
@@ -421,7 +421,7 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
         }
         SyncAll<true>();
         if (core_idx < rank_size) {
-            SetBuffFlag((__gm__ int32_t *)buff[core_idx] + FLAG_OFFSET + rank, cal_idx + 1);
+            SetBuffFlag((__gm__ int32_t*)buff[core_idx] + FLAG_OFFSET + rank, cal_idx + 1);
         }
     }
 }
@@ -431,14 +431,14 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
 {
     // 收到远端卡读写完成信号，并复位信号，然后退出kernel。
     if (core_idx < rank_size) {
-        CheckBuffFlag((__gm__ int32_t *)buff[rank] + FLAG_OFFSET + core_idx, cal_count + 1);
-        SetBuffFlag((__gm__ int32_t *)buff[rank] + FLAG_OFFSET + core_idx, -1);
+        CheckBuffFlag((__gm__ int32_t*)buff[rank] + FLAG_OFFSET + core_idx, cal_count + 1);
+        SetBuffFlag((__gm__ int32_t*)buff[rank] + FLAG_OFFSET + core_idx, -1);
     }
 }
 
 template <TemplateMMReduceScatterV2Class>
 __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV2Func>::CompleteRemoteDataCopy(
-    const CommColumnSplitter &taskSplit, bool needDequant, bool needPerChannel, bool needPerToken)
+    const CommColumnSplitter& taskSplit, bool needDequant, bool needPerChannel, bool needPerToken)
 {
     Arch::Resource<ArchTag> resource;
 
@@ -489,17 +489,17 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
                     i_loop_db++;
                     // 第一次拷贝，确保远端数据准备就绪
                     if (is_first_copy) {
-                        CheckBuffFlagV2((__gm__ int32_t *)buff[rank] + FLAG_OFFSET + target_rank, cal_idx);
+                        CheckBuffFlagV2((__gm__ int32_t*)buff[rank] + FLAG_OFFSET + target_rank, cal_idx);
                     }
                     WaitFlag<HardEvent::MTE3_MTE2>(event_id);
-                    auto src_peermem = reinterpret_cast<__gm__ cType *>(buff[target_rank]) + m * n_st * n0 +
+                    auto src_peermem = reinterpret_cast<__gm__ cType*>(buff[target_rank]) + m * n_st * n0 +
                                        rank * m_per_rank * actual_move_size_gm2ub +
                                        loop_copy_idx * n_repeat * actual_move_size_gm2ub;
                     CopyGmToUbuf(ub_buff_st, src_peermem, 1, cur_n_repeat * actual_move_size_gm2ub * sizeof(cType) / 32,
                                  0, 0);
                     SetFlag<HardEvent::MTE2_MTE3>(event_id);
                     WaitFlag<HardEvent::MTE2_MTE3>(event_id);
-                    auto dst_gm = reinterpret_cast<__gm__ cType *>(cGM_) + loop_copy_idx * n_repeat * n + n_st * n0;
+                    auto dst_gm = reinterpret_cast<__gm__ cType*>(cGM_) + loop_copy_idx * n_repeat * n + n_st * n0;
                     int32_t actual_move_size_ub2gm = n_ed * n0 >= n ? n - n_st * n0 : actual_move_size_gm2ub;
                     uint16_t dst_stride = ((n - actual_move_size_ub2gm) * sizeof(cType));
                     CopyUbufToGmUnknown(
@@ -519,7 +519,7 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
 {
     // 通知远端卡整个读取过程完成，可以退出。
     if (core_idx < rank_size) {
-        SetBuffFlag((__gm__ int32_t *)buff[core_idx] + FLAG_OFFSET + rank, cal_count + 1);
+        SetBuffFlag((__gm__ int32_t*)buff[core_idx] + FLAG_OFFSET + rank, cal_count + 1);
     }
 }
 
@@ -542,7 +542,7 @@ __aicore__ inline void MatmulReduceScatterAivModeSmallM<TemplateMMReduceScatterV
 
         // 通过检查其他卡的初始话的flag位，确认其他卡准备接受本卡的flag远程写。
         if (core_idx < rank_size && 1 == aiv_idx) {
-            CheckBuffFlag((__gm__ int32_t *)buff[core_idx] + FLAG_OFFSET + rank, 0);
+            CheckBuffFlag((__gm__ int32_t*)buff[core_idx] + FLAG_OFFSET + rank, 0);
         }
 
         SyncAll<true>();

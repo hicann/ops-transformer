@@ -41,7 +41,7 @@ struct MatmulAllReduceAddRmsNormInferShapeUtParam {
     ge::graphStatus expectResult;
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    MatmulAllReduceAddRmsNormInferShapeUtParam(const csv_map &csvMap)
+    MatmulAllReduceAddRmsNormInferShapeUtParam(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->group = ReadMap(csvMap, "group");
@@ -86,7 +86,7 @@ struct MatmulAllReduceAddRmsNormInferShapeUtParam {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MatmulAllReduceAddRmsNormInferShapeUtParam &param)
+inline std::ostream& operator<<(std::ostream& os, const MatmulAllReduceAddRmsNormInferShapeUtParam& param)
 {
     return os << param.case_name;
 }
@@ -115,7 +115,7 @@ struct MatmulAllReduceAddRmsNormInferDataTypeUtParam {
     ge::DataType expect_y_dtype;
     ge::DataType expect_norm_dtype;
 
-    MatmulAllReduceAddRmsNormInferDataTypeUtParam(const csv_map &csvMap)
+    MatmulAllReduceAddRmsNormInferDataTypeUtParam(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->group = ReadMap(csvMap, "group");
@@ -148,7 +148,7 @@ struct MatmulAllReduceAddRmsNormInferDataTypeUtParam {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MatmulAllReduceAddRmsNormInferDataTypeUtParam &param)
+inline std::ostream& operator<<(std::ostream& os, const MatmulAllReduceAddRmsNormInferDataTypeUtParam& param)
 {
     return os << param.case_name;
 }

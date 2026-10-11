@@ -30,14 +30,14 @@ using namespace mc2_matmul_v3_advanced;
 
 class MatmulAllReduceTilingA5 : public MatmulAllReduceTilingBase {
 public:
-    explicit MatmulAllReduceTilingA5(gert::TilingContext *context);
-    MatmulAllReduceTilingA5(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                            Mc2Tiling::MatmulAllReduce910TilingDataA5 *out);
+    explicit MatmulAllReduceTilingA5(gert::TilingContext* context);
+    MatmulAllReduceTilingA5(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                            Mc2Tiling::MatmulAllReduce910TilingDataA5* out);
     ~MatmulAllReduceTilingA5() override = default;
 
 protected:
-    ge::graphStatus DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg &tilingCfg, Mc2MMRegisterCfg &registerCfg,
-                                     Mc2MatMulV3TilingData &tilingData);
+    ge::graphStatus DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg& tilingCfg, Mc2MMRegisterCfg& registerCfg,
+                                     Mc2MatMulV3TilingData& tilingData);
     bool IsCapable() override;
 
     ge::graphStatus DoOpTiling() override;
@@ -50,24 +50,24 @@ protected:
 
     ge::graphStatus Do910Tiling();
 
-    Mc2Tiling::RCSTiling &MutableRCSTilingData() override;
+    Mc2Tiling::RCSTiling& MutableRCSTilingData() override;
 
-    ::TCubeTiling &MutableTCubeTileTilingData() override
+    ::TCubeTiling& MutableTCubeTileTilingData() override
     {
         return matmulAllReduce910TilingData_.mC2Mmv3TileTilingData.tCubeTiling;
     }
 
-    ::TCubeTiling &MutableTCubeTailTilingData() override
+    ::TCubeTiling& MutableTCubeTailTilingData() override
     {
         return matmulAllReduce910TilingData_.mC2Mmv3TailTilingData.tCubeTiling;
     }
 
-    inline Mc2MatMulV3TilingData &MutableMC2MmV3TileTilingData()
+    inline Mc2MatMulV3TilingData& MutableMC2MmV3TileTilingData()
     {
         return matmulAllReduce910TilingData_.mC2Mmv3TileTilingData;
     }
 
-    inline Mc2MatMulV3TilingData &MutableMC2MmV3TailTilingData()
+    inline Mc2MatMulV3TilingData& MutableMC2MmV3TailTilingData()
     {
         return matmulAllReduce910TilingData_.mC2Mmv3TailTilingData;
     }
@@ -75,8 +75,8 @@ protected:
     void PrintExtendMatmulTiling(bool isTail) override;
     void DoEmptyTensorTiling() override;
     ge::graphStatus GetWorkspaceSizeForA2ARSAG();
-    ge::graphStatus SetMc2HcommAllReduce(const char *groupName, const uint32_t reduceType);
-    ge::graphStatus SetMc2HcommTwoShot(const char *groupName, const uint32_t reduceType);
+    ge::graphStatus SetMc2HcommAllReduce(const char* groupName, const uint32_t reduceType);
+    ge::graphStatus SetMc2HcommTwoShot(const char* groupName, const uint32_t reduceType);
     ge::graphStatus SetMc2Hcomm();
     ge::graphStatus CheckInput() override;
     CutResult GetTilingResult() override;
@@ -85,7 +85,7 @@ private:
     ge::graphStatus CheckAxisSize();
     ge::graphStatus CheckX1X2();
     Mc2Tiling::MatmulAllReduce910TilingDataA5 matmulAllReduce910TilingDataSelf_{};
-    Mc2Tiling::MatmulAllReduce910TilingDataA5 &matmulAllReduce910TilingData_;
+    Mc2Tiling::MatmulAllReduce910TilingDataA5& matmulAllReduce910TilingData_;
     uint64_t myWorkSpaceSize_{0U};
     Mc2MatMulV3Args mmV3Args_;
     Mc2MatmulV3CompileInfo compileInfo_;

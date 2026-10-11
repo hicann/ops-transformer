@@ -54,7 +54,7 @@ void MoeDistributeDispatchSetupTilingA5::SetHcommCfg()
     mc2CcTilingConfig.SetCommEngine(aivEngineValue); // AIV_UB-MEM or AIV_URMA
     mc2CcTilingConfig.GetTiling(tilingData_->mc2InitTiling);
     mc2CcTilingConfig.GetTiling(tilingData_->mc2CcTiling);
-    reinterpret_cast<Mc2CcTilingInner *>(&tilingData_->mc2CcTiling)->protocal = 1; // 0: UB-MEM, 1: URMA
+    reinterpret_cast<Mc2CcTilingInner*>(&tilingData_->mc2CcTiling)->protocal = 1; // 0: UB-MEM, 1: URMA
 }
 
 bool MoeDistributeDispatchSetupTilingA5::IsCapable()

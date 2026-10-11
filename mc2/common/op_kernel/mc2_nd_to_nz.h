@@ -48,7 +48,7 @@ constexpr uint32_t SET_FLAG_MODE_2 = 2;
 
 using namespace matmul;
 template <class T>
-__aicore__ inline void CopyGmToUbufAlignMc2(const LocalTensor<T> &dst, const GlobalTensor<T> &src, uint16_t nBurst,
+__aicore__ inline void CopyGmToUbufAlignMc2(const LocalTensor<T>& dst, const GlobalTensor<T>& src, uint16_t nBurst,
                                             uint32_t lenBurst, uint8_t leftPaddingNum, uint8_t rightPaddingNum,
                                             uint32_t srcGap, uint32_t dstGap)
 {
@@ -58,7 +58,7 @@ __aicore__ inline void CopyGmToUbufAlignMc2(const LocalTensor<T> &dst, const Glo
 }
 
 template <typename T>
-__aicore__ inline void CopyUbufToGmAlignMc2(const GlobalTensor<T> &dst, const LocalTensor<T> &src, uint16_t nBurst,
+__aicore__ inline void CopyUbufToGmAlignMc2(const GlobalTensor<T>& dst, const LocalTensor<T>& src, uint16_t nBurst,
                                             uint32_t lenBurst, uint8_t leftPaddingNum, uint8_t rightPaddingNum,
                                             uint32_t srcGap, uint32_t dstGap)
 {
@@ -70,8 +70,8 @@ __aicore__ inline void CopyUbufToGmAlignMc2(const GlobalTensor<T> &dst, const Lo
 // outputOrgWidth should be 512 byte aligned
 // outputWidth should be 32 byte aligned
 template <typename T>
-__aicore__ inline void CopyPad(const GlobalTensor<T> &outputGlobal, const LocalTensor<T> &tmpUb,
-                               const GlobalTensor<T> &inputGlobal, uint32_t nBurst, uint32_t ubDstGap,
+__aicore__ inline void CopyPad(const GlobalTensor<T>& outputGlobal, const LocalTensor<T>& tmpUb,
+                               const GlobalTensor<T>& inputGlobal, uint32_t nBurst, uint32_t ubDstGap,
                                uint32_t inputWidth, uint32_t outputWidth, uint32_t inputOrgWidth,
                                uint32_t outputOrgWidth, uint8_t pingpongID)
 {
@@ -84,11 +84,11 @@ __aicore__ inline void CopyPad(const GlobalTensor<T> &outputGlobal, const LocalT
                             (outputOrgWidth - outputWidth) * sizeof(T));
 }
 
-__aicore__ __inline__ GM_ADDR GetTailA(GM_ADDR aGM, TCubeTiling &tiling, uint32_t size)
+__aicore__ __inline__ GM_ADDR GetTailA(GM_ADDR aGM, TCubeTiling& tiling, uint32_t size)
 {
     return aGM + (tiling.M * tiling.Ka) * sizeof(A_DTYPE) * size;
 }
-__aicore__ __inline__ GM_ADDR GetTailC(GM_ADDR cGM, TCubeTiling &tiling, uint32_t size)
+__aicore__ __inline__ GM_ADDR GetTailC(GM_ADDR cGM, TCubeTiling& tiling, uint32_t size)
 {
     return cGM + (tiling.M * tiling.N) * sizeof(C_DTYPE) * size;
 }
@@ -114,8 +114,8 @@ __aicore__ inline void Gm2GmTrans(GM_ADDR output, GM_ADDR aGm, uint32_t row, uin
 
     GlobalTensor<T> gmSrc;
     GlobalTensor<T> gmDst;
-    gmSrc.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(aGm), allCoreSize);
-    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(output), allCoreSize);
+    gmSrc.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(aGm), allCoreSize);
+    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(output), allCoreSize);
 
     TBuf<TPosition::VECCALC> totalUbBuf;
     GetTPipePtr()->InitBuffer(totalUbBuf, TOTAL_UB_SIZE);
@@ -150,7 +150,7 @@ __aicore__ inline void Gm2GmTrans(GM_ADDR output, GM_ADDR aGm, uint32_t row, uin
 #ifdef DB
 
 template <class T>
-__aicore__ inline void PreCopyPadNd2Nz(const LocalTensor<T> &tmpUb, const GlobalTensor<T> &inputGlobal, uint32_t nBurst,
+__aicore__ inline void PreCopyPadNd2Nz(const LocalTensor<T>& tmpUb, const GlobalTensor<T>& inputGlobal, uint32_t nBurst,
                                        uint32_t gmSrcGap, uint32_t inputWidth, uint32_t outputWidth, uint16_t pad_size,
                                        uint8_t pingpongID)
 {
@@ -162,22 +162,22 @@ __aicore__ inline void PreCopyPadNd2Nz(const LocalTensor<T> &tmpUb, const Global
         padParams.rightPadding = outputWidth - inputWidth;
     }
 
-    DataCopyPadGm2UBImpl((__ubuf__ T *)tmpUb.GetPhyAddr(), (__gm__ T *)inputGlobal.GetPhyAddr(), copyParams, padParams);
+    DataCopyPadGm2UBImpl((__ubuf__ T*)tmpUb.GetPhyAddr(), (__gm__ T*)inputGlobal.GetPhyAddr(), copyParams, padParams);
     SetFlag<HardEvent::MTE2_V>(static_cast<event_t>(pingpongID));
     WaitFlag<HardEvent::MTE2_V>(static_cast<event_t>(pingpongID));
     if (pad_size != 0 && nBurst > pad_size) {
         auto pad_offset = (nBurst - pad_size) * outputWidth;
         uint64_t mask_count = 32 / sizeof(T) * nBurst;
         SetVectorMask<T>(0UL, static_cast<uint64_t>(pad_size * outputWidth));
-        DuplicateIntrinsicsImpl((__ubuf__ T *)tmpUb[pad_offset].GetPhyAddr(), (T)0, 1, 1, 8);
+        DuplicateIntrinsicsImpl((__ubuf__ T*)tmpUb[pad_offset].GetPhyAddr(), (T)0, 1, 1, 8);
         PipeBarrier<PIPE_V>();
         SetVectorMask<T>(0UL, mask_count);
     }
 }
 
 template <class T>
-__aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T> &outputGlobal, const LocalTensor<T> &tmpUb,
-                                    const LocalTensor<T> &transUb, const GlobalTensor<T> &inputGlobal, uint32_t nBurst,
+__aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T>& outputGlobal, const LocalTensor<T>& tmpUb,
+                                    const LocalTensor<T>& transUb, const GlobalTensor<T>& inputGlobal, uint32_t nBurst,
                                     uint32_t gmSrcGap, uint32_t inputWidth, uint32_t outputWidth, uint32_t height,
                                     uint16_t pad_size, uint8_t pingpongID)
 {
@@ -231,7 +231,7 @@ __aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T> &outputGlobal, const L
 
 // widthAligned < 192 * 1024 / sizeof(T)
 template <class T>
-__aicore__ inline void PrePaddingImplNd2Nz(const GlobalTensor<T> &mmWorkspace, const GlobalTensor<T> &mmGlobal,
+__aicore__ inline void PrePaddingImplNd2Nz(const GlobalTensor<T>& mmWorkspace, const GlobalTensor<T>& mmGlobal,
                                            uint32_t height, uint32_t width, uint32_t widthAligned, int height_pad_size,
                                            int ori_width)
 {
@@ -311,8 +311,8 @@ __aicore__ inline void PrePaddingImplNd2Nz(const GlobalTensor<T> &mmWorkspace, c
 #else
 
 template <class T>
-__aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T> &outputGlobal, const LocalTensor<T> &tmpUb,
-                                    const LocalTensor<T> &transUb, const GlobalTensor<T> &inputGlobal, uint32_t nBurst,
+__aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T>& outputGlobal, const LocalTensor<T>& tmpUb,
+                                    const LocalTensor<T>& transUb, const GlobalTensor<T>& inputGlobal, uint32_t nBurst,
                                     uint32_t gmSrcGap, uint32_t inputWidth, uint32_t outputWidth, uint32_t height,
                                     uint16_t pad_size)
 {
@@ -345,10 +345,10 @@ __aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T> &outputGlobal, const L
         if constexpr (sizeof(T) == sizeof(int8_t)) {
             mask_count /= 2;
             SetVectorMask<T>(0UL, static_cast<uint64_t>(pad_size * outputWidth / 2));
-            DuplicateIntrinsicsImpl((__ubuf__ uint16_t *)tmpUb[pad_offset].GetPhyAddr(), (uint16_t)0, 1, 1, 8);
+            DuplicateIntrinsicsImpl((__ubuf__ uint16_t*)tmpUb[pad_offset].GetPhyAddr(), (uint16_t)0, 1, 1, 8);
         } else {
             SetVectorMask<T>(0UL, static_cast<uint64_t>(pad_size * outputWidth));
-            DuplicateIntrinsicsImpl((__ubuf__ T *)tmpUb[pad_offset].GetPhyAddr(), (T)0, 1, 1, 8);
+            DuplicateIntrinsicsImpl((__ubuf__ T*)tmpUb[pad_offset].GetPhyAddr(), (T)0, 1, 1, 8);
         }
         PipeBarrier<PIPE_V>();
         SetVectorMask<T>(0UL, mask_count);
@@ -393,9 +393,9 @@ __aicore__ inline void CopyPadNd2Nz(const GlobalTensor<T> &outputGlobal, const L
 }
 
 template <class T>
-__aicore__ inline void PrePaddingImplNd2Nz(const GlobalTensor<T> &mmWorkspace, const GlobalTensor<T> &mmGlobal,
+__aicore__ inline void PrePaddingImplNd2Nz(const GlobalTensor<T>& mmWorkspace, const GlobalTensor<T>& mmGlobal,
                                            uint32_t height, uint32_t width, uint32_t widthAligned, int height_pad_size,
-                                           int ori_width, TBuf<TPosition::VECCALC> &totalUbBuf)
+                                           int ori_width, TBuf<TPosition::VECCALC>& totalUbBuf)
 {
     int pad_size = 0;
     // 当前切出来的height是大于16的，所以只有第二个核需要进行padding补齐
@@ -455,7 +455,7 @@ __aicore__ inline void PrePaddingImplNd2Nz(const GlobalTensor<T> &mmWorkspace, c
 
 template <class T>
 __aicore__ inline void MatrixND2NZ(GM_ADDR outGm, GM_ADDR srcGm, uint32_t high, uint32_t width, uint32_t orgWidth,
-                                   TBuf<TPosition::VECCALC> &totalUbBuf)
+                                   TBuf<TPosition::VECCALC>& totalUbBuf)
 {
     const uint32_t alignRow = 16;
     int size = DivCeil(high, alignRow) * DivCeil(width, alignRow) * 256;
@@ -472,8 +472,8 @@ __aicore__ inline void MatrixND2NZ(GM_ADDR outGm, GM_ADDR srcGm, uint32_t high, 
 
     GlobalTensor<T> tempSrcGlobal;
     GlobalTensor<T> tempDtsGlobal;
-    tempDtsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(outGm), size);
-    tempSrcGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(srcGm), size);
+    tempDtsGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(outGm), size);
+    tempSrcGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(srcGm), size);
 
     auto alignedKSize = DivCeil(high, alignRow) * alignRow;
     int height_pad_size = alignedKSize - high;
@@ -483,8 +483,8 @@ __aicore__ inline void MatrixND2NZ(GM_ADDR outGm, GM_ADDR srcGm, uint32_t high, 
 }
 
 template <class T>
-__aicore__ inline void MatrixBtoNZ(GM_ADDR workspace, GM_ADDR src, const Mc2Tiling::RCSTiling &cfg,
-                                   TBuf<TPosition::VECCALC> &totalUbBuf)
+__aicore__ inline void MatrixBtoNZ(GM_ADDR workspace, GM_ADDR src, const Mc2Tiling::RCSTiling& cfg,
+                                   TBuf<TPosition::VECCALC>& totalUbBuf)
 {
     if (g_coreType == AIV) {
         auto alignedNSize = Ceil(cfg.rankN, (uint32_t)16) * 16; // N轴转换成分型
@@ -536,7 +536,7 @@ __aicore__ inline void MatrixBtoNZ(GM_ADDR workspace, GM_ADDR src, const Mc2Tili
 
 #endif // ENALBE_ND2NZ
 
-__aicore__ inline void CastBFtoFloat(GM_ADDR dst, GM_ADDR src, int size, TBuf<TPosition::VECCALC> &totalUbBuf)
+__aicore__ inline void CastBFtoFloat(GM_ADDR dst, GM_ADDR src, int size, TBuf<TPosition::VECCALC>& totalUbBuf)
 {
 #if __CCE_AICORE__ == 220
     if (g_coreType == AIC) { // 先aiv，后aic
@@ -555,8 +555,8 @@ __aicore__ inline void CastBFtoFloat(GM_ADDR dst, GM_ADDR src, int size, TBuf<TP
     // 1. 初始化global tensor
     GlobalTensor<bfloat16_t> gmSrc;
     GlobalTensor<float> gmDst;
-    gmSrc.SetGlobalBuffer((__gm__ bfloat16_t *)(src), size);
-    gmDst.SetGlobalBuffer((__gm__ float *)(dst), size);
+    gmSrc.SetGlobalBuffer((__gm__ bfloat16_t*)(src), size);
+    gmDst.SetGlobalBuffer((__gm__ float*)(dst), size);
 
     // 2. 初始化local tensor
     LocalTensor<bfloat16_t> fullBf16 = totalUbBuf.Get<bfloat16_t>();

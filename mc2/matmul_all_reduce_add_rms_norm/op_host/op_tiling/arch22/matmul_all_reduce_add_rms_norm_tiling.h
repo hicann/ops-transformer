@@ -26,7 +26,7 @@ class MatmulAllReduceAddRmsNormTiling : public TilingBaseClass {
     friend class MMNTilingTransferHelper;
 
 public:
-    explicit MatmulAllReduceAddRmsNormTiling(gert::TilingContext *context);
+    explicit MatmulAllReduceAddRmsNormTiling(gert::TilingContext* context);
     ~MatmulAllReduceAddRmsNormTiling() override = default;
 
 protected:
@@ -38,7 +38,7 @@ protected:
     uint64_t GetTilingKey() const override;
     bool IsCapable() override;
     ge::graphStatus DoOpTiling() override;
-    ge::graphStatus CheckMRNInput(const MRNCtxInfo &mrnCtxInfo);
+    ge::graphStatus CheckMRNInput(const MRNCtxInfo& mrnCtxInfo);
 
 private:
     bool HasTail() const;
@@ -52,12 +52,12 @@ private:
 
 class MMNTilingTransferHelper : public MatmulAllReduceTiling910 {
 public:
-    MMNTilingTransferHelper(MatmulAllReduceAddRmsNormTiling &MatmulAllReduceAddRmsNormTiling,
-                            Mc2Tiling::MatmulAllReduce910TilingData &data);
+    MMNTilingTransferHelper(MatmulAllReduceAddRmsNormTiling& MatmulAllReduceAddRmsNormTiling,
+                            Mc2Tiling::MatmulAllReduce910TilingData& data);
     ge::graphStatus GetShapeAttrsInfo() override;
 
 private:
-    MatmulAllReduceAddRmsNormTiling &tilingProcesser_;
+    MatmulAllReduceAddRmsNormTiling& tilingProcesser_;
 };
 } // namespace optiling
 

@@ -22,7 +22,7 @@ namespace optiling {
 namespace mc2_matmul_v3_advanced {
 class Mc2MatMulV3Tiling {
 public:
-    explicit Mc2MatMulV3Tiling(gert::TilingContext *context)
+    explicit Mc2MatMulV3Tiling(gert::TilingContext* context)
         : context_(context) {};
     virtual ~Mc2MatMulV3Tiling() = default;
     virtual ge::graphStatus DoTiling();
@@ -35,7 +35,7 @@ protected:
     virtual ge::graphStatus CheckArgs();
 
 protected:
-    gert::TilingContext *context_ = nullptr;
+    gert::TilingContext* context_ = nullptr;
     Mc2MatMulV3Args args_;
 };
 } // namespace mc2_matmul_v3_advanced

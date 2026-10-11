@@ -16,7 +16,7 @@
 namespace ops {
 namespace Mc2OpDef {
 
-inline void DefineCombineRequiredInputs(OpDef &op)
+inline void DefineCombineRequiredInputs(OpDef& op)
 {
     op.Input("expand_x")
         .ParamType(REQUIRED)
@@ -50,7 +50,7 @@ inline void DefineCombineRequiredInputs(OpDef &op)
         .AutoContiguous();
 }
 
-inline void DefineCombineOptionalInputs(OpDef &op)
+inline void DefineCombineOptionalInputs(OpDef& op)
 {
     op.Input("tp_send_counts")
         .ParamType(OPTIONAL)
@@ -132,7 +132,7 @@ inline void DefineCombineOptionalInputs(OpDef &op)
         .AutoContiguous();
 }
 
-inline void DefineDispatchOptionalInputs(OpDef &op)
+inline void DefineDispatchOptionalInputs(OpDef& op)
 {
     op.Input("x_active_mask")
         .ParamType(OPTIONAL)

@@ -17,7 +17,7 @@
 
 namespace Mc2Log {
 using namespace Mc2Tiling;
-static void PrintTCubeTilingDataSecondPart(const std::string &opName, ::TCubeTiling &tiling)
+static void PrintTCubeTilingDataSecondPart(const std::string& opName, ::TCubeTiling& tiling)
 {
     OP_LOGD(opName, "tiling.depthAL1CacheUB %d", tiling.depthAL1CacheUB);
     OP_LOGD(opName, "tiling.depthBL1CacheUB %d", tiling.depthBL1CacheUB);
@@ -43,7 +43,7 @@ static void PrintTCubeTilingDataSecondPart(const std::string &opName, ::TCubeTil
     OP_LOGD(opName, "tiling.get_mxTypePara %d", tiling.mxTypePara);
 }
 
-void PrintMMV3TilingData(const std::string &opName, Mc2Tiling::MC2MatmulV3TilingData &tiling)
+void PrintMMV3TilingData(const std::string& opName, Mc2Tiling::MC2MatmulV3TilingData& tiling)
 {
     PrintTCubeTilingData(opName, tiling.matmulTiling);
     OP_LOGD(opName, "mTailCnt %d", tiling.mTailCnt);
@@ -56,7 +56,7 @@ void PrintMMV3TilingData(const std::string &opName, Mc2Tiling::MC2MatmulV3Tiling
     OP_LOGD(opName, "isHf32 %d", tiling.isHf32);
 }
 
-void PrintMc2MatmulV3TilingData(const std::string &opName, ::Mc2MatmulV3TilingData &tiling)
+void PrintMc2MatmulV3TilingData(const std::string& opName, ::Mc2MatmulV3TilingData& tiling)
 {
     PrintTCubeTilingData(opName, tiling.matmulTiling);
     OP_LOGD(opName, " MMtiling.tileL2cacheTiling.mTileCntL2 %d", tiling.tileL2cacheTiling.mTileCntL2);
@@ -78,7 +78,7 @@ void PrintMc2MatmulV3TilingData(const std::string &opName, ::Mc2MatmulV3TilingDa
     OP_LOGD(opName, " MMtiling.baseBD %d", tiling.baseBD);
 }
 
-void PrintTCubeTilingData(const std::string &opName, ::TCubeTiling &tiling)
+void PrintTCubeTilingData(const std::string& opName, ::TCubeTiling& tiling)
 {
     OP_LOGD(opName, "tiling.usedCoreNum %d", tiling.usedCoreNum);
     OP_LOGD(opName, "tiling.M %d", tiling.M);
@@ -112,7 +112,7 @@ void PrintTCubeTilingData(const std::string &opName, ::TCubeTiling &tiling)
     PrintTCubeTilingDataSecondPart(opName, tiling);
 }
 
-void PrintRCSTilingData(const std::string &opName, Mc2Tiling::RCSTiling &rcsTiling)
+void PrintRCSTilingData(const std::string& opName, Mc2Tiling::RCSTiling& rcsTiling)
 {
     OP_LOGD(opName, "rcsTiling.rankDim %u", rcsTiling.rankDim);
     OP_LOGD(opName, "rcsTiling.rankID %u", rcsTiling.rankID);
@@ -139,7 +139,7 @@ void PrintRCSTilingData(const std::string &opName, Mc2Tiling::RCSTiling &rcsTili
     OP_LOGD(opName, "rcsTiling.addX3UbCnt %u", rcsTiling.addX3UbCnt);
 }
 
-void PrintTileL2TilingData(const std::string &opName, Mc2Tiling::TileL2Tiling &tileL2Tiling)
+void PrintTileL2TilingData(const std::string& opName, Mc2Tiling::TileL2Tiling& tileL2Tiling)
 {
     OP_LOGD(opName, "tileL2Tiling.mL2TileCnt %u", tileL2Tiling.mL2TileCnt);
     OP_LOGD(opName, "tileL2Tiling.nL2TileCnt %u", tileL2Tiling.nL2TileCnt);
@@ -152,7 +152,7 @@ void PrintTileL2TilingData(const std::string &opName, Mc2Tiling::TileL2Tiling &t
     OP_LOGD(opName, "tileL2Tiling.enableL2Tile %u", tileL2Tiling.enableL2Tile);
 }
 
-void PrintMc2MsgData(const std::string &opName, Mc2Tiling::Mc2Msg &msg)
+void PrintMc2MsgData(const std::string& opName, Mc2Tiling::Mc2Msg& msg)
 {
     OP_LOGD(opName, "msg.sendOff %lu", msg.sendOff);
     OP_LOGD(opName, "msg.recvOff %lu", msg.recvOff);
@@ -189,7 +189,7 @@ void PrintMc2MsgData(const std::string &opName, Mc2Tiling::Mc2Msg &msg)
     OP_LOGD(opName, "msg.preparePosition %u", msg.preparePosition);
 }
 
-void PrintTCubeTilingParams(const std::string &opName, DequantBmm::Mc2QuantBatchMatmulV3DataParams &tiling)
+void PrintTCubeTilingParams(const std::string& opName, DequantBmm::Mc2QuantBatchMatmulV3DataParams& tiling)
 {
     OP_LOGD(opName, "tiling.batchA %d", tiling.batchA);
     OP_LOGD(opName, "tiling.batchB %d", tiling.batchB);
@@ -225,7 +225,7 @@ void PrintTCubeTilingParams(const std::string &opName, DequantBmm::Mc2QuantBatch
     OP_LOGD(opName, "tiling.groupSizeK %d", tiling.groupSizeK);
 }
 
-void PrintTCubeTilingL2cache(const std::string &opName, DequantBmm::Mc2L2cacheTileParams &tiling)
+void PrintTCubeTilingL2cache(const std::string& opName, DequantBmm::Mc2L2cacheTileParams& tiling)
 {
     OP_LOGD(opName, "tiling.mTileCntL2 %d", tiling.mTileCntL2);
     OP_LOGD(opName, "tiling.nTileCntL2 %d", tiling.nTileCntL2);
@@ -235,13 +235,13 @@ void PrintTCubeTilingL2cache(const std::string &opName, DequantBmm::Mc2L2cacheTi
     OP_LOGD(opName, "tiling.isBasicTiling %d", tiling.isBasicTiling);
 }
 
-void PrintTCubeTilingWindowParam(const std::string &opName, DequantBmm::Mc2SlidingWindowParams &tiling)
+void PrintTCubeTilingWindowParam(const std::string& opName, DequantBmm::Mc2SlidingWindowParams& tiling)
 {
     OP_LOGD(opName, "tiling.mTailTile %d", tiling.mTailTile);
     OP_LOGD(opName, "tiling.nTailTile %d", tiling.nTailTile);
 }
 
-void PrintMMV3TilingData(const std::string &opName, Mc2MatMulV3TilingData &tiling)
+void PrintMMV3TilingData(const std::string& opName, Mc2MatMulV3TilingData& tiling)
 {
     PrintTCubeTilingData(opName, tiling.tCubeTiling);
     OP_LOGD(opName, "tiling.mTailCnt %d", tiling.mTailCnt);

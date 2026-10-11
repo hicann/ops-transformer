@@ -26,11 +26,11 @@ extern "C" {
 static constexpr int64_t ANTIQUANT_GROUP_SIZE_MIN_VALUE = 32;
 
 extern "C" uint64_t NnopbaseMsprofSysTime();
-extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
-extern "C" aclnnStatus __attribute__((weak)) NnopbaseDisableOptionalInput(void *executor, const size_t irIndex);
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
-extern "C" void NnopbaseSetUserHandle(void *executor, void *handle);
-extern "C" void *NnopbaseGetUserHandle(void *executor);
+extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId& dfxId);
+extern "C" aclnnStatus __attribute__((weak)) NnopbaseDisableOptionalInput(void* executor, const size_t irIndex);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
+extern "C" void NnopbaseSetUserHandle(void* executor, void* handle);
+extern "C" void* NnopbaseGetUserHandle(void* executor);
 
 // 根据API定义，需要列出所能支持的所有dtype
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {DataType::DT_FLOAT16, DataType::DT_BF16};
@@ -40,7 +40,7 @@ static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST_310P = {Data
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST_QUANT = {DataType::DT_INT8, DataType::DT_INT4};
 
 // 检查入参是否为nullptr
-static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTensor *scale, const aclTensor *output)
+static bool CheckNotNull(const aclTensor* x1, const aclTensor* x2, const aclTensor* scale, const aclTensor* output)
 {
     OP_CHECK_NULL(x1, return false);
     OP_CHECK_NULL(x2, return false);
@@ -49,8 +49,8 @@ static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTens
     return true;
 }
 
-static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *scale,
-                            const aclTensor *offset, const aclTensor *x3, const aclTensor *output)
+static bool CheckDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* scale,
+                            const aclTensor* offset, const aclTensor* x3, const aclTensor* output)
 {
     const auto curArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
     const auto supportedDtypeList = (curArch == Ops::Base::DAV_2002) ? DTYPE_SUPPORT_LIST_310P : DTYPE_SUPPORT_LIST;
@@ -95,7 +95,7 @@ static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclT
 }
 
 // 检查传入的reduction数值是否在可选范围内
-static bool CheckAttr(const char *reduceOp, int64_t streamMode, int64_t antiquantGroupSize, const aclTensor *x1)
+static bool CheckAttr(const char* reduceOp, int64_t streamMode, int64_t antiquantGroupSize, const aclTensor* x1)
 {
     if (reduceOp == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Expected reduceOp to be sum, but got nullptr.");
@@ -142,7 +142,7 @@ static size_t CeilDiv(size_t x, size_t y)
     }
 }
 
-static bool IsAntiquantScaleShapeValid(const aclTensor *scale, const aclTensor *x1, const aclTensor *output,
+static bool IsAntiquantScaleShapeValid(const aclTensor* scale, const aclTensor* x1, const aclTensor* output,
                                        int64_t antiquantGroupSize)
 {
     const size_t scaleDimNum = scale->GetViewShape().GetDimNum();
@@ -170,8 +170,8 @@ static bool IsAntiquantScaleShapeValid(const aclTensor *scale, const aclTensor *
     return false;
 }
 
-static bool CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *scale,
-                       const aclTensor *offset, const aclTensor *x3, const aclTensor *output,
+static bool CheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* scale,
+                       const aclTensor* offset, const aclTensor* x3, const aclTensor* output,
                        int64_t antiquantGroupSize)
 {
     bool isWeightNzFmt = MatmulAllReduceIsWeightNZFormat(x2);
@@ -271,7 +271,7 @@ static bool CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor
 }
 
 namespace ContiguousCheckImpl {
-static bool IsAffineInconsistent(const aclTensor *affineTensor, bool isX2Transposed)
+static bool IsAffineInconsistent(const aclTensor* affineTensor, bool isX2Transposed)
 {
     if (affineTensor == nullptr) {
         return false;
@@ -286,7 +286,7 @@ static bool IsAffineInconsistent(const aclTensor *affineTensor, bool isX2Transpo
     return (isX2Transposed && IsContiguous(affineTensor)) || (!isX2Transposed && !IsContiguous(affineTensor));
 }
 
-static bool CheckContiguous(const aclTensor *x2, const aclTensor *scale, const aclTensor *offset)
+static bool CheckContiguous(const aclTensor* x2, const aclTensor* scale, const aclTensor* offset)
 {
     // check x2(weight) is transposed, scale and offset should also be transposed
     const bool isX2Transposed = IsTransposeLastTwoDims(x2) || QuantMatmulAllReduceIsAclnnPreTransposed(x2);
@@ -307,9 +307,9 @@ static bool CheckContiguous(const aclTensor *x2, const aclTensor *scale, const a
 }
 } // namespace ContiguousCheckImpl
 
-static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                               const aclTensor *antiquantScale, const aclTensor *antiquantOffset, const aclTensor *x3,
-                               const char *reduceOp, const char *commMode, int64_t streamMode, const aclTensor *output,
+static aclnnStatus CheckParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                               const aclTensor* antiquantScale, const aclTensor* antiquantOffset, const aclTensor* x3,
+                               const char* reduceOp, const char* commMode, int64_t streamMode, const aclTensor* output,
                                int64_t antiquantGroupSize)
 {
     // 1. 检查参数是否为空指针
@@ -342,7 +342,7 @@ static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const a
     return ACLNN_SUCCESS;
 }
 
-static const aclTensor *CopyTensor(const aclTensor *x2)
+static const aclTensor* CopyTensor(const aclTensor* x2)
 {
     uint64_t storageDimsNum = x2->GetStorageShape().GetDimNum();
     std::vector<int64_t> storageDims(storageDimsNum);
@@ -370,10 +370,10 @@ static const aclTensor *CopyTensor(const aclTensor *x2)
 }
 
 aclnnStatus aclnnWeightQuantMatmulAllReduceV2GetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *antiquantScale,
-    const aclTensor *antiquantOffset, const aclTensor *x3, const char *group, const char *reduceOp,
-    const char *commMode, int64_t commTurn, int64_t streamMode, int64_t antiquantGroupSize, const aclTensor *output,
-    uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* antiquantScale,
+    const aclTensor* antiquantOffset, const aclTensor* x3, const char* group, const char* reduceOp,
+    const char* commMode, int64_t commTurn, int64_t streamMode, int64_t antiquantGroupSize, const aclTensor* output,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
     // 固定写法，参数检查
@@ -388,10 +388,10 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2GetWorkspaceSize(
     // 目前不支持x1进行transpose
     bool transposeX1 = false;
     bool transposeX2 = IsTransposeLastTwoDims(x2) || QuantMatmulAllReduceIsAclnnPreTransposed(x2);
-    aclTensor *pertokenScale = nullptr;
-    aclTensor *commQuantScale1 = nullptr;
-    aclTensor *commQuantScale2 = nullptr;
-    aclTensor *dequantScale = nullptr;
+    aclTensor* pertokenScale = nullptr;
+    aclTensor* commQuantScale1 = nullptr;
+    aclTensor* commQuantScale2 = nullptr;
+    aclTensor* dequantScale = nullptr;
     if (x2->GetTensor() == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Tensor of x2 is null.");
         return ACLNN_ERR_INNER_NULLPTR;
@@ -401,8 +401,8 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2GetWorkspaceSize(
     uint64_t yDtype = static_cast<uint64_t>(output->GetDataType());
     aclnnStatus ret = aclnnInnerMatmulAllReduceGetWorkspaceSize(
         x1, tempX2, bias, x3, antiquantScale, antiquantOffset, dequantScale, pertokenScale, commQuantScale1,
-        commQuantScale2, const_cast<char *>(group), const_cast<char *>(reduceOp), transposeX1, transposeX2, commTurn,
-        antiquantGroupSize, 0, yDtype, 0, const_cast<char *>(commMode), output, workspaceSize, executor);
+        commQuantScale2, const_cast<char*>(group), const_cast<char*>(reduceOp), transposeX1, transposeX2, commTurn,
+        antiquantGroupSize, 0, yDtype, 0, const_cast<char*>(commMode), output, workspaceSize, executor);
     OP_LOGD("WeightQuantMatmulAllReduceV2, aclnnMatmulAllReduceGetWorkspaceSize ret %d", ret);
     if (ret == ACLNN_SUCCESS && executor != nullptr && *executor != nullptr && commMode != nullptr) {
         // SetUserHandle to pass comm_mode to aclnnWeightQuantMatmulAllReduceV2
@@ -416,7 +416,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2GetWorkspaceSize(
                                       "'ccu' or 'ai_cpu'");
             return ACLNN_ERR_PARAM_INVALID;
         }
-        void *arg = reinterpret_cast<void *>(static_cast<uintptr_t>(commModeEnum));
+        void* arg = reinterpret_cast<void*>(static_cast<uintptr_t>(commModeEnum));
         NnopbaseSetUserHandle(*executor, arg);
     }
 #ifdef MC2_UT
@@ -436,7 +436,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2GetWorkspaceSize(
     return ret;
 }
 
-aclnnStatus aclnnWeightQuantMatmulAllReduceV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnWeightQuantMatmulAllReduceV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                               const aclrtStream stream)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
@@ -446,7 +446,7 @@ aclnnStatus aclnnWeightQuantMatmulAllReduceV2(void *workspace, uint64_t workspac
     }
     if (NnopbaseSetHcclServerType) {
         if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
-            void *arg = NnopbaseGetUserHandle(executor);
+            void* arg = NnopbaseGetUserHandle(executor);
             uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
             uint8_t commMode = static_cast<uint8_t>(handleVal);
             if (commMode == Mc2Comm::COMM_MODE_CCU) {

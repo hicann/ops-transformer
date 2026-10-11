@@ -65,7 +65,7 @@
         } \
     } while (0)
 
-inline bool ReadFile(const std::string &filePath, void *buffer, size_t bufferSize)
+inline bool ReadFile(const std::string& filePath, void* buffer, size_t bufferSize)
 {
     struct stat sBuf;
     int fileStatus = stat(filePath.data(), &sBuf);
@@ -85,7 +85,7 @@ inline bool ReadFile(const std::string &filePath, void *buffer, size_t bufferSiz
         return false;
     }
 
-    std::filebuf *buf = file.rdbuf();
+    std::filebuf* buf = file.rdbuf();
     size_t size = buf->pubseekoff(0, std::ios::end, std::ios::in);
     if (size == 0) {
         ERROR_LOG("File size is 0");
@@ -98,12 +98,12 @@ inline bool ReadFile(const std::string &filePath, void *buffer, size_t bufferSiz
         return false;
     }
     buf->pubseekpos(0, std::ios::in);
-    buf->sgetn(static_cast<char *>(buffer), size);
+    buf->sgetn(static_cast<char*>(buffer), size);
     file.close();
     return true;
 }
 
-inline bool WriteFile(const std::string &filePath, const void *buffer, size_t size, size_t offset = 0)
+inline bool WriteFile(const std::string& filePath, const void* buffer, size_t size, size_t offset = 0)
 {
     if (buffer == nullptr) {
         ERROR_LOG("Write file failed. Buffer is nullptr.");
@@ -131,7 +131,7 @@ inline bool WriteFile(const std::string &filePath, const void *buffer, size_t si
     }
 
     // write data
-    if (write(fd, static_cast<const char *>(buffer), size) != static_cast<ssize_t>(size)) {
+    if (write(fd, static_cast<const char*>(buffer), size) != static_cast<ssize_t>(size)) {
         std::cerr << "Failed to write to file: " << strerror(errno) << std::endl;
     }
 
@@ -142,7 +142,7 @@ inline bool WriteFile(const std::string &filePath, const void *buffer, size_t si
     return true;
 }
 
-inline uint64_t ParsePositiveUint64(const char *arg, const char *name)
+inline uint64_t ParsePositiveUint64(const char* arg, const char* name)
 {
     std::string value(arg);
     if (value.empty() || value.find_first_not_of("0123456789") != std::string::npos) {
@@ -155,12 +155,12 @@ inline uint64_t ParsePositiveUint64(const char *arg, const char *name)
             throw std::invalid_argument(std::string("ERROR: ") + name + " must be greater than 0");
         }
         return parsed;
-    } catch (const std::out_of_range &) {
+    } catch (const std::out_of_range&) {
         throw std::invalid_argument(std::string("ERROR: ") + name + " is out of range for uint64_t");
     }
 }
 
-inline void CheckUint32Shape(uint64_t value, const char *name)
+inline void CheckUint32Shape(uint64_t value, const char* name)
 {
     // QuantMatmulTilingData serializes public shape fields as uint32_t.
     constexpr uint64_t uint32Max = static_cast<uint64_t>(std::numeric_limits<uint32_t>::max());
@@ -169,7 +169,7 @@ inline void CheckUint32Shape(uint64_t value, const char *name)
     }
 }
 
-inline void PrintUsage(const std::string &programName)
+inline void PrintUsage(const std::string& programName)
 {
     if (programName == "./matmul_a16w16_swat") {
         std::cerr << "Usage: " << programName << " m k n transA transB" << std::endl;
@@ -190,7 +190,7 @@ inline void PrintUsage(const std::string &programName)
     }
 }
 
-inline void ParseArguments(int argc, char *argv[], uint64_t &m, uint64_t &k, uint64_t &n)
+inline void ParseArguments(int argc, char* argv[], uint64_t& m, uint64_t& k, uint64_t& n)
 {
     if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
         PrintUsage(argv[0]);
@@ -207,7 +207,7 @@ inline void ParseArguments(int argc, char *argv[], uint64_t &m, uint64_t &k, uin
     CheckUint32Shape(n, "n");
 }
 
-inline void ParseArguments(int argc, char *argv[], uint64_t &m, uint64_t &k, uint64_t &n, bool &transA, bool &transB)
+inline void ParseArguments(int argc, char* argv[], uint64_t& m, uint64_t& k, uint64_t& n, bool& transA, bool& transB)
 {
     if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
         PrintUsage(argv[0]);

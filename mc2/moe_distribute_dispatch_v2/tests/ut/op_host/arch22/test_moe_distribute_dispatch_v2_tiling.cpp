@@ -2175,7 +2175,7 @@ TEST_F(MoeDistributeDispatchV2Arch22TilingTest, HierarchyCommAlg)
 
 TEST_F(MoeDistributeDispatchV2Arch22TilingTest, A3HierarchyVariableBsSuccess)
 {
-    const char *envValue = getenv("HCCL_BUFFSIZE");
+    const char* envValue = getenv("HCCL_BUFFSIZE");
     std::string originalEnv = envValue != nullptr ? envValue : "";
     setenv("HCCL_BUFFSIZE", "6000", 1);
 
@@ -3768,8 +3768,8 @@ TEST_F(MoeDistributeDispatchV2Arch22TilingTest, A2Quant2WithScalesSuccess)
 
 TEST_F(MoeDistributeDispatchV2Arch22TilingTest, A2CommAlgEmptyPcieEnvHierarchy)
 {
-    const char *pcieEnv = getenv("HCCL_INTRA_PCIE_ENABLE");
-    const char *roceEnv = getenv("HCCL_INTRA_ROCE_ENABLE");
+    const char* pcieEnv = getenv("HCCL_INTRA_PCIE_ENABLE");
+    const char* roceEnv = getenv("HCCL_INTRA_ROCE_ENABLE");
     std::string origPcie = pcieEnv != nullptr ? pcieEnv : "";
     std::string origRoce = roceEnv != nullptr ? roceEnv : "";
     setenv("HCCL_INTRA_PCIE_ENABLE", "1", 1);

@@ -21,8 +21,8 @@ namespace AscendC {
 class Mc2QuantBatchMatmulV3BaseBlock {
 public:
     __aicore__ inline Mc2QuantBatchMatmulV3BaseBlock() {}
-    __aicore__ inline void Init(const Mc2QuantBatchMatmulV3TilingData *tilingData);
-    __aicore__ inline void Init(const Mc2L2cacheTileParam *tilingL2, const TCubeTiling *matmulTilingData);
+    __aicore__ inline void Init(const Mc2QuantBatchMatmulV3TilingData* tilingData);
+    __aicore__ inline void Init(const Mc2L2cacheTileParam* tilingL2, const TCubeTiling* matmulTilingData);
     __aicore__ inline void UpdateBlockCnt(uint64_t mTileIndex, uint64_t nTileIndex);
     __aicore__ inline void InitFirstTileBlockIndex();
     __aicore__ inline void InitBlockIndex();
@@ -42,16 +42,16 @@ public:
     uint64_t blockIdxStart_;
     uint64_t blockIdxEnd_;
     uint32_t blockIdx_;
-    const TCubeTiling *matmulTilingData_;
+    const TCubeTiling* matmulTilingData_;
 };
 
-__aicore__ inline void Mc2QuantBatchMatmulV3BaseBlock::Init(const Mc2QuantBatchMatmulV3TilingData *tilingData)
+__aicore__ inline void Mc2QuantBatchMatmulV3BaseBlock::Init(const Mc2QuantBatchMatmulV3TilingData* tilingData)
 {
     this->Init(&(tilingData->tileL2cacheTiling), &(tilingData->matmulTiling));
 }
 
-__aicore__ inline void Mc2QuantBatchMatmulV3BaseBlock::Init(const Mc2L2cacheTileParam *tilingL2,
-                                                            const TCubeTiling *matmulTilingData)
+__aicore__ inline void Mc2QuantBatchMatmulV3BaseBlock::Init(const Mc2L2cacheTileParam* tilingL2,
+                                                            const TCubeTiling* matmulTilingData)
 {
     blockIdx_ = static_cast<uint32_t>(GetBlockIdx());
     if ASCEND_IS_AIV {

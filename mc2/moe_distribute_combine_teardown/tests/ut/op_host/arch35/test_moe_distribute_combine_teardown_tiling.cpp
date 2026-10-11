@@ -98,7 +98,7 @@ struct MoeDistributeCombineTeardownTestParam {
     uint64_t mc2TilingDataReservedLen;
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MoeDistributeCombineTeardownTestParam &param)
+inline std::ostream& operator<<(std::ostream& os, const MoeDistributeCombineTeardownTestParam& param)
 {
     return os << param.caseName;
 }
@@ -4039,7 +4039,7 @@ protected:
 static struct MoeDistributeCombineTeardownCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombineTeardownTestParam &param)
+static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombineTeardownTestParam& param)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     gert::StorageShape expandXShape = {param.expandXShape, param.expandXShape};
@@ -4090,7 +4090,7 @@ static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombine
                                    CORE_NUM, UB_SIZE);
 }
 
-static void ThreadFunction(const MoeDistributeCombineTeardownTestParam *testCases, size_t caseNum, size_t threadIdx,
+static void ThreadFunction(const MoeDistributeCombineTeardownTestParam* testCases, size_t caseNum, size_t threadIdx,
                            size_t threadNum)
 {
     for (size_t idx = threadIdx; idx < caseNum; idx += threadNum) {
@@ -4101,7 +4101,7 @@ static void ThreadFunction(const MoeDistributeCombineTeardownTestParam *testCase
     }
 }
 
-static void TestExecMultiThread(const MoeDistributeCombineTeardownTestParam *testCases, size_t testCaseNum,
+static void TestExecMultiThread(const MoeDistributeCombineTeardownTestParam* testCases, size_t testCaseNum,
                                 size_t threadNum)
 {
     std::thread threads[threadNum];

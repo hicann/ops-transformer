@@ -41,25 +41,25 @@ constexpr uint32_t EPSILON_IDX = 5;
 constexpr uint32_t AVG_FACTOR_IDX = 6;
 
 using TilingInfo = std::tuple<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, float, float>;
-void SetWorkSpaceSize(AddRMSNormTilingOutput &addRmsNormTilingOutput)
+void SetWorkSpaceSize(AddRMSNormTilingOutput& addRmsNormTilingOutput)
 {
     size_t sysWorkspaceSize = SYS_WORKSPACE_SIZE;
     size_t usrSize = 256;
     addRmsNormTilingOutput.tilingOut.workSpaceSize = usrSize + sysWorkspaceSize;
 }
-void SetTilingKey(const uint32_t dtypeKey, uint32_t modeKey, AddRMSNormTilingOutput &addRmsNormTilingOutput)
+void SetTilingKey(const uint32_t dtypeKey, uint32_t modeKey, AddRMSNormTilingOutput& addRmsNormTilingOutput)
 {
     uint32_t tilingKey = dtypeKey * 10 + modeKey;
     addRmsNormTilingOutput.tilingOut.tilingKey = tilingKey;
 }
-void SetNumBlocks(const uint32_t numRow, const uint32_t blockFactor, AddRMSNormTilingOutput &addRmsNormTilingOutput)
+void SetNumBlocks(const uint32_t numRow, const uint32_t blockFactor, AddRMSNormTilingOutput& addRmsNormTilingOutput)
 {
     uint32_t useCoreNum = Ops::Base::CeilDiv(numRow, blockFactor);
     addRmsNormTilingOutput.tilingOut.numBlocks = useCoreNum;
 }
-void SetTilingData(const TilingInfo &tilingInfo, AddRMSNormTilingOutput &addRmsNormTilingOutput)
+void SetTilingData(const TilingInfo& tilingInfo, AddRMSNormTilingOutput& addRmsNormTilingOutput)
 {
-    auto &&tilingData = addRmsNormTilingOutput.addRmsNormTilingData;
+    auto&& tilingData = addRmsNormTilingOutput.addRmsNormTilingData;
     tilingData.num_row = std::get<NUM_ROW_IDX>(tilingInfo);
     tilingData.num_col = std::get<NUM_COL_IDX>(tilingInfo);
     tilingData.block_factor = std::get<BLOCK_FACTOR_IDX>(tilingInfo);
@@ -68,7 +68,7 @@ void SetTilingData(const TilingInfo &tilingInfo, AddRMSNormTilingOutput &addRmsN
     tilingData.epsilon = std::get<EPSILON_IDX>(tilingInfo);
     tilingData.avg_factor = std::get<AVG_FACTOR_IDX>(tilingInfo);
 }
-ge::graphStatus AssembleX1Shape(const AddRMSNormTilingDepend &addRmsNormTilingDepend, gert::Shape &xShape)
+ge::graphStatus AssembleX1Shape(const AddRMSNormTilingDepend& addRmsNormTilingDepend, gert::Shape& xShape)
 {
     if (!addRmsNormTilingDepend.useMmOutputAsX1Input) {
         MC2_CHECK_NOTNULL_RET(addRmsNormTilingDepend.nodeName, addRmsNormTilingDepend.arnCtxInfo.x1_shape);
@@ -80,7 +80,7 @@ ge::graphStatus AssembleX1Shape(const AddRMSNormTilingDepend &addRmsNormTilingDe
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AssembleX1Dtype(const AddRMSNormTilingDepend &addRmsNormTilingDepend, ge::DataType &xDtype)
+ge::graphStatus AssembleX1Dtype(const AddRMSNormTilingDepend& addRmsNormTilingDepend, ge::DataType& xDtype)
 {
     if (!addRmsNormTilingDepend.useMmOutputAsX1Input) {
         MC2_CHECK_NOTNULL_RET(addRmsNormTilingDepend.nodeName, addRmsNormTilingDepend.arnCtxInfo.x1);
@@ -90,9 +90,9 @@ ge::graphStatus AssembleX1Dtype(const AddRMSNormTilingDepend &addRmsNormTilingDe
     }
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus CheckAddRmsNormInputDtype(const gert::TilingContext *context, const ge::DataType &x2Type,
-                                          const ge::DataType &gammaType, const ge::DataType &yType,
-                                          const ge::DataType &xType)
+ge::graphStatus CheckAddRmsNormInputDtype(const gert::TilingContext* context, const ge::DataType& x2Type,
+                                          const ge::DataType& gammaType, const ge::DataType& yType,
+                                          const ge::DataType& xType)
 {
     // residual和gamma数据类型相同
     OP_TILING_CHECK(x2Type != gammaType,
@@ -118,9 +118,9 @@ ge::graphStatus CheckAddRmsNormInputDtype(const gert::TilingContext *context, co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckAddRmsNormInputShape(const gert::TilingContext *context, const gert::StorageShape *x2Shape,
-                                          const gert::StorageShape *gammaShape, const gert::StorageShape *yShape,
-                                          const gert::StorageShape *xShape)
+ge::graphStatus CheckAddRmsNormInputShape(const gert::TilingContext* context, const gert::StorageShape* x2Shape,
+                                          const gert::StorageShape* gammaShape, const gert::StorageShape* yShape,
+                                          const gert::StorageShape* xShape)
 {
     // residual shape
     OP_TILING_CHECK(
@@ -174,18 +174,18 @@ ge::graphStatus CheckAddRmsNormInputShape(const gert::TilingContext *context, co
 }
 } // namespace
 
-ge::graphStatus CommonAddResNormTiling::CheckAddRmsNormInput(const gert::TilingContext *context,
-                                                             const ARNCtxInfo &arnCtxInfo)
+ge::graphStatus CommonAddResNormTiling::CheckAddRmsNormInput(const gert::TilingContext* context,
+                                                             const ARNCtxInfo& arnCtxInfo)
 {
     auto x2Type = arnCtxInfo.x2->GetDataType();
     auto gammaType = arnCtxInfo.gamma->GetDataType();
     auto yType = arnCtxInfo.y->GetDataType();
     auto xType = arnCtxInfo.x->GetDataType();
     auto epsilon = arnCtxInfo.epsilon;
-    const gert::StorageShape *x2Shape = arnCtxInfo.x2_shape;
-    const gert::StorageShape *gammaShape = arnCtxInfo.gamma_shape;
-    const gert::StorageShape *yShape = arnCtxInfo.y_shape;
-    const gert::StorageShape *xShape = arnCtxInfo.x_shape;
+    const gert::StorageShape* x2Shape = arnCtxInfo.x2_shape;
+    const gert::StorageShape* gammaShape = arnCtxInfo.gamma_shape;
+    const gert::StorageShape* yShape = arnCtxInfo.y_shape;
+    const gert::StorageShape* xShape = arnCtxInfo.x_shape;
     MC2_CHECK_LOG_RET(context->GetNodeName(), CheckAddRmsNormInputDtype(context, x2Type, gammaType, yType, xType));
     MC2_CHECK_LOG_RET(context->GetNodeName(), CheckAddRmsNormInputShape(context, x2Shape, gammaShape, yShape, xShape));
     OP_TILING_CHECK(
@@ -195,10 +195,10 @@ ge::graphStatus CommonAddResNormTiling::CheckAddRmsNormInput(const gert::TilingC
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonAddResNormTiling::SetAddRmsNormTilingData(const AddRMSNormTilingDepend &addRmsNormTilingDepend,
+ge::graphStatus CommonAddResNormTiling::SetAddRmsNormTilingData(const AddRMSNormTilingDepend& addRmsNormTilingDepend,
                                                                 const uint32_t numRow, const int64_t numCol,
                                                                 const uint32_t blockFactor,
-                                                                AddRMSNormTilingOutput &addRmsNormTilingOutput)
+                                                                AddRMSNormTilingOutput& addRmsNormTilingOutput)
 {
     ge::DataType dataType;
     MC2_CHECK_LOG_RET(addRmsNormTilingDepend.nodeName, AssembleX1Dtype(addRmsNormTilingDepend, dataType));
@@ -217,7 +217,7 @@ ge::graphStatus CommonAddResNormTiling::SetAddRmsNormTilingData(const AddRMSNorm
     uint32_t numColAlign = Ops::Base::CeilDiv(numCol, static_cast<int64_t>(BLOCK_ALIGN_NUM)) * BLOCK_ALIGN_NUM;
     uint32_t rowFactor = VALUE_64;
     uint64_t ubSize;
-    const auto &ascendcPlatform = platform_ascendc::PlatformAscendC(&addRmsNormTilingDepend.platFormInfos);
+    const auto& ascendcPlatform = platform_ascendc::PlatformAscendC(&addRmsNormTilingDepend.platFormInfos);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     if (numCol > ubFactor) {
         modeKey = ModeKey::K_SPLIT_D;
@@ -253,13 +253,13 @@ ge::graphStatus CommonAddResNormTiling::SetAddRmsNormTilingData(const AddRMSNorm
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CommonAddResNormTiling::Tiling4AddRmsNorm(const AddRMSNormTilingDepend &addRmsNormTilingDepend,
-                                                          AddRMSNormTilingOutput &addRmsNormTilingOutput)
+ge::graphStatus CommonAddResNormTiling::Tiling4AddRmsNorm(const AddRMSNormTilingDepend& addRmsNormTilingDepend,
+                                                          AddRMSNormTilingOutput& addRmsNormTilingOutput)
 {
     const std::string node = addRmsNormTilingDepend.nodeName;
     OP_LOGD(node, "Enter CommonAddResNormTiling");
 
-    const auto &ascendcPlatform = platform_ascendc::PlatformAscendC(&addRmsNormTilingDepend.platFormInfos);
+    const auto& ascendcPlatform = platform_ascendc::PlatformAscendC(&addRmsNormTilingDepend.platFormInfos);
     uint32_t numCore = ascendcPlatform.GetCoreNumAiv();
     if (addRmsNormTilingDepend.useHalfNumBlocks) {
         numCore /= 2U; // 配比1：1时, 1/2个数
@@ -267,7 +267,7 @@ ge::graphStatus CommonAddResNormTiling::Tiling4AddRmsNorm(const AddRMSNormTiling
     OP_LOGD(node, "Core Num: %u, use half %d", numCore, addRmsNormTilingDepend.useHalfNumBlocks);
     uint32_t blockFactor = 1U;
     MC2_CHECK_NOTNULL_RET(addRmsNormTilingDepend.nodeName, addRmsNormTilingDepend.arnCtxInfo.gamma_shape);
-    const auto &gammaShape = addRmsNormTilingDepend.arnCtxInfo.gamma_shape->GetStorageShape();
+    const auto& gammaShape = addRmsNormTilingDepend.arnCtxInfo.gamma_shape->GetStorageShape();
     int64_t numCol = gammaShape.GetShapeSize();
     gert::Shape xShape;
     MC2_CHECK_LOG_RET(addRmsNormTilingDepend.nodeName, AssembleX1Shape(addRmsNormTilingDepend, xShape));

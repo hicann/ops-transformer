@@ -32,8 +32,8 @@ using namespace AscendC;
 template <typename xType, typename yType, Mc2CoreType coreType>
 class MatmulAllReduceBase {
 public:
-    __aicore__ inline MatmulAllReduceBase(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs, ArnGmAddrs *arnAddrs,
-                                          MC2TilingHeader *tilingData, TPipe *tPipe)
+    __aicore__ inline MatmulAllReduceBase(MC2GmAddrs* addrs, QuantGmAddrs* quantAddrs, ArnGmAddrs* arnAddrs,
+                                          MC2TilingHeader* tilingData, TPipe* tPipe)
         : addrs_(addrs),
           quantAddrs_(quantAddrs),
           arnAddrs_(arnAddrs),
@@ -52,7 +52,7 @@ public:
     {
         hccl_.Init(GetHcclContext<0>());
 
-        __gm__ HcclCombinOpParam *context = (__gm__ HcclCombinOpParam *)(GetHcclContext<0>());
+        __gm__ HcclCombinOpParam* context = (__gm__ HcclCombinOpParam*)(GetHcclContext<0>());
         OOMInit(context);
 
         if (msgInTiling_->useBufferType == MC2_BUFFER_TYPE::MC2_BUFFER_TYPE_WINDOW_IN &&
@@ -136,13 +136,13 @@ protected:
         }
     }
 
-    MC2GmAddrs *addrs_;
-    QuantGmAddrs *quantAddrs_;
-    ArnGmAddrs *arnAddrs_;
-    Mc2Tiling::Mc2Msg *msgInTiling_;
-    Mc2Tiling::RCSTiling *paramInTiling_;
+    MC2GmAddrs* addrs_;
+    QuantGmAddrs* quantAddrs_;
+    ArnGmAddrs* arnAddrs_;
+    Mc2Tiling::Mc2Msg* msgInTiling_;
+    Mc2Tiling::RCSTiling* paramInTiling_;
     MC2TileInfo tileInfo_, tailInfo_;
-    TPipe *tPipe_;
+    TPipe* tPipe_;
     Hccl<HCCL_SERVER_TYPE_AICPU> hccl_;
     bool notifyFlag_;
     bool addFlag_;

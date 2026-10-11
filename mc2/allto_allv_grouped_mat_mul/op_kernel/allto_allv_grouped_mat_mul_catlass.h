@@ -46,8 +46,8 @@ A2AVGMM_CATLASS_HOST_DEVICE bool IsSupportedTile(uint32_t m0, uint32_t k0, uint3
 
 template <bool TRANSPOSE_B>
 A2AVGMM_CATLASS_HOST_DEVICE bool BuildExpertGemmSpec(uint32_t expertIdx,
-                                                     const AlltoAllvGroupedMatMulAiv::ExpertMeta &expert, uint32_t k,
-                                                     uint32_t n, GemmLaunchSpec &spec)
+                                                     const AlltoAllvGroupedMatMulAiv::ExpertMeta& expert, uint32_t k,
+                                                     uint32_t n, GemmLaunchSpec& spec)
 {
     if (k == 0U || n == 0U || expert.recvTokenBase > 0xffffffffULL) {
         return false;
@@ -76,7 +76,7 @@ A2AVGMM_CATLASS_HOST_DEVICE bool BuildExpertGemmSpec(uint32_t expertIdx,
 
 template <bool TRANSPOSE_B>
 A2AVGMM_CATLASS_HOST_DEVICE bool BuildSharedGemmSpec(bool hasSharedExpert, uint32_t m, uint32_t k, uint32_t n,
-                                                     GemmLaunchSpec &spec)
+                                                     GemmLaunchSpec& spec)
 {
     if (!hasSharedExpert || m == 0U) {
         spec = {};
@@ -107,8 +107,8 @@ namespace AlltoAllvGroupedMatMulCatlass {
 
 template <typename Element, bool TRANSPOSE_B>
 __aicore__ inline bool RunExpertGemm(GM_ADDR recvTokenBuffer, GM_ADDR weight, GM_ADDR output, uint32_t expertIdx,
-                                     const AlltoAllvGroupedMatMulAiv::ExpertMeta &expert, const AlltoAllvGmmInfo &info,
-                                     const AlltoAllvGmmCoCTiling &tiling)
+                                     const AlltoAllvGroupedMatMulAiv::ExpertMeta& expert, const AlltoAllvGmmInfo& info,
+                                     const AlltoAllvGmmCoCTiling& tiling)
 {
     (void)recvTokenBuffer;
     (void)weight;
@@ -123,8 +123,8 @@ __aicore__ inline bool RunExpertGemm(GM_ADDR recvTokenBuffer, GM_ADDR weight, GM
 }
 
 template <typename Element, bool TRANSPOSE_B>
-__aicore__ inline bool RunSharedExpertGemm(GM_ADDR input, GM_ADDR weight, GM_ADDR output, const AlltoAllvGmmInfo &info,
-                                           const AlltoAllvGmmCoCTiling &tiling)
+__aicore__ inline bool RunSharedExpertGemm(GM_ADDR input, GM_ADDR weight, GM_ADDR output, const AlltoAllvGmmInfo& info,
+                                           const AlltoAllvGmmCoCTiling& tiling)
 {
     (void)input;
     (void)weight;
@@ -162,7 +162,7 @@ namespace detail {
 constexpr int32_t kL1TileK = 256;
 
 template <typename Element, bool TRANSPOSE_B, int32_t TILE_M, int32_t TILE_K, int32_t TILE_N>
-__aicore__ inline void RunElementGemm(const GemmLaunchSpec &spec, GM_ADDR ptrA, GM_ADDR ptrB, GM_ADDR ptrC)
+__aicore__ inline void RunElementGemm(const GemmLaunchSpec& spec, GM_ADDR ptrA, GM_ADDR ptrB, GM_ADDR ptrC)
 {
     using namespace Catlass;
     using ArchTag = Arch::AtlasA2;
@@ -192,7 +192,7 @@ __aicore__ inline void RunElementGemm(const GemmLaunchSpec &spec, GM_ADDR ptrA, 
 }
 
 template <typename Element, bool TRANSPOSE_B>
-__aicore__ inline bool RunConfiguredGemm(const GemmLaunchSpec &spec, const AlltoAllvGmmCoCTiling &tiling, GM_ADDR ptrA,
+__aicore__ inline bool RunConfiguredGemm(const GemmLaunchSpec& spec, const AlltoAllvGmmCoCTiling& tiling, GM_ADDR ptrA,
                                          GM_ADDR ptrB, GM_ADDR ptrC)
 {
     if (!spec.hasWork) {
@@ -216,8 +216,8 @@ __aicore__ inline bool RunConfiguredGemm(const GemmLaunchSpec &spec, const Allto
 
 template <typename Element, bool TRANSPOSE_B>
 __aicore__ inline bool RunExpertGemm(GM_ADDR recvTokenBuffer, GM_ADDR weight, GM_ADDR output, uint32_t expertIdx,
-                                     const AlltoAllvGroupedMatMulAiv::ExpertMeta &expert, const AlltoAllvGmmInfo &info,
-                                     const AlltoAllvGmmCoCTiling &tiling)
+                                     const AlltoAllvGroupedMatMulAiv::ExpertMeta& expert, const AlltoAllvGmmInfo& info,
+                                     const AlltoAllvGmmCoCTiling& tiling)
 {
     if ASCEND_IS_AIV {
         return true;
@@ -234,8 +234,8 @@ __aicore__ inline bool RunExpertGemm(GM_ADDR recvTokenBuffer, GM_ADDR weight, GM
 }
 
 template <typename Element, bool TRANSPOSE_B>
-__aicore__ inline bool RunSharedExpertGemm(GM_ADDR input, GM_ADDR weight, GM_ADDR output, const AlltoAllvGmmInfo &info,
-                                           const AlltoAllvGmmCoCTiling &tiling)
+__aicore__ inline bool RunSharedExpertGemm(GM_ADDR input, GM_ADDR weight, GM_ADDR output, const AlltoAllvGmmInfo& info,
+                                           const AlltoAllvGmmCoCTiling& tiling)
 {
     if ASCEND_IS_AIV {
         return true;

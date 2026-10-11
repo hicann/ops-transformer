@@ -35,8 +35,8 @@ const size_t RS_IS_AMAX_OUT = 8;
 const size_t AG_IS_AMAX_OUT = 9;
 
 struct CommParas {
-    const gert::Shape *x1MatrixShape;
-    const gert::Shape *x2MatrixShape;
+    const gert::Shape* x1MatrixShape;
+    const gert::Shape* x2MatrixShape;
     int64_t dimM;
     int64_t dimKX1;
     int64_t dimKX2;
@@ -44,9 +44,9 @@ struct CommParas {
     int64_t rankSize;
 };
 
-ge::graphStatus AllGatherMatmulCommonInferShape(gert::InferShapeContext *context, const size_t gatherIndex);
-ge::graphStatus InferMatmulReduceScatterCommon(gert::InferShapeContext *context);
-ge::graphStatus InferMatmulOutputDataType(gert::InferDataTypeContext *context, size_t inputIndex,
+ge::graphStatus AllGatherMatmulCommonInferShape(gert::InferShapeContext* context, const size_t gatherIndex);
+ge::graphStatus InferMatmulReduceScatterCommon(gert::InferShapeContext* context);
+ge::graphStatus InferMatmulOutputDataType(gert::InferDataTypeContext* context, size_t inputIndex,
                                           size_t yDtypeAttrIndex, size_t outputIndex);
 } // namespace ops
 #endif // MC2_COMMON_INFERSHAPE_H_

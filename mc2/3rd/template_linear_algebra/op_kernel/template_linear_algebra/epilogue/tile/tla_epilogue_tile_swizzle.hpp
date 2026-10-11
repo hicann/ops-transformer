@@ -26,7 +26,7 @@ struct EpilogueIdentityTileSwizzle {
     EpilogueIdentityTileSwizzle() = default;
 
     CATLASS_DEVICE
-    EpilogueIdentityTileSwizzle(MatrixCoord const &blockShape, MatrixCoord const &tileShape)
+    EpilogueIdentityTileSwizzle(MatrixCoord const& blockShape, MatrixCoord const& tileShape)
         : blockShape(blockShape),
           tileShape(tileShape)
     {
@@ -46,7 +46,7 @@ struct EpilogueIdentityTileSwizzle {
     }
 
     CATLASS_DEVICE
-    MatrixCoord GetActualTileShape(MatrixCoord const &tileCoord) const
+    MatrixCoord GetActualTileShape(MatrixCoord const& tileCoord) const
     {
         return MatrixCoord::Min(tileShape, blockShape - tileCoord * tileShape);
     }
@@ -61,7 +61,7 @@ struct EpilogueHorizontalTileSwizzle {
     EpilogueHorizontalTileSwizzle() = default;
 
     CATLASS_DEVICE
-    EpilogueHorizontalTileSwizzle(MatrixCoord const &blockShape, MatrixCoord const &tileShape)
+    EpilogueHorizontalTileSwizzle(MatrixCoord const& blockShape, MatrixCoord const& tileShape)
         : blockShape(blockShape),
           tileShape(tileShape)
     {
@@ -81,7 +81,7 @@ struct EpilogueHorizontalTileSwizzle {
     }
 
     CATLASS_DEVICE
-    MatrixCoord GetActualTileShape(MatrixCoord const &tileCoord) const
+    MatrixCoord GetActualTileShape(MatrixCoord const& tileCoord) const
     {
         return MatrixCoord::Min(tileShape, blockShape - tileCoord * tileShape);
     }

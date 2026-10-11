@@ -78,7 +78,7 @@ __aicore__ inline constexpr uint32_t GetVRegSizeDispatch()
 }
 
 template <typename T>
-__aicore__ inline void ComputeMaxExp(__ubuf__ T *srcAddr, __ubuf__ uint16_t *maxExpAddr, uint32_t eleNum)
+__aicore__ inline void ComputeMaxExp(__ubuf__ T* srcAddr, __ubuf__ uint16_t* maxExpAddr, uint32_t eleNum)
 {
     uint32_t vlB16Double = GetVRegSizeDispatch() / sizeof(T) * 2; // 两个向量寄存器可以存储的元素个数
     uint16_t blockPerReg = GetVRegSizeDispatch() / GetUbBlockSizeDispatch(); // Reduce操作后搬出的元素个数
@@ -117,11 +117,11 @@ __aicore__ inline void ComputeMaxExp(__ubuf__ T *srcAddr, __ubuf__ uint16_t *max
                 Reg::Cast<bfloat16_t, half, castTraitHalf2Bf16>(x0BF16, x0Half, validEleMaskEven);
                 Reg::Cast<bfloat16_t, half, castTraitHalf2Bf16>(x1BF16, x1Half, validEleMaskOdd);
             }
-            Reg::And(xExpExtract0, (Reg::RegTensor<uint16_t> &)x0BF16, expMaskBF16, validEleMaskEven);
-            Reg::And(xExpExtract1, (Reg::RegTensor<uint16_t> &)x1BF16, expMaskBF16, validEleMaskOdd);
+            Reg::And(xExpExtract0, (Reg::RegTensor<uint16_t>&)x0BF16, expMaskBF16, validEleMaskEven);
+            Reg::And(xExpExtract1, (Reg::RegTensor<uint16_t>&)x1BF16, expMaskBF16, validEleMaskOdd);
             if constexpr (Std::IsSame<T, half>::value) {
-                Reg::And(xExpSelect0, (Reg::RegTensor<uint16_t> &)x0Half, expMaskFP16, validEleMaskEven);
-                Reg::And(xExpSelect1, (Reg::RegTensor<uint16_t> &)x1Half, expMaskFP16, validEleMaskOdd);
+                Reg::And(xExpSelect0, (Reg::RegTensor<uint16_t>&)x0Half, expMaskFP16, validEleMaskEven);
+                Reg::And(xExpSelect1, (Reg::RegTensor<uint16_t>&)x1Half, expMaskFP16, validEleMaskOdd);
                 Reg::Compare<uint16_t, CMPMODE::NE>(validExpMask0, xExpSelect0, expMaskFP16, maskAll);
                 Reg::Compare<uint16_t, CMPMODE::NE>(validExpMask1, xExpSelect1, expMaskFP16, maskAll);
                 Reg::Select<uint16_t>(xExpExtract0, xExpExtract0, expMaskBF16, validExpMask0);
@@ -138,7 +138,7 @@ __aicore__ inline void ComputeMaxExp(__ubuf__ T *srcAddr, __ubuf__ uint16_t *max
 }
 
 template <typename T>
-__aicore__ inline void ComputeMaxExpClip(__ubuf__ T *srcAddr, __ubuf__ uint16_t *maxExpAddr, uint32_t totalCountInUB)
+__aicore__ inline void ComputeMaxExpClip(__ubuf__ T* srcAddr, __ubuf__ uint16_t* maxExpAddr, uint32_t totalCountInUB)
 {
     uint32_t vlForHalfNumber = GetVRegSizeDispatch() / sizeof(T); // 每个向量寄存器可以存储的元素个数
     uint16_t elementAfterReduce = GetVRegSizeDispatch() / GetUbBlockSizeDispatch(); // Reduce操作后搬出的元素个数
@@ -158,9 +158,9 @@ __aicore__ inline void ComputeMaxExpClip(__ubuf__ T *srcAddr, __ubuf__ uint16_t 
         for (uint16_t i = 0; i < loopNum; i++) {
             Reg::LoadAlign<T, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B16>(
                 vdExp0, vdExp1, srcAddr, vlForHalfNumber * DIGIT_TWO);
-            Reg::And((Reg::RegTensor<uint16_t> &)vdExp0, (Reg::RegTensor<uint16_t> &)vdExp0, absMask16Bit, Mask);
-            Reg::And((Reg::RegTensor<uint16_t> &)vdExp1, (Reg::RegTensor<uint16_t> &)vdExp1, absMask16Bit, Mask);
-            Reg::Max(vdMaxExp, (Reg::RegTensor<uint16_t> &)vdExp0, (Reg::RegTensor<uint16_t> &)vdExp1, Mask);
+            Reg::And((Reg::RegTensor<uint16_t>&)vdExp0, (Reg::RegTensor<uint16_t>&)vdExp0, absMask16Bit, Mask);
+            Reg::And((Reg::RegTensor<uint16_t>&)vdExp1, (Reg::RegTensor<uint16_t>&)vdExp1, absMask16Bit, Mask);
+            Reg::Max(vdMaxExp, (Reg::RegTensor<uint16_t>&)vdExp0, (Reg::RegTensor<uint16_t>&)vdExp1, Mask);
             Reg::ReduceMaxWithDataBlock(vdMaxExp, vdMaxExp, Mask);
             Reg::StoreUnAlign<uint16_t, Reg::PostLiteral::POST_MODE_UPDATE>(maxExpAddr, vdMaxExp, ureg,
                                                                             elementAfterReduce);
@@ -170,8 +170,8 @@ __aicore__ inline void ComputeMaxExpClip(__ubuf__ T *srcAddr, __ubuf__ uint16_t 
 }
 
 template <typename T>
-__aicore__ inline void ComputeScale(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *mxScaleLocalAddr,
-                                    __ubuf__ uint16_t *recipScaleLocalAddr, uint32_t scaleNum)
+__aicore__ inline void ComputeScale(__ubuf__ uint16_t* maxExpAddr, __ubuf__ uint16_t* mxScaleLocalAddr,
+                                    __ubuf__ uint16_t* recipScaleLocalAddr, uint32_t scaleNum)
 {
     uint32_t vlB16 = GetVRegSizeDispatch() / sizeof(uint16_t);
     uint32_t vlB16Pack = vlB16 / 2;
@@ -243,8 +243,8 @@ __aicore__ inline void ComputeScale(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint
 }
 
 template <typename T, typename U>
-__aicore__ inline void ComputeScaleClip(__ubuf__ uint16_t *maxExpAddr, __ubuf__ uint16_t *mxScaleLocalAddr,
-                                        __ubuf__ uint16_t *halfScaleLocalAddr, uint32_t totalScaleInUB)
+__aicore__ inline void ComputeScaleClip(__ubuf__ uint16_t* maxExpAddr, __ubuf__ uint16_t* mxScaleLocalAddr,
+                                        __ubuf__ uint16_t* halfScaleLocalAddr, uint32_t totalScaleInUB)
 {
     uint32_t vlForHalfNumber = GetVRegSizeDispatch() / sizeof(uint32_t);
     uint16_t loopNumScale = CeilDiv(totalScaleInUB, vlForHalfNumber);
@@ -301,19 +301,19 @@ __aicore__ inline void ComputeScaleClip(__ubuf__ uint16_t *maxExpAddr, __ubuf__ 
             Reg::LoadAlign<uint16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_UNPACK_B16>(
                 max16, maxExpAddr, vlForHalfNumber);
 
-            Reg::Cast<float, U, castTraitHalf2Float>((Reg::RegTensor<float> &)max32, (Reg::RegTensor<U> &)max16,
+            Reg::Cast<float, U, castTraitHalf2Float>((Reg::RegTensor<float>&)max32, (Reg::RegTensor<U>&)max16,
                                                      maskFloat);
             Reg::Compare<uint32_t, CMPMODE::LT>(cmpResult, max32, expMask, maskFloat);
             Reg::Compare<uint32_t, CMPMODE::NE>(zeroMask, max32, zeroRegTensor32, maskFloat);
 
             // 1e-4 下限 clamp：抑制 block 内 max_abs 过小导致 scale 噪声放大
             // 注意：cmpResult/zeroMask 已在 clamp 前用原始 max32 算好，特殊路径不受影响
-            Reg::Max((Reg::RegTensor<float> &)max32, (Reg::RegTensor<float> &)max32, (Reg::RegTensor<float> &)epsTensor,
+            Reg::Max((Reg::RegTensor<float>&)max32, (Reg::RegTensor<float>&)max32, (Reg::RegTensor<float>&)epsTensor,
                      maskFloat);
             // 等价的整数 Max 版本（max32 来自 |x|，非负 IEEE 浮点 bit pattern 与值序一致）：
             // Reg::Max(max32, max32, epsTensor, maskFloat);
 
-            Reg::Mul((Reg::RegTensor<float> &)max32, (Reg::RegTensor<float> &)max32, (Reg::RegTensor<float> &)invMax,
+            Reg::Mul((Reg::RegTensor<float>&)max32, (Reg::RegTensor<float>&)max32, (Reg::RegTensor<float>&)invMax,
                      maskFloat);
             Reg::ShiftRights(exp32, max32, SHR_NUM_FOR_FP32, maskFloat);
             Reg::And(man32, max32, manMaskFP32, maskFloat);
@@ -350,8 +350,8 @@ __aicore__ inline void ComputeScaleClip(__ubuf__ uint16_t *maxExpAddr, __ubuf__ 
 }
 
 template <typename T, typename U, RoundMode toBf16RoundMode, RoundMode roundMode>
-__aicore__ inline void ComputeFp8Data(__ubuf__ T *srcAddr, __ubuf__ uint16_t *recipScaleLocalAddr,
-                                      __ubuf__ int8_t *outLocalAddr, uint32_t eleNum)
+__aicore__ inline void ComputeFp8Data(__ubuf__ T* srcAddr, __ubuf__ uint16_t* recipScaleLocalAddr,
+                                      __ubuf__ int8_t* outLocalAddr, uint32_t eleNum)
 {
     uint32_t vlB16 = GetVecLen() / sizeof(uint16_t);
     uint32_t vlB16Double = vlB16 * 2;
@@ -394,7 +394,7 @@ __aicore__ inline void ComputeFp8Data(__ubuf__ T *srcAddr, __ubuf__ uint16_t *re
                 halfScaleForMul, recipScaleLocalAddr, blockPerReg);
             if constexpr (Std::IsSame<T, half>::value) {
                 Reg::Cast<float, bfloat16_t, castTraitB16ToB32Zero>(
-                    floatScaleForMul, (Reg::RegTensor<bfloat16_t> &)halfScaleForMul, maskAll);
+                    floatScaleForMul, (Reg::RegTensor<bfloat16_t>&)halfScaleForMul, maskAll);
 
                 Reg::Cast<float, T, castTraitB16ToB32Zero>(x0ZeroFP32, x0, maskAll);
                 Reg::Cast<float, T, castTraitB16ToB32One>(x0OneFP32, x0, maskAll);
@@ -406,8 +406,8 @@ __aicore__ inline void ComputeFp8Data(__ubuf__ T *srcAddr, __ubuf__ uint16_t *re
                 Reg::Mul(x1ZeroFP32, x1ZeroFP32, floatScaleForMul, maskAll);
                 Reg::Mul(x1OneFP32, x1OneFP32, floatScaleForMul, maskAll);
             } else if constexpr (Std::IsSame<T, bfloat16_t>::value) {
-                Reg::Mul(x0, x0, (Reg::RegTensor<T> &)halfScaleForMul, maskAll);
-                Reg::Mul(x1, x1, (Reg::RegTensor<T> &)halfScaleForMul, maskAll);
+                Reg::Mul(x0, x0, (Reg::RegTensor<T>&)halfScaleForMul, maskAll);
+                Reg::Mul(x1, x1, (Reg::RegTensor<T>&)halfScaleForMul, maskAll);
 
                 Reg::Cast<float, T, castTraitB16ToB32Zero>(x0ZeroFP32, x0, maskAll);
                 Reg::Cast<float, T, castTraitB16ToB32One>(x0OneFP32, x0, maskAll);
@@ -420,21 +420,21 @@ __aicore__ inline void ComputeFp8Data(__ubuf__ T *srcAddr, __ubuf__ uint16_t *re
             Reg::Cast<U, float, castTraitB32ToB82>(x0OneFP8, x0OneFP32, maskAll);
             Reg::Cast<U, float, castTraitB32ToB83>(x1OneFP8, x1OneFP32, maskAll);
 
-            Reg::Add((Reg::RegTensor<uint8_t> &)x0ZeroFP8, (Reg::RegTensor<uint8_t> &)x0ZeroFP8,
-                     (Reg::RegTensor<uint8_t> &)x0OneFP8, maskAll);
-            Reg::Add((Reg::RegTensor<uint8_t> &)x1ZeroFP8, (Reg::RegTensor<uint8_t> &)x1ZeroFP8,
-                     (Reg::RegTensor<uint8_t> &)x1OneFP8, maskAll);
-            Reg::Add((Reg::RegTensor<uint8_t> &)x0ZeroFP8, (Reg::RegTensor<uint8_t> &)x0ZeroFP8,
-                     (Reg::RegTensor<uint8_t> &)x1ZeroFP8, maskAll);
+            Reg::Add((Reg::RegTensor<uint8_t>&)x0ZeroFP8, (Reg::RegTensor<uint8_t>&)x0ZeroFP8,
+                     (Reg::RegTensor<uint8_t>&)x0OneFP8, maskAll);
+            Reg::Add((Reg::RegTensor<uint8_t>&)x1ZeroFP8, (Reg::RegTensor<uint8_t>&)x1ZeroFP8,
+                     (Reg::RegTensor<uint8_t>&)x1OneFP8, maskAll);
+            Reg::Add((Reg::RegTensor<uint8_t>&)x0ZeroFP8, (Reg::RegTensor<uint8_t>&)x0ZeroFP8,
+                     (Reg::RegTensor<uint8_t>&)x1ZeroFP8, maskAll);
 
             Reg::StoreAlign<int8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_NORM_B8>(
-                outLocalAddr, (Reg::RegTensor<int8_t> &)x0ZeroFP8, vlB16Double, dataMask);
+                outLocalAddr, (Reg::RegTensor<int8_t>&)x0ZeroFP8, vlB16Double, dataMask);
         }
     }
 }
 
 template <typename T, typename U>
-__aicore__ inline void FP16Convert(Reg::RegTensor<half> &output, Reg::RegTensor<half> &input, Reg::MaskReg &mask)
+__aicore__ inline void FP16Convert(Reg::RegTensor<half>& output, Reg::RegTensor<half>& input, Reg::MaskReg& mask)
 {
     __VEC_SCOPE__
     {
@@ -450,19 +450,19 @@ __aicore__ inline void FP16Convert(Reg::RegTensor<half> &output, Reg::RegTensor<
         }
         Reg::Duplicate(specialValueTensor, specialValue);
         Reg::Duplicate(newMantissa, NEW_MANTISSA);
-        Reg::And(andResult, (Reg::RegTensor<uint16_t> &)input, specialValueTensor, mask);
+        Reg::And(andResult, (Reg::RegTensor<uint16_t>&)input, specialValueTensor, mask);
         Reg::CompareScalar<uint16_t, CMPMODE::GT>(nonzeroMask, andResult, 0, mask);
         Reg::CompareScalar<uint16_t, CMPMODE::LT>(specialMask, andResult, NEW_MANTISSA, mask);
         Reg::MaskAnd(specialMask, specialMask, nonzeroMask, mask);
-        Reg::Or(newValue, (Reg::RegTensor<uint16_t> &)input, newMantissa, mask);
-        Reg::Select<uint16_t>((Reg::RegTensor<uint16_t> &)output, newValue, (Reg::RegTensor<uint16_t> &)input,
+        Reg::Or(newValue, (Reg::RegTensor<uint16_t>&)input, newMantissa, mask);
+        Reg::Select<uint16_t>((Reg::RegTensor<uint16_t>&)output, newValue, (Reg::RegTensor<uint16_t>&)input,
                               specialMask);
     }
 }
 
 template <typename T, typename U, RoundMode toBf16RoundMode, RoundMode roundMode>
-__aicore__ inline void ComputeFp4Data(__ubuf__ T *srcAddr, __ubuf__ uint16_t *halfScaleLocalAddr,
-                                      __ubuf__ int8_t *outLocalAddr, uint32_t totalCountInUB)
+__aicore__ inline void ComputeFp4Data(__ubuf__ T* srcAddr, __ubuf__ uint16_t* halfScaleLocalAddr,
+                                      __ubuf__ int8_t* outLocalAddr, uint32_t totalCountInUB)
 {
     uint32_t vlForHalfNumber = GetVRegSizeDispatch() / sizeof(T);
     uint16_t elementAfterReduce = GetVRegSizeDispatch() / GetUbBlockSizeDispatch();
@@ -488,7 +488,7 @@ __aicore__ inline void ComputeFp4Data(__ubuf__ T *srcAddr, __ubuf__ uint16_t *ha
                                                               Reg::MaskMergeMode::ZEROING, toBf16RoundMode};
         for (uint16_t i = 0; i < loopNum; i++) {
             Reg::DataCopy<uint32_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_DINTLV_B32>(
-                (Reg::RegTensor<uint32_t> &)vdExp0, (Reg::RegTensor<uint32_t> &)vdExp1, (__ubuf__ uint32_t *&)srcAddr,
+                (Reg::RegTensor<uint32_t>&)vdExp0, (Reg::RegTensor<uint32_t>&)vdExp1, (__ubuf__ uint32_t*&)srcAddr,
                 vlForHalfNumber);
             Reg::DataCopy<uint16_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::LoadDist::DIST_E2B_B16>(
                 halfScaleForMul, halfScaleLocalAddr, elementAfterReduce);
@@ -499,27 +499,27 @@ __aicore__ inline void ComputeFp4Data(__ubuf__ T *srcAddr, __ubuf__ uint16_t *ha
                 }
                 Reg::Cast<bfloat16_t, T, castTraitHalf2Bf16>(vdExp0BF16, vdExp0, dataMask1);
                 Reg::Cast<bfloat16_t, T, castTraitHalf2Bf16>(vdExp1BF16, vdExp1, dataMask1);
-                Reg::Mul(vdExp0BF16, vdExp0BF16, (Reg::RegTensor<bfloat16_t> &)halfScaleForMul, dataMask1);
-                Reg::Mul(vdExp1BF16, vdExp1BF16, (Reg::RegTensor<bfloat16_t> &)halfScaleForMul, dataMask1);
+                Reg::Mul(vdExp0BF16, vdExp0BF16, (Reg::RegTensor<bfloat16_t>&)halfScaleForMul, dataMask1);
+                Reg::Mul(vdExp1BF16, vdExp1BF16, (Reg::RegTensor<bfloat16_t>&)halfScaleForMul, dataMask1);
                 Reg::Cast<U, bfloat16_t, castTraitZero>(vdExp0FP4, vdExp0BF16, dataMask1);
                 Reg::Cast<U, bfloat16_t, castTraitOne>(vdExp1FP4, vdExp1BF16, dataMask1);
             } else {
-                Reg::Mul(vdExp0, vdExp0, (Reg::RegTensor<T> &)halfScaleForMul, dataMask1);
-                Reg::Mul(vdExp1, vdExp1, (Reg::RegTensor<T> &)halfScaleForMul, dataMask1);
+                Reg::Mul(vdExp0, vdExp0, (Reg::RegTensor<T>&)halfScaleForMul, dataMask1);
+                Reg::Mul(vdExp1, vdExp1, (Reg::RegTensor<T>&)halfScaleForMul, dataMask1);
                 Reg::Cast<U, T, castTraitZero>(vdExp0FP4, vdExp0, dataMask1);
                 Reg::Cast<U, T, castTraitOne>(vdExp1FP4, vdExp1, dataMask1);
             }
-            Reg::Add((Reg::RegTensor<uint8_t> &)vdExp0FP4, (Reg::RegTensor<uint8_t> &)vdExp0FP4,
-                     (Reg::RegTensor<uint8_t> &)vdExp1FP4, dataMask1);
+            Reg::Add((Reg::RegTensor<uint8_t>&)vdExp0FP4, (Reg::RegTensor<uint8_t>&)vdExp0FP4,
+                     (Reg::RegTensor<uint8_t>&)vdExp1FP4, dataMask1);
             Reg::DataCopy<int8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_PACK_B32>(
-                outLocalAddr, (Reg::RegTensor<int8_t> &)vdExp0FP4, OUT_ELE_NUM_PER_LOOP_FP4, dataMask1);
+                outLocalAddr, (Reg::RegTensor<int8_t>&)vdExp0FP4, OUT_ELE_NUM_PER_LOOP_FP4, dataMask1);
         }
     }
 }
 
 template <typename T, typename U, RoundMode RMode, bool HasSmooth>
-__aicore__ inline void ComputePerTileDynamic(__ubuf__ T *srcAddr, __ubuf__ float *smoothLocalAddr,
-                                             __ubuf__ float *scaleOutLocalAddr, __ubuf__ int8_t *outLocalAddr,
+__aicore__ inline void ComputePerTileDynamic(__ubuf__ T* srcAddr, __ubuf__ float* smoothLocalAddr,
+                                             __ubuf__ float* scaleOutLocalAddr, __ubuf__ int8_t* outLocalAddr,
                                              uint32_t totalCountInUB)
 {
     uint32_t vlB16 = GetVRegSizeDispatch() / sizeof(T);
@@ -621,9 +621,9 @@ __aicore__ inline void ComputePerTileDynamic(__ubuf__ T *srcAddr, __ubuf__ float
             }
 
             Reg::DataCopy<int8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_PACK4_B32>(
-                outLocalAddr, (Reg::RegTensor<int8_t> &)vOut0, OUT_ELE_NUM_ONE_BLK, dataMask2);
+                outLocalAddr, (Reg::RegTensor<int8_t>&)vOut0, OUT_ELE_NUM_ONE_BLK, dataMask2);
             Reg::DataCopy<int8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_PACK4_B32>(
-                outLocalAddr, (Reg::RegTensor<int8_t> &)vOut1, OUT_ELE_NUM_ONE_BLK, dataMask3);
+                outLocalAddr, (Reg::RegTensor<int8_t>&)vOut1, OUT_ELE_NUM_ONE_BLK, dataMask3);
 
             Reg::Mul(vOutputScale, vTileMax, vInvMaxVal, maskOne);
             Reg::DataCopy<float, Reg::StoreDist::DIST_FIRST_ELEMENT_B32>(scaleOutLocalAddr + i, vOutputScale, maskOne);
@@ -632,8 +632,8 @@ __aicore__ inline void ComputePerTileDynamic(__ubuf__ T *srcAddr, __ubuf__ float
 }
 
 template <typename T, bool HasSmooth>
-__aicore__ inline void ComputePerTileGroupMax(__ubuf__ T *srcAddr, __ubuf__ float *smoothLocalAddr,
-                                              __ubuf__ float *groupScaleLocalAddr, uint32_t totalCountInUB)
+__aicore__ inline void ComputePerTileGroupMax(__ubuf__ T* srcAddr, __ubuf__ float* smoothLocalAddr,
+                                              __ubuf__ float* groupScaleLocalAddr, uint32_t totalCountInUB)
 {
     uint32_t vlB16 = GetVRegSizeDispatch() / sizeof(T);
     uint32_t vlB32 = GetVRegSizeDispatch() / sizeof(float);
@@ -676,7 +676,7 @@ __aicore__ inline void ComputePerTileGroupMax(__ubuf__ T *srcAddr, __ubuf__ floa
 }
 
 template <typename U>
-__aicore__ inline void ComputePerTileGroupScale(__ubuf__ float *groupScaleLocalAddr, __ubuf__ float *scaleOutLocalAddr,
+__aicore__ inline void ComputePerTileGroupScale(__ubuf__ float* groupScaleLocalAddr, __ubuf__ float* scaleOutLocalAddr,
                                                 uint16_t groupNum)
 {
     uint32_t groupNumPerLoop = GetVRegSizeDispatch() / sizeof(float);
@@ -719,8 +719,8 @@ __aicore__ inline void ComputePerTileGroupScale(__ubuf__ float *groupScaleLocalA
 }
 
 template <typename T, typename U, RoundMode RMode, bool HasSmooth>
-__aicore__ inline void QuantizePerTileWithGroupScale(__ubuf__ T *srcAddr, __ubuf__ float *smoothLocalAddr,
-                                                     __ubuf__ float *groupScaleLocalAddr, __ubuf__ int8_t *outLocalAddr,
+__aicore__ inline void QuantizePerTileWithGroupScale(__ubuf__ T* srcAddr, __ubuf__ float* smoothLocalAddr,
+                                                     __ubuf__ float* groupScaleLocalAddr, __ubuf__ int8_t* outLocalAddr,
                                                      uint32_t totalCountInUB)
 {
     uint32_t vlB16 = GetVRegSizeDispatch() / sizeof(T);
@@ -765,19 +765,19 @@ __aicore__ inline void QuantizePerTileWithGroupScale(__ubuf__ T *srcAddr, __ubuf
 
             Reg::Cast<U, float, castTrait32tof80>(vOut0, vInFP32Zero, maskAll);
             Reg::Cast<U, float, castTrait32tof81>(vOut1, vInFP32One, maskAll);
-            Reg::Add((Reg::RegTensor<int8_t> &)vOut0, (Reg::RegTensor<int8_t> &)vOut0, (Reg::RegTensor<int8_t> &)vOut1,
+            Reg::Add((Reg::RegTensor<int8_t>&)vOut0, (Reg::RegTensor<int8_t>&)vOut0, (Reg::RegTensor<int8_t>&)vOut1,
                      maskAll);
 
             Reg::DataCopy<int8_t, Reg::PostLiteral::POST_MODE_UPDATE, Reg::StoreDist::DIST_PACK_B32>(
-                outLocalAddr, (Reg::RegTensor<int8_t> &)vOut0, OUT_ELE_NUM_ONE_BLK * 2, maskAll);
+                outLocalAddr, (Reg::RegTensor<int8_t>&)vOut0, OUT_ELE_NUM_ONE_BLK * 2, maskAll);
         }
     }
 }
 
 template <typename T, typename U, RoundMode RMode, bool HasSmooth>
-__aicore__ inline void ComputePerTileDynamicBatchScale(__ubuf__ T *srcAddr, __ubuf__ float *smoothLocalAddr,
-                                                       __ubuf__ float *groupScaleLocalAddr,
-                                                       __ubuf__ float *scaleOutLocalAddr, __ubuf__ int8_t *outLocalAddr,
+__aicore__ inline void ComputePerTileDynamicBatchScale(__ubuf__ T* srcAddr, __ubuf__ float* smoothLocalAddr,
+                                                       __ubuf__ float* groupScaleLocalAddr,
+                                                       __ubuf__ float* scaleOutLocalAddr, __ubuf__ int8_t* outLocalAddr,
                                                        uint32_t totalCountInUB)
 {
     uint16_t groupNum =

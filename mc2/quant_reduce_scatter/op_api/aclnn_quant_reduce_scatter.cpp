@@ -55,7 +55,7 @@ const std::initializer_list<op::DataType> OUTPUT_DTYPE_SUPPORT_LIST = {op::DataT
                                                                        op::DataType::DT_FLOAT};
 
 // 检查入参是否为nullptr
-static bool CheckNotNull(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool CheckNotNull(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(scales, return false);
@@ -64,7 +64,7 @@ static bool CheckNotNull(const aclTensor *x, const aclTensor *scales, const aclT
 }
 
 // 检查x、scales、output的数据类型是否在算子的支持列表之内
-static bool CheckKGAllDtypesValid(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool CheckKGAllDtypesValid(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     if (CheckType(x->GetDataType(), X_DTYPE_KG_SUPPORT_LIST) &&
         CheckType(scales->GetDataType(), SCALES_DTYPE_KG_SUPPORT_LIST) &&
@@ -75,7 +75,7 @@ static bool CheckKGAllDtypesValid(const aclTensor *x, const aclTensor *scales, c
     }
 }
 
-static bool CheckMXAllDtypesValid(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool CheckMXAllDtypesValid(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     if (CheckType(x->GetDataType(), X_DTYPE_MX_SUPPORT_LIST) &&
         CheckType(scales->GetDataType(), SCALES_DTYPE_MX_SUPPORT_LIST) &&
@@ -86,7 +86,7 @@ static bool CheckMXAllDtypesValid(const aclTensor *x, const aclTensor *scales, c
     }
 }
 
-static bool CheckAllDtypesValid(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool CheckAllDtypesValid(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     bool isAllDtypesValid = false;
     isAllDtypesValid = CheckKGAllDtypesValid(x, scales, output) || CheckMXAllDtypesValid(x, scales, output);
@@ -101,7 +101,7 @@ static bool CheckAllDtypesValid(const aclTensor *x, const aclTensor *scales, con
     return isAllDtypesValid;
 }
 
-static bool QuantReduceScatterCheckAllFormatValid(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool QuantReduceScatterCheckAllFormatValid(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     if (IsPrivateFormat(x->GetStorageFormat())) {
         OP_LOGE_FOR_INVALID_FORMAT("aclnnQuantReduceScatterGetWorkspaceSize", "x",
@@ -122,7 +122,7 @@ static bool QuantReduceScatterCheckAllFormatValid(const aclTensor *x, const aclT
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(CheckNotNull(x, scales, output), ACLNN_ERR_PARAM_NULLPTR);
@@ -135,13 +135,13 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *scales, cons
 }
 } // namespace
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
-extern "C" aclnnStatus aclnnQuantReduceScatterGetWorkspaceSize(const aclTensor *context, const aclTensor *x,
-                                                               const aclTensor *scales, int64_t hcclBufferSize,
-                                                               int64_t worldSize, const char *reduceOp,
-                                                               aclTensor *output, uint64_t *workspaceSize,
-                                                               aclOpExecutor **executor)
+extern "C" aclnnStatus aclnnQuantReduceScatterGetWorkspaceSize(const aclTensor* context, const aclTensor* x,
+                                                               const aclTensor* scales, int64_t hcclBufferSize,
+                                                               int64_t worldSize, const char* reduceOp,
+                                                               aclTensor* output, uint64_t* workspaceSize,
+                                                               aclOpExecutor** executor)
 {
     aclnnStatus retParam = CheckParams(x, scales, output);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
@@ -159,19 +159,19 @@ extern "C" aclnnStatus aclnnQuantReduceScatterGetWorkspaceSize(const aclTensor *
     }
     if (output->GetStorageFormat() != op::Format::FORMAT_ND) {
         OP_LOGW("output origin format is: %s.", op::ToString(output->GetStorageFormat()).GetString());
-        output = const_cast<aclTensor *>(l0op::ReFormat(output, op::Format::FORMAT_ND));
+        output = const_cast<aclTensor*>(l0op::ReFormat(output, op::Format::FORMAT_ND));
         CHECK_RET(output != nullptr, ACLNN_ERR_PARAM_INVALID);
     }
 
     uint64_t yDtype = static_cast<uint64_t>(output->GetDataType());
     aclnnStatus ret =
-        aclnnInnerQuantReduceScatterGetWorkspaceSize(context, x, scales, hcclBufferSize, const_cast<char *>(reduceOp),
+        aclnnInnerQuantReduceScatterGetWorkspaceSize(context, x, scales, hcclBufferSize, const_cast<char*>(reduceOp),
                                                      yDtype, worldSize, output, workspaceSize, executor);
     OP_LOGD("QuantReduceScatter, aclnnQuantReduceScatterGetWorkspaceSize ret %d.", ret);
     return ret;
 }
 
-extern "C" aclnnStatus aclnnQuantReduceScatter(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnQuantReduceScatter(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                const aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {

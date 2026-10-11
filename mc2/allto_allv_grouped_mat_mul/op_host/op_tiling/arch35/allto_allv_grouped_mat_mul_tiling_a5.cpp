@@ -15,7 +15,7 @@
 #include "allto_allv_grouped_mat_mul_tiling_a5.h"
 
 namespace {
-static const char *A_INNER_DEBUG = "AlltoAllvGroupedMatMul Tiling";
+static const char* A_INNER_DEBUG = "AlltoAllvGroupedMatMul Tiling";
 }
 
 namespace optiling {
@@ -29,7 +29,7 @@ bool AlltoAllvGmmTilingA5::NeedToCheckCounts() const
     return false;
 }
 
-ge::graphStatus AlltoAllvGmmTilingFuncA5::AlltoAllvGmmOpTilingFunc(gert::TilingContext *context)
+ge::graphStatus AlltoAllvGmmTilingFuncA5::AlltoAllvGmmOpTilingFunc(gert::TilingContext* context)
 {
     AlltoAllvGmmTilingA5 tiling(context);
     OP_TILING_CHECK(tiling.Init(context) != ge::GRAPH_SUCCESS, OP_LOGE(A_INNER_DEBUG, "GMM tiling init failed."),

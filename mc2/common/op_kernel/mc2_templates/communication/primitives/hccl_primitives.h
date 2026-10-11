@@ -34,7 +34,7 @@ struct MC2AlltoAllContext {
 template <typename HcclType>
 class MC2AlltoAllPrimitives {
 public:
-    __aicore__ inline AscendC::HcclHandle Prepare(HcclType *hccl, MC2AlltoAllContext *context, uint32_t taskIndex)
+    __aicore__ inline AscendC::HcclHandle Prepare(HcclType* hccl, MC2AlltoAllContext* context, uint32_t taskIndex)
     {
         return hccl->template AlltoAll<false>(context->sendBuffer + taskIndex * context->sendOffset,
                                               context->recvBuffer + taskIndex * context->recvOffset, context->sendCount,
@@ -42,7 +42,7 @@ public:
                                               context->strideCount, context->repeat);
     }
 
-    __aicore__ inline AscendC::HcclHandle SyncSend(HcclType *hccl, MC2AlltoAllContext *context, uint32_t taskIndex)
+    __aicore__ inline AscendC::HcclHandle SyncSend(HcclType* hccl, MC2AlltoAllContext* context, uint32_t taskIndex)
     {
         return hccl->template AlltoAll<true>(context->sendBuffer + taskIndex * context->sendOffset,
                                              context->recvBuffer + taskIndex * context->recvOffset, context->sendCount,

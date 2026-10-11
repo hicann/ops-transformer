@@ -33,12 +33,12 @@ constexpr uint64_t CORE_NUM = 20;
 constexpr uint64_t UB_SIZE = 192 * 1024;
 
 template <typename T>
-auto build_from(const T &value)
+auto build_from(const T& value)
 {
     return Ops::Transformer::AnyValue::CreateFrom<T>(value);
 }
 
-gert::StorageShape make_shape(const std::initializer_list<int64_t> &input_shape)
+gert::StorageShape make_shape(const std::initializer_list<int64_t>& input_shape)
 {
     if (input_shape.size() == 0) {
         return gert::StorageShape{};
@@ -97,12 +97,12 @@ struct MoeDistributeDispatchTeardownTilingTestParam {
     // 扩展字段（默认值兼容原有用例）：
     // groupEpOverride=nullptr 表示沿用默认 "ep_group"；特殊字面值 "__LONG128__" 展开为 128 个 'a'
     // commAlgOverride=nullptr 表示沿用默认 ""
-    const char *groupEpOverride;
-    const char *commAlgOverride;
+    const char* groupEpOverride;
+    const char* commAlgOverride;
 };
 
 // 重写 << 操作符，规避用例执行失败时打印入参乱码的问题
-inline std::ostream &operator<<(std::ostream &os, const MoeDistributeDispatchTeardownTilingTestParam &param)
+inline std::ostream& operator<<(std::ostream& os, const MoeDistributeDispatchTeardownTilingTestParam& param)
 {
     return os << param.caseName;
 }
@@ -3590,7 +3590,7 @@ static MoeDistributeDispatchTeardownTilingTestParam test_cases[] = {
 struct MoeDistributeDispatchTeardownCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatchTeardownTilingTestParam &param)
+static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeDispatchTeardownTilingTestParam& param)
 {
     // 存储用例中输入信息：context 为必选第 0 输入，其后为 x/y/expert_ids/comm_cmd_info
     std::vector<pair<std::initializer_list<int64_t>, ge::DataType>> inputshapeDtypeList = {

@@ -121,7 +121,7 @@ __aicore__ inline uint32_t CalcDedupPrepassChunkTokens(uint32_t numTokens, uint3
     return chunk == 0U ? 1U : chunk;
 }
 
-__aicore__ inline DedupConfig CreateDedupConfig(const Params &params)
+__aicore__ inline DedupConfig CreateDedupConfig(const Params& params)
 {
     DedupConfig config;
     config.dedupMode = params.tilingData->dedupMode;
@@ -154,10 +154,10 @@ __aicore__ inline TEventID DedupDescHalfEvent(uint32_t half)
 // 在去重 UB 暂存段上建立 prepass 工人视图。route 槽元素类型与基线 dispatch 同源
 // （int16/int32 由 UseInt16TopkIndex 选定）；UB 字节预算不变，条数随元素宽度变。
 template <typename TopkIndexType, typename DispatchScratch>
-__aicore__ inline DedupPrepassWorker<TopkIndexType> CreateDedupPrepassWorker(const DedupConfig &dedup,
-                                                                             const MoeSyncWorkspaceLayout &syncLayout,
-                                                                             const Params &params,
-                                                                             DispatchScratch &scratch)
+__aicore__ inline DedupPrepassWorker<TopkIndexType> CreateDedupPrepassWorker(const DedupConfig& dedup,
+                                                                             const MoeSyncWorkspaceLayout& syncLayout,
+                                                                             const Params& params,
+                                                                             DispatchScratch& scratch)
 {
     DedupPrepassWorker<TopkIndexType> worker;
     const uint32_t routeLoadAddr = scratch.dedupUbBaseAddr;
@@ -170,7 +170,7 @@ __aicore__ inline DedupPrepassWorker<TopkIndexType> CreateDedupPrepassWorker(con
     worker.descAsmTensor =
         LocalTensor<int32_t>(TPosition::VECCALC, descAsmAddr, DEDUP_DESC_ASM_UB_BYTES / sizeof(int32_t));
     worker.memberTensor = LocalTensor<int32_t>(TPosition::VECCALC, memberAddr, DEDUP_MEMBER_UB_BYTES / sizeof(int32_t));
-    worker.rowDescGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(dedup.rowDescPtr));
+    worker.rowDescGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(dedup.rowDescPtr));
     worker.topK = params.tilingData->topK;
     worker.strideInt32 = dedup.rowDescStrideInt32;
     worker.maxOutputSize = params.tilingData->maxOutputSize;
@@ -181,8 +181,8 @@ __aicore__ inline DedupPrepassWorker<TopkIndexType> CreateDedupPrepassWorker(con
 // 对已装载进 UB 半区的一个 route 槽段做判界扫描，更新 count/member 表。
 // 槽内按 topkIndex 升序，故低于窗口下界 continue、达到上界即 break。
 template <typename TopkIndexType>
-__aicore__ inline void DedupPrepassScanSlot(DedupPrepassWorker<TopkIndexType> &worker,
-                                            LocalTensor<TopkIndexType> &routeSeg, const DedupChunkWindow &window,
+__aicore__ inline void DedupPrepassScanSlot(DedupPrepassWorker<TopkIndexType>& worker,
+                                            LocalTensor<TopkIndexType>& routeSeg, const DedupChunkWindow& window,
                                             int32_t segCount, int32_t rowBase, int32_t segBase, uint32_t expertIdx,
                                             int32_t expertRowBegin)
 {
@@ -221,8 +221,8 @@ __aicore__ inline void DedupPrepassScanSlot(DedupPrepassWorker<TopkIndexType> &w
 
 // 扫描在途槽并释放其半区（等装载完成 → 扫描 → 武装"可复写"）。无在途时为空操作。
 template <typename TopkIndexType>
-__aicore__ inline void DedupFlushPendingSlot(DedupPrepassWorker<TopkIndexType> &worker, DedupPendingSlot &pending,
-                                             const DedupChunkWindow &window)
+__aicore__ inline void DedupFlushPendingSlot(DedupPrepassWorker<TopkIndexType>& worker, DedupPendingSlot& pending,
+                                             const DedupChunkWindow& window)
 {
     if (pending.expertIdx < 0) {
         return;
@@ -240,8 +240,8 @@ __aicore__ inline void DedupFlushPendingSlot(DedupPrepassWorker<TopkIndexType> &
 // 大槽（单槽超过半区容量，大 bs 罕见路径）：原地分段串行扫描，复用当前装载半区。
 // 段末值低于窗口下界可整段跳过，达到上界即提前结束（槽内升序）。
 template <typename TopkIndexType>
-__aicore__ inline void DedupScanLargeSlot(DedupPrepassWorker<TopkIndexType> &worker, __gm__ TopkIndexType *slotPtr,
-                                          int32_t slotCount, uint32_t loadHalf, const DedupChunkWindow &window,
+__aicore__ inline void DedupScanLargeSlot(DedupPrepassWorker<TopkIndexType>& worker, __gm__ TopkIndexType* slotPtr,
+                                          int32_t slotCount, uint32_t loadHalf, const DedupChunkWindow& window,
                                           int32_t rowBase, uint32_t expertIdx, int32_t expertRowBegin)
 {
     const TEventID evt = DedupRouteHalfEvent(loadHalf);
@@ -276,9 +276,9 @@ __aicore__ inline void DedupScanLargeSlot(DedupPrepassWorker<TopkIndexType> &wor
  * S_MTE2=扫描完可复写、MTE2_S=装载完可扫描），零悬挂。
  */
 template <typename TopkIndexType, typename DispatchScratch>
-__aicore__ inline void DedupScanRouteSlots(DedupPrepassWorker<TopkIndexType> &worker,
-                                           const MoeStageCommonConfig &common, const Params &params,
-                                           DispatchScratch &scratch, uint32_t srcRank, const DedupChunkWindow &window)
+__aicore__ inline void DedupScanRouteSlots(DedupPrepassWorker<TopkIndexType>& worker,
+                                           const MoeStageCommonConfig& common, const Params& params,
+                                           DispatchScratch& scratch, uint32_t srcRank, const DedupChunkWindow& window)
 {
     const uint64_t routeIndexAlignSize = static_cast<uint64_t>(CalcDispatchRouteIndexAlignSize(params.tilingData));
     SetFlag<AscendC::HardEvent::S_MTE2>(static_cast<TEventID>(SYNC_EVENT_ID4));
@@ -294,7 +294,7 @@ __aicore__ inline void DedupScanRouteSlots(DedupPrepassWorker<TopkIndexType> &wo
         }
         const int32_t expertRowBegin =
             expertIdx == 0U ? 0 : scratch.cumsumInfoTensor.GetValue(expertIdx * common.worldSize - 1U);
-        __gm__ TopkIndexType *slotPtr = reinterpret_cast<__gm__ TopkIndexType *>(
+        __gm__ TopkIndexType* slotPtr = reinterpret_cast<__gm__ TopkIndexType*>(
             params.peermemInfo.maskRecvPtr + static_cast<uint64_t>(prefixIdx) * routeIndexAlignSize);
         if (slotCount > worker.ROUTE_HALF_ITEMS) {
             DedupFlushPendingSlot(worker, pending, window); // 大槽独占半区前先清空在途
@@ -327,7 +327,7 @@ __aicore__ inline void DedupScanRouteSlots(DedupPrepassWorker<TopkIndexType> &wo
 
 // 落一条 PLAIN 行 desc（该 token 全量只出现一次，dispatch/combine 走原路径）：word0 = 0。
 template <typename TopkIndexType>
-__aicore__ inline void DedupStorePlainRowDesc(DedupPrepassWorker<TopkIndexType> &worker, uint32_t memberBase)
+__aicore__ inline void DedupStorePlainRowDesc(DedupPrepassWorker<TopkIndexType>& worker, uint32_t memberBase)
 {
     const int32_t row = worker.memberTensor.GetValue(memberBase);
     const TEventID evt = DedupDescHalfEvent(worker.descHalf);
@@ -344,7 +344,7 @@ __aicore__ inline void DedupStorePlainRowDesc(DedupPrepassWorker<TopkIndexType> 
 // 落一个重复组的全部成员行 desc。组成员按扫描序 = 专家升序 = 行号升序，天然满足 FIRST/LAST 语义；
 // 组内每个成员行持有整组完整拷贝，读一行即可拿到全组信息。
 template <typename TopkIndexType>
-__aicore__ inline void DedupStoreGroupRowDesc(DedupPrepassWorker<TopkIndexType> &worker, uint32_t memberBase,
+__aicore__ inline void DedupStoreGroupRowDesc(DedupPrepassWorker<TopkIndexType>& worker, uint32_t memberBase,
                                               int32_t survivorCount, int32_t fullMinK)
 {
     for (int32_t m = 0; m < survivorCount; ++m) {
@@ -379,7 +379,7 @@ __aicore__ inline void DedupStoreGroupRowDesc(DedupPrepassWorker<TopkIndexType> 
 // 按扫描结果逐 token 落 rowDesc。fullCount>=2 即使幸存成员只剩 1 个也按组发
 // （minK 取全量口径，保证发送槽与归属卡 canonical 槽一致）；fullCount==1 才走 PLAIN。
 template <typename TopkIndexType>
-__aicore__ inline void DedupStoreRowDescChunk(DedupPrepassWorker<TopkIndexType> &worker, int32_t chunkTokenCount)
+__aicore__ inline void DedupStoreRowDescChunk(DedupPrepassWorker<TopkIndexType>& worker, int32_t chunkTokenCount)
 {
     for (int32_t localToken = 0; localToken < chunkTokenCount; ++localToken) {
         const int32_t packed = worker.countTensor.GetValue(localToken);
@@ -401,8 +401,8 @@ __aicore__ inline void DedupStoreRowDescChunk(DedupPrepassWorker<TopkIndexType> 
 // 建表工人集按档切换（判据见 DEDUP_AIV0_PREPASS_MAX_HIDDEN_DIM）：AIV0 参与档按
 // AIV1=jobIndex / AIV0=jobIndex+totalJobs 平铺；不参与档保持 AIV1 单方建表。
 // 返回 false = 本子核不参与建表。
-__aicore__ inline bool GetDedupPrepassWorkerSlot(const BlockJobContext &blockJob, const Params &params,
-                                                 uint32_t &workerIndex, uint32_t &totalWorkers)
+__aicore__ inline bool GetDedupPrepassWorkerSlot(const BlockJobContext& blockJob, const Params& params,
+                                                 uint32_t& workerIndex, uint32_t& totalWorkers)
 {
     const bool aiv0Joins = params.tilingData->hiddenDim <= DEDUP_AIV0_PREPASS_MAX_HIDDEN_DIM;
     if (GetSubBlockIdx() != 1U && !aiv0Joins) {
@@ -415,7 +415,7 @@ __aicore__ inline bool GetDedupPrepassWorkerSlot(const BlockJobContext &blockJob
 
 // 计算工作项 chunkIdx 的 token 窗口（末段按 numTokens 截断）。
 __aicore__ inline DedupChunkWindow MakeDedupChunkWindow(uint32_t chunkIdx, uint32_t chunkTokens, uint32_t numTokens,
-                                                        uint32_t topK, int32_t &tokenHi)
+                                                        uint32_t topK, int32_t& tokenHi)
 {
     DedupChunkWindow window;
     window.tokenLo = static_cast<int32_t>(chunkIdx * chunkTokens);
@@ -430,9 +430,9 @@ __aicore__ inline DedupChunkWindow MakeDedupChunkWindow(uint32_t chunkIdx, uint3
 
 // 执行一个 prepass 工作项：count 清零 → 槽扫描 → desc 落盘 → drain desc 乒乓并置本项 ready。
 template <typename TopkIndexType, typename DispatchScratch>
-__aicore__ inline void RunDedupPrepassWorkItem(DedupPrepassWorker<TopkIndexType> &worker,
-                                               const MoeStageCommonConfig &common, const Params &params,
-                                               DispatchScratch &scratch, const DedupConfig &dedup, uint32_t workItem)
+__aicore__ inline void RunDedupPrepassWorkItem(DedupPrepassWorker<TopkIndexType>& worker,
+                                               const MoeStageCommonConfig& common, const Params& params,
+                                               DispatchScratch& scratch, const DedupConfig& dedup, uint32_t workItem)
 {
     const uint32_t srcRank = workItem / dedup.prepassChunkCount;
     const uint32_t chunkIdx = workItem % dedup.prepassChunkCount;
@@ -451,7 +451,7 @@ __aicore__ inline void RunDedupPrepassWorkItem(DedupPrepassWorker<TopkIndexType>
     WaitFlag<AscendC::HardEvent::MTE3_S>(static_cast<TEventID>(SYNC_EVENT_ID5));
     SetFlag<AscendC::HardEvent::MTE3_S>(static_cast<TEventID>(SYNC_EVENT_ID3));
     SetFlag<AscendC::HardEvent::MTE3_S>(static_cast<TEventID>(SYNC_EVENT_ID5));
-    __gm__ int32_t *readyBase = reinterpret_cast<__gm__ int32_t *>(dedup.prepassReadyPtr);
+    __gm__ int32_t* readyBase = reinterpret_cast<__gm__ int32_t*>(dedup.prepassReadyPtr);
     AtomicAdd(readyBase + (1U + workItem) * INT_CACHELINE, static_cast<int32_t>(1));
 }
 
@@ -465,9 +465,9 @@ __aicore__ inline void RunDedupPrepassWorkItem(DedupPrepassWorker<TopkIndexType>
  * （驱动侧机制未明，实测复现），当前平铺形态是稳定边界。
  */
 template <typename TopkIndexType, typename DispatchScratch>
-__aicore__ inline void BuildDedupRowDescTable(const DedupConfig &dedup, const MoeStageCommonConfig &common,
-                                              const BlockJobContext &blockJob, const MoeSyncWorkspaceLayout &syncLayout,
-                                              const Params &params, DispatchScratch &scratch)
+__aicore__ inline void BuildDedupRowDescTable(const DedupConfig& dedup, const MoeStageCommonConfig& common,
+                                              const BlockJobContext& blockJob, const MoeSyncWorkspaceLayout& syncLayout,
+                                              const Params& params, DispatchScratch& scratch)
 {
     if constexpr (g_coreType == AIC) {
         return;
@@ -483,7 +483,7 @@ __aicore__ inline void BuildDedupRowDescTable(const DedupConfig &dedup, const Mo
 
     // 切片宽/项数以 DedupConfig 缓存值为准（与 dispatch 消费侧同一 CalcDedupPrepassChunkTokens 单源）。
     const uint32_t totalWorkItems = common.worldSize * dedup.prepassChunkCount;
-    __gm__ int32_t *readyBase = reinterpret_cast<__gm__ int32_t *>(dedup.prepassReadyPtr);
+    __gm__ int32_t* readyBase = reinterpret_cast<__gm__ int32_t*>(dedup.prepassReadyPtr);
 
     DedupPrepassWorker<TopkIndexType> worker =
         CreateDedupPrepassWorker<TopkIndexType>(dedup, syncLayout, params, scratch);

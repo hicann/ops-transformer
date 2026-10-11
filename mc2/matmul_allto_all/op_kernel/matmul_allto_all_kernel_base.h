@@ -21,18 +21,18 @@ template <typename SchedulerType, typename SchedulerContextType, typename Matmul
           bool SEP_BIAS = false>
 class MatmulAlltoAllKernelBase {
 public:
-    __aicore__ inline MatmulAlltoAllKernelBase(SchedulerType *pipeLine)
+    __aicore__ inline MatmulAlltoAllKernelBase(SchedulerType* pipeLine)
         : pipeLine_(pipeLine){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR workspaceGM,
-                                MatmulAlltoAllTilingDataType *tilingData, AscendC::TPipe *tPipe);
+                                MatmulAlltoAllTilingDataType* tilingData, AscendC::TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
-    SchedulerType *pipeLine_;
+    SchedulerType* pipeLine_;
     SchedulerContextType pipeLineContext_;
-    MatmulAlltoAllTilingDataType *tilingData_;
+    MatmulAlltoAllTilingDataType* tilingData_;
     // 数据控制
-    AscendC::TPipe *tPipe_;
+    AscendC::TPipe* tPipe_;
     // 输入输出矩阵地址
     GM_ADDR x1_;
     GM_ADDR x2_;
@@ -52,12 +52,12 @@ template <typename SchedulerType, typename SchedulerContextType, typename Matmul
 __aicore__ inline void MatmulAlltoAllKernelBase<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataType,
                                                 SEP_BIAS>::Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y,
                                                                 GM_ADDR workspaceGM,
-                                                                MatmulAlltoAllTilingDataType *tilingData,
-                                                                AscendC::TPipe *tPipe)
+                                                                MatmulAlltoAllTilingDataType* tilingData,
+                                                                AscendC::TPipe* tPipe)
 {
     // 获取tilingdata数据
     tilingData_ = tilingData;
-    auto &&mc2Tiling_ = tilingData_->matmulAlltoAllTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->matmulAlltoAllTilingInfo;
     // 数据初始化
     tPipe_ = tPipe;
     x1_ = x1;
@@ -80,7 +80,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename Matmul
 __aicore__ inline void
 MatmulAlltoAllKernelBase<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataType, SEP_BIAS>::Process()
 {
-    auto &&mc2Tiling_ = tilingData_->matmulAlltoAllTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->matmulAlltoAllTilingInfo;
     // 启动主块流水
     if (mc2Tiling_.tileCnt > 0) {
         ProcessTile(mc2Tiling_.tileCnt);
@@ -99,7 +99,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename Matmul
 __aicore__ inline void MatmulAlltoAllKernelBase<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataType,
                                                 SEP_BIAS>::ProcessTile(uint32_t taskCnt)
 {
-    auto &&mc2Tiling_ = tilingData_->matmulAlltoAllTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->matmulAlltoAllTilingInfo;
     // 复用的中间量
     uint64_t tileMMultiRankN = (uint64_t)mc2Tiling_.tileM * mc2Tiling_.rankN;
     uint64_t rankNDivRankDim = (uint64_t)mc2Tiling_.rankN / mc2Tiling_.rankDim;
@@ -153,7 +153,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename Matmul
 __aicore__ inline void MatmulAlltoAllKernelBase<SchedulerType, SchedulerContextType, MatmulAlltoAllTilingDataType,
                                                 SEP_BIAS>::ProcessTail(uint32_t taskCnt)
 {
-    auto &&mc2Tiling_ = tilingData_->matmulAlltoAllTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->matmulAlltoAllTilingInfo;
     // 复用的中间量
     uint64_t tileCntMultitileM = (uint64_t)mc2Tiling_.tileCnt * mc2Tiling_.tileM;
     uint64_t rankNDivRankDim = (uint64_t)mc2Tiling_.rankN / mc2Tiling_.rankDim;

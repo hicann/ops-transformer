@@ -26,8 +26,8 @@ struct Matmul310TPLParam {
 class UnQuantMatmulAllReduceTiling310 : public MatmulAllReduceTilingBase {
     class UnQuantTilingTransferHelper : public mc2_matmul_v3::Mc2MatmulV3BaseTiling {
     public:
-        UnQuantTilingTransferHelper(UnQuantMatmulAllReduceTiling310 &unquantMatmulAllReduceTiling,
-                                    Mc2MatmulV3TilingData &data)
+        UnQuantTilingTransferHelper(UnQuantMatmulAllReduceTiling310& unquantMatmulAllReduceTiling,
+                                    Mc2MatmulV3TilingData& data)
             : Mc2MatmulV3BaseTiling(unquantMatmulAllReduceTiling.context_, &data),
               tilingProcesser_(unquantMatmulAllReduceTiling)
         {}
@@ -44,7 +44,7 @@ class UnQuantMatmulAllReduceTiling310 : public MatmulAllReduceTilingBase {
                 return ge::GRAPH_FAILED;
             }
 
-            auto &&tilingArgs = tilingProcesser_.args_;
+            auto&& tilingArgs = tilingProcesser_.args_;
             args_.opName = tilingProcesser_.opName_;
             args_.isATrans = tilingArgs.isATrans;
             args_.isBTrans = tilingArgs.isBTrans;
@@ -82,11 +82,11 @@ class UnQuantMatmulAllReduceTiling310 : public MatmulAllReduceTilingBase {
         }
 
     private:
-        UnQuantMatmulAllReduceTiling310 &tilingProcesser_;
+        UnQuantMatmulAllReduceTiling310& tilingProcesser_;
     };
 
 public:
-    explicit UnQuantMatmulAllReduceTiling310(gert::TilingContext *context)
+    explicit UnQuantMatmulAllReduceTiling310(gert::TilingContext* context)
         : MatmulAllReduceTilingBase(context)
     {}
     ~UnQuantMatmulAllReduceTiling310() override = default;
@@ -102,13 +102,13 @@ protected:
 
     ge::graphStatus PostTiling() override;
 
-    Mc2Tiling::Mc2Msg &MutableMc2MsgData() override;
+    Mc2Tiling::Mc2Msg& MutableMc2MsgData() override;
 
-    Mc2Tiling::RCSTiling &MutableRCSTilingData() override;
+    Mc2Tiling::RCSTiling& MutableRCSTilingData() override;
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTileTilingData() override;
+    AscendC::tiling::TCubeTiling& MutableTCubeTileTilingData() override;
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTailTilingData() override;
+    AscendC::tiling::TCubeTiling& MutableTCubeTailTilingData() override;
 
     CutResult GetTilingResult() override;
 

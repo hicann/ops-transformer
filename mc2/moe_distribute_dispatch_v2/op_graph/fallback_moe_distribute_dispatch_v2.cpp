@@ -20,9 +20,9 @@ namespace fallback {
 using namespace ge;
 using namespace gert;
 
-const char *MoeDistributeDispatchV2Info = "MoeDistributeDispatchV2Fallback";
+const char* MoeDistributeDispatchV2Info = "MoeDistributeDispatchV2Fallback";
 
-static graphStatus MoeDistributeDispatchV2ExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus MoeDistributeDispatchV2ExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_LOGD(MoeDistributeDispatchV2Info, "start to fallback for moeDistributeDispatchV2");
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "host_api_ctx"),
@@ -72,75 +72,75 @@ static graphStatus MoeDistributeDispatchV2ExecuteFunc(OpExecuteContext *host_api
     OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "attrs"),
                 return ge::GRAPH_FAILED);
 
-    const auto *group_ep = attrs->GetStr(static_cast<size_t>(0));
+    const auto* group_ep = attrs->GetStr(static_cast<size_t>(0));
     OP_CHECK_IF(group_ep == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "group_ep"),
                 return ge::GRAPH_FAILED);
 
-    const auto *ep_world_size = attrs->GetInt(static_cast<size_t>(1));
+    const auto* ep_world_size = attrs->GetInt(static_cast<size_t>(1));
     OP_CHECK_IF(ep_world_size == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "ep_world_size"),
                 return ge::GRAPH_FAILED);
 
-    const auto *ep_rank_id = attrs->GetInt(static_cast<size_t>(2));
+    const auto* ep_rank_id = attrs->GetInt(static_cast<size_t>(2));
     OP_CHECK_IF(ep_rank_id == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "ep_rank_id"),
                 return ge::GRAPH_FAILED);
 
-    const auto *moe_expert_num = attrs->GetInt(static_cast<size_t>(3));
+    const auto* moe_expert_num = attrs->GetInt(static_cast<size_t>(3));
     OP_CHECK_IF(moe_expert_num == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "moe_expert_num"),
                 return ge::GRAPH_FAILED);
 
-    const auto *group_tp = attrs->GetStr(static_cast<size_t>(4));
+    const auto* group_tp = attrs->GetStr(static_cast<size_t>(4));
     OP_CHECK_IF(group_tp == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "group_tp"),
                 return ge::GRAPH_FAILED);
 
-    const auto *tp_world_size = attrs->GetInt(static_cast<size_t>(5));
+    const auto* tp_world_size = attrs->GetInt(static_cast<size_t>(5));
     OP_CHECK_IF(tp_world_size == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "tp_world_size"),
                 return ge::GRAPH_FAILED);
 
-    const auto *tp_rank_id = attrs->GetInt(static_cast<size_t>(6));
+    const auto* tp_rank_id = attrs->GetInt(static_cast<size_t>(6));
     OP_CHECK_IF(tp_rank_id == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "tp_rank_id"),
                 return ge::GRAPH_FAILED);
 
-    const auto *expert_shard_type = attrs->GetInt(static_cast<size_t>(7));
+    const auto* expert_shard_type = attrs->GetInt(static_cast<size_t>(7));
     OP_CHECK_IF(expert_shard_type == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "expert_shard_type"), return ge::GRAPH_FAILED);
 
-    const auto *shared_expert_num = attrs->GetInt(static_cast<size_t>(8));
+    const auto* shared_expert_num = attrs->GetInt(static_cast<size_t>(8));
     OP_CHECK_IF(shared_expert_num == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "shared_expert_num"), return ge::GRAPH_FAILED);
 
-    const auto *shared_expert_rank_num = attrs->GetInt(static_cast<size_t>(9));
+    const auto* shared_expert_rank_num = attrs->GetInt(static_cast<size_t>(9));
     OP_CHECK_IF(shared_expert_rank_num == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "shared_expert_rank_num"),
                 return ge::GRAPH_FAILED);
 
-    const auto *quant_mode_ptr = attrs->GetInt(static_cast<size_t>(10));
+    const auto* quant_mode_ptr = attrs->GetInt(static_cast<size_t>(10));
     OP_CHECK_IF(quant_mode_ptr == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "quant_mode_ptr"),
                 return ge::GRAPH_FAILED);
 
-    const int64_t *global_bs_ptr = attrs->GetInt(static_cast<size_t>(11));
+    const int64_t* global_bs_ptr = attrs->GetInt(static_cast<size_t>(11));
     OP_CHECK_IF(global_bs_ptr == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "global_bs_ptr"),
                 return ge::GRAPH_FAILED);
 
-    const int64_t *expert_token_nums_type_ptr = attrs->GetInt(static_cast<size_t>(12));
+    const int64_t* expert_token_nums_type_ptr = attrs->GetInt(static_cast<size_t>(12));
     OP_CHECK_IF(expert_token_nums_type_ptr == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "expert_token_nums_type_ptr"),
                 return ge::GRAPH_FAILED);
 
-    const auto *comm_alg_ptr = attrs->GetInt(static_cast<size_t>(13));
+    const auto* comm_alg_ptr = attrs->GetInt(static_cast<size_t>(13));
     OP_CHECK_IF(comm_alg_ptr == nullptr, OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "comm_alg_ptr"),
                 return ge::GRAPH_FAILED);
 
-    const auto *zero_expert_num_ptr = attrs->GetInt(static_cast<size_t>(14));
+    const auto* zero_expert_num_ptr = attrs->GetInt(static_cast<size_t>(14));
     OP_CHECK_IF(zero_expert_num_ptr == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "zero_expert_num_ptr"),
                 return ge::GRAPH_FAILED);
 
-    const auto *copy_expert_num_ptr = attrs->GetInt(static_cast<size_t>(15));
+    const auto* copy_expert_num_ptr = attrs->GetInt(static_cast<size_t>(15));
     OP_CHECK_IF(copy_expert_num_ptr == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "copy_expert_num_ptr"),
                 return ge::GRAPH_FAILED);
 
-    const auto *const_expert_num_ptr = attrs->GetInt(static_cast<size_t>(16));
+    const auto* const_expert_num_ptr = attrs->GetInt(static_cast<size_t>(16));
     OP_CHECK_IF(const_expert_num_ptr == nullptr,
                 OP_LOGE_WITH_INVALID_INPUT(MoeDistributeDispatchV2Info, "const_expert_num_ptr"),
                 return ge::GRAPH_FAILED);

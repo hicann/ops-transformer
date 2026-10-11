@@ -19,11 +19,11 @@
 namespace optiling {
 class MatmulReduceScatterTilingFuncA5 : public MatmulReduceScatterTilingFuncBase {
 public:
-    CutResult GetCutResult(MatmulReduceScatterTilingData &tilingData, mc2tiling::TilingArgs &args) override;
+    CutResult GetCutResult(MatmulReduceScatterTilingData& tilingData, mc2tiling::TilingArgs& args) override;
     ge::graphStatus CheckValidRank(const std::map<uint32_t, std::vector<uint32_t>> VALID_RANK,
-                                   MatmulReduceScatterTilingData *tilingData, gert::TilingContext *context,
+                                   MatmulReduceScatterTilingData* tilingData, gert::TilingContext* context,
                                    uint32_t rankSize) override;
-    std::string GetRsConfig(MatmulReduceScatterTilingData &tilingData) override;
+    std::string GetRsConfig(MatmulReduceScatterTilingData& tilingData) override;
 };
 } // namespace optiling
 

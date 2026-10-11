@@ -39,7 +39,7 @@ struct BasicBlock {
 
 class Mc2WeightQuantBatchMatmulV2BasicBlockTable {
 public:
-    const std::map<BlockMNComb, std::vector<BasicBlock>> &GetBasicBlockTable(int64_t aDtypeBits, int64_t bDtypeBits)
+    const std::map<BlockMNComb, std::vector<BasicBlock>>& GetBasicBlockTable(int64_t aDtypeBits, int64_t bDtypeBits)
     {
         if (aDtypeBits == BITS_16 && bDtypeBits == BITS_4) {
             return A16W4_BASIC_BLOCK_TABLE_V100;

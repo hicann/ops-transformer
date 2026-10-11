@@ -27,12 +27,12 @@ template <class T>
 class Mc2KernelND2NZMM {
 public:
     __aicore__ inline Mc2KernelND2NZMM(){};
-    __aicore__ inline void CopyIn(uint64_t progress, LocalTensor<T> &dstLocal);
-    __aicore__ inline void CopyOutMM(uint64_t progress, LocalTensor<T> &srcLocal);
-    __aicore__ inline void PadD(uint64_t progress, LocalTensor<T> &dstLocal, LocalTensor<T> &srcLocal, int eventIn,
+    __aicore__ inline void CopyIn(uint64_t progress, LocalTensor<T>& dstLocal);
+    __aicore__ inline void CopyOutMM(uint64_t progress, LocalTensor<T>& srcLocal);
+    __aicore__ inline void PadD(uint64_t progress, LocalTensor<T>& dstLocal, LocalTensor<T>& srcLocal, int eventIn,
                                 int eventOut);
     __aicore__ inline void Init(GM_ADDR dst, GM_ADDR src, uint32_t height, uint32_t width, uint32_t batch,
-                                TBuf<TPosition::VECCALC> &ubBuffer, uint32_t usedCoreNum);
+                                TBuf<TPosition::VECCALC>& ubBuffer, uint32_t usedCoreNum);
     template <ND2NZ_DB_TYPE TYPE, bool noZero = false>
     __aicore__ inline bool SetBufMM();
     template <Nd2NzMode mode = Nd2NzMode::MULTI_CORE>
@@ -45,7 +45,7 @@ public:
     __aicore__ inline void ProcessOutDBReuse();
 
 private:
-    TBuf<TPosition::VECCALC> *ubPtr_;
+    TBuf<TPosition::VECCALC>* ubPtr_;
     GlobalTensor<T> srcGM;
     GlobalTensor<T> dstGM;
     LocalTensor<T> inBuf_;
@@ -75,7 +75,7 @@ private:
 };
 
 template <class T>
-__aicore__ inline void Mc2KernelND2NZMM<T>::CopyIn(uint64_t progress, LocalTensor<T> &dstLocal)
+__aicore__ inline void Mc2KernelND2NZMM<T>::CopyIn(uint64_t progress, LocalTensor<T>& dstLocal)
 {
     uint64_t curCopyInSize = progress == nFullProgress_ ? heightTotalTail_ * width_ : copyInSize_;
     uint64_t gmInOffset = copyInSize_ * progress;
@@ -86,7 +86,7 @@ __aicore__ inline void Mc2KernelND2NZMM<T>::CopyIn(uint64_t progress, LocalTenso
 }
 
 template <class T>
-__aicore__ inline void Mc2KernelND2NZMM<T>::CopyOutMM(uint64_t progress, LocalTensor<T> &srcLocal)
+__aicore__ inline void Mc2KernelND2NZMM<T>::CopyOutMM(uint64_t progress, LocalTensor<T>& srcLocal)
 {
     uint64_t oneColSizeGM = Align2(height_ * batch_, ALIGNED_H) * c0_;
     uint64_t oneColSize = hBuffer_ * c0_;
@@ -105,7 +105,7 @@ __aicore__ inline void Mc2KernelND2NZMM<T>::CopyOutMM(uint64_t progress, LocalTe
 }
 
 template <class T>
-__aicore__ inline void Mc2KernelND2NZMM<T>::PadD(uint64_t progress, LocalTensor<T> &dstLocal, LocalTensor<T> &srcLocal,
+__aicore__ inline void Mc2KernelND2NZMM<T>::PadD(uint64_t progress, LocalTensor<T>& dstLocal, LocalTensor<T>& srcLocal,
                                                  int eventIn, int eventOut)
 {
     if (wTail_ == 0) {
@@ -118,7 +118,7 @@ __aicore__ inline void Mc2KernelND2NZMM<T>::PadD(uint64_t progress, LocalTensor<
 
 template <class T>
 __aicore__ inline void Mc2KernelND2NZMM<T>::Init(GM_ADDR dst, GM_ADDR src, uint32_t height, uint32_t width,
-                                                 uint32_t batch, TBuf<TPosition::VECCALC> &ubBuffer,
+                                                 uint32_t batch, TBuf<TPosition::VECCALC>& ubBuffer,
                                                  uint32_t usedCoreNum)
 {
     height_ = height;
@@ -131,8 +131,8 @@ __aicore__ inline void Mc2KernelND2NZMM<T>::Init(GM_ADDR dst, GM_ADDR src, uint3
 
     c0_ = BLOCK_SIZE_BYTE / sizeof(T);
 
-    srcGM.SetGlobalBuffer((__gm__ T *)src);
-    dstGM.SetGlobalBuffer((__gm__ T *)dst);
+    srcGM.SetGlobalBuffer((__gm__ T*)src);
+    dstGM.SetGlobalBuffer((__gm__ T*)dst);
     ubPtr_ = &ubBuffer;
 
     noPadD_ = (width_ == c0_);

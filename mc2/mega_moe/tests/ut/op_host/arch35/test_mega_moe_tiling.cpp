@@ -279,8 +279,8 @@ TEST_F(MegaMoeArch35TilingTest, DifferentNConfig)
 }
 
 static void RunUrmaTilingCase(int64_t xBs, int64_t topkIdsBs, int64_t topkWeightsBs, int64_t numMaxTokensPerRank,
-                              int64_t maxRecvTokenNum, int64_t hiddenDim, const std::string &activation,
-                              const std::vector<float> &activationParams, ge::graphStatus expectedStatus)
+                              int64_t maxRecvTokenNum, int64_t hiddenDim, const std::string& activation,
+                              const std::vector<float>& activationParams, ge::graphStatus expectedStatus)
 {
     ASSERT_GT(hiddenDim, 0);
     ASSERT_EQ(hiddenDim % (MegaMoeImpl::ACTIVATION_N_HALF * MegaMoeImpl::MXFP_DIVISOR_SIZE), 0);
@@ -384,8 +384,8 @@ static void RunUrmaVariableBsCase(int64_t bs, int64_t numMaxTokensPerRank, int64
     RunUrmaVariableBsInputShapeCase(bs, bs, bs, numMaxTokensPerRank, maxRecvTokenNum, expectedStatus);
 }
 
-static void RunUrmaActivationCase(int64_t hiddenDim, const std::string &activation,
-                                  const std::vector<float> &activationParams, ge::graphStatus expectedStatus)
+static void RunUrmaActivationCase(int64_t hiddenDim, const std::string& activation,
+                                  const std::vector<float>& activationParams, ge::graphStatus expectedStatus)
 {
     RunUrmaTilingCase(128, 128, 128, 256, 0, hiddenDim, activation, activationParams, expectedStatus);
 }
@@ -609,7 +609,7 @@ static void RunA8W4FormatCase(ge::Format weightOneFormat, ge::Format weightTwoFo
     ASSERT_GE(tilingInfo.tilingDataSize, sizeof(MegaMoeTilingData));
     MegaMoeTilingData tilingData{};
     std::memcpy(&tilingData, tilingInfo.tilingData.get(), sizeof(tilingData));
-    const auto &layout = tilingData.a8w4L1Layout;
+    const auto& layout = tilingData.a8w4L1Layout;
     EXPECT_EQ(layout.aBufferNum, 3U);
     EXPECT_EQ(layout.bBufferNum, 4U);
     EXPECT_EQ(layout.tileK, 256U);

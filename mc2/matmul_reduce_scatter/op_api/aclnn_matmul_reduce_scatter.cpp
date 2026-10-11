@@ -44,12 +44,12 @@ static constexpr size_t TWO_DIMS = 2;
 
 typedef struct {
     uint32_t id;
-    const char *funcName;
+    const char* funcName;
     bool hasReg;
 } NnopbaseDfxId;
 
 extern "C" uint64_t NnopbaseMsprofSysTime();
-extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
+extern "C" void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId& dfxId);
 
 static inline bool IsAscend910A5(void)
 {
@@ -68,7 +68,7 @@ static uint8_t GetDebugMode()
 }
 
 // 检查入参是否为nullptr
-static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTensor *output)
+static bool CheckNotNull(const aclTensor* x1, const aclTensor* x2, const aclTensor* output)
 {
     OP_CHECK_NULL(x1, return false);
     OP_CHECK_NULL(x2, return false);
@@ -77,7 +77,7 @@ static bool CheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTens
 }
 // 根据API定义，需要列出所能支持的所有dtype
 static const std::initializer_list<op::DataType> DTYPE_SUPPORT_LIST = {op::DataType::DT_FLOAT16, op::DataType::DT_BF16};
-static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *output)
+static bool CheckDtypeValid(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* output)
 {
     // 检查x1、x2、bias、output的数据类型是否在算子的支持列表内
     OP_CHECK_DTYPE_NOT_SUPPORT(output, DTYPE_SUPPORT_LIST, return false);
@@ -99,7 +99,7 @@ static bool CheckDtypeValid(const aclTensor *x1, const aclTensor *x2, const aclT
     return true;
 }
 
-static bool CheckNotEmptyTensor(const aclTensor *x1)
+static bool CheckNotEmptyTensor(const aclTensor* x1)
 {
     auto kValue = x1->GetViewShape().GetDim(1);
     OP_API_CHECK((kValue == 0), {
@@ -120,8 +120,8 @@ static bool CheckAttr(int64_t streamMode)
     return true;
 }
 
-static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, int64_t streamMode,
-                               const aclTensor *output)
+static aclnnStatus CheckParams(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, int64_t streamMode,
+                               const aclTensor* output)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(CheckNotNull(x1, x2, output), ACLNN_ERR_PARAM_NULLPTR);
@@ -142,7 +142,7 @@ static aclnnStatus CheckParams(const aclTensor *x1, const aclTensor *x2, const a
     return ACLNN_SUCCESS;
 }
 
-static bool CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *output, bool isTransA)
+static bool CheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor* output, bool isTransA)
 {
     if (x1->GetViewShape().GetDimNum() != TWO_DIMS) {
         OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("aclnnMatmulReduceScatterGetWorkspaceSize", "x1",
@@ -188,10 +188,10 @@ static bool CheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor
     return true;
 }
 
-aclnnStatus aclnnMatmulReduceScatterGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                                     const char *group, const char *reduce_op, int64_t commTurn,
-                                                     int64_t streamMode, const aclTensor *output,
-                                                     uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnMatmulReduceScatterGetWorkspaceSize(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                                     const char* group, const char* reduce_op, int64_t commTurn,
+                                                     int64_t streamMode, const aclTensor* output,
+                                                     uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
     // 固定写法，参数检查
@@ -224,13 +224,13 @@ aclnnStatus aclnnMatmulReduceScatterGetWorkspaceSize(const aclTensor *x1, const 
         }
     }
     if (IsAscend910A5()) {
-        const char *commMode = "ai_cpu";
+        const char* commMode = "ai_cpu";
         return aclnnMatmulReduceScatterV2GetWorkspaceSize(
             x1, x2, bias, nullptr, nullptr, nullptr, 0, group, reduce_op, commTurn, streamMode, 0, commMode,
-            const_cast<aclTensor *>(output), nullptr, workspaceSize, executor);
+            const_cast<aclTensor*>(output), nullptr, workspaceSize, executor);
     }
     aclnnStatus ret = aclnnInnerMatmulReduceScatterGetWorkspaceSize(
-        x1, x2, bias, const_cast<char *>(group), const_cast<char *>(reduce_op), transposeX1, transposeX2, commTurn,
+        x1, x2, bias, const_cast<char*>(group), const_cast<char*>(reduce_op), transposeX1, transposeX2, commTurn,
         rankSize, output, workspaceSize, executor);
     OP_LOGD("MatmulReduceScatter, aclnnGetWorkspaceSize ret %d.", ret);
     static NnopbaseDfxId dfxId = {0x60000, __func__, false};
@@ -238,7 +238,7 @@ aclnnStatus aclnnMatmulReduceScatterGetWorkspaceSize(const aclTensor *x1, const 
     return ret;
 }
 
-aclnnStatus aclnnMatmulReduceScatter(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMatmulReduceScatter(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                      aclrtStream stream)
 {
     if (IsAscend910A5()) {

@@ -49,15 +49,15 @@ constexpr AscendC::Reg::CastTrait CAST_FP32_TO_BF16 = {AscendC::Reg::RegLayout::
  */
 template <typename InputType>
 struct GatedActivationTileContext {
-    __ubuf__ InputType *gate;
-    __ubuf__ InputType *up;
-    __ubuf__ bfloat16_t *output;
-    __ubuf__ float *topkWeights;
+    __ubuf__ InputType* gate;
+    __ubuf__ InputType* up;
+    __ubuf__ bfloat16_t* output;
+    __ubuf__ float* topkWeights;
 
-    __ubuf__ InputType *gateTail;
-    __ubuf__ InputType *upTail;
-    __ubuf__ bfloat16_t *outputTail;
-    __ubuf__ bfloat16_t *additionalPaddingOutput;
+    __ubuf__ InputType* gateTail;
+    __ubuf__ InputType* upTail;
+    __ubuf__ bfloat16_t* outputTail;
+    __ubuf__ bfloat16_t* additionalPaddingOutput;
 
     uint32_t inputRowStrideElements;
     uint32_t outputRowStrideElements;

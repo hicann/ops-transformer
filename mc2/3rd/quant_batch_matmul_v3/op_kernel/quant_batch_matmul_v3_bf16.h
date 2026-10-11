@@ -32,7 +32,7 @@ class BmmDequantBf16 {
 public:
     __aicore__ inline BmmDequantBf16() {}
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scale, GM_ADDR y, GM_ADDR workSpace,
-                                const Mc2QuantBatchMatmulV3TilingData *__restrict tilingData, TPipe *tPipe)
+                                const Mc2QuantBatchMatmulV3TilingData* __restrict tilingData, TPipe* tPipe)
     {
         blockIdx_ = GetBlockIdx(); // AIC_AIV_1_1 by default
         if constexpr (isAllAiv) {
@@ -70,26 +70,26 @@ public:
             return;
         }
         if (isPerTensor_) {
-            scaleScalar_ = *((__gm__ scaleType *)scale);
+            scaleScalar_ = *((__gm__ scaleType*)scale);
         }
-        xGm_.SetGlobalBuffer((__gm__ xType *)x1);
-        weightGm_.SetGlobalBuffer((__gm__ wType *)x2);
+        xGm_.SetGlobalBuffer((__gm__ xType*)x1);
+        weightGm_.SetGlobalBuffer((__gm__ wType*)x2);
         if (m_ <= baseM_) {
             weightGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
         }
         if (hasBias_ != 0U) {
             if (biasDtype_ == DT_BF16) {
-                biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t *)bias);
+                biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t*)bias);
             } else if (biasDtype_ == DT_FLOAT16) {
-                biasGmFp16_.SetGlobalBuffer((__gm__ half *)bias);
+                biasGmFp16_.SetGlobalBuffer((__gm__ half*)bias);
             } else if (biasDtype_ == DT_FLOAT) {
-                biasGmFp32_.SetGlobalBuffer((__gm__ float *)bias);
+                biasGmFp32_.SetGlobalBuffer((__gm__ float*)bias);
             } else {
-                biasGmInt32_.SetGlobalBuffer((__gm__ int32_t *)bias);
+                biasGmInt32_.SetGlobalBuffer((__gm__ int32_t*)bias);
             }
         }
-        yGm_.SetGlobalBuffer((__gm__ yType *)y);
-        scaleGm_.SetGlobalBuffer((__gm__ scaleType *)scale);
+        yGm_.SetGlobalBuffer((__gm__ yType*)y);
+        scaleGm_.SetGlobalBuffer((__gm__ scaleType*)scale);
         uint32_t singleOffset =
             DequantBmm::Max(singleTimeM_, baseM_) * DequantBmm::Max(singleTimeN_, baseN_) * sizeof(int32_t);
         mm.SetWorkspace(workSpace + blockIdx_ * singleOffset, singleOffset);
@@ -159,7 +159,7 @@ protected:
     GlobalTensor<yType> yGm_;
     GlobalTensor<scaleType> scaleGm_;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     // define the que
     TQue<QuePosition::VECIN, 1> vecQueSrc_;
     TQue<QuePosition::VECIN, 1> vecQueScale_;
@@ -210,7 +210,7 @@ protected:
 
     /** init function for TilingData of mm1
      */
-    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData *tilingData)
+    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData* tilingData)
     {
         hasBias_ = tilingData->matmulTiling.isBias;
         isPerTensor_ = tilingData->params.isPerTensor;
@@ -358,9 +358,9 @@ protected:
         mm.template Iterate<false>(); // matmultiling singleTimeM_ * singleTimeN_
     }
 
-    __aicore__ inline void BiasTensorInit(LocalTensor<float> &dstLocalFp32, LocalTensor<float> &biasFp32,
-                                          LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                          LocalTensor<float> &oriBiasFp32)
+    __aicore__ inline void BiasTensorInit(LocalTensor<float>& dstLocalFp32, LocalTensor<float>& biasFp32,
+                                          LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                          LocalTensor<float>& oriBiasFp32)
     {
         dstLocalFp32 = outFp32Tmp_.Get<float>();
         biasFp32 = biasFp32Tmp_.Get<float>();
@@ -373,8 +373,8 @@ protected:
         }
     }
 
-    __aicore__ inline void BiasGm2Ub(LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                     LocalTensor<float> &oriBiasFp32, DataCopyPadParams padParams,
+    __aicore__ inline void BiasGm2Ub(LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                     LocalTensor<float>& oriBiasFp32, DataCopyPadParams padParams,
                                      uint64_t baseNOfffset, uint32_t curAivN)
     {
         DataCopyParams bias2UbParams{1, 0, 0, 0};
@@ -390,7 +390,7 @@ protected:
         }
     }
 
-    __aicore__ inline void Bf16ScaleGm2Ub(LocalTensor<scaleType> &scaleLocal, GlobalTensor<scaleType> &scaleGm_,
+    __aicore__ inline void Bf16ScaleGm2Ub(LocalTensor<scaleType>& scaleLocal, GlobalTensor<scaleType>& scaleGm_,
                                           DataCopyPadParams padParams, uint64_t baseNOfffset, uint32_t curAivN)
     {
         DataCopyParams scale2UbParams{1, 0, 0, 0};
@@ -399,9 +399,9 @@ protected:
         DataCopyPad(scaleLocal, scaleGm_[scaleOffset], scale2UbParams, padParams);
     }
 
-    __aicore__ inline void CalBiasAdd(LocalTensor<float> &dstLocalFp32, LocalTensor<float> &biasFp32,
-                                      LocalTensor<bfloat16_t> &oriBiasBf16, LocalTensor<half> &oriBiasFp16,
-                                      LocalTensor<float> &oriBiasFp32, LocalTensor<yType> &dstLocal, uint32_t curAivN,
+    __aicore__ inline void CalBiasAdd(LocalTensor<float>& dstLocalFp32, LocalTensor<float>& biasFp32,
+                                      LocalTensor<bfloat16_t>& oriBiasBf16, LocalTensor<half>& oriBiasFp16,
+                                      LocalTensor<float>& oriBiasFp32, LocalTensor<yType>& dstLocal, uint32_t curAivN,
                                       uint32_t curAivM)
     {
         uint32_t computedAivN = DequantBmm::Align(curAivN, 8U); // 8: 32B aligned for int32_t
@@ -441,7 +441,7 @@ protected:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void DequantCompute(GlobalTensor<int32_t> &curMmOutGm, uint64_t baseMOfffset,
+    __aicore__ inline void DequantCompute(GlobalTensor<int32_t>& curMmOutGm, uint64_t baseMOfffset,
                                           uint64_t baseNOfffset, uint32_t curAicM, uint32_t curAicN)
     {
         LocalTensor<float> dstLocalFp32;

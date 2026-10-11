@@ -40,7 +40,7 @@ struct MoeDistributeCombineV2HostUtParamBase {
     int64_t const_expert_num;
     ge::graphStatus expectResult;
 
-    MoeDistributeCombineV2HostUtParamBase(const csv_map &csvMap)
+    MoeDistributeCombineV2HostUtParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->group_ep = ReadMap(csvMap, "group_ep");
@@ -65,7 +65,7 @@ struct MoeDistributeCombineV2HostUtParamBase {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MoeDistributeCombineV2HostUtParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const MoeDistributeCombineV2HostUtParamBase& param)
 {
     return os << param.case_name;
 }
@@ -96,7 +96,7 @@ struct MoeDistributeCombineV2TilingUtParam : public MoeDistributeCombineV2HostUt
     uint64_t ranksize;
     uint64_t expectTilingKey;
 
-    MoeDistributeCombineV2TilingUtParam(const csv_map &csvMap)
+    MoeDistributeCombineV2TilingUtParam(const csv_map& csvMap)
         : MoeDistributeCombineV2HostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(

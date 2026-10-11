@@ -106,9 +106,9 @@ public:
     DEVICE BlockMmad() {}
 
     struct Params {
-        __gm__ DtypeB *bGmAddr = nullptr;
-        __gm__ DtypeA *antiquantScaleGmAddr = nullptr;
-        __gm__ DtypeA *antiquantOffsetGmAddr = nullptr;
+        __gm__ DtypeB* bGmAddr = nullptr;
+        __gm__ DtypeA* antiquantScaleGmAddr = nullptr;
+        __gm__ DtypeA* antiquantOffsetGmAddr = nullptr;
         uint64_t groupSize;
 
         TileShapeL1 tileShapeL1;
@@ -162,7 +162,7 @@ private:
 
 public:
     template <class ProblemShape, typename TilingData>
-    DEVICE static Params GetParams(ProblemShape &problemShape, Arguments const &args, TilingData const &tiling)
+    DEVICE static Params GetParams(ProblemShape& problemShape, Arguments const& args, TilingData const& tiling)
     {
         decltype(auto) sizeK = get<2>(problemShape);
 
@@ -244,11 +244,11 @@ public:
     }
 
     template <class ProblemShape>
-    DEVICE static Params GetParams(ProblemShape &problemShape, Arguments const &args)
+    DEVICE static Params GetParams(ProblemShape& problemShape, Arguments const& args)
     {}
 
     template <class ProblemShape>
-    DEVICE auto Init(ProblemShape const &problemShape, Params const &params)
+    DEVICE auto Init(ProblemShape const& problemShape, Params const& params)
     {
 #if defined(__CCE_KT_TEST__)
         if ASCEND_IS_AIC {
@@ -298,7 +298,7 @@ public:
 
     // 提取的辅助函数：执行权重和反量化数据的拷贝
     template <typename ProblemShape, typename Iterators, typename Params>
-    DEVICE void CopyWeightAndAntiquant(ProblemShape const &problemShape, Iterators const &iters, Params const &params,
+    DEVICE void CopyWeightAndAntiquant(ProblemShape const& problemShape, Iterators const& iters, Params const& params,
                                        uint64_t pipelineIndex)
     {
         decltype(auto) sizeN = get<1>(problemShape);
@@ -317,7 +317,7 @@ public:
 
     // 提取的辅助函数：更新迭代器状态
     template <typename Iterators>
-    DEVICE void UpdateIteratorState(Iterators &iters)
+    DEVICE void UpdateIteratorState(Iterators& iters)
     {
         decltype(auto) iterMLoad = get<0>(iters);
         decltype(auto) iterNLoad = get<1>(iters);
@@ -335,8 +335,8 @@ public:
 
     // 优化后的LoadInAdvance函数
     template <typename ProblemShape, typename Iterators>
-    DEVICE void LoadInAdvance(ProblemShape const &problemShape, PipelineTuple const &pipelines,
-                              PipelineStateTuple &states, Params const &params, Iterators &iters)
+    DEVICE void LoadInAdvance(ProblemShape const& problemShape, PipelineTuple const& pipelines,
+                              PipelineStateTuple& states, Params const& params, Iterators& iters)
     {
 #if defined(__CCE_KT_TEST__)
         if ASCEND_IS_AIC {
@@ -356,8 +356,8 @@ public:
 
     // 优化后的Process函数
     template <typename ProblemShape, typename Iterators>
-    DEVICE void Process(ProblemShape const &problemShape, PipelineTuple const &pipelines, PipelineStateTuple &states,
-                        Params const &params, Iterators &itersLoad, Iterators const &itersCompute)
+    DEVICE void Process(ProblemShape const& problemShape, PipelineTuple const& pipelines, PipelineStateTuple& states,
+                        Params const& params, Iterators& itersLoad, Iterators const& itersCompute)
     {
         decltype(auto) sizeK = get<2>(problemShape);
         decltype(auto) iterNCompute = get<1>(itersCompute);
@@ -371,10 +371,10 @@ public:
 
     // 提取的处理单个K迭代的函数
     template <typename ProblemShape, typename Iterators>
-    DEVICE void ProcessSingleKIteration(ProblemShape const &problemShape, PipelineTuple const &pipelines,
-                                        PipelineStateTuple &states, Params const &params, Iterators &itersLoad,
-                                        ContinuousIterator<uint64_t> const &iterKCompute,
-                                        decltype(get<1>(Iterators())) const &iterNCompute)
+    DEVICE void ProcessSingleKIteration(ProblemShape const& problemShape, PipelineTuple const& pipelines,
+                                        PipelineStateTuple& states, Params const& params, Iterators& itersLoad,
+                                        ContinuousIterator<uint64_t> const& iterKCompute,
+                                        decltype(get<1>(Iterators())) const& iterNCompute)
     {
         decltype(auto) pipelineGm2Ub = get<0>(pipelines);
         decltype(auto) pipelineUb2L1 = get<1>(pipelines);
@@ -400,7 +400,7 @@ public:
         ++pipelineStateWeightInCompute;
     }
 
-    DEVICE void ClearPipeline(PipelineTuple const &pipelines, PipelineStateTuple &states)
+    DEVICE void ClearPipeline(PipelineTuple const& pipelines, PipelineStateTuple& states)
     {
         decltype(auto) pipelineGm2Ub = get<0>(pipelines);
         decltype(auto) pipelineUb2L1 = get<1>(pipelines);
@@ -493,10 +493,10 @@ private:
     }
 
     template <typename IterN, typename IterK>
-    DEVICE void ConsumeUbInL1(IterK const &iterKUb, IterN const &iterN, Params const &params,
-                              PipelineStateWeightInCompute const &pipelineStateWeightIn,
-                              PipelineStateAiv2Aic &pipelineStateAiv2Aic, PipelineUb2L1 const &pipelineUb2L1,
-                              PipelineStateUb2L1 &pipelineStateUb2L1)
+    DEVICE void ConsumeUbInL1(IterK const& iterKUb, IterN const& iterN, Params const& params,
+                              PipelineStateWeightInCompute const& pipelineStateWeightIn,
+                              PipelineStateAiv2Aic& pipelineStateAiv2Aic, PipelineUb2L1 const& pipelineUb2L1,
+                              PipelineStateUb2L1& pipelineStateUb2L1)
     {
         // ub->l1 k
         for (ContinuousIterator<uint32_t> iterKUb2L1(/*stop*/ iterKUb.Size(), /*step*/ get<3>(params.tileShapeL1));
@@ -510,10 +510,10 @@ private:
     }
 
     template <typename IterN, typename IterK>
-    DEVICE void ProduceL1InUb(IterK const &iterKUb2L1, IterN const &iterN, Params const &params,
-                              PipelineStateWeightInCompute const &pipelineStateWeightIn,
-                              PipelineUb2L1 const &pipelineUb2L1, PipelineStateUb2L1 &pipelineStateUb2L1,
-                              PipelineStateAiv2Aic const &pipelineStateAiv2Aic)
+    DEVICE void ProduceL1InUb(IterK const& iterKUb2L1, IterN const& iterN, Params const& params,
+                              PipelineStateWeightInCompute const& pipelineStateWeightIn,
+                              PipelineUb2L1 const& pipelineUb2L1, PipelineStateUb2L1& pipelineStateUb2L1,
+                              PipelineStateAiv2Aic const& pipelineStateAiv2Aic)
     {
         // 两处需要用到
         //   reg2Ub

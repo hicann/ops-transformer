@@ -25,7 +25,7 @@
 constexpr uint16_t MAX_TENSOR_CONT = 256;
 constexpr uint16_t MAX_CORE_CONT = 64;
 
-inline void InitQuantMatmulAllReduceTilingData(uint8_t *tiling, Mc2Tiling::QuantMatmulAllReduceTilingData *const_data)
+inline void InitQuantMatmulAllReduceTilingData(uint8_t* tiling, Mc2Tiling::QuantMatmulAllReduceTilingData* const_data)
 {
     memcpy(const_data, tiling, sizeof(Mc2Tiling::QuantMatmulAllReduceTilingData));
 }

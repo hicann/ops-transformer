@@ -100,7 +100,7 @@ private:
     uint32_t rank_size{0};
     uint32_t rank{0};
 
-    __gm__ cType *gm_peer_mem;
+    __gm__ cType* gm_peer_mem;
     CommBase commUtil;
 
     bool TA;
@@ -113,7 +113,7 @@ __aicore__ inline void MatmulAlltoAll<TemplateMMA2AFunc>::Init(GM_ADDR aGM, GM_A
                                                                GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(MatmulAlltoAllTilingData);
-    auto tiling = (__gm__ MatmulAlltoAllTilingData *)tilingGM;
+    auto tiling = (__gm__ MatmulAlltoAllTilingData*)tilingGM;
     GET_TILING_DATA(tilingData, tilingGM);
 
     rank_size = tilingData.matmulAlltoAllInfo.worldSize;
@@ -126,7 +126,7 @@ __aicore__ inline void MatmulAlltoAll<TemplateMMA2AFunc>::Init(GM_ADDR aGM, GM_A
     workspaceGM_ = GetUserWorkspace(workspaceGM);
 
     commUtil.SetArgs(&rank, rank_size, tilingData);
-    gm_peer_mem = reinterpret_cast<__gm__ cType *>(commUtil.buff[rank]); // 注意注意，quant是aiv使用，非quant是aic使用
+    gm_peer_mem = reinterpret_cast<__gm__ cType*>(commUtil.buff[rank]); // 注意注意，quant是aiv使用，非quant是aic使用
 }
 
 template <TemplateMMA2AClass>
@@ -377,8 +377,8 @@ __aicore__ inline void MatmulAlltoAll<TemplateMMA2AFunc>::Process()
                     int64_t dst_offset = commUtil.core_idx * rank_offset + static_cast<int64_t>(commIdx) * commUtil.m0 *
                                                                                commUtil.p_value *
                                                                                (commUtil.n / rank_size);
-                    commUtil.CopyGMToGM((__gm__ cType *)commUtil.buff[commUtil.core_idx] + src_offset,
-                                        reinterpret_cast<__gm__ cType *>(cGM_) + dst_offset, token_per_rank);
+                    commUtil.CopyGMToGM((__gm__ cType*)commUtil.buff[commUtil.core_idx] + src_offset,
+                                        reinterpret_cast<__gm__ cType*>(cGM_) + dst_offset, token_per_rank);
                 }
 
                 commUtil.SetAndWaitAivSync(flag_idx);

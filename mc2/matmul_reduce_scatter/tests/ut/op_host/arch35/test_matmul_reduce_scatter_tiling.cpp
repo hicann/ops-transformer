@@ -304,7 +304,7 @@ TEST_F(MatmulReduceScatterArch35TilingTest, InvalidRankSize16)
 
 TEST_F(MatmulReduceScatterArch35TilingTest, IsDeterministic_True_FP16)
 {
-    const char *envValue = getenv("HCCL_DETERMINISTIC");
+    const char* envValue = getenv("HCCL_DETERMINISTIC");
     std::string originalStr = (envValue != nullptr) ? std::string(envValue) : "";
     setenv("HCCL_DETERMINISTIC", "TRUE", 1);
 
@@ -343,7 +343,7 @@ TEST_F(MatmulReduceScatterArch35TilingTest, IsDeterministic_True_FP16)
 
 TEST_F(MatmulReduceScatterArch35TilingTest, IsDeterministic_False_FP16)
 {
-    const char *envValue = getenv("HCCL_DETERMINISTIC");
+    const char* envValue = getenv("HCCL_DETERMINISTIC");
     std::string originalStr = (envValue != nullptr) ? std::string(envValue) : "";
     setenv("HCCL_DETERMINISTIC", "0", 1);
 
@@ -602,7 +602,7 @@ TEST_F(MatmulReduceScatterArch35TilingTest, TilingParse_Success)
     ASSERT_NE(opImpl, nullptr);
     ASSERT_NE(opImpl->tiling_parse, nullptr);
 
-    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext *>(parseContext));
+    auto ret = opImpl->tiling_parse(reinterpret_cast<gert::KernelContext*>(parseContext));
     EXPECT_EQ(ret, ge::GRAPH_SUCCESS);
 }
 

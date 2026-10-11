@@ -80,18 +80,18 @@ extern "C" {
  *
  */
 ACLNN_API aclnnStatus aclnnMegaMoeGetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x, const aclTensor *topkIds, const aclTensor *topkWeights,
-    const aclTensorList *weight1, const aclTensorList *weight2, const aclTensorList *weightScales1Optional,
-    const aclTensorList *weightScales2Optional, const aclTensorList *bias1Optional, const aclTensorList *bias2Optional,
-    const aclTensor *xActiveMaskOptional, const aclTensor *scalesOptional, const aclTensorList *sharedWeight1Optional,
-    const aclTensorList *sharedWeight2Optional, const aclTensorList *sharedWeightScales1Optional,
-    const aclTensorList *sharedWeightScales2Optional, const aclTensorList *sharedBias1Optional,
-    const aclTensorList *sharedBias2Optional, const aclTensor *maskBufferOptional, int64_t moeExpertNum,
+    const aclTensor* context, const aclTensor* x, const aclTensor* topkIds, const aclTensor* topkWeights,
+    const aclTensorList* weight1, const aclTensorList* weight2, const aclTensorList* weightScales1Optional,
+    const aclTensorList* weightScales2Optional, const aclTensorList* bias1Optional, const aclTensorList* bias2Optional,
+    const aclTensor* xActiveMaskOptional, const aclTensor* scalesOptional, const aclTensorList* sharedWeight1Optional,
+    const aclTensorList* sharedWeight2Optional, const aclTensorList* sharedWeightScales1Optional,
+    const aclTensorList* sharedWeightScales2Optional, const aclTensorList* sharedBias1Optional,
+    const aclTensorList* sharedBias2Optional, const aclTensor* maskBufferOptional, int64_t moeExpertNum,
     int64_t epWorldSize, int64_t cclBufferSize, int64_t maxRecvTokenNum, int64_t dispatchQuantMode,
-    int64_t dispatchQuantOutDtype, int64_t sharedExpertQuantOutDtype, int64_t combineQuantMode, const char *commAlg,
-    int64_t numMaxTokensPerRank, const char *activation, const aclFloatArray *activationParams, int64_t topoType,
-    int64_t rankNumPerServer, int64_t topkWeightsType, int64_t combineCommMode, aclTensor *yOut,
-    aclTensor *expertTokenNumsOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t dispatchQuantOutDtype, int64_t sharedExpertQuantOutDtype, int64_t combineQuantMode, const char* commAlg,
+    int64_t numMaxTokensPerRank, const char* activation, const aclFloatArray* activationParams, int64_t topoType,
+    int64_t rankNumPerServer, int64_t topkWeightsType, int64_t combineCommMode, aclTensor* yOut,
+    aclTensor* expertTokenNumsOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMegaMoe的第二段接口，用于执行计算。
@@ -101,7 +101,7 @@ ACLNN_API aclnnStatus aclnnMegaMoeGetWorkspaceSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnMegaMoe(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMegaMoe(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                    aclrtStream stream);
 
 #ifdef __cplusplus

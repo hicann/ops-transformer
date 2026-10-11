@@ -96,7 +96,7 @@ struct TileShardParams {
     bool isTail;
 };
 
-static void PrintCommonTilingVariables(AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void PrintCommonTilingVariables(AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     OP_LOGD("AlltoAllAllGatherBatchMatMul Tiling Check", "Common tiling - epGroupSize is %u.",
             tilingData->commonTiling.epGroupSize);
@@ -142,7 +142,7 @@ static void PrintCommonTilingVariables(AlltoAllAllGatherBatchMatMulTilingData *t
             tilingData->commonTiling.totalUbSize);
 }
 
-static void PrintSliceTileInfo(AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void PrintSliceTileInfo(AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     OP_LOGD("AlltoAllAllGatherBatchMatMul Tiling Check", "Local E - Tile length is %lu.",
             tilingData->commonTiling.localTileE.tileLen);
@@ -198,7 +198,7 @@ static uint32_t GetDataSize(ge::DataType geDtype)
     }
 }
 
-static void InitTileInfoInCommonTiling(AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void InitTileInfoInCommonTiling(AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     tilingData->commonTiling.localTileE.tileCnt = 1;
     tilingData->commonTiling.localTileE.tileLen = tilingData->commonTiling.EOverEp;
@@ -230,7 +230,7 @@ static void InitTileInfoInCommonTiling(AlltoAllAllGatherBatchMatMulTilingData *t
     tilingData->commonTiling.domesticTileC.tailLen = 0;
 }
 
-static void UpdateTileInfo(BMM_TileInfo &tileInfo, uint64_t tileCnt, uint64_t tileLen, uint64_t tailCnt,
+static void UpdateTileInfo(BMM_TileInfo& tileInfo, uint64_t tileCnt, uint64_t tileLen, uint64_t tailCnt,
                            uint64_t tailLen)
 {
     tileInfo.tailCnt = tailCnt;
@@ -239,8 +239,8 @@ static void UpdateTileInfo(BMM_TileInfo &tileInfo, uint64_t tileCnt, uint64_t ti
     tileInfo.tileLen = tileLen;
 }
 
-static void CheckTransposeUBAndUpdateTileShard(TransposeConfig &config,
-                                               AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void CheckTransposeUBAndUpdateTileShard(TransposeConfig& config,
+                                               AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     uint64_t H = tilingData->commonTiling.H;
     uint64_t ep = tilingData->commonTiling.epGroupSize;
@@ -267,7 +267,7 @@ static void CheckTransposeUBAndUpdateTileShard(TransposeConfig &config,
     uint64_t tailLen = totalDataSize - tileLen * tileCnt;
     uint64_t tailCnt = (tailLen == 0UL) ? 0UL : 1UL;
 
-    BMM_TileInfo &tileInfo = config.isLocal ? (config.isTail ? tilingData->commonTiling.localTailUbTranspose :
+    BMM_TileInfo& tileInfo = config.isLocal ? (config.isTail ? tilingData->commonTiling.localTailUbTranspose :
                                                                tilingData->commonTiling.localUbTranspose) :
                                               (config.isTail ? tilingData->commonTiling.domesticTailUbTranspose :
                                                                tilingData->commonTiling.domesticUbTranspose);
@@ -275,7 +275,7 @@ static void CheckTransposeUBAndUpdateTileShard(TransposeConfig &config,
     return;
 }
 
-static void CheckAddActivateUB(ActivationParams &actParams, AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void CheckAddActivateUB(ActivationParams& actParams, AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     uint64_t ubCapacity = 1U;
     uint64_t actIn = 2U;
@@ -319,7 +319,7 @@ static void CheckAddActivateUB(ActivationParams &actParams, AlltoAllAllGatherBat
     tilingData->commonTiling.fastGeluBuffer = std::max(static_cast<uint64_t>(FASTGELU_MINSIZE), fastGelu * ubCapacity);
 }
 
-static void UpdateTileShard(TileShardParams &params, AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void UpdateTileShard(TileShardParams& params, AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     uint64_t ep = tilingData->commonTiling.epGroupSize;
     uint64_t tp = tilingData->commonTiling.tpGroupSize;
@@ -341,7 +341,7 @@ static void UpdateTileShard(TileShardParams &params, AlltoAllAllGatherBatchMatMu
     uint64_t tailLen = totalDataSize - tileLen * tileCnt;
     uint64_t tailCnt = (tailLen == 0U) ? 0U : 1U;
 
-    BMM_TileInfo &tileInfo =
+    BMM_TileInfo& tileInfo =
         params.isLocal ?
             (params.isTail ? tilingData->commonTiling.localTailUbAdd : tilingData->commonTiling.localUbAdd) :
             (params.isTail ? tilingData->commonTiling.domesticTailUbAdd : tilingData->commonTiling.domesticUbAdd);
@@ -349,14 +349,14 @@ static void UpdateTileShard(TileShardParams &params, AlltoAllAllGatherBatchMatMu
     return;
 }
 
-static void CheckAddActivateUBAndUpdateTileShard(ActivationParams &actParams, TileShardParams &params,
-                                                 AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void CheckAddActivateUBAndUpdateTileShard(ActivationParams& actParams, TileShardParams& params,
+                                                 AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     CheckAddActivateUB(actParams, tilingData);
     UpdateTileShard(params, tilingData);
 }
 
-static uint64_t UpdateTilingKey(AlltoAllAllGatherBatchMatMulTilingData *tilingData, bool y2Flag, bool y3Flag)
+static uint64_t UpdateTilingKey(AlltoAllAllGatherBatchMatMulTilingData* tilingData, bool y2Flag, bool y3Flag)
 {
     uint8_t xShardFlag = tilingData->commonTiling.xShardFlag;
     bool isWeightTrans = tilingData->commonTiling.isWeightTrans;
@@ -378,7 +378,7 @@ static uint64_t UpdateTilingKey(AlltoAllAllGatherBatchMatMulTilingData *tilingDa
     return tilingKey;
 }
 
-static void CompleteBmmStructs(AlltoAllAllGatherBatchInfo &BMMV3BatchInfo, AlltoAllAllGatherMatmulInfo &MMV3ArgsInfo,
+static void CompleteBmmStructs(AlltoAllAllGatherBatchInfo& BMMV3BatchInfo, AlltoAllAllGatherMatmulInfo& MMV3ArgsInfo,
                                uint32_t m, uint32_t n, uint32_t k, uint32_t b)
 {
     MMV3ArgsInfo.mValue = m;
@@ -394,8 +394,8 @@ static void CompleteBmmStructs(AlltoAllAllGatherBatchInfo &BMMV3BatchInfo, Allto
     return;
 }
 
-static void GetAlltoAllAllGatherFormulateTileCnt(mc2tiling::TilingArgs &formulaicArgs,
-                                                 AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void GetAlltoAllAllGatherFormulateTileCnt(mc2tiling::TilingArgs& formulaicArgs,
+                                                 AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     All2AllAllGatherBMM formulaicTiling(formulaicArgs, tilingData->commonTiling.epGroupSize,
                                         tilingData->commonTiling.tpGroupSize, tilingData->commonTiling.EOverEp);
@@ -421,8 +421,8 @@ static void GetAlltoAllAllGatherFormulateTileCnt(mc2tiling::TilingArgs &formulai
     return;
 }
 
-static void GetAlltoAllAllGatherFormulateTileCntShardH(mc2tiling::TilingArgs &formulaicArgs,
-                                                       AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void GetAlltoAllAllGatherFormulateTileCntShardH(mc2tiling::TilingArgs& formulaicArgs,
+                                                       AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     All2AllAllGatherBMMShardH formulaicTiling(formulaicArgs, tilingData->commonTiling.epGroupSize,
                                               tilingData->commonTiling.tpGroupSize, tilingData->commonTiling.EOverEp);
@@ -466,8 +466,8 @@ static void GetAlltoAllAllGatherFormulateTileCntShardH(mc2tiling::TilingArgs &fo
     return;
 }
 
-static ge::graphStatus HandleLocalBmmTilingData(gert::TilingContext *context,
-                                                AlltoAllAllGatherBatchMatMulTilingData *tilingData,
+static ge::graphStatus HandleLocalBmmTilingData(gert::TilingContext* context,
+                                                AlltoAllAllGatherBatchMatMulTilingData* tilingData,
                                                 AlltoAllAllGatherBatchInfo bmmV3BatchInfo,
                                                 AlltoAllAllGatherMatmulInfo mmV3ArgsInfo)
 {
@@ -510,8 +510,8 @@ static ge::graphStatus HandleLocalBmmTilingData(gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus HandleNoneLocalBmmTilingData(gert::TilingContext *context,
-                                                    AlltoAllAllGatherBatchMatMulTilingData *tilingData,
+static ge::graphStatus HandleNoneLocalBmmTilingData(gert::TilingContext* context,
+                                                    AlltoAllAllGatherBatchMatMulTilingData* tilingData,
                                                     AlltoAllAllGatherBatchInfo bmmV3BatchInfo,
                                                     AlltoAllAllGatherMatmulInfo mmV3ArgsInfo)
 {
@@ -558,11 +558,11 @@ static ge::graphStatus HandleNoneLocalBmmTilingData(gert::TilingContext *context
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetMatmulTilingAlltoAllAllGatherBatchMatMul(gert::TilingContext *context,
-                                                                   AlltoAllAllGatherBatchMatMulTilingData *tilingData,
+static ge::graphStatus SetMatmulTilingAlltoAllAllGatherBatchMatMul(gert::TilingContext* context,
+                                                                   AlltoAllAllGatherBatchMatMulTilingData* tilingData,
                                                                    AlltoAllAllGatherBatchInfo BMMV3BatchInfo,
                                                                    AlltoAllAllGatherMatmulInfo MMV3ArgsInfo,
-                                                                   mc2tiling::TilingArgs &formulaicArgs)
+                                                                   mc2tiling::TilingArgs& formulaicArgs)
 {
     // 1. 调用公式化tiling接口，获取local和非local块的切分信息并更新commonTiling
     if (tilingData->commonTiling.xShardFlag == 1U) {
@@ -595,9 +595,9 @@ static ge::graphStatus SetMatmulTilingAlltoAllAllGatherBatchMatMul(gert::TilingC
     return ge::GRAPH_SUCCESS;
 }
 
-const char *K_INNER_DEBUG = "MC2: AlltoAllAllGatherBmm Tiling Shape Debug";
+const char* K_INNER_DEBUG = "MC2: AlltoAllAllGatherBmm Tiling Shape Debug";
 
-static bool ActTypeCheck(const char *nodeName, const int64_t actType, const bool y3Flag)
+static bool ActTypeCheck(const char* nodeName, const int64_t actType, const bool y3Flag)
 {
     if (std::find(ops::ACT_TYPE_SUPPORT_VEC.begin(), ops::ACT_TYPE_SUPPORT_VEC.end(), actType) ==
         ops::ACT_TYPE_SUPPORT_VEC.end()) {
@@ -624,7 +624,7 @@ static bool ActTypeCheck(const char *nodeName, const int64_t actType, const bool
     return true;
 }
 
-static bool CommonCheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
+static bool CommonCheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
                                    const size_t wDimH)
 {
     // 检查每个维度: x dim C >= 1，dim E H M 会在后面限制, 这里不再做校验
@@ -643,8 +643,8 @@ static bool CommonCheckTensorShape(const char *nodeName, const gert::Shape *xSha
 }
 
 // GPT 2.2T
-static bool XShardCheckTensorShape(const char *nodeName, const int64_t xShard, const gert::Shape *xShape,
-                                   const gert::Shape *weightShape, const int64_t epSize, const int64_t tpSize,
+static bool XShardCheckTensorShape(const char* nodeName, const int64_t xShard, const gert::Shape* xShape,
+                                   const gert::Shape* weightShape, const int64_t epSize, const int64_t tpSize,
                                    const size_t wDimH, const size_t wDimM)
 {
     // 检查 shape 维度的范围
@@ -702,7 +702,7 @@ static bool XShardCheckTensorShape(const char *nodeName, const int64_t xShard, c
     return true;
 }
 
-static bool CheckBiasShape(const char *nodeName, const gert::Shape *weightShape, const gert::Shape *biasShape,
+static bool CheckBiasShape(const char* nodeName, const gert::Shape* weightShape, const gert::Shape* biasShape,
                            const size_t wDimM)
 {
     // 检查 dimNum
@@ -739,8 +739,8 @@ static bool CheckBiasShape(const char *nodeName, const gert::Shape *weightShape,
     return true;
 }
 
-static bool CheckTensorShape(const char *nodeName, const gert::Shape *xShape, const gert::Shape *weightShape,
-                             const gert::Shape *biasShape, const int64_t epSize, const int64_t tpSize,
+static bool CheckTensorShape(const char* nodeName, const gert::Shape* xShape, const gert::Shape* weightShape,
+                             const gert::Shape* biasShape, const int64_t epSize, const int64_t tpSize,
                              const size_t wDimH, const size_t wDimM, const int64_t xShard)
 {
     if ((xShape == nullptr) || (weightShape == nullptr)) {
@@ -780,9 +780,9 @@ static bool CheckTensorShape(const char *nodeName, const gert::Shape *xShape, co
     return true;
 }
 
-static bool CheckIsAttrNull(const char *nodeName, const int64_t *tpWorldSize, const int64_t *epWorldSize,
-                            const int64_t *xShardType, const int64_t *actTypePtr, const bool *outputY2Flag,
-                            const bool *outputY3Flag)
+static bool CheckIsAttrNull(const char* nodeName, const int64_t* tpWorldSize, const int64_t* epWorldSize,
+                            const int64_t* xShardType, const int64_t* actTypePtr, const bool* outputY2Flag,
+                            const bool* outputY3Flag)
 {
     if ((tpWorldSize == nullptr) || (epWorldSize == nullptr)) {
         OP_LOGE_WITH_INVALID_INPUT(nodeName, "tpWorldSize or epWorldSize");
@@ -801,21 +801,21 @@ static bool CheckIsAttrNull(const char *nodeName, const int64_t *tpWorldSize, co
     return true;
 }
 
-static bool CheckAttrs(const gert::TilingContext *context, int64_t &epSize, int64_t &tpSize, int64_t &xShard,
-                       bool &y2Flag, bool &y3Flag)
+static bool CheckAttrs(const gert::TilingContext* context, int64_t& epSize, int64_t& tpSize, int64_t& xShard,
+                       bool& y2Flag, bool& y3Flag)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "attrs"), return false);
     // get 只有在 index 超出 attr num 的时候才会返回 nullptr
-    const char *groupEp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_EP));
-    const char *groupTp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_TP));
-    const int64_t *tpWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_TP_WORLD_SIZE));
-    const int64_t *epWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_EP_WORLD_SIZE));
-    const int64_t *xShardType = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_X_SHARD_TYPE));
-    const int64_t *actTypePtr = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_ACT_TYPE));
-    const bool *outputY2Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y2_FLAG));
-    const bool *outputY3Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y3_FLAG));
+    const char* groupEp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_EP));
+    const char* groupTp = attrs->GetStr(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_GROUP_TP));
+    const int64_t* tpWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_TP_WORLD_SIZE));
+    const int64_t* epWorldSize = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_EP_WORLD_SIZE));
+    const int64_t* xShardType = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_X_SHARD_TYPE));
+    const int64_t* actTypePtr = attrs->GetInt(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_ACT_TYPE));
+    const bool* outputY2Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y2_FLAG));
+    const bool* outputY3Flag = attrs->GetBool(static_cast<size_t>(ops::AlltoAllAllGatherBmmAttrIdx::K_OUTPUT_Y3_FLAG));
 
     if (!CheckIsAttrNull(nodeName, tpWorldSize, epWorldSize, xShardType, actTypePtr, outputY2Flag, outputY3Flag)) {
         return false;
@@ -853,21 +853,21 @@ static bool CheckAttrs(const gert::TilingContext *context, int64_t &epSize, int6
 }
 
 // 入参校验
-static ge::graphStatus TilingCheckAlltoAllAllGatherBatchMatMul(gert::TilingContext *context)
+static ge::graphStatus TilingCheckAlltoAllAllGatherBatchMatMul(gert::TilingContext* context)
 {
     OP_TILING_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_INNER_DEBUG, "context"), return ge::GRAPH_FAILED);
 
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGI(nodeName, "Enter AlltoAllAllGatherBmm tiling check impl.");
 
     // 检查 shape 是否为空
-    const gert::StorageShape *xStorageShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_X));
+    const gert::StorageShape* xStorageShape = context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_X));
     OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "x"), return ge::GRAPH_FAILED);
-    const gert::StorageShape *weightStorageShape =
+    const gert::StorageShape* weightStorageShape =
         context->GetInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_WEIGHT));
     OP_TILING_CHECK(weightStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "weight"),
                     return ge::GRAPH_FAILED);
-    const gert::StorageShape *y1StorageShape =
+    const gert::StorageShape* y1StorageShape =
         context->GetOutputShape(static_cast<size_t>(ops::AlltoAllAllGatherBmmOutIdx::K_Y1));
     OP_TILING_CHECK(y1StorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "y1"), return ge::GRAPH_FAILED);
 
@@ -884,12 +884,12 @@ static ge::graphStatus TilingCheckAlltoAllAllGatherBatchMatMul(gert::TilingConte
 
     // 判断可选参数
     if (y2Flag) {
-        const gert::StorageShape *y2StorageShape =
+        const gert::StorageShape* y2StorageShape =
             context->GetOutputShape(static_cast<size_t>(ops::AlltoAllAllGatherBmmOutIdx::K_Y2));
         OP_TILING_CHECK(y2StorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "y2"), return ge::GRAPH_FAILED);
     }
     if (y3Flag) {
-        const gert::StorageShape *y3StorageShape =
+        const gert::StorageShape* y3StorageShape =
             context->GetOutputShape(static_cast<size_t>(ops::AlltoAllAllGatherBmmOutIdx::K_Y3));
         OP_TILING_CHECK(y3StorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "y3"), return ge::GRAPH_FAILED);
     }
@@ -901,11 +901,11 @@ static ge::graphStatus TilingCheckAlltoAllAllGatherBatchMatMul(gert::TilingConte
     size_t wDimH = isWeightTrans ? 2UL : 1UL;
     size_t wDimM = isWeightTrans ? 1UL : 2UL;
 
-    const gert::StorageShape *biasStorageShape =
+    const gert::StorageShape* biasStorageShape =
         context->GetOptionalInputShape(static_cast<size_t>(ops::MC2MoeInputIdx::K_BIAS));
-    const gert::Shape *xShape = &xStorageShape->GetStorageShape();
-    const gert::Shape *weightShape = &weightStorageShape->GetStorageShape();
-    const gert::Shape *biasShape = (biasStorageShape == nullptr) ? nullptr : &biasStorageShape->GetStorageShape();
+    const gert::Shape* xShape = &xStorageShape->GetStorageShape();
+    const gert::Shape* weightShape = &weightStorageShape->GetStorageShape();
+    const gert::Shape* biasShape = (biasStorageShape == nullptr) ? nullptr : &biasStorageShape->GetStorageShape();
 
     // tensor shape 检查
     if (!CheckTensorShape(nodeName, xShape, weightShape, biasShape, epSize, tpSize, wDimH, wDimM, xShard)) {
@@ -917,7 +917,7 @@ static ge::graphStatus TilingCheckAlltoAllAllGatherBatchMatMul(gert::TilingConte
     return ge::GRAPH_SUCCESS;
 }
 
-static uint64_t GetCommOutSize(AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static uint64_t GetCommOutSize(AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     uint64_t commOut = 0UL;
     if (tilingData->commonTiling.xShardFlag == 0) {
@@ -945,7 +945,7 @@ static uint64_t GetCommOutSize(AlltoAllAllGatherBatchMatMulTilingData *tilingDat
     return commOut * static_cast<uint64_t>(tilingData->commonTiling.inputDatasize);
 }
 
-static uint64_t GetTransOutSize(AlltoAllAllGatherBatchMatMulTilingData *tilingData, const uint64_t maxLenDomesticTileC,
+static uint64_t GetTransOutSize(AlltoAllAllGatherBatchMatMulTilingData* tilingData, const uint64_t maxLenDomesticTileC,
                                 const uint64_t maxLenLocalTileE, const uint64_t maxLenDomesticTileE)
 {
     uint64_t transOut = 0UL;
@@ -973,7 +973,7 @@ static uint64_t GetTransOutSize(AlltoAllAllGatherBatchMatMulTilingData *tilingDa
     return transOut * static_cast<uint64_t>(tilingData->commonTiling.inputDatasize);
 }
 
-static uint64_t GetBmmOutSize(AlltoAllAllGatherBatchMatMulTilingData *tilingData, const uint64_t maxLenDomesticTileC,
+static uint64_t GetBmmOutSize(AlltoAllAllGatherBatchMatMulTilingData* tilingData, const uint64_t maxLenDomesticTileC,
                               const uint64_t maxLenLocalTileE, const uint64_t maxLenDomesticTileE)
 {
     uint64_t bmmOut = 0UL;
@@ -1001,10 +1001,10 @@ static uint64_t GetBmmOutSize(AlltoAllAllGatherBatchMatMulTilingData *tilingData
 }
 
 // calculate workspace for GPT2.2T scenario
-static ge::graphStatus MC2SetWorkspaceShard(gert::TilingContext *context,
-                                            AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static ge::graphStatus MC2SetWorkspaceShard(gert::TilingContext* context,
+                                            AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(context->GetNodeName(), "get workspace failed"),
                     return ge::GRAPH_FAILED);
 
@@ -1027,12 +1027,12 @@ static ge::graphStatus MC2SetWorkspaceShard(gert::TilingContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetDataSliceInfoInCommmonTilingData(const gert::TilingContext *context,
-                                                AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void SetDataSliceInfoInCommmonTilingData(const gert::TilingContext* context,
+                                                AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     auto attrs = context->GetAttrs();
-    const gert::StorageShape *xInputShape = context->GetInputShape(X_INDEX);
-    const gert::StorageShape *weightInputShape = context->GetInputShape(WEIGHT_INDEX);
+    const gert::StorageShape* xInputShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* weightInputShape = context->GetInputShape(WEIGHT_INDEX);
     auto ep = *(attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX));
     auto tp = *(attrs->GetAttrPointer<int64_t>(ATTR_TP_WORLD_SIZE_INDEX));
     auto xShard = attrs->GetAttrPointer<int64_t>(ATTR_X_SHARD_TYPE_INDEX);
@@ -1071,11 +1071,11 @@ static void SetDataSliceInfoInCommmonTilingData(const gert::TilingContext *conte
     return;
 }
 
-static void SetDataTypeAndSizeInfoInCommmonTilingData(const gert::TilingContext *context,
-                                                      AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void SetDataTypeAndSizeInfoInCommmonTilingData(const gert::TilingContext* context,
+                                                      AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     auto attrs = context->GetAttrs();
-    const gert::StorageShape *biasInputShape =
+    const gert::StorageShape* biasInputShape =
         context->GetOptionalInputTensor(BIAS_INDEX) == nullptr ? nullptr : context->GetOptionalInputShape(BIAS_INDEX);
     auto y2Flag = attrs->GetAttrPointer<bool>(ATTR_OUTPUT_Y2_FLAG_INDEX);
     auto y3Flag = attrs->GetAttrPointer<bool>(ATTR_OUTPUT_Y3_FLAG_INDEX);
@@ -1096,8 +1096,8 @@ static void SetDataTypeAndSizeInfoInCommmonTilingData(const gert::TilingContext 
     return;
 }
 
-static void SetCommonTilingData(gert::TilingContext *context, uint64_t ubSize, uint64_t aivNum,
-                                AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void SetCommonTilingData(gert::TilingContext* context, uint64_t ubSize, uint64_t aivNum,
+                                AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     SetDataSliceInfoInCommmonTilingData(context, tilingData);
     SetDataTypeAndSizeInfoInCommmonTilingData(context, tilingData);
@@ -1107,8 +1107,8 @@ static void SetCommonTilingData(gert::TilingContext *context, uint64_t ubSize, u
     return;
 }
 
-static void GetChipDataFromPlatform(const gert::TilingContext *context, uint32_t &numBlocks, uint64_t &ubSize,
-                                    uint64_t &aicNum, uint64_t &aivNum)
+static void GetChipDataFromPlatform(const gert::TilingContext* context, uint32_t& numBlocks, uint64_t& ubSize,
+                                    uint64_t& aicNum, uint64_t& aivNum)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     aicNum = ascendcPlatform.GetCoreNumAic();
@@ -1118,7 +1118,7 @@ static void GetChipDataFromPlatform(const gert::TilingContext *context, uint32_t
     return;
 }
 
-static void SetHcclTiling(const gert::TilingContext *context, AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void SetHcclTiling(const gert::TilingContext* context, AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     std::string alltoAllConfig = "AlltoAll=level0:fullmesh;level1:pairwise";
     std::string allGatherConfig = "AllGather=level0:doublering";
@@ -1155,14 +1155,14 @@ static void SetHcclTiling(const gert::TilingContext *context, AlltoAllAllGatherB
     return;
 }
 
-static ge::graphStatus SetBatchMatMulTilingData(gert::TilingContext *context, uint64_t aicNum,
-                                                AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static ge::graphStatus SetBatchMatMulTilingData(gert::TilingContext* context, uint64_t aicNum,
+                                                AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     mc2tiling::TilingArgs formulaicArgs;
     AlltoAllAllGatherBatchInfo BMMV3BatchInfo;
     AlltoAllAllGatherMatmulInfo MMV3ArgsInfo;
 
-    const gert::StorageShape *biasInputShape =
+    const gert::StorageShape* biasInputShape =
         context->GetOptionalInputTensor(BIAS_INDEX) == nullptr ? nullptr : context->GetOptionalInputShape(BIAS_INDEX);
     ge::DataType inputDatatype = context->GetInputDesc(X_INDEX)->GetDataType();
     ge::DataType biasDatatype =
@@ -1196,8 +1196,8 @@ static ge::graphStatus SetBatchMatMulTilingData(gert::TilingContext *context, ui
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetUbTilingDataInCommonTiling(const gert::TilingContext *context, uint64_t ubSize,
-                                          AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static void SetUbTilingDataInCommonTiling(const gert::TilingContext* context, uint64_t ubSize,
+                                          AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     ge::DataType inputDatatype = context->GetInputDesc(X_INDEX)->GetDataType();
     auto inputDatasize = GetDataSize(inputDatatype);
@@ -1255,8 +1255,8 @@ static void SetUbTilingDataInCommonTiling(const gert::TilingContext *context, ui
     return;
 }
 
-static ge::graphStatus SetContextData(gert::TilingContext *context, uint32_t numBlocks,
-                                      AlltoAllAllGatherBatchMatMulTilingData *tilingData)
+static ge::graphStatus SetContextData(gert::TilingContext* context, uint32_t numBlocks,
+                                      AlltoAllAllGatherBatchMatMulTilingData* tilingData)
 {
     uint64_t tilingKey = UpdateTilingKey(tilingData, tilingData->commonTiling.y2Flag, tilingData->commonTiling.y3Flag);
     context->SetTilingKey(tilingKey);
@@ -1265,12 +1265,12 @@ static ge::graphStatus SetContextData(gert::TilingContext *context, uint32_t num
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus AlltoAllAllGatherBatchMatMulTilingFunc(gert::TilingContext *context)
+ge::graphStatus AlltoAllAllGatherBatchMatMulTilingFunc(gert::TilingContext* context)
 {
     // tiling校验shape
     OP_TILING_CHECK(TilingCheckAlltoAllAllGatherBatchMatMul(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(context->GetNodeName(), "Tiling check shape Failed!"), return ge::GRAPH_FAILED);
-    AlltoAllAllGatherBatchMatMulTilingData *tilingData =
+    AlltoAllAllGatherBatchMatMulTilingData* tilingData =
         context->GetTilingData<AlltoAllAllGatherBatchMatMulTilingData>();
     uint32_t numBlocks = 1U;
     uint64_t ubSize = 0U;
@@ -1294,7 +1294,7 @@ ge::graphStatus AlltoAllAllGatherBatchMatMulTilingFunc(gert::TilingContext *cont
 }
 
 struct AlltoAllAllGatherBatchMatMulCompileInfo {};
-ge::graphStatus TilingParseForAlltoAllAllGatherBatchMatMul(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForAlltoAllAllGatherBatchMatMul(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

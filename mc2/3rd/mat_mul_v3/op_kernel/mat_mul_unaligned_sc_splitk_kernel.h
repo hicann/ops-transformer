@@ -23,7 +23,7 @@ using namespace AscendC;
 using namespace matmul;
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE,
-          class BLOCK_TYPE = Mc2MatmulSingleCoreSplitKBaseBlock, const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD>
+          class BLOCK_TYPE = Mc2MatmulSingleCoreSplitKBaseBlock, const MatmulConfig& MM_CFG = MM_CFG_NO_PRELOAD>
 class Mc2MatMulUnAlignedSingleCoreSplitKKernel {
     struct UnAlignedSingleCoreSplitKParams {
         int nd2nzFlag;
@@ -55,7 +55,7 @@ class Mc2MatMulUnAlignedSingleCoreSplitKKernel {
 public:
     __aicore__ inline Mc2MatMulUnAlignedSingleCoreSplitKKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
-                                GM_ADDR workspaceGM, const Mc2MatmulV3TilingData *matmulTilingData, TPipe *pipe);
+                                GM_ADDR workspaceGM, const Mc2MatmulV3TilingData* matmulTilingData, TPipe* pipe);
     __aicore__ inline void UpdateGlobalTensor(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                               GM_ADDR workspaceGM);
     __aicore__ inline void Process();
@@ -80,10 +80,10 @@ protected:
     Mc2MatMulBaseKernelSingleCoreSplitK<aType, bType, cType, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG> mmab_;
     GlobalTensor<float> matmulOutput_;
     GlobalTensor<typename C_TYPE::T> castCGm_;
-    TPipe *pipe_;
+    TPipe* pipe_;
     TBuf<> ubBuf_;
     UnAlignedSingleCoreSplitKParams innerParams_;
-    const Mc2MatmulV3TilingData *matmulTilingData_;
+    const Mc2MatmulV3TilingData* matmulTilingData_;
 
 private:
     __aicore__ inline void ProcessNDtoNZ();
@@ -92,11 +92,11 @@ private:
     __aicore__ inline void ProcessRemovePaddingImpl();
 };
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM,
-    const Mc2MatmulV3TilingData *matmulTilingData, TPipe *pipe)
+    const Mc2MatmulV3TilingData* matmulTilingData, TPipe* pipe)
 {
     matmulTilingData_ = matmulTilingData;
     innerParams_.isTransposeAIn = matmulTilingData_->matmulRunInfo.transA;
@@ -138,7 +138,7 @@ Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOC
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::InitInputs(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM)
@@ -223,17 +223,17 @@ Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOC
         if (static_cast<uint64_t>(matmulTilingData_->matmulTiling.N) * DATA_SIZE_FP32 % ALIGN_BYTE != 0) {
             innerParams_.alignedN = MMV3DivCeil(matmulTilingData_->matmulTiling.N, 64) * 64;
             matmulOutput_.SetGlobalBuffer(
-                reinterpret_cast<__gm__ float *>(innerParams_.castAddr),
+                reinterpret_cast<__gm__ float*>(innerParams_.castAddr),
                 static_cast<uint64_t>(matmulTilingData_->matmulTiling.M) * innerParams_.alignedN);
             castCGm_.SetGlobalBuffer(
-                reinterpret_cast<__gm__ typename C_TYPE::T *>(cGM),
+                reinterpret_cast<__gm__ typename C_TYPE::T*>(cGM),
                 static_cast<uint64_t>(matmulTilingData_->matmulTiling.M) * matmulTilingData_->matmulTiling.N);
         }
         return;
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::UpdateGlobalTensor(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM)
@@ -265,7 +265,7 @@ Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOC
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::ProcessNDtoNZ()
 {
@@ -293,7 +293,7 @@ Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOC
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE,
                                                                 MM_CFG>::ProcessRemovePaddingImpl()
 {
@@ -317,13 +317,13 @@ __aicore__ inline void Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, 
             matmulOutput_[innerParams_.vIndex * splitM * innerParams_.alignedN], coreMSize, innerParams_.alignedN,
             matmulTilingData_->matmulTiling.N, ubBuf_);
     } else {
-        UnAlignedCast32to16V220(reinterpret_cast<__gm__ typename C_TYPE::T *>(innerParams_.cGM) + innerParams_.offset,
-                                reinterpret_cast<__gm__ float *>(innerParams_.castAddr) + innerParams_.offset, 0,
+        UnAlignedCast32to16V220(reinterpret_cast<__gm__ typename C_TYPE::T*>(innerParams_.cGM) + innerParams_.offset,
+                                reinterpret_cast<__gm__ float*>(innerParams_.castAddr) + innerParams_.offset, 0,
                                 innerParams_.coreSizeNum, ubBuf_);
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2MatMulUnAlignedSingleCoreSplitKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process()
 {

@@ -41,7 +41,7 @@ TEST_P(AclnnAlltoAllvQuantGroupedMatMulV2Test, param)
               param.transMmWeight, param.groupSize, param.permuteOutFlag),
         OUTPUT(param.gmmY, param.mmYOptional, param.permuteOutOptional));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(ACLNN_ERR_PARAM_INVALID, aclnnRet);

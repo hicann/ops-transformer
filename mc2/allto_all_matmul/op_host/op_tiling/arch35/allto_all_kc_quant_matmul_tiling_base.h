@@ -40,7 +40,7 @@ class AllToAllKcQuantMatmulTilingBase : public AllToAllMatmulTilingBase {
     friend class AlltoAllKcQuantMatmulHelper;
 
 public:
-    explicit AllToAllKcQuantMatmulTilingBase(gert::TilingContext *context);
+    explicit AllToAllKcQuantMatmulTilingBase(gert::TilingContext* context);
     ~AllToAllKcQuantMatmulTilingBase() override = default;
 
 protected:
@@ -55,40 +55,40 @@ protected:
     ge::graphStatus DoKcQuantMMTiling();
     ge::graphStatus SetHcclTiling();
     void SetUserWorkSpace();
-    ge::graphStatus CheckKcTensorFormat(const gert::TilingContext *context, const char *opName);
-    ge::graphStatus SetKcDataTypeInfo(const gert::TilingContext *context, const char *opName,
-                                      TilingContextInfo &contextInfo);
+    ge::graphStatus CheckKcTensorFormat(const gert::TilingContext* context, const char* opName);
+    ge::graphStatus SetKcDataTypeInfo(const gert::TilingContext* context, const char* opName,
+                                      TilingContextInfo& contextInfo);
 
-    void SetTilingInfo(AlltoAllMatmulTilingInfo &tilingInfo) const;
-    void PrintAlltoAllKcQuantMatmulTilingData(AlltoAllQuantMatmulTilingData &outTilingData);
+    void SetTilingInfo(AlltoAllMatmulTilingInfo& tilingInfo) const;
+    void PrintAlltoAllKcQuantMatmulTilingData(AlltoAllQuantMatmulTilingData& outTilingData);
 
 private:
     AlltoAllQuantMatmulTilingData localTilingData_{};
     uint64_t mm_mvalue_len = 0;
     QuantType matmulQuantType_ = QuantType::KC_QUANT;
-    void PrintAlltoAllKcQuantMatmulTilingInfo(const std::string &opName, AlltoAllMatmulTilingInfo &tilingInfo);
-    void PrintKcQuantMMV3TilingData(const std::string &opName,
-                                    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &tiling);
-    void PrintExtendMatmulTiling(const std::string &opName, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &tiling);
+    void PrintAlltoAllKcQuantMatmulTilingInfo(const std::string& opName, AlltoAllMatmulTilingInfo& tilingInfo);
+    void PrintKcQuantMMV3TilingData(const std::string& opName,
+                                    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& tiling);
+    void PrintExtendMatmulTiling(const std::string& opName, DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& tiling);
 };
 
 class AlltoAllKcQuantMatmulHelper : public Mc2AdaptiveSlidingWindowTiling {
 public:
-    AlltoAllKcQuantMatmulHelper(AllToAllKcQuantMatmulTilingBase &allToAllKcQuantMatmulTilingBase,
-                                DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &out, uint64_t &mmMvalueLen);
+    AlltoAllKcQuantMatmulHelper(AllToAllKcQuantMatmulTilingBase& allToAllKcQuantMatmulTilingBase,
+                                DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& out, uint64_t& mmMvalueLen);
     const gert::Shape GetX1Shape(const size_t index) override;
     const gert::Shape GetX2Shape(const size_t index) override;
-    const gert::Shape &GetScaleShape(const size_t index) override;
-    const gert::StorageShape *GetPertokenShape(const size_t index) override;
-    const gert::StorageShape *GetBiasShape(const size_t index) override;
+    const gert::Shape& GetScaleShape(const size_t index) override;
+    const gert::StorageShape* GetPertokenShape(const size_t index) override;
+    const gert::StorageShape* GetBiasShape(const size_t index) override;
     ge::graphStatus GetShapeAttrsInfo() override;
     ge::graphStatus DoLibApiTiling() override;
-    void PrintTilingInputParam(Mc2QuantBatchMatmulInfo &quantMatmulInfo);
+    void PrintTilingInputParam(Mc2QuantBatchMatmulInfo& quantMatmulInfo);
     ge::graphStatus PostTiling() override;
 
 private:
     uint64_t mm_len = 0;
-    AllToAllKcQuantMatmulTilingBase &tilingProcesser_;
+    AllToAllKcQuantMatmulTilingBase& tilingProcesser_;
     QuantType matmulQuantType_ = QuantType::KC_QUANT;
 };
 } // namespace MC2Tiling

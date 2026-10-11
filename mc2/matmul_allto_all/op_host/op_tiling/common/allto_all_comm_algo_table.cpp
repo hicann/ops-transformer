@@ -32,13 +32,13 @@ static constexpr Mc2Hcom::CommAlgoEntry ALLTOALL_COMM_ALGO_TABLE[] = {
      ALLTOALL_DEFAULT_ALGO_NAME},
 };
 
-const Mc2Hcom::CommAlgoEntry *GetAllToAllCommAlgoTable(uint32_t &count)
+const Mc2Hcom::CommAlgoEntry* GetAllToAllCommAlgoTable(uint32_t& count)
 {
     count = sizeof(ALLTOALL_COMM_ALGO_TABLE) / sizeof(ALLTOALL_COMM_ALGO_TABLE[0]);
     return ALLTOALL_COMM_ALGO_TABLE;
 }
 
-std::string SelectAllToAllAlgoName(const std::string &opName, const std::string &group, uint8_t commEngine,
+std::string SelectAllToAllAlgoName(const std::string& opName, const std::string& group, uint8_t commEngine,
                                    uint32_t tileM, uint64_t dimSize, uint64_t dtypeSize, uint32_t rankDim)
 {
     uint64_t commDataBytes = 0;
@@ -57,7 +57,7 @@ std::string SelectAllToAllAlgoName(const std::string &opName, const std::string 
     OP_LOGI(opName.c_str(), "[SetHcclTiling] commDataBytes=%llu, tileM=%u, dimSize=%llu, rankDim=%u, engine=%u",
             commDataBytes, tileM, dimSize, rankDim, static_cast<uint32_t>(commEngine));
     uint32_t algoCount = 0;
-    const Mc2Hcom::CommAlgoEntry *algoEntries = GetAllToAllCommAlgoTable(algoCount);
+    const Mc2Hcom::CommAlgoEntry* algoEntries = GetAllToAllCommAlgoTable(algoCount);
     std::string algoName = Mc2Hcom::Mc2CommAlgoSelector::SelectAlgoName(
         opName, group.c_str(), commEngine, commDataBytes, rankDim, algoEntries, algoCount, ALLTOALL_DEFAULT_ALGO_NAME);
     OP_LOGI(opName.c_str(), "[SetHcclTiling] selected algoName=%s, group=%s", algoName.c_str(), group.c_str());

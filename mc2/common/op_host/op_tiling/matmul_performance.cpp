@@ -91,7 +91,7 @@ void MatmulPerformanceModel::CheckKvalueAlignVersion310P()
     }
 }
 
-double MatmulPerformanceModel::FindCubeUtilByL2Usage(uint64_t mSize, uint64_t rankTileNum, uint64_t *maxTileLen)
+double MatmulPerformanceModel::FindCubeUtilByL2Usage(uint64_t mSize, uint64_t rankTileNum, uint64_t* maxTileLen)
 {
     L2CacheEstimateParameters l2EstimatePar = L2_PARAMETER_MAP.at(MatmulPerformance::DEFAULT_KEY_FOR_PAR_MAP);
     auto key = GetCalcTypeString();
@@ -182,7 +182,7 @@ void MatmulPerformanceModel::ChangeCubeUtilByKAlign()
 }
 
 void MatmulPerformanceModel::FindCubeUtil(uint64_t mSize, uint64_t rankTileNum, bool flagAllReduce,
-                                          uint64_t *maxTileLen)
+                                          uint64_t* maxTileLen)
 {
     if (npuArch_ == Ops::Base::DAV_2002) {
         if (calcType_ == MatmulCalcType::QUANT) {

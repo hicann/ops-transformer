@@ -24,13 +24,13 @@
 #include "register/op_impl_registry.h"
 
 namespace ops {
-static ge::Status MatmulReduceScatterCalcOpParam(gert::ExeResGenerationContext *context)
+static ge::Status MatmulReduceScatterCalcOpParam(gert::ExeResGenerationContext* context)
 {
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, "aicpu kfc server", "kfc_stream");
 }
 
-static ge::Status MatmulReduceScatterGenTask(const gert::ExeResGenerationContext *context,
-                                             std::vector<std::vector<uint8_t>> &tasks)
+static ge::Status MatmulReduceScatterGenTask(const gert::ExeResGenerationContext* context,
+                                             std::vector<std::vector<uint8_t>>& tasks)
 {
     return Mc2GenTaskOpsUtils::CommonKFCMc2GenTask(context, tasks);
 }

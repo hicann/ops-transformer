@@ -44,21 +44,21 @@ TEMPLATE_CLASS_PARAMS
 class MatmulA2AVecReduceFP16BF16 {
 public:
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR contextGM,
-                                GM_ADDR workspaceGM, Mc2Tiling::MatmulReduceScatterV2TilingData *tilingData,
-                                TPipe *tpipe);
+                                GM_ADDR workspaceGM, Mc2Tiling::MatmulReduceScatterV2TilingData* tilingData,
+                                TPipe* tpipe);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void InnerProcess();
-    __aicore__ inline void Compute(GM_ADDR recvGMAddr, Mc2MatMulV3TilingData &tiling, const uint32_t count,
+    __aicore__ inline void Compute(GM_ADDR recvGMAddr, Mc2MatMulV3TilingData& tiling, const uint32_t count,
                                    GM_ADDR sendGMAddr, const bool isLast, const bool isTail);
-    __aicore__ inline void MatMulV3Compute(GM_ADDR recvGMAddr, Mc2MatMulV3TilingData &tiling, const uint32_t count,
+    __aicore__ inline void MatMulV3Compute(GM_ADDR recvGMAddr, Mc2MatMulV3TilingData& tiling, const uint32_t count,
                                            GM_ADDR sendGMAddr, const bool isLast, const bool isTail);
     __aicore__ inline void PostProcess();
-    __aicore__ inline void ExecuteAicMatMulPipeline(Mc2MatMulV3TilingData &tiling, const uint32_t count,
+    __aicore__ inline void ExecuteAicMatMulPipeline(Mc2MatMulV3TilingData& tiling, const uint32_t count,
                                                     const bool isLast, const bool isTail);
     __aicore__ inline void ExecuteAivCommReducePipeline(GM_ADDR recvGMAddr, GM_ADDR sendGMAddr,
-                                                        Mc2MatMulV3TilingData &tiling, const uint32_t count,
+                                                        Mc2MatMulV3TilingData& tiling, const uint32_t count,
                                                         const bool isTail);
     __aicore__ inline void CubeNotifyVector();
     __aicore__ inline void VecWaitCube();
@@ -66,13 +66,13 @@ private:
 private:
     ReduceSumForAlltoAll<C_DTYPE> reduceSum_; // AIV ReduceSum 相关实现
 
-    Mc2Tiling::MatmulReduceScatterV2TilingData *tilingData_;
-    TPipe *tPipe_;
+    Mc2Tiling::MatmulReduceScatterV2TilingData* tilingData_;
+    TPipe* tPipe_;
     GM_ADDR aGM_;
     GM_ADDR bGM_;
     GM_ADDR cGM_;
     GM_ADDR biasGM_;
-    __gm__ HcclCombinOpParam *context_;
+    __gm__ HcclCombinOpParam* context_;
     AscendC::HcclDataType dataType_;
     uint8_t debugMode_;
     typename HcclTypeSelector<TPL_COMM_MODE>::type hccl_;
@@ -89,19 +89,19 @@ private:
 TEMPLATE_CLASS_PARAMS
 __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR contextGM, GM_ADDR workspaceGM,
-    Mc2Tiling::MatmulReduceScatterV2TilingData *tilingData, TPipe *tPipe)
+    Mc2Tiling::MatmulReduceScatterV2TilingData* tilingData, TPipe* tPipe)
 {
     tilingData_ = tilingData;
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
 
     // 初始化 HCCL
-    const void *hcclInitTilingV2 = &(tilingData_->mc2InitTiling);
+    const void* hcclInitTilingV2 = &(tilingData_->mc2InitTiling);
     uint64_t hcclCcTilingOffset = offsetof(Mc2Tiling::MatmulReduceScatterV2TilingData, mc2CcTiling);
     hccl_.InitV2(contextGM, hcclInitTilingV2);
     hccl_.SetCcTilingV2(hcclCcTilingOffset);
 
     // 读取上下文和配置
-    context_ = (__gm__ HcclCombinOpParam *)(contextGM);
+    context_ = (__gm__ HcclCombinOpParam*)(contextGM);
     tPipe_ = tPipe;
     dataType_ = static_cast<AscendC::HcclDataType>(tilingData_->dataType);
     debugMode_ = tilingData_->debugMode;
@@ -137,8 +137,8 @@ __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::Process
 TEMPLATE_CLASS_PARAMS
 __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::InnerProcess()
 {
-    auto &&tiling = tilingData_->mC2Mmv3TileTilingData.tCubeTiling;
-    auto &&cfg = tilingData_->param;
+    auto&& tiling = tilingData_->mC2Mmv3TileTilingData.tCubeTiling;
+    auto&& cfg = tilingData_->param;
 
     // fullmesh算法
     // 计算主块（整除部分）
@@ -155,7 +155,7 @@ __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::InnerPr
 
 TEMPLATE_CLASS_PARAMS
 __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::Compute(GM_ADDR recvGMAddr,
-                                                                                 Mc2MatMulV3TilingData &tiling,
+                                                                                 Mc2MatMulV3TilingData& tiling,
                                                                                  const uint32_t count,
                                                                                  GM_ADDR sendGMAddr, const bool isLast,
                                                                                  const bool isTail)
@@ -169,9 +169,9 @@ __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::Compute
  */
 TEMPLATE_CLASS_PARAMS
 __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::ExecuteAicMatMulPipeline(
-    Mc2MatMulV3TilingData &tiling, const uint32_t count, const bool isLast, const bool isTail)
+    Mc2MatMulV3TilingData& tiling, const uint32_t count, const bool isLast, const bool isTail)
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     cfg.rankID = rankId_;
 
     // 初始化Matmul
@@ -194,9 +194,9 @@ __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::Execute
  */
 TEMPLATE_CLASS_PARAMS
 __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::ExecuteAivCommReducePipeline(
-    GM_ADDR recvGMAddr, GM_ADDR sendGMAddr, Mc2MatMulV3TilingData &tiling, const uint32_t count, const bool isTail)
+    GM_ADDR recvGMAddr, GM_ADDR sendGMAddr, Mc2MatMulV3TilingData& tiling, const uint32_t count, const bool isTail)
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
 
     // 每个 rank 应得的 M 维度大小
     uint64_t sliceM = static_cast<uint64_t>(tiling.tCubeTiling.M) / cfg.rankDim;
@@ -276,7 +276,7 @@ __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::Execute
 
 TEMPLATE_CLASS_PARAMS
 __aicore__ inline void MatmulA2AVecReduceFP16BF16<TEMPLATE_FUNC_PARAMS>::MatMulV3Compute(
-    GM_ADDR recvGMAddr, Mc2MatMulV3TilingData &tiling, const uint32_t count, GM_ADDR sendGMAddr, const bool isLast,
+    GM_ADDR recvGMAddr, Mc2MatMulV3TilingData& tiling, const uint32_t count, GM_ADDR sendGMAddr, const bool isLast,
     const bool isTail)
 {
     // [AIC 阶段] 执行 MatMul 计算流水线

@@ -21,15 +21,15 @@ using namespace op;
 extern "C" {
 #endif
 
-aclnnStatus aclnnDistributeBarrierGetWorkspaceSize(aclTensor *xRef, const char *group, int64_t worldSize,
-                                                   uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnDistributeBarrierGetWorkspaceSize(aclTensor* xRef, const char* group, int64_t worldSize,
+                                                   uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("aclnn_barrier WorkspaceSize start");
     return aclnnDistributeBarrierGetWorkspaceSizeBase(xRef, nullptr, nullptr, group, worldSize, workspaceSize,
                                                       executor);
 }
 
-aclnnStatus aclnnDistributeBarrier(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnDistributeBarrier(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     OP_LOGD("aclnn_barrier start");
     return aclnnDistributeBarrierBase(workspace, workspaceSize, executor, stream);

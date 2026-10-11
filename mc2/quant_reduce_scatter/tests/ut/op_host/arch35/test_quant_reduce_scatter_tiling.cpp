@@ -53,7 +53,7 @@ struct QuantReduceScatterTestParam {
     uint64_t mc2TilingDataReservedLen;
 };
 
-inline std::ostream &operator<<(std::ostream &os, const QuantReduceScatterTestParam &param)
+inline std::ostream& operator<<(std::ostream& os, const QuantReduceScatterTestParam& param)
 {
     return os << param.caseName;
 }
@@ -1523,7 +1523,7 @@ protected:
 static struct QuantReduceScatterCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const QuantReduceScatterTestParam &param)
+static gert::TilingContextPara BuildTilingContextPara(const QuantReduceScatterTestParam& param)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     // 参数封装
@@ -1546,7 +1546,7 @@ static gert::TilingContextPara BuildTilingContextPara(const QuantReduceScatterTe
                                    param.socVersion);
 }
 
-static void ThreadFunction(const QuantReduceScatterTestParam *testCases, size_t caseNum, size_t threadIdx,
+static void ThreadFunction(const QuantReduceScatterTestParam* testCases, size_t caseNum, size_t threadIdx,
                            size_t threadNum)
 {
     for (size_t idx = threadIdx; idx < caseNum; idx += threadNum) {
@@ -1557,7 +1557,7 @@ static void ThreadFunction(const QuantReduceScatterTestParam *testCases, size_t 
     }
 }
 
-static void TestExecMultiThread(const QuantReduceScatterTestParam *testCases, size_t testCaseNum, size_t threadNum)
+static void TestExecMultiThread(const QuantReduceScatterTestParam* testCases, size_t testCaseNum, size_t threadNum)
 {
     if (threadNum == 0 || testCases == nullptr || testCaseNum == 0) {
         return;

@@ -27,9 +27,9 @@ namespace optiling {
 constexpr uint32_t COMM_CONTEXT_INDEX = 0U;
 constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024 * 1024;
 
-static ge::graphStatus CheckInputDataType(const gert::TilingContext *context)
+static ge::graphStatus CheckInputDataType(const gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
 
     auto commContextDesc = context->GetInputDesc(COMM_CONTEXT_INDEX);
     OP_TILING_CHECK(commContextDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "commContext"),
@@ -42,30 +42,30 @@ static ge::graphStatus CheckInputDataType(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetTilingKey(gert::TilingContext *context)
+static void SetTilingKey(gert::TilingContext* context)
 {
     context->SetTilingKey(0);
 }
 
-static ge::graphStatus SetWorkSpace(gert::TilingContext *context)
+static ge::graphStatus SetWorkSpace(gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    const char* nodeName = context->GetNodeName();
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE(nodeName, "workSpaces is nullptr."), return ge::GRAPH_FAILED);
     workSpaces[0] = SYSTEM_NEED_WORKSPACE;
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus EngramFetchWaitTilingFunc(gert::TilingContext *context)
+static ge::graphStatus EngramFetchWaitTilingFunc(gert::TilingContext* context)
 {
     OP_LOGD("EngramFetchWait", "tiling start.");
     OP_TILING_CHECK(context == nullptr, OP_LOGE("engram_fetch_wait_tiling", "failed to get tiling context."),
                     return ge::GRAPH_FAILED);
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_TILING_CHECK(nodeName == nullptr, OP_LOGE("engram_fetch_wait_tiling", "failed to get nodeName."),
                     return ge::GRAPH_FAILED);
 
-    EngramFetchWaitTilingData *tilingData = context->GetTilingData<EngramFetchWaitTilingData>();
+    EngramFetchWaitTilingData* tilingData = context->GetTilingData<EngramFetchWaitTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE(nodeName, "tilingData is nullptr."), return ge::GRAPH_FAILED);
 
     OP_TILING_CHECK(CheckInputDataType(context) != ge::GRAPH_SUCCESS, OP_LOGE(nodeName, "Check input dtype failed."),

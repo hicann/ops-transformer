@@ -36,8 +36,8 @@ using namespace ge;
 using namespace mc2tiling;
 
 namespace MegaMoeA2A3Tiling {
-const char *K_INNER_DEBUG = "MegaMoeA2A3 Tiling Debug";
-const char *K_OP_NAME = "MegaMoe";
+const char* K_INNER_DEBUG = "MegaMoeA2A3 Tiling Debug";
+const char* K_OP_NAME = "MegaMoe";
 
 // 算子属性索引
 constexpr uint32_t ATTR_MOE_EXPERT_NUM_INDEX = 0;               // moe 专家数
@@ -188,7 +188,7 @@ static int64_t CalcLeastCclBufferSize(int64_t maxRecvTokenNum, int64_t h, int64_
 
 // =========================== Attr 校验分函数 ===========================
 
-static ge::graphStatus CheckMoeExpertNumAttr(const int64_t *ptr)
+static ge::graphStatus CheckMoeExpertNumAttr(const int64_t* ptr)
 {
     OP_TILING_CHECK(ptr == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "moe_expert_num", "null", "not null"),
                     return GRAPH_FAILED);
@@ -199,7 +199,7 @@ static ge::graphStatus CheckMoeExpertNumAttr(const int64_t *ptr)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckEpWorldSizeAttr(const int64_t *ptr)
+static ge::graphStatus CheckEpWorldSizeAttr(const int64_t* ptr)
 {
     OP_TILING_CHECK(ptr == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "ep_world_size", "null", "not null"),
                     return GRAPH_FAILED);
@@ -212,7 +212,7 @@ static ge::graphStatus CheckEpWorldSizeAttr(const int64_t *ptr)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckMaxRecvTokenNumAttr(const int64_t *ptr)
+static ge::graphStatus CheckMaxRecvTokenNumAttr(const int64_t* ptr)
 {
     OP_TILING_CHECK(ptr == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "max_recv_token_num", "null", "not null"),
                     return GRAPH_FAILED);
@@ -223,8 +223,8 @@ static ge::graphStatus CheckMaxRecvTokenNumAttr(const int64_t *ptr)
 }
 
 // 校验 dispatch_quant_mode 和 dispatch_quant_out_dtype，两者都依赖 weight1 的 dataType
-static ge::graphStatus CheckDispatchQuantAttrs(gert::TilingContext *context, const int64_t *dispatchQuantModePtr,
-                                               const int64_t *dispatchQuantOutDtypePtr)
+static ge::graphStatus CheckDispatchQuantAttrs(gert::TilingContext* context, const int64_t* dispatchQuantModePtr,
+                                               const int64_t* dispatchQuantOutDtypePtr)
 {
     OP_TILING_CHECK(dispatchQuantModePtr == nullptr,
                     OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "dispatch_quant_mode", "null", "not null"),
@@ -273,7 +273,7 @@ static ge::graphStatus CheckDispatchQuantAttrs(gert::TilingContext *context, con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckCombineQuantModeAttr(const int64_t *ptr)
+static ge::graphStatus CheckCombineQuantModeAttr(const int64_t* ptr)
 {
     OP_TILING_CHECK(ptr == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "combine_quant_mode", "null", "not null"),
                     return GRAPH_FAILED);
@@ -284,11 +284,11 @@ static ge::graphStatus CheckCombineQuantModeAttr(const int64_t *ptr)
 }
 
 // 校验 num_max_tokens_per_rank，需要从 x shape 获取 bs
-static ge::graphStatus CheckNumMaxTokensPerRankAttr(gert::TilingContext *context, const int64_t *ptr)
+static ge::graphStatus CheckNumMaxTokensPerRankAttr(gert::TilingContext* context, const int64_t* ptr)
 {
     OP_TILING_CHECK(ptr == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "num_max_tokens_per_rank", "null", "not null"),
                     return GRAPH_FAILED);
-    const gert::StorageShape *xStorageShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* xStorageShape = context->GetInputShape(X_INDEX);
     OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "x"), return GRAPH_FAILED);
     int64_t bs = xStorageShape->GetStorageShape().GetDim(0);
     if (*ptr > 0) {
@@ -304,7 +304,7 @@ static ge::graphStatus CheckNumMaxTokensPerRankAttr(gert::TilingContext *context
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckActivationAttr(const char *ptr, uint32_t &activationCode)
+static ge::graphStatus CheckActivationAttr(const char* ptr, uint32_t& activationCode)
 {
     OP_TILING_CHECK(ptr == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation", "null", "not null"),
                     return GRAPH_FAILED);
@@ -352,7 +352,7 @@ static ge::graphStatus CheckActivationParamCount(uint32_t activationCode, size_t
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetActivationParams(const float *data, size_t paramCount, MegaMoeA2A3TilingData &info)
+static ge::graphStatus SetActivationParams(const float* data, size_t paramCount, MegaMoeA2A3TilingData& info)
 {
     if (info.activationCode == ACTIVATION_CODE_SWIGLU || info.activationCode == ACTIVATION_CODE_SWIGLU_STEP) {
         OP_TILING_CHECK(CheckActivationParamCount(info.activationCode, paramCount, 1U, 1U) != ge::GRAPH_SUCCESS,
@@ -376,7 +376,7 @@ static ge::graphStatus SetActivationParams(const float *data, size_t paramCount,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ValidateActivationParams(size_t paramCount, const MegaMoeA2A3TilingData &info)
+static ge::graphStatus ValidateActivationParams(size_t paramCount, const MegaMoeA2A3TilingData& info)
 {
     if (info.activationCode != ACTIVATION_CODE_SITU) {
         OP_TILING_CHECK(!IsValidActivationClamp(info.activationClamp),
@@ -409,8 +409,8 @@ static ge::graphStatus ValidateActivationParams(size_t paramCount, const MegaMoe
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckActivationParamsAttr(const gert::TypedContinuousVector<float> *params,
-                                                 MegaMoeA2A3TilingData &info)
+static ge::graphStatus CheckActivationParamsAttr(const gert::TypedContinuousVector<float>* params,
+                                                 MegaMoeA2A3TilingData& info)
 {
     OP_TILING_CHECK(params == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_params", "null", "not null"),
                     return GRAPH_FAILED);
@@ -426,7 +426,7 @@ static ge::graphStatus CheckActivationParamsAttr(const gert::TypedContinuousVect
         return ge::GRAPH_SUCCESS;
     }
 
-    const float *data = params->GetData();
+    const float* data = params->GetData();
     OP_TILING_CHECK(data == nullptr, OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get activation_params data."),
                     return GRAPH_FAILED);
 
@@ -437,7 +437,7 @@ static ge::graphStatus CheckActivationParamsAttr(const gert::TypedContinuousVect
     return ValidateActivationParams(paramCount, info);
 }
 
-static ge::graphStatus CheckActivationOutDtypeAttr(const int64_t *ptr)
+static ge::graphStatus CheckActivationOutDtypeAttr(const int64_t* ptr)
 {
     OP_TILING_CHECK(ptr == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "activation_out_dtype", "null", "not null"),
                     return GRAPH_FAILED);
@@ -448,7 +448,7 @@ static ge::graphStatus CheckActivationOutDtypeAttr(const int64_t *ptr)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckTransposeWeightAttr(const bool *w1, const bool *w2)
+static ge::graphStatus CheckTransposeWeightAttr(const bool* w1, const bool* w2)
 {
     OP_TILING_CHECK(w1 == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "transpose_weight1", "null", "not null"),
                     return GRAPH_FAILED);
@@ -467,7 +467,7 @@ static ge::graphStatus CheckTransposeWeightAttr(const bool *w1, const bool *w2)
 }
 
 // 校验 weight1_interleave，需要从 weight1 tensor 获取 N
-static ge::graphStatus CheckWeight1InterleaveAttr(gert::TilingContext *context, const int64_t *ptr)
+static ge::graphStatus CheckWeight1InterleaveAttr(gert::TilingContext* context, const int64_t* ptr)
 {
     OP_TILING_CHECK(ptr == nullptr, OP_LOGE_WITH_INVALID_ATTR(K_OP_NAME, "weight1_interleave", "null", "not null"),
                     return GRAPH_FAILED);
@@ -486,7 +486,7 @@ static ge::graphStatus CheckWeight1InterleaveAttr(gert::TilingContext *context, 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MegaMoeA2A3CheckAttrAndSetTiling(gert::TilingContext *context, MegaMoeA2A3TilingData &info)
+static ge::graphStatus MegaMoeA2A3CheckAttrAndSetTiling(gert::TilingContext* context, MegaMoeA2A3TilingData& info)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get operator attributes."),
@@ -652,7 +652,7 @@ static ge::graphStatus MegaMoeA2A3CheckAttrAndSetTiling(gert::TilingContext *con
 }
 
 // 获取指定 DynamicInput 的 TensorList 长度
-static uint32_t GetDynamicInputTensorListLen(gert::TilingContext *context, uint32_t inputIndex)
+static uint32_t GetDynamicInputTensorListLen(gert::TilingContext* context, uint32_t inputIndex)
 {
     uint32_t listLen = 0;
     while (context->GetDynamicInputTensor(inputIndex, ++listLen) != nullptr) {
@@ -661,7 +661,7 @@ static uint32_t GetDynamicInputTensorListLen(gert::TilingContext *context, uint3
 }
 
 // 校验 context 输入
-static ge::graphStatus CheckContextInput(gert::TilingContext *context, const gert::StorageShape *contextStorageShape)
+static ge::graphStatus CheckContextInput(gert::TilingContext* context, const gert::StorageShape* contextStorageShape)
 {
     auto contextDesc = context->GetInputDesc(CONTEXT_INDEX);
     OP_TILING_CHECK(contextDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "context"), return GRAPH_FAILED);
@@ -684,8 +684,8 @@ static ge::graphStatus CheckContextInput(gert::TilingContext *context, const ger
 }
 
 // 校验 x 输入，返回 bs 和 hiddenSize
-static ge::graphStatus CheckXInput(gert::TilingContext *context, const gert::StorageShape *xStorageShape,
-                                   int64_t &outBs, int64_t &outHiddenSize)
+static ge::graphStatus CheckXInput(gert::TilingContext* context, const gert::StorageShape* xStorageShape,
+                                   int64_t& outBs, int64_t& outHiddenSize)
 {
     OP_TILING_CHECK(xStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
                     OP_LOGE_FOR_INVALID_SHAPEDIM(
@@ -729,8 +729,8 @@ static ge::graphStatus CheckXInput(gert::TilingContext *context, const gert::Sto
 }
 
 // 校验 topk_ids 输入，返回 topK
-static ge::graphStatus CheckTopkIdsInput(gert::TilingContext *context, const gert::StorageShape *topkIdsStorageShape,
-                                         int64_t bs, int64_t &outTopK)
+static ge::graphStatus CheckTopkIdsInput(gert::TilingContext* context, const gert::StorageShape* topkIdsStorageShape,
+                                         int64_t bs, int64_t& outTopK)
 {
     OP_TILING_CHECK(
         topkIdsStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
@@ -772,8 +772,8 @@ static ge::graphStatus CheckTopkIdsInput(gert::TilingContext *context, const ger
 }
 
 // 校验 topk_weights 输入
-static ge::graphStatus CheckTopkWeightsInput(gert::TilingContext *context,
-                                             const gert::StorageShape *topkWeightsStorageShape, int64_t bs,
+static ge::graphStatus CheckTopkWeightsInput(gert::TilingContext* context,
+                                             const gert::StorageShape* topkWeightsStorageShape, int64_t bs,
                                              int64_t topK)
 {
     OP_TILING_CHECK(topkWeightsStorageShape->GetStorageShape().GetDimNum() != TWO_DIMS,
@@ -820,9 +820,9 @@ static ge::graphStatus CheckTopkWeightsInput(gert::TilingContext *context,
 }
 
 // 校验 x_active_mask 输入（可选），返回 isActiveMask
-static ge::graphStatus CheckXActiveMaskInput(gert::TilingContext *context, int64_t bs, bool &outIsActiveMask)
+static ge::graphStatus CheckXActiveMaskInput(gert::TilingContext* context, int64_t bs, bool& outIsActiveMask)
 {
-    const gert::StorageShape *xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
+    const gert::StorageShape* xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
     bool isActiveMask = (xActiveMaskStorageShape != nullptr);
     if (isActiveMask) {
         int64_t xActiveMaskDimNums = xActiveMaskStorageShape->GetStorageShape().GetDimNum();
@@ -859,9 +859,9 @@ static ge::graphStatus CheckXActiveMaskInput(gert::TilingContext *context, int64
 }
 
 // 校验 weight1 动态输入，返回 N / expertPerRank / w1DataType / w1Format
-static ge::graphStatus CheckWeight1Input(gert::TilingContext *context, int64_t hiddenSize, uint32_t &outN,
-                                         uint32_t &outExpertPerRank, ge::DataType &outW1DataType,
-                                         ge::Format &outW1Format)
+static ge::graphStatus CheckWeight1Input(gert::TilingContext* context, int64_t hiddenSize, uint32_t& outN,
+                                         uint32_t& outExpertPerRank, ge::DataType& outW1DataType,
+                                         ge::Format& outW1Format)
 {
     auto w1Tensor = context->GetDynamicInputTensor(WEIGHT1_INDEX, 0);
     OP_TILING_CHECK(w1Tensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "weight1"), return GRAPH_FAILED);
@@ -909,7 +909,7 @@ static ge::graphStatus CheckWeight1Input(gert::TilingContext *context, int64_t h
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckWeight2TensorShapes(gert::TilingContext *context, int64_t hiddenSize, uint32_t n2,
+static ge::graphStatus CheckWeight2TensorShapes(gert::TilingContext* context, int64_t hiddenSize, uint32_t n2,
                                                 uint32_t expertPerRank)
 {
     for (uint32_t i = 0; i < expertPerRank; i++) {
@@ -939,8 +939,8 @@ static ge::graphStatus CheckWeight2TensorShapes(gert::TilingContext *context, in
 }
 
 // 校验 weight2 动态输入，与 weight1 做交叉校验
-static ge::graphStatus CheckWeight2Desc(gert::TilingContext *context, ge::DataType w1DataType, ge::Format w1Format,
-                                        ge::DataType &w2DataType)
+static ge::graphStatus CheckWeight2Desc(gert::TilingContext* context, ge::DataType w1DataType, ge::Format w1Format,
+                                        ge::DataType& w2DataType)
 {
     auto w2Desc = context->GetDynamicInputDesc(WEIGHT2_INDEX, 0);
     OP_TILING_CHECK(w2Desc == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "weight2"), return GRAPH_FAILED);
@@ -971,9 +971,9 @@ static ge::graphStatus CheckWeight2Desc(gert::TilingContext *context, ge::DataTy
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckWeight2Input(gert::TilingContext *context, int64_t hiddenSize, uint32_t N,
+static ge::graphStatus CheckWeight2Input(gert::TilingContext* context, int64_t hiddenSize, uint32_t N,
                                          uint32_t expertPerRank, ge::DataType w1DataType, ge::Format w1Format,
-                                         ge::DataType &outW2DataType)
+                                         ge::DataType& outW2DataType)
 {
     auto w2Tensor = context->GetDynamicInputTensor(WEIGHT2_INDEX, 0);
     OP_TILING_CHECK(w2Tensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "weight2"), return GRAPH_FAILED);
@@ -1015,8 +1015,8 @@ static ge::graphStatus CheckWeight2Input(gert::TilingContext *context, int64_t h
 }
 
 // 校验 weight_scales1/weight_scales2 输入（可选），quant 权重时必选
-static ge::graphStatus CheckWeightScaleInput(gert::TilingContext *context, uint32_t inputIndex, const char *inputName,
-                                             uint32_t expertPerRank, int64_t dim1Expected, const char *dim1Name)
+static ge::graphStatus CheckWeightScaleInput(gert::TilingContext* context, uint32_t inputIndex, const char* inputName,
+                                             uint32_t expertPerRank, int64_t dim1Expected, const char* dim1Name)
 {
     auto wScaleTensor = context->GetDynamicInputTensor(inputIndex, 0);
     OP_TILING_CHECK(wScaleTensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, inputName), return GRAPH_FAILED);
@@ -1057,10 +1057,10 @@ static ge::graphStatus CheckWeightScaleInput(gert::TilingContext *context, uint3
 }
 
 // 校验 bias1/bias2 输入, 当且仅当 INT4 权重时存在 bias
-static ge::graphStatus CheckBiasInput(gert::TilingContext *context, uint32_t inputIndex, const char *inputName,
-                                      uint32_t expertPerRank, int64_t dim0Expected, const char *dim0Name)
+static ge::graphStatus CheckBiasInput(gert::TilingContext* context, uint32_t inputIndex, const char* inputName,
+                                      uint32_t expertPerRank, int64_t dim0Expected, const char* dim0Name)
 {
-    const gert::StorageShape *biasStorageShape = context->GetDynamicInputShape(inputIndex, 0);
+    const gert::StorageShape* biasStorageShape = context->GetDynamicInputShape(inputIndex, 0);
     OP_TILING_CHECK(biasStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, inputName), return GRAPH_FAILED);
     auto biasTensor = context->GetDynamicInputTensor(inputIndex, 0);
     OP_TILING_CHECK(biasTensor == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, inputName), return GRAPH_FAILED);
@@ -1106,13 +1106,13 @@ static ge::graphStatus CheckBiasInput(gert::TilingContext *context, uint32_t inp
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MegaMoeA2A3CheckShapeAndSetTiling(gert::TilingContext *context, MegaMoeA2A3TilingData &info)
+static ge::graphStatus MegaMoeA2A3CheckShapeAndSetTiling(gert::TilingContext* context, MegaMoeA2A3TilingData& info)
 {
     // ==================== 1. 输入张量非空校验 ====================
-    const gert::StorageShape *contextStorageShape = context->GetInputShape(CONTEXT_INDEX);
-    const gert::StorageShape *xStorageShape = context->GetInputShape(X_INDEX);
-    const gert::StorageShape *topkIdsStorageShape = context->GetInputShape(TOPK_IDS_INDEX);
-    const gert::StorageShape *topkWeightsStorageShape = context->GetInputShape(TOPK_WEIGHTS_INDEX);
+    const gert::StorageShape* contextStorageShape = context->GetInputShape(CONTEXT_INDEX);
+    const gert::StorageShape* xStorageShape = context->GetInputShape(X_INDEX);
+    const gert::StorageShape* topkIdsStorageShape = context->GetInputShape(TOPK_IDS_INDEX);
+    const gert::StorageShape* topkWeightsStorageShape = context->GetInputShape(TOPK_WEIGHTS_INDEX);
     OP_TILING_CHECK(contextStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "context"),
                     return GRAPH_FAILED);
     OP_TILING_CHECK(xStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "x"), return GRAPH_FAILED);
@@ -1234,7 +1234,7 @@ static ge::graphStatus MegaMoeA2A3CheckShapeAndSetTiling(gert::TilingContext *co
                     OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckXActiveMaskInput failed."), return GRAPH_FAILED);
 
     // ==================== 13. scales 输入校验（可选，预留） ====================
-    const gert::StorageShape *scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
+    const gert::StorageShape* scalesStorageShape = context->GetOptionalInputShape(SCALES_INDEX);
     OP_TILING_CHECK(scalesStorageShape != nullptr, OP_LOGE_FOR_INVALID_VALUE(K_OP_NAME, "scales", "not null", "null"),
                     return GRAPH_FAILED);
 
@@ -1257,7 +1257,7 @@ static ge::graphStatus MegaMoeA2A3CheckShapeAndSetTiling(gert::TilingContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MegaMoeA2A3GetPlatformInfoAndSetTiling(gert::TilingContext *context, MegaMoeA2A3TilingData &info)
+static ge::graphStatus MegaMoeA2A3GetPlatformInfoAndSetTiling(gert::TilingContext* context, MegaMoeA2A3TilingData& info)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -1273,7 +1273,7 @@ static ge::graphStatus MegaMoeA2A3GetPlatformInfoAndSetTiling(gert::TilingContex
 }
 
 // 表示通信亲和内存布局算法，当前版本仅支持 ""。
-static ge::graphStatus MegaMoeA2A3CommAlg(const gert::TilingContext *context)
+static ge::graphStatus MegaMoeA2A3CommAlg(const gert::TilingContext* context)
 {
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get operator attributes."),
@@ -1290,9 +1290,9 @@ static ge::graphStatus MegaMoeA2A3CommAlg(const gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MegaMoeA2A3CheckHcclBuffSize(const gert::TilingContext *context, MegaMoeA2A3TilingData &info)
+static ge::graphStatus MegaMoeA2A3CheckHcclBuffSize(const gert::TilingContext* context, MegaMoeA2A3TilingData& info)
 {
-    const char *nodeName = K_INNER_DEBUG;
+    const char* nodeName = K_INNER_DEBUG;
     // info.cclBufferSize是winIn和winOut空间之和（两者相等），这里只通过winIn校验
     int64_t cclBufferSize = info.cclBufferSize / 2;
     OP_LOGD(nodeName, "cclBufferSize = %ld Bytes (%ld MB).", cclBufferSize,
@@ -1328,10 +1328,10 @@ static ge::graphStatus MegaMoeA2A3CheckHcclBuffSize(const gert::TilingContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckYOutput(gert::TilingContext *context, const MegaMoeA2A3TilingData &info)
+static ge::graphStatus CheckYOutput(gert::TilingContext* context, const MegaMoeA2A3TilingData& info)
 {
     // ==================== 1. y 输出校验 ====================
-    const gert::StorageShape *yStorageShape = context->GetOutputShape(OUTPUT_Y_INDEX);
+    const gert::StorageShape* yStorageShape = context->GetOutputShape(OUTPUT_Y_INDEX);
     OP_TILING_CHECK(yStorageShape == nullptr, OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get output y shape."),
                     return GRAPH_FAILED);
 
@@ -1373,10 +1373,10 @@ static ge::graphStatus CheckYOutput(gert::TilingContext *context, const MegaMoeA
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus CheckExpertTokenNumsOutput(gert::TilingContext *context, const MegaMoeA2A3TilingData &info)
+static ge::graphStatus CheckExpertTokenNumsOutput(gert::TilingContext* context, const MegaMoeA2A3TilingData& info)
 {
     // ==================== 2. expert_token_nums 输出校验 ====================
-    const gert::StorageShape *expertTokenNumsStorageShape = context->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    const gert::StorageShape* expertTokenNumsStorageShape = context->GetOutputShape(OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
     OP_TILING_CHECK(expertTokenNumsStorageShape == nullptr,
                     OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get output expert_token_nums shape."),
                     return GRAPH_FAILED);
@@ -1415,7 +1415,7 @@ static ge::graphStatus CheckExpertTokenNumsOutput(gert::TilingContext *context, 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MegaMoeA2A3CheckOutputTensor(gert::TilingContext *context, const MegaMoeA2A3TilingData &info)
+static ge::graphStatus MegaMoeA2A3CheckOutputTensor(gert::TilingContext* context, const MegaMoeA2A3TilingData& info)
 {
     auto status = CheckYOutput(context, info);
     if (status != ge::GRAPH_SUCCESS) {
@@ -1424,18 +1424,18 @@ static ge::graphStatus MegaMoeA2A3CheckOutputTensor(gert::TilingContext *context
     return CheckExpertTokenNumsOutput(context, info);
 }
 
-static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext *context)
+static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
 {
     // 涉及SyncAll，设置batch mode模式，所有核同时启动
     uint32_t batch_mode = 1U;
     auto ret = context->SetScheduleMode(batch_mode);
 
     // 1. tilingData
-    MegaMoeTilingDataQuant *tilingData = context->GetTilingData<MegaMoeTilingDataQuant>();
+    MegaMoeTilingDataQuant* tilingData = context->GetTilingData<MegaMoeTilingDataQuant>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get tiling data."),
                     return ge::GRAPH_FAILED);
     OP_LOGI(K_INNER_DEBUG, "MegaMoeA2A3 get tilingData.");
-    MegaMoeA2A3TilingData &info = tilingData->common;
+    MegaMoeA2A3TilingData& info = tilingData->common;
     OP_LOGI(K_INNER_DEBUG, "MegaMoeA2A3 get tilingData info.");
 
     OP_TILING_CHECK(MegaMoeA2A3CommAlg(context) != ge::GRAPH_SUCCESS,
@@ -1496,13 +1496,13 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext *context)
     size_t initRoutingWorkspace = 0;
 
     if (info.isQuantRouting != 0U) {
-        MegaMoeTilingDataQuant *quantTilingData = context->GetTilingData<MegaMoeTilingDataQuant>();
+        MegaMoeTilingDataQuant* quantTilingData = context->GetTilingData<MegaMoeTilingDataQuant>();
         OP_TILING_CHECK(tilingData == nullptr,
                         OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get quant tiling data."),
                         return ge::GRAPH_FAILED);
         quantTilingData->common = info;
     } else {
-        MegaMoeTilingDataNonQuant *nonQuantTilingData = context->GetTilingData<MegaMoeTilingDataNonQuant>();
+        MegaMoeTilingDataNonQuant* nonQuantTilingData = context->GetTilingData<MegaMoeTilingDataNonQuant>();
         OP_TILING_CHECK(tilingData == nullptr,
                         OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get non-quant tiling data."),
                         return ge::GRAPH_FAILED);
@@ -1513,7 +1513,7 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext *context)
     initRoutingWorkspace = permuteTilingBase.workspaceSize_;
 
     // 4. workspace
-    size_t *workSpaces = context->GetWorkspaceSizes(1);
+    size_t* workSpaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workSpaces == nullptr, OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get workspace sizes."),
                     return ge::GRAPH_FAILED);
 
@@ -1581,13 +1581,13 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MegaMoeA2A3TilingFunc(gert::TilingContext *context)
+static ge::graphStatus MegaMoeA2A3TilingFunc(gert::TilingContext* context)
 {
     return MegaMoeA2A3TilingFuncImpl(context);
 }
 
 struct MegaMoeA2A3CompileInfo {};
-ge::graphStatus TilingParseForMegaMoeA2A3(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForMegaMoeA2A3(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;
@@ -1596,7 +1596,7 @@ ge::graphStatus TilingParseForMegaMoeA2A3(gert::TilingParseContext *context)
 IMPL_OP_OPTILING(MegaMoe).Tiling(MegaMoeA2A3TilingFunc).TilingParse<MegaMoeA2A3CompileInfo>(TilingParseForMegaMoeA2A3);
 
 #if RUNTIME_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION && METADEF_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION
-inline void MegaMoeExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+inline void MegaMoeExceptionImplWrapper(aclrtExceptionInfo* args, void* userdata)
 {
     Mc2Exception::Mc2ExceptionImpl(args, userdata, "MegaMoe");
 }

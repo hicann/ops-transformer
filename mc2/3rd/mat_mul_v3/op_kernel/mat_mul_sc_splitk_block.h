@@ -72,7 +72,7 @@ class Mc2MatmulSingleCoreSplitKBaseBlock {
 public:
     __aicore__ inline Mc2MatmulSingleCoreSplitKBaseBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-    __aicore__ inline void Init(const Mc2MatmulV3TilingData *matmulTilingData);
+    __aicore__ inline void Init(const Mc2MatmulV3TilingData* matmulTilingData);
     __aicore__ inline void UpdateBlockCnt();
     __aicore__ inline void InitBlockIndex();
     __aicore__ inline void UpdateBlockParamsMk(uint64_t innerMIndex, uint64_t kIndex);
@@ -84,14 +84,14 @@ public:
 public:
     BlockOffset offset_;
     SingleCoreSplitKBaseBlockArgs params_;
-    const Mc2MatmulV3TilingData *matmulTilingData_;
+    const Mc2MatmulV3TilingData* matmulTilingData_;
 };
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-__aicore__ inline void Mc2MatmulSingleCoreSplitKBaseBlock::Init(const Mc2MatmulV3TilingData *matmulTilingData)
+__aicore__ inline void Mc2MatmulSingleCoreSplitKBaseBlock::Init(const Mc2MatmulV3TilingData* matmulTilingData)
 {
     matmulTilingData_ = matmulTilingData;
-    const Mc2L2cacheTilePara &tilingL2 = matmulTilingData_->tileL2cacheTiling;
+    const Mc2L2cacheTilePara& tilingL2 = matmulTilingData_->tileL2cacheTiling;
     params_.rowOrder = tilingL2.calOrder;
     params_.isTransposeA = matmulTilingData_->matmulRunInfo.transA;
     params_.isTransposeB = matmulTilingData_->matmulRunInfo.transB;

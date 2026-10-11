@@ -33,13 +33,12 @@ template <typename xType, typename wType, typename yType, class mmType>
 class MatmulAllReduceAddRmsNorm910General
     : public MatmulAllReduce910General<xType, wType, yType, mmType, Mc2CoreType::ON_CUBE_AND_VECTOR> {
 public:
-    __aicore__ inline MatmulAllReduceAddRmsNorm910General(MC2GmAddrs *addrs, ArnGmAddrs *arnAddrs,
-                                                          MC2TilingHeader *tilingData, TPipe *tPipe)
+    __aicore__ inline MatmulAllReduceAddRmsNorm910General(MC2GmAddrs* addrs, ArnGmAddrs* arnAddrs,
+                                                          MC2TilingHeader* tilingData, TPipe* tPipe)
         : MatmulAllReduce910General<xType, wType, yType, mmType, Mc2CoreType::ON_CUBE_AND_VECTOR>(addrs, arnAddrs,
                                                                                                   tilingData, tPipe)
     {
-        Mc2Tiling::MatmulAllReduceAddRmsNormTilingData *p =
-            (Mc2Tiling::MatmulAllReduceAddRmsNormTilingData *)tilingData;
+        Mc2Tiling::MatmulAllReduceAddRmsNormTilingData* p = (Mc2Tiling::MatmulAllReduceAddRmsNormTilingData*)tilingData;
         arnTile_ = &p->addRMSNormTileTilingData;
         arnTail_ = &p->addRMSNormTailTilingData;
         arnTilineKey_ = &p->addRmsNormTilingeKeyData;
@@ -71,9 +70,9 @@ public:
     }
 
 private:
-    Mc2Tiling::AddRMSNormTilingeKeyData *arnTilineKey_;
-    Mc2Tiling::AddRMSNormTilingData *arnTile_;
-    Mc2Tiling::AddRMSNormTilingData *arnTail_;
+    Mc2Tiling::AddRMSNormTilingeKeyData* arnTilineKey_;
+    Mc2Tiling::AddRMSNormTilingData* arnTile_;
+    Mc2Tiling::AddRMSNormTilingData* arnTail_;
 };
 
 #define INVOKE_MC2_ARN_910_OP_IMPL_HELPER(opTemplateClass, bTransFlag) \
@@ -86,7 +85,7 @@ private:
         MC2GmAddrs addrs = {aGM, bGM, biasGM, nullptr, normOutGM, workspaceGM, normOutGM}; \
         ArnGmAddrs arnAddrs = {residualGM, gammaGM, yGM, normOutGM}; \
         MatmulAllReduceAddRmsNorm910General<DTYPE_X1, DTYPE_X2, DTYPE_Y, opType> op( \
-            &addrs, &arnAddrs, (MC2TilingHeader *)&tilingData, &tPipe); \
+            &addrs, &arnAddrs, (MC2TilingHeader*)&tilingData, &tPipe); \
         op.Init(); \
         op.Process(); \
     } while (0)

@@ -16,9 +16,9 @@
 #include "../../../../op_host/op_tiling/arch35/tt_quant_grouped_mat_mul_allto_allv_tiling.h"
 #include "../../../../op_host/op_tiling/arch35/mx_quant_grouped_mat_mul_allto_allv_tiling.h"
 
-static std::string GetCsvPath(const char *file)
+static std::string GetCsvPath(const char* file)
 {
-    const char *envPath = std::getenv("CSV_CASE_PATH");
+    const char* envPath = std::getenv("CSV_CASE_PATH");
     if (envPath != nullptr && strlen(envPath) > 0) {
         return std::string(envPath);
     }

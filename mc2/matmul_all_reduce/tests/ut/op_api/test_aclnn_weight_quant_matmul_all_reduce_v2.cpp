@@ -18,19 +18,19 @@ namespace MatmulAllReduceUT {
 
 namespace {
 
-void RunWeightQuantMatmulAllReduceV2Ut(op::SocVersion soc, const TensorDesc &x1, const TensorDesc &x2,
-                                       const TensorDesc *bias, const TensorDesc &antiquantScale,
-                                       const TensorDesc *antiquantOffset, const TensorDesc *x3,
-                                       const TensorDesc &output, const char *commMode, int64_t groupSize,
+void RunWeightQuantMatmulAllReduceV2Ut(op::SocVersion soc, const TensorDesc& x1, const TensorDesc& x2,
+                                       const TensorDesc* bias, const TensorDesc& antiquantScale,
+                                       const TensorDesc* antiquantOffset, const TensorDesc* x3,
+                                       const TensorDesc& output, const char* commMode, int64_t groupSize,
                                        aclnnStatus expectResult)
 {
     op::SetPlatformSocVersion(soc);
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclnnRet = ACLNN_SUCCESS;
 
     if (bias != nullptr && antiquantOffset != nullptr) {
@@ -90,7 +90,7 @@ TEST_P(AclnnWeightQuantMatmulAllReduceV2Test, param)
                               param.streamMode, param.groupSize),
                         OUTPUT(param.output));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(ACLNN_ERR_PARAM_INVALID, aclnnRet);

@@ -35,7 +35,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::CatlassMatmul()
 
 template <TemplateAGMMClass>
 template <typename LayoutB>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::DispatchMatmul(const LayoutB &layoutB)
+__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::DispatchMatmul(const LayoutB& layoutB)
 {
     if (m0 == TILE_SHAPE_128) {
         LaunchMatmul<LayoutB, TILE_SHAPE_128, TILE_SHAPE_256>(layoutB);
@@ -46,7 +46,7 @@ __aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::DispatchMatmul(
 
 template <TemplateAGMMClass>
 template <typename LayoutB, int32_t TileM, int32_t TileN>
-__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::LaunchMatmul(const LayoutB &layoutB)
+__aicore__ inline void AllGatherMatmulAIVMode<TemplateAGMMFunc>::LaunchMatmul(const LayoutB& layoutB)
 {
     int64_t peer_mem_m = static_cast<int64_t>(m0) * pValue * worldSize;
     bool need_fixpipe = quantFlag && std::is_same<YType, half>::value && isX2ScaleTypeInt64 &&

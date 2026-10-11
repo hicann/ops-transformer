@@ -36,7 +36,7 @@ struct AllGatherMatmulV3ApiUtParam {
     std::string commMode;
     aclnnStatus expectResult;
 
-    explicit AllGatherMatmulV3ApiUtParam(const csv_map &csvMap)
+    explicit AllGatherMatmulV3ApiUtParam(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->context = GetTensorACL(csvMap, "context_shape", "context_dtype", "context_format");
@@ -66,7 +66,7 @@ struct AllGatherMatmulV3ApiUtParam {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AllGatherMatmulV3ApiUtParam &param)
+inline std::ostream& operator<<(std::ostream& os, const AllGatherMatmulV3ApiUtParam& param)
 {
     return os << param.case_name;
 }

@@ -25,12 +25,12 @@ struct FpMMAdditionalData {};
 template <typename MMTilingType, typename MMType>
 class MC2FpMatmul {
 public:
-    __aicore__ inline MC2FpMatmul(AscendC::TPipe *tPipe)
+    __aicore__ inline MC2FpMatmul(AscendC::TPipe* tPipe)
         : tPipePtr_(tPipe){};
     // 初始化方法
     __aicore__ inline void Init();
     // 获取数据上下文引用
-    __aicore__ inline MC2MMContext<FpMMAdditionalData, MMTilingType> *GetContextPtr();
+    __aicore__ inline MC2MMContext<FpMMAdditionalData, MMTilingType>* GetContextPtr();
     // 执行一次计算的方法
     __aicore__ inline void Process(uint32_t taskIndex);
     // 结束方法
@@ -39,7 +39,7 @@ public:
 protected:
     MC2MMContext<FpMMAdditionalData, MMTilingType> MMcontext_;
     MMType MMImpl_;
-    AscendC::TPipe *tPipePtr_;
+    AscendC::TPipe* tPipePtr_;
 };
 
 template <typename MMTilingType, typename MMType>
@@ -47,7 +47,7 @@ inline __aicore__ void MC2FpMatmul<MMTilingType, MMType>::Init()
 {}
 
 template <typename MMTilingType, typename MMType>
-inline __aicore__ MC2MMContext<FpMMAdditionalData, MMTilingType> *MC2FpMatmul<MMTilingType, MMType>::GetContextPtr()
+inline __aicore__ MC2MMContext<FpMMAdditionalData, MMTilingType>* MC2FpMatmul<MMTilingType, MMType>::GetContextPtr()
 {
     return &MMcontext_;
 }

@@ -75,7 +75,7 @@ public:
 
     /// Construct
     CATLASS_DEVICE
-    BlockMmad(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0)
+    BlockMmad(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
     {
         // Allocate L1 memory space
         l1ATensor = resource.l1Buf.template GetBufferByByte<ElementA>(l1BufAddrStart + L1A_SIZE + L1B_SIZE * STAGES);
@@ -94,7 +94,7 @@ public:
     /// Perform a block-scoped matrix multiply-accumulate
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementA> gA, AscendC::GlobalTensor<ElementC> gC, LayoutA layoutA,
-                    LayoutB layoutB, LayoutC layoutC, GemmCoord actualShape, uint32_t &nIdx,
+                    LayoutB layoutB, LayoutC layoutC, GemmCoord actualShape, uint32_t& nIdx,
                     Arch::CrossCoreFlag softmaxReady)
     {
         uint32_t rowNum = actualShape.m();

@@ -57,7 +57,7 @@ struct MoeDistributeCombineTeardownTestParam {
     ge::graphStatus status;
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MoeDistributeCombineTeardownTestParam &param)
+inline std::ostream& operator<<(std::ostream& os, const MoeDistributeCombineTeardownTestParam& param)
 {
     return os << param.caseName;
 }
@@ -286,7 +286,7 @@ protected:
 static struct MoeDistributeCombineTeardownCompileInfo {
 } compileInfo;
 
-static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombineTeardownTestParam &param)
+static gert::TilingContextPara BuildTilingContextPara(const MoeDistributeCombineTeardownTestParam& param)
 {
     std::cout << "[TEST_CASE] " << param.caseName << std::endl;
     gert::StorageShape expandXShape = {param.expandXShape, param.expandXShape};

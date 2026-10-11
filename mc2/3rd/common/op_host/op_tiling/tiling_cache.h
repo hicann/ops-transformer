@@ -25,7 +25,7 @@ constexpr uint32_t kMaxTilingCacheEntryNum = 500;
 template <typename HashInput, typename HashItem>
 class TilingCache {
 public:
-    void Add(uint32_t key, const HashInput &hash_input, const HashItem &value)
+    void Add(uint32_t key, const HashInput& hash_input, const HashItem& value)
     {
         rwlock_.wrlock();
         if (size_ >= kMaxTilingCacheEntryNum) {
@@ -44,7 +44,7 @@ public:
         return;
     }
 
-    void Replace(uint32_t key, const HashInput &hash_input, const HashItem &value)
+    void Replace(uint32_t key, const HashInput& hash_input, const HashItem& value)
     {
         rwlock_.wrlock();
         if (size_ >= kMaxTilingCacheEntryNum) {
@@ -61,7 +61,7 @@ public:
         return;
     }
 
-    bool Get(uint32_t key, const HashInput &hash_input, HashItem &value)
+    bool Get(uint32_t key, const HashInput& hash_input, HashItem& value)
     {
         rwlock_.rdlock();
         auto iter = map_.find(key);

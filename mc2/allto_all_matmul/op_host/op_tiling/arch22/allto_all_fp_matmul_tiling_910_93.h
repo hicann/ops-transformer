@@ -36,7 +36,7 @@ class AllToAllFpMatmulTilingBaseA3 : public AllToAllMatmulTilingBase {
     friend class AllToAllFpMatmulHelper;
 
 public:
-    explicit AllToAllFpMatmulTilingBaseA3(gert::TilingContext *context);
+    explicit AllToAllFpMatmulTilingBaseA3(gert::TilingContext* context);
     ~AllToAllFpMatmulTilingBaseA3() override = default;
 
 protected:
@@ -45,17 +45,17 @@ protected:
     ge::graphStatus PostTiling() override;
     uint64_t GetTilingKey() const override;
 
-    ge::graphStatus CheckA3NonQuantTensorDataType(const gert::TilingContext *context, const char *opName);
+    ge::graphStatus CheckA3NonQuantTensorDataType(const gert::TilingContext* context, const char* opName);
     ge::graphStatus CheckOpInputInfo();
     ge::graphStatus InitTilingContextParameters();
     ge::graphStatus DoMMTiling();
 
     ge::graphStatus SetHcclTiling();
-    void SetTilingInfo(AlltoAllMatmulTilingInfoA3 &tilingInfo) const;
+    void SetTilingInfo(AlltoAllMatmulTilingInfoA3& tilingInfo) const;
 
 private:
-    void PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingDataA3 &alltoAllMatmulTilingDataA3);
-    void PrintAlltoAllMatmulTilingInfo(const std::string &opName, AlltoAllMatmulTilingInfoA3 &tilingInfo);
+    void PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingDataA3& alltoAllMatmulTilingDataA3);
+    void PrintAlltoAllMatmulTilingInfo(const std::string& opName, AlltoAllMatmulTilingInfoA3& tilingInfo);
 
     AlltoAllMatmulTilingDataA3 localTilingData_;
     std::string socVersionStr_;
@@ -63,12 +63,12 @@ private:
 
 class AllToAllFpMatmulHelper : public mc2_matmul_v3::Mc2MatmulV3BaseTiling {
 public:
-    AllToAllFpMatmulHelper(AllToAllFpMatmulTilingBaseA3 &alltoAllMatmulTilingA3, Mc2MatmulV3TilingData &data);
+    AllToAllFpMatmulHelper(AllToAllFpMatmulTilingBaseA3& alltoAllMatmulTilingA3, Mc2MatmulV3TilingData& data);
 
     ge::graphStatus GetShapeAttrsInfo() override;
 
 private:
-    AllToAllFpMatmulTilingBaseA3 &tilingProcesser_;
+    AllToAllFpMatmulTilingBaseA3& tilingProcesser_;
 };
 
 } // namespace MC2Tiling

@@ -46,7 +46,7 @@ struct Args {
 };
 
 const uint32_t MACHINE_NUM = 1;
-const char *env_dev_num = std::getenv("ENV_DEV_NUM");
+const char* env_dev_num = std::getenv("ENV_DEV_NUM");
 
 const uint32_t EP_WORLD_SIZE = 2;
 const uint32_t DEV_NUM = EP_WORLD_SIZE;
@@ -56,7 +56,7 @@ const bool IS_TEST_A3A5 = true;
 const uint32_t EP_WORLD_SIZE_A2 = 8;
 const uint32_t DEV_NUM_A2 = EP_WORLD_SIZE_A2;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -66,8 +66,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -83,21 +83,21 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-void DestroyTensor(aclTensor *tensor)
+void DestroyTensor(aclTensor* tensor)
 {
     if (tensor != nullptr) {
         aclDestroyTensor(tensor);
     }
 }
 
-void FreeDeviceAddr(void *deviceAddr)
+void FreeDeviceAddr(void* deviceAddr)
 {
     if (deviceAddr != nullptr) {
         aclrtFree(deviceAddr);
     }
 }
 
-int launchOneThreadDispatchV2AndCombineV2_A3A5(Args &args)
+int launchOneThreadDispatchV2AndCombineV2_A3A5(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed. ret: %d\n", ret); return ret);
@@ -137,29 +137,29 @@ int launchOneThreadDispatchV2AndCombineV2_A3A5(Args &args)
 
     /* 根据当前场景，构造device侧输入输出变量*/
     // 声明device侧输入输出变量
-    void *xDeviceAddr = nullptr;
-    void *expertIdsDeviceAddr = nullptr;
-    void *scalesDeviceAddr = nullptr;
-    void *expertScalesDeviceAddr = nullptr;
-    void *expandXDeviceAddr = nullptr;
-    void *dynamicScalesDeviceAddr = nullptr;
-    void *expandIdxDeviceAddr = nullptr;
-    void *expertTokenNumsDeviceAddr = nullptr;
-    void *epRecvCountsDeviceAddr = nullptr;
-    void *tpRecvCountsDeviceAddr = nullptr;
-    void *expandScalesDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* expertIdsDeviceAddr = nullptr;
+    void* scalesDeviceAddr = nullptr;
+    void* expertScalesDeviceAddr = nullptr;
+    void* expandXDeviceAddr = nullptr;
+    void* dynamicScalesDeviceAddr = nullptr;
+    void* expandIdxDeviceAddr = nullptr;
+    void* expertTokenNumsDeviceAddr = nullptr;
+    void* epRecvCountsDeviceAddr = nullptr;
+    void* tpRecvCountsDeviceAddr = nullptr;
+    void* expandScalesDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *expertIds = nullptr;
-    aclTensor *scales = nullptr;
-    aclTensor *expertScales = nullptr;
-    aclTensor *expandX = nullptr;
-    aclTensor *dynamicScales = nullptr;
-    aclTensor *expandIdx = nullptr;
-    aclTensor *expertTokenNums = nullptr;
-    aclTensor *epRecvCounts = nullptr;
-    aclTensor *tpRecvCounts = nullptr;
-    aclTensor *expandScales = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* expertIds = nullptr;
+    aclTensor* scales = nullptr;
+    aclTensor* expertScales = nullptr;
+    aclTensor* expandX = nullptr;
+    aclTensor* dynamicScales = nullptr;
+    aclTensor* expandIdx = nullptr;
+    aclTensor* expertTokenNums = nullptr;
+    aclTensor* epRecvCounts = nullptr;
+    aclTensor* tpRecvCounts = nullptr;
+    aclTensor* expandScales = nullptr;
 
     // 定义当前场景下各变量维度
     std::vector<int64_t> xShape{BS, H};
@@ -238,12 +238,12 @@ int launchOneThreadDispatchV2AndCombineV2_A3A5(Args &args)
 
     /* 声明算子执行必需变量 */
     uint64_t dispatchV2WorkspaceSize = 0;
-    aclOpExecutor *dispatchV2Executor = nullptr;
-    void *dispatchV2WorkspaceAddr = nullptr;
+    aclOpExecutor* dispatchV2Executor = nullptr;
+    void* dispatchV2WorkspaceAddr = nullptr;
 
     uint64_t combineV2WorkspaceSize = 0;
-    aclOpExecutor *combineV2Executor = nullptr;
-    void *combineV2WorkspaceAddr = nullptr;
+    aclOpExecutor* combineV2Executor = nullptr;
+    void* combineV2WorkspaceAddr = nullptr;
 
     /* 依次执行dispatchV2及combineV2算子 */
     // 调用dispatchV2算子第一阶段接口
@@ -336,7 +336,7 @@ int launchOneThreadDispatchV2AndCombineV2_A3A5(Args &args)
     return 0;
 }
 
-int launchOneThreadDispatchV2AndCombineV2_A2(Args &args)
+int launchOneThreadDispatchV2AndCombineV2_A2(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed, ret %d\n", ret); return ret);
@@ -371,43 +371,43 @@ int launchOneThreadDispatchV2AndCombineV2_A2(Args &args)
         A = globalBs * (localExpertNum < K ? localExpertNum : K);
     }
 
-    void *xDeviceAddr = nullptr;
-    void *expertIdsDeviceAddr = nullptr;
-    void *scalesDeviceAddr = nullptr;
-    void *expertScalesDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* expertIdsDeviceAddr = nullptr;
+    void* scalesDeviceAddr = nullptr;
+    void* expertScalesDeviceAddr = nullptr;
 
-    void *expandXDeviceAddr = nullptr;
-    void *dynamicScalesDeviceAddr = nullptr;
-    void *assistInfoForCombineDeviceAddr = nullptr;
-    void *expertTokenNumsDeviceAddr = nullptr;
-    void *epRecvCountsDeviceAddr = nullptr;
-    void *tpRecvCountsDeviceAddr = nullptr;
-    void *expandScalesDeviceAddr = nullptr;
+    void* expandXDeviceAddr = nullptr;
+    void* dynamicScalesDeviceAddr = nullptr;
+    void* assistInfoForCombineDeviceAddr = nullptr;
+    void* expertTokenNumsDeviceAddr = nullptr;
+    void* epRecvCountsDeviceAddr = nullptr;
+    void* tpRecvCountsDeviceAddr = nullptr;
+    void* expandScalesDeviceAddr = nullptr;
 
-    void *xOutDeviceAddr = nullptr;
+    void* xOutDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *expertIds = nullptr;
-    aclTensor *scales = nullptr;
-    aclTensor *xActiveMask = nullptr;
-    aclTensor *expertScales = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* expertIds = nullptr;
+    aclTensor* scales = nullptr;
+    aclTensor* xActiveMask = nullptr;
+    aclTensor* expertScales = nullptr;
 
-    aclTensor *elasticInfo = nullptr; // A3
-    aclTensor *expandX = nullptr;
-    aclTensor *dynamicScales = nullptr;
-    aclTensor *assistInfoForCombine = nullptr; // expandIdx
-    aclTensor *expertTokenNums = nullptr;
-    aclTensor *epRecvCounts = nullptr;
-    aclTensor *tpRecvCounts = nullptr;
-    aclTensor *expandScales = nullptr;
+    aclTensor* elasticInfo = nullptr; // A3
+    aclTensor* expandX = nullptr;
+    aclTensor* dynamicScales = nullptr;
+    aclTensor* assistInfoForCombine = nullptr; // expandIdx
+    aclTensor* expertTokenNums = nullptr;
+    aclTensor* epRecvCounts = nullptr;
+    aclTensor* tpRecvCounts = nullptr;
+    aclTensor* expandScales = nullptr;
 
-    aclTensor *activationScale = nullptr; // 预留参数
-    aclTensor *weightScale = nullptr;     // 预留参数
-    aclTensor *groupList = nullptr;       // 预留参数
+    aclTensor* activationScale = nullptr; // 预留参数
+    aclTensor* weightScale = nullptr;     // 预留参数
+    aclTensor* groupList = nullptr;       // 预留参数
 
-    aclTensor *sharedExpertX = nullptr; // A3
+    aclTensor* sharedExpertX = nullptr; // A3
 
-    aclTensor *xOut = nullptr;
+    aclTensor* xOut = nullptr;
 
     // 定义当前场景下各变量维度
     std::vector<int64_t> xShape{Bs, H};
@@ -497,12 +497,12 @@ int launchOneThreadDispatchV2AndCombineV2_A2(Args &args)
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t dispatchWorkspaceSize = 0;
-    aclOpExecutor *dispatchExecutor = nullptr;
-    void *dispatchWorkspaceAddr = nullptr;
+    aclOpExecutor* dispatchExecutor = nullptr;
+    void* dispatchWorkspaceAddr = nullptr;
 
     uint64_t combineWorkspaceSize = 0;
-    aclOpExecutor *combineExecutor = nullptr;
-    void *combineWorkspaceAddr = nullptr;
+    aclOpExecutor* combineExecutor = nullptr;
+    void* combineWorkspaceAddr = nullptr;
 
     /**************************************** 调用dispatch ********************************************/
     // 调用第一阶段接口
@@ -710,7 +710,7 @@ int run_example_on_A3A5()
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     if (!env_dev_num) {
         LOG_PRINT("[WARNING] Please check whether environment variable ENV_DEV_NUM is set correctly.\n");

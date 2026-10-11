@@ -69,7 +69,7 @@ __global__ __aicore__ void fp_matmul_all_reduce(GM_ADDR aGM, GM_ADDR bGM, GM_ADD
                                                 GM_ADDR antiquantScaleGM, GM_ADDR antiquantOffsetGM, GM_ADDR dequantGM,
                                                 GM_ADDR pertokenGM, GM_ADDR commQuantScale1GM,
                                                 GM_ADDR commQuantScale2GM, GM_ADDR cGM, GM_ADDR workspaceGM,
-                                                GM_ADDR tilingGM, TPipe &tPipe, GM_ADDR userWS)
+                                                GM_ADDR tilingGM, TPipe& tPipe, GM_ADDR userWS)
 {
 #if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && ((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)))
     // 910非量化
@@ -88,7 +88,7 @@ __global__ __aicore__ void quant_matmul_all_reduce(GM_ADDR aGM, GM_ADDR bGM, GM_
                                                    GM_ADDR antiquantScaleGM, GM_ADDR antiquantOffsetGM,
                                                    GM_ADDR dequantGM, GM_ADDR pertokenGM, GM_ADDR commQuantScale1GM,
                                                    GM_ADDR commQuantScale2GM, GM_ADDR cGM, GM_ADDR workspaceGM,
-                                                   GM_ADDR tilingGM, TPipe &tPipe, GM_ADDR userWS)
+                                                   GM_ADDR tilingGM, TPipe& tPipe, GM_ADDR userWS)
 {
 #if defined(DAVID_QUANT_INT8_OUT_FP16)
 #undef DTYPE_BIAS
@@ -175,7 +175,7 @@ __global__ __aicore__ void weight_quant_matmul_allreduce(GM_ADDR aGM, GM_ADDR bG
                                                          GM_ADDR dequantGM, GM_ADDR pertokenGM,
                                                          GM_ADDR commQuantScale1GM, GM_ADDR commQuantScale2GM,
                                                          GM_ADDR cGM, GM_ADDR workspaceGM, GM_ADDR tilingGM,
-                                                         TPipe &tPipe, GM_ADDR userWS)
+                                                         TPipe& tPipe, GM_ADDR userWS)
 {
 #if defined(WEIGHT_W4_W8) || defined(WEIGHT_F8)
 #if defined(WEIGHT_W4_W8)

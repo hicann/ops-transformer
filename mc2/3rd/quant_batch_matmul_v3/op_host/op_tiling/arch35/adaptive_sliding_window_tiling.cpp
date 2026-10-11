@@ -64,15 +64,15 @@ constexpr uint32_t VEC_CORE_GROUP_NUM = 2;
 
 namespace optiling {
 
-Mc2AdaptiveSlidingWindowTiling::Mc2AdaptiveSlidingWindowTiling(gert::TilingContext *context)
+Mc2AdaptiveSlidingWindowTiling::Mc2AdaptiveSlidingWindowTiling(gert::TilingContext* context)
     : Mc2QuantBatchMatmulV3TilingBase(context, false),
       tilingData_(tilingDataSelf_)
 {
     Reset();
 }
 
-Mc2AdaptiveSlidingWindowTiling::Mc2AdaptiveSlidingWindowTiling(gert::TilingContext *context,
-                                                               DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *out)
+Mc2AdaptiveSlidingWindowTiling::Mc2AdaptiveSlidingWindowTiling(gert::TilingContext* context,
+                                                               DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* out)
     : Mc2QuantBatchMatmulV3TilingBase(context, true),
       tilingData_(*out)
 {
@@ -101,10 +101,10 @@ bool Mc2AdaptiveSlidingWindowTiling::CheckDtype() const
     return true;
 }
 
-bool Mc2AdaptiveSlidingWindowTiling::CheckShape(const std::vector<gert::Shape *> &mandatoryShape,
-                                                const gert::StorageShape *biasShape,
-                                                const gert::StorageShape *pertokenShape,
-                                                const std::vector<int64_t> &dimValueOfMKN) const
+bool Mc2AdaptiveSlidingWindowTiling::CheckShape(const std::vector<gert::Shape*>& mandatoryShape,
+                                                const gert::StorageShape* biasShape,
+                                                const gert::StorageShape* pertokenShape,
+                                                const std::vector<int64_t>& dimValueOfMKN) const
 {
     Mc2QuantBatchMatmulV3Checker qmmV3Checker(context_, inputParams_);
     OP_TILING_CHECK(!qmmV3Checker.CheckShape(mandatoryShape, biasShape, pertokenShape, dimValueOfMKN),
@@ -242,14 +242,14 @@ ge::graphStatus Mc2AdaptiveSlidingWindowTiling::PostTiling()
                     OP_LOGE(inputParams_.opName, "Tiling data size[%zu] is not aligned to 8.", tilingDataSize_),
                     return ge::GRAPH_FAILED);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize_);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize_);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
     }
     context_->SetBlockDim(basicTiling_.usedCoreNum);
     context_->GetRawTilingData()->SetDataSize(tilingDataSize_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     OPS_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = workspaceSize_;
     return ge::GRAPH_SUCCESS;
@@ -830,8 +830,8 @@ void Mc2AdaptiveSlidingWindowTiling::CalcTailBasicBlock()
     uint64_t nTile = 1UL;
     uint64_t preSplit = 1UL;
     uint64_t secSplit = 1UL;
-    auto &preSplitValid = adaptiveWin_.mTail >= adaptiveWin_.nTail ? mTile : nTile;
-    auto &secSplitValid = adaptiveWin_.mTail >= adaptiveWin_.nTail ? nTile : mTile;
+    auto& preSplitValid = adaptiveWin_.mTail >= adaptiveWin_.nTail ? mTile : nTile;
+    auto& secSplitValid = adaptiveWin_.mTail >= adaptiveWin_.nTail ? nTile : mTile;
     while (CalUsedCoreNum(preSplit + 1, secSplit) <= aicoreParams_.aicNum) {
         preSplit += 1UL;
         if (!IsInValidPerblockTailSplit(preSplit) && !IsInValidWeighNzTailSplit(preSplit, true)) {

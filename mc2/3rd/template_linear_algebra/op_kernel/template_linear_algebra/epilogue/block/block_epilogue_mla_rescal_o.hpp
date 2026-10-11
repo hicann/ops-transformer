@@ -51,7 +51,7 @@ public:
     static constexpr uint32_t VECTOR_SIZE = 128;
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> &resource, uint32_t kvSplitCoreNum_)
+    BlockEpilogue(Arch::Resource<ArchTag>& resource, uint32_t kvSplitCoreNum_)
     {
         // Allocate UB space
         constexpr uint32_t LO_UB_TENSOR_OFFSET = 4 * UB_UINT8_BLOCK_SIZE_MLA;
@@ -99,11 +99,11 @@ public:
     CATLASS_DEVICE
     void SubCoreCompute(AscendC::GlobalTensor<ElementInput> gInput, AscendC::GlobalTensor<ElementUpdate> gUpdate,
                         AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementUpdate> gOCoreTmp,
-                        AscendC::GlobalTensor<ElementUpdate> gl, const LayoutInput &layoutInput,
-                        const LayoutOutput &layoutOutput, const LayoutUpdate &layoutUpdate, uint32_t nIdx,
+                        AscendC::GlobalTensor<ElementUpdate> gl, const LayoutInput& layoutInput,
+                        const LayoutOutput& layoutOutput, const LayoutUpdate& layoutUpdate, uint32_t nIdx,
                         uint32_t isLastNTile, uint32_t needRowLoop, uint32_t rowLoopIdx, uint32_t proTokenIdx,
                         uint32_t proTokenNum, uint32_t epiTokenNum, uint32_t integralHeadNum,
-                        uint32_t rescaleOPingPongFlag, uint32_t &glFlag)
+                        uint32_t rescaleOPingPongFlag, uint32_t& glFlag)
     {
         uint32_t curRowNum = layoutInput.shape(0);
         uint32_t embed = layoutInput.shape(1);
@@ -306,10 +306,10 @@ public:
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementInput> gInput, AscendC::GlobalTensor<ElementUpdate> gUpdate,
                     AscendC::GlobalTensor<ElementOutput> gOutput, AscendC::GlobalTensor<ElementUpdate> gOCoreTmp,
-                    AscendC::GlobalTensor<ElementUpdate> gl, const LayoutInput &layoutInput,
-                    const LayoutOutput &layoutOutput, const LayoutUpdate &layoutUpdate, GemmCoord actualBlockShape,
+                    AscendC::GlobalTensor<ElementUpdate> gl, const LayoutInput& layoutInput,
+                    const LayoutOutput& layoutOutput, const LayoutUpdate& layoutUpdate, GemmCoord actualBlockShape,
                     uint32_t nIdx, uint32_t isLastNTile, uint32_t curHeadNum, uint32_t rescaleOPingPongFlag,
-                    uint32_t &glFlag)
+                    uint32_t& glFlag)
     {
         uint32_t tokenNumPerHead = layoutOutput.shape(0);
         uint32_t embed = layoutInput.shape(1);

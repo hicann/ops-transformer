@@ -28,9 +28,9 @@ using namespace ge;
  * @param tilingData: 框架根据context的opName匹配tiling模板，计算产生的tilingData
  * @return
  */
-static void PrintTilingDataInfo(const gert::TilingContext *context, QuantReduceScatterTilingData &tilingData)
+static void PrintTilingDataInfo(const gert::TilingContext* context, QuantReduceScatterTilingData& tilingData)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGD(nodeName, "bs is %lu in quant_reduce_scatter.", tilingData.quantReduceScatterTilingInfo.bs);
     OP_LOGD(nodeName, "hiddenSize is %u in quant_reduce_scatter.", tilingData.quantReduceScatterTilingInfo.hiddenSize);
     OP_LOGD(nodeName, "scaleHiddenSize is %lu in quant_reduce_scatter.",
@@ -44,10 +44,10 @@ static void PrintTilingDataInfo(const gert::TilingContext *context, QuantReduceS
  * @param tilingData: 框架根据context的opName匹配tiling模板，计算产生的tilingData
  * @return
  */
-static bool SetTilingData(gert::TilingContext *context, QuantReduceScatterTilingData &tilingData)
+static bool SetTilingData(gert::TilingContext* context, QuantReduceScatterTilingData& tilingData)
 {
-    const char *nodeName = context->GetNodeName();
-    fe::PlatFormInfos *platformInfoPtr = context->GetPlatformInfo();
+    const char* nodeName = context->GetNodeName();
+    fe::PlatFormInfos* platformInfoPtr = context->GetPlatformInfo();
     platform_ascendc::PlatformAscendC ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     // set tilingData
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -75,7 +75,7 @@ static bool SetTilingData(gert::TilingContext *context, QuantReduceScatterTiling
 }
 
 // 基于 TARGET_ITER 公式计算 host 推荐的 xPerBlock（先除 rankSize 再反推），写入 tilingData
-static void SetXPerBlock(QuantReduceScatterTilingData &tilingData, const TilingRunInfo &runInfo)
+static void SetXPerBlock(QuantReduceScatterTilingData& tilingData, const TilingRunInfo& runInfo)
 {
     constexpr uint32_t TARGET_ITER = 3U;    // 与 QAR 对称
     constexpr uint32_t MIN_BLOCK = 2048U;   // QRS comm-bound：per_core 太小公式失效，MIN 兜到 2048
@@ -97,9 +97,9 @@ static void SetXPerBlock(QuantReduceScatterTilingData &tilingData, const TilingR
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @return
  */
-static void SetTilingKey(gert::TilingContext *context)
+static void SetTilingKey(gert::TilingContext* context)
 {
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     // 设置tilingKey模板参数
     const uint64_t tilingKey = GET_TPL_TILING_KEY(MTE_COMM);
     context->SetTilingKey(tilingKey);
@@ -111,15 +111,15 @@ static void SetTilingKey(gert::TilingContext *context)
  * @param context: 框架根据input，output，attrs等信息生成tiling需要的context
  * @return
  */
-static ge::graphStatus QuantReduceScatterTilingFunc(gert::TilingContext *context)
+static ge::graphStatus QuantReduceScatterTilingFunc(gert::TilingContext* context)
 {
     OP_TILING_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT("quant_reduce_scatter", "context"),
                     return ge::GRAPH_FAILED);
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_TILING_CHECK(nodeName == nullptr, OP_LOGE_WITH_INVALID_INPUT("quant_reduce_scatter", "nodeName"),
                     return ge::GRAPH_FAILED);
 
-    QuantReduceScatterTilingData *tilingData = context->GetTilingData<QuantReduceScatterTilingData>();
+    QuantReduceScatterTilingData* tilingData = context->GetTilingData<QuantReduceScatterTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
 
     TilingRunInfo runInfo = {};
@@ -143,7 +143,7 @@ static ge::graphStatus QuantReduceScatterTilingFunc(gert::TilingContext *context
 
 struct QuantReduceScatterCompileInfo {};
 
-ge::graphStatus TilingParseForQuantReduceScatter(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForQuantReduceScatter(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

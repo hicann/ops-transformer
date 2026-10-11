@@ -23,8 +23,8 @@ extern "C" {
 #endif
 
 // MatmulAllReduceAddRmsNorm
-bool ArnCheckNotNull(const aclTensor *x1, const aclTensor *x2, const aclTensor *residual, const aclTensor *gamma);
-bool ArnCheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *residual);
+bool ArnCheckNotNull(const aclTensor* x1, const aclTensor* x2, const aclTensor* residual, const aclTensor* gamma);
+bool ArnCheckShape(const aclTensor* x1, const aclTensor* x2, const aclTensor* residual);
 
 #define DEPRECATED_MM_ARN_API_WARN_ONCE(oldApiName1, oldApiName2, deprecatedDate, newApiName1, newApiName2) \
     do { \
@@ -41,10 +41,10 @@ bool ArnCheckShape(const aclTensor *x1, const aclTensor *x2, const aclTensor *re
     } while (0)
 
 aclnnStatus InnerMatmulAllReduceAddRmsNormGetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *bias, const aclTensor *antiquantScale,
-    const aclTensor *antiquantOffset, const aclTensor *dequant, const aclTensor *residual, const aclTensor *gamma,
-    double epsilon, const char *group, const char *reduceOp, int64_t commTurn, int64_t antiquantGroupSize,
-    const aclTensor *y, const aclTensor *normOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* antiquantScale,
+    const aclTensor* antiquantOffset, const aclTensor* dequant, const aclTensor* residual, const aclTensor* gamma,
+    double epsilon, const char* group, const char* reduceOp, int64_t commTurn, int64_t antiquantGroupSize,
+    const aclTensor* y, const aclTensor* normOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 #ifdef __cplusplus
 }

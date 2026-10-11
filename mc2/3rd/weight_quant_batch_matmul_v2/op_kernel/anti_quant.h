@@ -47,9 +47,9 @@ struct Mc2AntiQuantTensorShape {
 };
 
 template <typename T, bool HasOffset>
-__aicore__ inline void Mc2AddMulWithBroadcastHelper(const LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                                    const LocalTensor<T> &scale, const LocalTensor<T> &offset,
-                                                    uint8_t repeatTimesDim0, const BinaryRepeatParams &params,
+__aicore__ inline void Mc2AddMulWithBroadcastHelper(const LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                                    const LocalTensor<T>& scale, const LocalTensor<T>& offset,
+                                                    uint8_t repeatTimesDim0, const BinaryRepeatParams& params,
                                                     uint32_t loopDim1, uint32_t tailDim1)
 {
     // (dim0, dim1)
@@ -73,9 +73,9 @@ __aicore__ inline void Mc2AddMulWithBroadcastHelper(const LocalTensor<T> &dst, c
 }
 
 template <typename T, bool HasOffset>
-__aicore__ inline void Mc2AddMulWithBroadcastPerChannel(const LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                                        const LocalTensor<T> &scale, const LocalTensor<T> &offset,
-                                                        const Mc2AntiQuantTensorShape &tensorShape)
+__aicore__ inline void Mc2AddMulWithBroadcastPerChannel(const LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                                        const LocalTensor<T>& scale, const LocalTensor<T>& offset,
+                                                        const Mc2AntiQuantTensorShape& tensorShape)
 {
     // per-channel
     //   src shape (n, k_align) ori_shape (n, k)
@@ -102,10 +102,10 @@ __aicore__ inline void Mc2AddMulWithBroadcastPerChannel(const LocalTensor<T> &ds
 }
 
 template <typename T, bool HasOffset>
-__aicore__ inline void Mc2AddMulWithBroadcastPerGroupAtRepeat(const LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                                              const LocalTensor<T> &scale, const LocalTensor<T> &offset,
-                                                              const Mc2BroadCastPerGroupLoopParams &loopParams,
-                                                              const BinaryRepeatParams &repeatParamsK,
+__aicore__ inline void Mc2AddMulWithBroadcastPerGroupAtRepeat(const LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                                              const LocalTensor<T>& scale, const LocalTensor<T>& offset,
+                                                              const Mc2BroadCastPerGroupLoopParams& loopParams,
+                                                              const BinaryRepeatParams& repeatParamsK,
                                                               uint32_t groupSize, uint8_t repeatTimes)
 {
     constexpr uint32_t elemsOneBlock = 32 / sizeof(T);
@@ -130,9 +130,9 @@ __aicore__ inline void Mc2AddMulWithBroadcastPerGroupAtRepeat(const LocalTensor<
 }
 
 template <typename T, bool HasOffset>
-__aicore__ inline void Mc2AddMulWithBroadcastPerGroup(const LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                                      const LocalTensor<T> &scale, const LocalTensor<T> &offset,
-                                                      const Mc2AntiQuantTensorShape &tensorShape, uint32_t groupSize)
+__aicore__ inline void Mc2AddMulWithBroadcastPerGroup(const LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                                      const LocalTensor<T>& scale, const LocalTensor<T>& offset,
+                                                      const Mc2AntiQuantTensorShape& tensorShape, uint32_t groupSize)
 {
     // per-group
     //   src:
@@ -191,9 +191,9 @@ __aicore__ inline void Mc2AddMulWithBroadcastPerGroup(const LocalTensor<T> &dst,
 }
 
 template <typename T, bool HasOffset>
-__aicore__ inline void Mc2AddMulWithoutBroadcastHelper(const LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                                       const LocalTensor<T> &scale, const LocalTensor<T> &offset,
-                                                       uint8_t repeatTimesDim0, const BinaryRepeatParams &params,
+__aicore__ inline void Mc2AddMulWithoutBroadcastHelper(const LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                                       const LocalTensor<T>& scale, const LocalTensor<T>& offset,
+                                                       uint8_t repeatTimesDim0, const BinaryRepeatParams& params,
                                                        uint32_t loopDim1, uint32_t tailDim1)
 {
     constexpr uint32_t oneRepeatSize = ONE_REPEAT_BYTE_SIZE / sizeof(T);
@@ -219,9 +219,9 @@ __aicore__ inline void Mc2AddMulWithoutBroadcastHelper(const LocalTensor<T> &dst
 }
 
 template <typename T, bool HasOffset>
-__aicore__ inline void Mc2AddMulWithoutBroadcastPerChannel(const LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                                           const LocalTensor<T> &scale, const LocalTensor<T> &offset,
-                                                           const Mc2AntiQuantTensorShape &tensorShape)
+__aicore__ inline void Mc2AddMulWithoutBroadcastPerChannel(const LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                                           const LocalTensor<T>& scale, const LocalTensor<T>& offset,
+                                                           const Mc2AntiQuantTensorShape& tensorShape)
 {
     // src
     //   shape (k, n)
@@ -247,9 +247,9 @@ __aicore__ inline void Mc2AddMulWithoutBroadcastPerChannel(const LocalTensor<T> 
 }
 
 template <typename SrcDataType, typename ScaleOffsetDataType, typename DstDataType, bool IsTranspose, bool HasOffset>
-__aicore__ inline void Mc2AntiQuant(LocalTensor<DstDataType> &dst, const LocalTensor<SrcDataType> &src,
-                                    const ScaleOffsetDataType &scale, const ScaleOffsetDataType &offset,
-                                    TBuf<> &sharedTmpBuffer, const int64_t groupSize = 0)
+__aicore__ inline void Mc2AntiQuant(LocalTensor<DstDataType>& dst, const LocalTensor<SrcDataType>& src,
+                                    const ScaleOffsetDataType& scale, const ScaleOffsetDataType& offset,
+                                    TBuf<>& sharedTmpBuffer, const int64_t groupSize = 0)
 {
     if ASCEND_IS_AIC {
         return;
@@ -283,12 +283,12 @@ __aicore__ inline void Mc2AntiQuant(LocalTensor<DstDataType> &dst, const LocalTe
 }
 
 template <typename SrcDataType, typename ScaleOffsetDataType, typename DstDataType, bool HasOffset>
-__aicore__ inline void Mc2AscendAntiQuantPerGroupWithTranspose(LocalTensor<DstDataType> &dst,
-                                                               const LocalTensor<SrcDataType> &src,
-                                                               const LocalTensor<ScaleOffsetDataType> &scale,
-                                                               const LocalTensor<ScaleOffsetDataType> &offset,
-                                                               const Mc2AntiQuantTensorShape &tensorShape,
-                                                               TBuf<> &sharedTmpBuffer, uint32_t groupSize)
+__aicore__ inline void Mc2AscendAntiQuantPerGroupWithTranspose(LocalTensor<DstDataType>& dst,
+                                                               const LocalTensor<SrcDataType>& src,
+                                                               const LocalTensor<ScaleOffsetDataType>& scale,
+                                                               const LocalTensor<ScaleOffsetDataType>& offset,
+                                                               const Mc2AntiQuantTensorShape& tensorShape,
+                                                               TBuf<>& sharedTmpBuffer, uint32_t groupSize)
 {
     if constexpr (IsSameType<SrcDataType, float>::value || IsSameType<SrcDataType, half>::value) {
         // preprocess: f32->f32
@@ -304,8 +304,8 @@ __aicore__ inline void Mc2AscendAntiQuantPerGroupWithTranspose(LocalTensor<DstDa
 
 template <typename SrcDataType, typename ScaleOffsetDataType, typename DstDataType, bool HasOffset>
 __aicore__ inline void Mc2AscendAntiQuantPerChannelWithTranspose(
-    LocalTensor<DstDataType> &dst, const LocalTensor<SrcDataType> &src, const LocalTensor<ScaleOffsetDataType> &scale,
-    const LocalTensor<ScaleOffsetDataType> &offset, const Mc2AntiQuantTensorShape &tensorShape, TBuf<> &sharedTmpBuffer)
+    LocalTensor<DstDataType>& dst, const LocalTensor<SrcDataType>& src, const LocalTensor<ScaleOffsetDataType>& scale,
+    const LocalTensor<ScaleOffsetDataType>& offset, const Mc2AntiQuantTensorShape& tensorShape, TBuf<>& sharedTmpBuffer)
 {
     if constexpr (IsSameType<SrcDataType, float>::value || IsSameType<SrcDataType, half>::value) {
         // preprocess: f32->f32
@@ -320,9 +320,9 @@ __aicore__ inline void Mc2AscendAntiQuantPerChannelWithTranspose(
 }
 
 template <typename T, bool HasOffset>
-__aicore__ inline void Mc2AddMulWithoutBroadcastPerGroup(const LocalTensor<T> &dst, const LocalTensor<T> &src,
-                                                         const LocalTensor<T> &scale, const LocalTensor<T> &offset,
-                                                         const Mc2AntiQuantTensorShape &tensorShape, uint32_t groupSize,
+__aicore__ inline void Mc2AddMulWithoutBroadcastPerGroup(const LocalTensor<T>& dst, const LocalTensor<T>& src,
+                                                         const LocalTensor<T>& scale, const LocalTensor<T>& offset,
+                                                         const Mc2AntiQuantTensorShape& tensorShape, uint32_t groupSize,
                                                          uint32_t preGroupSize)
 {
     // src
@@ -374,8 +374,8 @@ __aicore__ inline void Mc2AddMulWithoutBroadcastPerGroup(const LocalTensor<T> &d
 
 template <typename SrcDataType, typename ScaleOffsetDataType, typename DstDataType, bool HasOffset>
 __aicore__ inline void Mc2AscendAntiQuantPerGroupWithoutTranspose(
-    LocalTensor<DstDataType> &dst, const LocalTensor<SrcDataType> &src, const LocalTensor<ScaleOffsetDataType> &scale,
-    const LocalTensor<ScaleOffsetDataType> &offset, const Mc2AntiQuantTensorShape &tensorShape, TBuf<> &sharedTmpBuffer,
+    LocalTensor<DstDataType>& dst, const LocalTensor<SrcDataType>& src, const LocalTensor<ScaleOffsetDataType>& scale,
+    const LocalTensor<ScaleOffsetDataType>& offset, const Mc2AntiQuantTensorShape& tensorShape, TBuf<>& sharedTmpBuffer,
     uint32_t groupSize, uint32_t preGroupSize)
 {
     if constexpr (IsSameType<SrcDataType, float>::value || IsSameType<SrcDataType, half>::value) {
@@ -393,8 +393,8 @@ __aicore__ inline void Mc2AscendAntiQuantPerGroupWithoutTranspose(
 
 template <typename SrcDataType, typename ScaleOffsetDataType, typename DstDataType, bool HasOffset>
 __aicore__ inline void Mc2AscendAntiQuantPerChannelWithoutTranspose(
-    LocalTensor<DstDataType> &dst, const LocalTensor<SrcDataType> &src, const LocalTensor<ScaleOffsetDataType> &scale,
-    const LocalTensor<ScaleOffsetDataType> &offset, const Mc2AntiQuantTensorShape &tensorShape, TBuf<> &sharedTmpBuffer)
+    LocalTensor<DstDataType>& dst, const LocalTensor<SrcDataType>& src, const LocalTensor<ScaleOffsetDataType>& scale,
+    const LocalTensor<ScaleOffsetDataType>& offset, const Mc2AntiQuantTensorShape& tensorShape, TBuf<>& sharedTmpBuffer)
 {
     if constexpr (IsSameType<SrcDataType, float>::value || IsSameType<SrcDataType, half>::value) {
         // preprocess: f32->f32
@@ -409,10 +409,10 @@ __aicore__ inline void Mc2AscendAntiQuantPerChannelWithoutTranspose(
 }
 
 template <typename SrcDataType, typename ScaleOffsetDataType, typename DstDataType, bool IsTranspose, bool HasOffset>
-__aicore__ inline void Mc2AntiQuant(LocalTensor<DstDataType> &dst, const LocalTensor<SrcDataType> &src,
-                                    const LocalTensor<ScaleOffsetDataType> &scale,
-                                    const LocalTensor<ScaleOffsetDataType> &offset,
-                                    const Mc2AntiQuantTensorShape &tensorShape, TBuf<> &sharedTmpBuffer,
+__aicore__ inline void Mc2AntiQuant(LocalTensor<DstDataType>& dst, const LocalTensor<SrcDataType>& src,
+                                    const LocalTensor<ScaleOffsetDataType>& scale,
+                                    const LocalTensor<ScaleOffsetDataType>& offset,
+                                    const Mc2AntiQuantTensorShape& tensorShape, TBuf<>& sharedTmpBuffer,
                                     const int64_t groupSize = 0, const uint32_t preGroupSize = 0)
 {
     if ASCEND_IS_AIC {

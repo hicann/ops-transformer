@@ -23,7 +23,7 @@ public:
     };
 
 public:
-    DEVICE void operator()(Params const &params)
+    DEVICE void operator()(Params const& params)
     {
         BlockMainloop blockMainloop;
         blockMainloop.Init(params.problemShape, params.mainloop);

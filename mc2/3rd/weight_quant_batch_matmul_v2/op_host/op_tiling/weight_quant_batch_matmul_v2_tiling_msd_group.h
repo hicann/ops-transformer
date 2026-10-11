@@ -26,12 +26,12 @@ namespace optiling {
 
 class Mc2WeightQuantBatchMatmulV2TilingMsdGroup : public Mc2WeightQuantBatchMatmulV2Tiling {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2TilingMsdGroup(gert::TilingContext *context)
+    explicit Mc2WeightQuantBatchMatmulV2TilingMsdGroup(gert::TilingContext* context)
         : Mc2WeightQuantBatchMatmulV2Tiling(context)
     {
         Reset();
     };
-    void Reset(gert::TilingContext *context) override
+    void Reset(gert::TilingContext* context) override
     {
         TilingBaseClass::Reset(context);
         Reset();
@@ -125,7 +125,7 @@ protected:
     // 6、计算Workspace 大小
     ge::graphStatus GetWorkspaceSize() override
     {
-        size_t *workspaces = context_->GetWorkspaceSizes(1);
+        size_t* workspaces = context_->GetWorkspaceSizes(1);
         OPS_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
         workspaces[0] = 64 * 1024 * 1024; // workspace 固定使用 64 * 1024 * 1024
         return ge::GRAPH_SUCCESS;

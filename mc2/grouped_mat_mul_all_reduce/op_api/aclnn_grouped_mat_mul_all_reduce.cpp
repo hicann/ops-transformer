@@ -54,17 +54,17 @@ const std::map<DataType, aclDataType> BIAS_DTYPE{{DataType::DT_FLOAT16, aclDataT
 
 struct NnopbaseDfxId {
     uint32_t id;
-    const char *funcName;
+    const char* funcName;
     bool hasReg;
 };
 
 extern uint64_t NnopbaseMsprofSysTime();
-extern void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId &dfxId);
+extern void NnopbaseReportApiInfo(const uint64_t beginTime, NnopbaseDfxId& dfxId);
 
-static void SplitTensorList(const std::vector<std::vector<int64_t>> &shapes, const aclTensorList *tensorList,
-                            std::vector<aclTensor *> &tensors)
+static void SplitTensorList(const std::vector<std::vector<int64_t>>& shapes, const aclTensorList* tensorList,
+                            std::vector<aclTensor*>& tensors)
 {
-    uint8_t *addr = static_cast<uint8_t *>((*tensorList)[0]->GetStorageAddr());
+    uint8_t* addr = static_cast<uint8_t*>((*tensorList)[0]->GetStorageAddr());
     aclDataType dataType;
     aclGetDataType((*tensorList)[0], &dataType);
     aclFormat format;
@@ -72,11 +72,11 @@ static void SplitTensorList(const std::vector<std::vector<int64_t>> &shapes, con
     uint64_t groupListSum = 0;
     for (size_t i = 0; i < shapes.size(); i++) {
         if (shapes[i].empty()) {
-            aclTensor *tensor = nullptr;
+            aclTensor* tensor = nullptr;
             tensors.emplace_back(tensor);
             continue;
         }
-        aclTensor *tensor = aclCreateTensor(
+        aclTensor* tensor = aclCreateTensor(
             shapes[i].data(), shapes[i].size(), dataType, nullptr, 0, format, shapes[i].data(), shapes[i].size(),
             addr + groupListSum * shapes[i][1] * TypeSize((*tensorList)[0]->GetDataType()));
         groupListSum += shapes[i][0];
@@ -85,19 +85,19 @@ static void SplitTensorList(const std::vector<std::vector<int64_t>> &shapes, con
 }
 
 struct GroupedMatMulAllReduceParams {
-    const aclTensorList *x = nullptr;
-    const aclTensorList *weight = nullptr;
-    const aclTensorList *bias = nullptr;
-    const aclIntArray *groupListOptional = nullptr;
+    const aclTensorList* x = nullptr;
+    const aclTensorList* weight = nullptr;
+    const aclTensorList* bias = nullptr;
+    const aclIntArray* groupListOptional = nullptr;
     int64_t splitItemOptional;
-    const char *group = nullptr;
-    const char *reduceOp = nullptr; // reduce type, now 'sum'
+    const char* group = nullptr;
+    const char* reduceOp = nullptr; // reduce type, now 'sum'
     int64_t commTurn;               // communication trun num
-    const aclTensorList *y = nullptr;
+    const aclTensorList* y = nullptr;
     DataType xDtype;
 };
 
-static bool CheckNotNull(const GroupedMatMulAllReduceParams &gmmParams)
+static bool CheckNotNull(const GroupedMatMulAllReduceParams& gmmParams)
 {
     CHECK_COND(gmmParams.x != nullptr, false, "x must not be nullptr.");
     CHECK_COND(gmmParams.weight != nullptr, false, "weight must not be nullptr.");
@@ -105,7 +105,7 @@ static bool CheckNotNull(const GroupedMatMulAllReduceParams &gmmParams)
     return true;
 }
 
-static bool CheckGroupListOptional(const GroupedMatMulAllReduceParams &gmmParams)
+static bool CheckGroupListOptional(const GroupedMatMulAllReduceParams& gmmParams)
 {
     CHECK_COND(gmmParams.groupListOptional != nullptr, false,
                "When splitItem is 1/3, groupList size must not be nullptr.");
@@ -125,7 +125,7 @@ static bool CheckGroupListOptional(const GroupedMatMulAllReduceParams &gmmParams
     return true;
 }
 
-static aclnnStatus CheckInputGroupSizes(const GroupedMatMulAllReduceParams &gmmParams, uint64_t xGroupedSize,
+static aclnnStatus CheckInputGroupSizes(const GroupedMatMulAllReduceParams& gmmParams, uint64_t xGroupedSize,
                                         uint64_t weightGroupedSize)
 {
     if (gmmParams.splitItemOptional == Y_SEPARATED || gmmParams.splitItemOptional == NO_SEPARATED) {
@@ -158,7 +158,7 @@ static aclnnStatus CheckInputGroupSizes(const GroupedMatMulAllReduceParams &gmmP
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckBiasGroupDimensions(const GroupedMatMulAllReduceParams &gmmParams, uint64_t weightGroupedSize)
+static aclnnStatus CheckBiasGroupDimensions(const GroupedMatMulAllReduceParams& gmmParams, uint64_t weightGroupedSize)
 {
     if (gmmParams.bias != nullptr) {
         uint64_t biasGroupedSize = gmmParams.bias->Size();
@@ -182,7 +182,7 @@ static aclnnStatus CheckBiasGroupDimensions(const GroupedMatMulAllReduceParams &
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckInputGroupDimensions(const GroupedMatMulAllReduceParams &gmmParams, uint64_t xGroupedSize,
+static aclnnStatus CheckInputGroupDimensions(const GroupedMatMulAllReduceParams& gmmParams, uint64_t xGroupedSize,
                                              uint64_t weightGroupedSize)
 {
     for (size_t i = 0; i < xGroupedSize; ++i) {
@@ -208,7 +208,7 @@ static aclnnStatus CheckInputGroupDimensions(const GroupedMatMulAllReduceParams 
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParamDimAndLengthGmmAr(const GroupedMatMulAllReduceParams &gmmParams)
+static aclnnStatus CheckParamDimAndLengthGmmAr(const GroupedMatMulAllReduceParams& gmmParams)
 {
     uint64_t xGroupedSize = gmmParams.x->Size();
     uint64_t weightGroupedSize = gmmParams.weight->Size();
@@ -247,7 +247,7 @@ static aclnnStatus CheckParamDimAndLengthGmmAr(const GroupedMatMulAllReduceParam
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckDimK(const GroupedMatMulAllReduceParams &gmmParams)
+static aclnnStatus CheckDimK(const GroupedMatMulAllReduceParams& gmmParams)
 {
     bool isXSeparated = gmmParams.splitItemOptional == X_Y_SEPARATED || gmmParams.splitItemOptional == X_SEPARATED;
     auto xTensor = (*gmmParams.x)[0]; // 0: first x tensor
@@ -289,7 +289,7 @@ static aclnnStatus CheckDimK(const GroupedMatMulAllReduceParams &gmmParams)
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckSeparatedXYDimensions(const GroupedMatMulAllReduceParams &gmmParams)
+static aclnnStatus CheckSeparatedXYDimensions(const GroupedMatMulAllReduceParams& gmmParams)
 {
     for (size_t i = 0; i < gmmParams.x->Size(); ++i) {
         auto xTensor = (*gmmParams.x)[i];
@@ -319,7 +319,7 @@ static aclnnStatus CheckSeparatedXYDimensions(const GroupedMatMulAllReduceParams
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckDims(const GroupedMatMulAllReduceParams &gmmParams)
+static aclnnStatus CheckDims(const GroupedMatMulAllReduceParams& gmmParams)
 {
     if (gmmParams.splitItemOptional == X_Y_SEPARATED) {
         if (CheckSeparatedXYDimensions(gmmParams) != ACLNN_SUCCESS) {
@@ -363,7 +363,7 @@ static aclnnStatus CheckDims(const GroupedMatMulAllReduceParams &gmmParams)
     return ACLNN_SUCCESS;
 }
 
-static bool CheckMatmulShape(const GroupedMatMulAllReduceParams &gmmParams)
+static bool CheckMatmulShape(const GroupedMatMulAllReduceParams& gmmParams)
 {
     for (size_t i = 0; i < gmmParams.x->Size(); ++i) {
         if ((*gmmParams.weight)[i] == nullptr) {
@@ -413,17 +413,17 @@ static bool CheckMatmulShape(const GroupedMatMulAllReduceParams &gmmParams)
     return true;
 }
 
-static bool CheckTensorListDataType(const aclTensorList *tensorList, const DataType dtype)
+static bool CheckTensorListDataType(const aclTensorList* tensorList, const DataType dtype)
 {
     for (size_t i = 0; i < tensorList->Size(); ++i) {
-        const aclTensor *tensor = (*tensorList)[i];
+        const aclTensor* tensor = (*tensorList)[i];
         OP_CHECK_NULL(tensor, continue);
         OP_CHECK_DTYPE_NOT_MATCH(tensor, dtype, return false);
     }
     return true;
 }
 
-static bool CheckMatmulDataType(const GroupedMatMulAllReduceParams &gmmParams, const DataType comDtype,
+static bool CheckMatmulDataType(const GroupedMatMulAllReduceParams& gmmParams, const DataType comDtype,
                                 const DataType weightDtype, const DataType biasDtype)
 {
     if (!CheckTensorListDataType(gmmParams.x, comDtype)) {
@@ -453,7 +453,7 @@ static bool CheckMatmulDataType(const GroupedMatMulAllReduceParams &gmmParams, c
     return true;
 }
 
-static aclnnStatus CheckParamOptionGmmAr(const GroupedMatMulAllReduceParams &gmmParams)
+static aclnnStatus CheckParamOptionGmmAr(const GroupedMatMulAllReduceParams& gmmParams)
 {
     DataType weightDtype = (*gmmParams.weight)[0]->GetDataType();
     if ((gmmParams.xDtype == DataType::DT_BF16 || gmmParams.xDtype == DataType::DT_FLOAT16) &&
@@ -469,7 +469,7 @@ static aclnnStatus CheckParamOptionGmmAr(const GroupedMatMulAllReduceParams &gmm
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus CheckParam(const GroupedMatMulAllReduceParams &gmmParams)
+static aclnnStatus CheckParam(const GroupedMatMulAllReduceParams& gmmParams)
 {
     CHECK_RET(CheckNotNull(gmmParams), ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(CheckParamDimAndLengthGmmAr(gmmParams) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
@@ -478,8 +478,8 @@ static aclnnStatus CheckParam(const GroupedMatMulAllReduceParams &gmmParams)
     return ACLNN_SUCCESS;
 }
 
-static void InitShape(const GroupedMatMulAllReduceParams &gmmParams, const bool isXTensor,
-                      std::vector<std::vector<int64_t>> &shapes)
+static void InitShape(const GroupedMatMulAllReduceParams& gmmParams, const bool isXTensor,
+                      std::vector<std::vector<int64_t>>& shapes)
 {
     shapes.reserve(gmmParams.weight->Size());
     int64_t preOffset = 0;
@@ -502,7 +502,7 @@ static void InitShape(const GroupedMatMulAllReduceParams &gmmParams, const bool 
     }
 }
 
-static void CheckOptionalTensorListEmpty(const aclTensorList *&tensorList)
+static void CheckOptionalTensorListEmpty(const aclTensorList*& tensorList)
 {
     if (tensorList != nullptr) {
         if (tensorList->Size() == 0) {
@@ -516,7 +516,7 @@ static void CheckOptionalTensorListEmpty(const aclTensorList *&tensorList)
     return;
 }
 
-static void ResetEmptyTensor(GroupedMatMulAllReduceParams &gmmParams)
+static void ResetEmptyTensor(GroupedMatMulAllReduceParams& gmmParams)
 {
     if (gmmParams.groupListOptional != nullptr && gmmParams.groupListOptional->Size() == 0) {
         gmmParams.groupListOptional = nullptr;
@@ -525,13 +525,13 @@ static void ResetEmptyTensor(GroupedMatMulAllReduceParams &gmmParams)
     return;
 }
 
-static aclnnStatus CreateXYTensorList(const aclTensorList *xAfterSplit, const aclTensorList *yAfterSplit,
-                                      GroupedMatMulAllReduceParams &gmmParams)
+static aclnnStatus CreateXYTensorList(const aclTensorList* xAfterSplit, const aclTensorList* yAfterSplit,
+                                      GroupedMatMulAllReduceParams& gmmParams)
 {
     if (gmmParams.splitItemOptional == Y_SEPARATED || gmmParams.splitItemOptional == NO_SEPARATED) {
         std::vector<std::vector<int64_t>> shapes;
         InitShape(gmmParams, true, shapes);
-        std::vector<aclTensor *> xTensorList;
+        std::vector<aclTensor*> xTensorList;
         SplitTensorList(shapes, gmmParams.x, xTensorList);
         xAfterSplit = aclCreateTensorList(xTensorList.data(), xTensorList.size());
         gmmParams.x = xAfterSplit;
@@ -539,7 +539,7 @@ static aclnnStatus CreateXYTensorList(const aclTensorList *xAfterSplit, const ac
     if (gmmParams.splitItemOptional == X_SEPARATED || gmmParams.splitItemOptional == NO_SEPARATED) {
         std::vector<std::vector<int64_t>> shapes;
         InitShape(gmmParams, false, shapes);
-        std::vector<aclTensor *> yTensorList;
+        std::vector<aclTensor*> yTensorList;
         SplitTensorList(shapes, gmmParams.y, yTensorList);
         yAfterSplit = aclCreateTensorList(yTensorList.data(), yTensorList.size());
         gmmParams.y = yAfterSplit;
@@ -547,12 +547,12 @@ static aclnnStatus CreateXYTensorList(const aclTensorList *xAfterSplit, const ac
     return ACLNN_SUCCESS;
 }
 
-static void CreateEmptyTensor(const aclDataType dataType, const aclTensorList *&gmmTensorList,
-                              aclTensorList *&tensorList)
+static void CreateEmptyTensor(const aclDataType dataType, const aclTensorList*& gmmTensorList,
+                              aclTensorList*& tensorList)
 {
     if (gmmTensorList == nullptr) {
-        std::vector<aclTensor *> emptyTensors;
-        aclTensor *emptyTensor = aclCreateTensor({}, 0, dataType, nullptr, 0, aclFormat::ACL_FORMAT_ND, {}, 0, nullptr);
+        std::vector<aclTensor*> emptyTensors;
+        aclTensor* emptyTensor = aclCreateTensor({}, 0, dataType, nullptr, 0, aclFormat::ACL_FORMAT_ND, {}, 0, nullptr);
         emptyTensors.emplace_back(emptyTensor);
         tensorList = aclCreateTensorList(emptyTensors.data(), emptyTensors.size());
         gmmTensorList = tensorList;
@@ -560,10 +560,10 @@ static void CreateEmptyTensor(const aclDataType dataType, const aclTensorList *&
     return;
 }
 
-static aclnnStatus PreAndPostProcessForInner(GroupedMatMulAllReduceParams &gmmParams, uint64_t *workspaceSize,
-                                             aclOpExecutor **executor)
+static aclnnStatus PreAndPostProcessForInner(GroupedMatMulAllReduceParams& gmmParams, uint64_t* workspaceSize,
+                                             aclOpExecutor** executor)
 {
-    aclTensorList *emptyBiasList = nullptr; // init emptyBiasList
+    aclTensorList* emptyBiasList = nullptr; // init emptyBiasList
     if (BIAS_DTYPE.find(gmmParams.xDtype) == BIAS_DTYPE.cend()) {
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("aclnnGroupedMatMulAllReduce", "bias",
                                               op::ToString(gmmParams.xDtype).GetString(),
@@ -573,7 +573,7 @@ static aclnnStatus PreAndPostProcessForInner(GroupedMatMulAllReduceParams &gmmPa
     CreateEmptyTensor(BIAS_DTYPE.at(gmmParams.xDtype), gmmParams.bias, emptyBiasList);
     aclnnStatus ret = aclnnInnerGroupedMatMulAllReduceGetWorkspaceSize(
         gmmParams.x, gmmParams.weight, gmmParams.bias, gmmParams.groupListOptional, gmmParams.splitItemOptional,
-        const_cast<char *>(gmmParams.group), const_cast<char *>(gmmParams.reduceOp), gmmParams.commTurn, gmmParams.y,
+        const_cast<char*>(gmmParams.group), const_cast<char*>(gmmParams.reduceOp), gmmParams.commTurn, gmmParams.y,
         workspaceSize, executor);
 
     if (emptyBiasList != nullptr) { // destroy tensorList
@@ -582,11 +582,11 @@ static aclnnStatus PreAndPostProcessForInner(GroupedMatMulAllReduceParams &gmmPa
     return ret;
 }
 
-aclnnStatus aclnnGroupedMatMulAllReduceGetWorkspaceSize(const aclTensorList *x, const aclTensorList *weight,
-                                                        const aclTensorList *bias, const aclIntArray *groupListOptional,
-                                                        int64_t splitItem, const char *group, const char *reduceOp,
-                                                        int64_t commTurn, int64_t streamMode, const aclTensorList *y,
-                                                        uint64_t *workspaceSize, aclOpExecutor **executor)
+aclnnStatus aclnnGroupedMatMulAllReduceGetWorkspaceSize(const aclTensorList* x, const aclTensorList* weight,
+                                                        const aclTensorList* bias, const aclIntArray* groupListOptional,
+                                                        int64_t splitItem, const char* group, const char* reduceOp,
+                                                        int64_t commTurn, int64_t streamMode, const aclTensorList* y,
+                                                        uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();
     if (streamMode != 1) {
@@ -615,8 +615,8 @@ aclnnStatus aclnnGroupedMatMulAllReduceGetWorkspaceSize(const aclTensorList *x, 
     ResetEmptyTensor(gmmParams);
     CHECK_RET(CheckParam(gmmParams) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
-    aclTensorList *xAfterSplit = nullptr;
-    aclTensorList *yAfterSplit = nullptr;
+    aclTensorList* xAfterSplit = nullptr;
+    aclTensorList* yAfterSplit = nullptr;
     CreateXYTensorList(xAfterSplit, yAfterSplit, gmmParams);
     CHECK_RET(CheckMatmulShape(gmmParams), ACLNN_ERR_PARAM_INVALID);
 
@@ -637,7 +637,7 @@ aclnnStatus aclnnGroupedMatMulAllReduceGetWorkspaceSize(const aclTensorList *x, 
     return ret;
 }
 
-aclnnStatus aclnnGroupedMatMulAllReduce(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnGroupedMatMulAllReduce(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                         aclrtStream stream)
 {
     uint64_t timeStamp = NnopbaseMsprofSysTime();

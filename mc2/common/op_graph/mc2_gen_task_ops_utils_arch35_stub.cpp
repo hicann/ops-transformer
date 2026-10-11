@@ -18,8 +18,8 @@
 
 namespace ops {
 
-ge::Status Mc2Arch35GenTaskOpsUtils::CreateCCUFusionTask(const gert::ExeResGenerationContext *context,
-                                                         std::vector<std::vector<uint8_t>> &tasks)
+ge::Status Mc2Arch35GenTaskOpsUtils::CreateCCUFusionTask(const gert::ExeResGenerationContext* context,
+                                                         std::vector<std::vector<uint8_t>>& tasks)
 {
     return ge::GRAPH_SUCCESS;
 }

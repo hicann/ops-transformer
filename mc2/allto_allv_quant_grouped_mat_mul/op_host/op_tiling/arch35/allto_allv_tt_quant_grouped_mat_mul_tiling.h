@@ -21,7 +21,7 @@ namespace optiling {
 
 class AlltoAllvTTQuantGmmTiling : public AlltoAllvQuantGmmTilingCommon {
 public:
-    explicit AlltoAllvTTQuantGmmTiling(gert::TilingContext *context)
+    explicit AlltoAllvTTQuantGmmTiling(gert::TilingContext* context)
         : AlltoAllvQuantGmmTilingCommon(context) {};
 
 protected:
@@ -37,11 +37,11 @@ protected:
     void GetPermuteOutSize() override;
 
 private:
-    void SetGMMQuantParams(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData,
+    void SetGMMQuantParams(Mc2GroupedMatmulTilingData::GMMQuantTilingData& gmmQuantTilingData,
                            uint32_t groupNum = 1) const;
-    void SetTilingArray(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData, uint64_t M, uint64_t N,
+    void SetTilingArray(Mc2GroupedMatmulTilingData::GMMQuantTilingData& gmmQuantTilingData, uint64_t M, uint64_t N,
                         uint64_t K, uint32_t groupNum = 1) const;
-    void SetTilingParams(Mc2GroupedMatmulTilingData::GMMQuantTilingData &gmmQuantTilingData, uint64_t M, uint64_t N,
+    void SetTilingParams(Mc2GroupedMatmulTilingData::GMMQuantTilingData& gmmQuantTilingData, uint64_t M, uint64_t N,
                          uint64_t K, bool transB) const;
 };
 } // namespace optiling

@@ -51,27 +51,27 @@ class MoeDistributeCombineSetup {
 public:
     __aicore__ inline MoeDistributeCombineSetup(){};
     __aicore__ inline void Init(GM_ADDR context, GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR assistInfoForCombine,
-                                GM_ADDR quantExpandX, GM_ADDR commCmdInfoOut, GM_ADDR workspaceGM, TPipe *pipe,
-                                const MoeDistributeCombineSetupTilingData *tilingData, __gm__ void *mc2InitTiling,
-                                __gm__ void *mc2CcTiling);
+                                GM_ADDR quantExpandX, GM_ADDR commCmdInfoOut, GM_ADDR workspaceGM, TPipe* pipe,
+                                const MoeDistributeCombineSetupTilingData* tilingData, __gm__ void* mc2InitTiling,
+                                __gm__ void* mc2CcTiling);
     __aicore__ inline void Process();
 
 private:
     __aicore__ inline void SplitCoreCal();
-    __aicore__ inline void CurRankComm(const LocalTensor<int32_t> &assistInfoForCombineLocal,
+    __aicore__ inline void CurRankComm(const LocalTensor<int32_t>& assistInfoForCombineLocal,
                                        uint32_t curRankExpertNum);
     __aicore__ inline void Communication();
     __aicore__ inline void BuffInit();
     __aicore__ inline void AssistInfoLocalCopy();
 
-    TPipe *tpipe_{nullptr};
+    TPipe* tpipe_{nullptr};
     GlobalTensor<int32_t> assistInfoForCombineGlobal_;
     GM_ADDR epWindowGM_;
     GM_ADDR epStatusSpaceGM_;
     GM_ADDR expandXGM_;
 
     // tiling侧已确保数据上限， 相乘不会越界，因此统一采用uin32_t进行处理
-    const MoeDistributeCombineSetupInfo *moeDistributeCombineSetupInfo_{nullptr};
+    const MoeDistributeCombineSetupInfo* moeDistributeCombineSetupInfo_{nullptr};
     uint32_t axisMaxBS_{0};
     uint32_t moeSendNum_{0}; // moeExpertPerRankNum * epWorldSize
     uint64_t epDataOffsetOnWin_{0};
@@ -103,7 +103,7 @@ private:
 
     LocalTensor<uint8_t> hcommTensor_;
 
-    __gm__ Mc2MoeContext *mc2Context_{nullptr};
+    __gm__ Mc2MoeContext* mc2Context_{nullptr};
     AscendC::Hcomm<COMM_PROTOCOL_UBC_CTP> hcomm_; // 通信上下文
 
     __aicore__ inline uint64_t GetCommHandle(uint32_t rankId)
@@ -111,7 +111,7 @@ private:
         uint32_t index = rankId > epRankId_ ? rankId - 1 : rankId;
         // hcommHandle_ 在 GM(context) 上，读前 DCCI 单 cacheline，避免脏/陈旧 handle
         GlobalTensor<uint64_t> handleGT;
-        handleGT.SetGlobalBuffer((__gm__ uint64_t *)&mc2Context_->hcommHandle_[index]);
+        handleGT.SetGlobalBuffer((__gm__ uint64_t*)&mc2Context_->hcommHandle_[index]);
         DataCacheCleanAndInvalid<uint64_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(handleGT);
         return handleGT(0);
     }
@@ -134,13 +134,13 @@ private:
 template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Init(
     GM_ADDR context, GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR assistInfoForCombine, GM_ADDR quantExpandX,
-    GM_ADDR /* commCmdInfoOut */, GM_ADDR /* workspaceGM */, TPipe *pipe,
-    const MoeDistributeCombineSetupTilingData *tilingData, __gm__ void *mc2InitTiling, __gm__ void *mc2CcTiling)
+    GM_ADDR /* commCmdInfoOut */, GM_ADDR /* workspaceGM */, TPipe* pipe,
+    const MoeDistributeCombineSetupTilingData* tilingData, __gm__ void* mc2InitTiling, __gm__ void* mc2CcTiling)
 {
     tpipe_ = pipe;
     aivId_ = GetBlockIdx();
     moeDistributeCombineSetupInfo_ = &(tilingData->moeDistributeCombineSetupInfo);
-    mc2Context_ = (__gm__ Mc2MoeContext *)context;
+    mc2Context_ = (__gm__ Mc2MoeContext*)context;
     epRankId_ = mc2Context_->epRankId;
 
     quantExpandXGM_ = quantExpandX;
@@ -148,9 +148,9 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Init(
     // 获取 win 控制区：本算子只读写 C_S，与 D_S 独立，避免联跑抢乒乓
     GlobalTensor<int32_t> selfDataStatusTensor;
     statusDataSpaceGM_ = (GM_ADDR)(mc2Context_->epHcclBuffer_[epRankId_]);
-    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t *)(statusDataSpaceGM_ + STATE_WIN_OFFSET +
-                                                            STATE_SIZE_PER_CORE * static_cast<uint64_t>(aivId_) +
-                                                            CTRL_COMBINE_STATE_OFFSET));
+    selfDataStatusTensor.SetGlobalBuffer((__gm__ int32_t*)(statusDataSpaceGM_ + STATE_WIN_OFFSET +
+                                                           STATE_SIZE_PER_CORE * static_cast<uint64_t>(aivId_) +
+                                                           CTRL_COMBINE_STATE_OFFSET));
 
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(selfDataStatusTensor);
     dataState_ = selfDataStatusTensor(0); // C_S：combine 专用 0/1
@@ -159,12 +159,12 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Init(
                     CTRL_COMBINE_FLAG_OFFSET;
 
     GlobalTensor<int32_t> statusFlagTensor;
-    statusFlagTensor.SetGlobalBuffer((__gm__ int32_t *)statusFlagGM_);
+    statusFlagTensor.SetGlobalBuffer((__gm__ int32_t*)statusFlagGM_);
     statusFlagTensor.SetValue(0, static_cast<int32_t>(STATUS_FLAG_VALUE));
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(statusFlagTensor);
 
     expandXGM_ = expandX;
-    assistInfoForCombineGlobal_.SetGlobalBuffer((__gm__ int32_t *)assistInfoForCombine);
+    assistInfoForCombineGlobal_.SetGlobalBuffer((__gm__ int32_t*)assistInfoForCombine);
 
     // tiling侧已确保数据上限， 相乘不会越界，因此统一采用uin32_t进行处理
     axisMaxBS_ = moeDistributeCombineSetupInfo_->globalBs / moeDistributeCombineSetupInfo_->epWorldSize;
@@ -189,9 +189,9 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Init(
     epWindowGM_ = GetUrmaAddrByRankId(epRankId_);
     epStatusSpaceGM_ = GetUrmaStateAddrByRankId(epRankId_);
 #if defined(ASCENDC_OOM) && ASCENDC_OOM == 1
-    OOMCheckAddrRange<ExpandXType>((__gm__ ExpandXType *)(epWindowGM_),
+    OOMCheckAddrRange<ExpandXType>((__gm__ ExpandXType*)(epWindowGM_),
                                    moeDistributeCombineSetupInfo_->totalWinSize / 4U);
-    OOMCheckAddrRange<float>((__gm__ float *)(epStatusSpaceGM_), COMBINE_STATE_BANK_STRIDE);
+    OOMCheckAddrRange<float>((__gm__ float*)(epStatusSpaceGM_), COMBINE_STATE_BANK_STRIDE);
 #endif
 
     SplitCoreCal(); // 分核计算
@@ -349,7 +349,7 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::Communica
 
 template <TemplateMC2TypeClass>
 __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::CurRankComm(
-    const LocalTensor<int32_t> &assistInfoForCombineLocal, uint32_t curRankExpertNum)
+    const LocalTensor<int32_t>& assistInfoForCombineLocal, uint32_t curRankExpertNum)
 {
     uint32_t curTokenNum = 0;
     for (uint32_t expertIdx = 0U; expertIdx < curRankExpertNum; ++expertIdx) {
@@ -372,8 +372,8 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::CurRankCo
         // 因此，数据需要GM -> local -> winIn
         GlobalTensor<uint8_t> selfDataSrcTensor;
         GlobalTensor<uint8_t> selfDataDstTensor;
-        selfDataSrcTensor.SetGlobalBuffer((__gm__ uint8_t *)srcAddr);
-        selfDataDstTensor.SetGlobalBuffer((__gm__ uint8_t *)dstAddr);
+        selfDataSrcTensor.SetGlobalBuffer((__gm__ uint8_t*)srcAddr);
+        selfDataDstTensor.SetGlobalBuffer((__gm__ uint8_t*)dstAddr);
 
         uint64_t sendBytes = static_cast<uint64_t>(curTokenNum) * axisHExpandXTypeSize_;
         DataCopyPadExtParams<uint8_t> padParams{false, 0U, 0U, 0U};
@@ -431,7 +431,7 @@ __aicore__ inline void MoeDistributeCombineSetup<TemplateMC2TypeFunc>::CurRankCo
     AscendC::SyncFunc<AscendC::HardEvent::MTE3_S>(); // 数据拷贝完后才能写状态
     // 向本卡状态区写状态
     GlobalTensor<int32_t> selfStatusTensor;
-    selfStatusTensor.SetGlobalBuffer((__gm__ int32_t *)(GetUrmaStateAddrByRankId(epRankId_) + epStateOffsetOnWin_));
+    selfStatusTensor.SetGlobalBuffer((__gm__ int32_t*)(GetUrmaStateAddrByRankId(epRankId_) + epStateOffsetOnWin_));
     selfStatusTensor.SetValue(0, static_cast<int32_t>(STATUS_FLAG_VALUE));
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(selfStatusTensor);
 }

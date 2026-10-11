@@ -12,7 +12,7 @@
 #define OP_API_INC_LEVEL0_SHAPE_OP_H
 #include "opdev/op_executor.h"
 namespace l0op {
-const aclTensor *Shape_op(const aclTensor *x, aclOpExecutor *executor);
+const aclTensor* Shape_op(const aclTensor* x, aclOpExecutor* executor);
 }
 
 #endif

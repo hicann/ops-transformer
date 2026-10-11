@@ -21,7 +21,7 @@ template <typename T>
 class KernelAddRmsNormSplitD {
 public:
     __aicore__ inline KernelAddRmsNormSplitD() {}
-    __aicore__ inline void Init(GM_ADDR gamma, Mc2Tiling::AddRMSNormTilingData &tilingData, TPipe *Ppipe,
+    __aicore__ inline void Init(GM_ADDR gamma, Mc2Tiling::AddRMSNormTilingData& tilingData, TPipe* Ppipe,
                                 uint32_t numBlocks)
     {
         ASSERT(numBlocks != 0 && "Block dim can not be zero!");
@@ -41,7 +41,7 @@ public:
         } else {
         }
         // get start index for current core, core parallel
-        gammaGm.SetGlobalBuffer((__gm__ T *)gamma, numCol);
+        gammaGm.SetGlobalBuffer((__gm__ T*)gamma, numCol);
 
         // Ppipe alloc memory to queue, the unit is Bytes.
         // We need 2 buffers here for both x1 and x2.
@@ -63,13 +63,13 @@ public:
         } else if (GetBlockIdx() == numBlocks - 1) {
             this->rowWork = numRow - (numBlocks - 1) * blockFactor;
         }
-        normOutGm.SetGlobalBuffer((__gm__ T *)normOut + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
-        residualGm.SetGlobalBuffer((__gm__ T *)residual + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
-        yGm.SetGlobalBuffer((__gm__ T *)y + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
+        normOutGm.SetGlobalBuffer((__gm__ T*)normOut + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
+        residualGm.SetGlobalBuffer((__gm__ T*)residual + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
+        yGm.SetGlobalBuffer((__gm__ T*)y + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
     }
 
     __aicore__ inline void ComputeProcess(GM_ADDR normOut, GM_ADDR residual, GM_ADDR y,
-                                          Mc2Tiling::AddRMSNormTilingData &tilingData, uint32_t addRmsNormCount,
+                                          Mc2Tiling::AddRMSNormTilingData& tilingData, uint32_t addRmsNormCount,
                                           uint32_t rcvCnt)
     {
         auto x1Addr = normOut;
@@ -165,7 +165,7 @@ private:
     }
 
     __aicore__ inline void ComputeFormer(uint32_t i_o_idx, uint32_t calc_row_num, uint32_t j_idx,
-                                         LocalTensor<float> &rstdLocal, LocalTensor<float> &sumLocal, uint32_t num)
+                                         LocalTensor<float>& rstdLocal, LocalTensor<float>& sumLocal, uint32_t num)
     {
         for (uint32_t i_i = 0; i_i < calc_row_num; i_i++) {
             CopyInAndAdd(i_o_idx * rowFactor + i_i, j_idx, num);
@@ -176,7 +176,7 @@ private:
         PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void ComputeSum(uint32_t i_i_idx, LocalTensor<float> &sumLocal, uint32_t num)
+    __aicore__ inline void ComputeSum(uint32_t i_i_idx, LocalTensor<float>& sumLocal, uint32_t num)
     {
         LocalTensor<float> sqx = sqxBuf.Get<float>();
         LocalTensor<float> reduce_buf_local = reduceFp32Buf.Get<float>();
@@ -204,7 +204,7 @@ private:
     }
 
     __aicore__ inline void ComputeLatter(uint32_t i_o_idx, uint32_t calc_row_num, uint32_t j_idx,
-                                         LocalTensor<float> &rstdLocal, uint32_t num)
+                                         LocalTensor<float>& rstdLocal, uint32_t num)
     {
         CopyInGamma(j_idx, num);
         LocalTensor<T> gammaLocal = inQueueGamma.DeQue<T>();
@@ -237,7 +237,7 @@ private:
         }
     }
 
-    __aicore__ inline void ComputeY(uint32_t i_i_idx, LocalTensor<half> &gammaLocal, LocalTensor<float> &rstdLocal,
+    __aicore__ inline void ComputeY(uint32_t i_i_idx, LocalTensor<half>& gammaLocal, LocalTensor<float>& rstdLocal,
                                     uint32_t num)
     {
         LocalTensor<float> x_fp32 = xFp32Buf.Get<float>();
@@ -260,8 +260,8 @@ private:
         outQueueY.EnQue<half>(yLocal);
     }
 
-    __aicore__ inline void ComputeY(uint32_t i_i_idx, LocalTensor<bfloat16_t> &gammaLocal,
-                                    LocalTensor<float> &rstdLocal, uint32_t num)
+    __aicore__ inline void ComputeY(uint32_t i_i_idx, LocalTensor<bfloat16_t>& gammaLocal,
+                                    LocalTensor<float>& rstdLocal, uint32_t num)
     {
         LocalTensor<float> x_fp32 = xFp32Buf.Get<float>();
         LocalTensor<float> sqx = sqxBuf.Get<float>();

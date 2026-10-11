@@ -94,7 +94,7 @@ public:
 
     /// Construct
     CATLASS_DEVICE
-    BlockMmad(Arch::Resource<ArchTag> &resource, uint32_t l1BufAddrStart = 0)
+    BlockMmad(Arch::Resource<ArchTag>& resource, uint32_t l1BufAddrStart = 0)
     {
         uint32_t l1AOffset = l1BufAddrStart;
         uint32_t l1BOffset = l1BufAddrStart + L1A_SIZE * STAGES;
@@ -146,10 +146,10 @@ public:
 
     /// Perform a block-scoped matrix multiply-accumulate
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementA> const &gmA, LayoutA const &layoutA,
-                    AscendC::GlobalTensor<ElementB> const &gmB, LayoutB const &layoutB,
-                    AscendC::GlobalTensor<ElementC> const &gmC, LayoutC const &layoutC,
-                    AscendC::GlobalTensor<ElementBias> const &gmBias, GemmCoord const &actualShape)
+    void operator()(AscendC::GlobalTensor<ElementA> const& gmA, LayoutA const& layoutA,
+                    AscendC::GlobalTensor<ElementB> const& gmB, LayoutB const& layoutB,
+                    AscendC::GlobalTensor<ElementC> const& gmC, LayoutC const& layoutC,
+                    AscendC::GlobalTensor<ElementBias> const& gmBias, GemmCoord const& actualShape)
     {
         uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(actualShape.m());
         uint32_t nRound = RoundUp<L1BAlignHelper::N_ALIGNED>(actualShape.n());

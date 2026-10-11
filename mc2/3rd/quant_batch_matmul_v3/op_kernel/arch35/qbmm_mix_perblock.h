@@ -27,12 +27,12 @@ class MatMulPerBlockASW {
 public:
     __aicore__ inline MatMulPerBlockASW() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale,
-                                GM_ADDR cGM, GM_ADDR workSpace, const void *tilingData, TPipe *que);
+                                GM_ADDR cGM, GM_ADDR workSpace, const void* tilingData, TPipe* que);
     __aicore__ inline void Process();
     __aicore__ inline void ProcessWithoutBatch();
 
 protected:
-    const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *quantBmmTilingData_;
+    const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* quantBmmTilingData_;
     Mc2QuantBmmAswBlock block_;
     MatMulPerBlock<x1Type, x2Type, float, biasType, float, yType, formatX1, formatX2, formatY, aTrans, bTrans, float,
                    Mc2QuantBatchMatmulV3::Mc2QuantBmmAswBlock>
@@ -44,9 +44,9 @@ template <typename x1Type, typename x2Type, typename biasType, typename yType, C
 __aicore__ inline void MatMulPerBlockASW<x1Type, x2Type, biasType, yType, formatX1, formatX2, formatY, aTrans,
                                          bTrans>::Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale,
                                                        GM_ADDR perTokenScale, GM_ADDR cGM, GM_ADDR workSpace,
-                                                       const void *tilingData, TPipe *que)
+                                                       const void* tilingData, TPipe* que)
 {
-    quantBmmTilingData_ = static_cast<const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *>(tilingData);
+    quantBmmTilingData_ = static_cast<const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams*>(tilingData);
     uint32_t blockIdx = GetBlockIdx();
     if ASCEND_IS_AIV {
         blockIdx = blockIdx / AscendC::GetTaskRation();

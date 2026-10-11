@@ -50,11 +50,11 @@ bool IsDimMismatch(uint64_t actual, int64_t expected)
 }
 
 // rank_size 未设置(<=0)时拦截
-ge::graphStatus ResolveRankSize(const gert::InferShapeContext *context, int64_t &rankSize)
+ge::graphStatus ResolveRankSize(const gert::InferShapeContext* context, int64_t& rankSize)
 {
     const auto nodeName = context->GetNodeName();
     const auto attrs = context->GetAttrs();
-    const int64_t *rankSizeAttr = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_RANK_SIZE);
+    const int64_t* rankSizeAttr = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_RANK_SIZE);
     OPS_CHECK(rankSizeAttr == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "rank_size"), return ge::GRAPH_FAILED);
     rankSize = *rankSizeAttr;
     OPS_CHECK(rankSize <= 0, OP_LOGE(nodeName, "rank_size attr must be set, got %ld", rankSize),
@@ -62,7 +62,7 @@ ge::graphStatus ResolveRankSize(const gert::InferShapeContext *context, int64_t 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckMatrixInputShapes(const gert::InferShapeContext *context)
+ge::graphStatus CheckMatrixInputShapes(const gert::InferShapeContext* context)
 {
     const auto x1Shape = context->GetInputShape(INDEX_IN_X1);
     const auto x2Shape = context->GetInputShape(INDEX_IN_X2);
@@ -81,7 +81,7 @@ ge::graphStatus CheckMatrixInputShapes(const gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckMatrixDtypes(const gert::InferShapeContext *context)
+ge::graphStatus CheckMatrixDtypes(const gert::InferShapeContext* context)
 {
     const auto nodeName = context->GetNodeName();
     auto x1Dtype = context->GetInputDesc(INDEX_IN_X1)->GetDataType();
@@ -104,7 +104,7 @@ ge::graphStatus CheckMatrixDtypes(const gert::InferShapeContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckKDimMatch(const gert::InferShapeContext *context, int64_t kX1, int64_t kX2)
+ge::graphStatus CheckKDimMatch(const gert::InferShapeContext* context, int64_t kX1, int64_t kX2)
 {
     OPS_CHECK(kX1 != kX2,
               OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "x1.K, x2.K",
@@ -114,7 +114,7 @@ ge::graphStatus CheckKDimMatch(const gert::InferShapeContext *context, int64_t k
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckKConstraints(const gert::InferShapeContext *context, int64_t k)
+ge::graphStatus CheckKConstraints(const gert::InferShapeContext* context, int64_t k)
 {
     const auto nodeName = context->GetNodeName();
     OPS_CHECK(
@@ -134,8 +134,8 @@ ge::graphStatus CheckKConstraints(const gert::InferShapeContext *context, int64_
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckOneScaleShape(const gert::InferShapeContext *context, const gert::Shape *scaleShape,
-                                   const char *paramName, int64_t dim0, int64_t expectedScaleK)
+ge::graphStatus CheckOneScaleShape(const gert::InferShapeContext* context, const gert::Shape* scaleShape,
+                                   const char* paramName, int64_t dim0, int64_t expectedScaleK)
 {
     const auto nodeName = context->GetNodeName();
     OPS_CHECK(IsDimMismatch(scaleShape->GetDim(0U), dim0) || IsDimMismatch(scaleShape->GetDim(1U), expectedScaleK) ||
@@ -153,7 +153,7 @@ ge::graphStatus CheckOneScaleShape(const gert::InferShapeContext *context, const
 }
 
 // x1_scale: [M, Ceil(K/64), 2]; x2_scale: [N, Ceil(K/64), 2]
-ge::graphStatus CheckScaleShapes(const gert::InferShapeContext *context, int64_t m, int64_t n, int64_t k)
+ge::graphStatus CheckScaleShapes(const gert::InferShapeContext* context, int64_t m, int64_t n, int64_t k)
 {
     auto x1ScaleShape = context->GetOptionalInputShape(INDEX_IN_X1_SCALE);
     auto x2ScaleShape = context->GetOptionalInputShape(INDEX_IN_X2_SCALE);
@@ -170,7 +170,7 @@ ge::graphStatus CheckScaleShapes(const gert::InferShapeContext *context, int64_t
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus DeriveOutputShapes(gert::InferShapeContext *context, int64_t m, int64_t k, int64_t n, int64_t worldSize)
+ge::graphStatus DeriveOutputShapes(gert::InferShapeContext* context, int64_t m, int64_t k, int64_t n, int64_t worldSize)
 {
     // y = [world_size * M_per_rank, N]
     auto outShape = context->GetOutputShape(INDEX_OUT_Y);
@@ -200,7 +200,7 @@ ge::graphStatus DeriveOutputShapes(gert::InferShapeContext *context, int64_t m, 
 
 } // namespace
 
-ge::graphStatus AllGatherMatmulV3InferShape(gert::InferShapeContext *context)
+ge::graphStatus AllGatherMatmulV3InferShape(gert::InferShapeContext* context)
 {
     const auto nodeName = context->GetNodeName();
     OP_LOGD(nodeName, "InferShape start");
@@ -215,7 +215,7 @@ ge::graphStatus AllGatherMatmulV3InferShape(gert::InferShapeContext *context)
     const auto x2Shape = context->GetInputShape(INDEX_IN_X2);
     int64_t m = x1Shape->GetDim(0U);
     int64_t k = x1Shape->GetDim(1U);
-    const bool *isTransX2 = context->GetAttrs()->GetAttrPointer<bool>(INDEX_ATTR_IS_TRANS_B);
+    const bool* isTransX2 = context->GetAttrs()->GetAttrPointer<bool>(INDEX_ATTR_IS_TRANS_B);
     const bool transX2 = ((isTransX2 != nullptr) && (*isTransX2));
     int64_t n = transX2 ? x2Shape->GetDim(0U) : x2Shape->GetDim(1U);
     int64_t kX2 = transX2 ? x2Shape->GetDim(1U) : x2Shape->GetDim(0U);
@@ -245,7 +245,7 @@ ge::graphStatus AllGatherMatmulV3InferShape(gert::InferShapeContext *context)
 }
 
 // y dtype 由 y_dtype attr 决定（BF16/FP16），gather_out 与 x1 同 dtype
-ge::graphStatus AllGatherMatmulV3InferDataType(gert::InferDataTypeContext *context)
+ge::graphStatus AllGatherMatmulV3InferDataType(gert::InferDataTypeContext* context)
 {
     const auto nodeName = context->GetNodeName();
 

@@ -22,22 +22,22 @@ namespace optiling {
 namespace mc2_matmul_v3 {
 class Mc2L2Cache {
 public:
-    Mc2L2Cache(Mc2MatmulV3Args &args, Mc2MatmulV3TilingData &tilingData)
+    Mc2L2Cache(Mc2MatmulV3Args& args, Mc2MatmulV3TilingData& tilingData)
         : args_(args),
           tilingData_(tilingData)
     {}
-    void SetL2CacheFlag(Mc2TilingEnable tilingEnable, uint64_t l2Size, uint32_t &l2CacheFlag);
+    void SetL2CacheFlag(Mc2TilingEnable tilingEnable, uint64_t l2Size, uint32_t& l2CacheFlag);
 
 private:
     void SetL2CacheFlag(bool aEnableL2Cache, bool bEnableL2Cache, bool cEnableL2Cache, bool biasEnableL2Cache,
-                        uint32_t &l2CacheFlag);
-    void SetL2CacheFlagMultiCoreSplitK(bool &aEnableL2Cache, bool &bEnableL2Cache) const;
-    void SetL2CacheFlagSingleCoreSplitK(bool &aEnableL2Cache, bool &bEnableL2Cache) const;
-    void SetL2CacheFlagBase(bool &aEnableL2Cache, bool &bEnableL2Cache) const;
+                        uint32_t& l2CacheFlag);
+    void SetL2CacheFlagMultiCoreSplitK(bool& aEnableL2Cache, bool& bEnableL2Cache) const;
+    void SetL2CacheFlagSingleCoreSplitK(bool& aEnableL2Cache, bool& bEnableL2Cache) const;
+    void SetL2CacheFlagBase(bool& aEnableL2Cache, bool& bEnableL2Cache) const;
 
 private:
-    Mc2MatmulV3Args &args_;
-    Mc2MatmulV3TilingData &tilingData_;
+    Mc2MatmulV3Args& args_;
+    Mc2MatmulV3TilingData& tilingData_;
 };
 } // namespace mc2_matmul_v3
 } // namespace optiling

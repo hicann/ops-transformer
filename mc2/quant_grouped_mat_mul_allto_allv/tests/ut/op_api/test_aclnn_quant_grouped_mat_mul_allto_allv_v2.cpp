@@ -57,10 +57,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_gmmX_quantmode0_with_
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, nullptr, // gmmXScale 非空, gmmWeightScale 空
@@ -68,7 +68,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_gmmX_quantmode0_with_
                               mmX_, mmWeight_, nullptr, nullptr,      // mm scale
                               nullptr,                                // commQuantScale
                               0, 0, 0, 0, 0,                          // gmmXQM=0, 其余=0
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -91,10 +91,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_gmmX_quantmode1_witho
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmmXScale=nullptr
@@ -102,7 +102,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_gmmX_quantmode1_witho
                               mmX_, mmWeight_, nullptr, nullptr,   // mm scale
                               nullptr,                             // commQuantScale
                               1, 0, 0, 0, 0,                       // gmmXQM=1, 其余=0
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -126,10 +126,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_gmmWeight_quantmode0_
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, gmmWeightScale_, // gmmWeightScale 非空
@@ -137,7 +137,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_gmmWeight_quantmode0_
                               mmX_, mmWeight_, nullptr, nullptr,           // mm scale
                               nullptr,                                     // commQuantScale
                               0, 0, 0, 0, 0,                               // gmmWQM=0
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -160,10 +160,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_gmmWeight_quantmode1_
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmmWeightScale=nullptr
@@ -171,7 +171,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_gmmWeight_quantmode1_
                               mmX_, mmWeight_, nullptr, nullptr,   // mm scale
                               nullptr,                             // commQuantScale
                               0, 1, 0, 0, 0,                       // gmmWQM=1
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -195,10 +195,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mmX_quantmode0_with_s
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmm scale
@@ -206,7 +206,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mmX_quantmode0_with_s
                               mmX_, mmWeight_, mmXScale_, nullptr, // mmXScale 非空
                               nullptr,                             // commQuantScale
                               0, 0, 0, 0, 0,                       // mmXQM=0
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -229,10 +229,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mmX_quantmode1_withou
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmm scale
@@ -240,7 +240,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mmX_quantmode1_withou
                               mmX_, mmWeight_, nullptr, nullptr,   // mmXScale=nullptr
                               nullptr,                             // commQuantScale
                               0, 0, 1, 0, 0,                       // mmXQM=1
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -264,10 +264,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mmWeight_quantmode0_w
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr,      // gmm scale
@@ -275,7 +275,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mmWeight_quantmode0_w
                               mmX_, mmWeight_, nullptr, mmWeightScale_, // mmWeightScale 非空
                               nullptr,                                  // commQuantScale
                               0, 0, 0, 0, 0,                            // mmWQM=0
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -298,10 +298,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mmWeight_quantmode1_w
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // gmm scale
@@ -309,7 +309,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mmWeight_quantmode1_w
                               mmX_, mmWeight_, nullptr, nullptr,   // mmWeightScale=nullptr
                               nullptr,                             // commQuantScale
                               0, 0, 0, 1, 0,                       // mmWQM=1
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -337,18 +337,18 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_sendCountsTensor_not_
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
                               sendCountsTensor_, nullptr,          // sendCountsTensor 非空
                               mmX_, mmWeight_, nullptr, nullptr,   // mm scale
                               nullptr,                             // commQuantScale
-                              0, 0, 0, 0, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-                              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+                              0, 0, 0, 0, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+                              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -371,18 +371,18 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_recvCountsTensor_not_
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
                               nullptr, recvCountsTensor_,          // recvCountsTensor 非空
                               mmX_, mmWeight_, nullptr, nullptr,   // mm scale
                               nullptr,                             // commQuantScale
-                              0, 0, 0, 0, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-                              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+                              0, 0, 0, 0, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+                              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -406,19 +406,19 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_sendCounts_empty_arra
     constexpr int64_t e = 4;
     constexpr int64_t BS = 4096;
     constexpr int64_t K = 2;
-    aclIntArray *sendCounts = aclCreateIntArray(nullptr, 0);
+    aclIntArray* sendCounts = aclCreateIntArray(nullptr, 0);
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
                               nullptr, nullptr,                    // counts tensor
                               mmX_, mmWeight_, nullptr, nullptr,   // mm scale
                               nullptr,                             // commQuantScale
-                              0, 0, 0, 0, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-                              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+                              0, 0, 0, 0, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+                              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -439,18 +439,18 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_recvCounts_empty_arra
     constexpr int64_t BS = 4096;
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(nullptr, 0);
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(nullptr, 0);
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
                               nullptr, nullptr,                    // counts tensor
                               mmX_, mmWeight_, nullptr, nullptr,   // mm scale
                               nullptr,                             // commQuantScale
-                              0, 0, 0, 0, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-                              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+                              0, 0, 0, 0, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+                              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -475,10 +475,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_group_nullptr)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
@@ -486,8 +486,8 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_group_nullptr)
                               mmX_, mmWeight_, nullptr, nullptr,   // mm scale
                               nullptr,                             // commQuantScale
                               0, 0, 0, 0, 0, -1, 0,
-                              (const char *)nullptr, // group=nullptr
-                              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+                              (const char*)nullptr, // group=nullptr
+                              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -513,10 +513,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_commQuantMode_nonzero
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, // scale
@@ -524,7 +524,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_commQuantMode_nonzero
                               mmX_, mmWeight_, nullptr, nullptr,   // mm scale
                               nullptr,                             // commQuantScale
                               0, 0, 0, 0, 1,                       // commQuantMode=1
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -549,10 +549,10 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_tt_quant_normal)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, // TT: 双 scale 非空
@@ -560,7 +560,7 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_tt_quant_normal)
                               mmX_, mmWeight_, nullptr, nullptr,              // mm scale
                               nullptr,                                        // commQuantScale
                               1, 1, 0, 0, 0,                                  // gmmXQM=1, gmmWQM=1
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -583,15 +583,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_commQuantMode_reject)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, nullptr, nullptr, mmX_, mmWeight_, nullptr, nullptr,
                               nullptr, 0, 0, 0, 0, 1, // commQuantMode=1
-                              -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
+                              -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu",
                               epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
@@ -622,16 +622,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_gmmx_dtype_invalid)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_, nullptr, nullptr,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, true, true),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, true, true),
         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -659,16 +659,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_gmmX_nullptr)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(nullptr, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_,
                               mmXScale_, mmWeightScale_, nullptr, 6, 6, 0, 0, 0, -1, groupSize,
-                              (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
-                              epWorldSize, sendCounts, recvCounts, false, false),
+                              (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu", epWorldSize,
+                              sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -695,16 +695,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_gmmWeight_nullptr)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, nullptr, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_, mmXScale_, mmWeightScale_,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -731,16 +731,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_y_nullptr)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_,
                               mmXScale_, mmWeightScale_, nullptr, 6, 6, 0, 0, 0, -1, groupSize,
-                              (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
-                              epWorldSize, sendCounts, recvCounts, false, false),
+                              (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu", epWorldSize,
+                              sendCounts, recvCounts, false, false),
                         OUTPUT(nullptr, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -767,16 +767,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_gmmXScale_null)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, nullptr, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_, mmXScale_, mmWeightScale_,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -803,16 +803,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_gmmWeightScale_nul
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, nullptr, nullptr, nullptr, mmX_, mmWeight_, mmXScale_, mmWeightScale_,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, true, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, true, false),
         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -841,16 +841,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_mm_mode_noquant_in
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_,
                               mmXScale_, mmWeightScale_, nullptr, 6, 6, 0, 0, 0, -1, groupSize,
-                              (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
-                              epWorldSize, sendCounts, recvCounts, false, false),
+                              (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu", epWorldSize,
+                              sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -879,16 +879,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_mm_mode_mismatch_i
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_,
                               mmXScale_, mmWeightScale_, nullptr, 6, 6, 1, 1, 0, -1, groupSize,
-                              (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
-                              epWorldSize, sendCounts, recvCounts, true, true),
+                              (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu", epWorldSize,
+                              sendCounts, recvCounts, true, true),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -916,16 +916,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_mmXScale_null)
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_,
                               nullptr, mmWeightScale_, nullptr, 6, 6, 6, 6, 0, -1, groupSize,
-                              (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
-                              epWorldSize, sendCounts, recvCounts, true, true),
+                              (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu", epWorldSize,
+                              sendCounts, recvCounts, true, true),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -953,16 +953,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_mmWeightScale_null
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_, mmXScale_, nullptr,
-              nullptr, 6, 6, 6, 6, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 6, 6, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -987,16 +987,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_sendCounts_nullptr_va
     constexpr int64_t K = 2;
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = nullptr;
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = nullptr;
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1016,16 +1016,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_recvCounts_nullptr_va
     constexpr int64_t K = 2;
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = nullptr;
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = nullptr;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1051,16 +1051,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mm_optional_partial_m
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_,
                               mmXScale_, mmWeightScale_, nullptr, 6, 6, 6, 6, 0, -1, groupSize,
-                              (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
-                              epWorldSize, sendCounts, recvCounts, false, false),
+                              (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu", epWorldSize,
+                              sendCounts, recvCounts, false, false),
                         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -1081,15 +1081,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_quant_mode_perchannel
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, nullptr, nullptr, mmX_, mmWeight_, nullptr, nullptr,
-                              nullptr, 2, 2, 0, 0, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-                              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+                              nullptr, 2, 2, 0, 0, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+                              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1110,17 +1110,17 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_quant_mode_unknown_en
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     constexpr int64_t kBadQuantMode = 99;
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, nullptr, nullptr, mmX_, mmWeight_, nullptr, nullptr, nullptr,
-              kBadQuantMode, kBadQuantMode, 0, 0, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              kBadQuantMode, kBadQuantMode, 0, 0, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1141,15 +1141,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_group_empty_string)
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, nullptr, nullptr, nullptr, nullptr, mmX_, mmWeight_, nullptr, nullptr, nullptr, 0, 0,
-              0, 0, 0, -1, 0, (const char *)"", (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              0, 0, 0, -1, 0, (const char*)"", (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
@@ -1172,15 +1172,15 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_group_name_length_ge_
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr,
                               nullptr, nullptr, nullptr, 6, 6, 0, 0, 0, -1, groupSize, longGroup.c_str(),
-                              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+                              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
                         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1201,16 +1201,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_gmm_weight_scale_r
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1231,16 +1231,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_gmm_weight_scale_l
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1266,16 +1266,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_mm_weight_scale_la
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_,
                               mmXScale_, mmWeightScale_, nullptr, 6, 6, 6, 6, 0, -1, groupSize,
-                              (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
-                              epWorldSize, sendCounts, recvCounts, false, false),
+                              (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu", epWorldSize,
+                              sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1295,16 +1295,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_sendCounts_empty_arra
     constexpr int64_t K = 2;
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(nullptr, 0);
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(nullptr, 0);
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1324,16 +1324,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_recvCounts_empty_arra
     constexpr int64_t K = 2;
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(nullptr, 0);
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(nullptr, 0);
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1355,16 +1355,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_gmm_weight_transpo
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, true, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, true, false),
         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1386,16 +1386,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_gmm_weight_transpo
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              nullptr, 6, 6, 0, 0, 0, -1, groupSize, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1424,16 +1424,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_mm_weight_transpos
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_,
                               mmXScale_, mmWeightScale_, nullptr, 6, 6, 6, 6, 0, -1, groupSize,
-                              (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
-                              epWorldSize, sendCounts, recvCounts, false, true),
+                              (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu", epWorldSize,
+                              sendCounts, recvCounts, false, true),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1462,16 +1462,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_mx_mm_weight_transpos
     constexpr int64_t groupSize = 32;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
                         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_,
                               mmXScale_, mmWeightScale_, nullptr, 6, 6, 6, 6, 0, -1, groupSize,
-                              (const char *)"test_grouped_mat_mul_allto_allv_ep_group", (const char *)"ccu",
-                              epWorldSize, sendCounts, recvCounts, false, false),
+                              (const char*)"test_grouped_mat_mul_allto_allv_ep_group", (const char*)"ccu", epWorldSize,
+                              sendCounts, recvCounts, false, false),
                         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1492,17 +1492,17 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_tt_gmm_weight_transpo
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
-    auto ut = OP_API_UT(
-        aclnnQuantGroupedMatMulAlltoAllvV2,
-        INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 1, 1, 0, 0, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, true, false),
-        OUTPUT(y_, nullptr));
+    auto ut =
+        OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
+                  INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr,
+                        nullptr, nullptr, 1, 1, 0, 0, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+                        (const char*)"ccu", epWorldSize, sendCounts, recvCounts, true, false),
+                  OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -1522,17 +1522,17 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_tt_gmm_weight_transpo
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
-    auto ut = OP_API_UT(
-        aclnnQuantGroupedMatMulAlltoAllvV2,
-        INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-              nullptr, 1, 1, 0, 0, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
-        OUTPUT(y_, nullptr));
+    auto ut =
+        OP_API_UT(aclnnQuantGroupedMatMulAlltoAllvV2,
+                  INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, nullptr, nullptr, nullptr,
+                        nullptr, nullptr, 1, 1, 0, 0, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+                        (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+                  OUTPUT(y_, nullptr));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -1558,16 +1558,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_tt_mm_weight_transpos
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_, mmXScale_,
-              mmWeightScale_, nullptr, 1, 1, 1, 1, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, true),
+              mmWeightScale_, nullptr, 1, 1, 1, 1, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, true),
         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -1594,16 +1594,16 @@ TEST_F(test_aclnn_quant_grouped_mat_mul_allto_all_v2, test_tt_mm_weight_transpos
     constexpr int64_t K = 2;
     std::vector<int64_t> sendCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
     std::vector<int64_t> recvCountsList(epWorldSize * e, BS * K / (epWorldSize * e));
-    aclIntArray *sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
-    aclIntArray *recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
+    aclIntArray* sendCounts = aclCreateIntArray(sendCountsList.data(), sendCountsList.size());
+    aclIntArray* recvCounts = aclCreateIntArray(recvCountsList.data(), recvCountsList.size());
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     auto ut = OP_API_UT(
         aclnnQuantGroupedMatMulAlltoAllvV2,
         INPUT(gmmX_, gmmWeight_, gmmXScale_, gmmWeightScale_, nullptr, nullptr, mmX_, mmWeight_, mmXScale_,
-              mmWeightScale_, nullptr, 1, 1, 1, 1, 0, -1, 0, (const char *)"test_grouped_mat_mul_allto_allv_ep_group",
-              (const char *)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
+              mmWeightScale_, nullptr, 1, 1, 1, 1, 0, -1, 0, (const char*)"test_grouped_mat_mul_allto_allv_ep_group",
+              (const char*)"ccu", epWorldSize, sendCounts, recvCounts, false, false),
         OUTPUT(y_, mmY_));
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);

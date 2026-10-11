@@ -63,7 +63,7 @@ struct AlltoAllMatmulAclnnTestParam {
     aclFormat alltoalloutputFormat; // alltoalloutputoutput数据format，仅支持ND
     // 其它属性
     vector<int64_t> alltoAllAxesOptional; // alltoall数据交换的方向，只能为空或者[-2,-1]
-    char *group;                          // 通信域标识，字符串，长度要求（0，128）
+    char* group;                          // 通信域标识，字符串，长度要求（0，128）
     bool transposeX1;                     // x1是否转置，现不支持为true
     bool transposeX2;                     // x2是否转置，为true时x2shape为（H2，H1）
     // ut用例期望返回状态
@@ -1164,7 +1164,7 @@ static AlltoAllMatmulAclnnTestParam casesParams[] = {
      false,
      ACLNN_ERR_PARAM_INVALID}};
 
-static void TestOneParamCase(const AlltoAllMatmulAclnnTestParam &param)
+static void TestOneParamCase(const AlltoAllMatmulAclnnTestParam& param)
 {
     std::cout << "run case " << param.caseName << std::endl;
     // 从结构体list中获取实际用例属性
@@ -1184,8 +1184,8 @@ static void TestOneParamCase(const AlltoAllMatmulAclnnTestParam &param)
     aclFormat outputFormat = param.outputFormat;
     aclFormat alltoalloutFormat = param.alltoalloutputFormat;
     vector<int64_t> axesAcl = param.alltoAllAxesOptional;
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
-    const char *group = param.group;
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    const char* group = param.group;
     bool transposeX1 = param.transposeX1;
     bool transposeX2 = param.transposeX2;
     aclnnStatus retStatus = param.aclnnStatusUt;
@@ -1194,7 +1194,7 @@ static void TestOneParamCase(const AlltoAllMatmulAclnnTestParam &param)
     TensorDesc output = TensorDesc(outputShape, outputDtype, outputFormat);
     uint64_t workspaceSize = 0;
     aclnnStatus aclRet;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     if (biasShape.empty() && alltoalloutShape.empty()) {
         auto ut = OP_API_UT(aclnnAlltoAllMatmul,
                             INPUT(x1, x2, nullptr, alltoAllAxesOptional, group, transposeX1, transposeX2),
@@ -1257,15 +1257,15 @@ TEST_P(AclnnAlltoAllMatmulTest, param)
 {
     auto param = GetParam();
     op::SetPlatformSocVersion(param.soc);
-    aclTensor *x1 = param.x1.GetViewDims().empty() ? nullptr : param.x1.ToAclTypeRawPtr();
-    aclTensor *x2 = param.x2.GetViewDims().empty() ? nullptr : param.x2.ToAclTypeRawPtr();
-    aclTensor *output = param.output.GetViewDims().empty() ? nullptr : param.output.ToAclTypeRawPtr();
+    aclTensor* x1 = param.x1.GetViewDims().empty() ? nullptr : param.x1.ToAclTypeRawPtr();
+    aclTensor* x2 = param.x2.GetViewDims().empty() ? nullptr : param.x2.ToAclTypeRawPtr();
+    aclTensor* output = param.output.GetViewDims().empty() ? nullptr : param.output.ToAclTypeRawPtr();
     auto ut = OP_API_UT(
         aclnnAlltoAllMatmul,
         INPUT(x1, x2, param.bias, param.alltoAllAxes, param.group.c_str(), param.transposeX1, param.transposeX2),
         OUTPUT(output, param.alltoAllOut));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(ACLNN_ERR_PARAM_INVALID, aclnnRet);

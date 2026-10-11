@@ -22,8 +22,8 @@ constexpr char MRN[] = "MatmulAllReduceAddRmsNorm";
 constexpr char IMRN[] = "InplaceMatmulAllReduceAddRmsNorm";
 } // namespace
 QuantMMNTilingTransferHelper::QuantMMNTilingTransferHelper(
-    QuantMatmulAllReduceAddRmsNormTiling &quantMatmulAllReduceAddRmsNormTiling,
-    Mc2Tiling::QuantMatmulAllReduceTilingData &data)
+    QuantMatmulAllReduceAddRmsNormTiling& quantMatmulAllReduceAddRmsNormTiling,
+    Mc2Tiling::QuantMatmulAllReduceTilingData& data)
     : QuantMatmulAllReduceTiling(quantMatmulAllReduceAddRmsNormTiling.context_,
                                  &quantMatmulAllReduceAddRmsNormTiling.mrnCtxInfo_.mmrCtxInfo, &data),
       tilingProcesser_(quantMatmulAllReduceAddRmsNormTiling)
@@ -37,7 +37,7 @@ bool QuantMatmulAllReduceAddRmsNormTiling::HasTail() const
 {
     return hasTail_;
 }
-ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::CheckMRNInput(const MRNCtxInfo &mrnCtxInfo)
+ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::CheckMRNInput(const MRNCtxInfo& mrnCtxInfo)
 {
     // dequantScale数据类型为bf16时, residual为bf16;其他时,residual为fp16
     auto dequantScaleType = mrnCtxInfo.mmrCtxInfo.dequant_scale->GetDataType();
@@ -121,7 +121,7 @@ bool QuantMatmulAllReduceAddRmsNormTiling::IsCapable()
 {
     return helper_->IsCapable();
 }
-QuantMatmulAllReduceAddRmsNormTiling::QuantMatmulAllReduceAddRmsNormTiling(gert::TilingContext *context)
+QuantMatmulAllReduceAddRmsNormTiling::QuantMatmulAllReduceAddRmsNormTiling(gert::TilingContext* context)
     : TilingBaseClass(context)
 {
     helper_ = std::move(std::unique_ptr<QuantMMNTilingTransferHelper>(
@@ -143,7 +143,7 @@ ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::GetWorkspaceSize()
     const auto my_workspace = mc2_workspace + arn_workspace;
     OP_LOGI(helper_->opName_, " Workspace %lu with detail: mc2: %lu arn: %u", my_workspace, mc2_workspace,
             arn_workspace);
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     workspaces[0] = my_workspace;
     return ge::GRAPH_SUCCESS;
 }
@@ -158,7 +158,7 @@ ge::graphStatus QuantMatmulAllReduceAddRmsNormTiling::PostTiling()
                     OP_LOGE(helper_->opName_, "tiling data size[%zu] is not aligned to 8", tilingDataSize),
                     return ge::GRAPH_FAILED);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;

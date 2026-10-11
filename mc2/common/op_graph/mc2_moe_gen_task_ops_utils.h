@@ -23,16 +23,16 @@
 namespace ops {
 class Mc2MoeGenTaskOpsUtils {
 public:
-    static ge::Status McMoeInsertHiddenInputForAicore(const gert::ExeResGenerationContext *context,
-                                                      const int32_t groupCnt, std::vector<std::vector<uint8_t>> &tasks);
-    static ge::Status CreateAicpuTaskMc2Moe(const gert::ExeResGenerationContext *context,
-                                            ge::KernelLaunchInfo &aicpuTask, const int32_t groupCnt);
-    static ge::Status Mc2MoeInsertTask(const gert::ExeResGenerationContext *context,
-                                       std::vector<std::vector<uint8_t>> &tasks, int32_t groupCnt);
-    static ge::Status Mc2MoeGenTaskCallback(const gert::ExeResGenerationContext *context,
-                                            std::vector<std::vector<uint8_t>> &tasks);
-    static ge::Status Mc2MoeGenTaskCallbackV2(const gert::ExeResGenerationContext *context,
-                                              std::vector<std::vector<uint8_t>> &tasks);
+    static ge::Status McMoeInsertHiddenInputForAicore(const gert::ExeResGenerationContext* context,
+                                                      const int32_t groupCnt, std::vector<std::vector<uint8_t>>& tasks);
+    static ge::Status CreateAicpuTaskMc2Moe(const gert::ExeResGenerationContext* context,
+                                            ge::KernelLaunchInfo& aicpuTask, const int32_t groupCnt);
+    static ge::Status Mc2MoeInsertTask(const gert::ExeResGenerationContext* context,
+                                       std::vector<std::vector<uint8_t>>& tasks, int32_t groupCnt);
+    static ge::Status Mc2MoeGenTaskCallback(const gert::ExeResGenerationContext* context,
+                                            std::vector<std::vector<uint8_t>>& tasks);
+    static ge::Status Mc2MoeGenTaskCallbackV2(const gert::ExeResGenerationContext* context,
+                                              std::vector<std::vector<uint8_t>>& tasks);
 };
 } // namespace ops
 #endif // OPS_TRANSFORMER_DEV_MC2_COMMON_INC_OPS_MC2_MOE_GEN_TASK_UTILS

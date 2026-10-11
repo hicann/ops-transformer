@@ -17,7 +17,7 @@
 #include "mc2_log.h"
 #include "one_calc_two_comm_tiling.h"
 
-void OneCalcTwoCommBase::ECutInit(CutResult &eCut)
+void OneCalcTwoCommBase::ECutInit(CutResult& eCut)
 {
     eCut.longTileLen = clusterInfo.batchSize;
     eCut.numLongTile = ONE;
@@ -27,7 +27,7 @@ void OneCalcTwoCommBase::ECutInit(CutResult &eCut)
     eCut.totalTileCnt = eCut.numLongTile;
 }
 
-void OneCalcTwoCommBase::EAxisCut(uint64_t tmpCnt, uint64_t eSize, CutResult &eCut) const
+void OneCalcTwoCommBase::EAxisCut(uint64_t tmpCnt, uint64_t eSize, CutResult& eCut) const
 {
     tmpCnt = std::min(eSize, tmpCnt);
     tmpCnt = std::max(ONE, tmpCnt);
@@ -145,7 +145,7 @@ void OneCalcTwoCommBase::GetTiling()
     }
 }
 
-void OneCalcTwoCommShardHBase::InitCutResult(CutResult &tmpCut, uint64_t totalLen) const
+void OneCalcTwoCommShardHBase::InitCutResult(CutResult& tmpCut, uint64_t totalLen) const
 {
     tmpCut.longTileLen = totalLen;
     tmpCut.numLongTile = ONE;
@@ -174,7 +174,7 @@ void OneCalcTwoCommShardHBase::AsignMaxCutNumForBranches(double totalBMMTime, do
     }
 }
 
-void OneCalcTwoCommShardHBase::CutAxisE(CutResult &cutRes, uint64_t maxCutNum, uint64_t minLen,
+void OneCalcTwoCommShardHBase::CutAxisE(CutResult& cutRes, uint64_t maxCutNum, uint64_t minLen,
                                         double unbalanceRatio) const
 {
     uint64_t totalLen = cutRes.longTileLen;
@@ -243,7 +243,7 @@ void OneCalcTwoCommShardHBase::CutAxisC(uint64_t maxCutNum, uint64_t minLen, dou
     tilingC.cutRes.totalTileCnt = tilingC.cutRes.numLongTile + tilingC.cutRes.numShortTile;
 }
 
-void OneCalcTwoCommShardHBase::TrimCutResult(CutResult &tmpCut, bool setShortFlag) const
+void OneCalcTwoCommShardHBase::TrimCutResult(CutResult& tmpCut, bool setShortFlag) const
 {
     // 长短块一样长时归一
     if (tmpCut.shortTileLen == tmpCut.longTileLen) {

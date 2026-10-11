@@ -15,9 +15,9 @@
 
 // 两段式接口
 extern "C" aclnnStatus aclnnAlltoAllMatmulV2GetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, const aclIntArray *alltoAllAxesOptional,
-    const char *group, const char *commMode, bool transposeX1, bool transposeX2, const aclTensor *output,
-    const aclTensor *alltoAllOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor)
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional, const aclIntArray* alltoAllAxesOptional,
+    const char* group, const char* commMode, bool transposeX1, bool transposeX2, const aclTensor* output,
+    const aclTensor* alltoAllOutOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("aclnnAlltoAllMatmulV2GetWorkspaceSize start");
     return aclnnAlltoAllMatmulBaseGetWorkspaceSize(x1, x2, biasOptional, alltoAllAxesOptional, group, commMode,
@@ -25,7 +25,7 @@ extern "C" aclnnStatus aclnnAlltoAllMatmulV2GetWorkspaceSize(
                                                    executor);
 }
 
-extern "C" aclnnStatus aclnnAlltoAllMatmulV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnAlltoAllMatmulV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                              aclrtStream stream)
 {
     OP_LOGD("aclnnAlltoAllMatmulV2 start");

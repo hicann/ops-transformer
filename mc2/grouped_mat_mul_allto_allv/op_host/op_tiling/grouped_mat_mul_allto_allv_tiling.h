@@ -19,7 +19,7 @@
 namespace optiling {
 class GroupedMatmulAllToAllvTiling : public Mc2Tiling::Mc2GroupedMatmul::QuantGroupedMatmulAllToAllvTilingCommon {
 public:
-    explicit GroupedMatmulAllToAllvTiling(gert::TilingContext *context)
+    explicit GroupedMatmulAllToAllvTiling(gert::TilingContext* context)
         : Mc2Tiling::Mc2GroupedMatmul::QuantGroupedMatmulAllToAllvTilingCommon(context) {};
 
 protected:
@@ -38,7 +38,7 @@ protected:
     ge::graphStatus GetPlatformInfo() override;
     uint64_t GetTilingKey() const override;
     uint32_t GetCommModeIndex() const override;
-    ge::graphStatus GetAndConvertCommMode(gert::TilingContext *context, uint8_t &commMode) const;
+    ge::graphStatus GetAndConvertCommMode(gert::TilingContext* context, uint8_t& commMode) const;
 
     static constexpr uint32_t GMM_X_INDEX = 0;
     static constexpr uint32_t GMM_WEIGHT_INDEX = 1;

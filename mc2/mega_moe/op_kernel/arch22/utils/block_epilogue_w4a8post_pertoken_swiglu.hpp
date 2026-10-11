@@ -77,17 +77,17 @@ public:
         Epilogue::Tile::CopyUb2Gm<ArchTag, Gemm::GemmType<ElementPerTokenScale, LayoutPerTokenScale>>;
 
     struct Params {
-        __gm__ ElementPerTokenScale *ptrPerTokenScale{nullptr};
+        __gm__ ElementPerTokenScale* ptrPerTokenScale{nullptr};
         LayoutPerTokenScale layoutPerTokenScale{};
-        __gm__ ElementD *ptrD{nullptr};
+        __gm__ ElementD* ptrD{nullptr};
         LayoutD layoutD{};
         int32_t expertPerRank{0};
 
         CATLASS_DEVICE Params() {};
 
         CATLASS_DEVICE
-        Params(__gm__ ElementPerTokenScale *ptrPerTokenScale_, LayoutPerTokenScale const &layoutPerTokenScale_,
-               __gm__ ElementD *ptrD_, LayoutD const &layoutD_, int32_t expertPerRank_)
+        Params(__gm__ ElementPerTokenScale* ptrPerTokenScale_, LayoutPerTokenScale const& layoutPerTokenScale_,
+               __gm__ ElementD* ptrD_, LayoutD const& layoutD_, int32_t expertPerRank_)
             : ptrPerTokenScale(ptrPerTokenScale_),
               layoutPerTokenScale(layoutPerTokenScale_),
               ptrD(ptrD_),
@@ -97,7 +97,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, int32_t n, Params const &params = Params{})
+    BlockEpilogue(Arch::Resource<ArchTag> const& resource, int32_t n, Params const& params = Params{})
         : params(params)
     {
         (void)n;
@@ -166,22 +166,22 @@ public:
     CATLASS_DEVICE ~BlockEpilogue() {}
 
     CATLASS_DEVICE
-    void UpdateParams(Params const &params_)
+    void UpdateParams(Params const& params_)
     {
         params = params_;
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementC> const &gmC, MatrixCoord const &shapeC,
-                    AscendC::GlobalTensor<ElementPerTokenScale> const &gmPerTokenScale1, __gm__ float *gmWeightAux,
-                    AscendC::GlobalTensor<ElementD> const &gmD, AscendC::GlobalTensor<int32_t> const &cumsumMM,
-                    uint32_t MOffset, AscendC::GlobalTensor<ElementPerTokenScale> const &gmPerTokenScale2,
+    void operator()(AscendC::GlobalTensor<ElementC> const& gmC, MatrixCoord const& shapeC,
+                    AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale1, __gm__ float* gmWeightAux,
+                    AscendC::GlobalTensor<ElementD> const& gmD, AscendC::GlobalTensor<int32_t> const& cumsumMM,
+                    uint32_t MOffset, AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale2,
                     uint32_t expertPerRank, uint32_t EP, int32_t rank, int32_t listLen,
-                    Arch::Resource<ArchTag> const &resource, uint32_t epilogueCoreNum = 40,
+                    Arch::Resource<ArchTag> const& resource, uint32_t epilogueCoreNum = 40,
                     float activationClamp = 0.0f, uint32_t activationCode = 0,
                     float activationParams1 = SwigluOaiActivation::DEFAULT_ALPHA,
                     float activationParams2 = SituActivation::DEFAULT_BETA, uint32_t gmmOutPreRowStride = 1,
-                    Callback &&callback = Callback{})
+                    Callback&& callback = Callback{})
     {
         (void)rank;
         (void)resource;
@@ -209,7 +209,7 @@ public:
             uint32_t groupIdx = GetGroupIndex(cumsumMM, MOffset + loopIdx, expertPerRank, EP);
             int32_t arrayGroupIdx = listLen == 1 ? 0 : static_cast<int32_t>(groupIdx);
             AscendC::GlobalTensor<float> weightAux;
-            weightAux.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(
+            weightAux.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(
                 GetTensorAddr<float>(arrayGroupIdx, reinterpret_cast<GM_ADDR>(gmWeightAux))));
             uint32_t weightAuxOffset = listLen == 1 ? groupIdx * shapeC.column() : 0;
 
@@ -295,7 +295,7 @@ public:
 
 private:
     CATLASS_DEVICE
-    bool GetTaskRange(uint32_t blockM, uint32_t epilogueCoreNum, uint32_t &loopStartIdx, uint32_t &tasksForIdx)
+    bool GetTaskRange(uint32_t blockM, uint32_t epilogueCoreNum, uint32_t& loopStartIdx, uint32_t& tasksForIdx)
     {
         uint32_t subblockIdx = get_block_idx() + get_subblockid() * get_block_num();
         uint32_t moveDataCoreNum = get_block_num() * 2 - epilogueCoreNum;
@@ -312,7 +312,7 @@ private:
     }
 
     CATLASS_DEVICE
-    void FlushScaleBatch(AscendC::GlobalTensor<ElementPerTokenScale> const &gmPerTokenScale, uint32_t gmOffset,
+    void FlushScaleBatch(AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale, uint32_t gmOffset,
                          uint32_t scaleCount, uint32_t scaleStage)
     {
         if (scaleCount == 0) {
@@ -362,7 +362,7 @@ private:
     }
 
     CATLASS_DEVICE
-    static uint32_t GetGroupIndex(AscendC::GlobalTensor<int32_t> const &cumsumMM, uint32_t globalOffset,
+    static uint32_t GetGroupIndex(AscendC::GlobalTensor<int32_t> const& cumsumMM, uint32_t globalOffset,
                                   uint32_t expertPerRank, uint32_t EP)
     {
         uint32_t groupIdx = 0;
@@ -375,12 +375,12 @@ private:
     }
 
     CATLASS_DEVICE
-    void LoadTile(AscendC::GlobalTensor<ElementC> const &gmTileC, AscendC::GlobalTensor<float> const &weightAux,
+    void LoadTile(AscendC::GlobalTensor<ElementC> const& gmTileC, AscendC::GlobalTensor<float> const& weightAux,
                   uint32_t branchLength, uint32_t tileOffset, uint32_t tileLength, uint32_t gmRowStride,
                   uint32_t stageId)
     {
-        auto &ubC = ubCList[stageId];
-        auto &ubWeightAux = ubWeightAuxList[stageId];
+        auto& ubC = ubCList[stageId];
+        auto& ubWeightAux = ubWeightAuxList[stageId];
 
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[stageId]);
         LayoutC tileLayout{1, tileLength};
@@ -403,8 +403,8 @@ private:
     void ComputeLoadedTile(uint32_t stageId, uint32_t tileLength, ElementPerTokenScale perTokenScale,
                            float activationClamp, float reconstructScale)
     {
-        auto &ubC = ubCList[stageId];
-        auto &ubWeightAux = ubWeightAuxList[stageId];
+        auto& ubC = ubCList[stageId];
+        auto& ubWeightAux = ubWeightAuxList[stageId];
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[stageId]);
         AscendC::Cast(ubGateFp32, ubC, AscendC::RoundMode::CAST_NONE, tileLength);
@@ -439,7 +439,7 @@ private:
     }
 
     CATLASS_DEVICE
-    void QuantizeAndCopyTile(uint32_t stageId, AscendC::GlobalTensor<ElementD> const &gmTileD, uint32_t branchLength,
+    void QuantizeAndCopyTile(uint32_t stageId, AscendC::GlobalTensor<ElementD> const& gmTileD, uint32_t branchLength,
                              uint32_t tileOffset, uint32_t tileLength, ElementPerTokenScale quantMultiplier)
     {
         auto ubQuantS32 = ubGateFp32.template ReinterpretCast<int32_t>();
@@ -454,8 +454,8 @@ private:
         AscendC::Cast(ubD, ubQuantF16, AscendC::RoundMode::CAST_RINT, tileLength);
         AscendC::PipeBarrier<PIPE_V>();
 
-        auto &xHighI4Tensor = xHighI4TensorList[stageId];
-        auto &xLowI4Tensor = xLowI4TensorList[stageId];
+        auto& xHighI4Tensor = xHighI4TensorList[stageId];
+        auto& xLowI4Tensor = xLowI4TensorList[stageId];
         Cast(ubQuantF16, ubD, AscendC::RoundMode::CAST_NONE, tileLength);
         PipeBarrier<PIPE_V>();
         Muls(ubQuantF16, ubQuantF16, static_cast<half>(0.0625f), tileLength);

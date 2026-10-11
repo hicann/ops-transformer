@@ -22,12 +22,12 @@ using namespace AscendC;
 
 namespace optiling {
 
-ge::graphStatus MoeDistributeDispatchTeardownTilingFunc(gert::TilingContext *context)
+ge::graphStatus MoeDistributeDispatchTeardownTilingFunc(gert::TilingContext* context)
 {
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-ge::graphStatus TilingParseForMoeDistributeDispatchTeardown(gert::TilingParseContext *context)
+ge::graphStatus TilingParseForMoeDistributeDispatchTeardown(gert::TilingParseContext* context)
 {
     (void)context;
     return ge::GRAPH_SUCCESS;

@@ -33,16 +33,16 @@
 namespace optiling {
 class MoeDistributeDispatchTilingBase : public MoeTilingBase {
 public:
-    explicit MoeDistributeDispatchTilingBase(gert::TilingContext *context)
+    explicit MoeDistributeDispatchTilingBase(gert::TilingContext* context)
         : MoeTilingBase(context) {};
-    ge::graphStatus CheckAttrs(gert::TilingContext *context, const char *nodeName,
-                               MoeDistributeDispatchTilingData &tilingData, uint32_t &localMoeExpertNum);
-    ge::graphStatus MoeDistributeDispatchA3A5TilingCheckAttr(gert::TilingContext *context, uint32_t &quantMode,
-                                                             bool &isScales);
-    ge::graphStatus MoeDistributeDispatchA3A5TilingFuncImpl(gert::TilingContext *context);
-    virtual ge::graphStatus MoeDistributeDispatchTilingFunc(gert::TilingContext *context) = 0;
-    virtual ge::graphStatus CheckEpWorldSizeAttrs(const char *nodeName,
-                                                  MoeDistributeDispatchTilingData &tilingData) = 0;
+    ge::graphStatus CheckAttrs(gert::TilingContext* context, const char* nodeName,
+                               MoeDistributeDispatchTilingData& tilingData, uint32_t& localMoeExpertNum);
+    ge::graphStatus MoeDistributeDispatchA3A5TilingCheckAttr(gert::TilingContext* context, uint32_t& quantMode,
+                                                             bool& isScales);
+    ge::graphStatus MoeDistributeDispatchA3A5TilingFuncImpl(gert::TilingContext* context);
+    virtual ge::graphStatus MoeDistributeDispatchTilingFunc(gert::TilingContext* context) = 0;
+    virtual ge::graphStatus CheckEpWorldSizeAttrs(const char* nodeName,
+                                                  MoeDistributeDispatchTilingData& tilingData) = 0;
 
 protected:
     ge::graphStatus DoOpTiling() override;

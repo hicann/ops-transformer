@@ -21,10 +21,10 @@
 namespace optiling {
 class MoeDistributeDispatchTilingA2A3 : public MoeDistributeDispatchTilingBase {
 public:
-    explicit MoeDistributeDispatchTilingA2A3(gert::TilingContext *context)
+    explicit MoeDistributeDispatchTilingA2A3(gert::TilingContext* context)
         : MoeDistributeDispatchTilingBase(context) {};
-    ge::graphStatus MoeDistributeDispatchTilingFunc(gert::TilingContext *context) override;
-    ge::graphStatus CheckEpWorldSizeAttrs(const char *nodeName, MoeDistributeDispatchTilingData &tilingData) override;
+    ge::graphStatus MoeDistributeDispatchTilingFunc(gert::TilingContext* context) override;
+    ge::graphStatus CheckEpWorldSizeAttrs(const char* nodeName, MoeDistributeDispatchTilingData& tilingData) override;
 };
 
 } // namespace optiling

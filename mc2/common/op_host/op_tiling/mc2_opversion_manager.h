@@ -21,15 +21,15 @@
 
 class OpVersionManager {
 public:
-    OpVersionManager(const OpVersionManager &) = delete;
-    OpVersionManager &operator=(const OpVersionManager &) = delete;
+    OpVersionManager(const OpVersionManager&) = delete;
+    OpVersionManager& operator=(const OpVersionManager&) = delete;
 
     static void SetVersion(uint32_t version)
     {
         GetInstance().opVersion = version;
     }
 
-    static OpVersionManager &GetInstance()
+    static OpVersionManager& GetInstance()
     {
         static OpVersionManager instance(0);
         return instance;

@@ -39,7 +39,7 @@ struct MoeDistributeDispatchV2HostUtParamBase {
     ge::DataType y_dtype;
     ge::graphStatus expectResult;
 
-    MoeDistributeDispatchV2HostUtParamBase(const csv_map &csvMap)
+    MoeDistributeDispatchV2HostUtParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->group_ep = ReadMap(csvMap, "group_ep");
@@ -64,7 +64,7 @@ struct MoeDistributeDispatchV2HostUtParamBase {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const MoeDistributeDispatchV2HostUtParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const MoeDistributeDispatchV2HostUtParamBase& param)
 {
     return os << param.case_name;
 }
@@ -90,7 +90,7 @@ struct MoeDistributeDispatchV2TilingUtParam : public MoeDistributeDispatchV2Host
     uint64_t ranksize;
     uint64_t expectTilingKey;
 
-    MoeDistributeDispatchV2TilingUtParam(const csv_map &csvMap)
+    MoeDistributeDispatchV2TilingUtParam(const csv_map& csvMap)
         : MoeDistributeDispatchV2HostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "x_shape", "x_dtype", "x_format", x));

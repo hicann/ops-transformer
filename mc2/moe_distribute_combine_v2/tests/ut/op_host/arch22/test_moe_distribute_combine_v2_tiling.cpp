@@ -1915,7 +1915,7 @@ TEST_F(MoeDistributeCombineV2Arch22TilingTest, A3_Hierarchy)
 
 TEST_F(MoeDistributeCombineV2Arch22TilingTest, A3HierarchyVariableBsSuccess)
 {
-    const char *envValue = getenv("HCCL_BUFFSIZE");
+    const char* envValue = getenv("HCCL_BUFFSIZE");
     std::string originalEnv = envValue != nullptr ? envValue : "";
     setenv("HCCL_BUFFSIZE", "6000", 1);
 

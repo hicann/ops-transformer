@@ -77,9 +77,9 @@ public:
     /**
      * @brief 初始化算子状态和参数
      */
-    __aicore__ inline void Init(__gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM,
+    __aicore__ inline void Init(__gm__ CommContext* hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM,
                                 GM_ADDR scaleBGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR workspaceGM,
-                                const allToAllMatmulTilingData *tilingData);
+                                const allToAllMatmulTilingData* tilingData);
     /**
      * @brief 执行算子逻辑（包含 AIC/AIV 分离逻辑）
      */
@@ -129,8 +129,8 @@ public:
 
 private:
     // ---------------- 通信相关组件与参数 ----------------
-    __gm__ CommUbmemContext *syncBuffer_{nullptr};
-    __gm__ CommUdmaContext *udmaCtx_{nullptr};
+    __gm__ CommUbmemContext* syncBuffer_{nullptr};
+    __gm__ CommUdmaContext* udmaCtx_{nullptr};
     CollectiveComm<CommCollectiveOp::AllToAll, CommMode::PUT, AType, TeamBarrier> allToAllA_;
     CollectiveComm<CommCollectiveOp::AllToAll, CommMode::PUT, TypeScaleA, TeamBarrier> allToAllScaleA_;
     TeamBarrier teamBarrier_;
@@ -157,14 +157,14 @@ private:
         uint64_t rankDataBytes{0};
     } baseParams_;
 
-    const allToAllMatmulTilingData *tilingData_{nullptr};
+    const allToAllMatmulTilingData* tilingData_{nullptr};
     Mc2Kernel::OpStateDump opStateDump_{};
     static constexpr uint8_t POS_COMM_BEFORE = 0U;
     static constexpr uint8_t POS_COMP_CUBE_MATMUL_BEFORE = 1U;
     static constexpr uint8_t POS_COMP_LOCAL_BEFORE = 2U;
     // ---------------- 私有方法 ----------------
-    __aicore__ inline void InitBaseParams(const allToAllMatmulTilingData *tilingData);
-    __aicore__ inline void SetupParams(const QuantMatmulTilingData *mmTile, Params &out, MatmulMode matmulMode);
+    __aicore__ inline void InitBaseParams(const allToAllMatmulTilingData* tilingData);
+    __aicore__ inline void SetupParams(const QuantMatmulTilingData* mmTile, Params& out, MatmulMode matmulMode);
 
     __aicore__ inline void RunAllToAll();    // AIV 通信任务
     __aicore__ inline void RunLocalMatmul(); // AIC 本地计算任务
@@ -177,8 +177,8 @@ private:
 
 template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::Init(
-    __gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM, GM_ADDR cGM,
-    GM_ADDR biasGM, GM_ADDR workspaceGM, const allToAllMatmulTilingData *tilingData)
+    __gm__ CommContext* hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM, GM_ADDR scaleBGM, GM_ADDR cGM,
+    GM_ADDR biasGM, GM_ADDR workspaceGM, const allToAllMatmulTilingData* tilingData)
 {
     tilingData_ = tilingData;
     baseParams_.aGm = aGM;
@@ -269,8 +269,8 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
     opStateDump_.DoDump(DUMP_FIELD_PHASE, 0, static_cast<uint8_t>(Utils::RT_PHASE_COMM_FINALIZE));
     // 通信接口使用了 channel 内的字段，需要刷新 GM 地址保证跨 kernel launch 的 GM 状态与 aiCore cache 一致
     // 后续通信接口会内置刷 cache 机制，届时可移除此处调用
-    dcci(reinterpret_cast<__gm__ void *>(udmaCtx_->commBufferAddrs),
-         static_cast<uint64_t>(CacheLine::ENTIRE_DATA_CACHE), static_cast<uint64_t>(DcciDst::CACHELINE_OUT));
+    dcci(reinterpret_cast<__gm__ void*>(udmaCtx_->commBufferAddrs), static_cast<uint64_t>(CacheLine::ENTIRE_DATA_CACHE),
+         static_cast<uint64_t>(DcciDst::CACHELINE_OUT));
 }
 
 // =================================================================================
@@ -279,7 +279,7 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
 
 template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::InitBaseParams(
-    const allToAllMatmulTilingData *tilingData)
+    const allToAllMatmulTilingData* tilingData)
 {
     baseParams_.headMSize = tilingData->commTilingData.splitAxisTileSize;
     baseParams_.commTurn = tilingData->commTilingData.splitAxisTileCnt + tilingData->commTilingData.splitAxisTailCnt;
@@ -315,7 +315,7 @@ __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA
 
 template <typename AType, typename BType, typename CType, bool TransA, bool TransB>
 __aicore__ inline void AllToAllMxQuantMatmulUrmaImpl<AType, BType, CType, TransA, TransB>::SetupParams(
-    const QuantMatmulTilingData *mmTile, Params &out, MatmulMode matmulMode)
+    const QuantMatmulTilingData* mmTile, Params& out, MatmulMode matmulMode)
 {
     ProblemShape problemShape{mmTile->m, mmTile->n, mmTile->k, 1UL};
     BlockMmadParams mmadParams;

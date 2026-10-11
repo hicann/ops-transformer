@@ -60,7 +60,7 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantPerToken(
 }
 
 template <TemplateA2AMMClass>
-__aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantToken(__gm__ AType *dataSrc, int64_t dataOffset,
+__aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantToken(__gm__ AType* dataSrc, int64_t dataOffset,
                                                                      int32_t coreTokenOffset, int32_t dataLen,
                                                                      int32_t commIdx)
 {
@@ -107,7 +107,7 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantToken(__gm__ ATyp
     if (isSmoothQuant) {
         // smoothQuant场景需要将x1先乘上smoothQuantScale，MUL不支持bf16，因此需要先转换成float类型
         CopyGmToUbufAlignB16(smoothScaleTensor.ReinterpretCast<AType>()[smoothScaleCastOffset],
-                             reinterpret_cast<__gm__ AType *>(x1ScaleGM_), 1, tokenSize * sizeof(AType), 0, 0);
+                             reinterpret_cast<__gm__ AType*>(x1ScaleGM_), 1, tokenSize * sizeof(AType), 0, 0);
         SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
         WaitFlag<HardEvent::MTE2_V>(EVENT_ID0);
         Cast(smoothScaleTensor, smoothScaleTensor.ReinterpretCast<AType>()[smoothScaleCastOffset], RoundMode::CAST_NONE,
@@ -129,7 +129,7 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantToken(__gm__ ATyp
 
         WaitFlag<HardEvent::MTE3_MTE2>(eventId);
         CopyGmToUbufAlignB16(copyTensor.ReinterpretCast<AType>()[castOffset],
-                             reinterpret_cast<__gm__ AType *>(dataSrc) + dataOffset, 1, actualMoveSize * sizeof(AType),
+                             reinterpret_cast<__gm__ AType*>(dataSrc) + dataOffset, 1, actualMoveSize * sizeof(AType),
                              0, 0);
         SetFlag<HardEvent::MTE2_V>(eventId);
         WaitFlag<HardEvent::MTE2_V>(eventId);
@@ -139,14 +139,14 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantToken(__gm__ ATyp
         SetFlag<HardEvent::V_MTE3>(eventId);
         WaitFlag<HardEvent::V_MTE3>(eventId);
         /* 搬运到GM上时，与peerMem上的相对位置保持不变，后续数据offset可以复用 */
-        CopyUbufToGmAlignB16(reinterpret_cast<__gm__ int8_t *>(quantAGM_) + dataOffset / sizeScale,
+        CopyUbufToGmAlignB16(reinterpret_cast<__gm__ int8_t*>(quantAGM_) + dataOffset / sizeScale,
                              copyTensor.ReinterpretCast<int8_t>(), 1, actualMoveBytes, 0, 0);
         dataOffset += actualMoveSize;
         SetFlag<HardEvent::MTE3_MTE2>(eventId);
     }
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
-    CopyUbufToGmAlignB16(reinterpret_cast<__gm__ float *>(quantScaleGM_) + coreTokenOffset + commIdx * mPerLoop,
+    CopyUbufToGmAlignB16(reinterpret_cast<__gm__ float*>(quantScaleGM_) + coreTokenOffset + commIdx * mPerLoop,
                          quantScaleTensor, 1, tokenNum * sizeof(float), 0, 0);
 }
 
@@ -160,7 +160,7 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::SmoothQuantProc(event_
     SetFlag<HardEvent::V_MTE2>(eventId);
     WaitFlag<HardEvent::V_MTE2>(eventId);
     CopyGmToUbufAlignB16(smoothScaleTensor.ReinterpretCast<AType>()[smoothScaleCastOffset],
-                         reinterpret_cast<__gm__ AType *>(x1ScaleGM_) + dataSegmentOffset, 1,
+                         reinterpret_cast<__gm__ AType*>(x1ScaleGM_) + dataSegmentOffset, 1,
                          actualMoveSize * sizeof(AType), 0, 0);
     SetFlag<HardEvent::MTE2_V>(eventId);
     WaitFlag<HardEvent::MTE2_V>(eventId);
@@ -175,13 +175,13 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::SmoothQuantProc(event_
 template <TemplateA2AMMClass>
 __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::LoadCastAndSmoothToken(
     event_t eventId, LocalTensor<float> copyTensor, LocalTensor<float> smoothScaleTensor, int32_t castOffset,
-    __gm__ AType *dataSrc, int64_t dataTokenOffset, int32_t dataSegmentOffset, int32_t smoothScaleCastOffset,
+    __gm__ AType* dataSrc, int64_t dataTokenOffset, int32_t dataSegmentOffset, int32_t smoothScaleCastOffset,
     int32_t actualMoveSize)
 {
     WaitFlag<HardEvent::MTE3_MTE2>(eventId);
     /* 下一步需要将copyTensor转换成float类型，目标地址复用copyTensor。为防止踩踏，将AType类型数据内存放在后半段 */
     CopyGmToUbufAlignB16(copyTensor.ReinterpretCast<AType>()[castOffset],
-                         reinterpret_cast<__gm__ AType *>(dataSrc) + dataTokenOffset + dataSegmentOffset, 1,
+                         reinterpret_cast<__gm__ AType*>(dataSrc) + dataTokenOffset + dataSegmentOffset, 1,
                          actualMoveSize * sizeof(AType), 0, 0);
     SetFlag<HardEvent::MTE2_V>(eventId);
     WaitFlag<HardEvent::MTE2_V>(eventId);
@@ -197,7 +197,7 @@ template <TemplateA2AMMClass>
 __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::CalcTokenMaxValue(
     LocalTensor<float> copyTensor0, LocalTensor<float> copyTensor1, LocalTensor<float> absTensor0,
     LocalTensor<float> absTensor1, LocalTensor<float> smoothScaleTensor0, LocalTensor<float> smoothScaleTensor1,
-    int32_t castOffset, __gm__ AType *dataSrc, int64_t dataTokenOffset, int32_t smoothScaleCastOffset,
+    int32_t castOffset, __gm__ AType* dataSrc, int64_t dataTokenOffset, int32_t smoothScaleCastOffset,
     int32_t sizeScale, LocalTensor<float> reduceMaxTensor)
 {
     int32_t actualMoveSize = copyTensorSize;
@@ -231,7 +231,7 @@ template <TemplateA2AMMClass>
 __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantPerSegment(
     LocalTensor<float> copyTensor0, LocalTensor<float> copyTensor1, LocalTensor<float> absTensor0,
     LocalTensor<float> absTensor1, LocalTensor<float> smoothScaleTensor0, LocalTensor<float> smoothScaleTensor1,
-    int32_t castOffset, __gm__ AType *dataSrc, int64_t dataTokenOffset, int32_t smoothScaleCastOffset,
+    int32_t castOffset, __gm__ AType* dataSrc, int64_t dataTokenOffset, int32_t smoothScaleCastOffset,
     int32_t sizeScale, float quantScaleReciproal)
 {
     int32_t actualMoveSize = copyTensorSize;
@@ -265,7 +265,7 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantPerSegment(
         SetFlag<HardEvent::V_MTE3>(eventId);
         WaitFlag<HardEvent::V_MTE3>(eventId);
         CopyUbufToGmAlignB16(
-            reinterpret_cast<__gm__ int8_t *>(quantAGM_) + (dataTokenOffset + dataSegmentOffset) / sizeScale,
+            reinterpret_cast<__gm__ int8_t*>(quantAGM_) + (dataTokenOffset + dataSegmentOffset) / sizeScale,
             copyTensor.ReinterpretCast<int8_t>(), 1, actualMoveBytes, 0, 0);
         SetFlag<HardEvent::MTE3_MTE2>(eventId);
         dataSegmentOffset += actualMoveSize;
@@ -273,7 +273,7 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantPerSegment(
 }
 
 template <TemplateA2AMMClass>
-__aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantTokenSegment(__gm__ AType *dataSrc, int64_t dataOffset,
+__aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantTokenSegment(__gm__ AType* dataSrc, int64_t dataOffset,
                                                                             int32_t coreTokenOffset, int32_t dataLen,
                                                                             int32_t commIdx)
 {
@@ -324,7 +324,7 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantTokenSegment(__gm
         QuantPerSegment(copyTensor0, copyTensor1, absTensor0, absTensor1, smoothScaleTensor0, smoothScaleTensor1,
                         castOffset, dataSrc, dataTokenOffset, smoothScaleCastOffset, sizeScale, quantScaleReciproal);
     }
-    CopyUbufToGmAlignB16(reinterpret_cast<__gm__ float *>(quantScaleGM_) + coreTokenOffset + commIdx * mPerLoop,
+    CopyUbufToGmAlignB16(reinterpret_cast<__gm__ float*>(quantScaleGM_) + coreTokenOffset + commIdx * mPerLoop,
                          quantScaleTensor, 1, tokenNum * sizeof(float), 0, 0);
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID0);
     WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
@@ -333,7 +333,7 @@ __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::QuantTokenSegment(__gm
 template <TemplateA2AMMClass>
 __aicore__ inline void AlltoAllMatmul<TemplateA2AMMFunc>::Quant(uint64_t flagIdx, int32_t commIdx)
 {
-    __gm__ AType *dataSrc = (__gm__ AType *)buff[rank];
+    __gm__ AType* dataSrc = (__gm__ AType*)buff[rank];
     int32_t totalDataSize =
         x1DataSize < allToAllSizeAllRanksPerLoop ? x1DataSize : allToAllSizeAllRanksPerLoop; // 实际需要处理的数据量
     int32_t quantSizePerCore = (totalDataSize / quantCoreNum) / tokenSize * tokenSize;       // 每核均分的数据量

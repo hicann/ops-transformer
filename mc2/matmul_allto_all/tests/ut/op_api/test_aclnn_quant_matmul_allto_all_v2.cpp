@@ -23,20 +23,20 @@ using namespace std;
 
 constexpr int64_t MX_GROUP_SIZE = 4295032864;
 
-static aclTensor *CreateAclTensor(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensor(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
 {
-    void *storage_data = nullptr;
+    void* storage_data = nullptr;
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
         strides[i] = shape[i + 1] * strides[i + 1];
     }
-    aclTensor *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
+    aclTensor* tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
                                         shape.size(), storage_data);
     assert(tensor != nullptr);
     return tensor;
 }
 
-static aclTensor *CreateAclTensorOrNull(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensorOrNull(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
 {
     if (shape.empty()) {
         return nullptr;
@@ -84,8 +84,8 @@ struct QuantMatmulAlltoAllV2AclnnTestParam {
     aclFormat outputFormat;
     int64_t group_size;
     vector<int64_t> alltoAllAxesOptional;
-    char *group;
-    const char *commMode; // 新增：通信引擎参数
+    char* group;
+    const char* commMode; // 新增：通信引擎参数
     bool transposeX1;
     bool transposeX2;
     aclnnStatus aclnnStatusUt;
@@ -5276,7 +5276,7 @@ static QuantMatmulAlltoAllV2AclnnTestParam MXQuant_v2_cases_params[] = {
      ACLNN_ERR_PARAM_INVALID} // 异常场景：quantmode组合非法，不是mx量化场景（6,6）
 };
 
-static void TestQuantV2OneParamCase(const QuantMatmulAlltoAllV2AclnnTestParam &param)
+static void TestQuantV2OneParamCase(const QuantMatmulAlltoAllV2AclnnTestParam& param)
 {
     std::cout << "run case " << param.caseName << std::endl;
     int64_t x1quantmode = param.x1Quantmode;
@@ -5301,20 +5301,20 @@ static void TestQuantV2OneParamCase(const QuantMatmulAlltoAllV2AclnnTestParam &p
     aclFormat outputFormat = param.outputFormat;
     int64_t groupSize = param.group_size;
     vector<int64_t> axesAcl = param.alltoAllAxesOptional;
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
-    const char *group = param.group;
-    const char *commMode = param.commMode;
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    const char* group = param.group;
+    const char* commMode = param.commMode;
     bool transposeX1 = param.transposeX1;
     bool transposeX2 = param.transposeX2;
     aclnnStatus retStatus = param.aclnnStatusUt;
-    aclTensor *x1 = CreateAclTensorOrNull(x1Shape, x1Dtype, x1Format);
-    aclTensor *x2 = CreateAclTensorOrNull(x2Shape, x2Dtype, x2Format);
-    aclTensor *bias = CreateAclTensorOrNull(biasShape, biasDtype, biasFormat);
-    aclTensor *x1scales = CreateAclTensorOrNull(x1scalesShape, x1scalesDtype, x1ScaleFormat);
-    aclTensor *x2scales = CreateAclTensorOrNull(x2scalesShape, x2scalesDtype, x2ScaleFormat);
-    aclTensor *output = CreateAclTensorOrNull(outputShape, outputDtype, outputFormat);
+    aclTensor* x1 = CreateAclTensorOrNull(x1Shape, x1Dtype, x1Format);
+    aclTensor* x2 = CreateAclTensorOrNull(x2Shape, x2Dtype, x2Format);
+    aclTensor* bias = CreateAclTensorOrNull(biasShape, biasDtype, biasFormat);
+    aclTensor* x1scales = CreateAclTensorOrNull(x1scalesShape, x1scalesDtype, x1ScaleFormat);
+    aclTensor* x2scales = CreateAclTensorOrNull(x2scalesShape, x2scalesDtype, x2ScaleFormat);
+    aclTensor* output = CreateAclTensorOrNull(outputShape, outputDtype, outputFormat);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAllV2,
                         INPUT(x1, x2, bias, x1scales, x2scales, nullptr, nullptr, nullptr, alltoAllAxesOptional, group,

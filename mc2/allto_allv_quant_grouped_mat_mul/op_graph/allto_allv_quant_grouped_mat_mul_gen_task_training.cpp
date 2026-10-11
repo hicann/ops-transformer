@@ -25,14 +25,14 @@
 namespace ops {
 static const size_t ATTR_COMM_MODE_INDEX = 14;
 static const size_t RANK_DIM_BOUNDARY = 8;
-static ge::Status GetRankSizeAndSetCommmode(const gert::ExeResGenerationContext *context, std::string &commMode)
+static ge::Status GetRankSizeAndSetCommmode(const gert::ExeResGenerationContext* context, std::string& commMode)
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     if (attrs == nullptr) {
         OPS_LOG_E(context->GetNodeName(), "Attrs pointer is null.");
         return ge::GRAPH_FAILED;
     }
-    const char *commModePtr = attrs->GetStr(ATTR_COMM_MODE_INDEX);
+    const char* commModePtr = attrs->GetStr(ATTR_COMM_MODE_INDEX);
     if (commModePtr == nullptr) {
         OPS_LOG_E(context->GetNodeName(), "commModePtr pointer is null.");
         return ge::GRAPH_FAILED;
@@ -41,7 +41,7 @@ static ge::Status GetRankSizeAndSetCommmode(const gert::ExeResGenerationContext 
     return ge::GRAPH_SUCCESS;
 }
 
-ge::Status AlltoAllvQuantGroupedMatMulCalcParamFunc(gert::ExeResGenerationContext *context)
+ge::Status AlltoAllvQuantGroupedMatMulCalcParamFunc(gert::ExeResGenerationContext* context)
 {
     std::string commMode;
     ge::Status status = GetRankSizeAndSetCommmode(context, commMode);
@@ -49,8 +49,8 @@ ge::Status AlltoAllvQuantGroupedMatMulCalcParamFunc(gert::ExeResGenerationContex
         return status;
     }
     bool isArch35 = IsTargetPlatformNpuArch(context->GetNodeName(), NPUARCH_A5);
-    const char *serverType = nullptr;
-    const char *streamType = nullptr;
+    const char* serverType = nullptr;
+    const char* streamType = nullptr;
     if ((isArch35 && commMode == "ai_cpu")) {
         serverType = "aicpu kfc server";
         streamType = "kfc_stream";
@@ -63,8 +63,8 @@ ge::Status AlltoAllvQuantGroupedMatMulCalcParamFunc(gert::ExeResGenerationContex
     return Mc2GenTaskOpsUtils::CommonKFCMc2CalcParamFunc(context, serverType, streamType);
 }
 
-ge::Status AlltoAllvQuantGroupedMatMulGenTaskFunc(const gert::ExeResGenerationContext *context,
-                                                  std::vector<std::vector<uint8_t>> &tasks)
+ge::Status AlltoAllvQuantGroupedMatMulGenTaskFunc(const gert::ExeResGenerationContext* context,
+                                                  std::vector<std::vector<uint8_t>>& tasks)
 {
     std::string commMode;
     ge::Status status = GetRankSizeAndSetCommmode(context, commMode);

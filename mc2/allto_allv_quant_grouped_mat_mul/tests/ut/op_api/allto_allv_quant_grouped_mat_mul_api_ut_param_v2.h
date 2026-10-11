@@ -34,8 +34,8 @@ struct AlltoAllvQuantGroupedMatMulV2ApiUtParam {
     int64_t mmWeightQuantMode;
     int64_t epWorldSize = 0;
     int64_t groupSize = 0;
-    aclIntArray *sendCounts;
-    aclIntArray *recvCounts;
+    aclIntArray* sendCounts;
+    aclIntArray* recvCounts;
     int32_t transGmmWeight;
     int32_t transMmWeight;
     int32_t permuteOutFlag;
@@ -47,7 +47,7 @@ struct AlltoAllvQuantGroupedMatMulV2ApiUtParam {
     op::SocVersion soc;
     aclnnStatus expectResult;
 
-    AlltoAllvQuantGroupedMatMulV2ApiUtParam(const csv_map &csvMap)
+    AlltoAllvQuantGroupedMatMulV2ApiUtParam(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->gmmX = GetTensorACL(csvMap, "gmmx_shape", "gmmx_dtype", "gmmx_format");
@@ -82,7 +82,7 @@ struct AlltoAllvQuantGroupedMatMulV2ApiUtParam {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AlltoAllvQuantGroupedMatMulV2ApiUtParam &param)
+inline std::ostream& operator<<(std::ostream& os, const AlltoAllvQuantGroupedMatMulV2ApiUtParam& param)
 {
     return os << param.case_name;
 }

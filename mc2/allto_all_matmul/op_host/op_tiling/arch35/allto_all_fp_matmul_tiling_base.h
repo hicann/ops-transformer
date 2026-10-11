@@ -34,7 +34,7 @@ using namespace mc2_matmul_v3_advanced;
 
 class AllToAllFpMatmulTilingBase : public AllToAllMatmulTilingBase {
 public:
-    explicit AllToAllFpMatmulTilingBase(gert::TilingContext *context);
+    explicit AllToAllFpMatmulTilingBase(gert::TilingContext* context);
     ~AllToAllFpMatmulTilingBase() override = default;
 
 protected:
@@ -46,17 +46,17 @@ protected:
     ge::graphStatus CheckOpInputInfo();
     ge::graphStatus InitTilingContextParameters();
     ge::graphStatus DoMMTiling();
-    ge::graphStatus DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg &tilingCfg, Mc2MMRegisterCfg &mmRegisterCfg,
-                                     Mc2MatMulV3TilingData &tilingData);
+    ge::graphStatus DoMatmulV3Tiling(Mc2MatmulHelper::Mc2MatmulTilingCfg& tilingCfg, Mc2MMRegisterCfg& mmRegisterCfg,
+                                     Mc2MatMulV3TilingData& tilingData);
     ge::graphStatus SetHcclTiling();
-    void SetTilingInfo(AlltoAllMatmulTilingInfo &tilingInfo) const;
+    void SetTilingInfo(AlltoAllMatmulTilingInfo& tilingInfo) const;
     // 非量化+有bias时, 选择 add_bias 节点的分核策略
     uint8_t ChooseAddBiasSplitMode() const;
 
 private:
-    void PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingData &alltoAllMatmulTilingData);
-    void PrintAlltoAllMatmulTilingInfo(const std::string &opName, AlltoAllMatmulTilingInfo &tilingInfo);
-    void PrintMMV3TilingData(const std::string &opName, Mc2MatMulV3TilingData &tiling);
+    void PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingData& alltoAllMatmulTilingData);
+    void PrintAlltoAllMatmulTilingInfo(const std::string& opName, AlltoAllMatmulTilingInfo& tilingInfo);
+    void PrintMMV3TilingData(const std::string& opName, Mc2MatMulV3TilingData& tiling);
 
     AlltoAllMatmulTilingData localTilingData_{};
     Mc2MatMulV3Args mmV3Args_;

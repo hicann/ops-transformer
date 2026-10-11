@@ -83,7 +83,7 @@ class Mc2BatchMatMulAswBlock {
 public:
     __aicore__ inline Mc2BatchMatMulAswBlock() {}
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-    __aicore__ inline void Init(const void *tilingData);
+    __aicore__ inline void Init(const void* tilingData);
     __aicore__ inline void UpdateBasicIndex(uint64_t roundIdx, uint64_t newBlockIdx);
     template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
     __aicore__ inline void UpdateBlockParams(uint64_t roundIdx);
@@ -93,13 +93,13 @@ public:
 public:
     Mc2BmmAswBlockOffset offset_;
     Mc2BmmAswBlockArgs params_;
-    const BatchMatMulV3TilingData *batchMatmulTilingData_;
+    const BatchMatMulV3TilingData* batchMatmulTilingData_;
 };
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
-__aicore__ inline void Mc2BatchMatMulAswBlock::Init(const void *tilingData)
+__aicore__ inline void Mc2BatchMatMulAswBlock::Init(const void* tilingData)
 {
-    batchMatmulTilingData_ = static_cast<const BatchMatMulV3TilingData *>(tilingData);
+    batchMatmulTilingData_ = static_cast<const BatchMatMulV3TilingData*>(tilingData);
 
     params_.batchA1 = batchMatmulTilingData_->aBatchDim0;
     params_.batchA2 = batchMatmulTilingData_->aBatchDim1;

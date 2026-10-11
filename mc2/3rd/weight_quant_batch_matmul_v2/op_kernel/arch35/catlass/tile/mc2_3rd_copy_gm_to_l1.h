@@ -18,7 +18,7 @@ using AscendC::LocalTensor;
 using AscendC::Nd2NzParams;
 
 template <typename T>
-DEVICE void CopyGmToL1IntervalDataCopy(const LocalTensor<T> &dst, const GlobalTensor<T> &src, uint32_t nValue,
+DEVICE void CopyGmToL1IntervalDataCopy(const LocalTensor<T>& dst, const GlobalTensor<T>& src, uint32_t nValue,
                                        uint32_t dValue, uint32_t dstInnerLength, uint32_t srcInnerLength)
 {
     // ND2NZ
@@ -36,7 +36,7 @@ DEVICE void CopyGmToL1IntervalDataCopy(const LocalTensor<T> &dst, const GlobalTe
 }
 
 template <typename T>
-DEVICE void CopyGmToL1(const LocalTensor<T> &dst, const GlobalTensor<T> &src, uint32_t size)
+DEVICE void CopyGmToL1(const LocalTensor<T>& dst, const GlobalTensor<T>& src, uint32_t size)
 {
     DataCopy(dst, src, size);
 }

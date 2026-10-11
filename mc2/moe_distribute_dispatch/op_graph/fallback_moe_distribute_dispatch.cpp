@@ -21,48 +21,48 @@ namespace fallback {
 using namespace ge;
 using namespace gert;
 
-const char *moeDistributeDispatchInfo = "MoeDistributeDispatchFallback";
+const char* moeDistributeDispatchInfo = "MoeDistributeDispatchFallback";
 
 namespace {
 struct OpInput {
-    const gert::Tensor *x;
-    const gert::Tensor *expertIds;
+    const gert::Tensor* x;
+    const gert::Tensor* expertIds;
 };
 
 struct OpOptionalInput {
-    const gert::Tensor *scales;
-    const gert::Tensor *xActiveMask;
-    const gert::Tensor *expertScales;
+    const gert::Tensor* scales;
+    const gert::Tensor* xActiveMask;
+    const gert::Tensor* expertScales;
 };
 
 struct OpOutput {
-    const gert::Tensor *expandX;
-    const gert::Tensor *dynamicScales;
-    const gert::Tensor *expandIdx;
-    const gert::Tensor *expertTokenNums;
-    const gert::Tensor *epRecvCounts;
-    const gert::Tensor *tpRecvCounts;
-    const gert::Tensor *expandScales;
+    const gert::Tensor* expandX;
+    const gert::Tensor* dynamicScales;
+    const gert::Tensor* expandIdx;
+    const gert::Tensor* expertTokenNums;
+    const gert::Tensor* epRecvCounts;
+    const gert::Tensor* tpRecvCounts;
+    const gert::Tensor* expandScales;
 };
 
 struct OpAttrs {
-    const char *groupEp;
-    const int64_t *epWorldSize;
-    const int64_t *epRankId;
-    const int64_t *moeExpertNum;
-    const char *groupTp;
-    const int64_t *tpWorldSize;
-    const int64_t *tpRankId;
-    const int64_t *expertShardType;
-    const int64_t *sharedExpertNum;
-    const int64_t *sharedExpertRankNum;
-    const int64_t *quantMode;
-    const int64_t *globalBs;
-    const int64_t *expertTokenNumsType;
+    const char* groupEp;
+    const int64_t* epWorldSize;
+    const int64_t* epRankId;
+    const int64_t* moeExpertNum;
+    const char* groupTp;
+    const int64_t* tpWorldSize;
+    const int64_t* tpRankId;
+    const int64_t* expertShardType;
+    const int64_t* sharedExpertNum;
+    const int64_t* sharedExpertRankNum;
+    const int64_t* quantMode;
+    const int64_t* globalBs;
+    const int64_t* expertTokenNumsType;
 };
 
 // 获取必选输入
-graphStatus MoeDistributeDispatchGetOpInput(OpExecuteContext *host_api_ctx, OpInput &opInput)
+graphStatus MoeDistributeDispatchGetOpInput(OpExecuteContext* host_api_ctx, OpInput& opInput)
 {
     opInput.x = host_api_ctx->GetInputTensor(static_cast<size_t>(ops::MoeDistributeDispatchInputIdx::K_X));
     OP_CHECK_IF(opInput.x == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeDispatchInfo, "x"),
@@ -76,7 +76,7 @@ graphStatus MoeDistributeDispatchGetOpInput(OpExecuteContext *host_api_ctx, OpIn
 }
 
 // 获取可选输入
-void MoeDistributeDispatchGetOpOptionalInput(OpExecuteContext *host_api_ctx, OpOptionalInput &opOptionalInput)
+void MoeDistributeDispatchGetOpOptionalInput(OpExecuteContext* host_api_ctx, OpOptionalInput& opOptionalInput)
 {
     opOptionalInput.scales =
         host_api_ctx->GetOptionalInputTensor(static_cast<size_t>(ops::MoeDistributeDispatchInputIdx::K_SCALES));
@@ -87,7 +87,7 @@ void MoeDistributeDispatchGetOpOptionalInput(OpExecuteContext *host_api_ctx, OpO
 }
 
 // 获取输出
-graphStatus MoeDistributeDispatchGetOpOutput(OpExecuteContext *host_api_ctx, OpOutput &opOutput)
+graphStatus MoeDistributeDispatchGetOpOutput(OpExecuteContext* host_api_ctx, OpOutput& opOutput)
 {
     opOutput.expandX =
         host_api_ctx->GetOutputTensor(static_cast<size_t>(ops::MoeDistributeDispatchOutputIdx::K_EXPAND_X));
@@ -127,7 +127,7 @@ graphStatus MoeDistributeDispatchGetOpOutput(OpExecuteContext *host_api_ctx, OpO
 }
 
 // 获取属性
-graphStatus MoeDistributeDispatchGetOpAttrs(OpExecuteContext *host_api_ctx, OpAttrs &opAttrs)
+graphStatus MoeDistributeDispatchGetOpAttrs(OpExecuteContext* host_api_ctx, OpAttrs& opAttrs)
 {
     const auto attrs = host_api_ctx->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeDispatchInfo, "attrs"),
@@ -193,7 +193,7 @@ graphStatus MoeDistributeDispatchGetOpAttrs(OpExecuteContext *host_api_ctx, OpAt
 
 } // namespace
 
-static graphStatus MoeDistributeDispatchExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus MoeDistributeDispatchExecuteFunc(OpExecuteContext* host_api_ctx)
 {
     OP_LOGD(moeDistributeDispatchInfo, "start to fallback for moeDistributeDispatch");
     OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE_WITH_INVALID_INPUT(moeDistributeDispatchInfo, "host_api_ctx"),

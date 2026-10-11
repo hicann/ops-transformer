@@ -22,7 +22,7 @@ namespace optiling {
 
 class Mc2WeightQuantBatchMatmulV2RegBase : public Mc2WeightQuantBatchMatmulV2Tiling {
 public:
-    explicit Mc2WeightQuantBatchMatmulV2RegBase(gert::TilingContext *context)
+    explicit Mc2WeightQuantBatchMatmulV2RegBase(gert::TilingContext* context)
         : Mc2WeightQuantBatchMatmulV2Tiling(context)
     {
         if (context->GetCompileInfo() == nullptr) {
@@ -53,9 +53,9 @@ protected:
 private:
     void SetBubTiling();
     void SetAdditionalParam();
-    void GetBubTilingA16W4NZ(int64_t &nBubSize, int64_t &kBubSize) const;
-    void GetBubTilingA16W4ND(int64_t &nBubSize, int64_t &kBubSize) const;
-    void GetBubTilingA16W8NDPerGroup(int64_t &nBubSize, int64_t &kBubSize) const;
+    void GetBubTilingA16W4NZ(int64_t& nBubSize, int64_t& kBubSize) const;
+    void GetBubTilingA16W4ND(int64_t& nBubSize, int64_t& kBubSize) const;
+    void GetBubTilingA16W8NDPerGroup(int64_t& nBubSize, int64_t& kBubSize) const;
     void SetMatmulTiling();
 
     Mc2WeightQuantBatchMatmulV2BasicBlockTiling tilingSolver_;

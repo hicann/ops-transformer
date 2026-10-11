@@ -46,12 +46,12 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllFp1
     size_t sysWorkspaceSize = 16 * 1024 * 1024;
     size_t usrWorkspaceSize = E * C * H + 2 * E * C / tp * H;
     size_t allWorkspaceSize = usrWorkspaceSize + sysWorkspaceSize;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(allWorkspaceSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(allWorkspaceSize);
     size_t tilingSize = sizeof(BatchMatMulReduceScatterAlltoAllTilingData);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingSize);
 
-    BatchMatMulReduceScatterAlltoAllTilingData *tiling_data =
-        reinterpret_cast<BatchMatMulReduceScatterAlltoAllTilingData *>(tiling);
+    BatchMatMulReduceScatterAlltoAllTilingData* tiling_data =
+        reinterpret_cast<BatchMatMulReduceScatterAlltoAllTilingData*>(tiling);
     tiling_data->commonTiling.aivCoreNum = numBlocks * 2;
     tiling_data->commonTiling.EOverEp = E / ep;
     tiling_data->commonTiling.C = C;
@@ -63,10 +63,10 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllFp1
     tiling_data->commonTiling.domesticTileE.tileCnt = 0;
     tiling_data->commonTiling.domesticTileE.tileLen = 0;
 
-    uint8_t *xGM = (uint8_t *)AscendC::GmAlloc(E * C * M / tp * sizeof(uint16_t));
-    uint8_t *weightGM = (uint8_t *)AscendC::GmAlloc(E / ep * M / tp * H * sizeof(uint16_t));
-    uint8_t *biasGM = nullptr;
-    uint8_t *yGM = (uint8_t *)AscendC::GmAlloc(E * C / tp * H * sizeof(uint16_t));
+    uint8_t* xGM = (uint8_t*)AscendC::GmAlloc(E * C * M / tp * sizeof(uint16_t));
+    uint8_t* weightGM = (uint8_t*)AscendC::GmAlloc(E / ep * M / tp * H * sizeof(uint16_t));
+    uint8_t* biasGM = nullptr;
+    uint8_t* yGM = (uint8_t*)AscendC::GmAlloc(E * C / tp * H * sizeof(uint16_t));
 
     auto batchMatMulReduceScatterAlltoAllWarpper = [](GM_ADDR xGM, GM_ADDR weightGM, GM_ADDR biasGM, GM_ADDR yGM,
                                                       GM_ADDR workspaceGM, GM_ADDR tilingGM) {
@@ -77,11 +77,11 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllFp1
 
     ICPU_RUN_KF(batchMatMulReduceScatterAlltoAllWarpper, numBlocks, xGM, weightGM, nullptr, yGM, workspace, tiling);
 
-    AscendC::GmFree((void *)workspace);
-    AscendC::GmFree((void *)tiling);
-    AscendC::GmFree((void *)xGM);
-    AscendC::GmFree((void *)weightGM);
-    AscendC::GmFree((void *)yGM);
+    AscendC::GmFree((void*)workspace);
+    AscendC::GmFree((void*)tiling);
+    AscendC::GmFree((void*)xGM);
+    AscendC::GmFree((void*)weightGM);
+    AscendC::GmFree((void*)yGM);
 }
 
 TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllFp16WithFp16Bias)
@@ -99,12 +99,12 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllFp1
     size_t sysWorkspaceSize = 16 * 1024 * 1024;
     size_t usrWorkspaceSize = E * C * H + 2 * E * C / tp * H;
     size_t allWorkspaceSize = usrWorkspaceSize + sysWorkspaceSize;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(allWorkspaceSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(allWorkspaceSize);
     size_t tilingSize = sizeof(BatchMatMulReduceScatterAlltoAllTilingData);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingSize);
 
-    BatchMatMulReduceScatterAlltoAllTilingData *tiling_data =
-        reinterpret_cast<BatchMatMulReduceScatterAlltoAllTilingData *>(tiling);
+    BatchMatMulReduceScatterAlltoAllTilingData* tiling_data =
+        reinterpret_cast<BatchMatMulReduceScatterAlltoAllTilingData*>(tiling);
     tiling_data->commonTiling.aivCoreNum = numBlocks * 2;
     tiling_data->commonTiling.EOverEp = E / ep;
     tiling_data->commonTiling.C = C;
@@ -116,10 +116,10 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllFp1
     tiling_data->commonTiling.domesticTileE.tileCnt = 0;
     tiling_data->commonTiling.domesticTileE.tileLen = 0;
 
-    uint8_t *xGM = (uint8_t *)AscendC::GmAlloc(E * C * M / tp * sizeof(uint16_t));
-    uint8_t *weightGM = (uint8_t *)AscendC::GmAlloc(E / ep * M / tp * H * sizeof(uint16_t));
-    uint8_t *biasGM = (uint8_t *)AscendC::GmAlloc(E / ep * H * sizeof(uint16_t));
-    uint8_t *yGM = (uint8_t *)AscendC::GmAlloc(E * C / tp * H * sizeof(uint16_t));
+    uint8_t* xGM = (uint8_t*)AscendC::GmAlloc(E * C * M / tp * sizeof(uint16_t));
+    uint8_t* weightGM = (uint8_t*)AscendC::GmAlloc(E / ep * M / tp * H * sizeof(uint16_t));
+    uint8_t* biasGM = (uint8_t*)AscendC::GmAlloc(E / ep * H * sizeof(uint16_t));
+    uint8_t* yGM = (uint8_t*)AscendC::GmAlloc(E * C / tp * H * sizeof(uint16_t));
 
     auto batchMatMulReduceScatterAlltoAllWarpper = [](GM_ADDR xGM, GM_ADDR weightGM, GM_ADDR biasGM, GM_ADDR yGM,
                                                       GM_ADDR workspaceGM, GM_ADDR tilingGM) {
@@ -130,12 +130,12 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllFp1
 
     ICPU_RUN_KF(batchMatMulReduceScatterAlltoAllWarpper, numBlocks, xGM, weightGM, biasGM, yGM, workspace, tiling);
 
-    AscendC::GmFree((void *)workspace);
-    AscendC::GmFree((void *)tiling);
-    AscendC::GmFree((void *)xGM);
-    AscendC::GmFree((void *)weightGM);
-    AscendC::GmFree((void *)biasGM);
-    AscendC::GmFree((void *)yGM);
+    AscendC::GmFree((void*)workspace);
+    AscendC::GmFree((void*)tiling);
+    AscendC::GmFree((void*)xGM);
+    AscendC::GmFree((void*)weightGM);
+    AscendC::GmFree((void*)biasGM);
+    AscendC::GmFree((void*)yGM);
 }
 
 TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllBf16NoBias)
@@ -153,12 +153,12 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllBf1
     size_t sysWorkspaceSize = 16 * 1024 * 1024;
     size_t usrWorkspaceSize = E * C * H + 2 * E * C / tp * H;
     size_t allWorkspaceSize = usrWorkspaceSize + sysWorkspaceSize;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(allWorkspaceSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(allWorkspaceSize);
     size_t tilingSize = sizeof(BatchMatMulReduceScatterAlltoAllTilingData);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingSize);
 
-    BatchMatMulReduceScatterAlltoAllTilingData *tiling_data =
-        reinterpret_cast<BatchMatMulReduceScatterAlltoAllTilingData *>(tiling);
+    BatchMatMulReduceScatterAlltoAllTilingData* tiling_data =
+        reinterpret_cast<BatchMatMulReduceScatterAlltoAllTilingData*>(tiling);
     tiling_data->commonTiling.aivCoreNum = numBlocks * 2;
     tiling_data->commonTiling.EOverEp = E / ep;
     tiling_data->commonTiling.C = C;
@@ -170,10 +170,10 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllBf1
     tiling_data->commonTiling.domesticTileE.tileCnt = 0;
     tiling_data->commonTiling.domesticTileE.tileLen = 0;
 
-    uint8_t *xGM = (uint8_t *)AscendC::GmAlloc(E * C * M / tp * sizeof(uint16_t));
-    uint8_t *weightGM = (uint8_t *)AscendC::GmAlloc(E / ep * M / tp * H * sizeof(uint16_t));
-    uint8_t *biasGM = nullptr;
-    uint8_t *yGM = (uint8_t *)AscendC::GmAlloc(E * C / tp * H * sizeof(uint16_t));
+    uint8_t* xGM = (uint8_t*)AscendC::GmAlloc(E * C * M / tp * sizeof(uint16_t));
+    uint8_t* weightGM = (uint8_t*)AscendC::GmAlloc(E / ep * M / tp * H * sizeof(uint16_t));
+    uint8_t* biasGM = nullptr;
+    uint8_t* yGM = (uint8_t*)AscendC::GmAlloc(E * C / tp * H * sizeof(uint16_t));
 
     auto batchMatMulReduceScatterAlltoAllWarpper = [](GM_ADDR xGM, GM_ADDR weightGM, GM_ADDR biasGM, GM_ADDR yGM,
                                                       GM_ADDR workspaceGM, GM_ADDR tilingGM) {
@@ -184,11 +184,11 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllBf1
 
     ICPU_RUN_KF(batchMatMulReduceScatterAlltoAllWarpper, numBlocks, xGM, weightGM, nullptr, yGM, workspace, tiling);
 
-    AscendC::GmFree((void *)workspace);
-    AscendC::GmFree((void *)tiling);
-    AscendC::GmFree((void *)xGM);
-    AscendC::GmFree((void *)weightGM);
-    AscendC::GmFree((void *)yGM);
+    AscendC::GmFree((void*)workspace);
+    AscendC::GmFree((void*)tiling);
+    AscendC::GmFree((void*)xGM);
+    AscendC::GmFree((void*)weightGM);
+    AscendC::GmFree((void*)yGM);
 }
 
 TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllBf16WithFloatBias)
@@ -206,12 +206,12 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllBf1
     size_t sysWorkspaceSize = 16 * 1024 * 1024;
     size_t usrWorkspaceSize = E * C * H + 2 * E * C / tp * H;
     size_t allWorkspaceSize = usrWorkspaceSize + sysWorkspaceSize;
-    uint8_t *workspace = (uint8_t *)AscendC::GmAlloc(allWorkspaceSize);
+    uint8_t* workspace = (uint8_t*)AscendC::GmAlloc(allWorkspaceSize);
     size_t tilingSize = sizeof(BatchMatMulReduceScatterAlltoAllTilingData);
-    uint8_t *tiling = (uint8_t *)AscendC::GmAlloc(tilingSize);
+    uint8_t* tiling = (uint8_t*)AscendC::GmAlloc(tilingSize);
 
-    BatchMatMulReduceScatterAlltoAllTilingData *tiling_data =
-        reinterpret_cast<BatchMatMulReduceScatterAlltoAllTilingData *>(tiling);
+    BatchMatMulReduceScatterAlltoAllTilingData* tiling_data =
+        reinterpret_cast<BatchMatMulReduceScatterAlltoAllTilingData*>(tiling);
     tiling_data->commonTiling.aivCoreNum = numBlocks * 2;
     tiling_data->commonTiling.EOverEp = E / ep;
     tiling_data->commonTiling.C = C;
@@ -223,10 +223,10 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllBf1
     tiling_data->commonTiling.domesticTileE.tileCnt = 0;
     tiling_data->commonTiling.domesticTileE.tileLen = 0;
 
-    uint8_t *xGM = (uint8_t *)AscendC::GmAlloc(E * C * M / tp * sizeof(uint16_t));
-    uint8_t *weightGM = (uint8_t *)AscendC::GmAlloc(E / ep * M / tp * H * sizeof(uint16_t));
-    uint8_t *biasGM = (uint8_t *)AscendC::GmAlloc(E / ep * H * sizeof(float));
-    uint8_t *yGM = (uint8_t *)AscendC::GmAlloc(E * C / tp * H * sizeof(uint16_t));
+    uint8_t* xGM = (uint8_t*)AscendC::GmAlloc(E * C * M / tp * sizeof(uint16_t));
+    uint8_t* weightGM = (uint8_t*)AscendC::GmAlloc(E / ep * M / tp * H * sizeof(uint16_t));
+    uint8_t* biasGM = (uint8_t*)AscendC::GmAlloc(E / ep * H * sizeof(float));
+    uint8_t* yGM = (uint8_t*)AscendC::GmAlloc(E * C / tp * H * sizeof(uint16_t));
 
     auto batchMatMulReduceScatterAlltoAllWarpper = [](GM_ADDR xGM, GM_ADDR weightGM, GM_ADDR biasGM, GM_ADDR yGM,
                                                       GM_ADDR workspaceGM, GM_ADDR tilingGM) {
@@ -237,10 +237,10 @@ TEST_F(BatchMatmulReduceScatterAllToAllTest, BatchMatmulReduceScatterAllToAllBf1
 
     ICPU_RUN_KF(batchMatMulReduceScatterAlltoAllWarpper, numBlocks, xGM, weightGM, biasGM, yGM, workspace, tiling);
 
-    AscendC::GmFree((void *)workspace);
-    AscendC::GmFree((void *)tiling);
-    AscendC::GmFree((void *)xGM);
-    AscendC::GmFree((void *)weightGM);
-    AscendC::GmFree((void *)biasGM);
-    AscendC::GmFree((void *)yGM);
+    AscendC::GmFree((void*)workspace);
+    AscendC::GmFree((void*)tiling);
+    AscendC::GmFree((void*)xGM);
+    AscendC::GmFree((void*)weightGM);
+    AscendC::GmFree((void*)biasGM);
+    AscendC::GmFree((void*)yGM);
 }

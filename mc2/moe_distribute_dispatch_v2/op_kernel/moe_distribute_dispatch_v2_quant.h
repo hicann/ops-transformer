@@ -60,8 +60,8 @@ public:
         scalesPadParams_ = {true, 0, 0, 0};
     }
 
-    __aicore__ inline void QuantInit(uint32_t &hAlignSize_, uint32_t &hOutSize_, uint32_t scaleInBytes_,
-                                     int32_t &tokenQuantAlign_, uint32_t &hScaleIdxSize_, uint32_t &scaleOutBytes,
+    __aicore__ inline void QuantInit(uint32_t& hAlignSize_, uint32_t& hOutSize_, uint32_t scaleInBytes_,
+                                     int32_t& tokenQuantAlign_, uint32_t& hScaleIdxSize_, uint32_t& scaleOutBytes,
                                      uint32_t axisH)
     {
         axisH_ = axisH;
@@ -105,9 +105,9 @@ public:
         hScaleIdxSize_ = hScaleSizeAlign + EXPAND_IDX_INFO * sizeof(int32_t);
     }
 
-    __aicore__ inline void QuantProcess(LocalTensor<XOutType> &outLocal, LocalTensor<XInType> &inLocal,
+    __aicore__ inline void QuantProcess(LocalTensor<XOutType>& outLocal, LocalTensor<XInType>& inLocal,
                                         uint32_t expertIndex, uint32_t scalesCount_,
-                                        GlobalTensor<float> &scalesGMTensor_)
+                                        GlobalTensor<float>& scalesGMTensor_)
     {
         if constexpr (QuantMode == STATIC_QUANT) {
             QuantStatic(outLocal, inLocal, expertIndex, scalesCount_, scalesGMTensor_);
@@ -125,9 +125,9 @@ public:
 #endif
     }
 
-    __aicore__ inline void QuantStatic(LocalTensor<XOutType> &outLocal, LocalTensor<XInType> &inLocal,
+    __aicore__ inline void QuantStatic(LocalTensor<XOutType>& outLocal, LocalTensor<XInType>& inLocal,
                                        uint32_t expertIndex, uint32_t scalesCount_,
-                                       GlobalTensor<float> &scalesGMTensor_)
+                                       GlobalTensor<float>& scalesGMTensor_)
     {
         Cast(floatLocalTemp_, inLocal, RoundMode::CAST_NONE, axisH_);
         if constexpr (Std::IsSame<ExpandXOutType, int8_t>::value) {
@@ -163,8 +163,8 @@ public:
 #endif
     }
 
-    __aicore__ inline void QuantDynamicPerToken(LocalTensor<XOutType> &outLocal, LocalTensor<XInType> &inLocal,
-                                                uint32_t expertIndex, GlobalTensor<float> &scalesGMTensor_)
+    __aicore__ inline void QuantDynamicPerToken(LocalTensor<XOutType>& outLocal, LocalTensor<XInType>& inLocal,
+                                                uint32_t expertIndex, GlobalTensor<float>& scalesGMTensor_)
     {
         float dynamicScale = 0.0;
         float maxVal = INT8_MAX_VALUE; // 获取输出类型的最大值（AscendC未提供相关接口）
@@ -216,8 +216,8 @@ public:
     }
 
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-    __aicore__ inline void QuantDynamicPerGroup(LocalTensor<XOutType> &outLocal, LocalTensor<XInType> &inLocal,
-                                                uint32_t expertIndex, GlobalTensor<float> &scalesGMTensor_)
+    __aicore__ inline void QuantDynamicPerGroup(LocalTensor<XOutType>& outLocal, LocalTensor<XInType>& inLocal,
+                                                uint32_t expertIndex, GlobalTensor<float>& scalesGMTensor_)
     {
         if constexpr (Std::IsSame<ExpandXOutType, fp8_e4m3fn_t>::value ||
                       Std::IsSame<ExpandXOutType, fp8_e5m2_t>::value) {
@@ -232,31 +232,31 @@ public:
                 }
             }
 
-            __ubuf__ XInType *srcAddr = (__ubuf__ XInType *)inLocal.GetPhyAddr();
-            __ubuf__ float *smoothLocalAddr = (__ubuf__ float *)smoothScalesTensor_.GetPhyAddr();
-            __ubuf__ int8_t *outLocalAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
-            __ubuf__ float *scaleOutLocalAddr = (__ubuf__ float *)outLocal[Align128<uint32_t>(axisH_)].GetPhyAddr();
+            __ubuf__ XInType* srcAddr = (__ubuf__ XInType*)inLocal.GetPhyAddr();
+            __ubuf__ float* smoothLocalAddr = (__ubuf__ float*)smoothScalesTensor_.GetPhyAddr();
+            __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
+            __ubuf__ float* scaleOutLocalAddr = (__ubuf__ float*)outLocal[Align128<uint32_t>(axisH_)].GetPhyAddr();
 
             // per-group路径不使用floatLocalTemp_，复用这块UB暂存各group的最大值和量化系数。
-            __ubuf__ float *groupScaleLocalAddr = (__ubuf__ float *)floatLocalTemp_.GetPhyAddr();
+            __ubuf__ float* groupScaleLocalAddr = (__ubuf__ float*)floatLocalTemp_.GetPhyAddr();
             Quant::ComputePerTileDynamicBatchScale<XInType, ExpandXOutType, AscendC::RoundMode::CAST_RINT,
                                                    IsSmoothScaleExist>(srcAddr, smoothLocalAddr, groupScaleLocalAddr,
                                                                        scaleOutLocalAddr, outLocalAddr, axisH_);
         }
     }
 
-    __aicore__ inline void QuantDynamicMx(LocalTensor<XOutType> &outLocal, LocalTensor<XInType> &inLocal)
+    __aicore__ inline void QuantDynamicMx(LocalTensor<XOutType>& outLocal, LocalTensor<XInType>& inLocal)
     {
         uint32_t mxScaleNum = Align2(Ceil32(axisH_));
-        __ubuf__ XInType *srcAddr = (__ubuf__ XInType *)inLocal.GetPhyAddr();
-        __ubuf__ uint16_t *maxExpAddr = (__ubuf__ uint16_t *)floatLocalTemp_.GetPhyAddr();
-        __ubuf__ uint16_t *halfScaleLocalAddr = (__ubuf__ uint16_t *)floatLocalTemp_[Align32(mxScaleNum)].GetPhyAddr();
-        __ubuf__ int8_t *outLocalAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
-        __ubuf__ uint16_t *mxScaleLocalAddr = (__ubuf__ uint16_t *)outLocal[Align256<uint32_t>(axisH_)].GetPhyAddr();
+        __ubuf__ XInType* srcAddr = (__ubuf__ XInType*)inLocal.GetPhyAddr();
+        __ubuf__ uint16_t* maxExpAddr = (__ubuf__ uint16_t*)floatLocalTemp_.GetPhyAddr();
+        __ubuf__ uint16_t* halfScaleLocalAddr = (__ubuf__ uint16_t*)floatLocalTemp_[Align32(mxScaleNum)].GetPhyAddr();
+        __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
+        __ubuf__ uint16_t* mxScaleLocalAddr = (__ubuf__ uint16_t*)outLocal[Align256<uint32_t>(axisH_)].GetPhyAddr();
         if constexpr (Std::IsSame<ExpandXOutType, fp4x2_e2m1_t>::value ||
                       Std::IsSame<ExpandXOutType, fp4x2_e1m2_t>::value) {
             mxScaleLocalAddr =
-                (__ubuf__ uint16_t *)outLocal[Align256<uint32_t>(Ceil(axisH_, FP4_ELEMS_PER_BYTE))].GetPhyAddr();
+                (__ubuf__ uint16_t*)outLocal[Align256<uint32_t>(Ceil(axisH_, FP4_ELEMS_PER_BYTE))].GetPhyAddr();
         }
 
         Quant::ComputeMaxExp(srcAddr, maxExpAddr, axisH_); // 计算最大Exp
@@ -274,14 +274,14 @@ public:
         }
     }
 
-    __aicore__ inline void QuantDynamicMxClip(LocalTensor<XOutType> &outLocal, LocalTensor<XInType> &inLocal)
+    __aicore__ inline void QuantDynamicMxClip(LocalTensor<XOutType>& outLocal, LocalTensor<XInType>& inLocal)
     {
         uint32_t mxScaleNum = Align2(Ceil32(axisH_));
-        __ubuf__ XInType *srcAddr = (__ubuf__ XInType *)inLocal.GetPhyAddr();
-        __ubuf__ uint16_t *maxExpAddr = (__ubuf__ uint16_t *)floatLocalTemp_.GetPhyAddr();
-        __ubuf__ uint16_t *halfScaleLocalAddr = (__ubuf__ uint16_t *)floatLocalTemp_[Align32(mxScaleNum)].GetPhyAddr();
-        __ubuf__ int8_t *outLocalAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
-        __ubuf__ uint16_t *mxScaleLocalAddr = (__ubuf__ uint16_t *)outLocal[Align256<uint32_t>(axisH_)].GetPhyAddr();
+        __ubuf__ XInType* srcAddr = (__ubuf__ XInType*)inLocal.GetPhyAddr();
+        __ubuf__ uint16_t* maxExpAddr = (__ubuf__ uint16_t*)floatLocalTemp_.GetPhyAddr();
+        __ubuf__ uint16_t* halfScaleLocalAddr = (__ubuf__ uint16_t*)floatLocalTemp_[Align32(mxScaleNum)].GetPhyAddr();
+        __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
+        __ubuf__ uint16_t* mxScaleLocalAddr = (__ubuf__ uint16_t*)outLocal[Align256<uint32_t>(axisH_)].GetPhyAddr();
 
         Quant::ComputeMaxExpClip(srcAddr, maxExpAddr, axisH_); // 计算最大Exp
         // 计算scales并填充
@@ -296,7 +296,7 @@ public:
 #endif
 
     __aicore__ inline void CopyScalesToOut(uint32_t currentTokenIndex, uint32_t scaleOutBytes,
-                                           LocalTensor<XOutType> &quantTok, DataCopyExtParams &scaleOutParams)
+                                           LocalTensor<XOutType>& quantTok, DataCopyExtParams& scaleOutParams)
     {
         if constexpr (((QuantMode > UNQUANT) && (QuantMode != STATIC_QUANT)) ||
                       ((QuantMode == UNQUANT) && IsSmoothScaleExist)) {
@@ -322,7 +322,7 @@ public:
         }
     }
 
-    __aicore__ inline void ReduceMaxInplace(const LocalTensor<float> &srcLocal, uint32_t count)
+    __aicore__ inline void ReduceMaxInplace(const LocalTensor<float>& srcLocal, uint32_t count)
     {
         uint64_t repsFp32 = count >> 6;       // 6 is count / elemPerRefFp32
         uint64_t offsetsFp32 = repsFp32 << 6; // 6 is repsFp32 * elemPerRefFp32

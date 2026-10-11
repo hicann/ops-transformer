@@ -36,12 +36,12 @@ enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
 // check nullptr
-static bool CheckNotNull(const aclTensor *x, const aclTensor *y, const aclTensor *expertIds,
-                         const aclTensor *commCmdInfo, const char *groupEp, aclTensor *expandXOut,
-                         aclTensor *dynamicScalesOut, aclTensor *assistInfoForCombineOut, aclTensor *expertTokenNumsOut)
+static bool CheckNotNull(const aclTensor* x, const aclTensor* y, const aclTensor* expertIds,
+                         const aclTensor* commCmdInfo, const char* groupEp, aclTensor* expandXOut,
+                         aclTensor* dynamicScalesOut, aclTensor* assistInfoForCombineOut, aclTensor* expertTokenNumsOut)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(y, return false);
@@ -59,10 +59,10 @@ static bool CheckNotNull(const aclTensor *x, const aclTensor *y, const aclTensor
 }
 
 // check invalid parameters
-static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *y, const aclTensor *expertIds,
-                               const aclTensor *commCmdInfo, const char *groupEp, int64_t quantMode,
-                               aclTensor *expandXOut, aclTensor *dynamicScalesOut, aclTensor *assistInfoForCombineOut,
-                               aclTensor *expertTokenNumsOut)
+static aclnnStatus CheckParams(const aclTensor* x, const aclTensor* y, const aclTensor* expertIds,
+                               const aclTensor* commCmdInfo, const char* groupEp, int64_t quantMode,
+                               aclTensor* expandXOut, aclTensor* dynamicScalesOut, aclTensor* assistInfoForCombineOut,
+                               aclTensor* expertTokenNumsOut)
 {
     CHECK_RET(CheckNotNull(x, y, expertIds, commCmdInfo, groupEp, expandXOut, dynamicScalesOut, assistInfoForCombineOut,
                            expertTokenNumsOut),
@@ -82,12 +82,12 @@ static aclnnStatus CheckParams(const aclTensor *x, const aclTensor *y, const acl
 }
 
 aclnnStatus aclnnMoeDistributeDispatchTeardownGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *y, const aclTensor *expertIds, const aclTensor *commCmdInfo,
-    const char *groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType,
+    const aclTensor* x, const aclTensor* y, const aclTensor* expertIds, const aclTensor* commCmdInfo,
+    const char* groupEp, int64_t epWorldSize, int64_t epRankId, int64_t moeExpertNum, int64_t expertShardType,
     int64_t sharedExpertNum, int64_t sharedExpertRankNum, int64_t quantMode, int64_t globalBs,
-    int64_t expertTokenNumsType, int64_t commType, char *commAlg, aclTensor *expandXOut, aclTensor *dynamicScalesOut,
-    aclTensor *assistInfoForCombineOut, aclTensor *expertTokenNumsOut, uint64_t *workspaceSize,
-    aclOpExecutor **executor)
+    int64_t expertTokenNumsType, int64_t commType, char* commAlg, aclTensor* expandXOut, aclTensor* dynamicScalesOut,
+    aclTensor* assistInfoForCombineOut, aclTensor* expertTokenNumsOut, uint64_t* workspaceSize,
+    aclOpExecutor** executor)
 {
     OP_LOGD("aclnnMoeDistributeDispatchTeardownGetWorkspaceSize start");
     if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
@@ -103,20 +103,20 @@ aclnnStatus aclnnMoeDistributeDispatchTeardownGetWorkspaceSize(
 
     aclnnStatus retStatus;
     uint64_t hcclBuffSize = 0;
-    aclTensor *mc2Context = nullptr;
-    const char *opName = "moe_distribute_a2av_setup_teardown";
+    aclTensor* mc2Context = nullptr;
+    const char* opName = "moe_distribute_a2av_setup_teardown";
     retStatus = Mc2Aclnn::Mc2Context::GetMc2ContextTensor(groupEp, opName, hcclBuffSize, mc2Context,
                                                           CommProtocol::COMM_PROTOCOL_UBC_CTP);
     CHECK_RET(retStatus == ACLNN_SUCCESS, retStatus);
     retStatus = aclnnInnerMoeDistributeDispatchTeardownGetWorkspaceSize(
         mc2Context, x, y, expertIds, commCmdInfo, epWorldSize, epRankId, moeExpertNum, hcclBuffSize, expertShardType,
         sharedExpertNum, sharedExpertRankNum, quantMode, globalBs, expertTokenNumsType, commType,
-        const_cast<char *>(commAlg), expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
+        const_cast<char*>(commAlg), expandXOut, dynamicScalesOut, assistInfoForCombineOut, expertTokenNumsOut,
         workspaceSize, executor);
     return retStatus;
 }
 
-aclnnStatus aclnnMoeDistributeDispatchTeardown(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnStatus aclnnMoeDistributeDispatchTeardown(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {

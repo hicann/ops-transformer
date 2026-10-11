@@ -22,7 +22,7 @@
 namespace optiling {
 class Mc2MatMulBaseTiling {
 public:
-    Mc2MatMulBaseTiling(gert::TilingContext *context, Mc2MatMulTilingCfg &cfg)
+    Mc2MatMulBaseTiling(gert::TilingContext* context, Mc2MatMulTilingCfg& cfg)
         : context_(context),
           cfg_(cfg) {};
 
@@ -73,7 +73,7 @@ protected:
     // 9、Dump Tiling数据
     virtual void DumpTilingInfo()
     {
-        auto buf = (uint32_t *)context_->GetRawTilingData()->GetData();
+        auto buf = (uint32_t*)context_->GetRawTilingData()->GetData();
         auto bufLen = context_->GetRawTilingData()->GetDataSize();
         std::ostringstream oss;
         oss << "Start to dump tiling info. tilingkey:" << GetTilingKey() << ", tiling data size:" << bufLen
@@ -89,8 +89,8 @@ protected:
     }
 
 protected:
-    gert::TilingContext *context_ = nullptr;
-    Mc2MatMulTilingCfg &cfg_;
+    gert::TilingContext* context_ = nullptr;
+    Mc2MatMulTilingCfg& cfg_;
 };
 } // namespace optiling
 

@@ -39,10 +39,10 @@ constexpr int64_t MX_SCALE_BLOCK_SIZE = 64;
 constexpr int64_t MX_SCALE_LAST_DIM = 2;
 constexpr int64_t DIM_MINUS_ONE = -1;
 
-bool ValidateInferDtypes(gert::InferShapeContext *context, const char *nodeName)
+bool ValidateInferDtypes(gert::InferShapeContext* context, const char* nodeName)
 {
-    auto *x1Desc = context->GetInputDesc(INDEX_IN_X1);
-    auto *x2Desc = context->GetInputDesc(INDEX_IN_X2);
+    auto* x1Desc = context->GetInputDesc(INDEX_IN_X1);
+    auto* x2Desc = context->GetInputDesc(INDEX_IN_X2);
     if (x1Desc == nullptr || x2Desc == nullptr) {
         if (x1Desc == nullptr)
             OP_LOGE_WITH_INVALID_INPUT(nodeName, "x1 desc");
@@ -62,7 +62,7 @@ bool ValidateInferDtypes(gert::InferShapeContext *context, const char *nodeName)
     return true;
 }
 
-bool ValidateInferKCrossCheck(const char *nodeName, int64_t ka, int64_t kTotal, int64_t worldSize)
+bool ValidateInferKCrossCheck(const char* nodeName, int64_t ka, int64_t kTotal, int64_t worldSize)
 {
     if (kTotal != ka * worldSize) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -73,7 +73,7 @@ bool ValidateInferKCrossCheck(const char *nodeName, int64_t ka, int64_t kTotal, 
     return true;
 }
 
-bool ValidateInferScaleShapes(gert::InferShapeContext *context, const char *nodeName, int64_t ka, int64_t kTotal,
+bool ValidateInferScaleShapes(gert::InferShapeContext* context, const char* nodeName, int64_t ka, int64_t kTotal,
                               int64_t m, int64_t n)
 {
     if (m == DIM_MINUS_ONE || ka == DIM_MINUS_ONE || n == DIM_MINUS_ONE) {
@@ -118,15 +118,15 @@ bool ValidateInferScaleShapes(gert::InferShapeContext *context, const char *node
     return true;
 }
 
-bool ValidateInferYDtype(gert::InferShapeContext *context, const char *nodeName)
+bool ValidateInferYDtype(gert::InferShapeContext* context, const char* nodeName)
 {
-    auto *yDesc = context->GetOutputDesc(INDEX_OUT_Y);
+    auto* yDesc = context->GetOutputDesc(INDEX_OUT_Y);
     if (yDesc == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(nodeName, "y desc");
         return false;
     }
     auto outDtype = yDesc->GetDataType();
-    const int64_t *yDtypePtr = context->GetAttrs()->GetAttrPointer<int64_t>(INDEX_ATTR_Y_DTYPE);
+    const int64_t* yDtypePtr = context->GetAttrs()->GetAttrPointer<int64_t>(INDEX_ATTR_Y_DTYPE);
     if (yDtypePtr == nullptr) {
         return true;
     }
@@ -144,7 +144,7 @@ bool ValidateInferYDtype(gert::InferShapeContext *context, const char *nodeName)
 
 } // namespace
 
-ge::graphStatus AlltoAllMatmulV2InferShape(gert::InferShapeContext *context)
+ge::graphStatus AlltoAllMatmulV2InferShape(gert::InferShapeContext* context)
 {
     const auto nodeName = context->GetNodeName();
     OP_LOGD(nodeName, "InferShape start");
@@ -165,7 +165,7 @@ ge::graphStatus AlltoAllMatmulV2InferShape(gert::InferShapeContext *context)
     int64_t m = x1Shape->GetDim(0U);
     int64_t ka = x1Shape->GetDim(1U); // per-rank K dim (Ka = K_total / world_size)
     // x2 shape: TransB=true → [N,K_total], TransB=false → [K_total,N]
-    auto *tx2 = context->GetAttrs()->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_X2);
+    auto* tx2 = context->GetAttrs()->GetAttrPointer<bool>(INDEX_ATTR_TRANSPOSE_X2);
     bool transX2 = tx2 ? *tx2 : true;
     int64_t n = transX2 ? x2Shape->GetDim(0U) : x2Shape->GetDim(1U);
     int64_t kTotal = transX2 ? x2Shape->GetDim(1U) : x2Shape->GetDim(0U);
@@ -179,7 +179,7 @@ ge::graphStatus AlltoAllMatmulV2InferShape(gert::InferShapeContext *context)
 
     // ---- Get world_size attr --------------------------------------------
     const auto attrs = context->GetAttrs();
-    const int64_t *wsPtr = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_WORLD_SIZE);
+    const int64_t* wsPtr = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_WORLD_SIZE);
     if (wsPtr == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(nodeName, "world_size");
         return ge::GRAPH_FAILED;

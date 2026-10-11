@@ -41,7 +41,7 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
 template <TemplateMMReduceScatterV2Class, typename Derived>
 template <typename LayoutB>
 __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func, Derived>::DispatchMatmul(
-    const LayoutB &layoutB)
+    const LayoutB& layoutB)
 {
     if (m0 == TILE_SHAPE_128) {
         LaunchMatmul<LayoutB, TILE_SHAPE_128, TILE_SHAPE_256>(layoutB);
@@ -53,7 +53,7 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
 template <TemplateMMReduceScatterV2Class, typename Derived>
 template <typename LayoutB, int32_t TileM, int32_t TileN>
 __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func, Derived>::LaunchMatmul(
-    const LayoutB &layoutB)
+    const LayoutB& layoutB)
 {
     bool need_fixpipe = quantFlag && isX2ScaleTypeInt64 && std::is_same<cType, half>::value;
     int32_t peer_mem_m = m0 * loop_num_per_comm * MAX_BLOCK_COUNT;

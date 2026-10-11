@@ -26,20 +26,20 @@
 using namespace op;
 using namespace std;
 
-static aclTensor *CreateAclTensor(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensor(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
 {
-    void *storage_data = nullptr;
+    void* storage_data = nullptr;
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
         strides[i] = shape[i + 1] * strides[i + 1];
     }
-    aclTensor *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
+    aclTensor* tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
                                         shape.size(), storage_data);
     assert(tensor != nullptr);
     return tensor;
 }
 
-static aclTensor *CreateAclTensorOrNull(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensorOrNull(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
 {
     if (shape.empty()) {
         return nullptr;
@@ -73,7 +73,7 @@ struct MoeDistributeCombineTeardownAclnnTestParam {
     vector<int64_t> xActiveMaskOptionalShape;
     vector<int64_t> sharedExpertXOptionalShape;
     vector<int64_t> xOutShape;
-    char *groupEp;
+    char* groupEp;
     int64_t epWorldSize;
     int64_t epRankId;
     int64_t moeExpertNum;
@@ -83,7 +83,7 @@ struct MoeDistributeCombineTeardownAclnnTestParam {
     int64_t globalBs;
     int64_t commQuantMode;
     int64_t commType;
-    char *commAlg;
+    char* commAlg;
     aclnnStatus aclnnStatusUt;
 };
 
@@ -402,7 +402,7 @@ static MoeDistributeCombineTeardownAclnnTestParam g_casesParams[] = {
      ACLNN_ERR_PARAM_INVALID},
 };
 
-static void TestOneParamCase(const MoeDistributeCombineTeardownAclnnTestParam &param)
+static void TestOneParamCase(const MoeDistributeCombineTeardownAclnnTestParam& param)
 {
     std::cout << "run case " << param.case_name << std::endl;
     vector<int64_t> expandXShape = param.expandXShape;
@@ -414,7 +414,7 @@ static void TestOneParamCase(const MoeDistributeCombineTeardownAclnnTestParam &p
     vector<int64_t> xActiveMaskOptionalShape = param.xActiveMaskOptionalShape;
     vector<int64_t> sharedExpertXOptionalShape = param.sharedExpertXOptionalShape;
     vector<int64_t> xOutShape = param.xOutShape;
-    char *groupEp = param.groupEp;
+    char* groupEp = param.groupEp;
     int64_t epWorldSize = param.epWorldSize;
     int64_t epRankId = param.epRankId;
     int64_t moeExpertNum = param.moeExpertNum;
@@ -424,17 +424,17 @@ static void TestOneParamCase(const MoeDistributeCombineTeardownAclnnTestParam &p
     int64_t globalBs = param.globalBs;
     int64_t commQuantMode = param.commQuantMode;
     int64_t commType = param.commType;
-    char *commAlg = param.commAlg;
+    char* commAlg = param.commAlg;
     aclnnStatus retStatus = param.aclnnStatusUt;
-    aclTensor *expandX = CreateAclTensorOrNull(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
-    aclTensor *quantExpandX = CreateAclTensorOrNull(quantExpandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
-    aclTensor *expertIds = CreateAclTensorOrNull(expertIdsShape, ACL_INT32, ACL_FORMAT_ND);
-    aclTensor *expandIdx = CreateAclTensorOrNull(expandIdxShape, ACL_INT32, ACL_FORMAT_ND);
-    aclTensor *expertScales = CreateAclTensorOrNull(expertScalesShape, ACL_FLOAT16, ACL_FORMAT_ND);
-    aclTensor *commCmdInfo = CreateAclTensorOrNull(commCmdInfoShape, ACL_INT32, ACL_FORMAT_ND);
-    aclTensor *xActiveMaskOptional = CreateAclTensorOrNull(xActiveMaskOptionalShape, ACL_BOOL, ACL_FORMAT_ND);
-    aclTensor *sharedExpertXOptional = CreateAclTensorOrNull(sharedExpertXOptionalShape, ACL_FLOAT16, ACL_FORMAT_ND);
-    aclTensor *xOut = CreateAclTensorOrNull(xOutShape, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* expandX = CreateAclTensorOrNull(expandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* quantExpandX = CreateAclTensorOrNull(quantExpandXShape, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* expertIds = CreateAclTensorOrNull(expertIdsShape, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* expandIdx = CreateAclTensorOrNull(expandIdxShape, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* expertScales = CreateAclTensorOrNull(expertScalesShape, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* commCmdInfo = CreateAclTensorOrNull(commCmdInfoShape, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* xActiveMaskOptional = CreateAclTensorOrNull(xActiveMaskOptionalShape, ACL_BOOL, ACL_FORMAT_ND);
+    aclTensor* sharedExpertXOptional = CreateAclTensorOrNull(sharedExpertXOptionalShape, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* xOut = CreateAclTensorOrNull(xOutShape, ACL_FLOAT16, ACL_FORMAT_ND);
     auto ut =
         OP_API_UT(aclnnMoeDistributeCombineTeardown,
                   INPUT(expandX, quantExpandX, expertIds, expandIdx, expertScales, commCmdInfo, xActiveMaskOptional,
@@ -442,7 +442,7 @@ static void TestOneParamCase(const MoeDistributeCombineTeardownAclnnTestParam &p
                         sharedExpertNum, sharedExpertRankNum, globalBs, commQuantMode, commType, commAlg),
                   OUTPUT(xOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     if (retStatus == ACLNN_SUCCESS) {
         EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
@@ -478,15 +478,15 @@ protected:
 
 TEST_F(TestAclnnMoeDistributeCombineTeardownUnsupportedArch, UnsupportedArchError)
 {
-    aclTensor *expandX = CreateAclTensor({48, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
-    aclTensor *quantExpandX = CreateAclTensor({48, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
-    aclTensor *expertIds = CreateAclTensor({8, 6}, ACL_INT32, ACL_FORMAT_ND);
-    aclTensor *expandIdx = CreateAclTensor({8, 6}, ACL_INT32, ACL_FORMAT_ND);
-    aclTensor *expertScales = CreateAclTensor({8, 6}, ACL_FLOAT16, ACL_FORMAT_ND);
-    aclTensor *commCmdInfo = CreateAclTensor({128}, ACL_INT32, ACL_FORMAT_ND);
-    aclTensor *xActiveMaskOptional = nullptr;
-    aclTensor *sharedExpertXOptional = nullptr;
-    aclTensor *xOut = CreateAclTensor({48, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* expandX = CreateAclTensor({48, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* quantExpandX = CreateAclTensor({48, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* expertIds = CreateAclTensor({8, 6}, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* expandIdx = CreateAclTensor({8, 6}, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* expertScales = CreateAclTensor({8, 6}, ACL_FLOAT16, ACL_FORMAT_ND);
+    aclTensor* commCmdInfo = CreateAclTensor({128}, ACL_INT32, ACL_FORMAT_ND);
+    aclTensor* xActiveMaskOptional = nullptr;
+    aclTensor* sharedExpertXOptional = nullptr;
+    aclTensor* xOut = CreateAclTensor({48, 4096}, ACL_FLOAT16, ACL_FORMAT_ND);
     int64_t epWorldSize = 2;
     int64_t epRankId = 0;
     int64_t moeExpertNum = 8;
@@ -504,7 +504,7 @@ TEST_F(TestAclnnMoeDistributeCombineTeardownUnsupportedArch, UnsupportedArchErro
               expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, commQuantMode, commType, ""),
         OUTPUT(xOut));
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }

@@ -94,11 +94,11 @@ public:
 
     // 表按 grouplist 位置对齐（table[i] 对应 grouplist 第 i 项）
     struct GroupOffsetTables {
-        const __gm__ uint64_t *aGroupAddrTable{nullptr};
-        const __gm__ uint64_t *scaleAGroupAddrTable{nullptr};
-        const __gm__ uint64_t *cGroupAddrTable{nullptr};
-        const __gm__ uint64_t *bGroupAddrTable{nullptr};
-        const __gm__ uint64_t *scaleBGroupAddrTable{nullptr};
+        const __gm__ uint64_t* aGroupAddrTable{nullptr};
+        const __gm__ uint64_t* scaleAGroupAddrTable{nullptr};
+        const __gm__ uint64_t* cGroupAddrTable{nullptr};
+        const __gm__ uint64_t* bGroupAddrTable{nullptr};
+        const __gm__ uint64_t* scaleBGroupAddrTable{nullptr};
     };
 
     struct GMMTiling {
@@ -129,20 +129,20 @@ public:
     __aicore__ inline GroupedMatmulMxKernel() {}
     __aicore__ inline ~GroupedMatmulMxKernel() {}
 
-    __aicore__ inline void Init(const Params &params)
+    __aicore__ inline void Init(const Params& params)
     {
         if ASCEND_IS_AIV {
             return;
         }
         tiling_ = params.gmmParams;
-        const GMMTiling *gmmParams = &tiling_;
-        aBasePtr_ = reinterpret_cast<__gm__ AType *>(params.mmadParams.aGmAddr);
-        bBasePtr_ = reinterpret_cast<__gm__ BType *>(params.mmadParams.bGmAddr);
-        cBasePtr_ = reinterpret_cast<__gm__ CType *>(params.mmadParams.cGmAddr);
-        scaleABasePtr_ = reinterpret_cast<__gm__ ScaleAType *>(params.mmadParams.scaleAGmAddr);
-        scaleBBasePtr_ = reinterpret_cast<__gm__ ScaleBType *>(params.mmadParams.scaleBGmAddr);
+        const GMMTiling* gmmParams = &tiling_;
+        aBasePtr_ = reinterpret_cast<__gm__ AType*>(params.mmadParams.aGmAddr);
+        bBasePtr_ = reinterpret_cast<__gm__ BType*>(params.mmadParams.bGmAddr);
+        cBasePtr_ = reinterpret_cast<__gm__ CType*>(params.mmadParams.cGmAddr);
+        scaleABasePtr_ = reinterpret_cast<__gm__ ScaleAType*>(params.mmadParams.scaleAGmAddr);
+        scaleBBasePtr_ = reinterpret_cast<__gm__ ScaleBType*>(params.mmadParams.scaleBGmAddr);
         if (gmmParams->isBias == 1) {
-            biasBasePtr_ = reinterpret_cast<__gm__ float *>(params.mmadParams.biasGmAddr);
+            biasBasePtr_ = reinterpret_cast<__gm__ float*>(params.mmadParams.biasGmAddr);
             isBias_ = true;
         } else {
             biasBasePtr_ = nullptr;
@@ -194,7 +194,7 @@ public:
             (tiling_.groupListType == GROUP_LIST_TYPE_SPARSE ? SPARSE_GROUP_LIST_ITEM_STRIDE : 1UL);
         const auto groupListLayout = asc::te::make_layout(asc::te::make_shape(groupListSize), asc::te::make_stride(1L));
         const auto gmGroupList = asc::te::make_tensor(
-            asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ int64_t *>(groupListGmAddr_)),
+            asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ int64_t*>(groupListGmAddr_)),
             groupListLayout);
         BlockScheduler scheduler(tiling_.baseM, tiling_.baseN, tiling_.baseK);
         SetSchedulerTailAlign(scheduler); // 设置尾块调度器能切的最小 block 大小
@@ -230,7 +230,7 @@ public:
     }
 
 private:
-    __aicore__ inline void SetSchedulerTailAlign(BlockScheduler &scheduler)
+    __aicore__ inline void SetSchedulerTailAlign(BlockScheduler& scheduler)
     {
         // 调度器尾块切分，能切的最小block的大小
         constexpr uint32_t mTailAlign = 1;
@@ -239,7 +239,7 @@ private:
     }
 
     template <typename TensorB, typename TensorScaleB>
-    __aicore__ inline void SetL2CacheHint(TensorB &gmB, TensorScaleB &gmScaleB, int64_t mSize, int64_t curBaseM,
+    __aicore__ inline void SetL2CacheHint(TensorB& gmB, TensorScaleB& gmScaleB, int64_t mSize, int64_t curBaseM,
                                           int64_t baseN)
     {
         const int64_t problemN = asc::te::get<MNK_N>(problemShape_);
@@ -273,7 +273,7 @@ private:
         }
     }
 
-    __aicore__ inline void BaseMBalance(BlockScheduler &scheduler, int64_t m, int64_t baseM)
+    __aicore__ inline void BaseMBalance(BlockScheduler& scheduler, int64_t m, int64_t baseM)
     {
         if (m <= 0) {
             return;
@@ -285,13 +285,13 @@ private:
         scheduler.UpdateBaseM(curBaseM_);
     }
 
-    __aicore__ inline bool IsLastGroupAndNeedSplit(const BlockScheduler &scheduler)
+    __aicore__ inline bool IsLastGroupAndNeedSplit(const BlockScheduler& scheduler)
     {
         return (scheduler.GetEndBlockIdx() + 1) <= (AscendC::GetBlockNum() >> 1);
     }
 
     template <typename GroupListTensor>
-    __aicore__ inline void SetMNK(const GroupListTensor &gmGroupList, uint32_t groupIdx)
+    __aicore__ inline void SetMNK(const GroupListTensor& gmGroupList, uint32_t groupIdx)
     {
         const int64_t splitValue = GetSplitValueFromGroupList(gmGroupList, groupIdx); // 当前 groupIdx 的 tokens 数量
         const int64_t n = asc::te::get<MNK_N>(problemShape_);
@@ -299,7 +299,7 @@ private:
     }
 
     template <typename GroupListTensor>
-    __aicore__ inline int64_t GetSplitValueFromGroupList(const GroupListTensor &gmGroupList, uint32_t groupIdx)
+    __aicore__ inline int64_t GetSplitValueFromGroupList(const GroupListTensor& gmGroupList, uint32_t groupIdx)
     {
         int64_t splitValue = 0;
         if (tiling_.groupListType == GROUP_LIST_TYPE_OFFSET) {
@@ -324,7 +324,7 @@ private:
     }
 
     template <typename GroupListTensor>
-    __aicore__ inline void UpdateBaseOffsets(const GroupListTensor &gmGroupList, uint32_t groupIdx)
+    __aicore__ inline void UpdateBaseOffsets(const GroupListTensor& gmGroupList, uint32_t groupIdx)
     {
         uint32_t weightIdx = groupIdx;
         if (tiling_.groupListType == GROUP_LIST_TYPE_SPARSE) {
@@ -378,7 +378,7 @@ private:
     }
 
     template <bool isLastGroupAndNeedSplit, typename GroupListTensor>
-    __aicore__ inline void ProcessSingleGroup(BlockScheduler &scheduler, const GroupListTensor &gmGroupList,
+    __aicore__ inline void ProcessSingleGroup(BlockScheduler& scheduler, const GroupListTensor& gmGroupList,
                                               uint32_t groupIdx)
     {
         BlockCoord blockCoord;
@@ -452,12 +452,12 @@ private:
 private:
     BlockMmad mmadOp_;
     ProblemShape problemShape_{};
-    __gm__ AType *aBasePtr_{nullptr};
-    __gm__ BType *bBasePtr_{nullptr};
-    __gm__ CType *cBasePtr_{nullptr};
-    __gm__ float *biasBasePtr_{nullptr};
-    __gm__ ScaleAType *scaleABasePtr_{nullptr};
-    __gm__ ScaleBType *scaleBBasePtr_{nullptr};
+    __gm__ AType* aBasePtr_{nullptr};
+    __gm__ BType* bBasePtr_{nullptr};
+    __gm__ CType* cBasePtr_{nullptr};
+    __gm__ float* biasBasePtr_{nullptr};
+    __gm__ ScaleAType* scaleABasePtr_{nullptr};
+    __gm__ ScaleBType* scaleBBasePtr_{nullptr};
     GM_ADDR groupListGmAddr_{nullptr};
     GroupOffsetTables offsetTables_{};
     GMMTiling tiling_{};

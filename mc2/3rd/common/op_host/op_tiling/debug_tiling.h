@@ -19,8 +19,8 @@
 
 namespace Ops {
 namespace Transformer {
-std::string DebugTilingContext(const gert::TilingContext *context);
-std::string DebugTilingData(gert::TilingContext *context);
+std::string DebugTilingContext(const gert::TilingContext* context);
+std::string DebugTilingData(gert::TilingContext* context);
 } // namespace Transformer
 } // namespace Ops
 

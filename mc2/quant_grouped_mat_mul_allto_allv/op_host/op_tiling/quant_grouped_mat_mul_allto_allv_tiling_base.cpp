@@ -36,16 +36,16 @@ ge::graphStatus QuantGroupedMatmulAllToAllvTilingBase::GetShapeAttrsInfo()
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK((yDesc == nullptr), OP_LOGE_WITH_INVALID_INPUT(opName_, "y"), return ge::GRAPH_FAILED);
 
-    const gert::RuntimeAttrs *attrs = context_->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "attrs"), return ge::GRAPH_FAILED);
-    const char *group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
+    const char* group = attrs->GetAttrPointer<char>(ATTR_GROUP_INDEX);
     // 判断为空或者空字符串
     OP_TILING_CHECK(group == nullptr, OP_LOGE_WITH_INVALID_ATTR(opName_, "group", "null", "not null"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(group[0] == '\0', OP_LOGE_WITH_INVALID_ATTR(opName_, "group", "empty", "not empty"),
                     return ge::GRAPH_FAILED);
     // 判断group是否超过127
-    const char *nullTerminator = static_cast<const char *>(memchr(group, '\0', MAX_GROUP_BUFFER_SIZE));
+    const char* nullTerminator = static_cast<const char*>(memchr(group, '\0', MAX_GROUP_BUFFER_SIZE));
     OP_TILING_CHECK(nullTerminator == nullptr,
                     OP_LOGE_WITH_INVALID_ATTR(opName_, "group", "length > 128", "length <= 127"),
                     return ge::GRAPH_FAILED);
@@ -92,10 +92,10 @@ uint64_t QuantGroupedMatmulAllToAllvTilingBase::GetTilingKey() const
     return 0;
 }
 
-QuantModePair QuantGroupedMatmulAllToAllvTilingBase::GetQuantMode(const gert::TilingContext *context,
-                                                                  const char *opName) const
+QuantModePair QuantGroupedMatmulAllToAllvTilingBase::GetQuantMode(const gert::TilingContext* context,
+                                                                  const char* opName) const
 {
-    const gert::RuntimeAttrs *attrs = context->GetAttrs();
+    const gert::RuntimeAttrs* attrs = context->GetAttrs();
     if (attrs == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT(opName, "attrs");
         return QuantModePair::QUANT_PAIR_ERROR;
@@ -103,10 +103,10 @@ QuantModePair QuantGroupedMatmulAllToAllvTilingBase::GetQuantMode(const gert::Ti
     // 获取量化模式属性（默认为0，表示非量化）
     int64_t gmmXQuantMode = 0;
     int64_t gmmWeightQuantMode = 0;
-    if (const int64_t *ptr = attrs->GetAttrPointer<int64_t>(ATTR_GMM_X_QUANT_MODE_INDEX)) {
+    if (const int64_t* ptr = attrs->GetAttrPointer<int64_t>(ATTR_GMM_X_QUANT_MODE_INDEX)) {
         gmmXQuantMode = *ptr;
     }
-    if (const int64_t *ptr = attrs->GetAttrPointer<int64_t>(ATTR_GMM_WEIGHT_QUANT_MODE_INDEX)) {
+    if (const int64_t* ptr = attrs->GetAttrPointer<int64_t>(ATTR_GMM_WEIGHT_QUANT_MODE_INDEX)) {
         gmmWeightQuantMode = *ptr;
     }
     OP_LOGD(opName, "gmmXQuantMode=%ld, gmmWeightQuantMode=%ld", gmmXQuantMode, gmmWeightQuantMode);

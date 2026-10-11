@@ -26,7 +26,7 @@ struct ReduceAdd {
     using ElementOut = ElementOut_;
 
     CATLASS_DEVICE
-    ReduceAdd(Arch::Resource<ArchTag> &resource)
+    ReduceAdd(Arch::Resource<ArchTag>& resource)
     {
         int64_t bufferOffset = 0;
         for (uint32_t i = 0; i < BUFFER_NUM; i++) {
@@ -40,8 +40,8 @@ struct ReduceAdd {
     }
 
     CATLASS_DEVICE
-    void Gm2Ub(AscendC::LocalTensor<ElementAccumulator> const &dst,
-               AscendC::GlobalTensor<ElementAccumulator> const &src, uint32_t dataNum)
+    void Gm2Ub(AscendC::LocalTensor<ElementAccumulator> const& dst,
+               AscendC::GlobalTensor<ElementAccumulator> const& src, uint32_t dataNum)
     {
         AscendC::DataCopyExtParams dataCopyParams(1, dataNum * sizeof(ElementAccumulator), 0, 0, 0);
         AscendC::DataCopyPadExtParams<ElementAccumulator> padParams(false, 0, 0, 0);
@@ -49,7 +49,7 @@ struct ReduceAdd {
     }
 
     CATLASS_DEVICE
-    void Ub2Gm(AscendC::GlobalTensor<ElementOut> const &dst, AscendC::LocalTensor<ElementOut> const &src,
+    void Ub2Gm(AscendC::GlobalTensor<ElementOut> const& dst, AscendC::LocalTensor<ElementOut> const& src,
                uint32_t dataNum)
     {
         AscendC::DataCopyExtParams dataCopyParams(1, dataNum * sizeof(ElementOut), 0, 0, 0);
@@ -57,7 +57,7 @@ struct ReduceAdd {
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementOut> const &dst, AscendC::GlobalTensor<ElementAccumulator> const &src,
+    void operator()(AscendC::GlobalTensor<ElementOut> const& dst, AscendC::GlobalTensor<ElementAccumulator> const& src,
                     uint64_t elementCount, uint32_t splitkFactor)
     {
         // The vec mte processes 256 bytes of data at a time.
@@ -187,7 +187,7 @@ public:
         Params() {}
 
         CATLASS_DEVICE
-        Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
+        Params(GemmCoord const& problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR ptrC_, LayoutC layoutC_, GM_ADDR ptrWorkspace_, uint32_t splitkFactor_)
             : problemShape(problemShape_),
               ptrA(ptrA_),
@@ -206,11 +206,11 @@ public:
     SplitkMatmul() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params const &params);
+    CATLASS_DEVICE void operator()(Params const& params);
 
     /// Executes one Matmul
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const& params)
     {
         BlockScheduler matmulBlockScheduler(
             params.problemShape, GemmCoord(L1TileShape::M, L1TileShape::N, L1TileShape::K), params.splitkFactor);
@@ -221,11 +221,11 @@ public:
 
         // Represent the full gm
         AscendC::GlobalTensor<ElementA> gmA;
-        gmA.SetGlobalBuffer((__gm__ ElementA *)params.ptrA);
+        gmA.SetGlobalBuffer((__gm__ ElementA*)params.ptrA);
         AscendC::GlobalTensor<ElementB> gmB;
-        gmB.SetGlobalBuffer((__gm__ ElementB *)params.ptrB);
+        gmB.SetGlobalBuffer((__gm__ ElementB*)params.ptrB);
         AscendC::GlobalTensor<ElementC> gmC;
-        gmC.SetGlobalBuffer((__gm__ ElementC *)params.ptrWorkspace);
+        gmC.SetGlobalBuffer((__gm__ ElementC*)params.ptrWorkspace);
 
         for (uint32_t loopIdx = AscendC::GetBlockIdx(); loopIdx < coreLoops; loopIdx += AscendC::GetBlockNum()) {
             // Compute block location
@@ -253,7 +253,7 @@ public:
     }
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const& params)
     {
         using ElementOut = typename ReduceAdd::ElementOut;
         using ElementAccumulator = typename ReduceAdd::ElementAccumulator;
@@ -263,8 +263,8 @@ public:
 
         AscendC::GlobalTensor<ElementOut> gmC;
         AscendC::GlobalTensor<ElementAccumulator> gmWorkspace;
-        gmC.SetGlobalBuffer(reinterpret_cast<__gm__ ElementOut *>(params.ptrC));
-        gmWorkspace.SetGlobalBuffer(reinterpret_cast<__gm__ ElementAccumulator *>(params.ptrWorkspace));
+        gmC.SetGlobalBuffer(reinterpret_cast<__gm__ ElementOut*>(params.ptrC));
+        gmWorkspace.SetGlobalBuffer(reinterpret_cast<__gm__ ElementAccumulator*>(params.ptrWorkspace));
         ReduceAdd reduceAdd(resource);
         reduceAdd(gmC, gmWorkspace,
                   static_cast<uint64_t>(params.problemShape.m()) * static_cast<uint64_t>(params.problemShape.n()),

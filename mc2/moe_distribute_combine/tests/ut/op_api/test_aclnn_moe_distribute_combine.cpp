@@ -72,7 +72,7 @@ TEST_F(L2MoeDistributeCombineTest, TestMoeDistributeCombineFirstApi)
               sharedExpertRankNum, globalBs, outDtype, commQuantMode, groupListType),
         OUTPUT(x));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -113,7 +113,7 @@ TEST_F(L2MoeDistributeCombineTest, Ascend910B2TestMoeDistributeCombineTpNotEmpty
                               sharedExpertNum, sharedExpertRankNum, globalBs, outDtype, commQuantMode, groupListType),
                         OUTPUT(x));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
 }
@@ -157,7 +157,7 @@ TEST_F(L2MoeDistributeCombineTest, Ascend910B2TestMoeDistributeCombineNon910BPla
               sharedExpertRankNum, globalBs, outDtype, commQuantMode, groupListType),
         OUTPUT(x));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 
@@ -204,7 +204,7 @@ TEST_F(L2MoeDistributeCombineTest, GroupEpExceedsMaxLength)
               sharedExpertRankNum, globalBs, outDtype, commQuantMode, groupListType),
         OUTPUT(x));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
@@ -246,7 +246,7 @@ TEST_F(L2MoeDistributeCombineTest, GroupEpEmptyString)
                               sharedExpertNum, sharedExpertRankNum, globalBs, outDtype, commQuantMode, groupListType),
                         OUTPUT(x));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_SUCCESS);
 }
@@ -291,7 +291,7 @@ TEST_F(L2MoeDistributeCombineTest, Non910BPlatformWithTpGroup)
               sharedExpertRankNum, globalBs, outDtype, commQuantMode, groupListType),
         OUTPUT(x));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 

@@ -37,9 +37,9 @@ namespace MC2Tiling {
  */
 bool AllToAllFpMatmulTilingBaseA3::IsCapable()
 {
-    fe::PlatFormInfos *platformInfoPtr = context_->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfoPtr = context_->GetPlatformInfo();
     OP_TILING_CHECK(platformInfoPtr == nullptr, OP_LOGE(opName_, "fail to get platform info"), return false);
-    fe::PlatFormInfos &platformInfo = *platformInfoPtr;
+    fe::PlatFormInfos& platformInfo = *platformInfoPtr;
     (void)platformInfo.GetPlatformResWithLock("version", "Short_SoC_version", socVersionStr_);
     OP_LOGD(opName_, "Current SocVersion_2201 is : %s", socVersionStr_.c_str());
     if (socVersionStr_ == "Ascend910_93") {
@@ -57,8 +57,8 @@ bool AllToAllFpMatmulTilingBaseA3::IsCapable()
  * @param opName  算子名称
  * @return ge::graphStatus
  */
-ge::graphStatus AllToAllFpMatmulTilingBaseA3::CheckA3NonQuantTensorDataType(const gert::TilingContext *context,
-                                                                            const char *opName)
+ge::graphStatus AllToAllFpMatmulTilingBaseA3::CheckA3NonQuantTensorDataType(const gert::TilingContext* context,
+                                                                            const char* opName)
 {
     // 获取并校验输入张量描述符
     auto x1TensorDesc = context->GetInputDesc(INPUT_X1_INDEX);
@@ -249,7 +249,7 @@ uint64_t AllToAllFpMatmulTilingBaseA3::GetTilingKey() const
 ge::graphStatus AllToAllFpMatmulTilingBaseA3::PostTiling()
 {
     SetTilingInfo(localTilingData_.alltoAllMatmulTilingInfo);
-    AlltoAllMatmulTilingDataA3 *outTilingData = context_->GetTilingData<AlltoAllMatmulTilingDataA3>();
+    AlltoAllMatmulTilingDataA3* outTilingData = context_->GetTilingData<AlltoAllMatmulTilingDataA3>();
     size_t tilingBufCap = context_->GetRawTilingData()->GetCapacity();
     OP_TILING_CHECK((outTilingData == nullptr), OP_LOGE(opName_, "Failed to get tiling data from context"),
                     return ge::GRAPH_FAILED);
@@ -277,7 +277,7 @@ ge::graphStatus AllToAllFpMatmulTilingBaseA3::PostTiling()
  * @brief 将runInfo的信息拷贝到tilingInfo结构体
  * @param tilingInfo 目标结构体
  */
-void AllToAllFpMatmulTilingBaseA3::SetTilingInfo(AlltoAllMatmulTilingInfoA3 &tilingInfo) const
+void AllToAllFpMatmulTilingBaseA3::SetTilingInfo(AlltoAllMatmulTilingInfoA3& tilingInfo) const
 {
     // 基本字段拷贝
     tilingInfo.tileM = inferredInfo_.tileM;
@@ -300,7 +300,7 @@ void AllToAllFpMatmulTilingBaseA3::SetTilingInfo(AlltoAllMatmulTilingInfoA3 &til
  *
  * @param outTilingData tilingData参数
  */
-void AllToAllFpMatmulTilingBaseA3::PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingDataA3 &alltoAllMatmulTilingDataA3)
+void AllToAllFpMatmulTilingBaseA3::PrintAlltoAllMatmulTilingData(AlltoAllMatmulTilingDataA3& alltoAllMatmulTilingDataA3)
 {
     PrintAlltoAllMatmulTilingInfo(opName_, alltoAllMatmulTilingDataA3.alltoAllMatmulTilingInfo);
     PrintMc2MatmulV3TilingData(opName_, alltoAllMatmulTilingDataA3.mc2MmV3TileTilingData);
@@ -317,8 +317,8 @@ void AllToAllFpMatmulTilingBaseA3::PrintAlltoAllMatmulTilingData(AlltoAllMatmulT
  * @param opName
  * @param tilingInfo
  */
-void AllToAllFpMatmulTilingBaseA3::PrintAlltoAllMatmulTilingInfo(const std::string &opName,
-                                                                 AlltoAllMatmulTilingInfoA3 &tilingInfo)
+void AllToAllFpMatmulTilingBaseA3::PrintAlltoAllMatmulTilingInfo(const std::string& opName,
+                                                                 AlltoAllMatmulTilingInfoA3& tilingInfo)
 {
     OP_LOGD(opName, "TilingInfo.rankDim: %u", tilingInfo.rankDim);
     OP_LOGD(opName, "TilingInfo.tileM: %u", tilingInfo.tileM);
@@ -335,13 +335,13 @@ void AllToAllFpMatmulTilingBaseA3::PrintAlltoAllMatmulTilingInfo(const std::stri
     OP_LOGD(opName, "TilingInfo.hcclDataType: %llu", static_cast<unsigned long long>(tilingInfo.hcclDataType));
 }
 
-AllToAllFpMatmulTilingBaseA3::AllToAllFpMatmulTilingBaseA3(gert::TilingContext *context)
+AllToAllFpMatmulTilingBaseA3::AllToAllFpMatmulTilingBaseA3(gert::TilingContext* context)
     : AllToAllMatmulTilingBase(context)
 {}
 
 ge::graphStatus AllToAllFpMatmulHelper::GetShapeAttrsInfo()
 {
-    auto &&tilingArgs = tilingProcesser_.contextInfo_.args_;
+    auto&& tilingArgs = tilingProcesser_.contextInfo_.args_;
     args_.opName = tilingProcesser_.opName_;
     args_.isATrans = tilingArgs.isATrans;
     args_.isBTrans = tilingArgs.isBTrans;
@@ -361,8 +361,8 @@ ge::graphStatus AllToAllFpMatmulHelper::GetShapeAttrsInfo()
     return ge::GRAPH_SUCCESS;
 }
 
-AllToAllFpMatmulHelper::AllToAllFpMatmulHelper(AllToAllFpMatmulTilingBaseA3 &alltoAllMatmulTilingA3,
-                                               Mc2MatmulV3TilingData &data)
+AllToAllFpMatmulHelper::AllToAllFpMatmulHelper(AllToAllFpMatmulTilingBaseA3& alltoAllMatmulTilingA3,
+                                               Mc2MatmulV3TilingData& data)
     : Mc2MatmulV3BaseTiling(alltoAllMatmulTilingA3.context_, &data),
       tilingProcesser_(alltoAllMatmulTilingA3)
 {}

@@ -20,14 +20,14 @@ namespace Mc2MatmulHelper {
 
 constexpr int32_t BASEM_ALIGN_SIZE = 16;
 
-void Mc2MatmulTilingCfg::SetMatMulV3TilingData(Mc2MatMulV3TilingData &tilingData)
+void Mc2MatmulTilingCfg::SetMatMulV3TilingData(Mc2MatMulV3TilingData& tilingData)
 {
     mc2MmV3TilingData_ = &tilingData;
 }
 
-void Mc2MatmulTilingCfg::Update(const optiling::Mc2TilingResult &result)
+void Mc2MatmulTilingCfg::Update(const optiling::Mc2TilingResult& result)
 {
-    mmv3TilingData_ = static_cast<Mc2MatMulV3TilingData *>(result.tilingData);
+    mmv3TilingData_ = static_cast<Mc2MatMulV3TilingData*>(result.tilingData);
 
     if ((mmv3TilingData_ == nullptr) || (mc2MmV3TilingData_ == nullptr)) {
         OP_LOGE_WITH_INVALID_INPUT("Mc2MatmulTilingCfg", "mc2MmV3TilingData_, mmv3TilingData_");

@@ -92,15 +92,15 @@ std::string DType2Str(const ge::DataType dataType)
 } // namespace
 
 namespace optiling {
-Mc2QuantBatchMatmulV3Tiling::Mc2QuantBatchMatmulV3Tiling(gert::TilingContext *context)
+Mc2QuantBatchMatmulV3Tiling::Mc2QuantBatchMatmulV3Tiling(gert::TilingContext* context)
     : Mc2QuantBatchMatmulV3TilingBase(context, false),
       tilingData_(tilingDataSelf_)
 {
     Reset();
 }
 
-Mc2QuantBatchMatmulV3Tiling::Mc2QuantBatchMatmulV3Tiling(gert::TilingContext *context,
-                                                         Mc2QuantBatchMatmulV3TilingData *out)
+Mc2QuantBatchMatmulV3Tiling::Mc2QuantBatchMatmulV3Tiling(gert::TilingContext* context,
+                                                         Mc2QuantBatchMatmulV3TilingData* out)
     : Mc2QuantBatchMatmulV3TilingBase(context, true),
       tilingData_(*out)
 {
@@ -389,8 +389,8 @@ bool Mc2QuantBatchMatmulV3Tiling::CheckDtypeOnOnlyL0c2out() const
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Tiling::CheckShapeInRangeForOptionalInputs(const gert::StorageShape *biasShape,
-                                                                     const gert::StorageShape *pertokenShape) const
+bool Mc2QuantBatchMatmulV3Tiling::CheckShapeInRangeForOptionalInputs(const gert::StorageShape* biasShape,
+                                                                     const gert::StorageShape* pertokenShape) const
 {
     if (biasShape != nullptr) {
         auto biasDimNum = biasShape->GetStorageShape().GetDimNum();
@@ -411,7 +411,7 @@ bool Mc2QuantBatchMatmulV3Tiling::CheckShapeInRangeForOptionalInputs(const gert:
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Tiling::BiasShapeCheck(const gert::Shape &biasShape) const
+bool Mc2QuantBatchMatmulV3Tiling::BiasShapeCheck(const gert::Shape& biasShape) const
 {
     auto biasDimNum = biasShape.GetDimNum();
     if (biasDimNum == 1) {
@@ -445,9 +445,9 @@ bool Mc2QuantBatchMatmulV3Tiling::BiasShapeCheck(const gert::Shape &biasShape) c
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Tiling::CheckDimValue(const gert::Shape &scaleShape, const gert::StorageShape *biasShape,
-                                                const gert::StorageShape *pertokenShape,
-                                                const std::vector<int64_t> &dimValueOfMKN) const
+bool Mc2QuantBatchMatmulV3Tiling::CheckDimValue(const gert::Shape& scaleShape, const gert::StorageShape* biasShape,
+                                                const gert::StorageShape* pertokenShape,
+                                                const std::vector<int64_t>& dimValueOfMKN) const
 {
     auto x1Inner = dimValueOfMKN[0]; // using index 0 to get x1Inner
     auto x2Inner = dimValueOfMKN[2]; // using index 2 to get x2Inner
@@ -487,10 +487,10 @@ bool Mc2QuantBatchMatmulV3Tiling::CheckDimValue(const gert::Shape &scaleShape, c
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Tiling::CheckShape(const std::vector<gert::Shape *> &mandtoryShape,
-                                             const gert::StorageShape *biasShape,
-                                             const gert::StorageShape *pertokenShape,
-                                             const std::vector<int64_t> &dimValueOfMKN) const
+bool Mc2QuantBatchMatmulV3Tiling::CheckShape(const std::vector<gert::Shape*>& mandtoryShape,
+                                             const gert::StorageShape* biasShape,
+                                             const gert::StorageShape* pertokenShape,
+                                             const std::vector<int64_t>& dimValueOfMKN) const
 {
     auto x1Shape = *mandtoryShape[0];    // using index 0 to get x1Shape
     auto x2Shape = *mandtoryShape[1];    // using index 1 to get x2Shape
@@ -533,11 +533,11 @@ bool Mc2QuantBatchMatmulV3Tiling::CheckDtype() const
     return true;
 }
 
-bool Mc2QuantBatchMatmulV3Tiling::CheckShapeInBoundary(const gert::Shape &shape, uint32_t shapeIdx) const
+bool Mc2QuantBatchMatmulV3Tiling::CheckShapeInBoundary(const gert::Shape& shape, uint32_t shapeIdx) const
 {
     int64_t mul = 1;
     int64_t mulBound = 1;
-    const char *dimName = shapeIdx == X1_INDEX ? "x1" : "x2";
+    const char* dimName = shapeIdx == X1_INDEX ? "x1" : "x2";
     for (size_t i = 0; i < shape.GetDimNum(); ++i) {
         int64_t curDim = shape.GetDim(i);
 
@@ -564,8 +564,8 @@ bool Mc2QuantBatchMatmulV3Tiling::CheckShapeInBoundary(const gert::Shape &shape,
     return true;
 }
 
-void Mc2QuantBatchMatmulV3Tiling::SetQuantBatchMatmulRunParas(QuantBatchMatmulRunParas &runParams,
-                                                              const optiling::Mc2QuantBatchMatmulInfo &inputParams)
+void Mc2QuantBatchMatmulV3Tiling::SetQuantBatchMatmulRunParas(QuantBatchMatmulRunParas& runParams,
+                                                              const optiling::Mc2QuantBatchMatmulInfo& inputParams)
 {
     runParams.mSize = inputParams.mSize;
     runParams.kSize = inputParams.kSize;
@@ -748,7 +748,7 @@ ge::graphStatus Mc2QuantBatchMatmulV3Tiling::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus Mc2QuantBatchMatmulV3Tiling::InitTilingData(matmul_tiling::MatmulApiTilingBase &mm, bool fallback)
+ge::graphStatus Mc2QuantBatchMatmulV3Tiling::InitTilingData(matmul_tiling::MatmulApiTilingBase& mm, bool fallback)
 {
     auto aFormat =
         inputParams_.aFormat == ge::FORMAT_ND ? matmul_tiling::CubeFormat::ND : matmul_tiling::CubeFormat::NZ;
@@ -792,8 +792,8 @@ ge::graphStatus Mc2QuantBatchMatmulV3Tiling::InitTilingData(matmul_tiling::Matmu
     return ge::GRAPH_SUCCESS;
 }
 
-void Mc2QuantBatchMatmulV3Tiling::ConstructCacheParams(BatchmatmulCompileParas &compileParams,
-                                                       BatchmatmulRunParas &runParams) const
+void Mc2QuantBatchMatmulV3Tiling::ConstructCacheParams(BatchmatmulCompileParas& compileParams,
+                                                       BatchmatmulRunParas& runParams) const
 {
     compileParams.binary_mode_flag = true;
     compileParams.bias_flag = inputParams_.hasBias && (inputParams_.biasDtype == ge::DT_INT32);
@@ -861,7 +861,7 @@ void Mc2QuantBatchMatmulV3Tiling::ConstructCacheParams(BatchmatmulCompileParas &
 // 需要在传入TBE Tiling前对batch轴解除多核的绑定
 // 使得M/N轴上能有更多的核数参与tiling
 // 避免singleCoreM/N超过INT32_MAX
-void Mc2QuantBatchMatmulV3Tiling::ModifyCacheParams(BatchmatmulRunParas &runParams) const
+void Mc2QuantBatchMatmulV3Tiling::ModifyCacheParams(BatchmatmulRunParas& runParams) const
 {
     if (runParams.m * static_cast<int64_t>(BLOCK_CUBE) > static_cast<int64_t>(INT32_MAX) ||
         runParams.n * static_cast<int64_t>(BLOCK_CUBE) > static_cast<int64_t>(INT32_MAX)) {
@@ -935,7 +935,7 @@ ge::graphStatus Mc2QuantBatchMatmulV3Tiling::PostTiling()
                     OP_LOGE(inputParams_.opName, "Tiling data size[%zu] is not aligned to 8.", tilingDataSize),
                     return ge::GRAPH_FAILED);
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&tilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&tilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -947,7 +947,7 @@ ge::graphStatus Mc2QuantBatchMatmulV3Tiling::PostTiling()
         context_->SetScheduleMode(
             1); // 独占全核，设置以后会让所有核空闲以后才启动，有多核同步指令需要做此设置避免影响整网其他算子
     }
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     OPS_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = workspaceSize_;
     PrintTilingParams();
@@ -997,7 +997,7 @@ int32_t Mc2QuantBatchMatmulV3Tiling::GetIteratorOrder()
     }
 }
 
-bool Mc2QuantBatchMatmulV3Tiling::SetBlockDimsAndSingleCore(AscendC::tiling::TCubeTiling &mt)
+bool Mc2QuantBatchMatmulV3Tiling::SetBlockDimsAndSingleCore(AscendC::tiling::TCubeTiling& mt)
 {
     auto mFactor = (inputParams_.transA && inputParams_.mSize >= static_cast<uint64_t>(mt.baseM) ?
                         static_cast<uint64_t>(mt.baseM) :
@@ -1047,7 +1047,7 @@ bool Mc2QuantBatchMatmulV3Tiling::SetBlockDimsAndSingleCore(AscendC::tiling::TCu
 
 bool Mc2QuantBatchMatmulV3Tiling::SetMatmulTilingFromTbeTiling()
 {
-    auto &mt = tilingData_.matmulTiling;
+    auto& mt = tilingData_.matmulTiling;
     mt.M = inputParams_.mSize;
     mt.N = inputParams_.nSize;
     mt.Ka = inputParams_.kSize;
@@ -1101,7 +1101,7 @@ bool Mc2QuantBatchMatmulV3Tiling::SetMatmulTilingFromTbeTiling()
 
 uint32_t Mc2QuantBatchMatmulV3Tiling::GetABankConflictSize()
 {
-    auto &mt = tilingData_.matmulTiling;
+    auto& mt = tilingData_.matmulTiling;
     uint32_t ret = 0;
     if (inputParams_.transA) {
         bool isABankConflict = ops::CeilDiv<uint64_t>(mt.stepM * mt.baseM, ONE_BLK_SIZE) * 32 % 512 == 0;
@@ -1113,9 +1113,9 @@ uint32_t Mc2QuantBatchMatmulV3Tiling::GetABankConflictSize()
     return ret;
 }
 
-bool Mc2QuantBatchMatmulV3Tiling::CalcUsedL1AndUBSize(int32_t aL1Size, int32_t bL1Size, bool &fallback)
+bool Mc2QuantBatchMatmulV3Tiling::CalcUsedL1AndUBSize(int32_t aL1Size, int32_t bL1Size, bool& fallback)
 {
-    auto &mt = tilingData_.matmulTiling;
+    auto& mt = tilingData_.matmulTiling;
     int32_t biasL1Size = (inputParams_.hasBias && (inputParams_.biasDtype == ge::DT_INT32)) ?
                              mt.baseN * ge::GetSizeByDataType(inputParams_.biasDtype) * mt.stepN :
                              0;
@@ -1164,7 +1164,7 @@ bool Mc2QuantBatchMatmulV3Tiling::CalcUsedL1AndUBSize(int32_t aL1Size, int32_t b
 
 int32_t Mc2QuantBatchMatmulV3Tiling::CalcND2NZSpace() const
 {
-    auto &mt = tilingData_.matmulTiling;
+    auto& mt = tilingData_.matmulTiling;
     auto aDtypeSize = ge::GetSizeByDataType(inputParams_.aDtype);
     int32_t nd2nzSpace = mt.baseM * mt.baseK * mt.stepM * mt.stepKa * aDtypeSize;
     // ub bank confict
@@ -1178,7 +1178,7 @@ int32_t Mc2QuantBatchMatmulV3Tiling::CalcND2NZSpace() const
 
 void Mc2QuantBatchMatmulV3Tiling::PrintTilingData()
 {
-    auto &tiling = tilingData_.matmulTiling;
+    auto& tiling = tilingData_.matmulTiling;
     std::stringstream ss;
     ss << " usedCoreNum: " << tiling.usedCoreNum << " M: " << tiling.M << " N: " << tiling.N << " Ka: " << tiling.Ka
        << " Kb: " << tiling.Kb << " singleCoreM: " << tiling.singleCoreM << " singleCoreN: " << tiling.singleCoreN
@@ -1196,7 +1196,7 @@ void Mc2QuantBatchMatmulV3Tiling::PrintTilingData()
 
 void Mc2QuantBatchMatmulV3Tiling::PrintTbeTiling()
 {
-    optiling::CacheTilingData &tiling = tbeTiling_;
+    optiling::CacheTilingData& tiling = tbeTiling_;
     std::stringstream ss;
     ss << "tiling_id: " << tiling.tiling_id << " n_cub: " << tiling.n_cub << " db_cub: " << tiling.db_cub
        << " m_l0: " << tiling.m_l0 << " k_l0: " << tiling.k_l0 << " n_l0: " << tiling.n_l0
@@ -1228,7 +1228,7 @@ void Mc2QuantBatchMatmulV3Tiling::PrintTbeTiling()
 
 void Mc2QuantBatchMatmulV3Tiling::PrintTilingParams() const
 {
-    Mc2QuantBatchMatmulV3Params &params = tilingData_.params;
+    Mc2QuantBatchMatmulV3Params& params = tilingData_.params;
     std::stringstream ss;
     ss << " batchA: " << params.batchA << " batchB: " << params.batchB << " batchC: " << params.batchC
        << " singleCoreBatch: " << params.singleCoreBatch << " isPerTensor: " << params.isPerTensor
@@ -1239,7 +1239,7 @@ void Mc2QuantBatchMatmulV3Tiling::PrintTilingParams() const
     OPS_LOG_D(inputParams_.opName, "Mc2QuantBatchMatmulV3Params params: %s", ss.str().c_str());
 }
 
-void Mc2QuantBatchMatmulV3Tiling::SpiltSingleCore(int32_t &singleCoreM, int32_t &singleCoreN)
+void Mc2QuantBatchMatmulV3Tiling::SpiltSingleCore(int32_t& singleCoreM, int32_t& singleCoreN)
 {
     // 任意m,n方向无循环，KFC mm计算分区内不会S型计算，可以确定每次计算的起始点
     if (tilingData_.matmulTiling.baseM >= singleCoreM || tilingData_.matmulTiling.baseN >= singleCoreN) {
@@ -1448,7 +1448,7 @@ bool Mc2QuantBatchMatmulV3Tiling::NeedAtomiClean() const
 REGISTER_OPS_TILING_TEMPLATE(Mc2QuantBatchMatmulV3, Mc2QuantBatchMatmulV3Tiling, 1);
 REGISTER_OPS_TILING_TEMPLATE(Mc2QuantBatchMatmulV3, Mc2AdaptiveSlidingWindowTiling, 2);
 
-static ge::graphStatus Mc2QuantBatchMatmulV3TilingFunc(gert::TilingContext *context)
+static ge::graphStatus Mc2QuantBatchMatmulV3TilingFunc(gert::TilingContext* context)
 {
     OP_LOGE_IF(context == nullptr, ge::GRAPH_FAILED, "Mc2QuantBatchMatmulV3", "TilingContext is null!");
     auto compileInfoPtr = context->GetCompileInfo<Mc2QuantBatchMatmulV3CompileInfo>();
@@ -1462,7 +1462,7 @@ static ge::graphStatus Mc2QuantBatchMatmulV3TilingFunc(gert::TilingContext *cont
     }
 }
 
-static ge::graphStatus TilingParseForQuantBatchMatmulV3(gert::TilingParseContext *context)
+static ge::graphStatus TilingParseForQuantBatchMatmulV3(gert::TilingParseContext* context)
 {
     OP_LOGE_IF(context == nullptr, ge::GRAPH_FAILED, "Mc2QuantBatchMatmulV3", "TilingParseContext is null!");
     auto platformInfoPtr = context->GetPlatformInfo();

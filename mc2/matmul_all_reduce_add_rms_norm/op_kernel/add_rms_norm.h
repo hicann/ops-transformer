@@ -22,7 +22,7 @@ template <typename T>
 class KernelAddRmsNorm {
 public:
     __aicore__ inline KernelAddRmsNorm() {}
-    __aicore__ inline void Init(GM_ADDR gamma, Mc2Tiling::AddRMSNormTilingData &tilingData, TPipe *Ppipe,
+    __aicore__ inline void Init(GM_ADDR gamma, Mc2Tiling::AddRMSNormTilingData& tilingData, TPipe* Ppipe,
                                 uint32_t numBlocks)
     {
         ASSERT(numBlocks != 0 && "Block dim can not be zero!");
@@ -42,7 +42,7 @@ public:
         }
 
         // get start index for current core, core parallel
-        gammaGm.SetGlobalBuffer((__gm__ T *)gamma, numCol);
+        gammaGm.SetGlobalBuffer((__gm__ T*)gamma, numCol);
 
         // Ppipe alloc memory to queue, the unit is Bytes
         Ppipe->InitBuffer(inQueueX, SINGLE_BUFFER_NUM, ubFactor * sizeof(T));
@@ -63,13 +63,13 @@ public:
         } else if (GetBlockIdx() == numBlocks - 1) {
             this->rowWork = numRow - (numBlocks - 1) * blockFactor;
         }
-        normOutGm.SetGlobalBuffer((__gm__ T *)normOut + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
-        residualGm.SetGlobalBuffer((__gm__ T *)residual + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
-        yGm.SetGlobalBuffer((__gm__ T *)y + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
+        normOutGm.SetGlobalBuffer((__gm__ T*)normOut + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
+        residualGm.SetGlobalBuffer((__gm__ T*)residual + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
+        yGm.SetGlobalBuffer((__gm__ T*)y + GetBlockIdx() * blockFactor * numCol, rowWork * numCol);
     }
 
     __aicore__ inline void ComputeProcess(GM_ADDR normOut, GM_ADDR residual, GM_ADDR y,
-                                          Mc2Tiling::AddRMSNormTilingData &tilingData, uint32_t addRmsNormCount,
+                                          Mc2Tiling::AddRMSNormTilingData& tilingData, uint32_t addRmsNormCount,
                                           uint32_t rcvCnt)
     {
         auto x1Addr = normOut;
@@ -100,7 +100,7 @@ public:
         inQueueGamma.FreeTensor(gammaLocal);
     }
 
-    __aicore__ inline void SubProcess(uint32_t i_o, uint32_t calc_row_num, LocalTensor<T> &gammaLocal)
+    __aicore__ inline void SubProcess(uint32_t i_o, uint32_t calc_row_num, LocalTensor<T>& gammaLocal)
     {
         for (uint32_t i_i = 0; i_i < calc_row_num; i_i++) {
             uint32_t gm_bias = (i_o * rowFactor + i_i) * numCol;
@@ -273,7 +273,7 @@ private:
     }
 
 private:
-    TPipe *Ppipe = nullptr;
+    TPipe* Ppipe = nullptr;
     // create queues for input, in this case depth is equal to buffer num
     TQue<QuePosition::VECIN, SINGLE_BUFFER_NUM> inQueueX, inQueueGamma;
     // create queues for output, in this case depth is equal to buffer num

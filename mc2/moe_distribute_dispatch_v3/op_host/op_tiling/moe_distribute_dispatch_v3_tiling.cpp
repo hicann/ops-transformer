@@ -33,7 +33,7 @@ using namespace AscendC;
 using namespace ge;
 
 namespace optiling {
-ge::graphStatus MoeDistributeDispatchV3TilingFuncBase::MoeDistributeDispatchV3TilingFunc(gert::TilingContext *context)
+ge::graphStatus MoeDistributeDispatchV3TilingFuncBase::MoeDistributeDispatchV3TilingFunc(gert::TilingContext* context)
 {
     DispatchV2Config config;
     config.contextIndex = 0;                 // 0: 根据dispatchV3算子原型标志位初始化context索引
@@ -62,7 +62,7 @@ ge::graphStatus MoeDistributeDispatchV3TilingFuncBase::MoeDistributeDispatchV3Ti
     config.attrConstExpertNumIndex = 15; // 15: 根据dispatchV3算子原型标志位初始化constExpertNumIndex索引
     config.isMc2Context = true;
 
-    const char *nodeName = context->GetNodeName();
+    const char* nodeName = context->GetNodeName();
     OP_LOGD(nodeName, "Enter MoeDistributeDispatchV3 tiling");
     ge::graphStatus ret = MoeDistributeDispatchA3TilingFuncImplPublic(context, config);
     return ret;
@@ -70,7 +70,7 @@ ge::graphStatus MoeDistributeDispatchV3TilingFuncBase::MoeDistributeDispatchV3Ti
 
 #if RUNTIME_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION && METADEF_VERSION_NUM >= EXCEPTION_DUMP_SUPPORT_VERSION
 // Register exception func
-inline void MoeDistributeDispatchV3ExceptionImplWrapper(aclrtExceptionInfo *args, void *userdata)
+inline void MoeDistributeDispatchV3ExceptionImplWrapper(aclrtExceptionInfo* args, void* userdata)
 {
     Mc2Exception::Mc2ExceptionImpl(args, userdata, "MoeDistributeDispatchV3");
 }

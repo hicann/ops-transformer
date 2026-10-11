@@ -18,14 +18,14 @@
 namespace ops {
 namespace Mc2InferShape {
 
-inline ge::graphStatus InferCombineOutputShape(gert::InferShapeContext *context, size_t expandXIndex,
+inline ge::graphStatus InferCombineOutputShape(gert::InferShapeContext* context, size_t expandXIndex,
                                                size_t expertIdsIndex, size_t outputIndex)
 {
-    const gert::Shape *expandXShape = context->GetInputShape(expandXIndex);
+    const gert::Shape* expandXShape = context->GetInputShape(expandXIndex);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expandXShape);
-    const gert::Shape *expertIdsShape = context->GetInputShape(expertIdsIndex);
+    const gert::Shape* expertIdsShape = context->GetInputShape(expertIdsIndex);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
-    gert::Shape *xShape = context->GetOutputShape(outputIndex);
+    gert::Shape* xShape = context->GetOutputShape(outputIndex);
     OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
 
     int64_t bs = ((expertIdsShape->GetDimNum() == 1U) ? -1 : expertIdsShape->GetDim(0));
@@ -37,7 +37,7 @@ inline ge::graphStatus InferCombineOutputShape(gert::InferShapeContext *context,
     return ge::GRAPH_SUCCESS;
 }
 
-inline ge::graphStatus InferCombineOutputXDataType(gert::InferDataTypeContext *context, size_t expandXIndex,
+inline ge::graphStatus InferCombineOutputXDataType(gert::InferDataTypeContext* context, size_t expandXIndex,
                                                    size_t outputIndex)
 {
     auto xDtype = context->GetInputDataType(expandXIndex);

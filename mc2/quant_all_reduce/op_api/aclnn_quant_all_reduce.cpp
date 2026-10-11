@@ -58,7 +58,7 @@ static const std::initializer_list<op::DataType> OUTPUT_DTYPE_SUPPORT_LIST = {
     op::DataType::DT_FLOAT16, op::DataType::DT_BF16, op::DataType::DT_FLOAT};
 
 // 检查入参是否为nullptr
-static bool QuantAllReduceCheckNotNull(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool QuantAllReduceCheckNotNull(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     OP_CHECK_NULL(x, return false);
     OP_CHECK_NULL(scales, return false);
@@ -67,7 +67,7 @@ static bool QuantAllReduceCheckNotNull(const aclTensor *x, const aclTensor *scal
 }
 
 // 检查K-G量化方案中x、scales、output的数据类型是否在算子的支持列表内
-static bool QuantAllReduceCheckKGAllDtypesValid(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool QuantAllReduceCheckKGAllDtypesValid(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     if (CheckType(x->GetDataType(), X_DTYPE_KG_SUPPORT_LIST) &&
         CheckType(scales->GetDataType(), SCALES_DTYPE_KG_SUPPORT_LIST) &&
@@ -79,7 +79,7 @@ static bool QuantAllReduceCheckKGAllDtypesValid(const aclTensor *x, const aclTen
 }
 
 // 检查MX量化方案中x、scales、output的数据类型是否在算子的支持列表内
-static bool QuantAllReduceCheckMXAllDtypesValid(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool QuantAllReduceCheckMXAllDtypesValid(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     if (CheckType(x->GetDataType(), X_DTYPE_MX_SUPPORT_LIST) &&
         CheckType(scales->GetDataType(), SCALES_DTYPE_MX_SUPPORT_LIST) &&
@@ -91,7 +91,7 @@ static bool QuantAllReduceCheckMXAllDtypesValid(const aclTensor *x, const aclTen
 }
 
 // 统一数据类型检查
-static bool QuantAllReduceCheckAllDtypesValid(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool QuantAllReduceCheckAllDtypesValid(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     bool isAllDtypesValid = false;
     isAllDtypesValid = (QuantAllReduceCheckKGAllDtypesValid(x, scales, output) ||
@@ -107,7 +107,7 @@ static bool QuantAllReduceCheckAllDtypesValid(const aclTensor *x, const aclTenso
     return isAllDtypesValid;
 }
 
-static bool QuantAllReduceCheckAllFormatValid(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static bool QuantAllReduceCheckAllFormatValid(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     if (IsPrivateFormat(x->GetStorageFormat())) {
         OP_LOGE_FOR_INVALID_FORMAT("aclnnQuantAllReduceGetWorkspaceSize", "x",
@@ -129,7 +129,7 @@ static bool QuantAllReduceCheckAllFormatValid(const aclTensor *x, const aclTenso
 }
 
 // 参数综合校验
-static aclnnStatus QuantAllReduceCheckParams(const aclTensor *x, const aclTensor *scales, const aclTensor *output)
+static aclnnStatus QuantAllReduceCheckParams(const aclTensor* x, const aclTensor* scales, const aclTensor* output)
 {
     // 1. 检查参数是否为空指针
     CHECK_RET(QuantAllReduceCheckNotNull(x, scales, output), ACLNN_ERR_PARAM_NULLPTR);
@@ -144,12 +144,12 @@ static aclnnStatus QuantAllReduceCheckParams(const aclTensor *x, const aclTensor
 }
 } // namespace
 
-extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void *executor, NnopbaseHcclServerType sType);
+extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
 
-extern "C" aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor *context, const aclTensor *x,
-                                                           const aclTensor *scales, int64_t hcclBufferSize,
-                                                           int64_t worldSize, const char *reduceOp, aclTensor *output,
-                                                           uint64_t *workspaceSize, aclOpExecutor **executor)
+extern "C" aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor* context, const aclTensor* x,
+                                                           const aclTensor* scales, int64_t hcclBufferSize,
+                                                           int64_t worldSize, const char* reduceOp, aclTensor* output,
+                                                           uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     aclnnStatus retParam = QuantAllReduceCheckParams(x, scales, output);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
@@ -167,19 +167,19 @@ extern "C" aclnnStatus aclnnQuantAllReduceGetWorkspaceSize(const aclTensor *cont
     }
     if (output->GetStorageFormat() != op::Format::FORMAT_ND) {
         OP_LOGW("output origin format is: %s.", op::ToString(output->GetStorageFormat()).GetString());
-        output = const_cast<aclTensor *>(l0op::ReFormat(output, op::Format::FORMAT_ND));
+        output = const_cast<aclTensor*>(l0op::ReFormat(output, op::Format::FORMAT_ND));
         CHECK_RET(output != nullptr, ACLNN_ERR_PARAM_INVALID);
     }
 
     uint64_t yDtype = static_cast<uint64_t>(output->GetDataType());
     aclnnStatus ret =
-        aclnnInnerQuantAllReduceGetWorkspaceSize(context, x, scales, hcclBufferSize, const_cast<char *>(reduceOp),
+        aclnnInnerQuantAllReduceGetWorkspaceSize(context, x, scales, hcclBufferSize, const_cast<char*>(reduceOp),
                                                  yDtype, worldSize, output, workspaceSize, executor);
     OP_LOGD("QuantAllReduce, aclnnGetWorkspaceSize ret %d.", ret);
     return ret;
 }
 
-extern "C" aclnnStatus aclnnQuantAllReduce(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+extern "C" aclnnStatus aclnnQuantAllReduce(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                            const aclrtStream stream)
 {
     if (NnopbaseSetHcclServerType) {

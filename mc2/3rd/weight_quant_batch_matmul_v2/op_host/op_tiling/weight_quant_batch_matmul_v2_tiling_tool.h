@@ -44,10 +44,10 @@ uint64_t Mc2GetBlockAlignSizeByDataType(ge::DataType dtype);
 
 uint64_t Mc2GetShapeSizeWithDataType(uint64_t shapeSize, ge::DataType dtype);
 
-bool Mc2CheckOptionalInputByShape(const gert::StorageShape *storageShape);
+bool Mc2CheckOptionalInputByShape(const gert::StorageShape* storageShape);
 
 matmul_tiling::DataType Mc2GetMatmulTilingDtype(ge::DataType dtype);
 
-ge::Format Mc2GetInputStorageFormat(const gert::TilingContext *context, size_t id);
+ge::Format Mc2GetInputStorageFormat(const gert::TilingContext* context, size_t id);
 } // namespace optiling
 #endif // WEIGHT_QUANT_BATCH_MATMUL_V2_TOOL_H

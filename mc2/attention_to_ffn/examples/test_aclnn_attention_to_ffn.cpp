@@ -46,7 +46,7 @@ constexpr uint32_t WORLD_SIZE = 16;
 constexpr uint32_t FFN_WORKER_NUM = 5;
 constexpr uint32_t ATTENTION_WORKER_NUM = WORLD_SIZE - FFN_WORKER_NUM;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -56,8 +56,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -73,7 +73,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-static std::vector<int32_t> CreateExpertIdsHostData(const std::vector<int64_t> &expertIdsShape)
+static std::vector<int32_t> CreateExpertIdsHostData(const std::vector<int64_t>& expertIdsShape)
 {
     std::vector<int32_t> expertIdsHostData;
     for (int32_t micro_batch_id = 0; micro_batch_id < expertIdsShape[0]; micro_batch_id++) {
@@ -92,8 +92,8 @@ public:
         : rankId(workerRankId)
     {}
     int CreateInputTensors();
-    int PrepareWorkspace(const char *hcomName);
-    int Execute(const Args &args);
+    int PrepareWorkspace(const char* hcomName);
+    int Execute(const Args& args);
     void Release();
 
 private:
@@ -113,30 +113,30 @@ private:
     int64_t quantMode = 0;
     int64_t syncFlag = 0;
     int64_t ffnStartRankId = 0;
-    int64_t ffnTokenInfoTableShapeData[3] = {ATTENTION_WORKER_NUM, X, 2 + Bs *expertNumPerToken};
+    int64_t ffnTokenInfoTableShapeData[3] = {ATTENTION_WORKER_NUM, X, 2 + Bs* expertNumPerToken};
     int64_t ffnTokenDataShapeData[5] = {ATTENTION_WORKER_NUM, X, Bs, expertNumPerToken, H};
     int64_t attnTokenInfoTableShapeData[3] = {X, Bs, expertNumPerToken};
 
     /* 根据当前场景，构造device侧输入输出变量 */
     // 声明device侧输入输出变量
-    void *xDeviceAddr = nullptr;
-    void *sessionIdDeviceAddr = nullptr;
-    void *microBatchIdDeviceAddr = nullptr;
-    void *layerIdDeviceAddr = nullptr;
-    void *expertIdsDeviceAddr = nullptr;
-    void *expertRankTableDeviceAddr = nullptr;
-    void *scalesDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* sessionIdDeviceAddr = nullptr;
+    void* microBatchIdDeviceAddr = nullptr;
+    void* layerIdDeviceAddr = nullptr;
+    void* expertIdsDeviceAddr = nullptr;
+    void* expertRankTableDeviceAddr = nullptr;
+    void* scalesDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *sessionId = nullptr;
-    aclTensor *microBatchId = nullptr;
-    aclTensor *layerId = nullptr;
-    aclTensor *expertIds = nullptr;
-    aclTensor *expertRankTable = nullptr;
-    aclTensor *scales = nullptr;
-    aclIntArray *ffnTokenInfoTableShape = aclCreateIntArray(ffnTokenInfoTableShapeData, 3);
-    aclIntArray *ffnTokenDataShape = aclCreateIntArray(ffnTokenDataShapeData, 5);
-    aclIntArray *attnTokenInfoTableShape = aclCreateIntArray(attnTokenInfoTableShapeData, 3);
+    aclTensor* x = nullptr;
+    aclTensor* sessionId = nullptr;
+    aclTensor* microBatchId = nullptr;
+    aclTensor* layerId = nullptr;
+    aclTensor* expertIds = nullptr;
+    aclTensor* expertRankTable = nullptr;
+    aclTensor* scales = nullptr;
+    aclIntArray* ffnTokenInfoTableShape = aclCreateIntArray(ffnTokenInfoTableShapeData, 3);
+    aclIntArray* ffnTokenDataShape = aclCreateIntArray(ffnTokenDataShapeData, 5);
+    aclIntArray* attnTokenInfoTableShape = aclCreateIntArray(attnTokenInfoTableShapeData, 3);
 
     // 定义当前场景下各变量维度
     std::vector<int64_t> xShape{X, Bs, H};
@@ -170,8 +170,8 @@ private:
     std::vector<float> scalesHostData = std::vector<float>(scalesShapeSize, 0.1);
 
     uint64_t attentionToFFNWorkspaceSize = 0;
-    aclOpExecutor *attentionToFFNExecutor = nullptr;
-    void *attentionToFFNWorkspaceAddr = nullptr;
+    aclOpExecutor* attentionToFFNExecutor = nullptr;
+    void* attentionToFFNWorkspaceAddr = nullptr;
 };
 
 int AttentionToFFNExample::CreateInputTensors()
@@ -195,7 +195,7 @@ int AttentionToFFNExample::CreateInputTensors()
     return 0;
 }
 
-int AttentionToFFNExample::PrepareWorkspace(const char *hcomName)
+int AttentionToFFNExample::PrepareWorkspace(const char* hcomName)
 {
     /**************************************** 调用AttentionToFFN ********************************************/
     // 调用第一阶段接口
@@ -215,7 +215,7 @@ int AttentionToFFNExample::PrepareWorkspace(const char *hcomName)
     return 0;
 }
 
-int AttentionToFFNExample::Execute(const Args &args)
+int AttentionToFFNExample::Execute(const Args& args)
 {
     int ret = 0;
     if (args.rankId < FFN_WORKER_NUM) { // FFN Worker
@@ -305,7 +305,7 @@ void AttentionToFFNExample::Release()
     FreeDeviceMemory();
 }
 
-int LaunchOneProcessAttentionToFFN(Args &args)
+int LaunchOneProcessAttentionToFFN(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed, ret %d\n", ret); return ret);
@@ -333,7 +333,7 @@ int LaunchOneProcessAttentionToFFN(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // 本样例基于Atlas A3实现，必须在Atlas A3上运行
     int ret = aclInit(nullptr);

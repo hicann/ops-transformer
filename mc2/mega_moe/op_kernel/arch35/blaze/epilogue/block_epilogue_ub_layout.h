@@ -69,20 +69,20 @@ __aicore__ constexpr inline ActivationMxQuantUbOffsets BuildActivationMxQuantUbO
 
 template <typename InputType>
 struct ActivationMxQuantUbPointers {
-    __ubuf__ InputType *firstInput;
-    __ubuf__ InputType *secondInput;
-    __ubuf__ bfloat16_t *activationOutput;
-    __ubuf__ int8_t *quantOutput;
-    __ubuf__ uint16_t *quantScale;
-    __ubuf__ uint16_t *maxExp;
-    __ubuf__ uint16_t *inverseMxScale;
+    __ubuf__ InputType* firstInput;
+    __ubuf__ InputType* secondInput;
+    __ubuf__ bfloat16_t* activationOutput;
+    __ubuf__ int8_t* quantOutput;
+    __ubuf__ uint16_t* quantScale;
+    __ubuf__ uint16_t* maxExp;
+    __ubuf__ uint16_t* inverseMxScale;
     uint32_t selectedInt8BufferOffsetElements;
 };
 
 template <typename InputType, uint32_t MaxSingleElementCount>
 __aicore__ inline ActivationMxQuantUbPointers<InputType> ResolveActivationMxQuantUbPointers(
-    __ubuf__ InputType *firstInputBase, __ubuf__ bfloat16_t *activationOutputBase, __ubuf__ int8_t *quantOutputBase,
-    __ubuf__ uint16_t *quantScaleBase, __ubuf__ uint16_t *maxExpBase, __ubuf__ uint16_t *inverseMxScaleBase,
+    __ubuf__ InputType* firstInputBase, __ubuf__ bfloat16_t* activationOutputBase, __ubuf__ int8_t* quantOutputBase,
+    __ubuf__ uint16_t* quantScaleBase, __ubuf__ uint16_t* maxExpBase, __ubuf__ uint16_t* inverseMxScaleBase,
     uint32_t validColumnCount, uint16_t pingpongIdx)
 {
     constexpr uint32_t pongElementOfInput = MaxSingleElementCount;

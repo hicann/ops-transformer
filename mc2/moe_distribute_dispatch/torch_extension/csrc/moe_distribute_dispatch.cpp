@@ -28,12 +28,12 @@ const int64_t RANK_NUM_PER_NODE = 8;
 const int64_t SEND_COUNT_MEMORY_SIZE = 2;
 const int64_t PACKED_FLOAT4_ELEMENTS_PER_BYTE = 2;
 
-bool HasTensor(const c10::optional<at::Tensor> &tensor)
+bool HasTensor(const c10::optional<at::Tensor>& tensor)
 {
     return tensor.has_value() && tensor.value().defined();
 }
 
-aclDataType GetDynamicScalesDtype(const at::Tensor &x, const c10::optional<at::Tensor> &scales,
+aclDataType GetDynamicScalesDtype(const at::Tensor& x, const c10::optional<at::Tensor>& scales,
                                   c10::optional<int64_t> scales_dtype, int64_t quant_mode)
 {
     aclDataType dynamic_scale_dtype = ACL_FLOAT;
@@ -49,7 +49,7 @@ aclDataType GetDynamicScalesDtype(const at::Tensor &x, const c10::optional<at::T
     return dynamic_scale_dtype;
 }
 
-std::vector<int64_t> GetDynamicScalesShape(const c10::optional<at::Tensor> &scales, int64_t quant_mode, int64_t a,
+std::vector<int64_t> GetDynamicScalesShape(const c10::optional<at::Tensor>& scales, int64_t quant_mode, int64_t a,
                                            int64_t h)
 {
     constexpr int64_t perGroupSize = 128;
@@ -113,7 +113,7 @@ bool IsPackedFloat4(aclDataType dtype)
 
 bool IsAscend950()
 {
-    static const char *soc_name = aclrtGetSocName();
+    static const char* soc_name = aclrtGetSocName();
     return soc_name != nullptr && std::strstr(soc_name, "Ascend950") != nullptr;
 }
 
@@ -121,10 +121,10 @@ bool IsAscend950()
  * @brief Warpper for moe_distribute_dispatch
  */
 tensor_list NpuMoeDistributeDispatch(
-    const at::Tensor &context, const at::Tensor &x, const at::Tensor &expertIds, int64_t epWorldSize, int64_t epRankId,
-    int64_t moeExpertNum, int64_t cclBufferSize, const c10::optional<at::Tensor> &scales,
-    const c10::optional<at::Tensor> &xActiveMask, const c10::optional<at::Tensor> &expertScales,
-    const c10::optional<at::Tensor> &elasticInfo, const c10::optional<at::Tensor> &performanceInfo, int64_t tpWorldSize,
+    const at::Tensor& context, const at::Tensor& x, const at::Tensor& expertIds, int64_t epWorldSize, int64_t epRankId,
+    int64_t moeExpertNum, int64_t cclBufferSize, const c10::optional<at::Tensor>& scales,
+    const c10::optional<at::Tensor>& xActiveMask, const c10::optional<at::Tensor>& expertScales,
+    const c10::optional<at::Tensor>& elasticInfo, const c10::optional<at::Tensor>& performanceInfo, int64_t tpWorldSize,
     int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum, int64_t sharedExpertRankNum, int64_t quantMode,
     int64_t globalBs, int64_t expertTokenNumsType, std::string commAlg, int64_t zeroExpertNum, int64_t copyExpertNum,
     int64_t constExpertNum, c10::optional<int64_t> yDtype, c10::optional<int64_t> xDtype,
@@ -244,7 +244,7 @@ tensor_list NpuMoeDistributeDispatch(
     }
 
     std::string commAlgStr = std::string(commAlg);
-    char *commAlgPtr = const_cast<char *>(commAlgStr.c_str());
+    char* commAlgPtr = const_cast<char*>(commAlgStr.c_str());
 
     aclDataType xAclDtype = xDtype.has_value() ? GetAclDataType(xDtype.value()) : ConvertToAclDataType(x.scalar_type());
     at::Tensor scalesTensor = HasTensor(scales) ? scales.value() : at::Tensor();

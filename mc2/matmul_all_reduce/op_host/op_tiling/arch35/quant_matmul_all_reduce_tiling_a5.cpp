@@ -46,7 +46,7 @@ const gert::Shape defaultShape = gert::Shape();
 gert::StorageShape defaultStorageShape = gert::StorageShape();
 } // namespace
 
-bool QuantMatmulAllReduceTilingA5::IsPerTensorDequantScale(const gert::Shape &dequantShape) const
+bool QuantMatmulAllReduceTilingA5::IsPerTensorDequantScale(const gert::Shape& dequantShape) const
 {
     return dequantShape.GetDimNum() > 0 && dequantShape.GetDim(dequantShape.GetDimNum() - 1) == 1;
 }
@@ -62,7 +62,7 @@ bool QuantMatmulAllReduceTilingA5::IsCapable()
     return false;
 }
 
-ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2HcommAllReduce(const char *groupName, const uint32_t reduceType)
+ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2HcommAllReduce(const char* groupName, const uint32_t reduceType)
 {
     uint32_t opType = static_cast<uint32_t>(HcclCMDType::HCCL_CMD_ALLREDUCE);
     uint8_t dataType = static_cast<uint8_t>(mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType));
@@ -84,7 +84,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2HcommAllReduce(const char *g
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2HcommTwoShot(const char *groupName, const uint32_t reduceType,
+ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2HcommTwoShot(const char* groupName, const uint32_t reduceType,
                                                                  const uint8_t dataType)
 {
     uint32_t opType1 = static_cast<uint32_t>(HcclCMDType::HCCL_CMD_ALLTOALL);
@@ -119,7 +119,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2HcommTwoShot(const char *gro
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2HcommRSAG(const char *groupName, const uint32_t reduceType)
+ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2HcommRSAG(const char* groupName, const uint32_t reduceType)
 {
     uint32_t opType1 = static_cast<uint32_t>(HcclCMDType::HCCL_CMD_REDUCE_SCATTER);
     uint32_t opType2 = static_cast<uint32_t>(HcclCMDType::HCCL_CMD_ALLGATHER);
@@ -168,7 +168,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::SetMc2Hcomm()
         return ge::GRAPH_FAILED);
     OP_TILING_CHECK(context_->GetAttrs() == nullptr, OP_LOGE_WITH_INVALID_INPUT(opName_, "comm_mode"),
                     return ge::GRAPH_FAILED);
-    const char *groupName = context_->GetAttrs()->GetAttrPointer<char>(static_cast<int>(0));
+    const char* groupName = context_->GetAttrs()->GetAttrPointer<char>(static_cast<int>(0));
     const uint32_t reduceType = HcclReduceOp::HCCL_REDUCE_SUM;
     if (isUseA2APath && !MutableRCSTilingData().isInputCommQuantScale) {
         uint8_t dataType = static_cast<uint8_t>(mc2tiling::ConvertGeTypeToHcclType(opName_, args_.geCType));
@@ -219,7 +219,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::DoOpTiling()
 
 ge::graphStatus QuantMatmulAllReduceTilingA5::CheckHCCLSize()
 {
-    auto &&param = MutableRCSTilingData();
+    auto&& param = MutableRCSTilingData();
     if (param.isInputCommQuantScale != QUANT_MODE_FP8) {
         return ge::GRAPH_SUCCESS;
     }
@@ -242,7 +242,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::CheckHCCLSize()
 
 ge::graphStatus QuantMatmulAllReduceTilingA5::AdjustHCCLLimit()
 {
-    auto &&param = MutableRCSTilingData();
+    auto&& param = MutableRCSTilingData();
     // 当前仅校验pertile量化场景，pertile量化是低bit通信，通信的数据类型仅占1字节
     if (param.isInputCommQuantScale != QUANT_MODE_FP8) {
         return ge::GRAPH_SUCCESS;
@@ -348,7 +348,7 @@ uint64_t QuantMatmulAllReduceTilingA5::GetTilingKey() const
 
 void QuantMatmulAllReduceTilingA5::PrintExtendMatmulTiling(bool isTail)
 {
-    auto &tiling = quantMatmulAllReduceTilingData_.tilematmulTiling;
+    auto& tiling = quantMatmulAllReduceTilingData_.tilematmulTiling;
     if (isTail) {
         tiling = quantMatmulAllReduceTilingData_.tailmatmulTiling;
     }
@@ -463,7 +463,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::GetWorkspaceSizeOfCommQuantScaleOr
 
 ge::graphStatus QuantMatmulAllReduceTilingA5::GetWorkspaceSize()
 {
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     uint64_t commWorkSpace = myWorkSpaceSize_ - libApiWorkSpaceSize_;
     MutableRCSTilingData().commWorkSpaceSize = (commWorkSpace); // myWorkSpaceSize_去除系统空间后剩余大小
     uint64_t gmcFloat = static_cast<uint64_t>(MutableRCSTilingData().rankM) *
@@ -503,7 +503,7 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::PostTiling()
 
     errno_t ret =
         memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                 reinterpret_cast<void *>(&quantMatmulAllReduceTilingData_), sizeof(QuantMatmulAllReduceTilingDataA5));
+                 reinterpret_cast<void*>(&quantMatmulAllReduceTilingData_), sizeof(QuantMatmulAllReduceTilingDataA5));
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "Memcpy_s failed, ret=%d.", ret);
         return ge::GRAPH_FAILED;
@@ -516,15 +516,15 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-Mc2Tiling::RCSTiling &QuantMatmulAllReduceTilingA5::MutableRCSTilingData()
+Mc2Tiling::RCSTiling& QuantMatmulAllReduceTilingA5::MutableRCSTilingData()
 {
     return quantMatmulAllReduceTilingData_.param;
 }
-::TCubeTiling &QuantMatmulAllReduceTilingA5::MutableTCubeTileTilingData()
+::TCubeTiling& QuantMatmulAllReduceTilingA5::MutableTCubeTileTilingData()
 {
     return quantMatmulAllReduceTilingData_.tilematmulTiling.matmulTiling;
 }
-::TCubeTiling &QuantMatmulAllReduceTilingA5::MutableTCubeTailTilingData()
+::TCubeTiling& QuantMatmulAllReduceTilingA5::MutableTCubeTailTilingData()
 {
     return quantMatmulAllReduceTilingData_.tailmatmulTiling.matmulTiling;
 }
@@ -830,14 +830,14 @@ ge::graphStatus QuantMatmulAllReduceTilingA5::CheckInput()
     return CheckAxisSize();
 }
 
-QuantMatmulAllReduceTilingA5::QuantMatmulAllReduceTilingA5(gert::TilingContext *context)
+QuantMatmulAllReduceTilingA5::QuantMatmulAllReduceTilingA5(gert::TilingContext* context)
     : MatmulAllReduceTilingBase(context),
       quantMatmulAllReduceTilingData_(quantMatmulAllReduceTilingDataSelf_)
 {}
 
 // 使用外部传入的tilingdata和ctxinfo
-QuantMatmulAllReduceTilingA5::QuantMatmulAllReduceTilingA5(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                                                           QuantMatmulAllReduceTilingDataA5 *out)
+QuantMatmulAllReduceTilingA5::QuantMatmulAllReduceTilingA5(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                                                           QuantMatmulAllReduceTilingDataA5* out)
     : MatmulAllReduceTilingBase(context, mmrCtxInfo),
       quantMatmulAllReduceTilingData_(*out)
 {}
@@ -874,7 +874,7 @@ const gert::Shape QuantTilingTransferHelperA5::GetX2Shape(const size_t index)
         {static_cast<int64_t>(tilingProcesser_.args_.kValue), static_cast<int64_t>(tilingProcesser_.args_.nValue)});
 }
 
-const gert::Shape &QuantTilingTransferHelperA5::GetScaleShape(const size_t index)
+const gert::Shape& QuantTilingTransferHelperA5::GetScaleShape(const size_t index)
 {
     (void)index;
     OP_TILING_CHECK(tilingProcesser_.mmrCtxInfo_.dequant_scale_shape == nullptr,
@@ -882,13 +882,13 @@ const gert::Shape &QuantTilingTransferHelperA5::GetScaleShape(const size_t index
     return tilingProcesser_.mmrCtxInfo_.dequant_scale_shape->GetStorageShape();
 }
 
-const gert::StorageShape *QuantTilingTransferHelperA5::GetOffsetShape(const size_t index)
+const gert::StorageShape* QuantTilingTransferHelperA5::GetOffsetShape(const size_t index)
 {
     (void)index;
     return nullptr;
 }
 
-const gert::StorageShape *QuantTilingTransferHelperA5::GetPertokenShape(const size_t index)
+const gert::StorageShape* QuantTilingTransferHelperA5::GetPertokenShape(const size_t index)
 {
     (void)index;
     if (tilingProcesser_.mmrCtxInfo_.pertoken_scale_shape == nullptr) {
@@ -904,7 +904,7 @@ const gert::StorageShape *QuantTilingTransferHelperA5::GetPertokenShape(const si
     return &defaultStorageShape;
 }
 
-const gert::StorageShape *QuantTilingTransferHelperA5::GetBiasShape(const size_t index)
+const gert::StorageShape* QuantTilingTransferHelperA5::GetBiasShape(const size_t index)
 {
     (void)index;
     return tilingProcesser_.mmrCtxInfo_.bias_shape;
@@ -913,7 +913,7 @@ const gert::StorageShape *QuantTilingTransferHelperA5::GetBiasShape(const size_t
 ge::graphStatus QuantTilingTransferHelperA5::GetShapeAttrsInfo()
 {
     OP_LOGI(tilingProcesser_.opName_, "Start assemble input params for matmul tiling.");
-    auto &&tilingArgs = tilingProcesser_.args_;
+    auto&& tilingArgs = tilingProcesser_.args_;
     inputParams_.opName = tilingProcesser_.opName_;
     inputParams_.transA = tilingArgs.isATrans;
     inputParams_.transB = tilingArgs.isBTrans;
@@ -989,9 +989,9 @@ CutResult QuantMatmulAllReduceTilingA5::GetTilingResult()
     CutResult mCutAllreduce;
     SocVersion_2201 socVersion_2201 = SocVersion_2201::SOC910_B;
     SetMCutSocVersion(socVersion_2201);
-    const gert::StorageShape *commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
-    const gert::StorageShape *commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
-    auto &&param = MutableRCSTilingData();
+    const gert::StorageShape* commQuantScaleShape1 = mmrCtxInfo_.comm_quant_scale_1_shape;
+    const gert::StorageShape* commQuantScaleShape2 = mmrCtxInfo_.comm_quant_scale_2_shape;
+    auto&& param = MutableRCSTilingData();
     uint8_t commMode = GetCommMode();
     bool isPertileFp8 = (param.isInputCommQuantScale == QUANT_MODE_FP8);
     bool isAlign = (isPerBlock_ || (scenario_ == AllReduceScenario::MXFP4) || (scenario_ == AllReduceScenario::MXFP8) ||

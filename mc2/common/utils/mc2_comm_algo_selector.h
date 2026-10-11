@@ -31,18 +31,18 @@ struct CommAlgoEntry {
     uint32_t minRankSize;
     uint32_t maxRankSize;
     int32_t priority;
-    const char *algoName;
+    const char* algoName;
 };
 
 class Mc2CommAlgoSelector {
 public:
-    static std::string SelectAlgoName(const std::string &opName, const char *group, uint8_t commEngine,
-                                      uint64_t commDataBytes, uint32_t rankSize, const CommAlgoEntry *entries,
-                                      uint32_t entryCount, const std::string &defaultAlgoName);
+    static std::string SelectAlgoName(const std::string& opName, const char* group, uint8_t commEngine,
+                                      uint64_t commDataBytes, uint32_t rankSize, const CommAlgoEntry* entries,
+                                      uint32_t entryCount, const std::string& defaultAlgoName);
 
 private:
-    static uint32_t GetL0TopoType(const char *group);
-    static uint32_t GetLayerNum(const char *group);
+    static uint32_t GetL0TopoType(const char* group);
+    static uint32_t GetLayerNum(const char* group);
 };
 
 } // namespace Mc2Hcom

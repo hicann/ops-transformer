@@ -45,32 +45,32 @@ static constexpr size_t DISPATCH_INPUT_ATTR_GLOBAL_BS_INDEX = 8;
 static constexpr size_t DISPATCH_INPUT_ATTR_EXPERT_TOKEN_NUMS_TYPE_INDEX = 9;
 static constexpr size_t DISPATCH_INPUT_ATTR_COMM_TYPE_INDEX = 10;
 
-static ge::graphStatus InferShapeMoeDistributeDispatchTeardown(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMoeDistributeDispatchTeardown(gert::InferShapeContext* context)
 {
     OPS_LOG_D(context->GetNodeName(), "Begin to do InferShapeMoeDistributeDispatchTeardown.");
     // 获取输入shape
-    const gert::Shape *xShape = context->GetInputShape(DISPATCH_INPUT_X_INDEX);
+    const gert::Shape* xShape = context->GetInputShape(DISPATCH_INPUT_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
 
-    const gert::Shape *yShape = context->GetInputShape(DISPATCH_INPUT_Y_INDEX);
+    const gert::Shape* yShape = context->GetInputShape(DISPATCH_INPUT_Y_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, yShape);
 
-    const gert::Shape *expertIdsShape = context->GetInputShape(DISPATCH_INPUT_EXPERT_IDS_INDEX);
+    const gert::Shape* expertIdsShape = context->GetInputShape(DISPATCH_INPUT_EXPERT_IDS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
 
-    const gert::Shape *commCmdInfoShape = context->GetInputShape(DISPATCH_INPUT_COMM_CMD_INFO_INDEX);
+    const gert::Shape* commCmdInfoShape = context->GetInputShape(DISPATCH_INPUT_COMM_CMD_INFO_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, commCmdInfoShape);
 
-    gert::Shape *expandXShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_X_INDEX);
+    gert::Shape* expandXShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPAND_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expandXShape);
 
-    gert::Shape *dynamicScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_DYNAMIC_SCALES_INDEX);
+    gert::Shape* dynamicScalesShape = context->GetOutputShape(DISPATCH_OUTPUT_DYNAMIC_SCALES_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, dynamicScalesShape);
 
-    gert::Shape *assistInfoForCombineShape = context->GetOutputShape(DISPATCH_OUTPUT_ASSIST_INFO_FOR_COMBINE_INDEX);
+    gert::Shape* assistInfoForCombineShape = context->GetOutputShape(DISPATCH_OUTPUT_ASSIST_INFO_FOR_COMBINE_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, assistInfoForCombineShape);
 
-    gert::Shape *expertTokenNumsShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
+    gert::Shape* expertTokenNumsShape = context->GetOutputShape(DISPATCH_OUTPUT_EXPERT_TOKEN_NUMS_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expertTokenNumsShape);
 
     const auto attrs = context->GetAttrs();

@@ -51,11 +51,11 @@ extern "C" {
  *
  */
 ACLNN_API aclnnStatus aclnnMoeDistributeDispatchSetupGetWorkspaceSize(
-    const aclTensor *x, const aclTensor *expertIds, const aclTensor *scalesOptional,
-    const aclTensor *xActiveMaskOptional, const char *groupEp, int64_t epWorldSize, int64_t epRankId,
+    const aclTensor* x, const aclTensor* expertIds, const aclTensor* scalesOptional,
+    const aclTensor* xActiveMaskOptional, const char* groupEp, int64_t epWorldSize, int64_t epRankId,
     int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum, int64_t sharedExpertRankNum,
-    int64_t quantMode, int64_t globalBs, int64_t commType, const char *commAlg, aclTensor *yOut,
-    aclTensor *expandIdxOut, aclTensor *commCmdInfoOut, uint64_t *workspaceSize, aclOpExecutor **executor);
+    int64_t quantMode, int64_t globalBs, int64_t commType, const char* commAlg, aclTensor* yOut,
+    aclTensor* expandIdxOut, aclTensor* commCmdInfoOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  *
@@ -89,12 +89,12 @@ ACLNN_API aclnnStatus aclnnMoeDistributeDispatchSetupGetWorkspaceSize(
  *
  */
 ACLNN_API aclnnStatus aclnnMoeDistributeDispatchSetupTeardownCalcOutputSize(
-    const aclTensor *x, const aclTensor *expertIds, const aclTensor *scalesOptional,
-    const aclTensor *xActiveMaskOptional, const char *groupEp, int64_t epWorldSize, int64_t epRankId,
+    const aclTensor* x, const aclTensor* expertIds, const aclTensor* scalesOptional,
+    const aclTensor* xActiveMaskOptional, const char* groupEp, int64_t epWorldSize, int64_t epRankId,
     int64_t moeExpertNum, int64_t expertShardType, int64_t sharedExpertNum, int64_t sharedExpertRankNum,
-    int64_t quantMode, int64_t globalBs, int64_t expertTokenNumsType, int64_t commType, const char *commAlg,
-    uint64_t &tokenMsgSize, uint64_t &expandIdxOutSize, uint64_t &assistInfoForCombineOutSize,
-    uint64_t &commCmdInfoOutSize);
+    int64_t quantMode, int64_t globalBs, int64_t expertTokenNumsType, int64_t commType, const char* commAlg,
+    uint64_t& tokenMsgSize, uint64_t& expandIdxOutSize, uint64_t& assistInfoForCombineOutSize,
+    uint64_t& commCmdInfoOutSize);
 
 /**
  * @brief aclnnMoeDistributeDispatchSetup的第二段接口，用于执行计算。
@@ -105,7 +105,7 @@ ACLNN_API aclnnStatus aclnnMoeDistributeDispatchSetupTeardownCalcOutputSize(
  * @param [in] stream: acl stream流。
  * @return aclnnStatus: 返回状态码
  */
-ACLNN_API aclnnStatus aclnnMoeDistributeDispatchSetup(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnMoeDistributeDispatchSetup(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                       aclrtStream stream);
 
 #ifdef __cplusplus

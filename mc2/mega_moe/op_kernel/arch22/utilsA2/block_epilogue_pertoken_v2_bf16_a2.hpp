@@ -46,7 +46,7 @@ public:
     using CopyUbToGmD = typename TileCopy_::CopyUbToGmD;
 
     struct Params {
-        __gm__ int32_t *ptrTokenPerExpert{nullptr};
+        __gm__ int32_t* ptrTokenPerExpert{nullptr};
         int32_t EP;
         int32_t expertPerRank;
         int32_t n2;
@@ -66,8 +66,8 @@ public:
         CATLASS_DEVICE
         Params() {};
         CATLASS_DEVICE
-        Params(int32_t EP_, int32_t expertPerRank_, int32_t rank_, __gm__ int32_t *ptrTokenPerExpert_, LayoutC layoutC_,
-               int32_t n2_, int32_t n0_, HcclShmem<true> &shmem_, int64_t offsetD_, int64_t offsetWinOutD_,
+        Params(int32_t EP_, int32_t expertPerRank_, int32_t rank_, __gm__ int32_t* ptrTokenPerExpert_, LayoutC layoutC_,
+               int32_t n2_, int32_t n0_, HcclShmem<true>& shmem_, int64_t offsetD_, int64_t offsetWinOutD_,
                int32_t serverId_, Layout3D tokenPerExpertLayout_)
             : ptrTokenPerExpert(ptrTokenPerExpert_),
               EP(EP_),
@@ -85,7 +85,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{})
+    BlockEpilogue(Arch::Resource<ArchTag> const& resource, Params const& params = Params{})
         : params(params)
     {
         n0 = params.n0;
@@ -101,7 +101,7 @@ public:
             ubOffset += (max_len / n0) * sizeof(float);
             source_scale_offset[i] = -1;
         }
-        tokenPerExpert.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(params.ptrTokenPerExpert));
+        tokenPerExpert.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(params.ptrTokenPerExpert));
         tokenPerExpertLayout = params.tokenPerExpertLayout;
         is_ping = true;
     }
@@ -116,9 +116,9 @@ public:
     ~BlockEpilogue() {}
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementC> const &gmC,
-                    AscendC::GlobalTensor<ElementPerTokenScale> const &gmPerTokenScale, GemmCoord &blockCoord,
-                    GemmCoord &actualBlockShape, int32_t groupIdx, int32_t preSrcExpertSum,
+    void operator()(AscendC::GlobalTensor<ElementC> const& gmC,
+                    AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale, GemmCoord& blockCoord,
+                    GemmCoord& actualBlockShape, int32_t groupIdx, int32_t preSrcExpertSum,
                     AscendC::GlobalTensor<int32_t> preSumBeforeRank)
     {
         // BF16 path: per-token scale is not used (no dequant needed).
@@ -128,13 +128,13 @@ public:
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementC> const &gmC, GemmCoord &blockCoord, GemmCoord &actualBlockShape,
+    void operator()(AscendC::GlobalTensor<ElementC> const& gmC, GemmCoord& blockCoord, GemmCoord& actualBlockShape,
                     int32_t groupIdx, int32_t preSrcExpertSum, AscendC::GlobalTensor<int32_t> preSumBeforeRank)
     {
         is_ping = !is_ping;
         auto event_id = is_ping ? EVENT_ID0 : EVENT_ID1;
 
-        auto &ubC = ubCList[is_ping];
+        auto& ubC = ubCList[is_ping];
         int32_t gmCOffset = preSrcExpertSum * params.n2 + blockCoord.m() * params.n2 + blockCoord.n();
         auto gmTileC = gmC[gmCOffset];
 
@@ -181,8 +181,8 @@ public:
                 dstOffsetInExpert = stTile - stRankInExpert;
             }
             AscendC::GlobalTensor<ElementD> gmRemotePeer;
-            __gm__ void *dstPeermemPtr = params.shmem(params.offsetD, dstEpIdx);
-            gmRemotePeer.SetGlobalBuffer(reinterpret_cast<__gm__ ElementD *>(dstPeermemPtr));
+            __gm__ void* dstPeermemPtr = params.shmem(params.offsetD, dstEpIdx);
+            gmRemotePeer.SetGlobalBuffer(reinterpret_cast<__gm__ ElementD*>(dstPeermemPtr));
             MatrixCoord dstOffset{dstOffsetInExpert + dstExpertOffset, blockCoord.n()};
             int64_t gmDstOffset = params.layoutC.GetOffset(dstOffset);
             auto gmTileD = gmRemotePeer[gmDstOffset];
@@ -192,7 +192,7 @@ public:
             if (isCrossServer) {
                 AscendC::GlobalTensor<ElementD> gmLocalWindowsOut;
                 gmLocalWindowsOut.SetGlobalBuffer(
-                    reinterpret_cast<__gm__ ElementD *>(params.shmem.windowsOutAddr() + params.offsetWinOutD));
+                    reinterpret_cast<__gm__ ElementD*>(params.shmem.windowsOutAddr() + params.offsetWinOutD));
                 MatrixCoord srcOffset{(uint32_t)(stData + preSrcExpertSum), blockCoord.n()};
                 int64_t gmSrcOffset = params.layoutC.GetOffset(srcOffset);
                 auto gmTileLocal = gmLocalWindowsOut[gmSrcOffset];

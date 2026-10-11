@@ -148,7 +148,7 @@ struct Args {
     std::map<std::string, int64_t> addrMap;
 };
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shapeSize = 1;
     for (auto i : shape) {
@@ -157,7 +157,7 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
     return shapeSize;
 }
 
-int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
+int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream)
 {
     // 固定写法，资源初始化
     auto ret = aclInit(nullptr);
@@ -173,7 +173,7 @@ int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
     return 0;
 }
 
-int ReleaseAddr(vector<TensorInfo> &tensorList, map<string, int64_t> &addrMap)
+int ReleaseAddr(vector<TensorInfo>& tensorList, map<string, int64_t>& addrMap)
 {
     int len = tensorList.size();
     if (len == 0 || (len == 1 && tensorList[0].shape.size() == 0)) {
@@ -182,31 +182,31 @@ int ReleaseAddr(vector<TensorInfo> &tensorList, map<string, int64_t> &addrMap)
     for (size_t j = 0; j < len; ++j) {
         string name = tensorList[j].name;
         if (addrMap.find(name) != addrMap.end()) {
-            aclrtFree((void *)addrMap.at(name));
+            aclrtFree((void*)addrMap.at(name));
         }
     }
     return 0;
 }
 
-int DestroyTensor(void *items[], int item_type[], int num)
+int DestroyTensor(void* items[], int item_type[], int num)
 {
     for (size_t i = 0; i < num; ++i) {
         if (items[i] == nullptr) {
             continue;
         }
         if (item_type[i] == 0) {
-            aclDestroyTensor((aclTensor *)items[i]);
+            aclDestroyTensor((aclTensor*)items[i]);
         } else if (item_type[i] == 1) {
-            aclDestroyTensorList((aclTensorList *)items[i]);
+            aclDestroyTensorList((aclTensorList*)items[i]);
         } else {
-            aclDestroyIntArray((aclIntArray *)items[i]);
+            aclDestroyIntArray((aclIntArray*)items[i]);
         }
     }
     return 0;
 }
 
-int CreateAclTensor(std::vector<int64_t> &shape, std::string &name, std::string &dataTypeStr, void *&deviceAddr,
-                    void *&tensor, bool int_array, int rankId = 0)
+int CreateAclTensor(std::vector<int64_t>& shape, std::string& name, std::string& dataTypeStr, void*& deviceAddr,
+                    void*& tensor, bool int_array, int rankId = 0)
 {
     uint32_t axis = 0;
     uint32_t byteBlock = 0;
@@ -235,9 +235,9 @@ int CreateAclTensor(std::vector<int64_t> &shape, std::string &name, std::string 
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
 
     // 调用aclrtMemcpy将Host侧数据拷贝到Device侧内存上
-    uint8_t *hostData = new (std::nothrow) uint8_t[size];
+    uint8_t* hostData = new (std::nothrow) uint8_t[size];
     if (int_array) {
-        tensor = (void *)aclCreateIntArray((int64_t *)hostData, size / sizeof(int64_t));
+        tensor = (void*)aclCreateIntArray((int64_t*)hostData, size / sizeof(int64_t));
         delete[] hostData;
         return 0;
     }
@@ -251,12 +251,12 @@ int CreateAclTensor(std::vector<int64_t> &shape, std::string &name, std::string 
     }
 
     // 调用aclCreateTensor接口创建aclTensor
-    tensor = (void *)aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
-                                     shape.data(), shape.size(), deviceAddr);
+    tensor = (void*)aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
+                                    shape.data(), shape.size(), deviceAddr);
     return 0;
 }
 
-int CreateTensor_(int i, vector<TensorInfo> &tensorList, map<string, int64_t> &addrMap, void *items[], int item_type[],
+int CreateTensor_(int i, vector<TensorInfo>& tensorList, map<string, int64_t>& addrMap, void* items[], int item_type[],
                   bool copy, int rankId)
 {
     int len = tensorList.size();
@@ -265,24 +265,24 @@ int CreateTensor_(int i, vector<TensorInfo> &tensorList, map<string, int64_t> &a
         item_type[i] = 1;
         return 0;
     }
-    void *tensors[len];
+    void* tensors[len];
     for (int j = 0; j < len; ++j) {
         string name = tensorList[j].name;
         vector<int64_t> shape = tensorList[j].shape;
         string dtype = tensorList[j].dtype;
-        void *deviceAddr = nullptr;
+        void* deviceAddr = nullptr;
         auto ret = CreateAclTensor(shape, name, dtype, deviceAddr, tensors[j], false, rankId);
         addrMap[name] = (int64_t)deviceAddr;
         if (ret != 0) {
             return -1;
         }
     }
-    items[i] = (void *)aclCreateTensorList((aclTensor **)tensors, len);
+    items[i] = (void*)aclCreateTensorList((aclTensor**)tensors, len);
     item_type[i] = 1;
     return 0;
 }
 
-int CreateTensor(TensorsInfo &config, map<string, int64_t> &addrMap, void *items[], int item_type[], bool copy,
+int CreateTensor(TensorsInfo& config, map<string, int64_t>& addrMap, void* items[], int item_type[], bool copy,
                  int rankId)
 {
     int ret = 0;
@@ -306,8 +306,8 @@ int CreateTensor(TensorsInfo &config, map<string, int64_t> &addrMap, void *items
         }
 
         bool int_array = true;
-        void *deviceAddr = nullptr;
-        TensorInfo &grouplist = config.grouplist_array[0];
+        void* deviceAddr = nullptr;
+        TensorInfo& grouplist = config.grouplist_array[0];
         ret =
             CreateAclTensor(grouplist.shape, grouplist.name, grouplist.dtype, deviceAddr, items[3], int_array, rankId);
         addrMap[grouplist.name] = (int64_t)deviceAddr;
@@ -319,8 +319,8 @@ int CreateTensor(TensorsInfo &config, map<string, int64_t> &addrMap, void *items
     return 0;
 }
 
-int PrepareDeviceMemAndData(TensorsInfo &config, std::map<std::string, int64_t> &addrMap, void **inputs, void **outputs,
-                            int *input_type, int *output_type, int rankId)
+int PrepareDeviceMemAndData(TensorsInfo& config, std::map<std::string, int64_t>& addrMap, void** inputs, void** outputs,
+                            int* input_type, int* output_type, int rankId)
 {
     int ret = 0;
     ret = CreateTensor(config, addrMap, inputs, input_type, true, rankId);
@@ -331,20 +331,20 @@ int PrepareDeviceMemAndData(TensorsInfo &config, std::map<std::string, int64_t> 
 }
 
 typedef int32_t rtError_t;
-typedef void *rtNotify_t;
-typedef void *rtStream_t;
+typedef void* rtNotify_t;
+typedef void* rtStream_t;
 
 // init hccl args end
 extern "C" rtError_t rtNotifyWait(rtNotify_t notify, rtStream_t stm);
 extern "C" rtError_t rtNotifyRecord(rtNotify_t notify, rtStream_t stm);
-extern "C" rtError_t rtNotifyCreate(int32_t deviceId, rtNotify_t *notify);
-extern "C" HcclResult HcclCreateComResource(char *commName, uint32_t streamMode, void **commContext);
-extern "C" HcclResult HcclGetAicpuOpStreamNotify(char *commName, rtStream_t *Opstream, void **aicpuNotify);
+extern "C" rtError_t rtNotifyCreate(int32_t deviceId, rtNotify_t* notify);
+extern "C" HcclResult HcclCreateComResource(char* commName, uint32_t streamMode, void** commContext);
+extern "C" HcclResult HcclGetAicpuOpStreamNotify(char* commName, rtStream_t* Opstream, void** aicpuNotify);
 
-int callMatmulAndAicpu(HcclComm hcclComm, void **inputs, void **outputs, int *input_type, int *output_type,
-                       DataSize &dataPara, aclrtStream rtStream, aclrtEvent startEvent, aclrtEvent endEvent,
+int callMatmulAndAicpu(HcclComm hcclComm, void** inputs, void** outputs, int* input_type, int* output_type,
+                       DataSize& dataPara, aclrtStream rtStream, aclrtEvent startEvent, aclrtEvent endEvent,
                        int checkErr, int ndev, int rankId, int deviceId, int rootRank, std::string dtype,
-                       std::map<std::string, int64_t> &addrMap) // 主函数
+                       std::map<std::string, int64_t>& addrMap) // 主函数
 {
     struct timespec tp1, tp2;
     long cost;
@@ -360,16 +360,16 @@ int callMatmulAndAicpu(HcclComm hcclComm, void **inputs, void **outputs, int *in
     printf("rank %d hcom name is %s\n", rankId, hcom_name);
     // **********Add Hcommname end*********
 
-    void *workspaceAddr = nullptr;
+    void* workspaceAddr = nullptr;
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor;
+    aclOpExecutor* executor;
     int64_t split_item = 0;
     inputs[3] = nullptr;
     int64_t comm_turn = 0;
 
     auto aclnnRet = aclnnGroupedMatMulAllReduceGetWorkspaceSize(
-        (aclTensorList *)inputs[0], (aclTensorList *)inputs[1], (aclTensorList *)inputs[2], (aclIntArray *)inputs[3],
-        split_item, hcom_name, "sum", comm_turn, 1, (aclTensorList *)outputs[0], &workspaceSize, &executor);
+        (aclTensorList*)inputs[0], (aclTensorList*)inputs[1], (aclTensorList*)inputs[2], (aclIntArray*)inputs[3],
+        split_item, hcom_name, "sum", comm_turn, 1, (aclTensorList*)outputs[0], &workspaceSize, &executor);
     CHECK_RET(aclnnRet == ACL_SUCCESS,
               printf("[ERROR] aclnnGroupedMatMulAllReduceGetWorkspaceSize failed. aclnnRet = %d \n", aclnnRet);
               return -1);
@@ -397,7 +397,7 @@ int callMatmulAndAicpu(HcclComm hcclComm, void **inputs, void **outputs, int *in
     return 0;
 }
 
-int launchOneThread(Args &args, TensorsInfo &config)
+int launchOneThread(Args& args, TensorsInfo& config)
 {
     std::string thread_name = "test" + std::to_string(args.logicDeviceId);
     prctl(PR_SET_NAME, thread_name.c_str());
@@ -424,10 +424,10 @@ int launchOneThread(Args &args, TensorsInfo &config)
     ACL_CHECK(aclrtSetCurrentContext(args.resources.context));
 
     constexpr int input_num = 4;
-    void *inputs[input_num];
+    void* inputs[input_num];
     int input_type[input_num];
     constexpr int output_num = 1;
-    void *outputs[output_num];
+    void* outputs[output_num];
     int output_type[output_num];
     args.addrMap.clear();
     ret = PrepareDeviceMemAndData(config, args.addrMap, inputs, outputs, input_type, output_type, args.rankId);
@@ -468,7 +468,7 @@ int launchOneThread(Args &args, TensorsInfo &config)
     return 0;
 }
 
-int launchMultiThread(Args &input_args, int32_t *devices, HcclComm *comms, Resource *resources)
+int launchMultiThread(Args& input_args, int32_t* devices, HcclComm* comms, Resource* resources)
 {
     DataSize dataPara;
     dataPara.data_size = 10485760;
@@ -581,7 +581,7 @@ int launchMultiThread(Args &input_args, int32_t *devices, HcclComm *comms, Resou
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     // usage: ./main
     int ret = 0;

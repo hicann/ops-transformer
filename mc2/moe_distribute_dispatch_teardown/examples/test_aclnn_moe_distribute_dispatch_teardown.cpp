@@ -56,7 +56,7 @@ constexpr int64_t TIMEOUT = 100000000;
 template <typename Func>
 class Guard {
 public:
-    explicit Guard(Func &func)
+    explicit Guard(Func& func)
         : func_(func)
     {}
 
@@ -66,7 +66,7 @@ public:
     }
 
 private:
-    Func &func_;
+    Func& func_;
 };
 
 struct Args {
@@ -77,7 +77,7 @@ struct Args {
     aclrtStream teardownStream;
 };
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t size = 1;
     for (int64_t dim : shape) {
@@ -87,8 +87,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, aclDataType dataType,
-                    void **deviceAddr, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, aclDataType dataType,
+                    void** deviceAddr, aclTensor** tensor)
 {
     const size_t size = static_cast<size_t>(GetShapeSize(shape)) * sizeof(T);
     int ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -107,21 +107,21 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return ACL_SUCCESS;
 }
 
-void DestroyTensor(aclTensor *tensor)
+void DestroyTensor(aclTensor* tensor)
 {
     if (tensor != nullptr) {
         aclDestroyTensor(tensor);
     }
 }
 
-void FreeDeviceAddr(void *deviceAddr)
+void FreeDeviceAddr(void* deviceAddr)
 {
     if (deviceAddr != nullptr) {
         aclrtFree(deviceAddr);
     }
 }
 
-int LaunchOneProcess(Args &args)
+int LaunchOneProcess(Args& args)
 {
     std::cout << "[INFO] device_" << args.rankId << " worker start." << std::endl;
     int ret = aclrtSetCurrentContext(args.context);
@@ -170,27 +170,27 @@ int LaunchOneProcess(Args &args)
     std::vector<int32_t> assistInfoHostData(GetShapeSize(assistInfoShape), 0);
     std::vector<int64_t> expertTokenNumsHostData(GetShapeSize(expertTokenNumsShape), 0);
 
-    void *xAddr = nullptr;
-    void *expertIdsAddr = nullptr;
-    void *yAddr = nullptr;
-    void *expandIdxAddr = nullptr;
-    void *commCmdInfoAddr = nullptr;
-    void *expandXAddr = nullptr;
-    void *dynamicScalesAddr = nullptr;
-    void *assistInfoAddr = nullptr;
-    void *expertTokenNumsAddr = nullptr;
-    void *setupWorkspace = nullptr;
-    void *teardownWorkspace = nullptr;
+    void* xAddr = nullptr;
+    void* expertIdsAddr = nullptr;
+    void* yAddr = nullptr;
+    void* expandIdxAddr = nullptr;
+    void* commCmdInfoAddr = nullptr;
+    void* expandXAddr = nullptr;
+    void* dynamicScalesAddr = nullptr;
+    void* assistInfoAddr = nullptr;
+    void* expertTokenNumsAddr = nullptr;
+    void* setupWorkspace = nullptr;
+    void* teardownWorkspace = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *expertIds = nullptr;
-    aclTensor *y = nullptr;
-    aclTensor *expandIdx = nullptr;
-    aclTensor *commCmdInfo = nullptr;
-    aclTensor *expandX = nullptr;
-    aclTensor *dynamicScales = nullptr;
-    aclTensor *assistInfo = nullptr;
-    aclTensor *expertTokenNums = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* expertIds = nullptr;
+    aclTensor* y = nullptr;
+    aclTensor* expandIdx = nullptr;
+    aclTensor* commCmdInfo = nullptr;
+    aclTensor* expandX = nullptr;
+    aclTensor* dynamicScales = nullptr;
+    aclTensor* assistInfo = nullptr;
+    aclTensor* expertTokenNums = nullptr;
 
     auto tensorCleanup = [&]() {
         DestroyTensor(x);
@@ -240,7 +240,7 @@ int LaunchOneProcess(Args &args)
 
     /******************************调用dispatch_setup********************************************/
     uint64_t setupWorkspaceSize = 0;
-    aclOpExecutor *setupExecutor = nullptr;
+    aclOpExecutor* setupExecutor = nullptr;
     ret = aclnnMoeDistributeDispatchSetupGetWorkspaceSize(
         x, expertIds, nullptr, nullptr, groupEp, EP_WORLD_SIZE, args.rankId, MOE_EXPERT_NUM, EXPERT_SHARD_TYPE,
         SHARED_EXPERT_NUM, SHARED_EXPERT_RANK_NUM, QUANT_MODE, GLOBAL_BS, COMM_TYPE, nullptr, y, expandIdx, commCmdInfo,
@@ -265,7 +265,7 @@ int LaunchOneProcess(Args &args)
 
     /******************************调用dispatch_teardown********************************************/
     uint64_t teardownWorkspaceSize = 0;
-    aclOpExecutor *teardownExecutor = nullptr;
+    aclOpExecutor* teardownExecutor = nullptr;
     ret = aclnnMoeDistributeDispatchTeardownGetWorkspaceSize(
         x, y, expertIds, commCmdInfo, groupEp, EP_WORLD_SIZE, args.rankId, MOE_EXPERT_NUM, EXPERT_SHARD_TYPE,
         SHARED_EXPERT_NUM, SHARED_EXPERT_RANK_NUM, QUANT_MODE, GLOBAL_BS, EXPERT_TOKEN_NUMS_TYPE, COMM_TYPE, nullptr,
@@ -292,7 +292,7 @@ int LaunchOneProcess(Args &args)
     return ACL_SUCCESS;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclInit failed. ret = %d\n", ret); return ret);
@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
         threads[rankId] =
             std::thread([&args, &results, rankId]() { results[rankId] = LaunchOneProcess(args[rankId]); });
     }
-    for (auto &thread : threads) {
+    for (auto& thread : threads) {
         thread.join();
     }
 

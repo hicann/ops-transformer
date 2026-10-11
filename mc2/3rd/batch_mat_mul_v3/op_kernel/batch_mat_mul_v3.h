@@ -33,12 +33,12 @@ const uint64_t CV_SYNC_FLAG = 4UL;
 const uint64_t AIC_SYNC_FLAG = 6UL;
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE,
-          class BLOCK_TYPE = Mc2BatchMatMulMultiBatchBaseBlock, const MatmulConfig &MM_CFG = MM_CFG_ORDER_M>
+          class BLOCK_TYPE = Mc2BatchMatMulMultiBatchBaseBlock, const MatmulConfig& MM_CFG = MM_CFG_ORDER_M>
 class Mc2BatchMatMulMultiBatchKernel {
 public:
     __aicore__ inline Mc2BatchMatMulMultiBatchKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
-                                GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
+                                GM_ADDR workspaceGM, const void* tilingData, TPipe* pipe);
     __aicore__ inline void UpdateGlobalTensor(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                               GM_ADDR workspaceGM);
     __aicore__ inline void Process();
@@ -46,7 +46,7 @@ public:
     {
         mm_.End();
     }
-    template <class A_TP, class B_TP, class C_TP, class BIAS_TP, class BLOCK_TP, const MatmulConfig &MM_CFG_VAL>
+    template <class A_TP, class B_TP, class C_TP, class BIAS_TP, class BLOCK_TP, const MatmulConfig& MM_CFG_VAL>
     friend class Mc2BatchMatMulUnalignedMultiBatchKernel;
 
 protected:
@@ -60,16 +60,16 @@ protected:
     GlobalTensor<B_T> bGlobal_;
     GlobalTensor<C_T> cGlobal_;
     GlobalTensor<BiasT> biasGlobal_;
-    TPipe *pipe_;
+    TPipe* pipe_;
 
 private:
     __aicore__ inline void InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM);
 };
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM,
-    const void *tilingData, TPipe *pipe)
+    const void* tilingData, TPipe* pipe)
 {
     if ASCEND_IS_AIV {
         return;
@@ -95,13 +95,13 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BI
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE = Mc2MatmulBaseBlock,
-          const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD>
+          const MatmulConfig& MM_CFG = MM_CFG_NO_PRELOAD>
 class Mc2BatchMatMulUnalignedKernel {
 public:
     __aicore__ inline Mc2BatchMatMulUnalignedKernel() {}
 
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
-                                GM_ADDR workspaceGM, const Mc2BatchMatmulTilingData *matmulTilingData, TPipe *pipe);
+                                GM_ADDR workspaceGM, const Mc2BatchMatmulTilingData* matmulTilingData, TPipe* pipe);
 
     __aicore__ inline void Process();
 
@@ -117,27 +117,27 @@ protected:
     using B_T = typename B_TYPE::T;
     using C_T = typename C_TYPE::T;
     using BiasT = typename BIAS_TYPE::T;
-    TPipe *pipe_;
-    const Mc2BatchMatmulTilingData *tilingPtr_;
+    TPipe* pipe_;
+    const Mc2BatchMatmulTilingData* tilingPtr_;
 };
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void Mc2BatchMatMulUnalignedKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process()
 {
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == 220
-    const AscendC::tiling::TCubeTiling &tiling = tilingPtr_->matmulTiling.matmulTiling;
-    const uint32_t &batchA1 = tilingPtr_->Mc2multiBatchInfo.aBatchDim0;
-    const uint32_t &batchA2 = tilingPtr_->Mc2multiBatchInfo.aBatchDim1;
-    const uint32_t &batchA3 = tilingPtr_->Mc2multiBatchInfo.aBatchDim2;
-    const uint32_t &batchA4 = tilingPtr_->Mc2multiBatchInfo.aBatchDim3;
-    const uint32_t &batchB1 = tilingPtr_->Mc2multiBatchInfo.bBatchDim0;
-    const uint32_t &batchB2 = tilingPtr_->Mc2multiBatchInfo.bBatchDim1;
-    const uint32_t &batchB3 = tilingPtr_->Mc2multiBatchInfo.bBatchDim2;
-    const uint32_t &batchB4 = tilingPtr_->Mc2multiBatchInfo.bBatchDim3;
-    const uint32_t &batchC1 = tilingPtr_->Mc2multiBatchInfo.cBatchDim0;
-    const uint32_t &batchC2 = tilingPtr_->Mc2multiBatchInfo.cBatchDim1;
-    const uint32_t &batchC3 = tilingPtr_->Mc2multiBatchInfo.cBatchDim2;
-    const uint32_t &batchC4 = tilingPtr_->Mc2multiBatchInfo.cBatchDim3;
+    const AscendC::tiling::TCubeTiling& tiling = tilingPtr_->matmulTiling.matmulTiling;
+    const uint32_t& batchA1 = tilingPtr_->Mc2multiBatchInfo.aBatchDim0;
+    const uint32_t& batchA2 = tilingPtr_->Mc2multiBatchInfo.aBatchDim1;
+    const uint32_t& batchA3 = tilingPtr_->Mc2multiBatchInfo.aBatchDim2;
+    const uint32_t& batchA4 = tilingPtr_->Mc2multiBatchInfo.aBatchDim3;
+    const uint32_t& batchB1 = tilingPtr_->Mc2multiBatchInfo.bBatchDim0;
+    const uint32_t& batchB2 = tilingPtr_->Mc2multiBatchInfo.bBatchDim1;
+    const uint32_t& batchB3 = tilingPtr_->Mc2multiBatchInfo.bBatchDim2;
+    const uint32_t& batchB4 = tilingPtr_->Mc2multiBatchInfo.bBatchDim3;
+    const uint32_t& batchC1 = tilingPtr_->Mc2multiBatchInfo.cBatchDim0;
+    const uint32_t& batchC2 = tilingPtr_->Mc2multiBatchInfo.cBatchDim1;
+    const uint32_t& batchC3 = tilingPtr_->Mc2multiBatchInfo.cBatchDim2;
+    const uint32_t& batchC4 = tilingPtr_->Mc2multiBatchInfo.cBatchDim3;
 
     uint64_t offsetA = static_cast<uint64_t>(tiling.M) * tiling.Ka * sizeof(A_T);
     uint64_t offsetB = static_cast<uint64_t>(tiling.Kb) * tiling.N * sizeof(B_T);
@@ -190,10 +190,10 @@ __aicore__ inline void Mc2BatchMatMulUnalignedKernel<A_TYPE, B_TYPE, C_TYPE, BIA
 #endif
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void Mc2BatchMatMulUnalignedKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM,
-    const Mc2BatchMatmulTilingData *matmulTilingDataPtr, TPipe *pipePtr)
+    const Mc2BatchMatmulTilingData* matmulTilingDataPtr, TPipe* pipePtr)
 {
     pipe_ = pipePtr;
     tilingPtr_ = matmulTilingDataPtr;
@@ -206,7 +206,7 @@ __aicore__ inline void Mc2BatchMatMulUnalignedKernel<A_TYPE, B_TYPE, C_TYPE, BIA
     mm_.Init(aGM_, bGM_, cGM_, biasGM_, offsetWGM_, workspaceGM_, &(tilingPtr_->matmulTiling), pipe_);
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE,
                                                       MM_CFG>::InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM,
                                                                           GM_ADDR biasGM)
@@ -215,27 +215,27 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BI
     using B_T = typename B_TYPE::T;
     using C_T = typename C_TYPE::T;
     using BiasT = typename BIAS_TYPE::T;
-    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM),
+    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T*>(aGM),
                              static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.M) *
                                  block_.batchMatmulTilingData_->matmulTiling.matmulTiling.Ka *
                                  block_.batchMatmulTilingData_->Mc2multiBatchInfo.aBatchDimAll);
-    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM),
+    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T*>(bGM),
                              static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.Kb) *
                                  block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N *
                                  block_.batchMatmulTilingData_->Mc2multiBatchInfo.bBatchDimAll);
-    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM),
+    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T*>(cGM),
                              static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.M) *
                                  block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N *
                                  block_.batchMatmulTilingData_->Mc2multiBatchInfo.cBatchDimAll);
 
     if (block_.batchMatmulTilingData_->Mc2multiBatchInfo.biasWithBatch) {
-        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM),
+        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT*>(biasGM),
                                     static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N) *
                                         block_.batchMatmulTilingData_->Mc2multiBatchInfo.cBatchDimAll);
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process()
 {
     if ASCEND_IS_AIV {
@@ -269,13 +269,13 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BI
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE = Mc2BatchMatMulCommonBaseBlock,
-          const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD, class MM_CB = MatmulCallBackFunc<nullptr, nullptr, nullptr>>
+          const MatmulConfig& MM_CFG = MM_CFG_NO_PRELOAD, class MM_CB = MatmulCallBackFunc<nullptr, nullptr, nullptr>>
 class Mc2BatchMatMulCommonKernel {
 public:
     __aicore__ inline Mc2BatchMatMulCommonKernel() {}
 
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
-                                GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
+                                GM_ADDR workspaceGM, const void* tilingData, TPipe* pipe);
 
     __aicore__ inline void UpdateGlobalTensor(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                               GM_ADDR workspaceGM);
@@ -300,7 +300,7 @@ protected:
     GlobalTensor<B_T> bGlobal_;
     GlobalTensor<C_T> cGlobal_;
     GlobalTensor<BiasT> biasGlobal_;
-    TPipe *pipe_;
+    TPipe* pipe_;
     TBuf<> ubBuf_;
 
 private:
@@ -308,11 +308,11 @@ private:
     __aicore__ inline void SetOrgShape();
 };
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           class MM_CB>
 __aicore__ inline void Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM,
-    const void *tilingData, TPipe *pipe)
+    const void* tilingData, TPipe* pipe)
 {
     // cube core cases, ignore vector core
     if ASCEND_IS_AIV {
@@ -338,7 +338,7 @@ __aicore__ inline void Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_T
     SetOrgShape();
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           class MM_CB>
 __aicore__ inline void Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG,
                                                   MM_CB>::InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM,
@@ -348,15 +348,15 @@ __aicore__ inline void Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_T
     using B_T = typename B_TYPE::T;
     using C_T = typename C_TYPE::T;
     using BiasT = typename BIAS_TYPE::T;
-    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM),
+    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T*>(aGM),
                              block_.params_.aBatchDimAll *
                                  static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.M) *
                                  block_.batchMatmulTilingData_->matmulTiling.matmulTiling.Ka);
-    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM),
+    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T*>(bGM),
                              block_.params_.bBatchDimAll *
                                  static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.Kb) *
                                  block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N);
-    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM),
+    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T*>(cGM),
                              block_.params_.cBatchDimAll *
                                  static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.M) *
                                  block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N);
@@ -366,11 +366,11 @@ __aicore__ inline void Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_T
                             block_.params_.cBatchDimAll *
                                 static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N) :
                             block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N;
-        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM), biasSize);
+        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT*>(biasGM), biasSize);
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           class MM_CB>
 __aicore__ inline void
 Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB>::SetOrgShape()
@@ -392,7 +392,7 @@ Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG
 #endif
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           class MM_CB>
 __aicore__ inline void Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG,
                                                   MM_CB>::UpdateGlobalTensor(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM,
@@ -402,7 +402,7 @@ __aicore__ inline void Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_T
     InitInputs(aGM, bGM, cGM, biasGM);
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           class MM_CB>
 __aicore__ inline void Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG,
                                                   MM_CB>::InnerProcess(uint64_t mTileIndex, uint64_t nTileIndex)
@@ -433,7 +433,7 @@ __aicore__ inline void Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_T
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           class MM_CB>
 __aicore__ inline void
 Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, MM_CB>::Process()
@@ -469,7 +469,7 @@ Mc2BatchMatMulCommonKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE,
-          class BLOCK_TYPE = Mc2BatchMatMulUnalignedMultiBatchBaseBlock, const MatmulConfig &MM_CFG = MM_CFG_ORDER_M>
+          class BLOCK_TYPE = Mc2BatchMatMulUnalignedMultiBatchBaseBlock, const MatmulConfig& MM_CFG = MM_CFG_ORDER_M>
 class Mc2BatchMatMulUnalignedMultiBatchKernel {
     struct Mc2UnAlignedKernelParams {
         bool isTransposeA;
@@ -493,7 +493,7 @@ class Mc2BatchMatMulUnalignedMultiBatchKernel {
 public:
     __aicore__ inline Mc2BatchMatMulUnalignedMultiBatchKernel(){};
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
-                                GM_ADDR workspaceGM, const Mc2BatchMatmulTilingData *tilingData, TPipe *pipe);
+                                GM_ADDR workspaceGM, const Mc2BatchMatmulTilingData* tilingData, TPipe* pipe);
     __aicore__ inline void CalculateabGM(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                          GM_ADDR workspaceGM, uint64_t c0Size);
     __aicore__ inline void UpdateGlobalTensor(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
@@ -519,16 +519,16 @@ protected:
     GlobalTensor<A_T> aGlobal_;
     GlobalTensor<B_T> bGlobal_;
     GlobalTensor<C_T> cGlobal_;
-    TPipe *pipe_;
+    TPipe* pipe_;
     TBuf<> ubBuf_;
-    const Mc2BatchMatmulTilingData *tilingPtr_;
+    const Mc2BatchMatmulTilingData* tilingPtr_;
 };
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM,
-    const Mc2BatchMatmulTilingData *tilingData, TPipe *pipe)
+    const Mc2BatchMatmulTilingData* tilingData, TPipe* pipe)
 {
     pipe_ = pipe;
     pipe_->InitBuffer(ubBuf_, TOTAL_UB_SIZE);
@@ -578,7 +578,7 @@ Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::CalculateabGM(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM, uint64_t c0Size)
@@ -612,7 +612,7 @@ Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE,
                                                                MM_CFG>::CalculateAlign(uint64_t c0Size)
 {
@@ -657,7 +657,7 @@ __aicore__ inline void Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C
                                       sizeof(B_T) * alignedKbSize * alignedNSize;
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::UpdateGlobalTensor(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM)
@@ -673,7 +673,7 @@ Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE,
                                                                MM_CFG>::UpdateabGM(uint64_t loopIndex)
 {
@@ -724,7 +724,7 @@ __aicore__ inline void Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::ProcessNDtoNZ()
 {
@@ -751,7 +751,7 @@ Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK
     SyncAll();
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::Process()
 {
@@ -799,7 +799,7 @@ Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK
     }
 };
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG>
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG>
 __aicore__ inline void
 Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG>::End()
 {
@@ -812,10 +812,10 @@ Mc2BatchMatMulUnalignedMultiBatchKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK
     }
 }
 
-__aicore__ inline void BmmCopyAL1(const LocalTensor<int8_t> &aMatrix, const __gm__ void *gm, int row, int col, int useM,
+__aicore__ inline void BmmCopyAL1(const LocalTensor<int8_t>& aMatrix, const __gm__ void* gm, int row, int col, int useM,
                                   int useK, const uint64_t tilingPtr, const uint64_t dataPtr)
 {
-    Mc2BatchMatmulTilingData *tilingDataPtr = reinterpret_cast<Mc2BatchMatmulTilingData *>(tilingPtr);
+    Mc2BatchMatmulTilingData* tilingDataPtr = reinterpret_cast<Mc2BatchMatmulTilingData*>(tilingPtr);
     if (tilingDataPtr == nullptr || !Mc2MatmulV3::ctx.isFirst) {
         return;
     }
@@ -824,10 +824,10 @@ __aicore__ inline void BmmCopyAL1(const LocalTensor<int8_t> &aMatrix, const __gm
     Mc2MatmulV3::ctx.isFirst = false;
 }
 
-__aicore__ inline void BmmCopyBL1(const LocalTensor<int8_t> &bMatrix, const __gm__ void *gm, int row, int col, int useK,
+__aicore__ inline void BmmCopyBL1(const LocalTensor<int8_t>& bMatrix, const __gm__ void* gm, int row, int col, int useK,
                                   int useN, const uint64_t tilingPtr, const uint64_t dataPtr)
 {
-    Mc2BatchMatmulTilingData *tilingDataPtr = reinterpret_cast<Mc2BatchMatmulTilingData *>(tilingPtr);
+    Mc2BatchMatmulTilingData* tilingDataPtr = reinterpret_cast<Mc2BatchMatmulTilingData*>(tilingPtr);
     if (tilingDataPtr == nullptr || !Mc2MatmulV3::ctx.isFirst) {
         return;
     }
@@ -849,7 +849,7 @@ class Mc2BatchMatMulMultiBatchFullLoadKernel {
 public:
     __aicore__ inline Mc2BatchMatMulMultiBatchFullLoadKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
-                                GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
+                                GM_ADDR workspaceGM, const void* tilingData, TPipe* pipe);
     __aicore__ inline void UpdateGlobalTensor(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
                                               GM_ADDR workspaceGM);
     __aicore__ inline void Process();
@@ -871,7 +871,7 @@ protected:
     GlobalTensor<B_T> bGlobal_;
     GlobalTensor<C_T> cGlobal_;
     GlobalTensor<BiasT> biasGlobal_;
-    TPipe *pipe_;
+    TPipe* pipe_;
     TQue<QuePosition::A1, 1> InQueueAL1_;
     uint64_t c0Size;
 
@@ -884,7 +884,7 @@ private:
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE>
 __aicore__ inline void Mc2BatchMatMulMultiBatchFullLoadKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM,
-    const void *tilingData, TPipe *pipe)
+    const void* tilingData, TPipe* pipe)
 {
     if ASCEND_IS_AIV {
         return;
@@ -920,21 +920,21 @@ __aicore__ inline void Mc2BatchMatMulMultiBatchFullLoadKernel<A_TYPE, B_TYPE, C_
     using B_T = typename B_TYPE::T;
     using C_T = typename C_TYPE::T;
     using BiasT = typename BIAS_TYPE::T;
-    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM),
+    aGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ A_T*>(aGM),
                              static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.M) *
                                  block_.batchMatmulTilingData_->matmulTiling.matmulTiling.Ka *
                                  block_.batchMatmulTilingData_->Mc2multiBatchInfo.aBatchDimAll);
-    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM),
+    bGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ B_T*>(bGM),
                              static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.Kb) *
                                  block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N *
                                  block_.batchMatmulTilingData_->Mc2multiBatchInfo.bBatchDimAll);
-    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(cGM),
+    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ C_T*>(cGM),
                              static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.M) *
                                  block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N *
                                  block_.batchMatmulTilingData_->Mc2multiBatchInfo.cBatchDimAll);
 
     if (block_.batchMatmulTilingData_->Mc2multiBatchInfo.biasWithBatch) {
-        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM),
+        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT*>(biasGM),
                                     static_cast<uint64_t>(block_.batchMatmulTilingData_->matmulTiling.matmulTiling.N) *
                                         block_.batchMatmulTilingData_->Mc2multiBatchInfo.cBatchDimAll);
     }

@@ -34,15 +34,15 @@ public:
     __aicore__ inline HcclContextHolder(){};
 
     // 一次完成：保存 EP context + WinSize 越界校验。epWorldSize 仅供 mc2 路径暂存使用，hccl 路径忽略。
-    __aicore__ inline void InitAndCheck(GM_ADDR ctxPtr, uint32_t /* epWorldSize */, uint64_t totalWinSize, TPipe *pipe,
+    __aicore__ inline void InitAndCheck(GM_ADDR ctxPtr, uint32_t /* epWorldSize */, uint64_t totalWinSize, TPipe* pipe,
                                         GM_ADDR exceptionAddr)
     {
-        epContext_ = (__gm__ Mc2Kernel::HcclOpParam *)ctxPtr;
+        epContext_ = (__gm__ Mc2Kernel::HcclOpParam*)ctxPtr;
         Check(totalWinSize, pipe, exceptionAddr);
     }
 
     // 独立 check，便于调用方在某些场景仅做校验。
-    __aicore__ inline void Check(uint64_t totalWinSize, TPipe *pipe, GM_ADDR exceptionAddr)
+    __aicore__ inline void Check(uint64_t totalWinSize, TPipe* pipe, GM_ADDR exceptionAddr)
     {
         CheckWindowSize(totalWinSize, Mc2Kernel::GetWinSize(epContext_), pipe, exceptionAddr);
     }
@@ -73,7 +73,7 @@ public:
     }
 
 private:
-    __gm__ Mc2Kernel::HcclOpParam *epContext_{nullptr};
+    __gm__ Mc2Kernel::HcclOpParam* epContext_{nullptr};
 };
 
 } // namespace Mc2Kernel

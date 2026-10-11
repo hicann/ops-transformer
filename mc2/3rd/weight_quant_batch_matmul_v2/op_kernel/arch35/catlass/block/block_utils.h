@@ -26,7 +26,7 @@ public:
 namespace detail {
 
 template <typename T>
-DEVICE constexpr auto GetArgValue(T const &arg) -> decltype(arg)
+DEVICE constexpr auto GetArgValue(T const& arg) -> decltype(arg)
 {
     return arg;
 }
@@ -38,7 +38,7 @@ DEVICE constexpr T GetArgValue(AscendC::Std::integral_constant<T, Value>)
 }
 
 template <typename TupleT, typename ArgsTuple, size_t... I>
-DEVICE auto Crd2idxHelper(TupleT const &t, ArgsTuple const &argsTuple, AscendC::Std::index_sequence<I...>)
+DEVICE auto Crd2idxHelper(TupleT const& t, ArgsTuple const& argsTuple, AscendC::Std::index_sequence<I...>)
 {
     return (... +
             (GetArgValue<typename AscendC::Std::tuple_element<I, TupleT>::type>(AscendC::Std::get<I>(t)) *
@@ -49,7 +49,7 @@ template <size_t I, class Tuple>
 using deduce_optional_input_t = typename deduce_optional_input<I, Tuple>::type;
 
 template <typename... TupleTypes, typename... Args>
-DEVICE auto crd2idx(AscendC::Std::tuple<TupleTypes...> const &t, Args... args)
+DEVICE auto crd2idx(AscendC::Std::tuple<TupleTypes...> const& t, Args... args)
 {
     static_assert(sizeof...(Args) == sizeof...(TupleTypes), "The number of arguments must match the tuple size");
 

@@ -47,7 +47,7 @@ struct Args {
 constexpr uint32_t EP_WORLD_SIZE = 2;
 constexpr uint32_t DEV_NUM = EP_WORLD_SIZE;
 
-int64_t GetShapeSize(const std::vector<int64_t> &shape)
+int64_t GetShapeSize(const std::vector<int64_t>& shape)
 {
     int64_t shape_size = 1;
     for (auto i : shape) {
@@ -57,8 +57,8 @@ int64_t GetShapeSize(const std::vector<int64_t> &shape)
 }
 
 template <typename T>
-int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &shape, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -74,7 +74,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
     return 0;
 }
 
-int LaunchOneProcessDispatchAndCombine(Args &args)
+int LaunchOneProcessDispatchAndCombine(Args& args)
 {
     int ret = aclrtSetCurrentContext(args.context);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetCurrentContext failed, ret %d\n", ret); return ret);
@@ -112,41 +112,41 @@ int LaunchOneProcessDispatchAndCombine(Args &args)
 
     /* 根据当前场景，构造device侧输入输出变量 */
     // 声明device侧输入输出变量
-    void *xDeviceAddr = nullptr;
-    void *expertIdsDeviceAddr = nullptr;
-    void *scalesDeviceAddr = nullptr;
-    void *expertScalesDeviceAddr = nullptr;
-    void *expandXDeviceAddr = nullptr;
-    void *dynamicScalesDeviceAddr = nullptr;
-    void *expandIdxDeviceAddr = nullptr;
-    void *expertTokenNumsDeviceAddr = nullptr;
-    void *epRecvCountsDeviceAddr = nullptr;
-    void *tpRecvCountsDeviceAddr = nullptr;
-    void *expandScalesDeviceAddr = nullptr;
-    void *residualXDeviceAddr = nullptr;
-    void *sharedExpertXDeviceAddr = nullptr;
-    void *gammaDeviceAddr = nullptr;
-    void *yOutDeviceAddr = nullptr;
-    void *rstdOutDeviceAddr = nullptr;
-    void *xOutDeviceAddr = nullptr;
+    void* xDeviceAddr = nullptr;
+    void* expertIdsDeviceAddr = nullptr;
+    void* scalesDeviceAddr = nullptr;
+    void* expertScalesDeviceAddr = nullptr;
+    void* expandXDeviceAddr = nullptr;
+    void* dynamicScalesDeviceAddr = nullptr;
+    void* expandIdxDeviceAddr = nullptr;
+    void* expertTokenNumsDeviceAddr = nullptr;
+    void* epRecvCountsDeviceAddr = nullptr;
+    void* tpRecvCountsDeviceAddr = nullptr;
+    void* expandScalesDeviceAddr = nullptr;
+    void* residualXDeviceAddr = nullptr;
+    void* sharedExpertXDeviceAddr = nullptr;
+    void* gammaDeviceAddr = nullptr;
+    void* yOutDeviceAddr = nullptr;
+    void* rstdOutDeviceAddr = nullptr;
+    void* xOutDeviceAddr = nullptr;
 
-    aclTensor *x = nullptr;
-    aclTensor *expertIds = nullptr;
-    aclTensor *scales = nullptr;
-    aclTensor *expertScales = nullptr;
-    aclTensor *expandX = nullptr;
-    aclTensor *dynamicScales = nullptr;
-    aclTensor *expandIdx = nullptr;
-    aclTensor *expertTokenNums = nullptr;
-    aclTensor *epRecvCounts = nullptr;
-    aclTensor *tpRecvCounts = nullptr;
-    aclTensor *expandScales = nullptr;
-    aclTensor *residualX = nullptr;
-    aclTensor *sharedExpertX = nullptr;
-    aclTensor *gamma = nullptr;
-    aclTensor *yOut = nullptr;
-    aclTensor *rstdOut = nullptr;
-    aclTensor *xOut = nullptr;
+    aclTensor* x = nullptr;
+    aclTensor* expertIds = nullptr;
+    aclTensor* scales = nullptr;
+    aclTensor* expertScales = nullptr;
+    aclTensor* expandX = nullptr;
+    aclTensor* dynamicScales = nullptr;
+    aclTensor* expandIdx = nullptr;
+    aclTensor* expertTokenNums = nullptr;
+    aclTensor* epRecvCounts = nullptr;
+    aclTensor* tpRecvCounts = nullptr;
+    aclTensor* expandScales = nullptr;
+    aclTensor* residualX = nullptr;
+    aclTensor* sharedExpertX = nullptr;
+    aclTensor* gamma = nullptr;
+    aclTensor* yOut = nullptr;
+    aclTensor* rstdOut = nullptr;
+    aclTensor* xOut = nullptr;
 
     // 定义当前场景下各变量维度
     std::vector<int64_t> xShape{BS, H};
@@ -257,12 +257,12 @@ int LaunchOneProcessDispatchAndCombine(Args &args)
 
     /* 声明算子执行必需变量 */
     uint64_t dispatchWorkspaceSize = 0;
-    aclOpExecutor *dispatchExecutor = nullptr;
-    void *dispatchWorkspaceAddr = nullptr;
+    aclOpExecutor* dispatchExecutor = nullptr;
+    void* dispatchWorkspaceAddr = nullptr;
 
     uint64_t combineAddRmsNormWorkspaceSize = 0;
-    aclOpExecutor *combineAddRmsNormExecutor = nullptr;
-    void *combineWorkspaceAddr = nullptr;
+    aclOpExecutor* combineAddRmsNormExecutor = nullptr;
+    void* combineWorkspaceAddr = nullptr;
 
     /**************************************** 调用dispatch ********************************************/
 
@@ -435,7 +435,7 @@ int LaunchOneProcessDispatchAndCombine(Args &args)
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclInit failed, ret = %d\n", ret); return ret);

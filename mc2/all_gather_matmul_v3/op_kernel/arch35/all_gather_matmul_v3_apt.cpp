@@ -33,7 +33,7 @@ __global__ __aicore__ void all_gather_matmul_v3(GM_ADDR context, GM_ADDR x1, GM_
     REGISTER_TILING_DEFAULT(AllGatherMxMatmulUrmaTilingData);
     GET_TILING_DATA_WITH_STRUCT(AllGatherMxMatmulUrmaTilingData, tilingData, tilingGM);
 
-    __gm__ CommContext *hcommCtx = reinterpret_cast<__gm__ CommContext *>(context);
+    __gm__ CommContext* hcommCtx = reinterpret_cast<__gm__ CommContext*>(context);
 
     using Impl = AllGatherMxMatmulUrmaImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y>;
 

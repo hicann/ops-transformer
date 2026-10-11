@@ -113,7 +113,7 @@ public:
 
         BlockEpilogue blockEpilogue(resource);
         layout::RowMajor layoutC{m, n};
-        __gm__ OutputType *gmD = reinterpret_cast<__gm__ OutputType *>(output);
+        __gm__ OutputType* gmD = reinterpret_cast<__gm__ OutputType*>(output);
         for (uint32_t loopIdx = blockIdx; loopIdx < totalLoop; loopIdx += coreNum) {
             uint32_t dataBlockIdx = loopIdx / blockLoop;
             uint32_t blockLoopIdx = loopIdx % blockLoop;

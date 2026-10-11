@@ -72,12 +72,12 @@ private:
     __aicore__ inline void AICInit();
     __aicore__ inline void CatlassMatmul();
     template <typename LayoutB>
-    __aicore__ inline void DispatchMatmul(const LayoutB &layoutB);
+    __aicore__ inline void DispatchMatmul(const LayoutB& layoutB);
     template <typename LayoutB, int32_t TileM, int32_t TileN>
-    __aicore__ inline void LaunchMatmul(const LayoutB &layoutB);
+    __aicore__ inline void LaunchMatmul(const LayoutB& layoutB);
     __aicore__ inline void AIVComm();
     __aicore__ inline void Dequant(int32_t calIdx, uint64_t flagIdx);
-    __aicore__ inline void FirstStepInOut(int32_t actual_move_size, __gm__ cType *input, int32_t move_offset,
+    __aicore__ inline void FirstStepInOut(int32_t actual_move_size, __gm__ cType* input, int32_t move_offset,
                                           int32_t loop_idx_st);
     __aicore__ inline void FirstStepInOutWithSplit(int32_t rank_data_offset, int32_t loop_idx_st,
                                                    int32_t data_loop_idx);
@@ -89,10 +89,10 @@ protected:
     int32_t core_loop;
     int32_t cal_count;
 
-    __gm__ cType *gm_peer_mem;
-    __gm__ AType *gm_a_src;
-    __gm__ BType *gm_b_src;
-    __gm__ int32_t *gm_accum;
+    __gm__ cType* gm_peer_mem;
+    __gm__ AType* gm_a_src;
+    __gm__ BType* gm_b_src;
+    __gm__ int32_t* gm_accum;
 
 private:
     bool aligned_a;
@@ -127,9 +127,9 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
     hasBAlign = weight_nz ? false : hasBAlign;
     gm_a_align = reinterpret_cast<GM_ADDR>(hasAAlign ? workspaceGM : 0);
     gm_b_align = reinterpret_cast<GM_ADDR>(hasBAlign ? workspaceGM + aAlignSize : 0);
-    gm_accum = reinterpret_cast<__gm__ int32_t *>(quantFlag ? workspaceGM + aAlignSize + bAlignSize : 0);
-    gm_a_src = reinterpret_cast<__gm__ AType *>(hasAAlign ? gm_a_align : aGM_);
-    gm_b_src = reinterpret_cast<__gm__ BType *>(hasBAlign ? gm_b_align : bGM_);
+    gm_accum = reinterpret_cast<__gm__ int32_t*>(quantFlag ? workspaceGM + aAlignSize + bAlignSize : 0);
+    gm_a_src = reinterpret_cast<__gm__ AType*>(hasAAlign ? gm_a_align : aGM_);
+    gm_b_src = reinterpret_cast<__gm__ BType*>(hasBAlign ? gm_b_align : bGM_);
 
     if constexpr (!std::is_same_v<Derived, void>) {
         m_loop = CeilDev(m, m0);
@@ -151,7 +151,7 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
         SetLoadDataPaddingValue(0);
         SetAtomicNone();
         SetFixpipeNz2ndFlag(1, 0, 0);
-        gm_peer_mem = reinterpret_cast<__gm__ cType *>(buff[rank]);
+        gm_peer_mem = reinterpret_cast<__gm__ cType*>(buff[rank]);
     }
 }
 
@@ -197,13 +197,13 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
     uint32_t pValue = p_value;
     uint32_t swizzlDirect = swizzl_direct;
     uint32_t swizzlCount = swizzl_count;
-    __gm__ float32_t *perChannelScale =
-        needPerChannel ? reinterpret_cast<__gm__ float32_t *>(perChannelScaleGM_) : nullptr;
-    __gm__ float32_t *perTokenScale = needPerToken ? reinterpret_cast<__gm__ float32_t *>(perTokenScaleGM_) : nullptr;
-    __gm__ int32_t *workspace = needPerChannel ? reinterpret_cast<__gm__ int32_t *>(gm_accum) + pingpongSt : nullptr;
-    __gm__ cType *peerMem = reinterpret_cast<__gm__ cType *>(buff[rank]) + pingpongSt;
-    __gm__ cType *output = reinterpret_cast<__gm__ cType *>(cGM_);
-    __gm__ biasType *biasptr = reinterpret_cast<__gm__ biasType *>(biasGM_);
+    __gm__ float32_t* perChannelScale =
+        needPerChannel ? reinterpret_cast<__gm__ float32_t*>(perChannelScaleGM_) : nullptr;
+    __gm__ float32_t* perTokenScale = needPerToken ? reinterpret_cast<__gm__ float32_t*>(perTokenScaleGM_) : nullptr;
+    __gm__ int32_t* workspace = needPerChannel ? reinterpret_cast<__gm__ int32_t*>(gm_accum) + pingpongSt : nullptr;
+    __gm__ cType* peerMem = reinterpret_cast<__gm__ cType*>(buff[rank]) + pingpongSt;
+    __gm__ cType* output = reinterpret_cast<__gm__ cType*>(cGM_);
+    __gm__ biasType* biasptr = reinterpret_cast<__gm__ biasType*>(biasGM_);
 
     dequant_runner.RunMatmulReduceScatter(DEQUANT_ARGS_CALL());
     SetAndWaitAivSync(flagIdx);
@@ -264,7 +264,7 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
 
 template <TemplateMMReduceScatterV2Class, typename Derived>
 __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func, Derived>::FirstStepInOut(
-    int32_t actual_move_size, __gm__ cType *input, int32_t move_offset, int32_t loop_idx_st)
+    int32_t actual_move_size, __gm__ cType* input, int32_t move_offset, int32_t loop_idx_st)
 {
     auto ub_offset = USED_UB_SIZE / 2 / sizeof(cType);
     LocalTensor<cType> ubTensor = uBuf_.AllocTensor<cType>();
@@ -301,7 +301,7 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
             // left_m较小，则只copy left_m的部分
             int64_t out_buff_offset =
                 batch_idx * m * n / rank_size + (static_cast<int64_t>(m_idx) * m0 + m_offset) * n + n_idx * n0;
-            CopyUbufToGmUnknown(nAlign16, reinterpret_cast<__gm__ cType *>(cGM_) + out_buff_offset,
+            CopyUbufToGmUnknown(nAlign16, reinterpret_cast<__gm__ cType*>(cGM_) + out_buff_offset,
                                 ub_buff[ub_buff_offset], actual_move_m, actual_n * sizeof(cType),
                                 (n0 - actual_n) * sizeof(cType) / 32, (n - actual_n) * sizeof(cType));
         }
@@ -332,7 +332,7 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
         if (real_rank_idx == rank) {
             continue;
         }
-        FirstStepInOut(actual_move_num, reinterpret_cast<__gm__ cType *>(buff[real_rank_idx]) + rank_buff_offset,
+        FirstStepInOut(actual_move_num, reinterpret_cast<__gm__ cType*>(buff[real_rank_idx]) + rank_buff_offset,
                        data_offset, loop_idx_st);
     }
 }
@@ -382,7 +382,7 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
         }
         ResetIpcFlags(1);
         if (aiv_idx == 1 && core_idx < rank_size) {
-            CheckBuffFlag((__gm__ int32_t *)buff[other_rank] + FLAG_OFFSET + FLAG_ZERO_IDX, 0);
+            CheckBuffFlag((__gm__ int32_t*)buff[other_rank] + FLAG_OFFSET + FLAG_ZERO_IDX, 0);
         }
         PipeBarrier<PIPE_ALL>();
     }
@@ -395,8 +395,8 @@ __aicore__ inline void MatmulReduceScatterAivMode<TemplateMMReduceScatterV2Func,
         CatlassMatmul();
         AIVComm();
     } else {
-        static_cast<Derived *>(this)->CatlassMatmul();
-        static_cast<Derived *>(this)->AIVComm();
+        static_cast<Derived*>(this)->CatlassMatmul();
+        static_cast<Derived*>(this)->AIVComm();
     }
 }
 } // namespace MatmulReduceScatterV2Impl

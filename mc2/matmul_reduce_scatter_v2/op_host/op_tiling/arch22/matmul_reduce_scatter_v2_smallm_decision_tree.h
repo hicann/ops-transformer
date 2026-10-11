@@ -97,7 +97,7 @@ inline int TraverseDecisionTree(const DecisionNode (&decision_rules)[N], int m, 
     constexpr int RIGHT_NODE_OFFSET = 2;
 
     for (int i = 0; i < MAX_TREE_DEPTH; i++) {
-        const DecisionNode &node = decision_rules[node_idx];
+        const DecisionNode& node = decision_rules[node_idx];
 
         // 走到空占位符，理论不应发生，返回默认值
         if (node.feature == FeatureType::PLACEHOLDER) {

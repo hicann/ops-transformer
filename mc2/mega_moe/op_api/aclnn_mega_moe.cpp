@@ -31,7 +31,7 @@ extern "C" {
 #endif
 
 // 将int4打包为int32输入的Tensor还原回int4
-aclTensorList *ConvertTensorListToInt4(const aclTensorList *input, aclOpExecutor *executor)
+aclTensorList* ConvertTensorListToInt4(const aclTensorList* input, aclOpExecutor* executor)
 {
     if (input == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "ConvertTensorListToInt4: input is null.");
@@ -42,7 +42,7 @@ aclTensorList *ConvertTensorListToInt4(const aclTensorList *input, aclOpExecutor
         return nullptr;
     }
     constexpr int64_t INT4_NUMS_IN_INT32 = 8; // 每个int32包含8个int4
-    std::vector<aclTensor *> tensors;
+    std::vector<aclTensor*> tensors;
     const int tensorCount = input->Size();
     for (int i = 0; i < tensorCount; ++i) {
         auto tensor = (*input)[i];
@@ -58,7 +58,7 @@ aclTensorList *ConvertTensorListToInt4(const aclTensorList *input, aclOpExecutor
         inputTemp->SetViewFormat(Format::FORMAT_FRACTAL_NZ);
         tensors.push_back(inputTemp);
     }
-    aclTensorList *newInput = executor->AllocTensorList(tensors.data(), tensors.size());
+    aclTensorList* newInput = executor->AllocTensorList(tensors.data(), tensors.size());
     if (newInput == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER, "ConvertTensorListToInt4: AllocTensorList failed.");
         return nullptr;
@@ -67,24 +67,24 @@ aclTensorList *ConvertTensorListToInt4(const aclTensorList *input, aclOpExecutor
     return newInput;
 }
 
-static void CreateEmptyTensor(aclDataType dataType, const aclTensorList *&ioList, aclTensorList *&outList,
-                              aclOpExecutor *executor)
+static void CreateEmptyTensor(aclDataType dataType, const aclTensorList*& ioList, aclTensorList*& outList,
+                              aclOpExecutor* executor)
 {
     if (ioList == nullptr) {
-        std::vector<aclTensor *> emptyTensors;
-        aclTensor *emptyTensor = executor->AllocTensor({0}, static_cast<op::DataType>(dataType));
+        std::vector<aclTensor*> emptyTensors;
+        aclTensor* emptyTensor = executor->AllocTensor({0}, static_cast<op::DataType>(dataType));
         emptyTensors.emplace_back(emptyTensor);
         outList = executor->AllocTensorList(emptyTensors.data(), emptyTensors.size());
         ioList = outList;
     }
 }
 
-static void CreateEmptyTensorWithFormat(aclDataType dataType, ge::Format format, const aclTensorList *&ioList,
-                                        aclTensorList *&outList, aclOpExecutor *executor)
+static void CreateEmptyTensorWithFormat(aclDataType dataType, ge::Format format, const aclTensorList*& ioList,
+                                        aclTensorList*& outList, aclOpExecutor* executor)
 {
     if (ioList == nullptr) {
-        std::vector<aclTensor *> emptyTensors;
-        aclTensor *emptyTensor = executor->AllocTensor({0}, static_cast<op::DataType>(dataType));
+        std::vector<aclTensor*> emptyTensors;
+        aclTensor* emptyTensor = executor->AllocTensor({0}, static_cast<op::DataType>(dataType));
         emptyTensor->SetStorageFormat(format);
         emptyTensor->SetViewFormat(format);
         emptyTensors.emplace_back(emptyTensor);
@@ -98,18 +98,18 @@ static void CreateEmptyTensorWithFormat(aclDataType dataType, ge::Format format,
 // checks), which every aclnn path goes through. It is intentionally not duplicated here.
 
 aclnnStatus aclnnMegaMoeGetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x, const aclTensor *topkIds, const aclTensor *topkWeights,
-    const aclTensorList *weight1, const aclTensorList *weight2, const aclTensorList *weightScales1Optional,
-    const aclTensorList *weightScales2Optional, const aclTensorList *bias1Optional, const aclTensorList *bias2Optional,
-    const aclTensor *xActiveMaskOptional, const aclTensor *scalesOptional, const aclTensorList *sharedWeight1Optional,
-    const aclTensorList *sharedWeight2Optional, const aclTensorList *sharedWeightScales1Optional,
-    const aclTensorList *sharedWeightScales2Optional, const aclTensorList *sharedBias1Optional,
-    const aclTensorList *sharedBias2Optional, const aclTensor *maskBufferOptional, int64_t moeExpertNum,
+    const aclTensor* context, const aclTensor* x, const aclTensor* topkIds, const aclTensor* topkWeights,
+    const aclTensorList* weight1, const aclTensorList* weight2, const aclTensorList* weightScales1Optional,
+    const aclTensorList* weightScales2Optional, const aclTensorList* bias1Optional, const aclTensorList* bias2Optional,
+    const aclTensor* xActiveMaskOptional, const aclTensor* scalesOptional, const aclTensorList* sharedWeight1Optional,
+    const aclTensorList* sharedWeight2Optional, const aclTensorList* sharedWeightScales1Optional,
+    const aclTensorList* sharedWeightScales2Optional, const aclTensorList* sharedBias1Optional,
+    const aclTensorList* sharedBias2Optional, const aclTensor* maskBufferOptional, int64_t moeExpertNum,
     int64_t epWorldSize, int64_t cclBufferSize, int64_t maxRecvTokenNum, int64_t dispatchQuantMode,
-    int64_t dispatchQuantOutDtype, int64_t sharedExpertQuantOutDtype, int64_t combineQuantMode, const char *commAlg,
-    int64_t numMaxTokensPerRank, const char *activation, const aclFloatArray *activationParams, int64_t topoType,
-    int64_t rankNumPerServer, int64_t topkWeightsType, int64_t combineCommMode, aclTensor *yOut,
-    aclTensor *expertTokenNumsOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+    int64_t dispatchQuantOutDtype, int64_t sharedExpertQuantOutDtype, int64_t combineQuantMode, const char* commAlg,
+    int64_t numMaxTokensPerRank, const char* activation, const aclFloatArray* activationParams, int64_t topoType,
+    int64_t rankNumPerServer, int64_t topkWeightsType, int64_t combineCommMode, aclTensor* yOut,
+    aclTensor* expertTokenNumsOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     OP_LOGD("aclnn_mega_moe WorkspaceSize start");
 
@@ -136,11 +136,11 @@ aclnnStatus aclnnMegaMoeGetWorkspaceSize(
     }
 
     // 可选 DYNAMIC 参数为 nullptr 时创建带 dtype 的 dummy tensor list 满足支持列表校验
-    aclTensorList *tmpBiasList = nullptr;
-    aclTensorList *tmpScaleList = nullptr;
-    aclTensorList *tmpSharedBiasList = nullptr;
-    aclTensorList *tmpSharedScaleList = nullptr;
-    aclTensorList *tmpSharedWeightList = nullptr;
+    aclTensorList* tmpBiasList = nullptr;
+    aclTensorList* tmpScaleList = nullptr;
+    aclTensorList* tmpSharedBiasList = nullptr;
+    aclTensorList* tmpSharedScaleList = nullptr;
+    aclTensorList* tmpSharedWeightList = nullptr;
     CreateEmptyTensor(ACL_FLOAT, bias1Optional, tmpBiasList, *executor);
     CreateEmptyTensor(ACL_FLOAT, bias2Optional, tmpBiasList, *executor);
     CreateEmptyTensor(ACL_FLOAT, sharedBias1Optional, tmpSharedBiasList, *executor);
@@ -192,7 +192,7 @@ aclnnStatus aclnnMegaMoeGetWorkspaceSize(
 
     std::string commAlgValue = commAlg == nullptr ? std::string() : std::string(commAlg);
     std::string activationValue(activation);
-    char *commAlgData = commAlg == nullptr ? nullptr : commAlgValue.data();
+    char* commAlgData = commAlg == nullptr ? nullptr : commAlgValue.data();
 
     aclnnStatus getWorkspaceSizesRes = aclnnInnerMegaMoeGetWorkspaceSize(
         context, x, topkIds, topkWeights, weight1, weight2, weightScales1Optional, weightScales2Optional, bias1Optional,
@@ -206,7 +206,7 @@ aclnnStatus aclnnMegaMoeGetWorkspaceSize(
     return getWorkspaceSizesRes;
 }
 
-aclnnStatus aclnnMegaMoe(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)
+aclnnStatus aclnnMegaMoe(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     OP_LOGD("aclnn_mega_moe start");
     return aclnnInnerMegaMoe(workspace, workspaceSize, executor, stream);

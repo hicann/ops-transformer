@@ -61,29 +61,29 @@ constexpr uint64_t KEY_SCALES_FP32 = 0ULL;
 constexpr uint64_t KEY_SCALES_FP16 = 10ULL;
 constexpr uint64_t KEY_SCALES_BF16 = 20ULL;
 
-const char *MOE_UPDATE_EXPERT_DEBUG = "MoeUpdateExpert Tiling";
+const char* MOE_UPDATE_EXPERT_DEBUG = "MoeUpdateExpert Tiling";
 
 class MoeUpdateExpertTiling {
 public:
-    MoeUpdateExpertTilingData *tilingData;
+    MoeUpdateExpertTilingData* tilingData;
 
-    ge::graphStatus Init(gert::TilingContext *context);
-    ge::graphStatus RunFusionKernelTiling(gert::TilingContext *context);
+    ge::graphStatus Init(gert::TilingContext* context);
+    ge::graphStatus RunFusionKernelTiling(gert::TilingContext* context);
 
 protected:
-    ge::graphStatus CheckAttrs(const gert::TilingContext *context) const;
-    ge::graphStatus CheckInputDataType(const gert::TilingContext *context) const;
-    ge::graphStatus CheckOptionalInputDataType(const gert::TilingContext *context);
-    ge::graphStatus CheckOutputDataType(const gert::TilingContext *context) const;
-    ge::graphStatus CheckDataType(const gert::TilingContext *context);
-    ge::graphStatus CheckFormat(const gert::TilingContext *context) const;
-    ge::graphStatus CheckInputShape(const gert::TilingContext *context) const;
-    ge::graphStatus CheckExpertScalesShape(const gert::TilingContext *context);
-    ge::graphStatus CheckPruningThresholdShape(const gert::TilingContext *context);
-    ge::graphStatus CheckActiveMaskShape(const gert::TilingContext *context);
-    ge::graphStatus CheckOptionalInputShape(const gert::TilingContext *context);
-    ge::graphStatus CheckOutputShape(const gert::TilingContext *context) const;
-    ge::graphStatus CheckShape(const gert::TilingContext *context);
+    ge::graphStatus CheckAttrs(const gert::TilingContext* context) const;
+    ge::graphStatus CheckInputDataType(const gert::TilingContext* context) const;
+    ge::graphStatus CheckOptionalInputDataType(const gert::TilingContext* context);
+    ge::graphStatus CheckOutputDataType(const gert::TilingContext* context) const;
+    ge::graphStatus CheckDataType(const gert::TilingContext* context);
+    ge::graphStatus CheckFormat(const gert::TilingContext* context) const;
+    ge::graphStatus CheckInputShape(const gert::TilingContext* context) const;
+    ge::graphStatus CheckExpertScalesShape(const gert::TilingContext* context);
+    ge::graphStatus CheckPruningThresholdShape(const gert::TilingContext* context);
+    ge::graphStatus CheckActiveMaskShape(const gert::TilingContext* context);
+    ge::graphStatus CheckOptionalInputShape(const gert::TilingContext* context);
+    ge::graphStatus CheckOutputShape(const gert::TilingContext* context) const;
+    ge::graphStatus CheckShape(const gert::TilingContext* context);
     uint64_t GetTilingKey() const;
 
 private:
@@ -92,7 +92,7 @@ private:
     uint64_t keyScales_{0ULL};
 };
 
-ge::graphStatus MoeUpdateExpertTiling::CheckAttrs(const gert::TilingContext *context) const
+ge::graphStatus MoeUpdateExpertTiling::CheckAttrs(const gert::TilingContext* context) const
 {
     int64_t localRankId = -1LL;
     int64_t worldSize = -1LL;
@@ -142,7 +142,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckAttrs(const gert::TilingContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckInputDataType(const gert::TilingContext *context) const
+ge::graphStatus MoeUpdateExpertTiling::CheckInputDataType(const gert::TilingContext* context) const
 {
     auto expertIdsDesc = context->GetInputDesc(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdsDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(MOE_UPDATE_EXPERT_DEBUG, "expertIds"),
@@ -164,7 +164,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckInputDataType(const gert::TilingCont
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckOptionalInputDataType(const gert::TilingContext *context)
+ge::graphStatus MoeUpdateExpertTiling::CheckOptionalInputDataType(const gert::TilingContext* context)
 {
     auto expertScalesDesc = context->GetOptionalInputDesc(EXPERT_SCALES_INDEX);
     if (expertScalesDesc != nullptr) {
@@ -202,7 +202,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckOptionalInputDataType(const gert::Ti
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckOutputDataType(const gert::TilingContext *context) const
+ge::graphStatus MoeUpdateExpertTiling::CheckOutputDataType(const gert::TilingContext* context) const
 {
     auto expertIdsDesc = context->GetInputDesc(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdsDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(MOE_UPDATE_EXPERT_DEBUG, "expertIds"),
@@ -230,7 +230,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckOutputDataType(const gert::TilingCon
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckDataType(const gert::TilingContext *context)
+ge::graphStatus MoeUpdateExpertTiling::CheckDataType(const gert::TilingContext* context)
 {
     OP_TILING_CHECK(CheckInputDataType(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(MOE_UPDATE_EXPERT_DEBUG, "Check input data type failed!"), return ge::GRAPH_FAILED);
@@ -243,7 +243,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckDataType(const gert::TilingContext *
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckFormat(const gert::TilingContext *context) const
+ge::graphStatus MoeUpdateExpertTiling::CheckFormat(const gert::TilingContext* context) const
 {
     auto expertIdsDesc = context->GetInputDesc(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdsDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(MOE_UPDATE_EXPERT_DEBUG, "expertIds"),
@@ -309,14 +309,14 @@ ge::graphStatus MoeUpdateExpertTiling::CheckFormat(const gert::TilingContext *co
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckInputShape(const gert::TilingContext *context) const
+ge::graphStatus MoeUpdateExpertTiling::CheckInputShape(const gert::TilingContext* context) const
 {
     int64_t worldSize = static_cast<int64_t>(MAX_WORLD_SIZE);
     if (tilingData->worldSize != -1LL) {
         worldSize = tilingData->worldSize;
     }
 
-    const gert::StorageShape *expertIdsStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
+    const gert::StorageShape* expertIdsStorageShape = context->GetInputShape(EXPERT_IDS_INDEX);
     OP_TILING_CHECK(expertIdsStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(MOE_UPDATE_EXPERT_DEBUG, "expertIds"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
@@ -337,7 +337,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckInputShape(const gert::TilingContext
                                               (std::string("(0, ") + std::to_string(K_MAX) + "]").c_str()),
                     return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *eplbTableStorageShape = context->GetInputShape(EPLB_TABLE_INDEX);
+    const gert::StorageShape* eplbTableStorageShape = context->GetInputShape(EPLB_TABLE_INDEX);
     OP_TILING_CHECK(eplbTableStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(MOE_UPDATE_EXPERT_DEBUG, "eplbTable"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
@@ -364,9 +364,9 @@ ge::graphStatus MoeUpdateExpertTiling::CheckInputShape(const gert::TilingContext
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckExpertScalesShape(const gert::TilingContext *context)
+ge::graphStatus MoeUpdateExpertTiling::CheckExpertScalesShape(const gert::TilingContext* context)
 {
-    const gert::StorageShape *expertScalesShape = context->GetOptionalInputShape(EXPERT_SCALES_INDEX);
+    const gert::StorageShape* expertScalesShape = context->GetOptionalInputShape(EXPERT_SCALES_INDEX);
 
     if (expertScalesShape != nullptr) {
         OP_TILING_CHECK(
@@ -389,9 +389,9 @@ ge::graphStatus MoeUpdateExpertTiling::CheckExpertScalesShape(const gert::Tiling
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckPruningThresholdShape(const gert::TilingContext *context)
+ge::graphStatus MoeUpdateExpertTiling::CheckPruningThresholdShape(const gert::TilingContext* context)
 {
-    const gert::StorageShape *pruningThresholdShape = context->GetOptionalInputShape(PRUNING_THRESHOLD_INDEX);
+    const gert::StorageShape* pruningThresholdShape = context->GetOptionalInputShape(PRUNING_THRESHOLD_INDEX);
 
     if (pruningThresholdShape != nullptr) {
         if (pruningThresholdShape->GetStorageShape().GetDimNum() == NUM_ONE) {
@@ -425,9 +425,9 @@ ge::graphStatus MoeUpdateExpertTiling::CheckPruningThresholdShape(const gert::Ti
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckActiveMaskShape(const gert::TilingContext *context)
+ge::graphStatus MoeUpdateExpertTiling::CheckActiveMaskShape(const gert::TilingContext* context)
 {
-    const gert::StorageShape *activeMaskShape = context->GetOptionalInputShape(ACTIVE_MASK_INDEX);
+    const gert::StorageShape* activeMaskShape = context->GetOptionalInputShape(ACTIVE_MASK_INDEX);
 
     if (activeMaskShape != nullptr) {
         OP_TILING_CHECK(
@@ -451,7 +451,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckActiveMaskShape(const gert::TilingCo
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckOptionalInputShape(const gert::TilingContext *context)
+ge::graphStatus MoeUpdateExpertTiling::CheckOptionalInputShape(const gert::TilingContext* context)
 {
     OP_TILING_CHECK(CheckExpertScalesShape(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(MOE_UPDATE_EXPERT_DEBUG, "CheckExpertScalesShape failed!"), return ge::GRAPH_FAILED);
@@ -490,9 +490,9 @@ ge::graphStatus MoeUpdateExpertTiling::CheckOptionalInputShape(const gert::Tilin
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckOutputShape(const gert::TilingContext *context) const
+ge::graphStatus MoeUpdateExpertTiling::CheckOutputShape(const gert::TilingContext* context) const
 {
-    const gert::StorageShape *balancedExpertIdsStorageShape = context->GetOutputShape(OUTPUT_BALANCED_EXPERT_IDS);
+    const gert::StorageShape* balancedExpertIdsStorageShape = context->GetOutputShape(OUTPUT_BALANCED_EXPERT_IDS);
     OP_TILING_CHECK(balancedExpertIdsStorageShape == nullptr,
                     OP_LOGE_WITH_INVALID_INPUT(MOE_UPDATE_EXPERT_DEBUG, "balancedExpertIds"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((balancedExpertIdsStorageShape->GetStorageShape().GetDimNum() != NUM_TWO),
@@ -510,7 +510,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckOutputShape(const gert::TilingContex
                         "The shape of balanced_expert_ids must be [bs, k]"),
                     return ge::GRAPH_FAILED);
 
-    const gert::StorageShape *balancedActiveMaskShape = context->GetOutputShape(OUTPUT_ACTIVE_MASK_IDS);
+    const gert::StorageShape* balancedActiveMaskShape = context->GetOutputShape(OUTPUT_ACTIVE_MASK_IDS);
     OP_TILING_CHECK(balancedActiveMaskShape == nullptr,
                     OP_LOGE_WITH_INVALID_INPUT(MOE_UPDATE_EXPERT_DEBUG, "balancedActiveMask"), return ge::GRAPH_FAILED);
     OP_TILING_CHECK((balancedActiveMaskShape->GetStorageShape().GetDimNum() != NUM_TWO),
@@ -531,7 +531,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckOutputShape(const gert::TilingContex
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::CheckShape(const gert::TilingContext *context)
+ge::graphStatus MoeUpdateExpertTiling::CheckShape(const gert::TilingContext* context)
 {
     OP_TILING_CHECK(CheckInputShape(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE(MOE_UPDATE_EXPERT_DEBUG, "Check input shape failed!"), return ge::GRAPH_FAILED);
@@ -543,7 +543,7 @@ ge::graphStatus MoeUpdateExpertTiling::CheckShape(const gert::TilingContext *con
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::Init(gert::TilingContext *context)
+ge::graphStatus MoeUpdateExpertTiling::Init(gert::TilingContext* context)
 {
     tilingData = context->GetTilingData<MoeUpdateExpertTilingData>();
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE(MOE_UPDATE_EXPERT_DEBUG, "tilingData is nullptr."),
@@ -576,7 +576,7 @@ uint64_t MoeUpdateExpertTiling::GetTilingKey() const
     return tilingKey;
 }
 
-ge::graphStatus MoeUpdateExpertTiling::RunFusionKernelTiling(gert::TilingContext *context)
+ge::graphStatus MoeUpdateExpertTiling::RunFusionKernelTiling(gert::TilingContext* context)
 {
     OP_LOGD(MOE_UPDATE_EXPERT_DEBUG, "begin RunFusionKernelTiling.");
 
@@ -592,7 +592,7 @@ ge::graphStatus MoeUpdateExpertTiling::RunFusionKernelTiling(gert::TilingContext
     context->SetBlockDim(numBlocks);
     tilingData->aivCoreNum = aivNum;
 
-    size_t *workspaces = context->GetWorkspaceSizes(1);
+    size_t* workspaces = context->GetWorkspaceSizes(1);
     OP_TILING_CHECK(workspaces == nullptr, OP_LOGE(MOE_UPDATE_EXPERT_DEBUG, "get workspace failed"),
                     return ge::GRAPH_FAILED);
     libApiWorkSpaceSize_ = ascendcPlatform.GetLibApiWorkSpaceSize();
@@ -605,7 +605,7 @@ ge::graphStatus MoeUpdateExpertTiling::RunFusionKernelTiling(gert::TilingContext
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus MoeUpdateExpertTilingFunc(gert::TilingContext *context)
+static ge::graphStatus MoeUpdateExpertTilingFunc(gert::TilingContext* context)
 {
     MoeUpdateExpertTiling tiling;
     OP_TILING_CHECK(tiling.Init(context) != ge::GRAPH_SUCCESS,
@@ -614,7 +614,7 @@ static ge::graphStatus MoeUpdateExpertTilingFunc(gert::TilingContext *context)
 }
 
 struct MoeUpdateExpertCompileInfo {};
-static ge::graphStatus TilingPrepareForMoeUpdateExpert(gert::TilingParseContext *context)
+static ge::graphStatus TilingPrepareForMoeUpdateExpert(gert::TilingParseContext* context)
 {
     auto compileInfo = context->GetCompiledInfo<MoeUpdateExpertCompileInfo>();
     OPS_CHECK_NULL_WITH_CONTEXT(context, compileInfo);

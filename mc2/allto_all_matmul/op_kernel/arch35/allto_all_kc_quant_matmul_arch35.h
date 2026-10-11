@@ -20,18 +20,18 @@ namespace Mc2Kernel {
 template <typename SchedulerType, typename SchedulerContextType, typename AlltoAllMatmulTilingDataType>
 class AlltoAllKcQuantMatmulArch35 {
 public:
-    __aicore__ inline AlltoAllKcQuantMatmulArch35(SchedulerType *pipeLine)
+    __aicore__ inline AlltoAllKcQuantMatmulArch35(SchedulerType* pipeLine)
         : pipeLine_(pipeLine){};
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out,
                                 GM_ADDR smooth_scale, GM_ADDR x2_scale, GM_ADDR x2_offset, GM_ADDR workspaceGM,
-                                AlltoAllMatmulTilingDataType *tilingData, AscendC::TPipe *tPipe);
+                                AlltoAllMatmulTilingDataType* tilingData, AscendC::TPipe* tPipe);
     __aicore__ inline void Process();
 
 private:
-    SchedulerType *pipeLine_;
+    SchedulerType* pipeLine_;
     SchedulerContextType pipeLineContext_;
-    AlltoAllMatmulTilingDataType *tilingData_;
-    AscendC::TPipe *tPipe_;
+    AlltoAllMatmulTilingDataType* tilingData_;
+    AscendC::TPipe* tPipe_;
     GM_ADDR x1_;
     GM_ADDR x2_;
     GM_ADDR y_;
@@ -54,11 +54,11 @@ template <typename SchedulerType, typename SchedulerContextType, typename AlltoA
 __aicore__ inline void
 AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::Init(
     GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR y, GM_ADDR all2all_out, GM_ADDR smooth_scale, GM_ADDR x2_scale,
-    GM_ADDR x2_offset, GM_ADDR workspaceGM, AlltoAllMatmulTilingDataType *tilingData, AscendC::TPipe *tPipe)
+    GM_ADDR x2_offset, GM_ADDR workspaceGM, AlltoAllMatmulTilingDataType* tilingData, AscendC::TPipe* tPipe)
 {
     // 获取tilingdata数据
     tilingData_ = tilingData;
-    auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     tPipe_ = tPipe;
     x1_ = x1;
     x2_ = x2;
@@ -83,7 +83,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename AlltoA
 __aicore__ inline void
 AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType, AlltoAllMatmulTilingDataType>::Process()
 {
-    auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     // 启动主块流水
     if (mc2Tiling_.tileCnt > 0) {
         ProcessTile(mc2Tiling_.tileCnt);
@@ -102,7 +102,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename AlltoA
 __aicore__ inline void AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType,
                                                    AlltoAllMatmulTilingDataType>::ProcessTile(uint32_t taskCnt)
 {
-    auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     // 复用的变量
     uint64_t tileMMultiRankK = (uint64_t)mc2Tiling_.tileM * (uint64_t)mc2Tiling_.rankK;
 
@@ -157,7 +157,7 @@ template <typename SchedulerType, typename SchedulerContextType, typename AlltoA
 __aicore__ inline void AlltoAllKcQuantMatmulArch35<SchedulerType, SchedulerContextType,
                                                    AlltoAllMatmulTilingDataType>::ProcessTail(uint32_t taskCnt)
 {
-    auto &&mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
+    auto&& mc2Tiling_ = tilingData_->alltoAllQuantMatmulTilingInfo;
     uint64_t tailMMultiRankK = (uint64_t)mc2Tiling_.tailM * (uint64_t)mc2Tiling_.rankK;
     uint64_t tileCntMultitileMMultiRankK =
         (uint64_t)mc2Tiling_.tileCnt * (uint64_t)mc2Tiling_.tileM * (uint64_t)mc2Tiling_.rankK;

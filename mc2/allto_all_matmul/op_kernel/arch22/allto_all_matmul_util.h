@@ -95,7 +95,7 @@ public:
         this->rankSize = rankSize;
 
         auto contextGM0 = AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
-        winContext_ = (__gm__ HcclCombineOpParam *)contextGM0;
+        winContext_ = (__gm__ HcclCombineOpParam*)contextGM0;
 
         for (int i = 0; i < rankSize && i < static_cast<int32_t>(sizeof(buff) / sizeof(buff[0])); i++) {
             buff[i] = (GM_ADDR)winContext_->windowsIn[i];
@@ -125,7 +125,7 @@ public:
         }
     }
 
-    __aicore__ inline void SetTiling(AlltoAllMatmulTilingData &info)
+    __aicore__ inline void SetTiling(AlltoAllMatmulTilingData& info)
     {
         m = info.allToAllMatmulInfo.M;
         k = info.allToAllMatmulInfo.K;
@@ -152,20 +152,20 @@ public:
     }
 
     template <typename T>
-    __aicore__ inline void CopyGmToUbufAlignB16(LocalTensor<T> ubTensor, __gm__ T *src, uint16_t nBurst,
+    __aicore__ inline void CopyGmToUbufAlignB16(LocalTensor<T> ubTensor, __gm__ T* src, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
         Mc2AivDataCopy::CopyGmToUbufAlignB16(ubTensor, src, nBurst, lenBurst, srcStride, dstStride);
     }
 
     template <typename T>
-    __aicore__ inline void CopyUbufToGmAlignB16(__gm__ T *dst, LocalTensor<T> ubTensor, uint16_t nBurst,
+    __aicore__ inline void CopyUbufToGmAlignB16(__gm__ T* dst, LocalTensor<T> ubTensor, uint16_t nBurst,
                                                 uint32_t lenBurst, uint16_t srcStride, uint16_t dstStride)
     {
         Mc2AivDataCopy::CopyUbufToGmAlignB16(dst, ubTensor, nBurst, lenBurst, srcStride, dstStride);
     }
 
-    __aicore__ inline void CheckBuffFlag(__gm__ int32_t *buff, int32_t flag)
+    __aicore__ inline void CheckBuffFlag(__gm__ int32_t* buff, int32_t flag)
     {
         SetFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
         WaitFlag<HardEvent::MTE3_MTE2>(EVENT_ID1);
@@ -181,7 +181,7 @@ public:
         uBufSync_.FreeTensor<int32_t>(ubTensor);
     }
 
-    __aicore__ inline void SetBuffFlag(__gm__ int32_t *buff, int32_t flag)
+    __aicore__ inline void SetBuffFlag(__gm__ int32_t* buff, int32_t flag)
     {
         SetFlag<HardEvent::MTE3_S>(EVENT_ID2);
         WaitFlag<HardEvent::MTE3_S>(EVENT_ID2);
@@ -192,7 +192,7 @@ public:
         CopyUbufToGmAlignB16(buff, ubTensor, 1, sizeof(int32_t), 0, 0);
     }
 
-    __aicore__ inline void CopyTokensFromGMToGM(__gm__ int8_t *gmSrc, __gm__ int8_t *gmDst, uint32_t copyBytes,
+    __aicore__ inline void CopyTokensFromGMToGM(__gm__ int8_t* gmSrc, __gm__ int8_t* gmDst, uint32_t copyBytes,
                                                 uint32_t srcKBytes, uint32_t dstKBytes)
     {
         LocalTensor<int8_t> ubTensor = uBuf_.AllocTensor<int8_t>();
@@ -231,7 +231,7 @@ public:
     {
         for (int32_t idx = 0; idx < flagNum; ++idx) {
             if (aicIdx == 0 && aivIdx == 0) {
-                SetBuffFlag((__gm__ int32_t *)buff[rank] + FLAG_OFFSET + idx, 0);
+                SetBuffFlag((__gm__ int32_t*)buff[rank] + FLAG_OFFSET + idx, 0);
             }
         }
     }
@@ -239,10 +239,10 @@ public:
     __aicore__ inline void CrossRankSyncV1(int32_t flagIdx, int32_t flagVal)
     {
         if (aicIdx == 0 && aivIdx == 0) {
-            SetBuffFlag((__gm__ int32_t *)buff[rank] + FLAG_OFFSET + flagIdx, flagVal);
+            SetBuffFlag((__gm__ int32_t*)buff[rank] + FLAG_OFFSET + flagIdx, flagVal);
         }
         if (aicIdx < rankSize && aivIdx == 0) {
-            CheckBuffFlag((__gm__ int32_t *)buff[aicIdx] + FLAG_OFFSET + flagIdx, flagVal);
+            CheckBuffFlag((__gm__ int32_t*)buff[aicIdx] + FLAG_OFFSET + flagIdx, flagVal);
         }
     }
 
@@ -254,7 +254,7 @@ public:
     int32_t rank;
     int32_t rankSize;
     GM_ADDR buff[8];
-    __gm__ HcclCombineOpParam *winContext_{nullptr};
+    __gm__ HcclCombineOpParam* winContext_{nullptr};
     TBuf<AscendC::TPosition::VECCALC> uBuf_;
     TBuf<AscendC::TPosition::VECCALC> uBufSync_;
 

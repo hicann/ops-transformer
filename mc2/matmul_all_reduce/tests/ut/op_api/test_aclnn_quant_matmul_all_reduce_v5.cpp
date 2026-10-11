@@ -18,20 +18,20 @@ namespace MatmulAllReduceUT {
 
 namespace {
 
-void RunQuantMatmulAllReduceV5Ut(op::SocVersion soc, const TensorDesc &x1, const TensorDesc &x2, const aclTensor *bias,
-                                 const aclTensor *x3, const aclTensor *x1Scale, const TensorDesc &x2Scale,
-                                 const aclTensor *commQuantScale1, const aclTensor *commQuantScale2,
-                                 const TensorDesc &output, const char *commMode, int64_t commQuantMode,
+void RunQuantMatmulAllReduceV5Ut(op::SocVersion soc, const TensorDesc& x1, const TensorDesc& x2, const aclTensor* bias,
+                                 const aclTensor* x3, const aclTensor* x1Scale, const TensorDesc& x2Scale,
+                                 const aclTensor* commQuantScale1, const aclTensor* commQuantScale2,
+                                 const TensorDesc& output, const char* commMode, int64_t commQuantMode,
                                  aclnnStatus expectResult)
 {
     op::SetPlatformSocVersion(soc);
-    const char *group = "group";
-    const char *reduceOp = "sum";
+    const char* group = "group";
+    const char* reduceOp = "sum";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     int64_t groupSize = 0;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAllReduceV5,
                         INPUT(x1, x2, bias, x3, x1Scale, x2Scale, commQuantScale1, commQuantScale2, group, reduceOp,
                               commMode, commTurn, streamMode, groupSize, commQuantMode),
@@ -73,7 +73,7 @@ TEST_P(AclnnQuantMatmulAllReduceV5Test, param)
                         param.commTurn, param.streamMode, param.groupSize, param.commQuantMode),
                   OUTPUT(param.output));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto aclnnRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     if (param.expectResult == ACLNN_SUCCESS) {
         EXPECT_NE(ACLNN_ERR_PARAM_INVALID, aclnnRet);
@@ -133,15 +133,15 @@ TEST_F(AclnnQuantMatmulAllReduceV5ExtraTest, TransposedX2Int8)
     TensorDesc x2 = {{64, 128}, ACL_INT8, ACL_FORMAT_ND, {1, 64}};
     TensorDesc x2Scale = {{128}, ACL_FLOAT, ACL_FORMAT_ND};
     TensorDesc output = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
-    const char *reduceOp = "sum";
-    const char *commMode = "ai_cpu";
+    const char* group = "group";
+    const char* reduceOp = "sum";
+    const char* commMode = "ai_cpu";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     int64_t groupSize = 0;
     int64_t commQuantMode = 0;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAllReduceV5,
                         INPUT(x1, x2, nullptr, nullptr, nullptr, x2Scale, nullptr, nullptr, group, reduceOp, commMode,
                               commTurn, streamMode, groupSize, commQuantMode),
@@ -157,13 +157,13 @@ TEST_F(AclnnQuantMatmulAllReduceV5ExtraTest, ReduceOpNullptr)
     TensorDesc x2 = {{64, 128}, ACL_INT8, ACL_FORMAT_ND};
     TensorDesc x2Scale = {{128}, ACL_FLOAT, ACL_FORMAT_ND};
     TensorDesc output = {{32, 128}, ACL_FLOAT16, ACL_FORMAT_ND};
-    const char *group = "group";
+    const char* group = "group";
     int64_t commTurn = 0;
     int64_t streamMode = 1;
     int64_t groupSize = 0;
     int64_t commQuantMode = 0;
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAllReduceV5,
                         INPUT(x1, x2, nullptr, nullptr, nullptr, x2Scale, nullptr, nullptr, group, nullptr, "",
                               commTurn, streamMode, groupSize, commQuantMode),

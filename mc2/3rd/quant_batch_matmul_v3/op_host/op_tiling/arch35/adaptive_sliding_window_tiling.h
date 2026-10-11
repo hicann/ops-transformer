@@ -77,9 +77,9 @@ enum class Mc2QMMKernelType : uint32_t {
 
 class Mc2AdaptiveSlidingWindowTiling : public Mc2QuantBatchMatmulV3TilingBase {
 public:
-    explicit Mc2AdaptiveSlidingWindowTiling(gert::TilingContext *context);
-    Mc2AdaptiveSlidingWindowTiling(gert::TilingContext *context,
-                                   DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *out);
+    explicit Mc2AdaptiveSlidingWindowTiling(gert::TilingContext* context);
+    Mc2AdaptiveSlidingWindowTiling(gert::TilingContext* context,
+                                   DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* out);
     ~Mc2AdaptiveSlidingWindowTiling() override = default;
 
     // 1、获取平台信息比如CoreNum、UB/L1/L0C资源大小
@@ -102,8 +102,8 @@ public:
 protected:
     ge::graphStatus CalcUbTiling() override;
     bool CheckDtype() const override;
-    bool CheckShape(const std::vector<gert::Shape *> &mandatoryShape, const gert::StorageShape *biasShape,
-                    const gert::StorageShape *pertokenShape, const std::vector<int64_t> &dimValueOfMKN) const override;
+    bool CheckShape(const std::vector<gert::Shape*>& mandatoryShape, const gert::StorageShape* biasShape,
+                    const gert::StorageShape* pertokenShape, const std::vector<int64_t>& dimValueOfMKN) const override;
     void CalL1Tiling();
     bool CheckBiasAndScale(uint64_t baseN, uint64_t dbL0c) const;
     bool AnalyseSlidingWinInfo();
@@ -132,7 +132,7 @@ protected:
     void Reset();
 
     DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams tilingDataSelf_;
-    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams &tilingData_;
+    DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams& tilingData_;
 
 private:
     Mc2AdaptiveSlidingWinow adaptiveWin_;

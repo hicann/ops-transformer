@@ -35,7 +35,7 @@ namespace optiling {
 
 REGISTER_OPS_TILING_TEMPLATE(Mc2BatchMatMulV3, Mc2BatchMatmulV3BaseTiling, 0);
 
-static ge::graphStatus Mc2BatchMatMulV3TilingFunc(gert::TilingContext *context)
+static ge::graphStatus Mc2BatchMatMulV3TilingFunc(gert::TilingContext* context)
 {
     OP_TILING_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT("Mc2BatchMatMulV3", "context"),
                     return ge::GRAPH_FAILED);
@@ -45,11 +45,11 @@ static ge::graphStatus Mc2BatchMatMulV3TilingFunc(gert::TilingContext *context)
     return TilingRegistry::GetInstance().DoTilingImpl(context);
 }
 
-static ge::graphStatus Mc2TilingPrepareForBatchMatMulV3(gert::TilingParseContext *context)
+static ge::graphStatus Mc2TilingPrepareForBatchMatMulV3(gert::TilingParseContext* context)
 {
     OP_TILING_CHECK(context == nullptr, OP_LOGE_WITH_INVALID_INPUT("Mc2BatchMatMulV3", "context"),
                     return ge::GRAPH_FAILED);
-    fe::PlatFormInfos *platformInfo = context->GetPlatformInfo();
+    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     OP_TILING_CHECK(platformInfo == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "platformInfo"),
                     return ge::GRAPH_FAILED);
 

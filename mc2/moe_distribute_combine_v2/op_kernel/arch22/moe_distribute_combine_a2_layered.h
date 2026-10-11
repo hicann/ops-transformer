@@ -74,11 +74,11 @@ public:
 
     __aicore__ inline MoeDistributeCombineA2Layered(){};
     __aicore__ inline void Init(GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR expandIdx, GM_ADDR sendCount,
-                                GM_ADDR scales, GM_ADDR performanceInfo, GM_ADDR XOut, GM_ADDR workspaceGM, TPipe *pipe,
-                                const MoeDistributeCombineA2TilingData *tilingData, GM_ADDR contextGM);
+                                GM_ADDR scales, GM_ADDR performanceInfo, GM_ADDR XOut, GM_ADDR workspaceGM, TPipe* pipe,
+                                const MoeDistributeCombineA2TilingData* tilingData, GM_ADDR contextGM);
     __aicore__ inline void Process();
     __aicore__ inline void AIVRDMAPostSend(GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr, uint64_t destRankId,
-                                           uint64_t messageLen, __gm__ HcclAiRMAInfo *QpInfo);
+                                           uint64_t messageLen, __gm__ HcclAiRMAInfo* QpInfo);
 
 private:
     __aicore__ inline int PrepareQuantizedRecvWindow();
@@ -124,36 +124,36 @@ private:
         LocalTensor<float> castFp32ScaleBrcb;
     };
 
-    __aicore__ inline void CopyLocalServerTokens(LocalTensor<ExpandXTransType> &tmpLowUb_,
-                                                 GlobalTensor<ExpandXTransType> &aivSrcGlobal,
-                                                 GlobalTensor<ExpandXTransType> &aivDstGlobal, uint32_t copyLenAlign_,
+    __aicore__ inline void CopyLocalServerTokens(LocalTensor<ExpandXTransType>& tmpLowUb_,
+                                                 GlobalTensor<ExpandXTransType>& aivSrcGlobal,
+                                                 GlobalTensor<ExpandXTransType>& aivDstGlobal, uint32_t copyLenAlign_,
                                                  uint32_t copySum, uint32_t copyOnceNum);
-    __aicore__ inline void WriteRdmaWqe(__gm__ uint8_t *wqeAddr, GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr,
+    __aicore__ inline void WriteRdmaWqe(__gm__ uint8_t* wqeAddr, GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr,
                                         uint64_t messageLen, uint64_t destRankId, uint64_t curHead,
-                                        __gm__ HcclAiRMAInfo *QpInfo);
-    __aicore__ inline void ReduceWindowTokens(WindowSumBuffers &buffers, uint32_t targetServerId, uint32_t targetRankId,
+                                        __gm__ HcclAiRMAInfo* QpInfo);
+    __aicore__ inline void ReduceWindowTokens(WindowSumBuffers& buffers, uint32_t targetServerId, uint32_t targetRankId,
                                               uint32_t coreNumPerServer, uint32_t totalCopyLen,
                                               uint32_t offsetNumPerExpert);
-    __aicore__ inline void AccumulateIpcWindowToken(WindowSumBuffers &buffers, uint32_t targetRankId,
+    __aicore__ inline void AccumulateIpcWindowToken(WindowSumBuffers& buffers, uint32_t targetRankId,
                                                     uint32_t offsetNumPerExpert, uint32_t offsetIndexStart);
-    __aicore__ inline void BuildWindowTokenList(WindowSumBuffers &buffers, uint32_t targetServerId,
-                                                uint32_t coreNumPerServer, uint32_t &baseBuffOffset,
-                                                uint32_t &totalCopyLen);
-    __aicore__ inline void InitWindowSumBuffers(WindowSumBuffers &buffers, uint32_t baseBuffOffset);
-    __aicore__ inline void QuantizeBf16WindowToken(WindowSumBuffers &buffers, uint32_t dataOffset, uint32_t tokenOffset,
-                                                   const DataCopyParams &flagDataCopyParams);
-    __aicore__ inline void QuantizeFp16WindowToken(WindowSumBuffers &buffers, uint32_t dataOffset, uint32_t tokenOffset,
-                                                   const DataCopyParams &flagDataCopyParams);
-    __aicore__ inline void InitServerSumBuffers(ServerSumBuffers &buffers);
-    __aicore__ inline void SumUnquantizedToServer(ServerSumBuffers &buffers, int copyNum, uint32_t i);
-    __aicore__ inline void SumBf16ToServer(ServerSumBuffers &buffers, int copyNum, uint32_t i);
-    __aicore__ inline void SumFp16ToServer(ServerSumBuffers &buffers, int copyNum, uint32_t i);
-    __aicore__ inline void WaitRdmaTokens(LocalTensor<uint64_t> &checkRdmaLocal, uint32_t copyOnceNum,
-                                          uint32_t &copySum, bool &stopFlag,
-                                          const DataCopyExtParams &flagDataCopyParams,
-                                          const DataCopyPadExtParams<uint64_t> &flagPadParams);
+    __aicore__ inline void BuildWindowTokenList(WindowSumBuffers& buffers, uint32_t targetServerId,
+                                                uint32_t coreNumPerServer, uint32_t& baseBuffOffset,
+                                                uint32_t& totalCopyLen);
+    __aicore__ inline void InitWindowSumBuffers(WindowSumBuffers& buffers, uint32_t baseBuffOffset);
+    __aicore__ inline void QuantizeBf16WindowToken(WindowSumBuffers& buffers, uint32_t dataOffset, uint32_t tokenOffset,
+                                                   const DataCopyParams& flagDataCopyParams);
+    __aicore__ inline void QuantizeFp16WindowToken(WindowSumBuffers& buffers, uint32_t dataOffset, uint32_t tokenOffset,
+                                                   const DataCopyParams& flagDataCopyParams);
+    __aicore__ inline void InitServerSumBuffers(ServerSumBuffers& buffers);
+    __aicore__ inline void SumUnquantizedToServer(ServerSumBuffers& buffers, int copyNum, uint32_t i);
+    __aicore__ inline void SumBf16ToServer(ServerSumBuffers& buffers, int copyNum, uint32_t i);
+    __aicore__ inline void SumFp16ToServer(ServerSumBuffers& buffers, int copyNum, uint32_t i);
+    __aicore__ inline void WaitRdmaTokens(LocalTensor<uint64_t>& checkRdmaLocal, uint32_t copyOnceNum,
+                                          uint32_t& copySum, bool& stopFlag,
+                                          const DataCopyExtParams& flagDataCopyParams,
+                                          const DataCopyPadExtParams<uint64_t>& flagPadParams);
     __aicore__ inline void NotifyIpcReady();
-    __aicore__ inline void UpdateRdmaDoorbell(__gm__ HcclAiRMAWQ *qp_ctx_entry, uint64_t curHead,
+    __aicore__ inline void UpdateRdmaDoorbell(__gm__ HcclAiRMAWQ* qp_ctx_entry, uint64_t curHead,
                                               uint64_t curHardwareHead);
     __aicore__ inline void InitSendCountsAndStatus(GM_ADDR sendCount);
     __aicore__ inline void InitQuantParams();
@@ -164,35 +164,35 @@ private:
     __aicore__ inline void SumToWindow();
     __aicore__ inline void WaitDispatch();
     __aicore__ inline void AlltoAllServerDispatch();
-    __aicore__ inline uint32_t GatherValidTokenIdx(WindowSumBuffers &buffers, uint32_t realBS);
-    __aicore__ inline void FillWindowOffsetLists(WindowSumBuffers &buffers, uint32_t coreNumPerServer,
-                                                 uint32_t tokenNum, uint32_t &baseBuffOffset, uint32_t &totalCopyLen);
-    __aicore__ inline void InitServerUnquantizedBuffers(ServerSumBuffers &buffers, uint32_t &baseBuffOffset);
-    __aicore__ inline void InitServerFp16Buffers(ServerSumBuffers &buffers, uint32_t &fpBaseBuffOffset);
-    __aicore__ inline void InitServerBf16Buffers(ServerSumBuffers &buffers, uint32_t &bfBaseBuffOffset);
-    __aicore__ inline void CopyTokensToIpc(LocalTensor<ExpandIdxType> &sendCountLocal,
-                                           LocalTensor<float> &expandScalesLocal, LocalTensor<ExpandXType> &inUb,
-                                           LocalTensor<float> &inUbTemp);
-    __aicore__ inline void InitWindowCommonBuffers(WindowSumBuffers &buffers, uint32_t &baseBuffOffset,
-                                                   uint32_t &fp16baseBuffOffset);
-    __aicore__ inline void InitWindowFp16Buffers(WindowSumBuffers &buffers, uint32_t &fp16baseBuffOffset);
-    __aicore__ inline void InitTilingAttrs(const MoeDistributeCombineA2TilingData *tilingData, GM_ADDR contextGM);
+    __aicore__ inline uint32_t GatherValidTokenIdx(WindowSumBuffers& buffers, uint32_t realBS);
+    __aicore__ inline void FillWindowOffsetLists(WindowSumBuffers& buffers, uint32_t coreNumPerServer,
+                                                 uint32_t tokenNum, uint32_t& baseBuffOffset, uint32_t& totalCopyLen);
+    __aicore__ inline void InitServerUnquantizedBuffers(ServerSumBuffers& buffers, uint32_t& baseBuffOffset);
+    __aicore__ inline void InitServerFp16Buffers(ServerSumBuffers& buffers, uint32_t& fpBaseBuffOffset);
+    __aicore__ inline void InitServerBf16Buffers(ServerSumBuffers& buffers, uint32_t& bfBaseBuffOffset);
+    __aicore__ inline void CopyTokensToIpc(LocalTensor<ExpandIdxType>& sendCountLocal,
+                                           LocalTensor<float>& expandScalesLocal, LocalTensor<ExpandXType>& inUb,
+                                           LocalTensor<float>& inUbTemp);
+    __aicore__ inline void InitWindowCommonBuffers(WindowSumBuffers& buffers, uint32_t& baseBuffOffset,
+                                                   uint32_t& fp16baseBuffOffset);
+    __aicore__ inline void InitWindowFp16Buffers(WindowSumBuffers& buffers, uint32_t& fp16baseBuffOffset);
+    __aicore__ inline void InitTilingAttrs(const MoeDistributeCombineA2TilingData* tilingData, GM_ADDR contextGM);
     __aicore__ inline void InitGlobalBuffers(GM_ADDR expandX, GM_ADDR sendCount, GM_ADDR scales, GM_ADDR XOut,
                                              GM_ADDR performanceInfo);
-    __aicore__ inline void DispatchServerTokens(LocalTensor<uint64_t> &checkRdmaLocal,
-                                                LocalTensor<ExpandXTransType> &tmpLowUb_,
-                                                GlobalTensor<ExpandXTransType> &aivSrcGlobal,
-                                                GlobalTensor<ExpandXTransType> &aivDstGlobal, uint32_t dstRankId,
-                                                uint32_t &copySum, uint32_t copyOnceNum, uint32_t copyLen_,
+    __aicore__ inline void DispatchServerTokens(LocalTensor<uint64_t>& checkRdmaLocal,
+                                                LocalTensor<ExpandXTransType>& tmpLowUb_,
+                                                GlobalTensor<ExpandXTransType>& aivSrcGlobal,
+                                                GlobalTensor<ExpandXTransType>& aivDstGlobal, uint32_t dstRankId,
+                                                uint32_t& copySum, uint32_t copyOnceNum, uint32_t copyLen_,
                                                 uint32_t copyLenAlign_, uint64_t srcrdmaAddr, uint64_t dstrdmaAddr,
-                                                const DataCopyExtParams &flagDataCopyParams,
-                                                const DataCopyPadExtParams<uint64_t> &flagPadParams);
+                                                const DataCopyExtParams& flagDataCopyParams,
+                                                const DataCopyPadExtParams<uint64_t>& flagPadParams);
     __aicore__ inline void SumToServer();
     __aicore__ inline void Preload();
     __aicore__ inline void ToWindowPreload();
     __aicore__ inline void CopyPerformanceInfo();
 
-    TPipe *tpipe_{nullptr};
+    TPipe* tpipe_{nullptr};
     GlobalTensor<ExpandXType> expandXGlobal_;
     GlobalTensor<ExpandIdxType> sendCountGlobal_;
     GlobalTensor<float> expandScalesGlobal_;
@@ -208,7 +208,7 @@ private:
     OutputType_t<ExpandXType> scaleMulVal;
     uint32_t mask;
 
-    __gm__ HcclAiRMAInfo *qp_info_;
+    __gm__ HcclAiRMAInfo* qp_info_;
 
     GlobalTensor<uint64_t> shareFlagGlobal_;
     GlobalTensor<ExpandXType> shareMemGlobal_;
@@ -273,7 +273,7 @@ private:
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::UpdateRdmaDoorbell(
-    __gm__ HcclAiRMAWQ *qp_ctx_entry, uint64_t curHead, uint64_t curHardwareHead)
+    __gm__ HcclAiRMAWQ* qp_ctx_entry, uint64_t curHead, uint64_t curHardwareHead)
 {
     uint64_t doorBellInfo = 0;
     doorBellInfo |= qp_ctx_entry->wqn;                    // [0:23] DB_TAG (qp_num)
@@ -281,7 +281,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     doorBellInfo |= (curHead % 65536UL) << 32UL;          // [32:47] DB_PI = sq.head
     doorBellInfo |= (uint64_t)(qp_ctx_entry->sl) << 48UL; // [48:50] DB_SL = qp.sl
 
-    __gm__ uint64_t *doorBellAddr = (__gm__ uint64_t *)(qp_ctx_entry->dbAddr);
+    __gm__ uint64_t* doorBellAddr = (__gm__ uint64_t*)(qp_ctx_entry->dbAddr);
     PipeBarrier<PIPE_ALL>();
 
     ubLocal.SetValue(0, doorBellInfo);
@@ -294,7 +294,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
     ubLocalHead.SetValue(0, (uint32_t)curHead);
     AscendC::GlobalTensor<uint32_t> HeadGlobalTensor;
-    HeadGlobalTensor.SetGlobalBuffer((__gm__ uint32_t *)curHardwareHead);
+    HeadGlobalTensor.SetGlobalBuffer((__gm__ uint32_t*)curHardwareHead);
     AscendC::DataCopyExtParams copyParamsHead{1, 1 * sizeof(uint32_t), 0, 0, 0};
     PipeBarrier<PIPE_ALL>();
     AscendC::DataCopyPad(HeadGlobalTensor, ubLocalHead, copyParamsHead);
@@ -303,8 +303,8 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::WriteRdmaWqe(
-    __gm__ uint8_t *wqeAddr, GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr, uint64_t messageLen, uint64_t destRankId,
-    uint64_t curHead, __gm__ HcclAiRMAInfo *QpInfo)
+    __gm__ uint8_t* wqeAddr, GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr, uint64_t messageLen, uint64_t destRankId,
+    uint64_t curHead, __gm__ HcclAiRMAInfo* QpInfo)
 {
     auto mem_info_table = QpInfo->memPtr;
     auto sizeof_memdetail = QpInfo->sizeOfAiRMAMem;
@@ -315,44 +315,43 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     byte_4 |= ((~ownBit) << 7U) & (1U << 7U); // [7] owner_bit
     byte_4 |= 1U << 8U;                       // [8:8] IBV_SEND_SIGNALED
 
-    *(__gm__ uint32_t *)(wqeAddr) = byte_4;         // Control set by local parameter see above lines
-    *(__gm__ uint32_t *)(wqeAddr + 4) = messageLen; // message size
-    *(__gm__ uint32_t *)(wqeAddr + 8) = 0;          // immtdata is always 0 till we provide poll CQ flow in AIV
-    *(__gm__ uint32_t *)(wqeAddr + 12) = 1U << 24U; // [120:127] num_sge = 1
-    *(__gm__ uint32_t *)(wqeAddr + 16) = 0;         // [128:151] start_sge_idx = 0;
-    __gm__ HcclAiRMAMemInfo *memDetail = (__gm__ HcclAiRMAMemInfo *)(mem_info_table + sizeof_memdetail * destRankId);
-    *(__gm__ uint32_t *)(wqeAddr + 20) =
-        ((__gm__ MemDetails *)(memDetail->memDetailPtr +
-                               memDetail->sizeOfMemDetails * static_cast<uint32_t>(HcclAiRMAMemType::REMOTE_INPUT)))
+    *(__gm__ uint32_t*)(wqeAddr) = byte_4;         // Control set by local parameter see above lines
+    *(__gm__ uint32_t*)(wqeAddr + 4) = messageLen; // message size
+    *(__gm__ uint32_t*)(wqeAddr + 8) = 0;          // immtdata is always 0 till we provide poll CQ flow in AIV
+    *(__gm__ uint32_t*)(wqeAddr + 12) = 1U << 24U; // [120:127] num_sge = 1
+    *(__gm__ uint32_t*)(wqeAddr + 16) = 0;         // [128:151] start_sge_idx = 0;
+    __gm__ HcclAiRMAMemInfo* memDetail = (__gm__ HcclAiRMAMemInfo*)(mem_info_table + sizeof_memdetail * destRankId);
+    *(__gm__ uint32_t*)(wqeAddr + 20) =
+        ((__gm__ MemDetails*)(memDetail->memDetailPtr +
+                              memDetail->sizeOfMemDetails * static_cast<uint32_t>(HcclAiRMAMemType::REMOTE_INPUT)))
             ->key;
-    *(__gm__ uint64_t *)(wqeAddr + 24) = (uint64_t)destDmaAddr; // destination VA
+    *(__gm__ uint64_t*)(wqeAddr + 24) = (uint64_t)destDmaAddr; // destination VA
 
     // Setup SGE and write to GM
-    __gm__ uint8_t *sgeAddr = wqeAddr + sizeof(struct hns_roce_rc_sq_wqe);
-    *(__gm__ uint32_t *)(sgeAddr) = messageLen;
-    memDetail = (__gm__ HcclAiRMAMemInfo *)(mem_info_table + sizeof_memdetail * destRankId);
-    *(__gm__ uint32_t *)(sgeAddr + sizeof(uint32_t)) =
-        ((__gm__ MemDetails *)(memDetail->memDetailPtr +
-                               memDetail->sizeOfMemDetails * static_cast<uint32_t>(HcclAiRMAMemType::LOCAL_OUTPUT)))
-            ->key; // L_Key
-    *(__gm__ uint64_t *)(sgeAddr + 2 * sizeof(uint32_t)) =
-        (uint64_t)srcDmaAddr; // src VA addr memory registered by RNIC
+    __gm__ uint8_t* sgeAddr = wqeAddr + sizeof(struct hns_roce_rc_sq_wqe);
+    *(__gm__ uint32_t*)(sgeAddr) = messageLen;
+    memDetail = (__gm__ HcclAiRMAMemInfo*)(mem_info_table + sizeof_memdetail * destRankId);
+    *(__gm__ uint32_t*)(sgeAddr + sizeof(uint32_t)) =
+        ((__gm__ MemDetails*)(memDetail->memDetailPtr +
+                              memDetail->sizeOfMemDetails * static_cast<uint32_t>(HcclAiRMAMemType::LOCAL_OUTPUT)))
+            ->key;                                                              // L_Key
+    *(__gm__ uint64_t*)(sgeAddr + 2 * sizeof(uint32_t)) = (uint64_t)srcDmaAddr; // src VA addr memory registered by RNIC
 }
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::AIVRDMAPostSend(
-    GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr, uint64_t destRankId, uint64_t messageLen, __gm__ HcclAiRMAInfo *QpInfo)
+    GM_ADDR srcDmaAddr, GM_ADDR destDmaAddr, uint64_t destRankId, uint64_t messageLen, __gm__ HcclAiRMAInfo* QpInfo)
 {
-    auto qpNum = ((__gm__ HcclAiRMAInfo *)QpInfo)->qpNum;
+    auto qpNum = ((__gm__ HcclAiRMAInfo*)QpInfo)->qpNum;
     auto qp_ctx_entry =
-        (__gm__ HcclAiRMAWQ *)(((__gm__ HcclAiRMAInfo *)QpInfo)->sqPtr +
-                               destRankId * qpNum * (uint64_t)(((__gm__ HcclAiRMAInfo *)QpInfo)->sizeOfAiRMAWQ));
-    auto cur_rank_id = (((__gm__ HcclAiRMAInfo *)QpInfo)->curRankId);
+        (__gm__ HcclAiRMAWQ*)(((__gm__ HcclAiRMAInfo*)QpInfo)->sqPtr +
+                              destRankId * qpNum * (uint64_t)(((__gm__ HcclAiRMAInfo*)QpInfo)->sizeOfAiRMAWQ));
+    auto cur_rank_id = (((__gm__ HcclAiRMAInfo*)QpInfo)->curRankId);
     auto sqBaseAddr = qp_ctx_entry->bufAddr;
     auto wqeSize = qp_ctx_entry->wqeSize;
     auto curHardwareHead = qp_ctx_entry->headAddr;
-    cacheWriteThrough((__gm__ uint8_t *)curHardwareHead, 8);
-    uint64_t curHead = *(__gm__ uint32_t *)(curHardwareHead);
+    cacheWriteThrough((__gm__ uint8_t*)curHardwareHead, 8);
+    uint64_t curHead = *(__gm__ uint32_t*)(curHardwareHead);
     auto curHardwareTailAddr = qp_ctx_entry->tailAddr;
     auto QP_DEPTH = qp_ctx_entry->depth;
 
@@ -361,14 +360,14 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     // Make sure we don't overflow the SQ in an infinite loop - no need to mitigate endless loop as the host
     // will timeout and kill the kernel, same as all2all kernel if it fails to complete (e.g. in case of link loss)
     while (1) {
-        cacheWriteThrough((__gm__ uint8_t *)curHardwareTailAddr, 8);
-        if ((curHead - *(__gm__ uint32_t *)(curHardwareTailAddr)) < QP_DEPTH - 1) {
+        cacheWriteThrough((__gm__ uint8_t*)curHardwareTailAddr, 8);
+        if ((curHead - *(__gm__ uint32_t*)(curHardwareTailAddr)) < QP_DEPTH - 1) {
             break;
         }
         int64_t systemCycleAfter = AscendC::GetSystemCycle(); // add this line to solve slow poll CQ issue
     }
 
-    __gm__ uint8_t *wqeAddr = (__gm__ uint8_t *)(sqBaseAddr + wqeSize * (curHead % QP_DEPTH));
+    __gm__ uint8_t* wqeAddr = (__gm__ uint8_t*)(sqBaseAddr + wqeSize * (curHead % QP_DEPTH));
 
     WriteRdmaWqe(wqeAddr, srcDmaAddr, destDmaAddr, messageLen, destRankId, curHead, QpInfo);
     // wqe & sge cache flush
@@ -418,10 +417,10 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     uint64_t send_counts_outer_offset = offset_inner_offset + static_cast<uint64_t>(globalBs_ * axisK_ * serverNum_);
     uint64_t offset_outer_offset = send_counts_outer_offset + static_cast<uint64_t>(axisBS_);
 
-    countInnerGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int16_t *>(sendCount) + send_counts_inner_offset * 2);
-    offsetInnerGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(sendCount) + offset_inner_offset);
-    countOuterGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(sendCount) + send_counts_outer_offset);
-    offsetOuterGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t *>(sendCount) + offset_outer_offset);
+    countInnerGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int16_t*>(sendCount) + send_counts_inner_offset * 2);
+    offsetInnerGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sendCount) + offset_inner_offset);
+    countOuterGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sendCount) + send_counts_outer_offset);
+    offsetOuterGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sendCount) + offset_outer_offset);
 
     PipeBarrier<PIPE_ALL>();
     magicValue_ = addrInfo_.GetMagicValue();
@@ -443,7 +442,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::Init(
     GM_ADDR expandX, GM_ADDR expertIds, GM_ADDR expandIdx, GM_ADDR sendCount, GM_ADDR scales, GM_ADDR performanceInfo,
-    GM_ADDR XOut, GM_ADDR workspaceGM, TPipe *pipe, const MoeDistributeCombineA2TilingData *tilingData,
+    GM_ADDR XOut, GM_ADDR workspaceGM, TPipe* pipe, const MoeDistributeCombineA2TilingData* tilingData,
     GM_ADDR contextGM)
 {
     tpipe_ = pipe;
@@ -459,7 +458,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::InitTilingAttrs(
-    const MoeDistributeCombineA2TilingData *tilingData, GM_ADDR contextGM)
+    const MoeDistributeCombineA2TilingData* tilingData, GM_ADDR contextGM)
 {
     rankId_ = tilingData->moeDistributeCombineInfo.epRankId;
     axisBS_ = tilingData->moeDistributeCombineInfo.bs;
@@ -474,7 +473,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     InitQuantParams();
     hccl_.InitV2(contextGM, tilingData);
     hccl_.SetCcTilingV2(offsetof(MoeDistributeCombineA2TilingData, mc2CcTiling));
-    qp_info_ = (__gm__ HcclAiRMAInfo *)(((__gm__ HcclA2CombineOpParam *)contextGM)->aiRMAInfo);
+    qp_info_ = (__gm__ HcclAiRMAInfo*)(((__gm__ HcclA2CombineOpParam*)contextGM)->aiRMAInfo);
 
     serverNum_ = worldSize_ / SERVER_RANK_SIZE;
     localMoeExpertNum_ = moeExpertNum_ / worldSize_;
@@ -487,18 +486,18 @@ template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::InitGlobalBuffers(
     GM_ADDR expandX, GM_ADDR sendCount, GM_ADDR scales, GM_ADDR XOut, GM_ADDR performanceInfo)
 {
-    expandXGlobal_.SetGlobalBuffer((__gm__ ExpandXType *)expandX);
-    sendCountGlobal_.SetGlobalBuffer((__gm__ int32_t *)sendCount);
-    expandScalesGlobal_.SetGlobalBuffer((__gm__ float *)scales);
-    expandOutGlobal_.SetGlobalBuffer((__gm__ ExpandXType *)XOut);
-    readStateGlobal_.SetGlobalBuffer((__gm__ uint64_t *)(addrInfo_.GetLocalSendBuffFlagAddr()));
+    expandXGlobal_.SetGlobalBuffer((__gm__ ExpandXType*)expandX);
+    sendCountGlobal_.SetGlobalBuffer((__gm__ int32_t*)sendCount);
+    expandScalesGlobal_.SetGlobalBuffer((__gm__ float*)scales);
+    expandOutGlobal_.SetGlobalBuffer((__gm__ ExpandXType*)XOut);
+    readStateGlobal_.SetGlobalBuffer((__gm__ uint64_t*)(addrInfo_.GetLocalSendBuffFlagAddr()));
     axisHFloatSize_ = axisH_ * static_cast<uint32_t>(sizeof(float));
     axisHExpandXTypeSize_ = axisH_ * static_cast<uint32_t>(sizeof(ExpandXType));
 
     needPerformanceInfo_ = performanceInfo != nullptr;
     if (unlikely(needPerformanceInfo_)) {
         performanceInfoSize_ = worldSize_;
-        performanceInfoI32GMTensor_.SetGlobalBuffer((__gm__ int32_t *)performanceInfo);
+        performanceInfoI32GMTensor_.SetGlobalBuffer((__gm__ int32_t*)performanceInfo);
         tpipe_->InitBuffer(performanceInfoBuf_, performanceInfoSize_ * sizeof(int64_t));
         performanceInfoI32Tensor_ = performanceInfoBuf_.Get<int32_t>();
         Duplicate<int32_t>(performanceInfoI32Tensor_, 0, performanceInfoSize_ * sizeof(int64_t) / sizeof(int32_t));
@@ -539,8 +538,8 @@ __aicore__ inline int MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc
     uint32_t srcServerId = offsetReduceLocal_.GetValue(offsetIndex) / axisBS_;
     uint32_t srcRankId = srcServerId * SERVER_RANK_SIZE + rankId_ % SERVER_RANK_SIZE;
     GM_ADDR addr = addrInfo_.GetLocalRecvBuffDataAddr(srcRankId);
-    localInWindow_.SetGlobalBuffer((__gm__ ExpandXTransType *)(addr));
-    localInScaleWindow_.SetGlobalBuffer((__gm__ ExpandXType *)(addr));
+    localInWindow_.SetGlobalBuffer((__gm__ ExpandXTransType*)(addr));
+    localInScaleWindow_.SetGlobalBuffer((__gm__ ExpandXType*)(addr));
     SyncFunc<AscendC::HardEvent::V_MTE2>(); // 下一个token用的buffer和上一个token用的buffer之间进行同步
     return offsetOnIpc;
 }
@@ -557,7 +556,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     SyncAll<true>();
     if (coreIdx_ < SERVER_RANK_SIZE) {
         uint32_t dstRankId = (rankId_ / SERVER_RANK_SIZE) * SERVER_RANK_SIZE + coreIdx_;
-        shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t *)addrInfo_.GetRemoteIpcSyncFlagAddr(dstRankId));
+        shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t*)addrInfo_.GetRemoteIpcSyncFlagAddr(dstRankId));
         LocalTensor<uint64_t> inUb = statusBuf_.Get<uint64_t>();
         inUb(0) = GM2IPC_SYNC_FLAG + magicValue_;
         PipeBarrier<PIPE_ALL>();
@@ -595,8 +594,8 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::CopyTokensToIpc(
-    LocalTensor<ExpandIdxType> &sendCountLocal, LocalTensor<float> &expandScalesLocal, LocalTensor<ExpandXType> &inUb,
-    LocalTensor<float> &inUbTemp)
+    LocalTensor<ExpandIdxType>& sendCountLocal, LocalTensor<float>& expandScalesLocal, LocalTensor<ExpandXType>& inUb,
+    LocalTensor<float>& inUbTemp)
 {
     for (uint32_t expertId = 0U; expertId < localMoeExpertNum_; ++expertId) {
         for (uint32_t dstRankId = startRankId_; dstRankId < endRankId_; ++dstRankId) {
@@ -606,7 +605,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
                 preCount = static_cast<uint32_t>(sendCountLocal.GetValue(expertId * worldSize_ + dstRankId - 1));
             }
             dstshareMemGlobal_.SetGlobalBuffer(
-                (__gm__ ExpandXType *)(addrInfo_.GetIpcDataAddr(rankId_, expertId, dstRankId)));
+                (__gm__ ExpandXType*)(addrInfo_.GetIpcDataAddr(rankId_, expertId, dstRankId)));
 
             uint32_t tokenNum = sendCountLocal.GetValue(expertId * worldSize_ + dstRankId) - preCount;
             uint32_t startTokenAddr = preCount * axisH_;
@@ -640,7 +639,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
     if (coreIdx_ < stepCoreNum_) {
         uint32_t srcRankId = (rankId_ / SERVER_RANK_SIZE) * SERVER_RANK_SIZE + coreIdx_;
-        shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t *)addrInfo_.GetLocalIpcSyncFlagAddr(srcRankId));
+        shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t*)addrInfo_.GetLocalIpcSyncFlagAddr(srcRankId));
         int64_t startTime = GetCurrentTimestampUs();
         LocalTensor<uint64_t> inUb = statusBuf_.Get<uint64_t>();
         while (true) {
@@ -664,7 +663,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::QuantizeFp16WindowToken(
-    WindowSumBuffers &buffers, uint32_t dataOffset, uint32_t tokenOffset, const DataCopyParams &flagDataCopyParams)
+    WindowSumBuffers& buffers, uint32_t dataOffset, uint32_t tokenOffset, const DataCopyParams& flagDataCopyParams)
 {
     Cast(buffers.sumHalfLocal, buffers.sumFloatLocal, AscendC::RoundMode::CAST_RINT, axisH_);
     PipeBarrier<PIPE_V>();
@@ -691,7 +690,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::QuantizeBf16WindowToken(
-    WindowSumBuffers &buffers, uint32_t dataOffset, uint32_t tokenOffset, const DataCopyParams &flagDataCopyParams)
+    WindowSumBuffers& buffers, uint32_t dataOffset, uint32_t tokenOffset, const DataCopyParams& flagDataCopyParams)
 {
     PipeBarrier<PIPE_V>();
     Abs(buffers.castInFloatLocal, buffers.sumFloatLocal, axisH_); // 求fp32张量的绝对值
@@ -719,7 +718,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::InitWindowSumBuffers(
-    WindowSumBuffers &buffers, uint32_t baseBuffOffset)
+    WindowSumBuffers& buffers, uint32_t baseBuffOffset)
 {
     uint32_t fp16baseBuffOffset = 0U;
     InitWindowCommonBuffers(buffers, baseBuffOffset, fp16baseBuffOffset);
@@ -735,7 +734,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::InitWindowCommonBuffers(
-    WindowSumBuffers &buffers, uint32_t &baseBuffOffset, uint32_t &fp16baseBuffOffset)
+    WindowSumBuffers& buffers, uint32_t& baseBuffOffset, uint32_t& fp16baseBuffOffset)
 {
     // 量化和不量化都要用
 
@@ -767,7 +766,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::InitWindowFp16Buffers(
-    WindowSumBuffers &buffers, uint32_t &fp16baseBuffOffset)
+    WindowSumBuffers& buffers, uint32_t& fp16baseBuffOffset)
 {
     // 量化fp16
     buffers.sumHalfLocal = tBuf.GetWithOffset<ExpandXType>(axisH_, fp16baseBuffOffset); // 复用castInFloatLocal
@@ -789,8 +788,8 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::BuildWindowTokenList(
-    WindowSumBuffers &buffers, uint32_t targetServerId, uint32_t coreNumPerServer, uint32_t &baseBuffOffset,
-    uint32_t &totalCopyLen)
+    WindowSumBuffers& buffers, uint32_t targetServerId, uint32_t coreNumPerServer, uint32_t& baseBuffOffset,
+    uint32_t& totalCopyLen)
 {
     // 初始baseBuffOffset
     baseBuffOffset = TBUF_TEMP_OFFSET;
@@ -818,7 +817,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline uint32_t MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::GatherValidTokenIdx(
-    WindowSumBuffers &buffers, uint32_t realBS)
+    WindowSumBuffers& buffers, uint32_t realBS)
 {
     uint32_t tokenNum = 0;
     for (uint32_t i = 0U; i < realBS; i++) {
@@ -833,8 +832,8 @@ __aicore__ inline uint32_t MoeDistributeCombineA2Layered<TemplateMC2TypeA2layere
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::FillWindowOffsetLists(
-    WindowSumBuffers &buffers, uint32_t coreNumPerServer, uint32_t tokenNum, uint32_t &baseBuffOffset,
-    uint32_t &totalCopyLen)
+    WindowSumBuffers& buffers, uint32_t coreNumPerServer, uint32_t tokenNum, uint32_t& baseBuffOffset,
+    uint32_t& totalCopyLen)
 {
     // 计算offsetIndex, copyNum, dataOffset
     uint32_t listLen = RoundUp(maxBs_ / coreNumPerServer + 1, B32_PER_BLOCK); // maxBs_ / coreNumPerServer;
@@ -863,7 +862,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::AccumulateIpcWindowToken(
-    WindowSumBuffers &buffers, uint32_t targetRankId, uint32_t offsetNumPerExpert, uint32_t offsetIndexStart)
+    WindowSumBuffers& buffers, uint32_t targetRankId, uint32_t offsetNumPerExpert, uint32_t offsetIndexStart)
 {
     uint32_t targetLocalServerExpertId = buffers.offsetReduceLocal.GetValue(offsetIndex) / offsetNumPerExpert;
     uint32_t targetIpcRank =
@@ -873,7 +872,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
         (buffers.offsetReduceLocal.GetValue(offsetIndex) % offsetNumPerExpert) * (axisH_ + WEIGHT_VALUE_NUM);
 
     shareMemGlobal_.SetGlobalBuffer(
-        (__gm__ ExpandXType *)addrInfo_.GetIpcDataAddr(targetIpcRank, targetLocalExpertId, targetRankId));
+        (__gm__ ExpandXType*)addrInfo_.GetIpcDataAddr(targetIpcRank, targetLocalExpertId, targetRankId));
     SyncFunc<AscendC::HardEvent::MTE3_MTE2>();
     DataCopy(buffers.dataInLocal, shareMemGlobal_[targetIpcOffset], axisH_ + WEIGHT_VALUE_NUM); // mte2
     SyncFunc<AscendC::HardEvent::MTE2_S>();
@@ -890,7 +889,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::ReduceWindowTokens(
-    WindowSumBuffers &buffers, uint32_t targetServerId, uint32_t targetRankId, uint32_t coreNumPerServer,
+    WindowSumBuffers& buffers, uint32_t targetServerId, uint32_t targetRankId, uint32_t coreNumPerServer,
     uint32_t totalCopyLen, uint32_t offsetNumPerExpert)
 {
     uint32_t processTokenNum = 0;
@@ -900,7 +899,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     uint32_t dataOffset = buffers.dataOffsets(processTokenNum);
     uint32_t tokenOffset = 0;
     auto flagDataCopyParams = DataCopyParams{1U, static_cast<uint16_t>(sizeof(uint64_t)), 0, 0};
-    shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t *)addrInfo_.GetIpcTokenFlagAddr(targetServerId));
+    shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t*)addrInfo_.GetIpcTokenFlagAddr(targetServerId));
     PipeBarrier<PIPE_ALL>();
     for (uint32_t i = 0U; i < totalCopyLen; i++) {
         AccumulateIpcWindowToken(buffers, targetRankId, offsetNumPerExpert, offsetIndexStart);
@@ -950,7 +949,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     uint32_t totalCopyLen = 0U;
     BuildWindowTokenList(buffers, targetServerId, coreNumPerServer, baseBuffOffset, totalCopyLen);
     InitWindowSumBuffers(buffers, baseBuffOffset);
-    localOutWindow_.SetGlobalBuffer((__gm__ ExpandXType *)(addrInfo_.GetLocalSendBuffDataAddr(targetRankId)));
+    localOutWindow_.SetGlobalBuffer((__gm__ ExpandXType*)(addrInfo_.GetLocalSendBuffDataAddr(targetRankId)));
     buffers.rdmaFlagLocal = statusBuf_.Get<uint64_t>();
     buffers.rdmaFlagLocal(0) = RDMA_TOKEN_ARRIVED_FLAG + magicValue_;
     ReduceWindowTokens(buffers, targetServerId, targetRankId, coreNumPerServer, totalCopyLen, offsetNumPerExpert);
@@ -958,8 +957,8 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::WaitRdmaTokens(
-    LocalTensor<uint64_t> &checkRdmaLocal, uint32_t copyOnceNum, uint32_t &copySum, bool &stopFlag,
-    const DataCopyExtParams &flagDataCopyParams, const DataCopyPadExtParams<uint64_t> &flagPadParams)
+    LocalTensor<uint64_t>& checkRdmaLocal, uint32_t copyOnceNum, uint32_t& copySum, bool& stopFlag,
+    const DataCopyExtParams& flagDataCopyParams, const DataCopyPadExtParams<uint64_t>& flagPadParams)
 {
     for (uint32_t i = 0U; i < copyOnceNum; i++) {
         while (true) {
@@ -982,8 +981,8 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::CopyLocalServerTokens(
-    LocalTensor<ExpandXTransType> &tmpLowUb_, GlobalTensor<ExpandXTransType> &aivSrcGlobal,
-    GlobalTensor<ExpandXTransType> &aivDstGlobal, uint32_t copyLenAlign_, uint32_t copySum, uint32_t copyOnceNum)
+    LocalTensor<ExpandXTransType>& tmpLowUb_, GlobalTensor<ExpandXTransType>& aivSrcGlobal,
+    GlobalTensor<ExpandXTransType>& aivDstGlobal, uint32_t copyLenAlign_, uint32_t copySum, uint32_t copyOnceNum)
 {
     uint32_t cpNum = 0U;
     if constexpr (DynamicQuant && std::is_same<ExpandXTransType, int8_t>::value) {
@@ -1028,7 +1027,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
     uint64_t dstrdmaAddr = (uint64_t)(addrInfo_.GetRemoteRecvBuffDataAddr(dstRankId));
     auto flagDataCopyParams = DataCopyExtParams{1U, static_cast<uint16_t>(sizeof(uint64_t)), 0, 0, 0};
     auto flagPadParams = DataCopyPadExtParams<uint64_t>{false, 0, 0, 0};
-    shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t *)addrInfo_.GetIpcTokenFlagAddr(checkServer));
+    shareFlagGlobal_.SetGlobalBuffer((__gm__ uint64_t*)addrInfo_.GetIpcTokenFlagAddr(checkServer));
     DispatchServerTokens(checkRdmaLocal, tmpLowUb_, aivSrcGlobal, aivDstGlobal, dstRankId, copySum, copyOnceNum,
                          copyLen_, copyLenAlign_, srcrdmaAddr, dstrdmaAddr, flagDataCopyParams, flagPadParams);
     if (rankId_ != dstRankId) {
@@ -1040,25 +1039,25 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::DispatchServerTokens(
-    LocalTensor<uint64_t> &checkRdmaLocal, LocalTensor<ExpandXTransType> &tmpLowUb_,
-    GlobalTensor<ExpandXTransType> &aivSrcGlobal, GlobalTensor<ExpandXTransType> &aivDstGlobal, uint32_t dstRankId,
-    uint32_t &copySum, uint32_t copyOnceNum, uint32_t copyLen_, uint32_t copyLenAlign_, uint64_t srcrdmaAddr,
-    uint64_t dstrdmaAddr, const DataCopyExtParams &flagDataCopyParams,
-    const DataCopyPadExtParams<uint64_t> &flagPadParams)
+    LocalTensor<uint64_t>& checkRdmaLocal, LocalTensor<ExpandXTransType>& tmpLowUb_,
+    GlobalTensor<ExpandXTransType>& aivSrcGlobal, GlobalTensor<ExpandXTransType>& aivDstGlobal, uint32_t dstRankId,
+    uint32_t& copySum, uint32_t copyOnceNum, uint32_t copyLen_, uint32_t copyLenAlign_, uint64_t srcrdmaAddr,
+    uint64_t dstrdmaAddr, const DataCopyExtParams& flagDataCopyParams,
+    const DataCopyPadExtParams<uint64_t>& flagPadParams)
 {
     bool stopFlag = false;
     while (!stopFlag) {
         WaitRdmaTokens(checkRdmaLocal, copyOnceNum, copySum, stopFlag, flagDataCopyParams, flagPadParams);
         if (copySum > 0U) {
             if (rankId_ != dstRankId) {
-                aivSrcGlobal.SetGlobalBuffer((__gm__ ExpandXTransType *)(srcrdmaAddr));
-                aivDstGlobal.SetGlobalBuffer((__gm__ ExpandXTransType *)(dstrdmaAddr));
+                aivSrcGlobal.SetGlobalBuffer((__gm__ ExpandXTransType*)(srcrdmaAddr));
+                aivDstGlobal.SetGlobalBuffer((__gm__ ExpandXTransType*)(dstrdmaAddr));
                 AIVRDMAPostSend((GM_ADDR)(srcrdmaAddr + copyLenAlign_ * (copySum - copyOnceNum)),
                                 (GM_ADDR)(dstrdmaAddr + copyLenAlign_ * (copySum - copyOnceNum)), dstRankId,
                                 copyLen_ * copyOnceNum, qp_info_);
             } else {
-                aivSrcGlobal.SetGlobalBuffer((__gm__ ExpandXTransType *)(srcrdmaAddr));
-                aivDstGlobal.SetGlobalBuffer((__gm__ ExpandXTransType *)(dstrdmaAddr));
+                aivSrcGlobal.SetGlobalBuffer((__gm__ ExpandXTransType*)(srcrdmaAddr));
+                aivDstGlobal.SetGlobalBuffer((__gm__ ExpandXTransType*)(dstrdmaAddr));
                 CopyLocalServerTokens(tmpLowUb_, aivSrcGlobal, aivDstGlobal, copyLenAlign_, copySum, copyOnceNum);
             }
         }
@@ -1074,7 +1073,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
         uint32_t readNum = 1U;
         DataCopyParams intriParams{static_cast<uint16_t>(readNum), 1, 15, 0}; // srcStride为15个block
         GlobalTensor<uint64_t> statusSpaceGlobal;                             // win区状态位置拷入相关参数
-        statusSpaceGlobal.SetGlobalBuffer((__gm__ uint64_t *)addrInfo_.GetLocalRecvBuffFlagAddr(srcRankId));
+        statusSpaceGlobal.SetGlobalBuffer((__gm__ uint64_t*)addrInfo_.GetLocalRecvBuffFlagAddr(srcRankId));
 
         int64_t startTime = GetSystemCycle() / TIME_CYCLE;
         while (true) {
@@ -1132,7 +1131,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::SumFp16ToServer(
-    ServerSumBuffers &buffers, int copyNum, uint32_t i)
+    ServerSumBuffers& buffers, int copyNum, uint32_t i)
 {
     SyncFunc<AscendC::HardEvent::MTE3_V>();
     Duplicate(buffers.sumFp16Local, static_cast<ExpandXType>(0.0), axisH_);
@@ -1161,7 +1160,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::SumBf16ToServer(
-    ServerSumBuffers &buffers, int copyNum, uint32_t i)
+    ServerSumBuffers& buffers, int copyNum, uint32_t i)
 {
     SyncFunc<AscendC::HardEvent::MTE3_V>();
     Duplicate(buffers.sumFloatLocal1, 0.0f, axisH_);
@@ -1196,7 +1195,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::SumUnquantizedToServer(
-    ServerSumBuffers &buffers, int copyNum, uint32_t i)
+    ServerSumBuffers& buffers, int copyNum, uint32_t i)
 {
     Duplicate(buffers.sumFloatLocal, 0.0f, axisH_);
     for (int j = 0; j < copyNum; j++) {
@@ -1204,7 +1203,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
         uint32_t srcServerId = offsetReduceLocal_.GetValue(offsetIndex) / axisBS_;
         uint32_t srcRankId = srcServerId * SERVER_RANK_SIZE + rankId_ % SERVER_RANK_SIZE;
         GM_ADDR addr = addrInfo_.GetLocalRecvBuffDataAddr(srcRankId);
-        localInWindow_.SetGlobalBuffer((__gm__ ExpandXTransType *)(addr));
+        localInWindow_.SetGlobalBuffer((__gm__ ExpandXTransType*)(addr));
         SyncFunc<AscendC::HardEvent::V_MTE2>(); // 下一个token用的buffer和上一个token用的buffer之间进行同步
         DataCopy(buffers.dataIn, localInWindow_[offsetOnIpc], axisH_);
         SyncFunc<AscendC::HardEvent::MTE2_V>();
@@ -1225,7 +1224,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::InitServerSumBuffers(
-    ServerSumBuffers &buffers)
+    ServerSumBuffers& buffers)
 {
     // 初始化 fp16  bf16的offset
     uint32_t baseBuffOffset = sizeof(uint32_t) * RoundUp(axisBS_ * serverNum_, (uint32_t)(UB_ALIGN / sizeof(int32_t))) +
@@ -1240,7 +1239,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::InitServerUnquantizedBuffers(
-    ServerSumBuffers &buffers, uint32_t &baseBuffOffset)
+    ServerSumBuffers& buffers, uint32_t& baseBuffOffset)
 {
     // 不量化
     buffers.sumFloatLocal = tBuf.GetWithOffset<float>(axisH_, baseBuffOffset);
@@ -1254,7 +1253,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::InitServerFp16Buffers(
-    ServerSumBuffers &buffers, uint32_t &fpBaseBuffOffset)
+    ServerSumBuffers& buffers, uint32_t& fpBaseBuffOffset)
 {
     // 量化 fp16
     buffers.sumFp16Local = tBuf.GetWithOffset<ExpandXType>(axisH_, fpBaseBuffOffset);
@@ -1274,7 +1273,7 @@ __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFun
 
 template <TemplateMC2TypeA2layeredClass>
 __aicore__ inline void MoeDistributeCombineA2Layered<TemplateMC2TypeA2layeredFunc>::InitServerBf16Buffers(
-    ServerSumBuffers &buffers, uint32_t &bfBaseBuffOffset)
+    ServerSumBuffers& buffers, uint32_t& bfBaseBuffOffset)
 {
     // 量化 bf16
     buffers.sumFloatLocal1 = tBuf.GetWithOffset<float>(axisH_, bfBaseBuffOffset);

@@ -38,19 +38,19 @@ struct CommSizeInfo {
     uint64_t rankDim;
 };
 
-uint64_t CalcMaxTileMFromHcclLimit(const CutResult &cutRes, const CommSizeInfo &commSize, const std::string &opName);
+uint64_t CalcMaxTileMFromHcclLimit(const CutResult& cutRes, const CommSizeInfo& commSize, const std::string& opName);
 
 uint64_t SelectOptimalCandidateTileM(uint64_t maxTileM);
 
 uint64_t DetermineFinalTileMWithLimit(uint64_t mValue, uint64_t candidateTileM, uint64_t maxTileM,
-                                      const std::string &opName);
+                                      const std::string& opName);
 
-void ApplyTileSplit(CutResult &cutRes, uint64_t mValue, uint64_t tileM, const CommSizeInfo &commSize,
-                    const std::string &opName);
+void ApplyTileSplit(CutResult& cutRes, uint64_t mValue, uint64_t tileM, const CommSizeInfo& commSize,
+                    const std::string& opName);
 
-void AdjustCutResultForCCU(CutResult &cutRes, uint64_t mValue, const CommSizeInfo &commSize, const std::string &opName);
+void AdjustCutResultForCCU(CutResult& cutRes, uint64_t mValue, const CommSizeInfo& commSize, const std::string& opName);
 
-void AdjustCutResultForAICPU(CutResult &cutRes, uint64_t mValue, uint64_t baseM, const std::string &opName);
+void AdjustCutResultForAICPU(CutResult& cutRes, uint64_t mValue, uint64_t baseM, const std::string& opName);
 } // namespace optiling
 
 #endif // ALL_GATHER_HCCL_UTILS_H

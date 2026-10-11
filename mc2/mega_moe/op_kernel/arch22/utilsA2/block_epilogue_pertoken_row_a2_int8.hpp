@@ -57,7 +57,7 @@ public:
     using CopyUbToGmD = typename TileCopy_::CopyUbToGmD;
 
     struct Params {
-        __gm__ int32_t *ptrTokenPerExpert{nullptr};
+        __gm__ int32_t* ptrTokenPerExpert{nullptr};
         int32_t EP;
         int32_t expertPerRank;
         int32_t n2;
@@ -66,7 +66,7 @@ public:
         Params() {};
 
         CATLASS_DEVICE
-        Params(int32_t EP_, int32_t expertPerRank_, __gm__ int32_t *ptrTokenPerExpert_, int32_t n2_)
+        Params(int32_t EP_, int32_t expertPerRank_, __gm__ int32_t* ptrTokenPerExpert_, int32_t n2_)
             : ptrTokenPerExpert(ptrTokenPerExpert_),
               EP(EP_),
               expertPerRank(expertPerRank_),
@@ -75,7 +75,7 @@ public:
     };
 
     CATLASS_DEVICE
-    BlockEpilogue(Arch::Resource<ArchTag> const &resource, Params const &params = Params{})
+    BlockEpilogue(Arch::Resource<ArchTag> const& resource, Params const& params = Params{})
         : params(params)
     {
         size_t ubOffset = 0;
@@ -115,15 +115,15 @@ public:
     ~BlockEpilogue() {}
 
     CATLASS_DEVICE
-    void UpdateParams(Params const &params_)
+    void UpdateParams(Params const& params_)
     {
         params = params_;
     }
 
     CATLASS_DEVICE
-    void operator()(AscendC::GlobalTensor<ElementC> const &gmC, MatrixCoord const &shapeC,
-                    AscendC::GlobalTensor<ElementPerTokenScale> const &gmPerTokenScale,
-                    AscendC::GlobalTensor<ElementD> const &gmD)
+    void operator()(AscendC::GlobalTensor<ElementC> const& gmC, MatrixCoord const& shapeC,
+                    AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale,
+                    AscendC::GlobalTensor<ElementD> const& gmD)
     {
         uint32_t blockM = shapeC.row();
         uint32_t blockN = shapeC.column();
@@ -132,10 +132,10 @@ public:
 
         for (uint32_t loopIdx = 0; loopIdx < tileLoops; loopIdx++) {
             auto gmTileC = gmC[loopIdx * blockN];
-            auto &ubC = ubCList[ubListId];
-            auto &ubCFp32 = ubCFp32List[ubListId];
-            auto &ubMul = ubMulList[ubListId];
-            auto &ubD = ubDList[ubListId];
+            auto& ubC = ubCList[ubListId];
+            auto& ubCFp32 = ubCFp32List[ubListId];
+            auto& ubMul = ubMulList[ubListId];
+            auto& ubD = ubDList[ubListId];
             auto gmTileD = gmD[loopIdx * blockN];
             LayoutC layoutUbC{1, blockN};
 

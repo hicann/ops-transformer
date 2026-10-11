@@ -19,14 +19,14 @@ extern "C" {
 #endif
 
 ACLNN_API aclnnStatus aclnnAttentionToFfnV2GetWorkspaceSize(
-    const aclTensor *context, const aclTensor *x, const aclTensor *sessionId, const aclTensor *microBatchId,
-    const aclTensor *layerId, const aclTensor *expertIds, const aclTensor *expertRankTable,
-    const aclTensor *scalesOptional, const aclTensor *activeMaskOptional, const char *group, int64_t worldSize,
-    const aclIntArray *ffnTokenInfoTableShape, const aclIntArray *ffnTokenDataShape,
-    const aclIntArray *attnTokenInfoTableShape, int64_t moeExpertNum, int64_t quantMode, int64_t syncFlag,
-    int64_t ffnStartRankId, int64_t cclBufferSize, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* context, const aclTensor* x, const aclTensor* sessionId, const aclTensor* microBatchId,
+    const aclTensor* layerId, const aclTensor* expertIds, const aclTensor* expertRankTable,
+    const aclTensor* scalesOptional, const aclTensor* activeMaskOptional, const char* group, int64_t worldSize,
+    const aclIntArray* ffnTokenInfoTableShape, const aclIntArray* ffnTokenDataShape,
+    const aclIntArray* attnTokenInfoTableShape, int64_t moeExpertNum, int64_t quantMode, int64_t syncFlag,
+    int64_t ffnStartRankId, int64_t cclBufferSize, uint64_t* workspaceSize, aclOpExecutor** executor);
 
-ACLNN_API aclnnStatus aclnnAttentionToFfnV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+ACLNN_API aclnnStatus aclnnAttentionToFfnV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                             aclrtStream stream);
 
 #ifdef __cplusplus

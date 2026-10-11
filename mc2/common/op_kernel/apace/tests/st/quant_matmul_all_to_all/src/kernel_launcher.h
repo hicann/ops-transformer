@@ -18,7 +18,7 @@
 #include "apace/kernel/fusions/quant_matmul_all_to_all/mx_quant_matmul_all_to_all_urma_impl.h"
 
 #define DECLARE_MATMUL_A2A_MX_KERNEL(name, typeA, typeB, typeC, localDelay) \
-    __global__ __aicore__ void name(__gm__ CommContext *hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM, \
+    __global__ __aicore__ void name(__gm__ CommContext* hcommCtx, GM_ADDR aGM, GM_ADDR scaleAGM, GM_ADDR bGM, \
                                     GM_ADDR scaleBGM, GM_ADDR biasGM, GM_ADDR cGM, \
                                     MatmulAllToAllTilingData tilingData) \
     { \

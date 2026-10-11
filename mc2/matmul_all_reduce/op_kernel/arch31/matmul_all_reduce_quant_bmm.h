@@ -38,18 +38,18 @@ class MatmulAllReduceQuantBmm {
 public:
     __aicore__ inline MatmulAllReduceQuantBmm() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR dequantGM, GM_ADDR biasGM, GM_ADDR cGM,
-                                GM_ADDR workspaceGM, Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData,
-                                TPipe *tPipe, HcclServer *hcclServer);
+                                GM_ADDR workspaceGM, Mc2Tiling::QuantMatmulAllReduceTilingData* tilingData,
+                                TPipe* tPipe, HcclServer* hcclServer);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InnerProcess(uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData &quant_tiling,
+    __aicore__ inline void InnerProcess(uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData& quant_tiling,
                                         uint32_t shift);
 
 private:
-    Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData_;
-    HcclServer *hcclServer_;
-    TPipe *tPipe_;
+    Mc2Tiling::QuantMatmulAllReduceTilingData* tilingData_;
+    HcclServer* hcclServer_;
+    TPipe* tPipe_;
     GM_ADDR cGM_;
     GM_ADDR aGM_;
     GM_ADDR bGM_;
@@ -62,13 +62,13 @@ private:
 template <typename aType, typename bType, typename biasType, typename cType, bool aTrans, bool bTrans>
 __aicore__ inline void MatmulAllReduceQuantBmm<aType, bType, biasType, cType, aTrans, bTrans>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR dequantGM, GM_ADDR biasGM, GM_ADDR cGM, GM_ADDR workspaceGM,
-    Mc2Tiling::QuantMatmulAllReduceTilingData *tilingData, TPipe *tPipe, HcclServer *hcclServer)
+    Mc2Tiling::QuantMatmulAllReduceTilingData* tilingData, TPipe* tPipe, HcclServer* hcclServer)
 {
     GetTPipePtr()->InitBuffer(tmpBuf_, TOTAL_UB_SIZE);
-    auto &&cfg = tilingData->param;
+    auto&& cfg = tilingData->param;
 
-    __gm__ HcclCombinOpParam *context = (__gm__ HcclCombinOpParam *)(GetHcclContext<0>());
-    __gm__ uint8_t *workspaceMsg = (__gm__ uint8_t *)(context->WorkSpace + (tilingData->msg).notifyOff);
+    __gm__ HcclCombinOpParam* context = (__gm__ HcclCombinOpParam*)(GetHcclContext<0>());
+    __gm__ uint8_t* workspaceMsg = (__gm__ uint8_t*)(context->WorkSpace + (tilingData->msg).notifyOff);
     hcclServer->Init(workspaceMsg, (tilingData->msg).debugMode, tmpBuf_);
 
     workspaceGM += cfg.nd2NzWorkLen;
@@ -91,7 +91,7 @@ __aicore__ inline void MatmulAllReduceQuantBmm<aType, bType, biasType, cType, aT
 template <typename aType, typename bType, typename biasType, typename cType, bool aTrans, bool bTrans>
 __aicore__ inline void MatmulAllReduceQuantBmm<aType, bType, biasType, cType, aTrans, bTrans>::Process()
 {
-    auto &&cfg = tilingData_->param;
+    auto&& cfg = tilingData_->param;
     if (g_coreType == AIV) {
         return;
     }
@@ -108,7 +108,7 @@ __aicore__ inline void MatmulAllReduceQuantBmm<aType, bType, biasType, cType, aT
 
 template <typename aType, typename bType, typename biasType, typename cType, bool aTrans, bool bTrans>
 __aicore__ inline void MatmulAllReduceQuantBmm<aType, bType, biasType, cType, aTrans, bTrans>::InnerProcess(
-    uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData &quant_tiling, uint32_t shift)
+    uint32_t tileCnt, Mc2QuantBatchMatmulV3TilingData& quant_tiling, uint32_t shift)
 {
     const uint64_t aOffset = CalcShapeOffset(sizeof(aType), quant_tiling.matmulTiling.M, quant_tiling.matmulTiling.Ka);
     const uint64_t cOffset = CalcShapeOffset(sizeof(cType), quant_tiling.matmulTiling.M, quant_tiling.matmulTiling.N);

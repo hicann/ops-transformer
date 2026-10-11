@@ -33,8 +33,8 @@ class Mc2QuantBatchMatmulASWKernel {
 public:
     __aicore__ inline Mc2QuantBatchMatmulASWKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale,
-                                GM_ADDR cGM, GM_ADDR workSpace, const void *tilingData, TPipe *que,
-                                const Mc2Tiling::RCSTiling &cfg, bool isTail, bool isGather, uint64_t preCoreNum,
+                                GM_ADDR cGM, GM_ADDR workSpace, const void* tilingData, TPipe* que,
+                                const Mc2Tiling::RCSTiling& cfg, bool isTail, bool isGather, uint64_t preCoreNum,
                                 GM_ADDR offsetGM = nullptr);
     __aicore__ inline void UpdateSlice(uint32_t idx, bool isTail);
     __aicore__ inline void Process(bool isLast = true);
@@ -48,7 +48,7 @@ protected:
                                             GM_ADDR scale, GM_ADDR cGM, GM_ADDR workSpace);
 
     uint32_t blockIdx_;
-    const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *quantBmmTilingData_;
+    const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* quantBmmTilingData_;
 
     GlobalTensor<X1Type> aGlobal_;
     GlobalTensor<X2Type> bGlobal_;
@@ -83,19 +83,19 @@ protected:
 LOCAL_TEMPLATE_CLASS_PARAMS
 __aicore__ inline void Mc2QuantBatchMatmulASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale, GM_ADDR cGM, GM_ADDR workSpace,
-    const void *tilingData, TPipe *que, const Mc2Tiling::RCSTiling &cfg, bool isTail, bool isGather,
+    const void* tilingData, TPipe* que, const Mc2Tiling::RCSTiling& cfg, bool isTail, bool isGather,
     uint64_t preCoreNum, GM_ADDR offsetGM)
 {
     if ASCEND_IS_AIV {
         return;
     }
-    quantBmmTilingData_ = static_cast<const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *>(tilingData);
+    quantBmmTilingData_ = static_cast<const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams*>(tilingData);
     blockIdx_ = GetBlockIdx();
     block_.Init(quantBmmTilingData_, blockIdx_);
     block_.InitForMC2(cfg, isTail, isGather, preCoreNum);
     UpdateGlobalAddr(aGM, bGM, bias, scale, perTokenScale, cGM, workSpace);
     if (offsetGM != nullptr) {
-        cOwnGlobal_.SetGlobalBuffer((__gm__ YType *)offsetGM, block_.rankMN_);
+        cOwnGlobal_.SetGlobalBuffer((__gm__ YType*)offsetGM, block_.rankMN_);
         ownRedirect_ = true;
     }
     mm_.SetSubBlockIdx(0);
@@ -113,37 +113,37 @@ __aicore__ inline void Mc2QuantBatchMatmulASWKernel<LOCAL_TEMPLATE_FUNC_PARAMS>:
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale, GM_ADDR perTokenScale, GM_ADDR cGM, GM_ADDR workSpace)
 {
     if constexpr (DequantBmm::IsMxType<ScaleType>()) {
-        scaleAGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t *)perTokenScale);
-        scaleBGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t *)scale);
+        scaleAGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t*)perTokenScale);
+        scaleBGlobal_.SetGlobalBuffer((__gm__ fp8_e8m0_t*)scale);
     } else {
         if (static_cast<bool>(quantBmmTilingData_->params.isDoubleScale)) { // doubleScale
-            float deqScale = (*((__gm__ float *)scale)) * (*((__gm__ float *)perTokenScale));
-            uint32_t uint32Scale = *(reinterpret_cast<uint32_t *>(&deqScale));
+            float deqScale = (*((__gm__ float*)scale)) * (*((__gm__ float*)perTokenScale));
+            uint32_t uint32Scale = *(reinterpret_cast<uint32_t*>(&deqScale));
             block_.offset_.scaleScalar = uint32Scale & DEQ_SCALE_MUL;            // fixpipe只能取高19位
         } else if (static_cast<bool>(quantBmmTilingData_->params.isPerTensor)) { // pertensor
             if constexpr (!IsSameType<ScaleType, uint64_t>::value) {
                 uint32_t uint32Scale = 0;
                 if constexpr (IsSameType<ScaleType, bfloat16_t>::value) {
-                    uint16_t uint16Scale = *((__gm__ uint16_t *)scale);
+                    uint16_t uint16Scale = *((__gm__ uint16_t*)scale);
                     uint32Scale = uint16Scale << 16;
                 } else {
-                    uint32Scale = *((__gm__ uint32_t *)scale);
+                    uint32Scale = *((__gm__ uint32_t*)scale);
                 }
                 block_.offset_.scaleScalar = uint32Scale & DEQ_SCALE_MUL;
             } else {
-                block_.offset_.scaleScalar = *((__gm__ uint64_t *)scale);
+                block_.offset_.scaleScalar = *((__gm__ uint64_t*)scale);
             }
         } else {
-            scaleGlobal_.SetGlobalBuffer((__gm__ uint64_t *)scale);
+            scaleGlobal_.SetGlobalBuffer((__gm__ uint64_t*)scale);
         }
     }
     // update global buffer
-    aGlobal_.SetGlobalBuffer((__gm__ X1Type *)aGM);
-    bGlobal_.SetGlobalBuffer((__gm__ X2Type *)bGM);
+    aGlobal_.SetGlobalBuffer((__gm__ X1Type*)aGM);
+    bGlobal_.SetGlobalBuffer((__gm__ X2Type*)bGM);
     if (static_cast<bool>(quantBmmTilingData_->matmulTiling.isBias)) {
-        biasGlobal_.SetGlobalBuffer((__gm__ BiasType *)bias);
+        biasGlobal_.SetGlobalBuffer((__gm__ BiasType*)bias);
     }
-    cGlobal_.SetGlobalBuffer((__gm__ YType *)cGM);
+    cGlobal_.SetGlobalBuffer((__gm__ YType*)cGM);
 }
 
 LOCAL_TEMPLATE_CLASS_PARAMS

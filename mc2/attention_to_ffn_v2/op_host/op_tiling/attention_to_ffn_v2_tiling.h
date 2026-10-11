@@ -21,7 +21,7 @@
 
 namespace MC2Tiling {
 
-ge::graphStatus AttentionToFfnV2TilingFunc(gert::TilingContext *context);
+ge::graphStatus AttentionToFfnV2TilingFunc(gert::TilingContext* context);
 } // namespace MC2Tiling
 
 #endif // ATTENTION_TO_FFN_V2_TILING_HOST_H

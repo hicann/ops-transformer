@@ -54,23 +54,23 @@ public:
     __aicore__ inline AttentionToFFN(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR sessionId, GM_ADDR microBatchId, GM_ADDR layerId, GM_ADDR expertIds,
                                 GM_ADDR expertRankTable, GM_ADDR scales, GM_ADDR active_mask, GM_ADDR workspaceGM,
-                                TPipe *pipe, const AttentionToFFNTilingData *tilingData);
+                                TPipe* pipe, const AttentionToFFNTilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void ReduceMaxInplace(const LocalTensor<float> &srcLocal, uint32_t count);
+    __aicore__ inline void ReduceMaxInplace(const LocalTensor<float>& srcLocal, uint32_t count);
     __aicore__ inline void QuantInit(GM_ADDR scales);
     __aicore__ inline void ReadSessionMetadata();
     __aicore__ inline void InitWindowOffsets();
-    __aicore__ inline void InitByTinglingData(const AttentionToFFNTilingData *tilingData);
+    __aicore__ inline void InitByTinglingData(const AttentionToFFNTilingData* tilingData);
     __aicore__ inline void QuantProcess(uint32_t expertIndex);
-    __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId,
-                                       uint32_t &endTokenId, uint32_t &sendTokenNum);
+    __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startTokenId,
+                                       uint32_t& endTokenId, uint32_t& sendTokenNum);
     __aicore__ inline void SendTokenToFFN();
     __aicore__ inline void SendTokenToFFNByTokenIdx(uint32_t tokenIdx);
     __aicore__ inline void SendQuantizedTokenData(GM_ADDR toRankAddr, uint32_t tokenId, uint32_t topkId,
-                                                  GlobalTensor<int8_t> &tokenDataGMTensor,
-                                                  DataCopyExtParams &hCommuCopyOutParams);
+                                                  GlobalTensor<int8_t>& tokenDataGMTensor,
+                                                  DataCopyExtParams& hCommuCopyOutParams);
     __aicore__ inline void SetFlagToFFN();
     __aicore__ inline void AggregateFFNSendStatus(uint32_t startFFNId, uint32_t sentFFNNum);
     __aicore__ inline void SendFlagsToFFN(uint32_t startFFNId, uint32_t endFFNId);
@@ -78,9 +78,9 @@ private:
     __aicore__ inline void SetFlagInAttn();
     __aicore__ inline void FindExpertRank(int32_t expertId);
     __aicore__ inline void SetExpertAndRank(uint32_t tokenIdx, uint32_t tokenId, uint32_t topkId);
-    __aicore__ inline void CheckFlagAndSetTableGM(int32_t toRankId, GM_ADDR &toRankAddr,
-                                                  GlobalTensor<int32_t> &tokenInfoTableGMTensor);
-    TPipe *tpipe_{nullptr};
+    __aicore__ inline void CheckFlagAndSetTableGM(int32_t toRankId, GM_ADDR& toRankAddr,
+                                                  GlobalTensor<int32_t>& tokenInfoTableGMTensor);
+    TPipe* tpipe_{nullptr};
     GlobalTensor<XType> xGMTensor_;
     GlobalTensor<int32_t> sessionIdGMTensor_;
     GlobalTensor<int32_t> microBatchIdGMTensor_;
@@ -162,7 +162,7 @@ private:
     uint32_t aivWorkspaceOffset_{0};
     uint8_t windowType_{0};
     uint8_t sharedExpertNum_{1};
-    __gm__ HcclOpResParam *winContext_{nullptr};
+    __gm__ HcclOpResParam* winContext_{nullptr};
 };
 
 template <TemplateAttentionToFFNTypeClass>
@@ -178,7 +178,7 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::FindExper
 
 template <TemplateAttentionToFFNTypeClass>
 __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SplitToCore(
-    uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId, uint32_t &endTokenId, uint32_t &sendTokenNum)
+    uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startTokenId, uint32_t& endTokenId, uint32_t& sendTokenNum)
 {
     sendTokenNum = curSendCnt / curUseAivNum;               // 每个aiv需要发送的token数
     uint32_t remainderTokenNum = curSendCnt % curUseAivNum; // 余数
@@ -217,15 +217,15 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SetExpert
 
 template <TemplateAttentionToFFNTypeClass>
 __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::CheckFlagAndSetTableGM(
-    int32_t toRankId, GM_ADDR &toRankAddr, GlobalTensor<int32_t> &tokenInfoTableGMTensor)
+    int32_t toRankId, GM_ADDR& toRankAddr, GlobalTensor<int32_t>& tokenInfoTableGMTensor)
 {
     if (winContext_->userMemType == 0) {
-        toRankAddr = (GM_ADDR)(((HcclRankRelationResV2 *)(winContext_->remoteRes[toRankId].nextDevicePtr))->windowsIn);
+        toRankAddr = (GM_ADDR)(((HcclRankRelationResV2*)(winContext_->remoteRes[toRankId].nextDevicePtr))->windowsIn);
     } else {
-        toRankAddr = (GM_ADDR)(__gm__ uint8_t *)(winContext_->userMemRes[toRankId].addr);
+        toRankAddr = (GM_ADDR)(__gm__ uint8_t*)(winContext_->userMemRes[toRankId].addr);
     }
-    GM_ADDR tokenInfoTable = (__gm__ uint8_t *)(toRankAddr + winInfoTableOffset_);
-    tokenInfoTableGMTensor.SetGlobalBuffer((__gm__ int32_t *)tokenInfoTable);
+    GM_ADDR tokenInfoTable = (__gm__ uint8_t*)(toRankAddr + winInfoTableOffset_);
+    tokenInfoTableGMTensor.SetGlobalBuffer((__gm__ int32_t*)tokenInfoTable);
 
     int32_t ffnFlage = 1;
     while (ffnFlage == 1) {
@@ -238,14 +238,14 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::CheckFlag
 
 template <TemplateAttentionToFFNTypeClass>
 __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SendQuantizedTokenData(
-    GM_ADDR toRankAddr, uint32_t tokenId, uint32_t topkId, GlobalTensor<int8_t> &tokenDataGMTensor,
-    DataCopyExtParams &hCommuCopyOutParams)
+    GM_ADDR toRankAddr, uint32_t tokenId, uint32_t topkId, GlobalTensor<int8_t>& tokenDataGMTensor,
+    DataCopyExtParams& hCommuCopyOutParams)
 {
-    GM_ADDR tokenData = (__gm__ uint8_t *)(toRankAddr + winOffset_[1] +
-                                           (winTokenDataOffset_ + (tokenId * (axisK_ + sharedExpertNum_) * axisHS_) +
-                                            (topkId * axisHS_)) *
-                                               sizeof(int8_t));
-    tokenDataGMTensor.SetGlobalBuffer((__gm__ int8_t *)tokenData);
+    GM_ADDR tokenData = (__gm__ uint8_t*)(toRankAddr + winOffset_[1] +
+                                          (winTokenDataOffset_ + (tokenId * (axisK_ + sharedExpertNum_) * axisHS_) +
+                                           (topkId * axisHS_)) *
+                                              sizeof(int8_t));
+    tokenDataGMTensor.SetGlobalBuffer((__gm__ int8_t*)tokenData);
     xOutQueue_.EnQue(xOutTensor_);
     xOutTensor_ = xOutQueue_.DeQue<int8_t>();
     DataCopyPad(tokenDataGMTensor, xOutTensor_, hCommuCopyOutParams);
@@ -282,12 +282,11 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SendToken
         DataCopyPad(xInTensor_, xGMTensor_[tokenId * axisH_], xCopyParams, copyPadExtParams);
         SetExpertAndRank(tokenIdx, tokenId, topkId);
         CheckFlagAndSetTableGM(toRankId_, toRankAddr, tokenInfoTableGMTensor);
-        GM_ADDR tokenData =
-            (__gm__ uint8_t *)(toRankAddr + winOffset_[1] +
-                               (winTokenDataOffset_ + (tokenId * (axisK_ + sharedExpertNum_) * axisHS_) +
-                                (topkId * axisHS_)) *
-                                   sizeof(XType));
-        tokenDataGMTensor.SetGlobalBuffer((__gm__ XType *)tokenData);
+        GM_ADDR tokenData = (__gm__ uint8_t*)(toRankAddr + winOffset_[1] +
+                                              (winTokenDataOffset_ + (tokenId * (axisK_ + sharedExpertNum_) * axisHS_) +
+                                               (topkId * axisHS_)) *
+                                                  sizeof(XType));
+        tokenDataGMTensor.SetGlobalBuffer((__gm__ XType*)tokenData);
         xQueue_.EnQue(xInTensor_);
         xInTensor_ = xQueue_.DeQue<XType>();
         DataCopyPad(tokenDataGMTensor, xInTensor_, xCopyParams);
@@ -311,7 +310,7 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SendToken
     uint32_t aivWorkspaceStride = aivWorkspaceOffset_ / sizeof(int32_t);
     if constexpr (isSync) {
         ffnNumAlignCnt_ = ffnNumAlignSize_ / sizeof(int32_t);
-        syncStatusGMTensor_.SetGlobalBuffer((__gm__ int32_t *)syncStatusWorkspaceGM_);
+        syncStatusGMTensor_.SetGlobalBuffer((__gm__ int32_t*)syncStatusWorkspaceGM_);
         Duplicate<int32_t>(ffnStatusTensor_, static_cast<int32_t>(0), ffnNumAlignCnt_); // 初始化workSpace
     }
 
@@ -401,13 +400,12 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SendFlags
             }
         }
         if (winContext_->userMemType == 0) {
-            toRankAddr =
-                (GM_ADDR)(((HcclRankRelationResV2 *)(winContext_->remoteRes[ffnIdx].nextDevicePtr))->windowsIn);
+            toRankAddr = (GM_ADDR)(((HcclRankRelationResV2*)(winContext_->remoteRes[ffnIdx].nextDevicePtr))->windowsIn);
         } else {
             toRankAddr = (GM_ADDR)(winContext_->userMemRes[ffnIdx].addr);
         }
-        GM_ADDR tableFlagGM = (__gm__ uint8_t *)(toRankAddr + winInfoTableOffset_);
-        tableFlagGMTensor.SetGlobalBuffer((__gm__ int32_t *)tableFlagGM);
+        GM_ADDR tableFlagGM = (__gm__ uint8_t*)(toRankAddr + winInfoTableOffset_);
+        tableFlagGMTensor.SetGlobalBuffer((__gm__ int32_t*)tableFlagGM);
         if (ffnIdx == startFFNId) {
             SyncFunc<AscendC::HardEvent::S_MTE3>();
         }
@@ -435,9 +433,9 @@ __aicore__ inline void AttentionToFFN<TemplateAttentionToFFNTypeFunc>::SetFlagIn
     uint64_t attnTokenInfoTableOffset =
         (microBatchId_ * axisBS_ * (axisK_ + sharedExpertNum_) + sendMaskTokenCnt) * sizeof(int32_t);
     GM_ADDR selfRankAddr = (GM_ADDR)(winContext_->localWindowsIn);
-    GM_ADDR attnTokenInfoTableGM = (__gm__ uint8_t *)(selfRankAddr + attnTokenInfoTableOffset);
+    GM_ADDR attnTokenInfoTableGM = (__gm__ uint8_t*)(selfRankAddr + attnTokenInfoTableOffset);
     GlobalTensor<int32_t> attnTableGMTensor;
-    attnTableGMTensor.SetGlobalBuffer((__gm__ int32_t *)attnTokenInfoTableGM);
+    attnTableGMTensor.SetGlobalBuffer((__gm__ int32_t*)attnTokenInfoTableGM);
     DataCopyExtParams dataCopyParams = {1U, static_cast<uint32_t>(sendNum * sizeof(int32_t)), 0U, 0U, 0U};
     LocalTensor<int32_t> tempTensor = attnStatusBuf_.Get<int32_t>();
     Duplicate<int32_t>(tempTensor, (uint32_t)1, sendNum);

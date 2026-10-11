@@ -58,10 +58,10 @@ struct MegaMoeExceptionDumpPolicy {
 
 using ExceptionDumpEngine = MC2ExceptionDump::ExceptionDump<MegaMoeExceptionDumpPolicy>;
 
-__aicore__ inline __gm__ GmmLoopCount *RegisterMegaMoeExceptionDump(ExceptionDumpEngine &engine, GM_ADDR dumpBase,
+__aicore__ inline __gm__ GmmLoopCount* RegisterMegaMoeExceptionDump(ExceptionDumpEngine& engine, GM_ADDR dumpBase,
                                                                     GM_ADDR tilingGM,
-                                                                    const MegaMoeTilingData *tilingData,
-                                                                    const MegaMoeImpl::PeermemInfo &peermemInfo,
+                                                                    const MegaMoeTilingData* tilingData,
+                                                                    const MegaMoeImpl::PeermemInfo& peermemInfo,
                                                                     GM_ADDR epRankIdAddr)
 {
     engine.Init(dumpBase, tilingGM);
@@ -78,7 +78,7 @@ __aicore__ inline __gm__ GmmLoopCount *RegisterMegaMoeExceptionDump(ExceptionDum
     if ASCEND_IS_NOT_AIV {
         return nullptr;
     }
-    __gm__ GmmLoopCount *loopCount = reinterpret_cast<__gm__ GmmLoopCount *>(loopCountBase) + GetBlockIdx();
+    __gm__ GmmLoopCount* loopCount = reinterpret_cast<__gm__ GmmLoopCount*>(loopCountBase) + GetBlockIdx();
     loopCount->gmm1Count = 0U;
     loopCount->gmm2Count = 0U;
     GlobalTensor<uint8_t> loopCountGlobal;
@@ -87,7 +87,7 @@ __aicore__ inline __gm__ GmmLoopCount *RegisterMegaMoeExceptionDump(ExceptionDum
     return loopCount;
 }
 
-__aicore__ inline void UpdateGmmLoopCount(__gm__ GmmLoopCount *loopCount, LoopCountIndex index, uint64_t count)
+__aicore__ inline void UpdateGmmLoopCount(__gm__ GmmLoopCount* loopCount, LoopCountIndex index, uint64_t count)
 {
     if ASCEND_IS_NOT_AIV {
         return;
@@ -95,7 +95,7 @@ __aicore__ inline void UpdateGmmLoopCount(__gm__ GmmLoopCount *loopCount, LoopCo
     if (unlikely(loopCount == nullptr)) {
         return;
     }
-    __gm__ uint64_t *countAddr = &loopCount->gmm2Count;
+    __gm__ uint64_t* countAddr = &loopCount->gmm2Count;
     if (index == LoopCountIndex::GMM1) {
         countAddr = &loopCount->gmm1Count;
     }

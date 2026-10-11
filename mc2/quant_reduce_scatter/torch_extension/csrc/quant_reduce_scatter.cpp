@@ -35,12 +35,12 @@ static const int DIM_TWO = 2;
 static const int DIM_THREE = 3;
 static const int DIM_FOUR = 4;
 
-inline TensorWrapper make_wrapper(const at::Tensor &tensor, aclDataType tensorAcltype)
+inline TensorWrapper make_wrapper(const at::Tensor& tensor, aclDataType tensorAcltype)
 {
     return {tensor, tensorAcltype};
 }
 
-inline bool CheckTensorNotEmpty(const at::Tensor &tensor)
+inline bool CheckTensorNotEmpty(const at::Tensor& tensor)
 {
     bool check_result = tensor.dim() > 0;
     for (int i = 0; i < tensor.dim(); ++i) {
@@ -49,7 +49,7 @@ inline bool CheckTensorNotEmpty(const at::Tensor &tensor)
     return check_result;
 }
 
-at::Tensor NpuQuantReduceScatter(const at::Tensor &context, const at::Tensor &x, const at::Tensor &scales,
+at::Tensor NpuQuantReduceScatter(const at::Tensor& context, const at::Tensor& x, const at::Tensor& scales,
                                  int64_t hcclBufferSize, int64_t worldSize, c10::optional<std::string> reduceOp,
                                  c10::optional<int64_t> outputDtype, c10::optional<int64_t> xDtype,
                                  c10::optional<int64_t> scalesDtype)
@@ -120,7 +120,7 @@ at::Tensor NpuQuantReduceScatter(const at::Tensor &context, const at::Tensor &x,
 
     // attr
     std::string reduceOpValueStr = std::string(reduceOp.value_or("sum"));
-    char *reduceOpPtr = const_cast<char *>(reduceOpValueStr.c_str());
+    char* reduceOpPtr = const_cast<char*>(reduceOpValueStr.c_str());
 
     // 如果是自定义的dtype的话，那么这里就需要使用一个wrapper
     // 让aclnn接口识别到传入的tensor具体的dtype类型，相当于打一个标签，标记真实的属性

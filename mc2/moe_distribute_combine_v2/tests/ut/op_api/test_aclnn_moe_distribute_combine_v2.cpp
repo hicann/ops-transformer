@@ -42,7 +42,7 @@ constexpr int64_t OUT_DTYPE = 0;
 constexpr int64_t COMM_QUANT_MODE = 0;
 constexpr int64_t GROUP_LIST_TYPE = 0;
 
-aclnnStatus CallBaseGetWorkspaceSize(const char *groupTp, const char *commAlg)
+aclnnStatus CallBaseGetWorkspaceSize(const char* groupTp, const char* commAlg)
 {
     TensorDesc expandXDesc = TensorDesc({32, 7168}, ACL_FLOAT16, ACL_FORMAT_ND);
     TensorDesc expertIdsDesc = TensorDesc({32, 8}, ACL_INT32, ACL_FORMAT_ND);
@@ -58,7 +58,7 @@ aclnnStatus CallBaseGetWorkspaceSize(const char *groupTp, const char *commAlg)
     auto expertScales = expertScalesDesc.ToAclType();
     auto xOut = xOutDesc.ToAclType();
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
 
     return aclnnMoeDistributeCombineBaseGetWorkspaceSize(
         expandX.get(), expertIds.get(), assistInfo.get(), epSendCounts.get(), expertScales.get(), nullptr, nullptr,
@@ -144,7 +144,7 @@ TEST_F(L2MoeDistributeCombineV2Test, TestMoeDistributeCombineFirstApi)
               sharedExpertNum, sharedExpertRankNum, globalBs, outDtype, commQuantMode, groupListType, "test"),
         OUTPUT(x));
     uint64_t workspace_size = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspace_size, executor);
     EXPECT_NE(aclRet, ACLNN_ERR_PARAM_INVALID);
 }

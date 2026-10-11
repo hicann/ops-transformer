@@ -41,9 +41,9 @@ extern "C" {
  * @return aclnnStatus: 执行状态，返回0表示成功，其他值表示错误。
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllMatmulV2GetWorkspaceSize(
-    const aclTensor *x1, const aclTensor *x2, const aclTensor *biasOptional, const aclIntArray *alltoAllAxesOptional,
-    const char *group, const char *commMode, bool transposeX1, bool transposeX2, const aclTensor *output,
-    const aclTensor *alltoAllOutOptional, uint64_t *workspaceSize, aclOpExecutor **executor);
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* biasOptional, const aclIntArray* alltoAllAxesOptional,
+    const char* group, const char* commMode, bool transposeX1, bool transposeX2, const aclTensor* output,
+    const aclTensor* alltoAllOutOptional, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnAlltoAllMatMulV2的第二段接口，用于执行计算。
@@ -53,8 +53,8 @@ __attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllMatmulV2GetWorks
  * @param [in] stream: 指定执行任务的Stream。
  * @return aclnnStatus: 返回状态码
  */
-__attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllMatmulV2(void *workspace, uint64_t workspaceSize,
-                                                                         aclOpExecutor *executor, aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnAlltoAllMatmulV2(void* workspace, uint64_t workspaceSize,
+                                                                         aclOpExecutor* executor, aclrtStream stream);
 
 #ifdef __cplusplus
 }

@@ -103,9 +103,9 @@ public:
         BlockEpilogue blockEpilogue(resource);
         layout::RowMajor layoutBlock{m0, n0};
         layout::RowMajor layoutOutput{finalM, finalN};
-        __gm__ OutputType *gmPeerMem = reinterpret_cast<__gm__ OutputType *>(peerMem);
-        __gm__ OutputType *gmOutput = reinterpret_cast<__gm__ OutputType *>(output);
-        __gm__ BiasType *gmbias = reinterpret_cast<__gm__ BiasType *>(biasptr);
+        __gm__ OutputType* gmPeerMem = reinterpret_cast<__gm__ OutputType*>(peerMem);
+        __gm__ OutputType* gmOutput = reinterpret_cast<__gm__ OutputType*>(output);
+        __gm__ BiasType* gmbias = reinterpret_cast<__gm__ BiasType*>(biasptr);
         for (int32_t p = 0; p < pValue; p++) {
             int32_t loopIdx = loopSt + p * coreNum + coreIdx;
             if (loopIdx >= totalLoop) {
@@ -122,13 +122,13 @@ public:
             layout::VectorLayout layoutPerTokenScale{blockSizeCoord.m()};
             uint32_t dataBlockOffset = dstRankIdx * peerMemBlockSize + (loopIdx - loopSt) / rankSize * blockSize;
             layout::RowMajor layoutDst = layoutBlock;
-            __gm__ OutputType *gmDst = gmPeerMem + dataBlockOffset;
+            __gm__ OutputType* gmDst = gmPeerMem + dataBlockOffset;
             if (dstRankIdx == rankIdx) {
                 MatrixCoord offsetC{blockLocCoord.m(), blockLocCoord.n()};
                 layoutDst = layoutOutput;
                 gmDst = gmOutput + layoutOutput.GetOffset(offsetC);
             }
-            __gm__ BiasType *gmBiasOffset = (gmbias != nullptr) ? (gmbias + blockLocCoord.n()) : nullptr;
+            __gm__ BiasType* gmBiasOffset = (gmbias != nullptr) ? (gmbias + blockLocCoord.n()) : nullptr;
             if (needPerChannel && needPerToken) {
                 blockEpilogue(perChannelScale + blockLocCoord.n(), layoutPerChannelScale,
                               perTokenScale + dstRankIdx * finalM + blockLocCoord.m(), layoutPerTokenScale,

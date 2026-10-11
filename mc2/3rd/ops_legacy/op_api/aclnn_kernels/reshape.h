@@ -22,7 +22,7 @@ namespace l0op {
  * @param executor aclOpExecutor.ldd
  * @return *aclTensor Output tensor.
  */
-const aclTensor *Reshape(const aclTensor *x, const op::Shape &shape, aclOpExecutor *executor);
+const aclTensor* Reshape(const aclTensor* x, const op::Shape& shape, aclOpExecutor* executor);
 
 /**
  * @brief Modify input tensor's shape.
@@ -31,7 +31,7 @@ const aclTensor *Reshape(const aclTensor *x, const op::Shape &shape, aclOpExecut
  * @param executor aclOpExecutor.
  * @return *aclTensor Output tensor.
  */
-const aclTensor *Reshape(const aclTensor *x, const aclIntArray *shape, aclOpExecutor *executor);
+const aclTensor* Reshape(const aclTensor* x, const aclIntArray* shape, aclOpExecutor* executor);
 } // namespace l0op
 
 #endif // COMMON_INC_EXTERNAL_ACLNN_KERNELS_RESHAPE_H

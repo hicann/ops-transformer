@@ -32,9 +32,9 @@ __aicore__ inline uint64_t AlignTo256B(uint64_t base)
 }
 
 template <class A_TYPE, class B_TYPE>
-__aicore__ inline void SetOffset(uint64_t &offsetA, uint64_t &offsetB, uint64_t mOffset, uint64_t nOffset,
+__aicore__ inline void SetOffset(uint64_t& offsetA, uint64_t& offsetB, uint64_t mOffset, uint64_t nOffset,
                                  uint64_t kOffset, uint64_t c0Size, uint64_t alignedOriM, uint64_t alignedOriN,
-                                 uint64_t alignedKaSize, uint64_t alignedKbSize, const TCubeTiling &tiling)
+                                 uint64_t alignedKaSize, uint64_t alignedKbSize, const TCubeTiling& tiling)
 {
     if constexpr (A_TYPE::format == CubeFormat::ND) {
         offsetA = A_TYPE::isTrans ? (kOffset * tiling.M + mOffset) : (kOffset + mOffset * tiling.Ka);
@@ -199,7 +199,7 @@ __aicore__ inline void SplitKVectorNZProcess(GlobalTensor<float> gmSrc, GlobalTe
 template <class C_TYPE>
 __aicore__ inline void ReduceKInUb(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSize, uint64_t singleSize,
                                    uint64_t totalSize, uint64_t outSize, uint64_t cnt, uint64_t singleCoreN, uint64_t n,
-                                   TBuf<TPosition::VECCALC> &tmpBuf, bool orderFlag, const TCubeTiling &tiling)
+                                   TBuf<TPosition::VECCALC>& tmpBuf, bool orderFlag, const TCubeTiling& tiling)
 {
     using T = typename C_TYPE::T;
 
@@ -223,8 +223,8 @@ __aicore__ inline void ReduceKInUb(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSize,
     GlobalTensor<float> gmSrcPong;
     GlobalTensor<float> gmSrc = gmSrcPing;
 
-    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(cGM), outSize);
-    gmSrcPing.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(mmGM), totalSize);
+    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(cGM), outSize);
+    gmSrcPing.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(mmGM), totalSize);
     gmSrcPong = gmSrcPing[singleSize];
 
     uint64_t vIndex = GetBlockIdx();
@@ -329,8 +329,8 @@ __aicore__ inline void ReduceKInUb(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSize,
 template <class C_TYPE>
 __aicore__ inline void ReduceKNzInUb(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSize, uint64_t singleSize,
                                      uint64_t totalSize, uint64_t outSize, uint64_t cnt, uint64_t singleCoreN,
-                                     uint64_t n, TBuf<TPosition::VECCALC> &tmpBuf, bool orderFlag,
-                                     const TCubeTiling &tiling, uint64_t mCnt, uint64_t nCnt, uint64_t originM)
+                                     uint64_t n, TBuf<TPosition::VECCALC>& tmpBuf, bool orderFlag,
+                                     const TCubeTiling& tiling, uint64_t mCnt, uint64_t nCnt, uint64_t originM)
 {
     using T = typename C_TYPE::T;
     uint64_t totalVecCoreNum = tiling.usedCoreNum * NUM_AIV_TO_AIC_RATIO; // 40
@@ -361,8 +361,8 @@ __aicore__ inline void ReduceKNzInUb(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSiz
     uint64_t oriM = tiling.M;
     uint64_t oriN = tiling.N;
 
-    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(cGM), outSize);
-    gmSrcPing.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(mmGM), totalSize);
+    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(cGM), outSize);
+    gmSrcPing.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(mmGM), totalSize);
     gmSrcPong = gmSrcPing[singleSize];
 
     uint64_t vIndex = GetBlockIdx();
@@ -448,8 +448,8 @@ __aicore__ inline void ReduceKNzInUb(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSiz
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
 __aicore__ inline void Mc2MatMulMultiCoreSplitKDivide(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM, GM_ADDR mmOffsetGM,
-                                                      uint64_t singleSize, bool isHf32, TPipe *que,
-                                                      const TCubeTiling &tiling, bool isBias)
+                                                      uint64_t singleSize, bool isHf32, TPipe* que,
+                                                      const TCubeTiling& tiling, bool isBias)
 {
     using A_T = typename A_TYPE::T;
     using B_T = typename B_TYPE::T;
@@ -482,12 +482,12 @@ __aicore__ inline void Mc2MatMulMultiCoreSplitKDivide(GM_ADDR aGM, GM_ADDR bGM, 
         alignedKbSize = MMV3CeilAlign(tiling.Kb, c0Size);
     }
 
-    aGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM), tiling.M * tiling.Ka);
-    bGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM), tiling.Kb * tiling.N);
-    cGlobalPing.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(mmOffsetGM), singleSize * NUM_TWO);
+    aGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ A_T*>(aGM), tiling.M * tiling.Ka);
+    bGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ B_T*>(bGM), tiling.Kb * tiling.N);
+    cGlobalPing.SetGlobalBuffer(reinterpret_cast<__gm__ C_T*>(mmOffsetGM), singleSize * NUM_TWO);
     cGlobalPong = cGlobalPing[singleSize];
     if (isBias) {
-        biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ BIAS_T *>(biasGM), tiling.N);
+        biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ BIAS_T*>(biasGM), tiling.N);
     }
 #ifdef __CCE_KT_TEST__
     MatmulImpl<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, MM_CFG_PRELOAD_MK> mmmk_33;
@@ -647,7 +647,7 @@ __aicore__ inline void Mc2MatMulMultiCoreSplitKDivide(GM_ADDR aGM, GM_ADDR bGM, 
                 mmnk.SetSingleShape(mCoreUse, nCoreUse, kCoreUse);
                 mmnk.SetTensorA(aGlobal[offsetA], A_TYPE::isTrans);
                 mmnk.SetTensorB(bGlobal[offsetB], B_TYPE::isTrans);
-                isBias &&kIndex == 0 ?
+                isBias&& kIndex == 0 ?
                     mmnk.SetBias(biasGlobal[outIndex * tiling.singleCoreN]) :
                     mmnk.ClearBias(); // set bias at the first k loop and clear bias tag in the following loop
                 mmnk.IterateAll(cGlobal[offsetC], kIndex != index);
@@ -656,7 +656,7 @@ __aicore__ inline void Mc2MatMulMultiCoreSplitKDivide(GM_ADDR aGM, GM_ADDR bGM, 
                     mmmk_33.SetSingleShape(mCoreUse, nCoreUse, kCoreUse);
                     mmmk_33.SetTensorA(aGlobal[offsetA], A_TYPE::isTrans);
                     mmmk_33.SetTensorB(bGlobal[offsetB], B_TYPE::isTrans);
-                    isBias &&kIndex == 0 ?
+                    isBias&& kIndex == 0 ?
                         mmmk_33.SetBias(biasGlobal[0]) :
                         mmmk_33.ClearBias(); // set bias at the first k loop and clear bias tag in the following loop
                     mmmk_33.IterateAll(cGlobal[offsetC], kIndex != index);
@@ -664,7 +664,7 @@ __aicore__ inline void Mc2MatMulMultiCoreSplitKDivide(GM_ADDR aGM, GM_ADDR bGM, 
                     mmmk.SetSingleShape(mCoreUse, nCoreUse, kCoreUse);
                     mmmk.SetTensorA(aGlobal[offsetA], A_TYPE::isTrans);
                     mmmk.SetTensorB(bGlobal[offsetB], B_TYPE::isTrans);
-                    isBias &&kIndex == 0 ?
+                    isBias&& kIndex == 0 ?
                         mmmk.SetBias(biasGlobal[0]) :
                         mmmk.ClearBias(); // set bias at the first k loop and clear bias tag in the following loop
                     mmmk.IterateAll(cGlobal[offsetC], kIndex != index);
@@ -688,7 +688,7 @@ __aicore__ inline void Mc2MatMulMultiCoreSplitKDivide(GM_ADDR aGM, GM_ADDR bGM, 
     }
 }
 
-__aicore__ inline void AddTail(LocalTensor<float> &ubSrc1, LocalTensor<float> &ubSrc2, uint64_t burst,
+__aicore__ inline void AddTail(LocalTensor<float>& ubSrc1, LocalTensor<float>& ubSrc2, uint64_t burst,
                                uint64_t burstLen, uint64_t realLen)
 {
     for (uint64_t i = 0; i < burst; ++i) {
@@ -765,8 +765,8 @@ __aicore__ inline void SplitKVectorProcessL2cache(LocalTensor<float> ubSrc1, Loc
 template <class C_TYPE>
 __aicore__ inline void ReduceKInUbNzL2cache(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSize, uint64_t singleSize,
                                             uint64_t totalSize, uint64_t outSize, uint64_t mCnt, uint64_t nCnt,
-                                            uint64_t singleCoreN, uint64_t n, TBuf<TPosition::VECCALC> &tmpBuf,
-                                            bool orderNMFlag, const TCubeTiling &tiling, uint64_t originM)
+                                            uint64_t singleCoreN, uint64_t n, TBuf<TPosition::VECCALC>& tmpBuf,
+                                            bool orderNMFlag, const TCubeTiling& tiling, uint64_t originM)
 {
     using T = typename C_TYPE::T;
 
@@ -793,8 +793,8 @@ __aicore__ inline void ReduceKInUbNzL2cache(GM_ADDR cGM, GM_ADDR mmGM, uint64_t 
     GlobalTensor<float> gmSrcPong;
     GlobalTensor<float> gmSrc = gmSrcPing;
 
-    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(cGM), outSize);
-    gmSrcPing.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(mmGM), totalSize);
+    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(cGM), outSize);
+    gmSrcPing.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(mmGM), totalSize);
     gmSrcPong = gmSrcPing[singleSize];
 
     uint64_t vIndex = GetBlockIdx();
@@ -919,8 +919,8 @@ __aicore__ inline void ReduceKInUbNzL2cache(GM_ADDR cGM, GM_ADDR mmGM, uint64_t 
 template <class C_TYPE>
 __aicore__ inline void ReduceKInUbL2cache(GM_ADDR cGM, GM_ADDR mmGM, uint64_t coreSize, uint64_t singleSize,
                                           uint64_t totalSize, uint64_t outSize, uint64_t mCnt, uint64_t nCnt,
-                                          uint64_t singleCoreN, uint64_t n, TBuf<TPosition::VECCALC> &tmpBuf,
-                                          bool orderNMFlag, const TCubeTiling &tiling)
+                                          uint64_t singleCoreN, uint64_t n, TBuf<TPosition::VECCALC>& tmpBuf,
+                                          bool orderNMFlag, const TCubeTiling& tiling)
 {
     using T = typename C_TYPE::T;
 
@@ -947,8 +947,8 @@ __aicore__ inline void ReduceKInUbL2cache(GM_ADDR cGM, GM_ADDR mmGM, uint64_t co
     GlobalTensor<float> gmSrcPong;
     GlobalTensor<float> gmSrc = gmSrcPing;
 
-    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T *>(cGM), outSize);
-    gmSrcPing.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(mmGM), totalSize);
+    gmDst.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(cGM), outSize);
+    gmSrcPing.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(mmGM), totalSize);
     gmSrcPong = gmSrcPing[singleSize];
 
     uint64_t vIndex = GetBlockIdx();
@@ -1065,7 +1065,7 @@ __aicore__ inline void ReduceKInUbL2cache(GM_ADDR cGM, GM_ADDR mmGM, uint64_t co
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE>
 __aicore__ inline void Mc2MatMulMultiCoreSplitKDivideL2cache(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR biasGM,
                                                              GM_ADDR mmOffsetGM, uint64_t singleSize, bool isHf32,
-                                                             TPipe *que, const TCubeTiling &tiling, bool isBias)
+                                                             TPipe* que, const TCubeTiling& tiling, bool isBias)
 {
     using A_T = typename A_TYPE::T;
     using B_T = typename B_TYPE::T;
@@ -1098,12 +1098,12 @@ __aicore__ inline void Mc2MatMulMultiCoreSplitKDivideL2cache(GM_ADDR aGM, GM_ADD
         alignedKbSize = MMV3CeilAlign(tiling.Kb, c0Size);
     }
 
-    aGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ A_T *>(aGM), tiling.M * tiling.Ka);
-    bGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ B_T *>(bGM), tiling.Kb * tiling.N);
-    cGlobalPing.SetGlobalBuffer(reinterpret_cast<__gm__ C_T *>(mmOffsetGM), singleSize * NUM_TWO);
+    aGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ A_T*>(aGM), tiling.M * tiling.Ka);
+    bGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ B_T*>(bGM), tiling.Kb * tiling.N);
+    cGlobalPing.SetGlobalBuffer(reinterpret_cast<__gm__ C_T*>(mmOffsetGM), singleSize * NUM_TWO);
     cGlobalPong = cGlobalPing[singleSize];
     if (isBias) {
-        biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ BIAS_T *>(biasGM), tiling.N);
+        biasGlobal.SetGlobalBuffer(reinterpret_cast<__gm__ BIAS_T*>(biasGM), tiling.N);
     }
 #ifdef __CCE_KT_TEST__
     MatmulImpl<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, MM_CFG_PRELOAD_MK> mmNM;
@@ -1278,7 +1278,7 @@ __aicore__ inline void Mc2MatMulMultiCoreSplitKDivideL2cache(GM_ADDR aGM, GM_ADD
                     mmNM.SetSingleShape(mCoreUse, nCoreUse, kCoreUse);
                     mmNM.SetTensorA(aGlobal[offsetA], A_TYPE::isTrans);
                     mmNM.SetTensorB(bGlobal[offsetB], B_TYPE::isTrans);
-                    isBias &&kIndex == 0 ?
+                    isBias&& kIndex == 0 ?
                         mmNM.SetBias(biasGlobal[outIndex * tiling.singleCoreN]) :
                         mmNM.ClearBias(); // set bias at the first k loop and clear bias tag in the following loop
                     mmNM.IterateAll(cGlobal[offsetC], kIndex != index);
@@ -1286,7 +1286,7 @@ __aicore__ inline void Mc2MatMulMultiCoreSplitKDivideL2cache(GM_ADDR aGM, GM_ADD
                     mmMN.SetSingleShape(mCoreUse, nCoreUse, kCoreUse);
                     mmMN.SetTensorA(aGlobal[offsetA], A_TYPE::isTrans);
                     mmMN.SetTensorB(bGlobal[offsetB], B_TYPE::isTrans);
-                    isBias &&kIndex == 0 ?
+                    isBias&& kIndex == 0 ?
                         mmMN.SetBias(biasGlobal[inIndex * tiling.singleCoreN]) :
                         mmMN.ClearBias(); // set bias at the first k loop and clear bias tag in the following loop
                     mmMN.IterateAll(cGlobal[offsetC], kIndex != index);
@@ -1309,10 +1309,10 @@ __aicore__ inline void Mc2MatMulMultiCoreSplitKDivideL2cache(GM_ADDR aGM, GM_ADD
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE,
           FIXPIPE_OPT_SELECT FIXPIPE_OPT = FIXPIPE_OPT_SELECT::BASE>
 __aicore__ inline void Mc2MatMulKernelDeterministicSplitK(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM,
-                                                          const Mc2MatmulV3TilingData &matmulTilingData,
+                                                          const Mc2MatmulV3TilingData& matmulTilingData,
                                                           GM_ADDR workspaceGM)
 {
-    const TCubeTiling &tiling = matmulTilingData.matmulTiling;
+    const TCubeTiling& tiling = matmulTilingData.matmulTiling;
     TPipe que;
     bool orderNMFlag = tiling.iterateOrder; // orderNMFlag表示L2cache切分后循环遍历方式是for N for M  for K
     bool orderFlag = !tiling.iterateOrder;  // tiling侧拿到遍历方向来确认MK或NK，规避知识库

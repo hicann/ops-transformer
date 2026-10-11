@@ -33,12 +33,12 @@ template <typename XType, typename WType, typename YType, class MmType, Mc2CoreT
           int commMode>
 class MatmulAllReduceQuantPerBlock : public MatmulAllReduceBase<XType, YType, CoreType, basedA2aRsAg, commMode> {
 public:
-    __aicore__ inline MatmulAllReduceQuantPerBlock(MC2GmAddrs *addrs, QuantGmAddrs *quantAddrs, ArnGmAddrs *arnAddrs,
-                                                   MC2TilingHeader *tilingData, TPipe *tPipe)
+    __aicore__ inline MatmulAllReduceQuantPerBlock(MC2GmAddrs* addrs, QuantGmAddrs* quantAddrs, ArnGmAddrs* arnAddrs,
+                                                   MC2TilingHeader* tilingData, TPipe* tPipe)
         : MatmulAllReduceBase<XType, YType, CoreType, basedA2aRsAg, commMode>(addrs, quantAddrs, arnAddrs, tilingData,
                                                                               tPipe)
     {
-        mc2TilingData_ = (Mc2Tiling::QuantMatmulAllReduceTilingDataA5 *)tilingData;
+        mc2TilingData_ = (Mc2Tiling::QuantMatmulAllReduceTilingDataA5*)tilingData;
         this->tileInfo_.mmTiling = &mc2TilingData_->tilematmulTiling.matmulTiling;
         this->tailInfo_.mmTiling = &mc2TilingData_->tailmatmulTiling.matmulTiling;
     }
@@ -58,9 +58,9 @@ public:
     }
 
 protected:
-    __aicore__ inline void InnerProcess(MmType &mmOp, bool tailFlag, uint32_t turnCnt, const MC2TileInfo &tileInfo)
+    __aicore__ inline void InnerProcess(MmType& mmOp, bool tailFlag, uint32_t turnCnt, const MC2TileInfo& tileInfo)
     {
-        const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams *tiling =
+        const DequantBmm::Mc2QuantBatchMatmulV3TilingDataParams* tiling =
             (tailFlag ? &mc2TilingData_->tailmatmulTiling : &mc2TilingData_->tilematmulTiling);
         // CeilDiv
         const uint64_t mOfscale = (tiling->matmulTiling.M + 128 - 1) / 128;
@@ -86,7 +86,7 @@ protected:
     }
 
 private:
-    Mc2Tiling::QuantMatmulAllReduceTilingDataA5 *mc2TilingData_;
+    Mc2Tiling::QuantMatmulAllReduceTilingDataA5* mc2TilingData_;
 };
 
 #define INVOKE_MC2_QUANT_PERBLOCK_910_OP_IMPL(templateClass, coreType, basedA2aRsAg, commMode, ...) \
@@ -98,7 +98,7 @@ private:
         using OpType = \
             templateClass<DTYPE_X1, DTYPE_X2, DTYPE_BIAS, DTYPE_Y, X1_FORMAT, X2_FORMAT, Y_FORMAT, __VA_ARGS__>; \
         MatmulAllReduceQuantPerBlock<DTYPE_X1, DTYPE_X2, DTYPE_Y, OpType, coreType, basedA2aRsAg, commMode> op( \
-            &addrs, &quantAddrs, nullptr, (MC2TilingHeader *)&tilingData, &tPipe); \
+            &addrs, &quantAddrs, nullptr, (MC2TilingHeader*)&tilingData, &tPipe); \
         op.Init(); \
         op.Process(); \
     } while (0)

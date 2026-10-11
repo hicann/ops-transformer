@@ -36,9 +36,9 @@ class WeightQuantMatmulAllReduceTiling : public MatmulAllReduceTilingBase {
     friend class WeightQuantMatmulAllReduceAddRmsNormTiling;
 
 public:
-    explicit WeightQuantMatmulAllReduceTiling(gert::TilingContext *context);
-    WeightQuantMatmulAllReduceTiling(gert::TilingContext *context, MMRCtxInfo *mmrCtxInfo,
-                                     Mc2Tiling::WeightQuantMatmulAllReduceTilingData *out);
+    explicit WeightQuantMatmulAllReduceTiling(gert::TilingContext* context);
+    WeightQuantMatmulAllReduceTiling(gert::TilingContext* context, MMRCtxInfo* mmrCtxInfo,
+                                     Mc2Tiling::WeightQuantMatmulAllReduceTilingData* out);
     ~WeightQuantMatmulAllReduceTiling() override = default;
 
 protected:
@@ -52,22 +52,22 @@ protected:
 
     ge::graphStatus PostTiling() override;
 
-    Mc2Tiling::Mc2Msg &MutableMc2MsgData() override
+    Mc2Tiling::Mc2Msg& MutableMc2MsgData() override
     {
         return weightQuantMatmulAllReduceTilingData_.msg;
     }
 
-    Mc2Tiling::RCSTiling &MutableRCSTilingData() override
+    Mc2Tiling::RCSTiling& MutableRCSTilingData() override
     {
         return weightQuantMatmulAllReduceTilingData_.param;
     }
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTileTilingData() override
+    AscendC::tiling::TCubeTiling& MutableTCubeTileTilingData() override
     {
         return weightQuantMatmulAllReduceTilingData_.tilematmulTiling.matmulTiling;
     }
 
-    AscendC::tiling::TCubeTiling &MutableTCubeTailTilingData() override
+    AscendC::tiling::TCubeTiling& MutableTCubeTailTilingData() override
     {
         return weightQuantMatmulAllReduceTilingData_.tailmatmulTiling.matmulTiling;
     }
@@ -84,25 +84,25 @@ private:
     ge::graphStatus CheckInputDtype() const;
     ge::graphStatus CheckAxisSize();
     Mc2Tiling::WeightQuantMatmulAllReduceTilingData weightQuantMatmulAllReduceTilingDataSelf_{};
-    Mc2Tiling::WeightQuantMatmulAllReduceTilingData &weightQuantMatmulAllReduceTilingData_;
+    Mc2Tiling::WeightQuantMatmulAllReduceTilingData& weightQuantMatmulAllReduceTilingData_;
     uint64_t myWorkSpaceSize_{0U};
     WeightQuantMatmulTPLParam weightQuantMatmulTPLParam_;
 };
 
 class WeightQuantTilingTransferHelper : public Mc2WeightQuantBatchMatmulV2TilingCustom {
 public:
-    WeightQuantTilingTransferHelper(WeightQuantMatmulAllReduceTiling &weightQuantMatmulAllReduceTiling,
-                                    Mc2WeightQuantBatchMatmulV2TilingData &data)
+    WeightQuantTilingTransferHelper(WeightQuantMatmulAllReduceTiling& weightQuantMatmulAllReduceTiling,
+                                    Mc2WeightQuantBatchMatmulV2TilingData& data)
         : Mc2WeightQuantBatchMatmulV2TilingCustom(weightQuantMatmulAllReduceTiling.context_, &data),
           tilingProcesser_(weightQuantMatmulAllReduceTiling)
     {}
     ge::graphStatus GetShapeAttrsInfo() override;
-    void PrintTilingInputParam(Mc2WeightQuantBatchMatmulInfo &weightQuantBatchMatmulInfo);
+    void PrintTilingInputParam(Mc2WeightQuantBatchMatmulInfo& weightQuantBatchMatmulInfo);
     ge::graphStatus PostTiling() override;
     WeightQuantMatmulTPLParam GetWeightQuantMatmulTPLParam();
 
 private:
-    WeightQuantMatmulAllReduceTiling &tilingProcesser_;
+    WeightQuantMatmulAllReduceTiling& tilingProcesser_;
 };
 } // namespace optiling
 #endif // WEIGHT_QUANT_MATMUL_ALL_REDUCE_TILING_H

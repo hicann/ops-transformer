@@ -25,12 +25,12 @@ MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 class MatMulPerBlock {
 public:
     __aicore__ inline MatMulPerBlock(){};
-    __aicore__ inline void Init(const TCubeTiling &tilingData, GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale,
-                                GM_ADDR perTokenScale, GM_ADDR cGM, blockType &block, GM_ADDR workSpace, TPipe *pipe);
+    __aicore__ inline void Init(const TCubeTiling& tilingData, GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale,
+                                GM_ADDR perTokenScale, GM_ADDR cGM, blockType& block, GM_ADDR workSpace, TPipe* pipe);
     __aicore__ inline void InitAic(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR bias, GM_ADDR cGM, uint64_t baseL0c);
-    __aicore__ inline void AicBaseMadProcess(LocalTensor<aType> &aL1, LocalTensor<bType> &bL1, uint64_t &kInner,
+    __aicore__ inline void AicBaseMadProcess(LocalTensor<aType>& aL1, LocalTensor<bType>& bL1, uint64_t& kInner,
                                              uint64_t kAL1Offset, bool isTailAL1, uint64_t kBL1Offset, bool isTailBL1);
-    __aicore__ inline void WaitForVector(uint16_t &crossPingPongID)
+    __aicore__ inline void WaitForVector(uint16_t& crossPingPongID)
     {
         AscendC::CrossCoreWaitFlag<AIC_SYNC_AIV_MODE, PIPE_FIX>(AIC_SYNC_AIV_FLAG + crossPingPongID);
         AscendC::CrossCoreWaitFlag<AIC_SYNC_AIV_MODE, PIPE_FIX>(AIC_SYNC_AIV_FLAG + crossPingPongID + FLAG_ID_MAX);
@@ -40,37 +40,37 @@ public:
         SetFlag<HardEvent::V_MTE3>(eventIdV2Mte3[id]);
         WaitFlag<HardEvent::V_MTE3>(eventIdV2Mte3[id]);
     }
-    __aicore__ inline void NotifyVector(uint16_t &crossPingPongID)
+    __aicore__ inline void NotifyVector(uint16_t& crossPingPongID)
     {
         AscendC::CrossCoreSetFlag<AIC_SYNC_AIV_MODE, PIPE_FIX>(AIV_SYNC_AIC_FLAG + crossPingPongID);
         AscendC::CrossCoreSetFlag<AIC_SYNC_AIV_MODE, PIPE_FIX>(AIV_SYNC_AIC_FLAG + crossPingPongID + FLAG_ID_MAX);
     }
     template <bool isFirstKLoop>
-    __aicore__ inline void AivPerTensor(__ubuf__ l0cDtype *dst, __ubuf__ l0cDtype *l0cOut, float scaleScalar,
+    __aicore__ inline void AivPerTensor(__ubuf__ l0cDtype* dst, __ubuf__ l0cDtype* l0cOut, float scaleScalar,
                                         uint16_t mSize, uint16_t nSize, uint32_t nSrcUbAligned);
     template <bool isFirstKLoop>
-    __aicore__ inline void AivPerTensor(__ubuf__ l0cDtype *dst, __ubuf__ l0cDtype *l0cOut,
-                                        __ubuf__ ptScaleType *muledScale, uint16_t mSize, uint16_t nSize,
+    __aicore__ inline void AivPerTensor(__ubuf__ l0cDtype* dst, __ubuf__ l0cDtype* l0cOut,
+                                        __ubuf__ ptScaleType* muledScale, uint16_t mSize, uint16_t nSize,
                                         uint32_t nSrcUbAligned);
     __aicore__ inline scaleType GetScaleX2(GM_ADDR scaleX2AddrOff, uint64_t kOffset);
     __aicore__ inline uint64_t GetScaleX1Offset(const uint64_t scaleOffsetX1, uint64_t kOffset);
-    __aicore__ inline void ProcessKBlock(LocalTensor<l0cDtype> &mmAddUb, LocalTensor<ptScaleType> &mmPertokenScaleUb,
-                                         LocalTensor<scaleType> &mmMuledScaleUb, const uint64_t scaleOffsetX1,
+    __aicore__ inline void ProcessKBlock(LocalTensor<l0cDtype>& mmAddUb, LocalTensor<ptScaleType>& mmPertokenScaleUb,
+                                         LocalTensor<scaleType>& mmMuledScaleUb, const uint64_t scaleOffsetX1,
                                          GM_ADDR scaleX2AddrOff, uint64_t kb, uint64_t kOffset, uint64_t alignedM);
-    __aicore__ inline void PerformTensorOps(LocalTensor<l0cDtype> &mmAddUb, LocalTensor<scaleType> &mmMuledScaleUb,
+    __aicore__ inline void PerformTensorOps(LocalTensor<l0cDtype>& mmAddUb, LocalTensor<scaleType>& mmMuledScaleUb,
                                             uint64_t kb);
-    __aicore__ inline void UpdatePertokenScale(LocalTensor<ptScaleType> &mmPertokenScaleUb, uint64_t scaleX1GmOffset,
+    __aicore__ inline void UpdatePertokenScale(LocalTensor<ptScaleType>& mmPertokenScaleUb, uint64_t scaleX1GmOffset,
                                                uint64_t kb);
     __aicore__ inline void UpdatePingPongState();
     __aicore__ inline void ClearAL1Space();
-    __aicore__ inline void CopyInA1Nd2Nz(const uint64_t &kOffset, const bool &isTailAL1);
-    __aicore__ inline void CopyInB1Nd2Nz(const uint64_t &kOffset, const bool &isTailBL1);
-    __aicore__ inline void CopyInA2(LocalTensor<aType> &aL1, const uint64_t &mAL1Offset, const uint64_t &kAL1Offset,
-                                    const uint64_t &kOffset, const bool &isTailAL1);
-    __aicore__ inline void CopyInB2(LocalTensor<bType> &bL1, const uint64_t &nBL1Offset, const uint64_t &kBL1Offset,
-                                    const uint64_t &kOffset, const bool &isTailBL1);
-    __aicore__ inline void MmadBase(const uint64_t &kOffset);
-    __aicore__ inline void AivPostProcess(LocalTensor<l0cDtype> &mmAddUb);
+    __aicore__ inline void CopyInA1Nd2Nz(const uint64_t& kOffset, const bool& isTailAL1);
+    __aicore__ inline void CopyInB1Nd2Nz(const uint64_t& kOffset, const bool& isTailBL1);
+    __aicore__ inline void CopyInA2(LocalTensor<aType>& aL1, const uint64_t& mAL1Offset, const uint64_t& kAL1Offset,
+                                    const uint64_t& kOffset, const bool& isTailAL1);
+    __aicore__ inline void CopyInB2(LocalTensor<bType>& bL1, const uint64_t& nBL1Offset, const uint64_t& kBL1Offset,
+                                    const uint64_t& kOffset, const bool& isTailBL1);
+    __aicore__ inline void MmadBase(const uint64_t& kOffset);
+    __aicore__ inline void AivPostProcess(LocalTensor<l0cDtype>& mmAddUb);
     __aicore__ inline void ProcessAivSingleK();
     __aicore__ inline void ProcessAivSingleKPertile();
     __aicore__ inline void ProcessAicSingleK();
@@ -79,9 +79,9 @@ public:
     __aicore__ inline void AicEnd();
 
 protected:
-    blockType *block_;
-    TPipe *pipe_;
-    const TCubeTiling *matmulTiling_;
+    blockType* block_;
+    TPipe* pipe_;
+    const TCubeTiling* matmulTiling_;
     MatMulCommonParam<MATMUL_PERBLOCK_FUNC_PARAMS> matmulParam_;
     bool needAicWait_ = false; // 是否为第一个block，只有核的第一个基本块的前两次L0C2UB不需要等待AIV
     bool orderAL1BL1_ = false;
@@ -126,11 +126,11 @@ protected:
 };
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::Init(const TCubeTiling &tilingData, GM_ADDR aGM,
+__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::Init(const TCubeTiling& tilingData, GM_ADDR aGM,
                                                                          GM_ADDR bGM, GM_ADDR bias, GM_ADDR scale,
                                                                          GM_ADDR perTokenScale, GM_ADDR cGM,
-                                                                         blockType &block, GM_ADDR workSpace,
-                                                                         TPipe *pipe)
+                                                                         blockType& block, GM_ADDR workSpace,
+                                                                         TPipe* pipe)
 {
     matmulTiling_ = &tilingData;
     block_ = &block;
@@ -157,8 +157,8 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::Init(const T
         scaleN_ = DequantBmm::CeilDiv(matmulTiling_->N, PER_BLOCK_SIZE);
         scaleX2Addr_ = scale;
         scaleX1Addr_ = perTokenScale;
-        cGlobal_.SetGlobalBuffer((__gm__ cType *)cGM);
-        pertokenScaleGlobal_.SetGlobalBuffer((__gm__ ptScaleType *)perTokenScale);
+        cGlobal_.SetGlobalBuffer((__gm__ cType*)cGM);
+        pertokenScaleGlobal_.SetGlobalBuffer((__gm__ ptScaleType*)perTokenScale);
         isPertile_ = block_->params_.groupSizeM == 1;
         if (isPertile_) {
             pertokenPingPongID_ = 0;
@@ -181,10 +181,10 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::InitAic(GM_A
                                                                             GM_ADDR cGM, uint64_t baseL0c)
 {
     if ASCEND_IS_AIC {
-        aGlobal_.SetGlobalBuffer((__gm__ aType *)aGM);
-        bGlobal_.SetGlobalBuffer((__gm__ bType *)bGM);
+        aGlobal_.SetGlobalBuffer((__gm__ aType*)aGM);
+        bGlobal_.SetGlobalBuffer((__gm__ bType*)bGM);
         if (static_cast<bool>(matmulTiling_->isBias)) {
-            biasGlobal_.SetGlobalBuffer((__gm__ biasType *)bias);
+            biasGlobal_.SetGlobalBuffer((__gm__ biasType*)bias);
         }
         orderAL1BL1_ = matmulTiling_->stepKa >= matmulTiling_->stepKb;
         maxStepK_ = (orderAL1BL1_ ? matmulTiling_->stepKa : matmulTiling_->stepKb) * matmulTiling_->baseK;
@@ -264,7 +264,7 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::ProcessAicSi
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::AicBaseMadProcess(
-    LocalTensor<aType> &aL1, LocalTensor<bType> &bL1, uint64_t &kInner, uint64_t kAL1Offset, bool isTailAL1,
+    LocalTensor<aType>& aL1, LocalTensor<bType>& bL1, uint64_t& kInner, uint64_t kAL1Offset, bool isTailAL1,
     uint64_t kBL1Offset, bool isTailBL1)
 {
     for (uint64_t kb = kInner; kb < DequantBmm::Min(kInner + minStepK_, static_cast<uint64_t>(matmulTiling_->Ka));
@@ -294,8 +294,8 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::AicBaseMadPr
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 template <bool isFirstKLoop>
-__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::AivPerTensor(__ubuf__ l0cDtype *dst,
-                                                                                 __ubuf__ l0cDtype *l0cOut,
+__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::AivPerTensor(__ubuf__ l0cDtype* dst,
+                                                                                 __ubuf__ l0cDtype* l0cOut,
                                                                                  float scaleScalar, uint16_t mSize,
                                                                                  uint16_t nSize, uint32_t nSrcUbAligned)
 {
@@ -333,9 +333,9 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::AivPerTensor
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 template <bool isFirstKLoop>
-__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::AivPerTensor(__ubuf__ l0cDtype *dst,
-                                                                                 __ubuf__ l0cDtype *l0cOut,
-                                                                                 __ubuf__ ptScaleType *muledScale,
+__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::AivPerTensor(__ubuf__ l0cDtype* dst,
+                                                                                 __ubuf__ l0cDtype* l0cOut,
+                                                                                 __ubuf__ ptScaleType* muledScale,
                                                                                  uint16_t mSize, uint16_t nSize,
                                                                                  uint32_t nSrcUbAligned)
 {
@@ -396,14 +396,14 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::ProcessAivSi
         ptScaleType scaleX1 = 0;
         scaleType scaleX2 = 0;
         if constexpr (aTrans) {
-            scaleX1 = *((__gm__ ptScaleType *)(scaleX1AddrOff + sizeof(ptScaleType) * kOffset * scaleM_));
+            scaleX1 = *((__gm__ ptScaleType*)(scaleX1AddrOff + sizeof(ptScaleType) * kOffset * scaleM_));
         } else {
-            scaleX1 = *((__gm__ ptScaleType *)(scaleX1AddrOff + sizeof(ptScaleType) * kOffset));
+            scaleX1 = *((__gm__ ptScaleType*)(scaleX1AddrOff + sizeof(ptScaleType) * kOffset));
         }
         if constexpr (bTrans) {
-            scaleX2 = *((__gm__ scaleType *)(scaleX2AddrOff + sizeof(scaleType) * kOffset));
+            scaleX2 = *((__gm__ scaleType*)(scaleX2AddrOff + sizeof(scaleType) * kOffset));
         } else {
-            scaleX2 = *((__gm__ scaleType *)(scaleX2AddrOff + sizeof(scaleType) * kOffset * scaleN_));
+            scaleX2 = *((__gm__ scaleType*)(scaleX2AddrOff + sizeof(scaleType) * kOffset * scaleN_));
         }
         scaleType scaleMul = scaleX1 * scaleX2;
         AscendC::CrossCoreWaitFlag<AIC_SYNC_AIV_MODE, PIPE_V>(AIV_SYNC_AIC_FLAG + crossPingPongID_);
@@ -412,10 +412,10 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::ProcessAivSi
         uint64_t mmUbInputAddr = reinterpret_cast<uint64_t>(mmUbInput.GetPhyAddr());
         AscendC::PipeBarrier<PIPE_V>();
         if (kb == 0) {
-            AivPerTensor<true>((__ubuf__ l0cDtype *)mmAddUbAddr, (__ubuf__ l0cDtype *)mmUbInputAddr, scaleMul,
+            AivPerTensor<true>((__ubuf__ l0cDtype*)mmAddUbAddr, (__ubuf__ l0cDtype*)mmUbInputAddr, scaleMul,
                                block_->ubParams_.validM, block_->ubParams_.validN, block_->ubParams_.singleN);
         } else {
-            AivPerTensor<false>((__ubuf__ l0cDtype *)mmAddUbAddr, (__ubuf__ l0cDtype *)mmUbInputAddr, scaleMul,
+            AivPerTensor<false>((__ubuf__ l0cDtype*)mmAddUbAddr, (__ubuf__ l0cDtype*)mmUbInputAddr, scaleMul,
                                 block_->ubParams_.validM, block_->ubParams_.validN, block_->ubParams_.singleN);
         }
         AscendC::CrossCoreSetFlag<AIC_SYNC_AIV_MODE, PIPE_V>(AIC_SYNC_AIV_FLAG + crossPingPongID_);
@@ -426,7 +426,7 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::ProcessAivSi
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::AivPostProcess(LocalTensor<l0cDtype> &mmAddUb)
+__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::AivPostProcess(LocalTensor<l0cDtype>& mmAddUb)
 {
     if (block_->ubParams_.validM == 0 || block_->ubParams_.validN == 0) {
         return;
@@ -478,9 +478,9 @@ __aicore__ inline scaleType MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::GetScal
                                                                                     uint64_t kOffset)
 {
     if constexpr (bTrans) {
-        return *((__gm__ scaleType *)(scaleX2AddrOff + sizeof(scaleType) * kOffset));
+        return *((__gm__ scaleType*)(scaleX2AddrOff + sizeof(scaleType) * kOffset));
     } else {
-        return *((__gm__ scaleType *)(scaleX2AddrOff + sizeof(scaleType) * kOffset * scaleN_));
+        return *((__gm__ scaleType*)(scaleX2AddrOff + sizeof(scaleType) * kOffset * scaleN_));
     }
 }
 
@@ -497,7 +497,7 @@ __aicore__ inline uint64_t MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::GetScale
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::ProcessKBlock(
-    LocalTensor<l0cDtype> &mmAddUb, LocalTensor<ptScaleType> &mmPertokenScaleUb, LocalTensor<scaleType> &mmMuledScaleUb,
+    LocalTensor<l0cDtype>& mmAddUb, LocalTensor<ptScaleType>& mmPertokenScaleUb, LocalTensor<scaleType>& mmMuledScaleUb,
     const uint64_t scaleOffsetX1, GM_ADDR scaleX2AddrOff, uint64_t kb, uint64_t kOffset, uint64_t alignedM)
 {
     // Get scale values
@@ -525,7 +525,7 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::ProcessKBloc
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::PerformTensorOps(
-    LocalTensor<l0cDtype> &mmAddUb, LocalTensor<scaleType> &mmMuledScaleUb, uint64_t kb)
+    LocalTensor<l0cDtype>& mmAddUb, LocalTensor<scaleType>& mmMuledScaleUb, uint64_t kb)
 {
     uint64_t mmMuledScaleUbAddr = reinterpret_cast<uint64_t>(mmMuledScaleUb.GetPhyAddr());
     AscendC::CrossCoreWaitFlag<AIC_SYNC_AIV_MODE, PIPE_V>(AIV_SYNC_AIC_FLAG + crossPingPongID_);
@@ -536,12 +536,12 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::PerformTenso
     AscendC::PipeBarrier<PIPE_V>();
 
     if (kb == 0) {
-        AivPerTensor<true>((__ubuf__ l0cDtype *)mmAddUbAddr, (__ubuf__ l0cDtype *)mmUbInputAddr,
-                           (__ubuf__ ptScaleType *)mmMuledScaleUbAddr, block_->ubParams_.validM,
+        AivPerTensor<true>((__ubuf__ l0cDtype*)mmAddUbAddr, (__ubuf__ l0cDtype*)mmUbInputAddr,
+                           (__ubuf__ ptScaleType*)mmMuledScaleUbAddr, block_->ubParams_.validM,
                            block_->ubParams_.validN, block_->ubParams_.singleN);
     } else {
-        AivPerTensor<false>((__ubuf__ l0cDtype *)mmAddUbAddr, (__ubuf__ l0cDtype *)mmUbInputAddr,
-                            (__ubuf__ ptScaleType *)mmMuledScaleUbAddr, block_->ubParams_.validM,
+        AivPerTensor<false>((__ubuf__ l0cDtype*)mmAddUbAddr, (__ubuf__ l0cDtype*)mmUbInputAddr,
+                            (__ubuf__ ptScaleType*)mmMuledScaleUbAddr, block_->ubParams_.validM,
                             block_->ubParams_.validN, block_->ubParams_.singleN);
     }
 
@@ -559,7 +559,7 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::UpdatePingPo
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
 __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::UpdatePertokenScale(
-    LocalTensor<ptScaleType> &mmPertokenScaleUb, uint64_t scaleX1GmOffset, uint64_t kb)
+    LocalTensor<ptScaleType>& mmPertokenScaleUb, uint64_t scaleX1GmOffset, uint64_t kb)
 {
     if constexpr (aTrans) {
         paramsMain_.loopInfo.loopSize[1] =
@@ -653,11 +653,11 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::ProcessAivSi
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInA2(LocalTensor<aType> &aL1,
-                                                                             const uint64_t &mAL1Offset,
-                                                                             const uint64_t &kAL1Offset,
-                                                                             const uint64_t &kOffset,
-                                                                             const bool &isTailAL1)
+__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInA2(LocalTensor<aType>& aL1,
+                                                                             const uint64_t& mAL1Offset,
+                                                                             const uint64_t& kAL1Offset,
+                                                                             const uint64_t& kOffset,
+                                                                             const bool& isTailAL1)
 {
     uint64_t offsetAL1 = matmulParam_.CalcAL1Offset(mAL1Offset, kAL1Offset, isTailAL1);
     LocalTensor<aType> aL0 = inQueueTensorAL0.template AllocTensor<aType>();
@@ -668,11 +668,11 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInA2(Loc
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInB2(LocalTensor<bType> &bL1,
-                                                                             const uint64_t &nBL1Offset,
-                                                                             const uint64_t &kBL1Offset,
-                                                                             const uint64_t &kOffset,
-                                                                             const bool &isTailBL1)
+__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInB2(LocalTensor<bType>& bL1,
+                                                                             const uint64_t& nBL1Offset,
+                                                                             const uint64_t& kBL1Offset,
+                                                                             const uint64_t& kOffset,
+                                                                             const bool& isTailBL1)
 {
     uint64_t offsetBL1 = matmulParam_.CalcBL1Offset(nBL1Offset, kBL1Offset, isTailBL1);
     LocalTensor<bType> bL0 = inQueueTensorBL0.template AllocTensor<bType>();
@@ -683,7 +683,7 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInB2(Loc
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::MmadBase(const uint64_t &kOffset)
+__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::MmadBase(const uint64_t& kOffset)
 {
     auto aL0 = inQueueTensorAL0.template DeQue<aType>();
     auto bL0 = inQueueTensorBL0.template DeQue<bType>();
@@ -725,8 +725,8 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::ClearAL1Spac
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInA1Nd2Nz(const uint64_t &kOffset,
-                                                                                  const bool &isTailAL1)
+__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInA1Nd2Nz(const uint64_t& kOffset,
+                                                                                  const bool& isTailAL1)
 {
     LocalTensor<aType> aL1 = inQueueTensorAL1.template AllocTensor<aType>();
     uint64_t offset = matmulParam_.CalcAGMOffsetInnerLoop(0, kOffset);
@@ -737,8 +737,8 @@ __aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInA1Nd2N
 }
 
 MATMUL_PERBLOCK_CLASS_TEM_PARAMS
-__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInB1Nd2Nz(const uint64_t &kOffset,
-                                                                                  const bool &isTailBL1)
+__aicore__ inline void MatMulPerBlock<MATMUL_PERBLOCK_FUNC_PARAMS>::CopyInB1Nd2Nz(const uint64_t& kOffset,
+                                                                                  const bool& isTailBL1)
 {
     LocalTensor<bType> bL1 = inQueueTensorBL1.template AllocTensor<bType>();
     uint64_t offset = matmulParam_.CalcBGMOffsetInnerLoop(0, kOffset);

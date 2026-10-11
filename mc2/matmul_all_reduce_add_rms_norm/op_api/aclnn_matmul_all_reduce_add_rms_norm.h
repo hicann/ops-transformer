@@ -50,11 +50,11 @@ __attribute__((deprecated("aclnnMatmulAllReduceAddRmsNormGetWorkspaceSize is sch
                           "aclnnMatmulAllReduceGetWorkspaceSize and aclnnAddRmsNormGetWorkspaceSize. "
                           "We apologize for any inconvenience caused and appreciate your timely "
                           "migration to the other interface."))) ACLNN_API aclnnStatus
-aclnnMatmulAllReduceAddRmsNormGetWorkspaceSize(const aclTensor *x1, const aclTensor *x2, const aclTensor *bias,
-                                               const aclTensor *residual, const aclTensor *gamma, double epsilon,
-                                               const char *group, const char *reduceOp, int64_t commTurn,
-                                               int64_t streamMode, const aclTensor *y, const aclTensor *normOut,
-                                               uint64_t *workspaceSize, aclOpExecutor **executor);
+aclnnMatmulAllReduceAddRmsNormGetWorkspaceSize(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
+                                               const aclTensor* residual, const aclTensor* gamma, double epsilon,
+                                               const char* group, const char* reduceOp, int64_t commTurn,
+                                               int64_t streamMode, const aclTensor* y, const aclTensor* normOut,
+                                               uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief aclnnMatmulAllReduceAddRmsNorm的第二段接口，用于执行计算。
@@ -70,7 +70,7 @@ __attribute__((deprecated("aclnnMatmulAllReduceAddRmsNorm is scheduled to be dep
                           "Please migrate to aclnnMatmulAllReduce and aclnnAddRmsNorm. "
                           "We apologize for any inconvenience caused and "
                           "appreciate your timely migration to the other interface."))) ACLNN_API aclnnStatus
-aclnnMatmulAllReduceAddRmsNorm(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+aclnnMatmulAllReduceAddRmsNorm(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                const aclrtStream stream);
 
 #ifdef __cplusplus

@@ -29,7 +29,7 @@ struct AllGatherMatmulHostUtParamBase {
     bool is_gather_out;
     ge::graphStatus expectResult;
 
-    AllGatherMatmulHostUtParamBase(const csv_map &csvMap)
+    AllGatherMatmulHostUtParamBase(const csv_map& csvMap)
     {
         this->case_name = ReadMap(csvMap, "case_name");
         this->group = ReadMap(csvMap, "group");
@@ -43,7 +43,7 @@ struct AllGatherMatmulHostUtParamBase {
     }
 };
 
-inline std::ostream &operator<<(std::ostream &os, const AllGatherMatmulHostUtParamBase &param)
+inline std::ostream& operator<<(std::ostream& os, const AllGatherMatmulHostUtParamBase& param)
 {
     return os << param.case_name;
 }
@@ -61,7 +61,7 @@ struct AllGatherMatmulTilingUtParam : public AllGatherMatmulHostUtParamBase {
     uint64_t expectTilingKey;
     std::string expectTilingDataHash;
 
-    AllGatherMatmulTilingUtParam(const csv_map &csvMap)
+    AllGatherMatmulTilingUtParam(const csv_map& csvMap)
         : AllGatherMatmulHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "x1_shape", "x1_dtype", "x1_format", x1));
@@ -92,7 +92,7 @@ struct AllGatherMatmulInferShapeUtParam : public AllGatherMatmulHostUtParamBase 
     gert::InfershapeContextPara::TensorDescription gather_out = ID_DEFAULT;
     std::vector<std::vector<int64_t>> expectOutputShape;
 
-    AllGatherMatmulInferShapeUtParam(const csv_map &csvMap)
+    AllGatherMatmulInferShapeUtParam(const csv_map& csvMap)
         : AllGatherMatmulHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetTensorGE(csvMap, "x1_shape", "x1_dtype", "x1_format", x1));
@@ -115,7 +115,7 @@ struct AllGatherMatmulInferDataTypeUtParam : public AllGatherMatmulHostUtParamBa
     ge::DataType y = ge::DT_UNDEFINED;
     ge::DataType gather_out = ge::DT_UNDEFINED;
 
-    AllGatherMatmulInferDataTypeUtParam(const csv_map &csvMap)
+    AllGatherMatmulInferDataTypeUtParam(const csv_map& csvMap)
         : AllGatherMatmulHostUtParamBase(csvMap)
     {
         this->inputInstance.emplace_back(GetDataTypeGE(csvMap, "x1_dtype", x1));

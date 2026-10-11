@@ -84,97 +84,97 @@ extern "C" {
 
 bool IsInputSupportFp32();
 
-bool CheckBatchDimBroadcast(size_t batch1DimNum, size_t batch2DimNum, const op::Shape &batch1, const op::Shape &batch2);
+bool CheckBatchDimBroadcast(size_t batch1DimNum, size_t batch2DimNum, const op::Shape& batch1, const op::Shape& batch2);
 
-bool IsFormatSupportNd(const aclTensor *self, const aclTensor *mat2);
+bool IsFormatSupportNd(const aclTensor* self, const aclTensor* mat2);
 
-bool IsNdToNzOnTheFly(const aclTensor *self, const aclTensor *mat2);
+bool IsNdToNzOnTheFly(const aclTensor* self, const aclTensor* mat2);
 
 bool IsSmallMNMultiSplitK(const uint64_t mDim, const uint64_t kDim, const uint64_t nDim, const bool transposeX1,
                           const bool transposeX2);
 
-bool IsTransposeLastTwoDims(const aclTensor *tensor);
+bool IsTransposeLastTwoDims(const aclTensor* tensor);
 
-const aclTensor *formatContiguousAddCopyOptimize(const aclTensor *tensor, aclOpExecutor *executor);
+const aclTensor* formatContiguousAddCopyOptimize(const aclTensor* tensor, aclOpExecutor* executor);
 
-bool CheckGemmV3Support(const aclTensor *mat1, const aclTensor *mat2, MmOpInfo &mmOpInfo, int8_t cubeMathType);
+bool CheckGemmV3Support(const aclTensor* mat1, const aclTensor* mat2, MmOpInfo& mmOpInfo, int8_t cubeMathType);
 
-const aclTensor *ExecGemmV3Op(const aclTensor *self, const aclTensor *mat2, const aclTensor *c, MmOpInfo &mmOpInfo,
-                              aclOpExecutor *executor);
+const aclTensor* ExecGemmV3Op(const aclTensor* self, const aclTensor* mat2, const aclTensor* c, MmOpInfo& mmOpInfo,
+                              aclOpExecutor* executor);
 
-const aclTensor *ExecMmOp(const aclTensor *self, const aclTensor *mat2, int8_t cubeMathType, aclOpExecutor *executor);
+const aclTensor* ExecMmOp(const aclTensor* self, const aclTensor* mat2, int8_t cubeMathType, aclOpExecutor* executor);
 
-const aclTensor *ExecMmOpWithBias(const aclTensor *self, const aclTensor *mat2, const aclTensor *bias,
-                                  int8_t cubeMathType, aclOpExecutor *executor, bool transposeX2 = false);
+const aclTensor* ExecMmOpWithBias(const aclTensor* self, const aclTensor* mat2, const aclTensor* bias,
+                                  int8_t cubeMathType, aclOpExecutor* executor, bool transposeX2 = false);
 
-const aclTensor *ExecBmmOpWithBias(const aclTensor *self, const aclTensor *mat2, const aclTensor *bias,
-                                   const aclTensor *out, int8_t cubeMathType, aclOpExecutor *executor);
+const aclTensor* ExecBmmOpWithBias(const aclTensor* self, const aclTensor* mat2, const aclTensor* bias,
+                                   const aclTensor* out, int8_t cubeMathType, aclOpExecutor* executor);
 
-const aclTensor *ExecBatchMatmulOpWithBiasAndAttrs(const aclTensor *self, const aclTensor *mat2, const aclTensor *bias,
-                                                   const aclTensor *out, bool adjX1, bool adjX2, int8_t cubeMathType,
-                                                   aclOpExecutor *executor);
+const aclTensor* ExecBatchMatmulOpWithBiasAndAttrs(const aclTensor* self, const aclTensor* mat2, const aclTensor* bias,
+                                                   const aclTensor* out, bool adjX1, bool adjX2, int8_t cubeMathType,
+                                                   aclOpExecutor* executor);
 
-const aclTensor *ExecBatchMatmulOp(const aclTensor *self, const aclTensor *mat2, const aclTensor *out, bool adjX1,
-                                   bool adjX2, int8_t cubeMathType, aclOpExecutor *executor);
+const aclTensor* ExecBatchMatmulOp(const aclTensor* self, const aclTensor* mat2, const aclTensor* out, bool adjX1,
+                                   bool adjX2, int8_t cubeMathType, aclOpExecutor* executor);
 
-const aclTensor *ExecMmOpWithTrans(const aclTensor *self, const aclTensor *mat2, int64_t transSelf, int64_t transMat2,
-                                   int8_t cubeMathType, aclOpExecutor *executor);
+const aclTensor* ExecMmOpWithTrans(const aclTensor* self, const aclTensor* mat2, int64_t transSelf, int64_t transMat2,
+                                   int8_t cubeMathType, aclOpExecutor* executor);
 
-const aclTensor *ExecBmmOp(const aclTensor *self, const aclTensor *mat2, const aclTensor *out, int8_t cubeMathType,
-                           aclOpExecutor *executor);
+const aclTensor* ExecBmmOp(const aclTensor* self, const aclTensor* mat2, const aclTensor* out, int8_t cubeMathType,
+                           aclOpExecutor* executor);
 
-aclnnStatus SetMmSupportDType(const aclTensor *self, const aclTensor *mat2, MmOpInfo &mmOpInfo, int8_t cubeMathType);
+aclnnStatus SetMmSupportDType(const aclTensor* self, const aclTensor* mat2, MmOpInfo& mmOpInfo, int8_t cubeMathType);
 
-aclnnStatus SetMmSupportFormat(const aclTensor *self, const aclTensor *mat2, MmOpInfo &mmOpInfo);
+aclnnStatus SetMmSupportFormat(const aclTensor* self, const aclTensor* mat2, MmOpInfo& mmOpInfo);
 
 aclnnStatus GetMmInfo(MmOpInfo mmOpInfo);
-MmOpInfo GetMatmulOpInfo(const aclTensor *self, const aclTensor *mat2, int8_t cubeMathType);
-bool ContiguousAndCast(const aclTensor *&contiguousInput, const aclTensor *&castOut, bool &transposeFlag,
-                       op::DataType dtype, aclOpExecutor *executor);
+MmOpInfo GetMatmulOpInfo(const aclTensor* self, const aclTensor* mat2, int8_t cubeMathType);
+bool ContiguousAndCast(const aclTensor*& contiguousInput, const aclTensor*& castOut, bool& transposeFlag,
+                       op::DataType dtype, aclOpExecutor* executor);
 
-bool GetNzSplitKFlag(const aclTensor *self, const aclTensor *mat2, const op::Format selfSuppFormat,
+bool GetNzSplitKFlag(const aclTensor* self, const aclTensor* mat2, const op::Format selfSuppFormat,
                      const op::Format outSuppFormat);
 
-bool IsSupportNzNzNd(const aclTensor *self, const aclTensor *mat2);
+bool IsSupportNzNzNd(const aclTensor* self, const aclTensor* mat2);
 
-bool IsSplitk(const aclTensor *self, const aclTensor *mat2, const op::DataType selfDtype, const op::DataType mat2Dtype,
+bool IsSplitk(const aclTensor* self, const aclTensor* mat2, const op::DataType selfDtype, const op::DataType mat2Dtype,
               const op::Format selfSuppFormat, const op::Format outSuppFormat);
 
-bool NeedToConvertBias(const aclTensor *self, const aclTensor *mat1, const aclTensor *mat2, const aclScalar *beta,
-                       const aclScalar *alpha);
+bool NeedToConvertBias(const aclTensor* self, const aclTensor* mat1, const aclTensor* mat2, const aclScalar* beta,
+                       const aclScalar* alpha);
 
 // 区别bmm 和 mm, bmm（DimNum==3）返回 1， mm（DimNum==2）返回0
 int64_t GetOffSet(int64_t DimNum);
 
-aclIntArray *NeedTransPerm(const aclTensor *x, aclOpExecutor *executor);
+aclIntArray* NeedTransPerm(const aclTensor* x, aclOpExecutor* executor);
 
-bool checkBF16SizeValid(const aclTensor *&mat2, const bool &transX2Flag);
+bool checkBF16SizeValid(const aclTensor*& mat2, const bool& transX2Flag);
 
-bool checkBF16MMValid(const aclTensor *&self, const aclTensor *&mat2, const bool &transX2Flag);
+bool checkBF16MMValid(const aclTensor*& self, const aclTensor*& mat2, const bool& transX2Flag);
 
-bool IfKEqual1(const aclTensor *&selfInput, const MmOpInfo &mmOpInfo, const bool &transX1Flag, const aclTensor *&bias);
+bool IfKEqual1(const aclTensor*& selfInput, const MmOpInfo& mmOpInfo, const bool& transX1Flag, const aclTensor*& bias);
 
-aclnnStatus IfKEqual1SelfToMK(const aclTensor *&selfInput, const aclTensor *&selfReshapeOutput, bool &transX1Flag,
-                              aclOpExecutor *executor);
+aclnnStatus IfKEqual1SelfToMK(const aclTensor*& selfInput, const aclTensor*& selfReshapeOutput, bool& transX1Flag,
+                              aclOpExecutor* executor);
 
-aclnnStatus IfKEqual1Mat2ToKN(const aclTensor *&mat2Input, const aclTensor *&mat2ReshapeOutput, bool &transX2Flag,
-                              aclOpExecutor *executor);
+aclnnStatus IfKEqual1Mat2ToKN(const aclTensor*& mat2Input, const aclTensor*& mat2ReshapeOutput, bool& transX2Flag,
+                              aclOpExecutor* executor);
 
-aclnnStatus IfMEqual1SelfToMK(const aclTensor *&selfInput, const aclTensor *&selfReshapeOutput,
-                              const op::Format selfInputFormat, bool &transX1Flag, aclOpExecutor *executor);
+aclnnStatus IfMEqual1SelfToMK(const aclTensor*& selfInput, const aclTensor*& selfReshapeOutput,
+                              const op::Format selfInputFormat, bool& transX1Flag, aclOpExecutor* executor);
 
-aclnnStatus IfNEqual1Mat2ToNK(const aclTensor *&mat2Input, const aclTensor *&mat2ReshapeOutput,
-                              const op::Format mat2InputFormat, bool &transX2Flag, aclOpExecutor *executor);
+aclnnStatus IfNEqual1Mat2ToNK(const aclTensor*& mat2Input, const aclTensor*& mat2ReshapeOutput,
+                              const op::Format mat2InputFormat, bool& transX2Flag, aclOpExecutor* executor);
 
 uint64_t TransDequantScaleToM1(const float deqScale);
 
-uint32_t GetL2Size(const std::string &socLongVersion);
+uint32_t GetL2Size(const std::string& socLongVersion);
 
-uint64_t GetL1Size(const std::string &socLongVersion);
+uint64_t GetL1Size(const std::string& socLongVersion);
 
-const aclTensor *ContiguousBias(const aclTensor *self, const aclTensor *bias, aclOpExecutor *executor);
+const aclTensor* ContiguousBias(const aclTensor* self, const aclTensor* bias, aclOpExecutor* executor);
 
-op::FVector<int64_t> GetShape(const aclTensor *tensor);
+op::FVector<int64_t> GetShape(const aclTensor* tensor);
 #ifdef __cplusplus
 }
 #endif

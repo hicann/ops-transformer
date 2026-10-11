@@ -110,35 +110,35 @@ public:
         LocalParams localParams;
     };
 
-    __aicore__ inline void Init(const Params &params);
-    __aicore__ inline void Run(const Params &params);
-    __aicore__ inline void operator()(const Params &params)
+    __aicore__ inline void Init(const Params& params);
+    __aicore__ inline void Run(const Params& params);
+    __aicore__ inline void operator()(const Params& params)
     {
         Run(params);
     }
 
 private:
-    __aicore__ inline void ResetGmAddr(const Params &params);
-    __aicore__ inline void ProcessSingleBatch(const Params &params, BlockScheduler &bs, uint64_t restBatch,
+    __aicore__ inline void ResetGmAddr(const Params& params);
+    __aicore__ inline void ProcessSingleBatch(const Params& params, BlockScheduler& bs, uint64_t restBatch,
                                               bool isTailRound);
 
     template <typename TensorB, typename TensorScaleB, typename TensorC>
-    __aicore__ inline void SetL2Cache(const ProblemShape &problemShape, uint64_t curBaseM, uint64_t baseN,
-                                      uint64_t scaleKL1, TensorB &gmB, TensorScaleB &gmScaleB, TensorC &gmC);
+    __aicore__ inline void SetL2Cache(const ProblemShape& problemShape, uint64_t curBaseM, uint64_t baseN,
+                                      uint64_t scaleKL1, TensorB& gmB, TensorScaleB& gmScaleB, TensorC& gmC);
 
     template <typename TensorScaleB>
-    __aicore__ inline void SetScaleL2Cache(const ProblemShape &problemShape, uint64_t baseN, uint64_t scaleKL1,
-                                           TensorScaleB &gmScaleB);
+    __aicore__ inline void SetScaleL2Cache(const ProblemShape& problemShape, uint64_t baseN, uint64_t scaleKL1,
+                                           TensorScaleB& gmScaleB);
 
     BlockMmad mmadOp_;
 
-    __gm__ AType *aGmAddr_{};
-    __gm__ BType *bGmAddr_{};
-    __gm__ CType *cGmAddr_{};
-    __gm__ CType *cGmSelfAddr_{};
-    __gm__ BiasType *biasGmAddr_{};
-    __gm__ TypeScaleA *scaleAGmAddr_{};
-    __gm__ TypeScaleB *scaleBGmAddr_{};
+    __gm__ AType* aGmAddr_{};
+    __gm__ BType* bGmAddr_{};
+    __gm__ CType* cGmAddr_{};
+    __gm__ CType* cGmSelfAddr_{};
+    __gm__ BiasType* biasGmAddr_{};
+    __gm__ TypeScaleA* scaleAGmAddr_{};
+    __gm__ TypeScaleB* scaleBGmAddr_{};
 
     bool isBias_{false};
     bool needUpdateTail_{false};
@@ -150,7 +150,7 @@ private:
 // =================================================================================
 
 QBMM_MX_KERNEL_TPN_CLASS_TEM_PARAMS
-__aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::Init(const Params &params)
+__aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::Init(const Params& params)
 {
     isBias_ = (params.qbmmParams.isBias == QBMMTiling::BIAS_ENABLED);
     disableCL2Cache_ = params.qbmmParams.disableCL2Cache;
@@ -159,7 +159,7 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
 }
 
 QBMM_MX_KERNEL_TPN_CLASS_TEM_PARAMS
-__aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::Run(const Params &params)
+__aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::Run(const Params& params)
 {
     if ASCEND_IS_AIV {
         return;
@@ -213,22 +213,22 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
 // =================================================================================
 
 QBMM_MX_KERNEL_TPN_CLASS_TEM_PARAMS
-__aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::ResetGmAddr(const Params &params)
+__aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::ResetGmAddr(const Params& params)
 {
-    aGmAddr_ = reinterpret_cast<__gm__ AType *>(params.mmadParams.aGmAddr);
-    bGmAddr_ = reinterpret_cast<__gm__ BType *>(params.mmadParams.bGmAddr);
-    cGmAddr_ = reinterpret_cast<__gm__ CType *>(params.mmadParams.cGmAddr);
-    cGmSelfAddr_ = reinterpret_cast<__gm__ CType *>(params.localParams.cGmSelfAddr);
-    scaleAGmAddr_ = reinterpret_cast<__gm__ TypeScaleA *>(params.mmadParams.scaleAGmAddr);
-    scaleBGmAddr_ = reinterpret_cast<__gm__ TypeScaleB *>(params.mmadParams.scaleBGmAddr);
+    aGmAddr_ = reinterpret_cast<__gm__ AType*>(params.mmadParams.aGmAddr);
+    bGmAddr_ = reinterpret_cast<__gm__ BType*>(params.mmadParams.bGmAddr);
+    cGmAddr_ = reinterpret_cast<__gm__ CType*>(params.mmadParams.cGmAddr);
+    cGmSelfAddr_ = reinterpret_cast<__gm__ CType*>(params.localParams.cGmSelfAddr);
+    scaleAGmAddr_ = reinterpret_cast<__gm__ TypeScaleA*>(params.mmadParams.scaleAGmAddr);
+    scaleBGmAddr_ = reinterpret_cast<__gm__ TypeScaleB*>(params.mmadParams.scaleBGmAddr);
     if (isBias_) {
-        biasGmAddr_ = reinterpret_cast<__gm__ BiasType *>(params.mmadParams.biasGmAddr);
+        biasGmAddr_ = reinterpret_cast<__gm__ BiasType*>(params.mmadParams.biasGmAddr);
     }
 }
 
 QBMM_MX_KERNEL_TPN_CLASS_TEM_PARAMS
 __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::ProcessSingleBatch(
-    const Params &params, BlockScheduler &bs, uint64_t restBatch, bool isTailRound)
+    const Params& params, BlockScheduler& bs, uint64_t restBatch, bool isTailRound)
 {
     const auto m = asc::te::get<MNK_M>(params.problemShape);
     const auto n = asc::te::get<MNK_N>(params.problemShape);
@@ -248,8 +248,8 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
     auto gmBias = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(biasGmAddr_), layoutBias);
     auto gmC = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(cGmAddr_), layoutC);
 
-    auto &mTailTile = params.schParams.mTailTile;
-    auto &nTailTile = params.schParams.nTailTile;
+    auto& mTailTile = params.schParams.mTailTile;
+    auto& nTailTile = params.schParams.nTailTile;
     if (needUpdateTail_ ||
         (isTailRound && ((bs.GetEndBlockIdx() + 1) + (restBatch * bs.GetTotalCnt())) * mTailTile * nTailTile <=
                             AscendC::GetBlockNum())) {
@@ -291,7 +291,7 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
 QBMM_MX_KERNEL_TPN_CLASS_TEM_PARAMS
 template <typename TensorScaleB>
 __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::SetScaleL2Cache(
-    const ProblemShape &problemShape, uint64_t baseN, uint64_t scaleKL1, TensorScaleB &gmScaleB)
+    const ProblemShape& problemShape, uint64_t baseN, uint64_t scaleKL1, TensorScaleB& gmScaleB)
 {
     if (asc::te::get<MNK_B>(problemShape) != 1) {
         return;
@@ -316,8 +316,8 @@ __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARA
 QBMM_MX_KERNEL_TPN_CLASS_TEM_PARAMS
 template <typename TensorB, typename TensorScaleB, typename TensorC>
 __aicore__ inline void QuantBatchMatmulMxKernel<QBMM_MX_KERNEL_TPN_FUNC_TEM_PARAMS>::SetL2Cache(
-    const ProblemShape &problemShape, uint64_t curBaseM, uint64_t baseN, uint64_t scaleKL1, TensorB &gmB,
-    TensorScaleB &gmScaleB, TensorC &gmC)
+    const ProblemShape& problemShape, uint64_t curBaseM, uint64_t baseN, uint64_t scaleKL1, TensorB& gmB,
+    TensorScaleB& gmScaleB, TensorC& gmC)
 {
     if (disableCL2Cache_) {
         gmC.set_l2_cache_hint(asc::te::cache_mode::disable);

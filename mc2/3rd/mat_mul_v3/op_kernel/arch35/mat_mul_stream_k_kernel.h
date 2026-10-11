@@ -24,12 +24,12 @@ namespace Mc2MatmulV3Advanced {
 using namespace AscendC;
 using namespace matmul;
 
-static __aicore__ inline void CustomDataCopyOut(const __gm__ void *gm, const LocalTensor<int8_t> &co1Local,
-                                                const void *dataCopyOutParams, const uint64_t tilingPtr,
+static __aicore__ inline void CustomDataCopyOut(const __gm__ void* gm, const LocalTensor<int8_t>& co1Local,
+                                                const void* dataCopyOutParams, const uint64_t tilingPtr,
                                                 const uint64_t dataPtr)
 {
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
-    auto params = static_cast<const DataCopyOutParams *>(dataCopyOutParams);
+    auto params = static_cast<const DataCopyOutParams*>(dataCopyOutParams);
     fixpipeParams.nSize = params->oriNSize;
     fixpipeParams.dstStride = params->dstStride;
     fixpipeParams.mSize = static_cast<uint16_t>(params->burstLen * ONE_BLK_SIZE / BLOCK_CUBE / sizeof(float));
@@ -38,7 +38,7 @@ static __aicore__ inline void CustomDataCopyOut(const __gm__ void *gm, const Loc
         fixpipeParams.unitFlag = MM_FIX_PIPE_UNIT_FLAG; // 使能unitflag的参数 3U
     }
     GlobalTensor<float> dst;
-    dst.SetGlobalBuffer((__gm__ float *)(gm));
+    dst.SetGlobalBuffer((__gm__ float*)(gm));
     if (dataPtr == 1) {
         if constexpr (IsSameType<DTYPE_Y, half>::value) {
             fixpipeParams.quantPre = QuantMode_t::F322F16;
@@ -60,12 +60,12 @@ static __aicore__ inline void CustomDataCopyOut(const __gm__ void *gm, const Loc
 }
 
 template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE = Mc2MatmulStreamKBlock,
-          const MatmulConfig &MM_CFG = MM_CFG_NO_PRELOAD, const bool ALIGN_FLAG = false>
+          const MatmulConfig& MM_CFG = MM_CFG_NO_PRELOAD, const bool ALIGN_FLAG = false>
 class Mc2MatmulStreamKKernel {
 public:
     __aicore__ inline Mc2MatmulStreamKKernel() {}
     __aicore__ inline void Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM,
-                                GM_ADDR workspaceGM, const void *tilingData, TPipe *pipe);
+                                GM_ADDR workspaceGM, const void* tilingData, TPipe* pipe);
     __aicore__ inline void InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR workspaceGM);
     __aicore__ inline void Process();
     __aicore__ inline void StreamKAicProcess(uint64_t roundIdx);
@@ -96,47 +96,47 @@ protected:
     GlobalTensor<float> cGlobal_;
     GlobalTensor<float> workspaceGlobal_;
     GlobalTensor<BiasT> biasGlobal_;
-    TPipe *pipe_;
+    TPipe* pipe_;
 };
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           const bool ALIGN_FLAG>
 __aicore__ inline void Mc2MatmulStreamKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, ALIGN_FLAG>::Init(
     GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR biasGM, GM_ADDR offsetWGM, GM_ADDR workspaceGM,
-    const void *tilingData, TPipe *pipe)
+    const void* tilingData, TPipe* pipe)
 {
     pipe_ = pipe;
     block_.template Init<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE>(tilingData);
     InitInputs(aGM, bGM, cGM, biasGM, workspaceGM);
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           const bool ALIGN_FLAG>
 __aicore__ inline void Mc2MatmulStreamKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG,
                                               ALIGN_FLAG>::InitInputs(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM,
                                                                       GM_ADDR biasGM, GM_ADDR workspaceGM)
 {
-    workspaceGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(workspaceGM),
+    workspaceGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspaceGM),
                                      block_.aicParams_.lastLoopTotalCnt * BLOCK_BASE_M * BLOCK_BASE_N);
-    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ float *>(cGM),
+    cGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(cGM),
                              static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) *
                                      block_.matmulTilingData_->tCubeTiling.N * sizeof(C_T) / sizeof(float) +
                                  1UL);
     if ASCEND_IS_AIC {
         aGlobal_.SetGlobalBuffer(
-            reinterpret_cast<__gm__ A_T *>(aGM),
+            reinterpret_cast<__gm__ A_T*>(aGM),
             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.M) * block_.matmulTilingData_->tCubeTiling.Ka);
         bGlobal_.SetGlobalBuffer(
-            reinterpret_cast<__gm__ B_T *>(bGM),
+            reinterpret_cast<__gm__ B_T*>(bGM),
             static_cast<uint64_t>(block_.matmulTilingData_->tCubeTiling.Kb) * block_.matmulTilingData_->tCubeTiling.N);
         if (block_.matmulTilingData_->tCubeTiling.isBias) {
-            biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT *>(biasGM),
+            biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ BiasT*>(biasGM),
                                         block_.matmulTilingData_->tCubeTiling.N);
         }
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           const bool ALIGN_FLAG>
 __aicore__ inline void
 Mc2MatmulStreamKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, ALIGN_FLAG>::Process()
@@ -173,7 +173,7 @@ Mc2MatmulStreamKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG, AL
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           const bool ALIGN_FLAG>
 __aicore__ inline void Mc2MatmulStreamKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG,
                                               ALIGN_FLAG>::StreamKAicProcess(uint64_t roundIdx)
@@ -215,7 +215,7 @@ __aicore__ inline void Mc2MatmulStreamKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE,
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           const bool ALIGN_FLAG>
 __aicore__ inline void Mc2MatmulStreamKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG,
                                               ALIGN_FLAG>::StreamKAivProcess(uint64_t roundIdx)
@@ -271,7 +271,7 @@ __aicore__ inline void Mc2MatmulStreamKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE,
     }
 }
 
-template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig &MM_CFG,
+template <class A_TYPE, class B_TYPE, class C_TYPE, class BIAS_TYPE, class BLOCK_TYPE, const MatmulConfig& MM_CFG,
           const bool ALIGN_FLAG>
 __aicore__ inline void Mc2MatmulStreamKKernel<A_TYPE, B_TYPE, C_TYPE, BIAS_TYPE, BLOCK_TYPE, MM_CFG,
                                               ALIGN_FLAG>::CheckNeedClearWorkSpace(uint64_t roundIdx)

@@ -178,7 +178,7 @@ public:
     __aicore__ inline bool IterMatmulOut();
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset,
                                 GM_ADDR quantScale, GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                                const Mc2WeightQuantBatchMatmulV2RegBaseTilingData *tilingData, TPipe *tPipe);
+                                const Mc2WeightQuantBatchMatmulV2RegBaseTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void CopyInWeight(int64_t bubKOffset, int64_t bubNOffset, int32_t bubKLen, int32_t bubNLen);
     __aicore__ inline void CopyInScaleOffset(int64_t bubNOffset, int32_t bubNLen, int32_t bubNLoopIdx,
                                              int32_t bubKLoopIdx, int64_t bubKOffset, int64_t bubKFactor);
@@ -353,8 +353,8 @@ public:
     using inputBiasType = MatmulType<TPosition::TSCM, CubeFormat::ND, biasType>;
     MatmulImpl<inputXType, inputWType, outputYType, inputBiasType, CFG_MDL> mmObj_;
 
-    TPipe *pipe_;
-    const Mc2WeightQuantBatchMatmulV2RegBaseTilingData *tiling_;
+    TPipe* pipe_;
+    const Mc2WeightQuantBatchMatmulV2RegBaseTilingData* tiling_;
 
     xType scaleValue_;
     xType offsetValue_;
@@ -469,11 +469,11 @@ public:
     LocalTensor<biasType> biasL1LocalBuf0_;
     LocalTensor<biasType> biasL1LocalBuf1_;
 
-    __local_mem__ int8_t *weightInUbBaseAddr_;
-    __local_mem__ xType *scaleBaseAddr1_;
-    __local_mem__ xType *offsetBaseAddr1_;
-    __local_mem__ xType *weightOutUbAddr_;
-    __local_mem__ xType *weightOutUbAddr1_;
+    __local_mem__ int8_t* weightInUbBaseAddr_;
+    __local_mem__ xType* scaleBaseAddr1_;
+    __local_mem__ xType* offsetBaseAddr1_;
+    __local_mem__ xType* weightOutUbAddr_;
+    __local_mem__ xType* weightOutUbAddr1_;
 
 protected:
     static constexpr uint64_t FLAG_ID_MAX = 16;
@@ -522,13 +522,13 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2RegBaseCommonKernel<
 {
     // 申请 Global Buffer
     if ASCEND_IS_AIC {
-        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(x));
-        yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType *>(y));
-        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ biasType *>(bias));
+        xGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(x));
+        yGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ yType*>(y));
+        biasGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ biasType*>(bias));
     } else {
-        wGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ wType *>(weight));
-        mulGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(antiquantScale));
-        addGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType *>(antiquantOffset));
+        wGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ wType*>(weight));
+        mulGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(antiquantScale));
+        addGlobal_.SetGlobalBuffer(reinterpret_cast<__gm__ xType*>(antiquantOffset));
     }
 }
 
@@ -605,7 +605,7 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2RegBaseCommonKernel<
     xType, wType, biasType, yType, aTrans, bTrans, hasAntiQuantOffset, antiQuantType,
     weightNz>::Init(GM_ADDR x, GM_ADDR weight, GM_ADDR antiquantScale, GM_ADDR antiquantOffset, GM_ADDR quantScale,
                     GM_ADDR quantOffset, GM_ADDR bias, GM_ADDR y, GM_ADDR workspace,
-                    const Mc2WeightQuantBatchMatmulV2RegBaseTilingData *tilingData, TPipe *tPipe)
+                    const Mc2WeightQuantBatchMatmulV2RegBaseTilingData* tilingData, TPipe* tPipe)
 {
     tiling_ = tilingData;
     pipe_ = tPipe;
@@ -1038,10 +1038,10 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2RegBaseCommonKernel<
     uint32_t innerDstExtend = VEC_MAX_ELEM_B16 * bubpingpong_;
 
     // 向VF中传入局部变量
-    __local_mem__ xType *scaleBaseAddr = scaleBaseAddr1_;
-    __local_mem__ xType *offsetBaseAddr = offsetBaseAddr1_;
-    __local_mem__ int8_t *weightInUbBaseAddr = weightInUbBaseAddr_;
-    __local_mem__ xType *weightOutUbBaseAddr = weightOutUbAddr_;
+    __local_mem__ xType* scaleBaseAddr = scaleBaseAddr1_;
+    __local_mem__ xType* offsetBaseAddr = offsetBaseAddr1_;
+    __local_mem__ int8_t* weightInUbBaseAddr = weightInUbBaseAddr_;
+    __local_mem__ xType* weightOutUbBaseAddr = weightOutUbAddr_;
 
     int64_t mainGroupSize = mainGroupNum * tiling_->groupSize;
     if (unlikely(bubKLen > mainGroupSize)) {
@@ -1054,10 +1054,10 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2RegBaseCommonKernel<
         uint32_t n1DstExtend =
             CeilAlign((CeilAlign(bubKLen, BLOCK_CUBE) * BLOCK_CUBE) * sizeof(xType), VECTOR_REG_WIDTH) / sizeof(xType) *
             bubpingpong_;
-        __local_mem__ xType *tailScaleBaseAddr = scaleBaseAddr1_ + mainGroupNum * bubNLen;
-        __local_mem__ xType *tailOffsetBaseAddr = offsetBaseAddr1_ + mainGroupNum * bubNLen;
-        __local_mem__ int8_t *tailWeightInUbBaseAddr = weightInUbBaseAddr_ + mainGroupSize * BLOCK_CUBE_INT4;
-        __local_mem__ xType *tailWeightOutUbBaseAddr =
+        __local_mem__ xType* tailScaleBaseAddr = scaleBaseAddr1_ + mainGroupNum * bubNLen;
+        __local_mem__ xType* tailOffsetBaseAddr = offsetBaseAddr1_ + mainGroupNum * bubNLen;
+        __local_mem__ int8_t* tailWeightInUbBaseAddr = weightInUbBaseAddr_ + mainGroupSize * BLOCK_CUBE_INT4;
+        __local_mem__ xType* tailWeightOutUbBaseAddr =
             weightOutUbAddr_ +
             CeilAlign(mainGroupSize * BLOCK_CUBE * sizeof(xType), VECTOR_REG_WIDTH) / sizeof(xType) * bubpingpong_;
 #ifndef __CCE_KT_TEST__
@@ -1083,10 +1083,10 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2RegBaseCommonKernel<
                         // Vd 1 2 0 0 0 0 0 0 3 4 0 0 0 0 0 0
                         Reg::DataCopy<typename RegTensorActualT<wType>::T, Reg::LoadDist::DIST_UNPACK4_B8>(
                             wNz4BitPart0,
-                            (__local_mem__ typename RegTensorActualT<wType>::T *)(weightInUbBaseAddr +
-                                                                                  n1Idx * n1SrcExtend +
-                                                                                  groupIdx * mainGroupNumSrcExtend +
-                                                                                  innerIdx * innerSrcExtend));
+                            (__local_mem__ typename RegTensorActualT<wType>::T*)(weightInUbBaseAddr +
+                                                                                 n1Idx * n1SrcExtend +
+                                                                                 groupIdx * mainGroupNumSrcExtend +
+                                                                                 innerIdx * innerSrcExtend));
                         if constexpr (IsSameType<wType, fp4x2_e2m1_t>::value ||
                                       IsSameType<wType, fp4x2_e1m2_t>::value) {
                             if constexpr (!IsSameType<xType, half>::value) {
@@ -1122,9 +1122,9 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2RegBaseCommonKernel<
                     // Vn 1 2 3 4 5 6 7 8 9 a b c d e f g
                     // Vd 1 2 0 0 0 0 0 0 3 4 0 0 0 0 0 0
                     Reg::DataCopy<typename RegTensorActualT<wType>::T, Reg::LoadDist::DIST_UNPACK4_B8>(
-                        wNz4BitPart0, (__local_mem__ typename RegTensorActualT<wType>::T *)(tailWeightInUbBaseAddr +
-                                                                                            n1Idx * n1SrcExtend +
-                                                                                            innerIdx * innerSrcExtend));
+                        wNz4BitPart0, (__local_mem__ typename RegTensorActualT<wType>::T*)(tailWeightInUbBaseAddr +
+                                                                                           n1Idx * n1SrcExtend +
+                                                                                           innerIdx * innerSrcExtend));
                     if constexpr (IsSameType<wType, fp4x2_e2m1_t>::value || IsSameType<wType, fp4x2_e1m2_t>::value) {
                         if constexpr (!IsSameType<xType, half>::value) {
                             Reg::Cast<xType, wType, CAST_FP4_TO_BF16_TRAIT>(wNzF16Part0, wNz4BitPart0, preg);
@@ -1180,7 +1180,7 @@ __aicore__ inline void Mc2WeightQuantBatchMatmulV2RegBaseCommonKernel<
                             n1Idx, n1DstExtend, groupIdx, groupNumDstExtend, innerIdx, innerDstExtend);
                         RegTensor<typename RegTensorActualT<wType>::T> wNz4Bit;
                         Reg::DataCopy<typename RegTensorActualT<wType>::T, Reg::LoadDist::DIST_UNPACK4_B8>(
-                            wNz4Bit, (__local_mem__ typename RegTensorActualT<wType>::T *)(weightInUbBaseAddr),
+                            wNz4Bit, (__local_mem__ typename RegTensorActualT<wType>::T*)(weightInUbBaseAddr),
                             aregWeightIn);
                         if constexpr (IsSameType<wType, fp4x2_e2m1_t>::value ||
                                       IsSameType<wType, fp4x2_e1m2_t>::value) {
@@ -1574,12 +1574,12 @@ Mc2WeightQuantBatchMatmulV2RegBaseCommonKernel<xType, wType, biasType, yType, aT
         weightOutUbOffset = ubOutBufIdx_ * vecWeightOutSize_;
     }
 
-    weightInUbBaseAddr_ = (__local_mem__ int8_t *)weightInUb_[weightInUbOffset].GetPhyAddr();
+    weightInUbBaseAddr_ = (__local_mem__ int8_t*)weightInUb_[weightInUbOffset].GetPhyAddr();
     if constexpr (antiQuantType != Mc2QuantType::PER_TENSOR) {
-        scaleBaseAddr1_ = (__local_mem__ xType *)scaleInUb_[scaleUbOffset].GetPhyAddr();
-        offsetBaseAddr1_ = (__local_mem__ xType *)offsetInUb_[scaleUbOffset].GetPhyAddr();
+        scaleBaseAddr1_ = (__local_mem__ xType*)scaleInUb_[scaleUbOffset].GetPhyAddr();
+        offsetBaseAddr1_ = (__local_mem__ xType*)offsetInUb_[scaleUbOffset].GetPhyAddr();
     }
-    weightOutUbAddr_ = (__local_mem__ xType *)weightOutUb_[weightOutUbOffset].GetPhyAddr();
+    weightOutUbAddr_ = (__local_mem__ xType*)weightOutUb_[weightOutUbOffset].GetPhyAddr();
 
     if constexpr (bTrans) {
         if constexpr (IsSameType<wType, int4b_t>::value && antiQuantType == Mc2QuantType::PER_GROUP && !weightNz) {

@@ -49,11 +49,11 @@ enum class BasicTilingMode : uint32_t {
 
 class Mc2QuantBatchMatmulV3BasicTiling : public Mc2QuantBatchMatmulV3Tiling {
 public:
-    explicit Mc2QuantBatchMatmulV3BasicTiling(gert::TilingContext *contextIn)
+    explicit Mc2QuantBatchMatmulV3BasicTiling(gert::TilingContext* contextIn)
         : Mc2QuantBatchMatmulV3Tiling(contextIn),
           context(contextIn)
     {}
-    Mc2QuantBatchMatmulV3BasicTiling(gert::TilingContext *contextIn, Mc2QuantBatchMatmulV3TilingData *out)
+    Mc2QuantBatchMatmulV3BasicTiling(gert::TilingContext* contextIn, Mc2QuantBatchMatmulV3TilingData* out)
         : Mc2QuantBatchMatmulV3Tiling(contextIn, out),
           context(contextIn)
     {}
@@ -95,55 +95,55 @@ protected:
     std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> CalcCoreDistribution(uint64_t mCnt, uint64_t nCnt,
                                                                             uint64_t calcOrder, uint64_t round,
                                                                             uint64_t usedCoreNum) const; // 计算核的排布
-    bool SetBase(const std::vector<uint64_t> &mBases, const std::vector<uint64_t> &nBases);
-    void CompareBase(std::vector<uint64_t> &basicMetrics, uint64_t baseM, uint64_t baseN);
+    bool SetBase(const std::vector<uint64_t>& mBases, const std::vector<uint64_t>& nBases);
+    void CompareBase(std::vector<uint64_t>& basicMetrics, uint64_t baseM, uint64_t baseN);
     bool CheckCalcAndMemRatio(uint64_t baseM, uint64_t baseN) const;
-    bool CheckL2Load(std::vector<uint64_t> &basicMetrics, uint64_t coreClash, uint64_t firstL2Load) const;
+    bool CheckL2Load(std::vector<uint64_t>& basicMetrics, uint64_t coreClash, uint64_t firstL2Load) const;
     bool CheckMTE1(uint64_t baseM, uint64_t baseN) const;
     bool CheckBiasAndScale(uint64_t baseN, uint64_t dbL0c = 1) const;
     uint64_t GetMaxBaseN() const;
     bool CheckDbL0c() const;
     bool GetBaseK(uint64_t baseM, uint64_t baseN);
-    void CalcClashAndFirstL2Load(uint64_t &coreClash, uint64_t &firstL2Load, uint64_t mCnt, uint64_t nCnt,
+    void CalcClashAndFirstL2Load(uint64_t& coreClash, uint64_t& firstL2Load, uint64_t mCnt, uint64_t nCnt,
                                  uint64_t round) const;
-    void InitBasicMetrics(std::vector<uint64_t> &basicMetrics);
+    void InitBasicMetrics(std::vector<uint64_t>& basicMetrics);
     bool IsMNSmallForMultiCores(uint64_t coreNum) const;
     void ProcessMNSmallShape(uint64_t baseM, uint64_t baseN, uint64_t coreNum);
     bool IsNetBNZTrans() const;
     bool IsNetBNZDecode() const;
     bool CanProcessNetDecode() const;
-    void ModifyNZBase(uint64_t &baseN, uint64_t coreNum) const;
+    void ModifyNZBase(uint64_t& baseN, uint64_t coreNum) const;
     bool ProcessBNZDecode();
     int8_t CheckLoadAndCalcSize(uint64_t baseM, uint64_t baseN, uint64_t bestRound, uint64_t round,
-                                uint64_t &bestLoadSize) const;
+                                uint64_t& bestLoadSize) const;
     bool CheckTrans(bool isCheckTrans, bool isSmallerLoadSize, uint64_t base = 256) const; // 256: ND2NZ aligned
-    void Int4LowerAxisAlign(uint64_t &baseM, uint64_t &baseN) const;
-    void ModifyBase(uint64_t &baseM, uint64_t &baseN) const;
-    bool GetStepK(uint64_t &stepKa, uint64_t &stepKb) const;
-    void ModifyStepKForKOuter(uint64_t &stepKa, uint64_t &stepKb) const;
-    void CorrectStepK(uint64_t &bigStepK, uint64_t &smallStepK, uint64_t minStepK) const;
+    void Int4LowerAxisAlign(uint64_t& baseM, uint64_t& baseN) const;
+    void ModifyBase(uint64_t& baseM, uint64_t& baseN) const;
+    bool GetStepK(uint64_t& stepKa, uint64_t& stepKb) const;
+    void ModifyStepKForKOuter(uint64_t& stepKa, uint64_t& stepKb) const;
+    void CorrectStepK(uint64_t& bigStepK, uint64_t& smallStepK, uint64_t minStepK) const;
     uint64_t CalcL1SizeForBiasAndScale();
     uint64_t GetTotalCnt(uint64_t baseM, uint64_t baseN) const;
     bool IsTilingDataInvalid() const;
     void ResetBase(const uint64_t l0CSize);
     uint64_t GetTotalSize(uint64_t m, uint64_t k, uint64_t n) const;
     void CalcTileCnt(uint64_t outOriShape, uint64_t innerOriShape, uint64_t outBase, uint64_t innerBase,
-                     std::vector<std::tuple<uint64_t, uint64_t>> &tileCnt) const;
-    bool IsTileClash(uint64_t outSplit, uint64_t innerSplit, std::tuple<uint64_t, uint64_t> &tileClash,
-                     const std::tuple<uint64_t, uint64_t, uint64_t> &params) const;
+                     std::vector<std::tuple<uint64_t, uint64_t>>& tileCnt) const;
+    bool IsTileClash(uint64_t outSplit, uint64_t innerSplit, std::tuple<uint64_t, uint64_t>& tileClash,
+                     const std::tuple<uint64_t, uint64_t, uint64_t>& params) const;
     uint64_t GetCalcOrder(uint64_t mCnt, uint64_t nCnt, uint64_t mSize, uint64_t nSize, uint64_t usedCoreNum) const;
     bool CheckTileTail(uint64_t outTail, uint64_t innerTail, uint64_t outL2SplitTmp, uint64_t innerL2SplitTmp) const;
-    bool CheckTileClash(const std::tuple<uint64_t, uint64_t, uint64_t, uint64_t> &tileInfo,
-                        const std::tuple<uint64_t, uint64_t, uint64_t> &params,
-                        std::vector<std::tuple<uint64_t, uint64_t>> &tileClash) const;
-    uint64_t CalcTile(uint64_t &outTile, uint64_t &innerTile, uint64_t &outL2Split, uint64_t &innerL2Split,
-                      const std::tuple<uint64_t, uint64_t, double> &params) const;
-    void DivisibleCoreLayout(uint64_t mCnt, uint64_t nCnt, uint64_t &calcOrder, uint64_t round) const;
+    bool CheckTileClash(const std::tuple<uint64_t, uint64_t, uint64_t, uint64_t>& tileInfo,
+                        const std::tuple<uint64_t, uint64_t, uint64_t>& params,
+                        std::vector<std::tuple<uint64_t, uint64_t>>& tileClash) const;
+    uint64_t CalcTile(uint64_t& outTile, uint64_t& innerTile, uint64_t& outL2Split, uint64_t& innerL2Split,
+                      const std::tuple<uint64_t, uint64_t, double>& params) const;
+    void DivisibleCoreLayout(uint64_t mCnt, uint64_t nCnt, uint64_t& calcOrder, uint64_t round) const;
     void DetermineCalcOrder();
     void SetCalcOrderinMNClashCase(uint64_t mTotalCnt, uint64_t nTotalCnt);
 
 private:
-    gert::TilingContext *context;
+    gert::TilingContext* context;
     platform_ascendc::SocVersion socVersion;
     mutable bool isAicAiv1_2 = false;
 };

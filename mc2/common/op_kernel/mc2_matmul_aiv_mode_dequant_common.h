@@ -56,7 +56,7 @@ template <class Resource>
 class UbTensorAllocator {
 public:
     CATLASS_DEVICE
-    explicit UbTensorAllocator(const Resource &resource)
+    explicit UbTensorAllocator(const Resource& resource)
         : resource_(resource),
           offset_(0U)
     {}
@@ -76,7 +76,7 @@ public:
     }
 
 private:
-    const Resource &resource_;
+    const Resource& resource_;
     size_t offset_;
 };
 

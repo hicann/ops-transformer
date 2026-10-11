@@ -36,34 +36,34 @@ public:
     using TopoDescs = TopoLevelDesc[static_cast<int32_t>(TopoLevel::MAX)];
     struct TopoInfo {
         int64_t rank_size;
-        void *notify_handle;
+        void* notify_handle;
         TopoDescs topo_level_descs;
         uint64_t local_window_size = 0;
     };
-    static HcomTopoInfo &Instance();
-    bool TopoInfoHasBeenSet(const char *group);
-    bool TryGetGroupTopoInfo(const char *group, TopoInfo &info);
-    Status SetGroupTopoInfo(const char *group, const TopoInfo &info);
-    Status GetGroupRankSize(const char *group, int64_t &rank_size);
-    TopoDescs *GetGroupTopoDesc(const char *group);
-    Status GetGroupNotifyHandle(const char *group, void *&notify_handle);
-    void UnsetGroupTopoInfo(const char *group)
+    static HcomTopoInfo& Instance();
+    bool TopoInfoHasBeenSet(const char* group);
+    bool TryGetGroupTopoInfo(const char* group, TopoInfo& info);
+    Status SetGroupTopoInfo(const char* group, const TopoInfo& info);
+    Status GetGroupRankSize(const char* group, int64_t& rank_size);
+    TopoDescs* GetGroupTopoDesc(const char* group);
+    Status GetGroupNotifyHandle(const char* group, void*& notify_handle);
+    void UnsetGroupTopoInfo(const char* group)
     {
         const std::lock_guard<std::mutex> lock(mutex_);
         (void)rank_info_.erase(group);
     }
 
-    Status SetGroupOrderedStream(const int32_t device_id, const char *group, void *stream);
-    Status GetGroupOrderedStream(const int32_t device_id, const char *group, void *&stream);
-    void UnsetGroupOrderedStream(const int32_t device_id, const char *group);
-    Status GetGroupLocalWindowSize(const char *group, uint64_t &local_window_size);
+    Status SetGroupOrderedStream(const int32_t device_id, const char* group, void* stream);
+    Status GetGroupOrderedStream(const int32_t device_id, const char* group, void*& stream);
+    void UnsetGroupOrderedStream(const int32_t device_id, const char* group);
+    Status GetGroupLocalWindowSize(const char* group, uint64_t& local_window_size);
 
 private:
     HcomTopoInfo() = default;
     ~HcomTopoInfo() = default;
     std::unordered_map<std::string, TopoInfo> rank_info_;
     std::mutex mutex_;
-    std::unordered_map<int32_t, std::unordered_map<std::string, void *>>
+    std::unordered_map<int32_t, std::unordered_map<std::string, void*>>
         device_id_to_group_to_ordered_stream_; // 通信域保序流
 };
 } // namespace ge

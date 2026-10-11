@@ -42,7 +42,7 @@ bool WeightQuantMatmulAllReduceTiling310P::IsCapable()
 
 void WeightQuantMatmulAllReduceTiling310P::UpdateCommOffset()
 {
-    auto &&args = MutableMc2MsgData();
+    auto&& args = MutableMc2MsgData();
     auto debugMode = mc2tiling::Mc2TilingUtils::GetDebugMode();
     // 只通信不计算模式下，如果K < N，sendOff的offset和sendCnt需要根据K计算
     auto columnNum = args_.orgNValue;
@@ -120,7 +120,7 @@ ge::graphStatus WeightQuantMatmulAllReduceTiling310P::GetWorkspaceSize()
     MC2_CHECK_LOG_RET(opName_, MatmulAllReduceTilingBase::GetWorkspaceSize());
     myWorkSpaceSize_ = myWorkSpaceSize_ + (workspaceSize_ - libApiWorkSpaceSize_);
     OP_LOGI(opName_, " set max workspace size %lu to context", myWorkSpaceSize_);
-    size_t *workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
     workspaces[0] = myWorkSpaceSize_;
     return ge::GRAPH_SUCCESS;
 }
@@ -137,7 +137,7 @@ ge::graphStatus WeightQuantMatmulAllReduceTiling310P::PostTiling()
     context_->GetRawTilingData()->SetDataSize(tilingDataSize);
 
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void *>(&weightQuantMatmulAllReduceTilingData_), tilingDataSize);
+                           reinterpret_cast<void*>(&weightQuantMatmulAllReduceTilingData_), tilingDataSize);
     if (ret != EOK) {
         OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
         return ge::GRAPH_FAILED;
@@ -169,22 +169,22 @@ ge::graphStatus WeightQuantMatmulAllReduceTiling310P::PostTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-Mc2Tiling::Mc2Msg &WeightQuantMatmulAllReduceTiling310P::MutableMc2MsgData()
+Mc2Tiling::Mc2Msg& WeightQuantMatmulAllReduceTiling310P::MutableMc2MsgData()
 {
     return weightQuantMatmulAllReduceTilingData_.msg;
 }
 
-Mc2Tiling::RCSTiling &WeightQuantMatmulAllReduceTiling310P::MutableRCSTilingData()
+Mc2Tiling::RCSTiling& WeightQuantMatmulAllReduceTiling310P::MutableRCSTilingData()
 {
     return weightQuantMatmulAllReduceTilingData_.param;
 }
 
-AscendC::tiling::TCubeTiling &WeightQuantMatmulAllReduceTiling310P::MutableTCubeTileTilingData()
+AscendC::tiling::TCubeTiling& WeightQuantMatmulAllReduceTiling310P::MutableTCubeTileTilingData()
 {
     return weightQuantMatmulAllReduceTilingData_.tilematmulTiling.matmulTiling;
 }
 
-AscendC::tiling::TCubeTiling &WeightQuantMatmulAllReduceTiling310P::MutableTCubeTailTilingData()
+AscendC::tiling::TCubeTiling& WeightQuantMatmulAllReduceTiling310P::MutableTCubeTailTilingData()
 {
     return weightQuantMatmulAllReduceTilingData_.tailmatmulTiling.matmulTiling;
 }
@@ -229,8 +229,8 @@ CutResult WeightQuantMatmulAllReduceTiling310P::GetTilingResult()
     CutResult mCutAllreduceOut;
     SocVersion_2201 socVersionInput = SocVersion_2201::SOC910_B;
     SetMCutSocVersion(socVersionInput);
-    const gert::StorageShape *commQuantScaleFirst = mmrCtxInfo_.comm_quant_scale_1_shape;
-    const gert::StorageShape *commQuantScaleSecond = mmrCtxInfo_.comm_quant_scale_2_shape;
+    const gert::StorageShape* commQuantScaleFirst = mmrCtxInfo_.comm_quant_scale_1_shape;
+    const gert::StorageShape* commQuantScaleSecond = mmrCtxInfo_.comm_quant_scale_2_shape;
     if ((commQuantScaleFirst != nullptr) && (commQuantScaleSecond != nullptr)) { // low-bit comm
         OP_LOGD(opName_, "TileCnt enter comm quant.");
         MMPlusQuantAllReduce quantAllReduceTilingObj(args_, args_.rankDim, KernelType::ALL_REDUCE, npuArch_);

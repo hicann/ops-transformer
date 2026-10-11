@@ -23,20 +23,20 @@ using namespace std;
 
 constexpr int64_t MX_GROUP_SIZE = 4295032864;
 
-static aclTensor *CreateAclTensor(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensor(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
 {
-    void *storage_data = nullptr;
+    void* storage_data = nullptr;
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
         strides[i] = shape[i + 1] * strides[i + 1];
     }
-    aclTensor *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
+    aclTensor* tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
                                         shape.size(), storage_data);
     assert(tensor != nullptr);
     return tensor;
 }
 
-static aclTensor *CreateAclTensorOrNull(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
+static aclTensor* CreateAclTensorOrNull(const std::vector<int64_t> shape, aclDataType dataType, aclFormat format)
 {
     if (shape.empty()) {
         return nullptr;
@@ -88,7 +88,7 @@ struct QuantMatmulAlltoAllAclnnTestParam {
     // 其它属性
     int64_t group_size; // groupSize，仅在perGroup（MX）量化时产生意义，表示分组量化时分组的大小，其余场景默认传0即可
     vector<int64_t> alltoAllAxesOptional; // alltoall数据交换的方向，只能为空或者[-1,-2]
-    char *group;                          // 通信域标识，字符串，长度要求（0，128）
+    char* group;                          // 通信域标识，字符串，长度要求（0，128）
     bool transposeX1;                     // x1是否转置，现不支持为true
     bool transposeX2;          // x2是否转置，为true时x2shape为（H2，H1），mx量化时必须配置为true
     aclnnStatus aclnnStatusUt; // 期望状态
@@ -4792,7 +4792,7 @@ static QuantMatmulAlltoAllAclnnTestParam MXQuant_cases_params[] = {
      ACLNN_ERR_PARAM_INVALID} // 异常场景：quantmode组合非法，不是mx量化场景（6,6）
 };
 
-static void TestQuantOneParamCase(const QuantMatmulAlltoAllAclnnTestParam &param)
+static void TestQuantOneParamCase(const QuantMatmulAlltoAllAclnnTestParam& param)
 {
     std::cout << "run case " << param.caseName << std::endl;
     // 从结构体list中获取实际用例属性
@@ -4818,19 +4818,19 @@ static void TestQuantOneParamCase(const QuantMatmulAlltoAllAclnnTestParam &param
     aclFormat outputFormat = param.outputFormat;
     int64_t groupSize = param.group_size;
     vector<int64_t> axesAcl = param.alltoAllAxesOptional;
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
-    const char *group = param.group;
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    const char* group = param.group;
     bool transposeX1 = param.transposeX1;
     bool transposeX2 = param.transposeX2;
     aclnnStatus retStatus = param.aclnnStatusUt;
-    aclTensor *x1 = CreateAclTensorOrNull(x1Shape, x1Dtype, x1Format);
-    aclTensor *x2 = CreateAclTensorOrNull(x2Shape, x2Dtype, x2Format);
-    aclTensor *bias = CreateAclTensorOrNull(biasShape, biasDtype, biasFormat);
-    aclTensor *x1scales = CreateAclTensorOrNull(x1scalesShape, x1scalesDtype, x1ScaleFormat);
-    aclTensor *x2scales = CreateAclTensorOrNull(x2scalesShape, x2scalesDtype, x2ScaleFormat);
-    aclTensor *output = CreateAclTensorOrNull(outputShape, outputDtype, outputFormat);
+    aclTensor* x1 = CreateAclTensorOrNull(x1Shape, x1Dtype, x1Format);
+    aclTensor* x2 = CreateAclTensorOrNull(x2Shape, x2Dtype, x2Format);
+    aclTensor* bias = CreateAclTensorOrNull(biasShape, biasDtype, biasFormat);
+    aclTensor* x1scales = CreateAclTensorOrNull(x1scalesShape, x1scalesDtype, x1ScaleFormat);
+    aclTensor* x2scales = CreateAclTensorOrNull(x2scalesShape, x2scalesDtype, x2ScaleFormat);
+    aclTensor* output = CreateAclTensorOrNull(outputShape, outputDtype, outputFormat);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     aclnnStatus aclRet;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1scales, x2scales, nullptr, nullptr, nullptr, alltoAllAxesOptional, group,
@@ -4877,9 +4877,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, InvalidQuantModeCombo)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 0, 0, 0, -1, 0, false, false),
@@ -4899,9 +4899,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, InvalidQuantModeCombo2)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 1, 1, 0, -1, 0, false, false),
@@ -4920,9 +4920,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX1)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(nullptr, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -4941,9 +4941,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX2)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, nullptr, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -4962,9 +4962,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX1Scale)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, nullptr, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -4983,9 +4983,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX2Scale)
     auto x1Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, nullptr, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5004,9 +5004,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullOutput)
     auto x1Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5026,12 +5026,12 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullGroup)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
-                              (const char *)nullptr, 3, 2, 0, -1, 0, false, false),
+                              (const char*)nullptr, 3, 2, 0, -1, 0, false, false),
                         OUTPUT(output));
     aclnnStatus ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
     EXPECT_EQ(ret, ACLNN_ERR_PARAM_INVALID);
@@ -5047,9 +5047,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullBias)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, nullptr, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5070,7 +5070,7 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullAlltoAllAxes)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, nullptr,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5091,9 +5091,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_AlltoAllAxesWrongSize)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2, 0};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5113,9 +5113,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_AlltoAllAxesWrongData1)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-3, -2}; // data1=-3 不等于 -1
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5135,9 +5135,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_AlltoAllAxesWrongData2)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -3}; // data2=-3 不等于 -2
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5157,9 +5157,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_OutputFloat)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_FLOAT, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5179,9 +5179,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_OutputFloat16)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_FLOAT16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5201,9 +5201,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_OutputBF16)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
@@ -5223,9 +5223,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, MXQuant_NoTransposeX2)
     auto x2Scale = CreateAclTensor({256, 2, 2}, ACL_FLOAT8_E8M0, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_FLOAT, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 6, 6, 0, -1, MX_GROUP_SIZE, false, false),
@@ -5245,16 +5245,16 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, SecondApi_NullParams)
 */
 
 // Helper: create a non-contiguous (transposed-stride) 2D aclTensor
-static aclTensor *CreateNonContiguousAclTensor(const std::vector<int64_t> &shape, aclDataType dataType,
+static aclTensor* CreateNonContiguousAclTensor(const std::vector<int64_t>& shape, aclDataType dataType,
                                                aclFormat format)
 {
-    void *storage_data = nullptr;
+    void* storage_data = nullptr;
     // Swap strides to make it non-contiguous (transpose-like layout)
     std::vector<int64_t> strides(shape.size(), 1);
     strides[0] = 1;        // dim0 stride = 1 (instead of dim1)
     strides[1] = shape[0]; // dim1 stride = dim0 (instead of dim1*dim0... for 2D, normal would be strides[0]=shape[1],
                            // strides[1]=1)
-    aclTensor *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
+    aclTensor* tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, format, shape.data(),
                                         shape.size(), storage_data);
     assert(tensor != nullptr);
     return tensor;
@@ -5271,9 +5271,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, NonContiguousX2_WithTranspose)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     // transposeX2=true, non-contiguous x2 -> triggers error at line 443-444
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
@@ -5294,9 +5294,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, NonContiguousX2_NoTranspose)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     // transposeX2=false, non-contiguous x2 -> triggers transpose processing at lines 447,449-451
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
@@ -5331,9 +5331,9 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_ReFormatNotND)
     auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_NCHW);
     auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_NCHW);
     vector<int64_t> axesAcl = {-1, -2};
-    aclIntArray *alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
     uint64_t workspaceSize = 0;
-    aclOpExecutor *executor = nullptr;
+    aclOpExecutor* executor = nullptr;
     auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
                         INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
                               "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),

@@ -22,7 +22,7 @@ static constexpr size_t COMBINE_INPUT_EXPAND_X_INDEX = 0;
 static constexpr size_t COMBINE_INPUT_EXPERT_IDS_INDEX = 1;
 static constexpr size_t COMBINE_OUTPUT_X_INDEX = 0;
 
-static ge::graphStatus InferShapeMoeDistributeCombineV2(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMoeDistributeCombineV2(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
@@ -36,7 +36,7 @@ static ge::graphStatus InferShapeMoeDistributeCombineV2(gert::InferShapeContext 
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeMoeDistributeCombineV2(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMoeDistributeCombineV2(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeCombineV2.");
     Mc2InferShape::InferCombineOutputXDataType(context, COMBINE_INPUT_EXPAND_X_INDEX, COMBINE_OUTPUT_X_INDEX);

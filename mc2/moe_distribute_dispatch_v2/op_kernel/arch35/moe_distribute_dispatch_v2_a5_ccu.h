@@ -63,14 +63,14 @@ public:
     __aicore__ inline MoeDistributeDispatchA5(){};
     __aicore__ inline void Init(GM_ADDR x, GM_ADDR expertIds, GM_ADDR scales, GM_ADDR expandXOut, GM_ADDR xActiveMask,
                                 GM_ADDR dynamicScalesOut, GM_ADDR expandIdxOut, GM_ADDR expertTokenNumsOut,
-                                GM_ADDR sendCountsOut, GM_ADDR workspaceGM, TPipe *pipe,
-                                const MoeDistributeDispatchV2TilingData *tilingData);
+                                GM_ADDR sendCountsOut, GM_ADDR workspaceGM, TPipe* pipe,
+                                const MoeDistributeDispatchV2TilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
-    __aicore__ inline void InitGlobalAttrs(const MoeDistributeDispatchV2TilingData *tilingData);
+    __aicore__ inline void InitGlobalAttrs(const MoeDistributeDispatchV2TilingData* tilingData);
     __aicore__ inline void InitBuf();
-    __aicore__ inline void InitCommAndStatus(GM_ADDR workspaceGM, const MoeDistributeDispatchV2TilingData *tilingData);
+    __aicore__ inline void InitCommAndStatus(GM_ADDR workspaceGM, const MoeDistributeDispatchV2TilingData* tilingData);
     __aicore__ inline void CalcTokenActiveMask();
     __aicore__ inline uint32_t CalcToSharedRankId(uint32_t sendCnt);
     __aicore__ inline void TokenGatherProcess(int32_t sharedExpertRankNum, int32_t localExpertNum);
@@ -79,18 +79,18 @@ private:
     __aicore__ inline void Communication();
     __aicore__ inline void TokenGather();
 
-    __aicore__ inline void QuantStatic(LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal,
+    __aicore__ inline void QuantStatic(LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal,
                                        int32_t expertIndex);
-    __aicore__ inline void QuantDynamicPerToken(LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal,
+    __aicore__ inline void QuantDynamicPerToken(LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal,
                                                 int32_t expertIndex);
-    __aicore__ inline void QuantDynamicPerTile(LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal,
+    __aicore__ inline void QuantDynamicPerTile(LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal,
                                                int32_t expertIndex);
-    __aicore__ inline void QuantDynamicMxFp8(LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal);
+    __aicore__ inline void QuantDynamicMxFp8(LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal);
 
-    __aicore__ inline void QuantProcess(LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal,
+    __aicore__ inline void QuantProcess(LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal,
                                         int32_t expertIndex);
 
-    __aicore__ inline void CopyScalesToOut(uint32_t currentTokenIndex, LocalTensor<ExpandXOutType> &quantTok,
+    __aicore__ inline void CopyScalesToOut(uint32_t currentTokenIndex, LocalTensor<ExpandXOutType>& quantTok,
                                            int32_t expertIndex);
 
     __aicore__ inline void ShareScatter();
@@ -104,15 +104,15 @@ private:
     __aicore__ inline void SaveExpandIdx();
     __aicore__ inline void TokenGatherInit(uint32_t localExpertNum);
     __aicore__ inline void MoeGatherPrepare(uint32_t localExpertNum, uint32_t startRankIdx);
-    __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId,
-                                       uint32_t &endTokenId, uint32_t &sendTokenNum, bool isFront = true);
+    __aicore__ inline void SplitToCore(uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startTokenId,
+                                       uint32_t& endTokenId, uint32_t& sendTokenNum, bool isFront = true);
     __aicore__ inline void QuantInit();
-    __aicore__ inline void ProcessToken(GlobalTensor<ExpandXOutType> &outTokenGT, uint32_t tokenIndex,
-                                        DataCopyParams &tokenInParams, DataCopyPadParams &padParams,
-                                        DataCopyParams &tokenOutParams, DataCopyParams &scaleInParams,
+    __aicore__ inline void ProcessToken(GlobalTensor<ExpandXOutType>& outTokenGT, uint32_t tokenIndex,
+                                        DataCopyParams& tokenInParams, DataCopyPadParams& padParams,
+                                        DataCopyParams& tokenOutParams, DataCopyParams& scaleInParams,
                                         uint32_t expertIndex);
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     uint32_t epRankId_;
     uint32_t aivId_;
     uint32_t axisBS_;
@@ -205,7 +205,7 @@ private:
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::InitGlobalAttrs(
-    const MoeDistributeDispatchV2TilingData *tilingData)
+    const MoeDistributeDispatchV2TilingData* tilingData)
 {
     axisBS_ = tilingData->moeDistributeDispatchV2Info.bs;
     axisH_ = tilingData->moeDistributeDispatchV2Info.h;
@@ -289,9 +289,9 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::InitCommAndStatus(
-    GM_ADDR workspaceGM, const MoeDistributeDispatchV2TilingData *tilingData)
+    GM_ADDR workspaceGM, const MoeDistributeDispatchV2TilingData* tilingData)
 {
-    __gm__ HcclCombineOpParam *context = (__gm__ HcclCombineOpParam *)(GetHcclContext<0>());
+    __gm__ HcclCombineOpParam* context = (__gm__ HcclCombineOpParam*)(GetHcclContext<0>());
     // 结构体切换后，V1版本初始化方法不可用（已废弃），改用V2版本
     hccl_.InitV2((GM_ADDR)context, tilingData);
     hccl_.SetCcTilingV2(offsetof(MoeDistributeDispatchV2TilingData, mc2CcTiling1));
@@ -304,7 +304,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
     GM_ADDR cclBuf = (GM_ADDR)context->windowsOut[0];
 
     uint64_t statusSize = aivNum_ * STATUS_OFFSET;
-    statusGT.SetGlobalBuffer((__gm__ int32_t *)(cclBuf + aivId_ * STATUS_OFFSET));
+    statusGT.SetGlobalBuffer((__gm__ int32_t*)(cclBuf + aivId_ * STATUS_OFFSET));
     DataCacheCleanAndInvalid<int32_t, CacheLine::SINGLE_CACHE_LINE, DcciDst::CACHELINE_OUT>(statusGT);
     if (statusGT(0) == 0) {
         recvBufGM_ = cclBuf + statusSize;
@@ -366,8 +366,8 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::Init(
     GM_ADDR x, GM_ADDR expertIds, GM_ADDR scales, GM_ADDR xActiveMask, GM_ADDR expandXOut, GM_ADDR dynamicScalesOut,
-    GM_ADDR expandIdxOut, GM_ADDR expertTokenNumsOut, GM_ADDR sendCountsOut, GM_ADDR workspaceGM, TPipe *pipe,
-    const MoeDistributeDispatchV2TilingData *tilingData)
+    GM_ADDR expandIdxOut, GM_ADDR expertTokenNumsOut, GM_ADDR sendCountsOut, GM_ADDR workspaceGM, TPipe* pipe,
+    const MoeDistributeDispatchV2TilingData* tilingData)
 {
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
     pipe_ = pipe;
@@ -377,18 +377,18 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
     InitGlobalAttrs(tilingData);
 
-    xGT_.SetGlobalBuffer((__gm__ XType *)x);
-    expertIdsGT_.SetGlobalBuffer((__gm__ int32_t *)expertIds);
-    expandXOutGT_.SetGlobalBuffer((__gm__ ExpandXOutType *)expandXOut);
-    expandIdxGT_.SetGlobalBuffer((__gm__ int32_t *)expandIdxOut);
-    dynamicScaleGT_.SetGlobalBuffer((__gm__ uint8_t *)dynamicScalesOut);
-    expertTokenNumsGT_.SetGlobalBuffer((__gm__ int64_t *)expertTokenNumsOut);
-    sendCountsGT_.SetGlobalBuffer((__gm__ int32_t *)sendCountsOut);
+    xGT_.SetGlobalBuffer((__gm__ XType*)x);
+    expertIdsGT_.SetGlobalBuffer((__gm__ int32_t*)expertIds);
+    expandXOutGT_.SetGlobalBuffer((__gm__ ExpandXOutType*)expandXOut);
+    expandIdxGT_.SetGlobalBuffer((__gm__ int32_t*)expandIdxOut);
+    dynamicScaleGT_.SetGlobalBuffer((__gm__ uint8_t*)dynamicScalesOut);
+    expertTokenNumsGT_.SetGlobalBuffer((__gm__ int64_t*)expertTokenNumsOut);
+    sendCountsGT_.SetGlobalBuffer((__gm__ int32_t*)sendCountsOut);
     if constexpr (IsSmoothScaleExist) {
-        scalesGT_.SetGlobalBuffer((__gm__ float *)scales);
+        scalesGT_.SetGlobalBuffer((__gm__ float*)scales);
     }
     if (isTokenMaskFlag_) {
-        xActiveMaskGT_.SetGlobalBuffer((__gm__ bool *)xActiveMask);
+        xActiveMaskGT_.SetGlobalBuffer((__gm__ bool*)xActiveMask);
     }
 
     InitBuf();
@@ -406,7 +406,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::QuantStatic(
-    LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal, int32_t expertIndex)
+    LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal, int32_t expertIndex)
 {
     Cast(tokenF32LT_, inLocal, RoundMode::CAST_NONE, axisH_);
     DataCopyParams scalesInParams = {1U, static_cast<uint16_t>(axisH_ * sizeof(float)), 0U, 0U};
@@ -444,7 +444,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::QuantDynamicPerToken(
-    LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal, int32_t expertIndex)
+    LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal, int32_t expertIndex)
 {
     float dynamicScale = 0.0;
     float maxVal = 0.0f;
@@ -490,7 +490,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::QuantDynamicPerTile(
-    LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal, int32_t expertIndex)
+    LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal, int32_t expertIndex)
 {
     if constexpr (Std::IsSame<ExpandXOutType, fp8_e4m3fn_t>::value || Std::IsSame<ExpandXOutType, fp8_e5m2_t>::value) {
         if constexpr (IsSmoothScaleExist) {
@@ -500,10 +500,10 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
             SyncFunc<AscendC::HardEvent::MTE2_V>();
         }
 
-        __ubuf__ XType *srcAddr = (__ubuf__ XType *)inLocal.GetPhyAddr();
-        __ubuf__ float *smoothLocalAddr = (__ubuf__ float *)scalesLT_.GetPhyAddr();
-        __ubuf__ int8_t *outLocalAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
-        __ubuf__ float *scaleOutLocalAddr = (__ubuf__ float *)outLocal[Align128<uint32_t>(axisH_)].GetPhyAddr();
+        __ubuf__ XType* srcAddr = (__ubuf__ XType*)inLocal.GetPhyAddr();
+        __ubuf__ float* smoothLocalAddr = (__ubuf__ float*)scalesLT_.GetPhyAddr();
+        __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
+        __ubuf__ float* scaleOutLocalAddr = (__ubuf__ float*)outLocal[Align128<uint32_t>(axisH_)].GetPhyAddr();
 
         Quant::ComputePerTileDynamic<XType, ExpandXOutType, AscendC::RoundMode::CAST_RINT, IsSmoothScaleExist>(
             srcAddr, smoothLocalAddr, scaleOutLocalAddr, outLocalAddr, axisH_);
@@ -512,15 +512,15 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::QuantDynamicMxFp8(
-    LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal)
+    LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal)
 {
     if constexpr (Std::IsSame<ExpandXOutType, fp8_e4m3fn_t>::value || Std::IsSame<ExpandXOutType, fp8_e5m2_t>::value) {
         uint32_t mxScaleNum = Align2(Ceil32(axisH_));
-        __ubuf__ XType *srcAddr = (__ubuf__ XType *)inLocal.GetPhyAddr();
-        __ubuf__ uint16_t *maxExpAddr = (__ubuf__ uint16_t *)tokenF32LT_.GetPhyAddr();
-        __ubuf__ uint16_t *halfScaleLocalAddr = (__ubuf__ uint16_t *)tokenF32LT_[Align32(mxScaleNum)].GetPhyAddr();
-        __ubuf__ int8_t *outLocalAddr = (__ubuf__ int8_t *)outLocal.GetPhyAddr();
-        __ubuf__ uint16_t *mxScaleLocalAddr = (__ubuf__ uint16_t *)outLocal[Align256<uint32_t>(axisH_)].GetPhyAddr();
+        __ubuf__ XType* srcAddr = (__ubuf__ XType*)inLocal.GetPhyAddr();
+        __ubuf__ uint16_t* maxExpAddr = (__ubuf__ uint16_t*)tokenF32LT_.GetPhyAddr();
+        __ubuf__ uint16_t* halfScaleLocalAddr = (__ubuf__ uint16_t*)tokenF32LT_[Align32(mxScaleNum)].GetPhyAddr();
+        __ubuf__ int8_t* outLocalAddr = (__ubuf__ int8_t*)outLocal.GetPhyAddr();
+        __ubuf__ uint16_t* mxScaleLocalAddr = (__ubuf__ uint16_t*)outLocal[Align256<uint32_t>(axisH_)].GetPhyAddr();
 
         Quant::ComputeMaxExp(srcAddr, maxExpAddr, axisH_);
         Quant::ComputeScale<ExpandXOutType>(maxExpAddr, mxScaleLocalAddr, halfScaleLocalAddr, mxScaleNum);
@@ -531,7 +531,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::QuantProcess(
-    LocalTensor<ExpandXOutType> &outLocal, LocalTensor<XType> &inLocal, int32_t expertIndex)
+    LocalTensor<ExpandXOutType>& outLocal, LocalTensor<XType>& inLocal, int32_t expertIndex)
 {
     if constexpr (QuantMode == STATIC_QUANT) {
         QuantStatic(outLocal, inLocal, expertIndex);
@@ -603,7 +603,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
         GM_ADDR dstBaseGM =
             sendBufGM_ + COUNT_OFFSET * (toRankId + 1) + toRankId * axisMaxBs_ * localExpertNum_ * perTokenCommSize_;
         GM_ADDR tokenGM = dstBaseGM + tokenIndex * perTokenCommSize_;
-        outTokenGT.SetGlobalBuffer((__gm__ ExpandXOutType *)tokenGM);
+        outTokenGT.SetGlobalBuffer((__gm__ ExpandXOutType*)tokenGM);
         ProcessToken(outTokenGT, tokenIndex, tokenInParams, padParams, tokenOutParams, scaleInParams, 0);
     }
 }
@@ -647,16 +647,16 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
     SyncFunc<HardEvent::S_MTE3>();
     GlobalTensor<uint64_t> sendGT;
-    sendGT.SetGlobalBuffer((__gm__ uint64_t *)(sendSizeGM_ + startRank * sizeof(uint64_t)));
+    sendGT.SetGlobalBuffer((__gm__ uint64_t*)(sendSizeGM_ + startRank * sizeof(uint64_t)));
     uint32_t cpSize = rankPerAiv * sizeof(uint64_t);
     DataCopyExtParams params = {BLOCK_COUNT, cpSize, Ceil32<uint32_t>(eachSize) - Ceil32<uint32_t>(cpSize),
                                 static_cast<uint32_t>(epWorldSize_ * sizeof(uint64_t) - cpSize), 0};
     DataCopyPad(sendGT, sizeLT, params);
-    sendGT.SetGlobalBuffer((__gm__ uint64_t *)(sendOffsetGM_ + startRank * sizeof(uint64_t)));
+    sendGT.SetGlobalBuffer((__gm__ uint64_t*)(sendOffsetGM_ + startRank * sizeof(uint64_t)));
     DataCopyPad(sendGT, sendOffsetLT, params);
 
     GlobalTensor<uint32_t> sendCntGT;
-    sendCntGT.SetGlobalBuffer((__gm__ uint32_t *)(sendBufGM_ + startRank * perRankDataSize_));
+    sendCntGT.SetGlobalBuffer((__gm__ uint32_t*)(sendBufGM_ + startRank * perRankDataSize_));
     uint32_t cntSize = sizeof(uint32_t);
     DataCopyExtParams cntParams = {static_cast<uint16_t>(rankPerAiv), cntSize, 0, perRankDataSize_ - cntSize, 0};
     DataCopyPad(sendCntGT, cntLT, cntParams);
@@ -675,8 +675,8 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::ProcessToken(
-    GlobalTensor<ExpandXOutType> &outTokenGT, uint32_t tokenIndex, DataCopyParams &tokenInParams,
-    DataCopyPadParams &padParams, DataCopyParams &tokenOutParams, DataCopyParams &scaleInParams, uint32_t expertIndex)
+    GlobalTensor<ExpandXOutType>& outTokenGT, uint32_t tokenIndex, DataCopyParams& tokenInParams,
+    DataCopyPadParams& padParams, DataCopyParams& tokenOutParams, DataCopyParams& scaleInParams, uint32_t expertIndex)
 {
     if constexpr (QuantMode > UNQUANT) {
         auto tok = tokenInQue_.AllocTensor<XType>();
@@ -740,7 +740,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
         GM_ADDR tokenGM = sendBufGM_ + COUNT_OFFSET * (toRankId + 1) +
                           (toRankId * axisMaxBs_ * localExpertNum_ + preCount) * perTokenCommSize_;
         uint32_t tokenIndex = sortedIndex1LT_(tokenId) / axisK_;
-        outTokenGT.SetGlobalBuffer((__gm__ ExpandXOutType *)tokenGM);
+        outTokenGT.SetGlobalBuffer((__gm__ ExpandXOutType*)tokenGM);
         uint32_t expertIndex = sharedExpertRankNum_ > 0 ? (expertId + 1) : expertId;
         ProcessToken(outTokenGT, tokenIndex, tokenInParams, padParams, tokenOutParams, scaleInParams, expertIndex);
     }
@@ -789,16 +789,16 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
     SyncFunc<HardEvent::S_MTE3>();
     GlobalTensor<uint64_t> sendGT;
-    sendGT.SetGlobalBuffer((__gm__ uint64_t *)(sendSizeGM_ + (startRank + sharedExpertRankNum_) * sizeof(uint64_t)));
+    sendGT.SetGlobalBuffer((__gm__ uint64_t*)(sendSizeGM_ + (startRank + sharedExpertRankNum_) * sizeof(uint64_t)));
     uint32_t cpSize1 = rankPerAiv * sizeof(uint64_t);
     DataCopyExtParams params = {BLOCK_COUNT, cpSize1, Ceil32<uint32_t>(eachSize) - Ceil32<uint32_t>(cpSize1),
                                 static_cast<uint32_t>(epWorldSize_ * sizeof(uint64_t) - cpSize1), 0};
     DataCopyPad(sendGT, sizeLT, params);
-    sendGT.SetGlobalBuffer((__gm__ uint64_t *)(sendOffsetGM_ + (startRank + sharedExpertRankNum_) * sizeof(uint64_t)));
+    sendGT.SetGlobalBuffer((__gm__ uint64_t*)(sendOffsetGM_ + (startRank + sharedExpertRankNum_) * sizeof(uint64_t)));
     DataCopyPad(sendGT, sendOffsetLT, params);
 
     GlobalTensor<uint32_t> sendCntGT;
-    sendCntGT.SetGlobalBuffer((__gm__ uint32_t *)(sendBufGM_ + (startRank + sharedExpertRankNum_) * perRankDataSize_));
+    sendCntGT.SetGlobalBuffer((__gm__ uint32_t*)(sendBufGM_ + (startRank + sharedExpertRankNum_) * perRankDataSize_));
     uint32_t cpSize2 = sizeof(uint32_t) * localExpertNum_;
     DataCopyExtParams cntParams = {static_cast<uint16_t>(rankPerAiv), cpSize2, rankCntSize - cpSize2,
                                    perRankDataSize_ - cpSize2, 0};
@@ -969,7 +969,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::CopyScalesToOut(
-    uint32_t currentTokenIndex, LocalTensor<ExpandXOutType> &quantTok, int32_t expertIndex)
+    uint32_t currentTokenIndex, LocalTensor<ExpandXOutType>& quantTok, int32_t expertIndex)
 {
     DataCopyParams scaleOutParams = {1U, static_cast<uint16_t>(scaleOutBytes_), 0U, 0U};
     if constexpr (((QuantMode > UNQUANT) && (QuantMode != STATIC_QUANT)) ||
@@ -1003,7 +1003,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
     loopParams.loop2DstStride = 0;
 
     GlobalTensor<int32_t> recvCntGT;
-    recvCntGT.SetGlobalBuffer((__gm__ int32_t *)recvBufGM_);
+    recvCntGT.SetGlobalBuffer((__gm__ int32_t*)recvBufGM_);
     SetLoopModePara(loopParams, DataCopyMVType::OUT_TO_UB);
     DataCopyPad<int32_t, PaddingMode::Compact>(recvCntLT_, recvCntGT, copyInParams, padParams);
     ResetLoopModePara(DataCopyMVType::OUT_TO_UB);
@@ -1016,7 +1016,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
 
 template <TemplateMoeDistributeDispatchA5TypeClass>
 __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5TypeFunc>::SplitToCore(
-    uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t &startTokenId, uint32_t &endTokenId, uint32_t &sendTokenNum,
+    uint32_t curSendCnt, uint32_t curUseAivNum, uint32_t& startTokenId, uint32_t& endTokenId, uint32_t& sendTokenNum,
     bool isFront)
 {
     sendTokenNum = curSendCnt / curUseAivNum;               // 每个aiv需要发送的token数
@@ -1096,7 +1096,7 @@ __aicore__ inline void MoeDistributeDispatchA5<TemplateMoeDistributeDispatchA5Ty
             GM_ADDR baseAddr =
                 recvBufGM_ + curRankId * perRankDataSize_ + COUNT_OFFSET + rankInPreCnt * perTokenCommSize_;
             for (uint32_t j = 0; j < recvCount; ++j) {
-                tokenGT.SetGlobalBuffer((__gm__ ExpandXOutType *)(baseAddr + j * perTokenCommSize_));
+                tokenGT.SetGlobalBuffer((__gm__ ExpandXOutType*)(baseAddr + j * perTokenCommSize_));
                 auto tok = tokenGatherQue_.AllocTensor<ExpandXOutType>();
                 DataCopyPad(tok, tokenGT, tokenInParams, padParams);
                 tokenGatherQue_.EnQue(tok);

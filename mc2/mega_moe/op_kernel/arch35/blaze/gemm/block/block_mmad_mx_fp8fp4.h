@@ -91,7 +91,7 @@ public:
     using LayoutC = LayoutC_;
 
     static_assert(asc::te::is_satisfied_ptn_format_v<
-                  decltype(asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ AType *)0),
+                  decltype(asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>((__gm__ AType*)0),
                                                 LayoutA{}(0UL, 0UL))),
                   asc::te::nd_ext_layout_ptn>);
 
@@ -103,15 +103,15 @@ public:
     struct L1Params {};
 
     template <bool ResetBufferIndices = true>
-    __aicore__ inline void Init(const ProblemShape &problemShape, const BlockShape &l0TileShape,
+    __aicore__ inline void Init(const ProblemShape& problemShape, const BlockShape& l0TileShape,
                                 bool interleave = false);
 
-    __aicore__ inline BlockMmad(const MegaMoeL1Layout &layout);
+    __aicore__ inline BlockMmad(const MegaMoeL1Layout& layout);
     // When copyUbToV1 is true, L0C->UB copies the result to V1 core instead of V0.
     // Only meaningful when C tensor resides in UB; ignored for GM output.
     template <typename TensorA, typename TensorScaleA, typename TensorScaleB, typename TensorC>
-    __aicore__ inline void operator()(const TensorA &tensorA, const TensorScaleA &tensorScaleA,
-                                      const TensorScaleB &tensorScaleB, const TensorC &tensorC,
+    __aicore__ inline void operator()(const TensorA& tensorA, const TensorScaleA& tensorScaleA,
+                                      const TensorScaleB& tensorScaleB, const TensorC& tensorC,
                                       bool copyUbToV1 = false);
     __aicore__ inline ~BlockMmad();
 
@@ -130,34 +130,34 @@ private:
     __aicore__ inline void SetAicToAiv();
 
     template <typename TensorC>
-    __aicore__ inline void ProcessTileL1(int64_t kbOffset, uint64_t kbL1RealSize, const BlockMmadOffsetParam &param,
-                                         const TensorC &tensorC, bool copyUbToV1);
+    __aicore__ inline void ProcessTileL1(int64_t kbOffset, uint64_t kbL1RealSize, const BlockMmadOffsetParam& param,
+                                         const TensorC& tensorC, bool copyUbToV1);
     __aicore__ inline void CopyAAndScaleAL1ToL0(uint64_t l1KOffset, uint64_t kbOffset, uint64_t realL0K,
                                                 uint64_t realL0ScaleK, uint64_t mOffset, uint64_t mSize,
-                                                const BlockMmadOffsetParam &param);
+                                                const BlockMmadOffsetParam& param);
     template <typename TensorBL1Type>
-    __aicore__ inline void CopyBAndScaleBL1ToL0(const TensorBL1Type &tensorBL1, uint64_t l1KOffset, uint64_t kbOffset,
+    __aicore__ inline void CopyBAndScaleBL1ToL0(const TensorBL1Type& tensorBL1, uint64_t l1KOffset, uint64_t kbOffset,
                                                 uint64_t realL0K, uint64_t realL0ScaleK,
-                                                const BlockMmadOffsetParam &param);
+                                                const BlockMmadOffsetParam& param);
     template <typename TensorC>
-    __aicore__ inline auto GetBlockMmadOffsetParam(const TensorC &tensorC) const;
+    __aicore__ inline auto GetBlockMmadOffsetParam(const TensorC& tensorC) const;
     template <typename TensorA, typename TensorScaleA, typename TensorScaleB, typename TensorC>
-    __aicore__ inline void ProcessTilesL1(const TensorA &tensorA, const TensorScaleA &tensorScaleA,
-                                          const TensorScaleB &tensorScaleB, const TensorC &tensorC,
-                                          const BlockMmadOffsetParam &blockParam, bool copyUbToV1);
+    __aicore__ inline void ProcessTilesL1(const TensorA& tensorA, const TensorScaleA& tensorScaleA,
+                                          const TensorScaleB& tensorScaleB, const TensorC& tensorC,
+                                          const BlockMmadOffsetParam& blockParam, bool copyUbToV1);
     __aicore__ inline void WaitAMTE1ToMTE2();
     __aicore__ inline void SetMTE1ToMTE2();
     __aicore__ inline void WaitScaleMTE1ToMTE2();
     __aicore__ inline void SetScaleMTE1ToMTE2();
     template <typename TensorA>
-    __aicore__ inline auto CopyAGmToL1(const TensorA &tensorA, const BlockMmadOffsetParam &param, int64_t kaGmOffset,
+    __aicore__ inline auto CopyAGmToL1(const TensorA& tensorA, const BlockMmadOffsetParam& param, int64_t kaGmOffset,
                                        uint64_t slot);
     template <typename TensorScaleA, typename TensorScaleB>
-    __aicore__ inline auto CopyMxScaleGmToL1(const TensorScaleA &tensorScaleA, const TensorScaleB &tensorScaleB,
-                                             const BlockMmadOffsetParam &param, uint64_t kbL1Offset, uint64_t slot);
+    __aicore__ inline auto CopyMxScaleGmToL1(const TensorScaleA& tensorScaleA, const TensorScaleB& tensorScaleB,
+                                             const BlockMmadOffsetParam& param, uint64_t kbL1Offset, uint64_t slot);
 
     template <typename TensorC>
-    __aicore__ inline void CopyCL0c2GmOrUb(const TensorC &tensorC, const BlockMmadOffsetParam &param, bool copyUbToV1,
+    __aicore__ inline void CopyCL0c2GmOrUb(const TensorC& tensorC, const BlockMmadOffsetParam& param, bool copyUbToV1,
                                            uint64_t mOffset, uint64_t mSize);
 
     using MakeLayoutAL1 = asc::te::frame_layout_format<asc::te::nz_layout_ptn, AscendC::Std::Int<C0_SIZE>>;
@@ -226,7 +226,7 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyAAndScaleAL1ToL0
                                                                                  uint64_t realL0K,
                                                                                  uint64_t realL0ScaleK,
                                                                                  uint64_t mOffset, uint64_t mSize,
-                                                                                 const BlockMmadOffsetParam &param)
+                                                                                 const BlockMmadOffsetParam& param)
 {
     auto layoutAL0 = MakeLayoutAL0{}(mSize, realL0K);
     auto tensorAL0 = asc::te::make_tensor(
@@ -248,11 +248,11 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyAAndScaleAL1ToL0
 
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename TensorBL1Type>
-__aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyBAndScaleBL1ToL0(const TensorBL1Type &tensorBL1,
+__aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyBAndScaleBL1ToL0(const TensorBL1Type& tensorBL1,
                                                                                  uint64_t l1KOffset, uint64_t kbOffset,
                                                                                  uint64_t realL0K,
                                                                                  uint64_t realL0ScaleK,
-                                                                                 const BlockMmadOffsetParam &param)
+                                                                                 const BlockMmadOffsetParam& param)
 {
     auto layoutBL0 = MakeLayoutBL0{}(realL0K, param.nL1Size);
     auto tensorBL0 = asc::te::make_tensor(
@@ -275,8 +275,8 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyBAndScaleBL1ToL0
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename TensorC>
 __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::ProcessTileL1(int64_t kbOffset, uint64_t kbL1RealSize,
-                                                                          const BlockMmadOffsetParam &param,
-                                                                          const TensorC &tensorC, bool copyUbToV1)
+                                                                          const BlockMmadOffsetParam& param,
+                                                                          const TensorC& tensorC, bool copyUbToV1)
 {
     const uint64_t bL1Offset = layout_.bOffsets[bL1BufIdx_];
     auto tensorBL1 =
@@ -365,8 +365,8 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::SetMTE1ToMTE2()
 
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename TensorA>
-__aicore__ inline auto BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyAGmToL1(const TensorA &tensorA,
-                                                                        const BlockMmadOffsetParam &param,
+__aicore__ inline auto BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyAGmToL1(const TensorA& tensorA,
+                                                                        const BlockMmadOffsetParam& param,
                                                                         int64_t kaGmOffset, uint64_t slot)
 {
     int64_t kaL1RealSize = (kaGmOffset + param.kaL1Size) >= param.kSize ? param.kSize - kaGmOffset : param.kaL1Size;
@@ -381,9 +381,9 @@ __aicore__ inline auto BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyAGmToL1(const Te
 
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename TensorScaleA, typename TensorScaleB>
-__aicore__ inline auto BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyMxScaleGmToL1(const TensorScaleA &tensorScaleA,
-                                                                              const TensorScaleB &tensorScaleB,
-                                                                              const BlockMmadOffsetParam &param,
+__aicore__ inline auto BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyMxScaleGmToL1(const TensorScaleA& tensorScaleA,
+                                                                              const TensorScaleB& tensorScaleB,
+                                                                              const BlockMmadOffsetParam& param,
                                                                               uint64_t kbL1Offset, uint64_t slot)
 {
     uint64_t scaleKGmSize = CeilDiv(param.kSize, MXFP_DIVISOR_SIZE) * MXFP_MULTI_BASE_SIZE;
@@ -418,8 +418,8 @@ __aicore__ inline auto BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyMxScaleGmToL1(co
 
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename TensorC>
-__aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyCL0c2GmOrUb(const TensorC &tensorC,
-                                                                            const BlockMmadOffsetParam &param,
+__aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyCL0c2GmOrUb(const TensorC& tensorC,
+                                                                            const BlockMmadOffsetParam& param,
                                                                             bool copyUbToV1, uint64_t mOffset,
                                                                             uint64_t mSize)
 {
@@ -444,7 +444,7 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::CopyCL0c2GmOrUb(cons
 }
 
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
-__aicore__ inline BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::BlockMmad(const MegaMoeL1Layout &layout)
+__aicore__ inline BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::BlockMmad(const MegaMoeL1Layout& layout)
     : layout_(layout)
 {
     for (uint64_t i = 0; i < layout_.bBufferNum; i++) {
@@ -475,8 +475,8 @@ __aicore__ inline BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::~BlockMmad()
 
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <bool ResetBufferIndices>
-__aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::Init(const ProblemShape &problemShape,
-                                                                 const BlockShape &l0TileShape, bool interleave)
+__aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::Init(const ProblemShape& problemShape,
+                                                                 const BlockShape& l0TileShape, bool interleave)
 {
     concatHalfN_ = interleave ? asc::te::get<IDX_N_IDX>(problemShape) / MegaMoeImpl::ACTIVATION_N_HALF : 0U;
     k_ = asc::te::get<IDX_K_IDX>(problemShape);
@@ -494,7 +494,7 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::Init(const ProblemSh
 
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename TensorC>
-__aicore__ inline auto BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::GetBlockMmadOffsetParam(const TensorC &tensorC) const
+__aicore__ inline auto BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::GetBlockMmadOffsetParam(const TensorC& tensorC) const
 {
     BlockMmadOffsetParam blockParam = {};
     blockParam.mL1Size = asc::te::get_element<asc::te::attr_info::shape, asc::te::attr_info::row, 1>(tensorC.layout());
@@ -514,10 +514,10 @@ __aicore__ inline auto BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::GetBlockMmadOffsetPa
  */
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename TensorA, typename TensorScaleA, typename TensorScaleB, typename TensorC>
-__aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::operator()(const TensorA &tensorA,
-                                                                       const TensorScaleA &tensorScaleA,
-                                                                       const TensorScaleB &tensorScaleB,
-                                                                       const TensorC &tensorC, bool copyUbToV1)
+__aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::operator()(const TensorA& tensorA,
+                                                                       const TensorScaleA& tensorScaleA,
+                                                                       const TensorScaleB& tensorScaleB,
+                                                                       const TensorC& tensorC, bool copyUbToV1)
 {
     const auto blockParam = GetBlockMmadOffsetParam(tensorC);
     ProcessTilesL1(tensorA, tensorScaleA, tensorScaleB, tensorC, blockParam, copyUbToV1);
@@ -526,8 +526,8 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::operator()(const Ten
 BLOCK_MMAD_MX_FP8FP4_TEMPLATE_PARAMS
 template <typename TensorA, typename TensorScaleA, typename TensorScaleB, typename TensorC>
 __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::ProcessTilesL1(
-    const TensorA &tensorA, const TensorScaleA &tensorScaleA, const TensorScaleB &tensorScaleB, const TensorC &tensorC,
-    const BlockMmadOffsetParam &blockParam, bool copyUbToV1)
+    const TensorA& tensorA, const TensorScaleA& tensorScaleA, const TensorScaleB& tensorScaleB, const TensorC& tensorC,
+    const BlockMmadOffsetParam& blockParam, bool copyUbToV1)
 {
     uint64_t nextAKOffset = 0;
     uint64_t nextScaleKOffset = 0;

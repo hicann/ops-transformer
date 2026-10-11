@@ -44,8 +44,8 @@ template <TemplateTypeClass>
 class QuantAllReduceMteOneShot {
 public:
     __aicore__ inline QuantAllReduceMteOneShot(){};
-    __aicore__ inline void Init(GM_ADDR context, GM_ADDR x, GM_ADDR scales, GM_ADDR output, TPipe *pipe,
-                                const QuantAllReduceTilingData *tilingData);
+    __aicore__ inline void Init(GM_ADDR context, GM_ADDR x, GM_ADDR scales, GM_ADDR output, TPipe* pipe,
+                                const QuantAllReduceTilingData* tilingData);
     __aicore__ inline void Process();
 
 private:
@@ -53,10 +53,10 @@ private:
     __aicore__ inline void ReadDataBlockReduceSum(uint64_t currXOffset, uint64_t currScaleOffset, uint32_t xNum,
                                                   uint32_t scaleNum);
     __aicore__ inline void ExecuteAllReduce();
-    __aicore__ inline void ParseTilingInfo(const QuantAllReduceTilingData *tilingData);
-    __aicore__ inline void ComputeXPerBlock(const QuantAllReduceTilingData *tilingData, TPipe *tPipe);
+    __aicore__ inline void ParseTilingInfo(const QuantAllReduceTilingData* tilingData);
+    __aicore__ inline void ComputeXPerBlock(const QuantAllReduceTilingData* tilingData, TPipe* tPipe);
     __aicore__ inline void ComputeBlockDistribution(uint64_t aivNum);
-    __aicore__ inline void InitSubModules(GM_ADDR x, GM_ADDR scales, GM_ADDR output, TPipe *tPipe, uint64_t aivNum);
+    __aicore__ inline void InitSubModules(GM_ADDR x, GM_ADDR scales, GM_ADDR output, TPipe* tPipe, uint64_t aivNum);
 
     // 数据参数
     uint64_t xSize_{0};
@@ -88,8 +88,8 @@ private:
 
 template <TemplateTypeClass>
 __aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::Init(GM_ADDR context, GM_ADDR x, GM_ADDR scales,
-                                                                    GM_ADDR output, TPipe *tPipe,
-                                                                    const QuantAllReduceTilingData *tilingData)
+                                                                    GM_ADDR output, TPipe* tPipe,
+                                                                    const QuantAllReduceTilingData* tilingData)
 {
     mteComm_.InitHcclContext(context, tilingData->quantAllReduceTilingInfo.hcclBufferSize);
     ParseTilingInfo(tilingData);
@@ -102,9 +102,9 @@ __aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::Init(GM_ADDR cont
 
 template <TemplateTypeClass>
 __aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::ParseTilingInfo(
-    const QuantAllReduceTilingData *tilingData)
+    const QuantAllReduceTilingData* tilingData)
 {
-    auto &&info = tilingData->quantAllReduceTilingInfo;
+    auto&& info = tilingData->quantAllReduceTilingInfo;
     totalWinSize_ = info.totalWinSize;
     xNums_ = info.bs * info.hiddenSize;
     xSize_ = xNums_ * sizeof(XType);
@@ -112,9 +112,9 @@ __aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::ParseTilingInfo(
 
 template <TemplateTypeClass>
 __aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::ComputeXPerBlock(
-    const QuantAllReduceTilingData *tilingData, TPipe *tPipe)
+    const QuantAllReduceTilingData* tilingData, TPipe* tPipe)
 {
-    auto &&info = tilingData->quantAllReduceTilingInfo;
+    auto&& info = tilingData->quantAllReduceTilingInfo;
 
     // 固定开销：不随 xPerBlock_ 变化的 buffer
     uint64_t commFixedSpace = BUFFER_NUM * X_BLOCK_BYTES +             // scaleQueue_
@@ -195,7 +195,7 @@ __aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::ComputeBlockDistr
 // 初始化 vecComp、mteComm 子模块参数并分配其 UB buffer，绑定 GM Tensor
 template <TemplateTypeClass>
 __aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::InitSubModules(GM_ADDR x, GM_ADDR scales, GM_ADDR output,
-                                                                              TPipe *tPipe, uint64_t aivNum)
+                                                                              TPipe* tPipe, uint64_t aivNum)
 {
     vecComp_.SetBlockSize(xPerBlock_);
     vecComp_.SetScaleNums(scaleNumsPerBlock_);
@@ -277,8 +277,8 @@ __aicore__ inline void QuantAllReduceMteOneShot<TemplateType>::ExecuteAllReduce(
 
             // 获取对端Win区中数据区相关的地址
             GM_ADDR remoteDataSpaceGm = mteComm_.GetWinDataAddrGm(remoteRankId, mteComm_.winBufferFlags_);
-            remoteWinXTensor_.SetGlobalBuffer((__gm__ XType *)remoteDataSpaceGm);
-            remoteWinScaleTensor_.SetGlobalBuffer((__gm__ ScalesType *)(remoteDataSpaceGm + xSize_));
+            remoteWinXTensor_.SetGlobalBuffer((__gm__ XType*)remoteDataSpaceGm);
+            remoteWinScaleTensor_.SetGlobalBuffer((__gm__ ScalesType*)(remoteDataSpaceGm + xSize_));
 
             // 读取对端对应地址的 x 和 scale数据，进行反量化和求和
             ReadDataBlockReduceSum(currXOffset, currScaleOffset, currXNum, currScaleNum);

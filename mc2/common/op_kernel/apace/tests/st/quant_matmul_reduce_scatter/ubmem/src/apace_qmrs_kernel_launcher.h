@@ -63,7 +63,7 @@ __global__ __aicore__ void QuantMatmulReduceScatterUbmemKernel(GM_ADDR hcclConte
     using Impl = Apace::QuantMatmulReduceScatterImpl<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;
     using KernelImpl = typename Impl::KernelImpl;
 
-    __gm__ QuantMatmulTilingData *tilingData = (__gm__ QuantMatmulTilingData *)tilingGM;
+    __gm__ QuantMatmulTilingData* tilingData = (__gm__ QuantMatmulTilingData*)tilingGM;
 
     const uint64_t M = tilingData->m;
     const uint64_t N = tilingData->n;

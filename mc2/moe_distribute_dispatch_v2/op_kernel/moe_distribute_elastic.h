@@ -25,20 +25,20 @@ using namespace MoeDistributeV2Base;
 
 class MoeDistributeElastic {
 public:
-    TPipe *tpipe_;
+    TPipe* tpipe_;
     TBuf<> elasticInfoBuf_;
     GlobalTensor<int32_t> elasticInfoGM_;
 
     __aicore__ inline MoeDistributeElastic() = default;
 
-    __aicore__ inline void SetElasticInitParams(TPipe *tpipe, GlobalTensor<int32_t> elasticInfoGM)
+    __aicore__ inline void SetElasticInitParams(TPipe* tpipe, GlobalTensor<int32_t> elasticInfoGM)
     {
         tpipe_ = tpipe;
         elasticInfoGM_ = elasticInfoGM;
     }
 
     __aicore__ inline void InitElasticInfoTensor(uint32_t epWorldSizeOriginal_,
-                                                 LocalTensor<int32_t> &elasticInfoTensor_)
+                                                 LocalTensor<int32_t>& elasticInfoTensor_)
     {
         uint32_t elasticInfoSizeAlign = GetElasticInfoSizeAlign(epWorldSizeOriginal_);
         tpipe_->InitBuffer(elasticInfoBuf_, elasticInfoSizeAlign);
@@ -51,9 +51,9 @@ public:
         SyncFunc<AscendC::HardEvent::MTE2_S>();
     }
 
-    __aicore__ inline void InitElasticInfo(bool &isScalingDownFlag_, uint32_t &epWorldSize_,
-                                           uint32_t &sharedExpertRankNum_, uint32_t &moeExpertNum_, uint32_t &epRankId_,
-                                           uint32_t &moeExpertNumPerRank_)
+    __aicore__ inline void InitElasticInfo(bool& isScalingDownFlag_, uint32_t& epWorldSize_,
+                                           uint32_t& sharedExpertRankNum_, uint32_t& moeExpertNum_, uint32_t& epRankId_,
+                                           uint32_t& moeExpertNumPerRank_)
     {
         if (isScalingDownFlag_) {
             epWorldSize_ = elasticInfoGM_.GetValue(EP_WORLD_SIZE_IDX);

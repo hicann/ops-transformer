@@ -26,18 +26,18 @@ static constexpr size_t COMBINE_INPUT_EXPERT_X_INDEX = 0;
 static constexpr size_t COMBINE_INPUT_EXPERT_IDX_INDEX = 1;
 static constexpr size_t COMBINE_OUTPUT_X_INDEX = 0;
 
-static ge::graphStatus InferShapeMoeDistributeCombine(gert::InferShapeContext *context)
+static ge::graphStatus InferShapeMoeDistributeCombine(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMoeDistributeCombine.");
     // 获取输入shape
-    const gert::Shape *expandXShape = context->GetInputShape(COMBINE_INPUT_EXPERT_X_INDEX);
+    const gert::Shape* expandXShape = context->GetInputShape(COMBINE_INPUT_EXPERT_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expandXShape);
-    const gert::Shape *expandIdsShape = context->GetInputShape(COMBINE_INPUT_EXPERT_IDX_INDEX);
+    const gert::Shape* expandIdsShape = context->GetInputShape(COMBINE_INPUT_EXPERT_IDX_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expandIdsShape);
-    gert::Shape *xShape = context->GetOutputShape(COMBINE_OUTPUT_X_INDEX);
+    gert::Shape* xShape = context->GetOutputShape(COMBINE_OUTPUT_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
 
     int64_t bs = expandIdsShape->GetDimNum() == 1U ? NEG_ONE : expandIdsShape->GetDim(0);
@@ -52,7 +52,7 @@ static ge::graphStatus InferShapeMoeDistributeCombine(gert::InferShapeContext *c
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus InferDataTypeMoeDistributeCombine(gert::InferDataTypeContext *context)
+static ge::graphStatus InferDataTypeMoeDistributeCombine(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeCombine.");
     auto xDtype = context->GetInputDataType(COMBINE_INPUT_EXPERT_X_INDEX);

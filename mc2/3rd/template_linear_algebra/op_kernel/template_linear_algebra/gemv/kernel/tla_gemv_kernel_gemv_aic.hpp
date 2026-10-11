@@ -60,8 +60,8 @@ public:
         Params() {}
 
         CATLASS_HOST_DEVICE
-        Params(GemvCoord const &problemShape_, GM_ADDR ptrX_, LayoutX layoutX_, GM_ADDR ptrA_, LayoutA layoutA_,
-               GM_ADDR ptrWorkspace_, EpilogueParams const &epilogueParams_)
+        Params(GemvCoord const& problemShape_, GM_ADDR ptrX_, LayoutX layoutX_, GM_ADDR ptrA_, LayoutA layoutA_,
+               GM_ADDR ptrWorkspace_, EpilogueParams const& epilogueParams_)
             : problemShape(problemShape_),
               ptrX(ptrX_),
               layoutX(layoutX_),
@@ -77,21 +77,21 @@ public:
     KernelGemvAic() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params const &params);
+    CATLASS_DEVICE void operator()(Params const& params);
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const& params)
     {
         BlockGemv blockGemv(resource);
         // Represent the full gm
         AscendC::GlobalTensor<ElementX> gmX;
-        gmX.SetGlobalBuffer((__gm__ ElementX *)params.ptrX);
+        gmX.SetGlobalBuffer((__gm__ ElementX*)params.ptrX);
 
         AscendC::GlobalTensor<ElementA> gmA;
-        gmA.SetGlobalBuffer((__gm__ ElementA *)params.ptrA);
+        gmA.SetGlobalBuffer((__gm__ ElementA*)params.ptrA);
 
         AscendC::GlobalTensor<ElementY> gmY;
-        gmY.SetGlobalBuffer((__gm__ ElementY *)params.ptrWorkspace);
+        gmY.SetGlobalBuffer((__gm__ ElementY*)params.ptrWorkspace);
 
         layout::RowMajor layoutY(1, params.problemShape.m());
 
@@ -183,13 +183,13 @@ public:
     }
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const& params)
     {
         BlockEpilogue blockEpilogue(resource, params.epilogueParams);
 
         // Represent the full gm
         AscendC::GlobalTensor<ElementY> gmY;
-        gmY.SetGlobalBuffer((__gm__ ElementY *)params.ptrWorkspace);
+        gmY.SetGlobalBuffer((__gm__ ElementY*)params.ptrWorkspace);
 
         layout::VectorLayout layoutY(params.problemShape.m());
 

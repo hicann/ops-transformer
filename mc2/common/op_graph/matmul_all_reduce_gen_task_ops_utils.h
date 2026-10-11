@@ -22,8 +22,8 @@
 namespace ops {
 class MatmulAllReduceGenTaskOpsUtils {
 public:
-    static ge::Status MatmulAllReduceGenTaskCallback(const gert::ExeResGenerationContext *context,
-                                                     std::vector<std::vector<uint8_t>> &tasks);
+    static ge::Status MatmulAllReduceGenTaskCallback(const gert::ExeResGenerationContext* context,
+                                                     std::vector<std::vector<uint8_t>>& tasks);
 };
 } // namespace ops
 #endif // OPS_TRANSFORMER_DEV_MC2_COMMON_INC_MATMUL_ALL_REDUCE_GEN_TASK_UTILS

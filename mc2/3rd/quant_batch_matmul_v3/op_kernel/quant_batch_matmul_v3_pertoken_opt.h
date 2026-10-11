@@ -26,8 +26,8 @@ class BmmDequantPertokenOpt {
 public:
     __aicore__ inline BmmDequantPertokenOpt() {}
     __aicore__ inline void Init(GM_ADDR x1, GM_ADDR x2, GM_ADDR bias, GM_ADDR scale, GM_ADDR pertokenScale, GM_ADDR y,
-                                GM_ADDR workSpace, const Mc2QuantBatchMatmulV3TilingData *__restrict tilingData,
-                                TPipe *tPipe)
+                                GM_ADDR workSpace, const Mc2QuantBatchMatmulV3TilingData* __restrict tilingData,
+                                TPipe* tPipe)
     {
         blockIdx_ = GetBlockIdx();
         if constexpr (isAllAiv) {
@@ -75,22 +75,22 @@ public:
             return;
         }
         // update global buffer
-        xGm_.SetGlobalBuffer((__gm__ xType *)x1);
-        weightGm_.SetGlobalBuffer((__gm__ wType *)x2);
+        xGm_.SetGlobalBuffer((__gm__ xType*)x1);
+        weightGm_.SetGlobalBuffer((__gm__ wType*)x2);
         if (m_ <= baseM_) {
             weightGm_.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
         }
         if (biasDtype_ == DT_BF16) {
-            biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t *)bias);
+            biasGmBf16_.SetGlobalBuffer((__gm__ bfloat16_t*)bias);
         } else if (biasDtype_ == DT_FLOAT16) {
-            biasGmFp16_.SetGlobalBuffer((__gm__ half *)bias);
+            biasGmFp16_.SetGlobalBuffer((__gm__ half*)bias);
         } else if (biasDtype_ == DT_FLOAT) {
-            biasGmFp32_.SetGlobalBuffer((__gm__ float *)bias);
+            biasGmFp32_.SetGlobalBuffer((__gm__ float*)bias);
         } else if (hasBias_ != 0U) {
-            biasGmInt32_.SetGlobalBuffer((__gm__ int32_t *)bias);
+            biasGmInt32_.SetGlobalBuffer((__gm__ int32_t*)bias);
         }
-        yGm_.SetGlobalBuffer((__gm__ yType *)y);
-        scaleGm_.SetGlobalBuffer((__gm__ scaleType *)scale);
+        yGm_.SetGlobalBuffer((__gm__ yType*)y);
+        scaleGm_.SetGlobalBuffer((__gm__ scaleType*)scale);
         if (isPerTensor_) {
             if constexpr (IsSameType<scaleType, bfloat16_t>::value) {
                 scaleScalar_ = ToFloat(scaleGm_.GetValue(0));
@@ -98,9 +98,9 @@ public:
                 scaleScalar_ = scaleGm_.GetValue(0);
             }
         }
-        pertokenScaleGm_.SetGlobalBuffer((__gm__ float *)pertokenScale);
+        pertokenScaleGm_.SetGlobalBuffer((__gm__ float*)pertokenScale);
         uint32_t singleCoreOffset = baseM_ * DequantBmm::Align(singleCoreN_, baseN_);
-        mmOutGm_.SetGlobalBuffer((__gm__ int32_t *)workSpace, usedCoreNum_ * singleCoreOffset);
+        mmOutGm_.SetGlobalBuffer((__gm__ int32_t*)workSpace, usedCoreNum_ * singleCoreOffset);
     }
 
     /** main logical function
@@ -177,7 +177,7 @@ protected:
     GlobalTensor<float> pertokenScaleGm_;
     GlobalTensor<int32_t> mmOutGm_;
 
-    TPipe *pipe_;
+    TPipe* pipe_;
     // define the que
     TQue<QuePosition::VECIN, 1> vecQueSrc_;
     TQue<QuePosition::VECIN, 1> vecQueScale_;
@@ -231,7 +231,7 @@ protected:
 
     /** init function for TilingData of mm
      */
-    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData *tilingData)
+    __aicore__ inline void InitTilingData(const Mc2QuantBatchMatmulV3TilingData* tilingData)
     {
         hasBias_ = tilingData->matmulTiling.isBias;
         isPerTensor_ = tilingData->params.isPerTensor;
@@ -433,7 +433,7 @@ protected:
         }
     }
 
-    __aicore__ inline void CastBias2Fp32(LocalTensor<float> &biasFp32, uint32_t computedAivN)
+    __aicore__ inline void CastBias2Fp32(LocalTensor<float>& biasFp32, uint32_t computedAivN)
     {
         if (biasDtype_ == DT_INT32) {
             return;
@@ -457,7 +457,7 @@ protected:
         }
     }
 
-    __aicore__ inline void CalBiasAdd(const LocalTensor<float> &dstLocalFp32, LocalTensor<float> &biasFp32,
+    __aicore__ inline void CalBiasAdd(const LocalTensor<float>& dstLocalFp32, LocalTensor<float>& biasFp32,
                                       uint32_t curAivM, uint32_t computedAivN)
     {
         for (uint32_t mIdx = 0; mIdx < curAivM; ++mIdx) {
@@ -466,7 +466,7 @@ protected:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void MulPertokenAndScale(LocalTensor<float> &broadcastFp32, LocalTensor<float> &scaleLocalFp32,
+    __aicore__ inline void MulPertokenAndScale(LocalTensor<float>& broadcastFp32, LocalTensor<float>& scaleLocalFp32,
                                                const uint32_t (&broadCastDst)[2], uint32_t calCount)
     {
         uint32_t singleM = broadCastDst[0];
@@ -477,7 +477,7 @@ protected:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void BroadCastMN(LocalTensor<float> &broadcastFp32, uint32_t singleM, uint32_t computedAivN)
+    __aicore__ inline void BroadCastMN(LocalTensor<float>& broadcastFp32, uint32_t singleM, uint32_t computedAivN)
     {
         const uint32_t broadCastDst[M_N_TWO_DIMS] = {singleM, computedAivN};
         const uint32_t broadCastSrc[M_N_TWO_DIMS] = {singleM, 1};
@@ -485,7 +485,7 @@ protected:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    __aicore__ inline void PreUbProcess(LocalTensor<float> &broadcastFp32, uint32_t singleM, uint32_t curAicN)
+    __aicore__ inline void PreUbProcess(LocalTensor<float>& broadcastFp32, uint32_t singleM, uint32_t curAicN)
     {
         // 提前做好m,n方向的scale相乘矩阵，这部分cv并行,按行组成m * baseN的fp32矩阵, 最大L0C Size
         // 全部弄到shape 16对齐
@@ -518,7 +518,7 @@ protected:
         }
     }
 
-    __aicore__ inline void PostUbProcess(LocalTensor<float> &resFp32, uint32_t curAicM, uint32_t curAicN)
+    __aicore__ inline void PostUbProcess(LocalTensor<float>& resFp32, uint32_t curAicM, uint32_t curAicN)
     {
         LocalTensor<float> biasFp32;
         uint32_t curAivM = ubCalcM_;

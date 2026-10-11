@@ -47,7 +47,7 @@ public:
     CopyUb2Gm copyUb2Gm;
 
     CATLASS_DEVICE
-    PaddingMatrixBlockND(Arch::Resource<ArchTag> &resource)
+    PaddingMatrixBlockND(Arch::Resource<ArchTag>& resource)
     {
         int64_t bufferOffset = 0;
         for (uint32_t i = 0; i < BUFFER_NUM; i++) {
@@ -59,7 +59,7 @@ public:
     }
 
     template <class Tensor>
-    CATLASS_DEVICE auto GetPaddingTensorSrc(Tensor const &tensor)
+    CATLASS_DEVICE auto GetPaddingTensorSrc(Tensor const& tensor)
     {
         if constexpr (std::is_same_v<typename Tensor::Layout, LayoutInner>) {
             return tensor;
@@ -71,7 +71,7 @@ public:
     }
 
     template <class Tensor>
-    CATLASS_DEVICE auto GetPaddingTensorDst(Tensor const &tensor)
+    CATLASS_DEVICE auto GetPaddingTensorDst(Tensor const& tensor)
     {
         if constexpr (std::is_same_v<typename Tensor::Layout, LayoutInnerDstGm>) {
             return tensor;
@@ -83,7 +83,7 @@ public:
     }
 
     CATLASS_DEVICE
-    void operator()(TensorOut &tensorDst, TensorIn const &tensorSrc)
+    void operator()(TensorOut& tensorDst, TensorIn const& tensorSrc)
     {
         auto paddingTensorSrc = GetPaddingTensorSrc(tensorSrc);
         auto paddingTensorDst = GetPaddingTensorDst(tensorDst);
@@ -254,7 +254,7 @@ public:
         Params() {}
 
         CATLASS_DEVICE
-        Params(GemmCoord const &problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
+        Params(GemmCoord const& problemShape_, GM_ADDR ptrA_, LayoutA layoutA_, GM_ADDR ptrB_, LayoutB layoutB_,
                GM_ADDR ptrC_, LayoutC layoutC_, GM_ADDR ptrWA_, LayoutWA layoutWA_, GM_ADDR ptrWB_, LayoutWB layoutWB_)
             : problemShape(problemShape_),
               ptrA(ptrA_),
@@ -275,16 +275,16 @@ public:
     OptimizedMatmulTla() {}
 
     template <int32_t CORE_TYPE = g_coreType>
-    CATLASS_DEVICE void operator()(Params const &params);
+    CATLASS_DEVICE void operator()(Params const& params);
 
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIV>(Params const& params)
     {
         if constexpr (!std::is_void_v<PaddingA>) {
             AscendC::GlobalTensor<ElementA> gmA;
             AscendC::GlobalTensor<ElementA> gmWA;
-            gmA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA *>(params.ptrA));
-            gmWA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA *>(params.ptrWA));
+            gmA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA*>(params.ptrA));
+            gmWA.SetGlobalBuffer(reinterpret_cast<__gm__ ElementA*>(params.ptrWA));
             auto tensorA =
                 tla::MakeTensor<AscendC::GlobalTensor<ElementA>, LayoutA, AscendC::TPosition::GM>(gmA, params.layoutA);
             auto tensorWA = tla::MakeTensor<AscendC::GlobalTensor<ElementA>, LayoutWA, AscendC::TPosition::GM>(
@@ -296,8 +296,8 @@ public:
         if constexpr (!std::is_void_v<PaddingB>) {
             AscendC::GlobalTensor<ElementB> gmB;
             AscendC::GlobalTensor<ElementB> gmWB;
-            gmB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB *>(params.ptrB));
-            gmWB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB *>(params.ptrWB));
+            gmB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB*>(params.ptrB));
+            gmWB.SetGlobalBuffer(reinterpret_cast<__gm__ ElementB*>(params.ptrWB));
             auto tensorB =
                 tla::MakeTensor<AscendC::GlobalTensor<ElementB>, LayoutB, AscendC::TPosition::GM>(gmB, params.layoutB);
             auto tensorWB = tla::MakeTensor<AscendC::GlobalTensor<ElementB>, LayoutWB, AscendC::TPosition::GM>(
@@ -314,7 +314,7 @@ public:
 
     /// Executes matmul
     template <>
-    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const &params)
+    CATLASS_DEVICE void operator()<AscendC::AIC>(Params const& params)
     {
         if (!std::is_void_v<PaddingA> || !std::is_void_v<PaddingB>) {
             Catlass::Arch::CrossCoreWaitFlag(flagAivFinishPadding);
@@ -325,11 +325,11 @@ public:
 
         // Represent the full gm
         AscendC::GlobalTensor<ElementA> gmA;
-        gmA.SetGlobalBuffer((__gm__ ElementA *)params.ptrWA);
+        gmA.SetGlobalBuffer((__gm__ ElementA*)params.ptrWA);
         AscendC::GlobalTensor<ElementB> gmB;
-        gmB.SetGlobalBuffer((__gm__ ElementB *)params.ptrWB);
+        gmB.SetGlobalBuffer((__gm__ ElementB*)params.ptrWB);
         AscendC::GlobalTensor<ElementC> gmC;
-        gmC.SetGlobalBuffer((__gm__ ElementC *)params.ptrC);
+        gmC.SetGlobalBuffer((__gm__ ElementC*)params.ptrC);
 
         auto tensorA =
             tla::MakeTensor<AscendC::GlobalTensor<ElementA>, LayoutWA, AscendC::TPosition::GM>(gmA, params.layoutWA);
